@@ -1,0 +1,10 @@
+
+running 5 tests
+test sqlite_budget_projection_idempotent_retry_does_not_double_charge ... ok
+test sqlite_budget_projection_atomic_commits_do_not_overspend ... ok
+test sqlite_revocation_projection_preserves_token_and_ancestor_membership ... ok
+test sqlite_lineage_projection_preserves_root_first_chain ... ok
+test sqlite_receipt_projection_persists_signed_receipts ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+

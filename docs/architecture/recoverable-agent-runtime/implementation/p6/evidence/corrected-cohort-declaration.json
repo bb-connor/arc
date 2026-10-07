@@ -1,0 +1,22 @@
+{
+  "schema": "chio.recovery-p6-additional-cohort.v1",
+  "id": "corrected-framework-qualification",
+  "declared_at_utc": "2026-10-05T11:52:03.980508+00:00",
+  "manifest_sha256": "fb994599fb0f2e7d2bb8302f142ce12a8af0889a59507bded48fc4ce8ebb1247",
+  "model": "gpt-5.4-2026-03-05",
+  "runtime_source_binding": "167c0487c96e7391f25436bb8eab898c22a3037bb141c2902c727ba80b2e1c19",
+  "trials": 96,
+  "prior_planned_trials": 288,
+  "combined_planned_trials": 384,
+  "prior_cohorts_retained": true,
+  "qualification_previously_started": false,
+  "changed_source_paths": [
+    "fixtures/recovery-product/campaign_runner.py",
+    "fixtures/recovery-product/test_campaign_runner.py"
+  ],
+  "framework_protocol": {
+    "crewai": "BaseLLM._apply_stop_words before CrewAI parsing; retain provider output and framework-visible frame; no action synthesis or retry",
+    "langgraph": "unchanged closed explicit action parser"
+  },
+  "reason": "Real pinned CrewAI regression reproduced skipped actions because custom BaseLLM advertised stop-word support but did not apply its declared stop sequences. Correct native provider postprocessing now delegates to BaseLLM._apply_stop_words before Crew parsing, with raw and visible output retained. An omitted action remains unsuccessful. Tasks, authority, native/SDK sources, model, budgets and thresholds are unchanged. Every earlier failed row remains retained."
+}

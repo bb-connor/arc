@@ -1,0 +1,52 @@
+
+running 35 tests
+test admission_operation_store::schema::migration_v20::tests::v19_catalog_upgrade_is_exact_and_preserves_connection_settings ... ok
+test admission_operation_store::schema::migration_v34::tests::v33_catalog_upgrade_is_exact_and_preserves_parent_names ... ok
+test admission_operation_store::tests::clock_migration::failed_upgrade_rolls_back_and_restores_foreign_key_enforcement ... ok
+test admission_operation_store::tests::clock_migration::v16_upgrade_preserves_old_hashes_and_anchors_then_appends_v2 ... ok
+test admission_operation_store::tests::dpop_replay::activation::v24_upgrade_preserves_import_events_and_bytes_without_inventing_activation ... ok
+test admission_operation_store::tests::dpop_replay::claims::migration::v25_upgrade_preserves_activated_dpop_and_existing_admission_without_adopting_claims ... ok
+test admission_operation_store::tests::governed_approval_replay::claims::migration::v23_upgrade_preserves_active_approval_authority_and_owned_claims ... ok
+test admission_operation_store::tests::dpop_replay::migration::v23_upgrade_adds_only_empty_dpop_history_and_rejects_unqualified_namespaces ... ok
+test admission_operation_store::tests::governed_approval_replay::migration::v21_upgrade_introduces_only_empty_approval_history_and_rejects_unqualified_namespaces ... ok
+test admission_operation_store::tests::governed_approval_replay::migration::v22_upgrade_preserves_imported_approval_bytes_and_rejects_unqualified_claims ... ok
+test admission_operation_store::tests::runtime_replay::activation::v21_upgrade_preserves_active_runtime_source_history ... ok
+test admission_operation_store::tests::runtime_replay::claims::migration::populated_v19_upgrade_preserves_exact_commits_anchors_and_imported_source ... ok
+test admission_operation_store::tests::runtime_replay::claims::migration::populated_v20_upgrade_preserves_claims_releases_and_global_history ... ok
+test admission_operation_store::tests::runtime_replay::claims::runtime_claim_cannot_upgrade_absent_or_historical_authority_profile ... ok
+test admission_operation_store::tests::schema::caller_wait::populated_v33_caller_wait_upgrade_preserves_original_rows_and_commit_chain ... ok
+test admission_operation_store::tests::schema::recovery::recovery_p1_os_death_before_upgrade_commit_is_restartable_and_byte_preserving ... ok
+test admission_operation_store::tests::schema::recovery::recovery_p1_populated_v34_upgrade_preserves_original_operations_and_global_chain ... ok
+test admission_operation_store::tests::security_participant_state::dispatch_ledger::v30_dispatch_ledger_upgrade_rejects_partial_future_catalog_without_repair ... ok
+test admission_operation_store::tests::security_participant_migration::migration::v26_upgrade_is_empty_and_rejects_partial_future_or_aliased_state_without_repair ... ok
+test admission_operation_store::tests::security_participant_state::dispatch_ledger::v30_upgrade_adds_empty_dispatch_ledger_without_rewriting_native_history ... ok
+test admission_operation_store::tests::security_participant_state::egress::migration::v29_upgrade_preserves_native_initialization_join_bytes_and_global_digests ... ok
+test admission_operation_store::tests::security_participant_state::egress::migration::v29_upgrade_rejects_partial_or_alias_future_catalog_without_repair ... ok
+test admission_operation_store::tests::security_participant_state::migration::v27_import_history_and_global_digests_survive_empty_v28_upgrade ... ok
+test admission_operation_store::tests::security_participant_state::migration::v27_upgrade_adds_empty_native_tables_but_rejects_partial_future_and_aliases ... ok
+test admission_operation_store::tests::security_participant_state::nonce_preflight::v32_nonce_preflight_journal_upgrade_rejects_partial_future_catalog_without_repair ... ok
+test admission_operation_store::tests::security_participant_state::nonce_preflight::v32_upgrade_adds_empty_nonce_preflight_journal_without_rewriting_native_history ... ok
+test admission_operation_store::tests::security_participant_state::output::v31_output_journal_upgrade_rejects_partial_future_catalog_without_repair ... ok
+test budget_store::tests::elected_leader_provenance_bootstraps_a_fresh_pre_upgrade_follower ... ok
+test capability_lineage::tests::signed_capability_upgrade_advances_replication_cursor ... ok
+test finding_challenge_store::tests::submission_retention::offline_repair_upgrades_earliest_accepted_legacy_submission_schema ... FAILED
+test finding_market_store::tests::schema_v2_upgrade_adds_expired_activation_recovery_without_replaying_admissions ... ok
+test receipt_store::tests::federated_lineage::federated_reimport_upgrades_only_the_matching_legacy_share_row ... ok
+test serving_owner::global_commit_chain::schema_tests::nonhistorical_runtime_kind_without_status_is_not_an_upgrade_predecessor ... ok
+test admission_operation_store::tests::security_participant_state::output::v31_upgrade_adds_empty_output_journal_without_rewriting_native_history ... ok
+test serving_owner::tests::offline_provision_upgrade_is_fenced_and_idempotent ... ok
+
+failures:
+
+---- finding_challenge_store::tests::submission_retention::offline_repair_upgrades_earliest_accepted_legacy_submission_schema stdout ----
+
+thread 'finding_challenge_store::tests::submission_retention::offline_repair_upgrades_earliest_accepted_legacy_submission_schema' (19653459) panicked at crates/platform/chio-store-sqlite/src/finding_challenge_store_tests/submission_retention.rs:450:10:
+inspect v7 repair database: Unavailable("unable to open database file: /var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T/.tmpSw2TIH/challenge-repair-v7.sqlite3")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    finding_challenge_store::tests::submission_retention::offline_repair_upgrades_earliest_accepted_legacy_submission_schema
+
+test result: FAILED. 34 passed; 1 failed; 0 ignored; 0 measured; 1800 filtered out; finished in 69.93s
+

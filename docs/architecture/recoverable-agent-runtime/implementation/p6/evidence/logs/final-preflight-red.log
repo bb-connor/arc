@@ -1,0 +1,144 @@
+....<frozen importlib._bootstrap>:1342: ImportWarning: Cannot set an attribute on 'crewai.rag' for child module 'embeddings'
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/agent/core.py:431: DeprecationWarning: function_calling_llm is deprecated and will be removed in a future release.
+  if self.function_calling_llm and not isinstance(
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/agent/core.py:439: DeprecationWarning: deprecated
+  if self.allow_code_execution:
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/agent/core.py:450: DeprecationWarning: deprecated
+  if self.reasoning and self.planning_config is None:
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/crew.py:650: DeprecationWarning: function_calling_llm is deprecated and will be removed in a future release.
+  if self.function_calling_llm and not isinstance(self.function_calling_llm, LLM):
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/crews/utils.py:372: DeprecationWarning: function_calling_llm is deprecated and will be removed in a future release.
+  crew.function_calling_llm,
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/crews/utils.py:87: DeprecationWarning: function_calling_llm is deprecated and will be removed in a future release.
+  if not agent.function_calling_llm:  # type: ignore[attr-defined]
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/agent/core.py:1299: DeprecationWarning: function_calling_llm is deprecated and will be removed in a future release.
+  function_calling_llm=self.function_calling_llm,
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/crew.py:1675: DeprecationWarning: deprecated
+  if hasattr(agent, "allow_code_execution") and getattr(
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/crew.py:1682: DeprecationWarning: deprecated
+  and hasattr(agent, "multimodal")
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/crew.py:1683: DeprecationWarning: deprecated
+  and getattr(agent, "multimodal", False)
+..ERROR:crewai.flow.runtime:Error executing listener call_llm_and_parse: 'ExplicitAction' object has no attribute 'attempts'
+E
+======================================================================
+ERROR: test_shipped_model_free_preflight_uses_actual_crewai_tool (test_campaign_runner.ModelBoundaryTest.test_shipped_model_free_preflight_uses_actual_crewai_tool)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/flow/runtime/__init__.py", line 2125, in kickoff
+    asyncio.get_running_loop()
+RuntimeError: no running event loop
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/fixtures/recovery-product/test_campaign_runner.py", line 21, in test_shipped_model_free_preflight_uses_actual_crewai_tool
+    output = crew_trial(owner, model, "Call recovery once with choice resume.")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/fixtures/recovery-product/campaign_runner.py", line 139, in crew_trial
+    result = crew.kickoff()
+             ^^^^^^^^^^^^^^
+  File "/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/crew.py", line 1056, in kickoff
+    result = self._run_sequential_process()
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/crew.py", line 1524, in _run_sequential_process
+    return self._execute_tasks(self.tasks)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/crew.py", line 1628, in _execute_tasks
+    task_output = task.execute_sync(
+                  ^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/task.py", line 593, in execute_sync
+    return self._execute_core(agent, context, tools)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/task.py", line 963, in _execute_core
+    raise e
+  File "/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/task.py", line 853, in _execute_core
+    result = agent.execute_task(
+             ^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/agent/core.py", line 1024, in execute_task
+    return self._handle_execution_error(e, task, context, tools)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/agent/core.py", line 907, in _handle_execution_error
+    self._check_execution_error(e, task)
+  File "/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/agent/core.py", line 887, in _check_execution_error
+    raise e
+  File "/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/agent/core.py", line 1010, in execute_task
+    result = self._execute_without_timeout(task_prompt, task)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/agent/core.py", line 1081, in _execute_without_timeout
+    invoke_result = self.agent_executor.invoke(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/experimental/agent_executor.py", line 2908, in invoke
+    self.kickoff()
+  File "/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/flow/runtime/__init__.py", line 2130, in kickoff
+    return asyncio.run(_run_flow())
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/runners.py", line 194, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/flow/runtime/__init__.py", line 2116, in _run_flow
+    return await self.kickoff_async(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/flow/runtime/__init__.py", line 2400, in kickoff_async
+    await asyncio.gather(*tasks)
+  File "/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/flow/runtime/__init__.py", line 2835, in _execute_start_method
+    await self._execute_listeners(start_method_name, result, finished_event_id)
+  File "/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/flow/runtime/__init__.py", line 3163, in _execute_listeners
+    ) = await self._execute_single_listener(
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/flow/runtime/__init__.py", line 3375, in _execute_single_listener
+    await self._execute_listeners(
+  File "/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/flow/runtime/__init__.py", line 3163, in _execute_listeners
+    ) = await self._execute_single_listener(
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/flow/runtime/__init__.py", line 3371, in _execute_single_listener
+    listener_result, finished_event_id = await self._execute_method(
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/flow/runtime/__init__.py", line 3053, in _execute_method
+    raise e
+  File "/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/flow/runtime/__init__.py", line 2954, in _execute_method
+    result = await asyncio.to_thread(ctx.run, method, *args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/flow/flow_wrappers.py", line 101, in __call__
+    return self._meth(self._instance, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/experimental/agent_executor.py", line 1470, in call_llm_and_parse
+    answer = get_llm_response(
+             ^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/utilities/agent_utils.py", line 589, in get_llm_response
+    answer = llm.call(
+             ^^^^^^^^^
+  File "/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/llms/base_llm.py", line 199, in wrapped_call
+    return run_with_rate_limit_retry(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/llms/retry.py", line 153, in run_with_rate_limit_retry
+    raise error
+  File "/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/llms/retry.py", line 134, in attempt
+    return True, operation(), None
+                 ^^^^^^^^^^^
+  File "/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/llms/base_llm.py", line 200, in <lambda>
+    lambda: method(instance, *args, **kwargs)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/fixtures/recovery-product/campaign_runner.py", line 130, in call
+    model.attempts[-1]["framework_stop_sequences"] = list(self.stop_sequences)
+    ^^^^^^^^^^^^^^
+AttributeError: 'ExplicitAction' object has no attribute 'attempts'
+
+----------------------------------------------------------------------
+Ran 7 tests in 3.752s
+
+FAILED (errors=1)

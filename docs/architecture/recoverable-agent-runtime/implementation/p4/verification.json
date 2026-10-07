@@ -1,0 +1,2141 @@
+{
+  "schema": "chio.recovery-p4-verification.v1",
+  "phase": "P4",
+  "title": "Durable knowledge",
+  "status": "implemented_locally_verified_and_reviewed",
+  "recorded_at_utc": "2026-10-04T01:43:04.005968+00:00",
+  "source_base": "de84fc306efbb4c8dd6de748d0ad2a8d695fd30e",
+  "branch": "feat/recoverable-agent-runtime-20261002",
+  "working_tree_changes_committed": false,
+  "architecture_revision": 3,
+  "scope": "Local host-private Unix SQLite process artifacts, same-authority mediated release/restore, signed exact-content certificates/archives, permanent evidence retention and generation-safe collection. Trusted host/selected sink setup remains explicit. No filesystem/object-store streams, cross-process transfer, live provider, hosted CI, production release or scale qualification.",
+  "confidence": "high within the declared locally verified supported phase profile",
+  "review": {
+    "reviewer": "Codex",
+    "review_kind": "complete source self-review",
+    "independent_human_signoff": false,
+    "all_handwritten_changes_reviewed": true,
+    "schemas_generated_boundaries_sdk_and_manifests_reviewed": true,
+    "handwritten_rust_sources": 59,
+    "phase_changed_source_paths": 310,
+    "reviewed_rust_sources": [
+      {
+        "path": "crates/core/chio-core-types/src/recovery/knowledge.rs",
+        "sha256": "a2c83153f7cf6b62a33c10155d108faed70151f4db6240a664f99a678059e4f6"
+      },
+      {
+        "path": "crates/core/chio-core-types/src/recovery/mod.rs",
+        "sha256": "441c1d4c7ec1b4c93dd91140663e6919a50fd2a5663af5c540ab77e759c29937"
+      },
+      {
+        "path": "crates/core/chio-core-types/tests/recovery_p4_contracts.rs",
+        "sha256": "0b147d047bc1145d2f6505f6b98d1a71019c03e697dfd7091885ab738ca56208"
+      },
+      {
+        "path": "crates/kernel/chio-kernel/src/admission_operation/store.rs",
+        "sha256": "c29f195deccbcff82b79a11dc983a11cc82d2316b005eadb8419ca0c2a053ab1"
+      },
+      {
+        "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs",
+        "sha256": "61b24ab09d87c0765a26d87b0cc21df51dc77f0c900a91caada4e5aa90e88d63"
+      },
+      {
+        "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress.rs",
+        "sha256": "5ea28da93d338260c839b6cb5a20abac1a11868d2218f2cdd08d75d2bf3e1ec4"
+      },
+      {
+        "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/capture.rs",
+        "sha256": "70104d5c47c87764b0c4c976ae97e5402f638a34dba6ef79fe57746d297229e9"
+      },
+      {
+        "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/recovery_runtime.rs",
+        "sha256": "efaf4468c66e7991c11bfe0c0bdab0816b7a15d56122316f6a4f5d6e28f2faf1"
+      },
+      {
+        "path": "crates/kernel/chio-kernel/src/kernel/construction.rs",
+        "sha256": "14031e9f59e6888bc0aa6d75c5d4637339067aa345b26b6654fab847f43bdb54"
+      },
+      {
+        "path": "crates/kernel/chio-kernel/src/kernel/kernel_struct.rs",
+        "sha256": "cf224882de8d5f333a69402d1c8c68b748c9807948480f044683474aaba41556"
+      },
+      {
+        "path": "crates/kernel/chio-kernel/src/kernel/mod.rs",
+        "sha256": "17612cb2b741cfd2cdf60ec4f61f10e700cb6ce643d8eeeef6eb85e862988780"
+      },
+      {
+        "path": "crates/kernel/chio-kernel/src/knowledge.rs",
+        "sha256": "22eb391cc298cca1f330f04de83ded9fe8a6e0e165701aade3d102ea33db9ccb"
+      },
+      {
+        "path": "crates/kernel/chio-kernel/src/lib.rs",
+        "sha256": "c8654bb01570c6a160b401440ac7702e1a1d4d66ee2ba73cfdfaaa575936fd8b"
+      },
+      {
+        "path": "crates/kernel/chio-kernel/src/recovery/records.rs",
+        "sha256": "c853cbb5f87105f52ca5ebc071dd43fb7af0b1eca8ae46f6921fc006bb8a8f59"
+      },
+      {
+        "path": "crates/kernel/chio-process/src/knowledge.rs",
+        "sha256": "117609bdfaf7d346b6be4768d30f6ea10abda6dee9527da2dd7e683c2cfda208"
+      },
+      {
+        "path": "crates/kernel/chio-process/src/lib.rs",
+        "sha256": "2d5cc78f697e7e829f13746b83fa1a24c6ad6068fb910b8ac147d3a0c23f320d"
+      },
+      {
+        "path": "crates/kernel/chio-process/src/registry.rs",
+        "sha256": "70588b6aeb909f24f2a55ee4d5ed2dac662dd3edce816a264acf6018659b1690"
+      },
+      {
+        "path": "crates/kernel/chio-process/src/state_reader.rs",
+        "sha256": "98cb74c0a37abac8a129e0e7ec39e00963368bab181d6e9e976b59196a14d0cb"
+      },
+      {
+        "path": "crates/kernel/chio-process/src/store.rs",
+        "sha256": "2c72d59bf60dc83a5e9469498e51a3955f049122639c8b5cb4d220314f5fa31c"
+      },
+      {
+        "path": "crates/kernel/chio-process/src/store/blobs.rs",
+        "sha256": "1ea56599abf44f0cbed37cc76d865276a61ff817c84ae92465098084cc379032"
+      },
+      {
+        "path": "crates/kernel/chio-process/src/store/knowledge.rs",
+        "sha256": "a79f31d133f2960086f24e5ae8e618c3946d2064265ad80bf7035fac6f8b6b9c"
+      },
+      {
+        "path": "crates/platform/chio-control-plane/src/knowledge.rs",
+        "sha256": "225eede46cf787697e979c66254d4d6199ec136672ec4492ea51144f632cb6e7"
+      },
+      {
+        "path": "crates/platform/chio-control-plane/src/knowledge/checkpoints.rs",
+        "sha256": "b095cca3d7ea0c3a3401de2314baadce72d4661c4fecb7b847e3e9bbdd75be1f"
+      },
+      {
+        "path": "crates/platform/chio-control-plane/src/knowledge/transfer.rs",
+        "sha256": "d3425e5cdcd50344307d25a820e984090d91c848ed81eeeb652e45082d87f485"
+      },
+      {
+        "path": "crates/platform/chio-control-plane/src/lib.rs",
+        "sha256": "f6c7112cd0392b3703a4ef5fd5cd81fc254d0185b56171e1295268d8cd0a6154"
+      },
+      {
+        "path": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+        "sha256": "1a15c024a60a53990e0d988ceb173e6422283ca01e2db4c10f758f3492903a91"
+      },
+      {
+        "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge.rs",
+        "sha256": "521b42b9d584bed8dc05878db6cb4a0afb03a32ed9ce9e5671fffe81616e3cc6"
+      },
+      {
+        "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/acceptance.rs",
+        "sha256": "22296598ccc2a7b8828f5b2af9a6589b1c45c486e9eaf344fcd3927ede894934"
+      },
+      {
+        "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/native.rs",
+        "sha256": "3547a94683fa5804cac3e7b7fe9d2c2350737e26d8de163b2d02a597b74fb3a5"
+      },
+      {
+        "path": "crates/platform/chio-control-plane/src/recovery/tests/refusals.rs",
+        "sha256": "c15f6e5604180c59e4b9a81856fdc3cd549f069ed901dc9ebe57627a5abe828c"
+      },
+      {
+        "path": "crates/platform/chio-control-plane/src/recovery/tests/semantic.rs",
+        "sha256": "b68c522bc8f08a3ca9548ab7a26f85b3fea770ae8019601d37a28790d6c5f9ca"
+      },
+      {
+        "path": "crates/platform/chio-control-plane/src/semantic.rs",
+        "sha256": "4fc1aa7229daeec1d5294e9cf5c330501db1794a5d1011aa587ff09373c6e904"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store.rs",
+        "sha256": "409264c918a4ca7ed6f561dd8e892607092bd46362395180d7c8c0160efc7e4d"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge.rs",
+        "sha256": "e5a03fa8265121d49cbc6dfb20103680162884148cf1773d7a6120718e9c1831"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/checkpoints.rs",
+        "sha256": "ed8ea5130a07d0d3c06732ca8c428d7b6768ea5f11b513b30558140f097fe870"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/lifecycle.rs",
+        "sha256": "e19eded0a1c8ee6154885bbe7d60a394e985bdd1af889766bfb53c25bf768b07"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/publication.rs",
+        "sha256": "f66cf144052b03a9e0f93b6b62c8eb836d439b1d8dc69a808ad277c07541ddd4"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/release.rs",
+        "sha256": "396c5339343ffe38af1865ae0f8da66af02feb9b96446f966bb9b37e3f9136a7"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/transfer.rs",
+        "sha256": "09bed0c445faa707ab51de440e1b38cb6d96727952d65638fef951e2a2e8e20f"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/traversal.rs",
+        "sha256": "af54c31db7f4ff9bc5bd91c5ecc9babeb3e638df077f830a2f896495e33440e5"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery.rs",
+        "sha256": "0e9e00509ada7889163e37039d26d971b154da960bfd6b23dde88fc4b2f26184"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/validation.rs",
+        "sha256": "892f31564fdeeef5641578ebdefab6257f9fa5a2c1a8f628910bdd0ffdb83982"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs",
+        "sha256": "b0cfa356b19e68bfae4f3ea3af509c38c7adfb07793d45158c31624eeab7a8b0"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs",
+        "sha256": "219aba87c3c516b80283e169693972102ddd1382513512d15b5c5ad09a1ccbf8"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/rows.rs",
+        "sha256": "ba1ce47a0555a9e18086f0965c6ff0f16d257f96b60e3a2847516c69689e837f"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/knowledge.rs",
+        "sha256": "620fa4fd94bf7757422a2e9e77f56a547afd1658f1e011ef48c3c4d6ff28ddb5"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/semantic/capture.rs",
+        "sha256": "6ebf6c4ca826e24b1a26de0347dbd89198484e60b22c80c06afb1b9bebfd7c56"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/semantic/materialization.rs",
+        "sha256": "cae3678f791595ece0f003d0f63eaee7f65904200f7e66d5f39d99676b2778a3"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/store.rs",
+        "sha256": "c954f3831d9672240e440abee070fe1c109be58c6fb99782f0938c2c7e43a4b6"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/security_state.rs",
+        "sha256": "13216ee6020d84a651c182f6dfce163bf649211d0aae5947f6d135d653f10026"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/security_state/native_mutation.rs",
+        "sha256": "74b0b4bd1062b6103d99f539f74d73f572d07f2eed806057290164865c94fd29"
+      },
+      {
+        "path": "crates/security/chio-security-types/src/knowledge/artifact.rs",
+        "sha256": "51915dc730ffe57aaaa32e489504e56398cdc882121b480fd4c2bda5673cff20"
+      },
+      {
+        "path": "crates/security/chio-security-types/src/knowledge/checkpoint.rs",
+        "sha256": "9e05fa953cc022f5bda5bcfe31e1cd7853e6eadf71b445d63de53632c593470a"
+      },
+      {
+        "path": "crates/security/chio-security-types/src/knowledge/mod.rs",
+        "sha256": "c2e22c4486670e0814d26e40a1fe6bd708c75f86d04376595b45ead3169fdfe0"
+      },
+      {
+        "path": "crates/security/chio-security-types/src/knowledge/release.rs",
+        "sha256": "c2b6d6dfd4f706d26c104101f26ca1fea3bec1585dc27d7a91c9a4e4c1bfc20b"
+      },
+      {
+        "path": "crates/security/chio-security-types/src/lib.rs",
+        "sha256": "51c6909c2c5a85b192e9eb716999c8331ebd6503bed067db6402c0a9a61e75a6"
+      },
+      {
+        "path": "crates/security/chio-security-types/src/recovery/identifiers.rs",
+        "sha256": "273d21b957f8d529a2da5c9085b637b913690a3dcb3253177b7a22ae5c09d4c4"
+      },
+      {
+        "path": "fixtures/recovery-knowledge-profile.rs",
+        "sha256": "d20d1f8573c347493c923e3cb49b87ba10f22482cdc0a44ba126e755cc889cde"
+      },
+      {
+        "path": "fixtures/recovery-portable-consumer/src/lib.rs",
+        "sha256": "00e4db2f399e5fb805e7118fb69caf05706016ddb192f592444080a0e8a9e29e"
+      }
+    ],
+    "open_p0_findings": 0,
+    "open_p1_findings": 0,
+    "severity_scope": "Reviewed P4 changes and declared supported local profile; unrelated workspace and broader qualification are separate.",
+    "report": "REVIEW.md"
+  },
+  "tasks": [
+    {
+      "id": "P4-01",
+      "title": "Closed artifact, provenance, release, certificate and checkpoint contracts",
+      "obligations": [
+        "ART-01",
+        "CON-09"
+      ],
+      "status": "implemented_locally_verified_and_reviewed"
+    },
+    {
+      "id": "P4-02",
+      "title": "Durable publication, quarantine and exact reconciliation",
+      "obligations": [
+        "ART-02",
+        "ART-03",
+        "ART-11"
+      ],
+      "status": "implemented_locally_verified_and_reviewed"
+    },
+    {
+      "id": "P4-03",
+      "title": "Audience-scoped opaque references and fresh mediated native reads",
+      "obligations": [
+        "ART-04",
+        "ART-10",
+        "ART-12"
+      ],
+      "status": "implemented_locally_verified_and_reviewed"
+    },
+    {
+      "id": "P4-04",
+      "title": "Provenance-preserving copy, signed export/import and exact adoption",
+      "obligations": [
+        "ART-05",
+        "ART-06",
+        "ART-08",
+        "CON-09"
+      ],
+      "status": "implemented_locally_verified_and_reviewed"
+    },
+    {
+      "id": "P4-05",
+      "title": "Labeled checkpoint CAS, model context binding and monotone restore",
+      "obligations": [
+        "ART-07",
+        "ART-08",
+        "ART-12"
+      ],
+      "status": "implemented_locally_verified_and_reviewed"
+    },
+    {
+      "id": "P4-06",
+      "title": "Retention, native live pins, generation-barrier GC and permanent tombstones",
+      "obligations": [
+        "ART-09"
+      ],
+      "status": "implemented_locally_verified_and_reviewed"
+    },
+    {
+      "id": "P4-07",
+      "title": "Native faults/races/restart/refusal, portable acceptance and complete source review",
+      "obligations": [
+        "CON-09",
+        "ART-01",
+        "ART-02",
+        "ART-03",
+        "ART-04",
+        "ART-05",
+        "ART-06",
+        "ART-07",
+        "ART-08",
+        "ART-09",
+        "ART-10",
+        "ART-11",
+        "ART-12"
+      ],
+      "status": "implemented_locally_verified_and_reviewed"
+    }
+  ],
+  "requirements": {
+    "count": 13,
+    "ids": [
+      "CON-09",
+      "ART-01",
+      "ART-02",
+      "ART-03",
+      "ART-04",
+      "ART-05",
+      "ART-06",
+      "ART-07",
+      "ART-08",
+      "ART-09",
+      "ART-10",
+      "ART-11",
+      "ART-12"
+    ],
+    "status": "all_implemented_and_local_phase_acceptance_passed",
+    "coverage": "requirements-coverage.json"
+  },
+  "bounds": {
+    "artifact_bytes": 1048576,
+    "direct_dependencies": 16,
+    "dependency_traversal_versions": 64,
+    "archive_versions": 16,
+    "host_recipients": 16,
+    "checkpoint_roots": 8,
+    "model_contexts": 8,
+    "model_side_files": 8,
+    "wire_bytes": 65536,
+    "protected_record_bytes": 262144,
+    "shared_pure_work_units": 4096,
+    "certificate_lifetime_ms": 60000,
+    "publication_versions": 512,
+    "knowledge_history_events": 4096,
+    "combined_native_history_events": 65536,
+    "combined_native_history_bytes": 67108864
+  },
+  "source": {
+    "inventory": "source-inventory.json",
+    "inventory_sha256": "e224975a7be4c915bbe2562841966667ff95352882cac83b30e169ec4f997b6e",
+    "archive": "evidence/current-source.tar.gz",
+    "archive_sha256": "9ff429f2a1167b149d93cb47a2c06cd8011f88ed5c0a9e464a2eb0515c25947b",
+    "baseline": "source-baseline.json",
+    "baseline_sha256": "fb156f97150dc3500b159c3484a09bc3f414a113122eb74df30ddca8c2047be1",
+    "p3_baseline_archive": "evidence/p3-source-baseline.tar.gz",
+    "p3_baseline_archive_sha256": "a882f0d8633f30c2a6f7983b42988e02890d56e2bee5baad149554b0d96e39da",
+    "p3_verification": "../p3/verification.json",
+    "p3_verification_sha256": "0b6ef458fe652f1cfd9ffb5f69f513303bf2969f06013499ef0d763056be3963",
+    "p3_source_inventory_sha256": "821bbc01b86bcb6dcb9d66e07cf6c311aaa41c4b084b40821632dbebde11fb01"
+  },
+  "checks": [
+    {
+      "id": "native",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--lib",
+        "p4_",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791077677,
+      "duration_seconds": 171.545,
+      "log": "evidence/native.log",
+      "log_sha256": "aa8423a7c5b3ec80a146d0830c5b7dbf645753b965a533fb3d66c7c6af4fa7fc",
+      "required_for_local_phase_acceptance": true,
+      "rust_tests_passed": 24,
+      "rust_tests_failed": 0,
+      "rust_tests_ignored": 0,
+      "rust_test_binaries": 1
+    },
+    {
+      "id": "owner-doc-tests",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--doc"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791075756,
+      "duration_seconds": 91.963,
+      "log": "evidence/owner-doc-tests.log",
+      "log_sha256": "6c2a848cebbf02c35238f7b614da1e7d340fbadd162510b28fc86b97ade3905a",
+      "required_for_local_phase_acceptance": true,
+      "rust_tests_passed": 7,
+      "rust_tests_failed": 0,
+      "rust_tests_ignored": 0,
+      "rust_test_binaries": 1
+    },
+    {
+      "id": "p3-native",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--lib",
+        "p3_",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791074515,
+      "duration_seconds": 763.758,
+      "log": "evidence/p3-native.log",
+      "log_sha256": "881f8529158016fddfbd8cf1da97aeb2239624379396cb29e9e1de16b353be43",
+      "required_for_local_phase_acceptance": true,
+      "rust_tests_passed": 16,
+      "rust_tests_failed": 0,
+      "rust_tests_ignored": 0,
+      "rust_test_binaries": 1
+    },
+    {
+      "id": "p1-native",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--lib",
+        "recovery_p1_",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791076782,
+      "duration_seconds": 476.402,
+      "log": "evidence/p1-native.log",
+      "log_sha256": "a83b749b3955ee002d8f9f9193f74a6c02ab31a88d7735090ddf6463e37540c7",
+      "required_for_local_phase_acceptance": true,
+      "rust_tests_passed": 16,
+      "rust_tests_failed": 0,
+      "rust_tests_ignored": 2,
+      "rust_test_binaries": 1
+    },
+    {
+      "id": "p2-native",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--lib",
+        "recovery_p2_",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791075279,
+      "duration_seconds": 17.968,
+      "log": "evidence/p2-native.log",
+      "log_sha256": "106f2d85704c53a12cd0493d387c01b8efee3c6685a1713a219dd18f4046c111",
+      "required_for_local_phase_acceptance": true,
+      "rust_tests_passed": 9,
+      "rust_tests_failed": 0,
+      "rust_tests_ignored": 0,
+      "rust_test_binaries": 1
+    },
+    {
+      "id": "owning-tests",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-core-types",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-flow",
+        "-p",
+        "chio-recovery",
+        "-p",
+        "chio-semantic-contracts",
+        "-p",
+        "chio-process",
+        "-p",
+        "chio-spec-codegen",
+        "-p",
+        "xtask",
+        "--",
+        "--test-threads=2"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791076494,
+      "duration_seconds": 180.084,
+      "log": "evidence/owning-tests.log",
+      "log_sha256": "63aa580430a7724bf5dc99aa85b6bf9c6365273b4f31c43eb4e95ecd6a327404",
+      "required_for_local_phase_acceptance": true,
+      "rust_tests_passed": 1083,
+      "rust_tests_failed": 0,
+      "rust_tests_ignored": 2,
+      "rust_test_binaries": 95
+    },
+    {
+      "id": "store-native",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "--lib",
+        "security_participant",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791074792,
+      "duration_seconds": 509.399,
+      "log": "evidence/store-native.log",
+      "log_sha256": "e453889ae439e7fef524dcdd01ad047fdf09bbcc2d2a21b29ef2930ba26d82e7",
+      "required_for_local_phase_acceptance": true,
+      "rust_tests_passed": 116,
+      "rust_tests_failed": 0,
+      "rust_tests_ignored": 0,
+      "rust_test_binaries": 1
+    },
+    {
+      "id": "store-ordering",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "--lib",
+        "global_commit",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791075301,
+      "duration_seconds": 56.105,
+      "log": "evidence/store-ordering.log",
+      "log_sha256": "e9c3ec59cef988d3c322b4ead746ababc1b7c9590a3e3ffba514f714d67d07a1",
+      "required_for_local_phase_acceptance": true,
+      "rust_tests_passed": 15,
+      "rust_tests_failed": 0,
+      "rust_tests_ignored": 0,
+      "rust_test_binaries": 1
+    },
+    {
+      "id": "store-schema",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "--lib",
+        "admission_operation_store::tests::schema",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791077126,
+      "duration_seconds": 88.064,
+      "log": "evidence/store-schema.log",
+      "log_sha256": "84742e7cfd0328aad354654f24ae312e7b0655cb2c5c11b6e08dd8a74c1699d9",
+      "required_for_local_phase_acceptance": true,
+      "rust_tests_passed": 15,
+      "rust_tests_failed": 0,
+      "rust_tests_ignored": 1,
+      "rust_test_binaries": 1
+    },
+    {
+      "id": "store-regression",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "--lib",
+        "restoring",
+        "--",
+        "--test-threads=2",
+        "--skip",
+        "capability_lineage::tests::qualified_capability_snapshots_advance_the_external_rollback_generation",
+        "--skip",
+        "dead_letters::tests::qualified_alongside_store_rejects_dead_letter_rollback",
+        "--skip",
+        "finding_pool_ledger::tests::claimed_admission_operation_scan_is_bounded_and_cursor_ordered",
+        "--skip",
+        "finding_pool_ledger::tests::leased_outbox_rows_remain_observable_as_pending",
+        "--skip",
+        "finding_pool_ledger::tests::qualified_ledger_binds_validation_to_the_borrowed_database_file",
+        "--skip",
+        "finding_pool_ledger::tests::qualified_ledger_persists_one_receipt_sink",
+        "--skip",
+        "finding_pool_ledger::tests::qualified_ledger_rejects_a_writable_parent_directory",
+        "--skip",
+        "finding_pool_ledger::tests::qualified_ledger_rejects_unusable_domains",
+        "--skip",
+        "finding_pool_ledger::tests::qualified_schema_indexes_pending_outbox_and_expiration_reclamation",
+        "--skip",
+        "finding_pool_ledger::tests::recovered_mutation_loads_the_reservations_persisted_tenant",
+        "--skip",
+        "finding_pool_ledger::tests::unknown_dispatch_exact_replay_ignores_later_allocation_totals",
+        "--skip",
+        "iou_store::tests::qualified_alongside_store_rejects_iou_rollback",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_allows_explicitly_false_immutable_sqlite_uris",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_anchors_background_checkpoint_commits",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_anchors_checkpoint_publication_bindings",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_anchors_imported_checkpoint_commits",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_anchors_lineage_only_duplicate_mutations",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_anchors_retention_rotation",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_anchors_standalone_checkpoint_commits",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_anchors_standalone_lineage_mutations",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_refuses_to_seed_an_archive_only_store",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_rejects_atomic_database_replacement",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_rejects_internal_sink_identity_change",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_rejects_nonlocal_sqlite_uri_authorities",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_rejects_read_only_sqlite_uris",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_verifies_rollback_anchor_before_metadata_jobs",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_settlement_state_writes_advance_the_rollback_anchor",
+        "--skip",
+        "receipt_store::tests::verified_head::qualified_reader_and_reopen_reject_live_rollback_after_writer_routed_receipt",
+        "--skip",
+        "receipt_store::tests::verified_head::qualified_receipt_sink_rejects_locking_disabled_sqlite_uris"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791075359,
+      "duration_seconds": 4.898,
+      "log": "evidence/store-regression.log",
+      "log_sha256": "fba2212de389544379815a73439f2bdddb60876649ad27cacfa536548c0a5e1a",
+      "required_for_local_phase_acceptance": true,
+      "rust_tests_passed": 4,
+      "rust_tests_failed": 0,
+      "rust_tests_ignored": 0,
+      "rust_test_binaries": 1
+    },
+    {
+      "id": "store-doc-tests",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "--doc"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791075364,
+      "duration_seconds": 27.313,
+      "log": "evidence/store-doc-tests.log",
+      "log_sha256": "7bff01be690849d11fe1baddf18d1e440fff222911ae3d4c3101a769efd4eb39",
+      "required_for_local_phase_acceptance": true,
+      "rust_tests_passed": 0,
+      "rust_tests_failed": 0,
+      "rust_tests_ignored": 0,
+      "rust_test_binaries": 1
+    },
+    {
+      "id": "conformance-lib",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-conformance",
+        "--lib"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791075391,
+      "duration_seconds": 146.292,
+      "log": "evidence/conformance-lib.log",
+      "log_sha256": "49df299e2c52a84b45b12f8c8f6c752b3198f8469e222413d9bced12cf900a66",
+      "required_for_local_phase_acceptance": true,
+      "rust_tests_passed": 45,
+      "rust_tests_failed": 0,
+      "rust_tests_ignored": 0,
+      "rust_test_binaries": 1
+    },
+    {
+      "id": "kernel-lib",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-kernel",
+        "--lib",
+        "--",
+        "--skip",
+        "kernel::tests::governed_acp_hold_flow_records_commerce_scope_and_payment_metadata",
+        "--skip",
+        "kernel::tests::governed_x402_authorization_failure_denies_before_tool_execution",
+        "--skip",
+        "kernel::tests::governed_x402_prepaid_flow_records_governed_authorization_and_receipt_metadata",
+        "--skip",
+        "payment::tests::acp_adapter_externalizes_capture_release_and_refund",
+        "--skip",
+        "payment::tests::acp_adapter_posts_authorize_request_with_commerce_context_and_returns_hold",
+        "--skip",
+        "payment::tests::acp_adapter_queries_bound_settlement_state",
+        "--skip",
+        "payment::tests::acp_adapter_rejects_unbound_terminal_response",
+        "--skip",
+        "payment::tests::payment_error_bodies_are_not_reflected",
+        "--skip",
+        "payment::tests::payment_response_body_is_bounded",
+        "--skip",
+        "payment::tests::x402_adapter_maps_http_402_to_insufficient_funds",
+        "--skip",
+        "payment::tests::x402_adapter_posts_authorize_request_and_returns_settled_payment",
+        "--skip",
+        "payment::tests::x402_adapter_uses_custom_path_bearer_token_and_governed_payload"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791076674,
+      "duration_seconds": 138.536,
+      "log": "evidence/kernel-lib.log",
+      "log_sha256": "77164643b073b8be9eb8d7177db4e2828e7db8c0834d3f855ce849f621ef064b",
+      "required_for_local_phase_acceptance": true,
+      "rust_tests_passed": 1448,
+      "rust_tests_failed": 0,
+      "rust_tests_ignored": 0,
+      "rust_test_binaries": 1
+    },
+    {
+      "id": "kernel-doc-tests",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-kernel",
+        "--doc"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791075635,
+      "duration_seconds": 31.107,
+      "log": "evidence/kernel-doc-tests.log",
+      "log_sha256": "7be1c28046199bdf0a024e5d397db4201b3eff19a4c7eeeb2b390305a7f431c0",
+      "required_for_local_phase_acceptance": true,
+      "rust_tests_passed": 13,
+      "rust_tests_failed": 0,
+      "rust_tests_ignored": 0,
+      "rust_test_binaries": 1
+    },
+    {
+      "id": "clippy",
+      "actual_command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-core-types",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-flow",
+        "-p",
+        "chio-recovery",
+        "-p",
+        "chio-semantic-contracts",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-process",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-conformance",
+        "-p",
+        "chio-spec-codegen",
+        "-p",
+        "xtask",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791077577,
+      "duration_seconds": 100.208,
+      "log": "evidence/clippy.log",
+      "log_sha256": "3a04fad53ce11886f32f4096fa491f47ec3e5a791dd693cff2624439a9d5122a",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "format",
+      "actual_command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791077849,
+      "duration_seconds": 12.366,
+      "log": "evidence/format.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "diff",
+      "actual_command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791077979,
+      "duration_seconds": 0.337,
+      "log": "evidence/diff.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "rust-codegen",
+      "actual_command": [
+        "target/debug/xtask",
+        "codegen",
+        "rust",
+        "--check"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791074422,
+      "duration_seconds": 5.363,
+      "log": "evidence/rust-codegen.log",
+      "log_sha256": "ea8fe1220f36dfa900d0a6c80d0115d96df53ad47f2a28dd52418de956d7cfb9",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "vector-recompute",
+      "actual_command": [
+        "python3",
+        "docs/architecture/recoverable-agent-runtime/implementation/p4/evidence/verify-vectors.py"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791074420,
+      "duration_seconds": 1.655,
+      "log": "evidence/vector-recompute.log",
+      "log_sha256": "df43009eaf4943db37d3b823aa0bd591a8c183e35b75795402c75f8d5513e3bd",
+      "required_for_local_phase_acceptance": true,
+      "rust_tests_passed": 1,
+      "rust_tests_failed": 0,
+      "rust_tests_ignored": 0,
+      "rust_test_binaries": 1
+    },
+    {
+      "id": "ts-codegen",
+      "actual_command": [
+        "target/debug/xtask",
+        "codegen",
+        "ts",
+        "--check"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791074427,
+      "duration_seconds": 34.924,
+      "log": "evidence/ts-codegen.log",
+      "log_sha256": "6f3b674331a3c688c6b6bb4371c327d570aadfacf5e87927ec34cd0ce087f612",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "python-codegen",
+      "actual_command": [
+        "target/debug/xtask",
+        "codegen",
+        "python",
+        "--check"
+      ],
+      "cwd": ".",
+      "environment": {
+        "PATH": "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/target/recovery-p0-codegen-bin:/Users/connor/.codex/packages/app-server-daemon/releases/0.160.0-aarch64-apple-darwin/codex-path:/Users/connor/.codex/tmp/arg0/codex-arg0UEQ3PA:/Users/connor/.codex/tmp/arg0/codex-arg0S2tY1s:/Users/connor/.codex/packages/app-server-daemon/releases/0.159.3-aarch64-apple-darwin/codex-path:/Users/connor/.codex/tmp/arg0/codex-arg05RTEbr:/Users/connor/.codex/packages/app-server-daemon/releases/0.159.2-aarch64-apple-darwin/codex-path:/Users/connor/.codex/tmp/arg0/codex-arg055DeEw:/Users/connor/.codex/packages/app-server-daemon/releases/0.159.1-aarch64-apple-darwin/codex-path:/Users/connor/.codex/tmp/arg0/codex-arg0UxdSRW:/Users/connor/.bun/install/global/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/codex-path:/opt/homebrew/opt/openjdk@21/bin:/Users/connor/.local/bin:/Users/connor/.antigravity/antigravity/bin:/Users/connor/.proto/shims:/Users/connor/.proto/bin:/Users/connor/.bun/bin:/Users/connor/.codeium/windsurf/bin:/opt/homebrew/opt/libpq/bin:/opt/homebrew/bin:/Users/connor/bin:/usr/local/bin:/Users/connor/.elan/bin:/opt/homebrew/opt/openjdk@21/bin:/Users/connor/.local/share/solana/install/active_release/bin:/Users/connor/.pyenv/shims:/Users/connor/.local/go/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/opt/pkg/env/active/bin:/opt/pmk/env/global/bin:/Library/Apple/usr/bin:/Library/TeX/texbin:/Applications/VMware Fusion.app/Contents/Public:/usr/local/share/dotnet:~/.dotnet/tools:/usr/local/hatch/bin:/Users/connor/.railway/bin:/opt/homebrew/opt/openjdk@21/bin:/Users/connor/.local/bin:/Users/connor/.antigravity/antigravity/bin:/Users/connor/.proto/shims:/Users/connor/.proto/bin:/Users/connor/.bun/bin:/Users/connor/.codeium/windsurf/bin:/opt/homebrew/opt/libpq/bin:/Users/connor/Library/Application Support/carapace/bin:/Users/connor/bin:/Users/connor/.elan/bin:/Users/connor/.local/share/solana/install/active_release/bin:/Users/connor/.local/go/bin:/Users/connor/.wasmedge/bin:/Users/connor/.cargo/bin:/Applications/Ghostty.app/Contents/MacOS:/Users/connor/.cache/lm-studio/bin:/Users/connor/.local/bin:/Users/connor/.cache/lm-studio/bin"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791074462,
+      "duration_seconds": 7.627,
+      "log": "evidence/python-codegen.log",
+      "log_sha256": "263879d30dc7e5071c6c48d88ef9aa791acbbe3a5f1b425649497a73045152fa",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "pure-guard",
+      "actual_command": [
+        "python3",
+        "scripts/check-recovery-p0.py",
+        "--offline"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791077376,
+      "duration_seconds": 0.371,
+      "log": "evidence/pure-guard.log",
+      "log_sha256": "833390d11d2e74f4ccffd89b62f912a30db6db7a3c5bdf9a8780581dc9f07480",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "guard-mutations",
+      "actual_command": [
+        "python3",
+        "scripts/tests/check-recovery-p0.test.py"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791074488,
+      "duration_seconds": 0.084,
+      "log": "evidence/guard-mutations.log",
+      "log_sha256": "ab51ea60a180dcf83532117f0b671bba89aa7c055dfab26f507de72d874d2fb6",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "schemas",
+      "actual_command": [
+        "bash",
+        "scripts/check-chio-schema-registry.sh"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791074485,
+      "duration_seconds": 0.352,
+      "log": "evidence/schemas.log",
+      "log_sha256": "f08ca40211ee4cf16919c55a0c548472ee01a0ff6808eadb1e60a66f4aa43553",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "domains",
+      "actual_command": [
+        "python3",
+        "scripts/check-domain-separation.py"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791074484,
+      "duration_seconds": 1.537,
+      "log": "evidence/domains.log",
+      "log_sha256": "9660e42dc2a0efbad4e490330d6a6385e58a420c7c1648c95bc9031c502670af",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "wire-lock",
+      "actual_command": [
+        "python3",
+        "scripts/check-wire-schemas.py"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791074486,
+      "duration_seconds": 6.529,
+      "log": "evidence/wire-lock.log",
+      "log_sha256": "da291954c526561d6b46277a0846954253fca34f974ef3f1fd44de462c56718c",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "lint-parity",
+      "actual_command": [
+        "python3",
+        "scripts/check-lint-parity.py"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791074492,
+      "duration_seconds": 0.255,
+      "log": "evidence/lint-parity.log",
+      "log_sha256": "5cdbfdb13810b2e2e148e68b501cddfe136aa2de30eda0b7ef053818dbaf1f02",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "toolchain-parity",
+      "actual_command": [
+        "python3",
+        "scripts/check-rust-toolchain-parity.py"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791074492,
+      "duration_seconds": 0.075,
+      "log": "evidence/toolchain-parity.log",
+      "log_sha256": "0663e9dc80bac7594693bac2c394f9b68eeff85feaae6622feb1d67ad41aa730",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "layering",
+      "actual_command": [
+        "bash",
+        "scripts/check-workspace-layering.sh"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791074492,
+      "duration_seconds": 0.167,
+      "log": "evidence/layering.log",
+      "log_sha256": "d86efcdb613cfdb5c7cb93fbc663ad1379d53aa619f4b44377011ce820a3a8ea",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "hygiene",
+      "actual_command": [
+        "python3",
+        "scripts/check-rust-file-hygiene.py"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791077372,
+      "duration_seconds": 4.53,
+      "log": "evidence/hygiene.log",
+      "log_sha256": "342b6326fc741f1df0e2a0821bacf2b919b0c1893f37921f161467e2648bc179",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "alloc",
+      "actual_command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "fixtures/recovery-portable-consumer/Cargo.toml"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791074421,
+      "duration_seconds": 12.171,
+      "log": "evidence/alloc.log",
+      "log_sha256": "e2fd2c09fce50f3b98afc86b2741cd7ef279bb539eafd2a0b72babefdbcacf81",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "std",
+      "actual_command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "fixtures/recovery-portable-consumer/Cargo.toml",
+        "--features",
+        "std"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791074433,
+      "duration_seconds": 12.695,
+      "log": "evidence/std.log",
+      "log_sha256": "0d990f8ce455eedbe9b1546c7d2141ff6d0c7e5de07f10865155e4c75bcd3001",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "wasm",
+      "actual_command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "fixtures/recovery-portable-consumer/Cargo.toml",
+        "--target",
+        "wasm32-unknown-unknown"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791074446,
+      "duration_seconds": 14.58,
+      "log": "evidence/wasm.log",
+      "log_sha256": "2e27c684e213af3ec867fbf3cbe723718db2619702fe962872c6ba4b2bbf7df3",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "msrv-alloc",
+      "actual_command": [
+        "cargo",
+        "+1.93.0",
+        "check",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "fixtures/recovery-portable-consumer/Cargo.toml"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791074460,
+      "duration_seconds": 14.32,
+      "log": "evidence/msrv-alloc.log",
+      "log_sha256": "97105c57421b318c9d5c0e7a1d1691599c8b239f267e7ee96bb9f284db5b6c30",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "msrv-std",
+      "actual_command": [
+        "cargo",
+        "+1.93.0",
+        "check",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "fixtures/recovery-portable-consumer/Cargo.toml",
+        "--features",
+        "std"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791074475,
+      "duration_seconds": 13.3,
+      "log": "evidence/msrv-std.log",
+      "log_sha256": "95b31972a16ccd289eb691c816fd6a851a96bc7de224c41db9d1b358d64170b4",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "python",
+      "actual_command": [
+        "/Users/connor/Medica/backbay/standalone/arc/sdks/python/chio-crewai/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "sdks/python/chio-sdk-python/tests"
+      ],
+      "cwd": ".",
+      "environment": {
+        "PYTHONPATH": "sdks/python/chio-sdk-python/src"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791074218,
+      "duration_seconds": 3.356,
+      "log": "evidence/python.log",
+      "log_sha256": "dc9b7faad5be497ae52d5f94019a414b6e656f6e7770ba9f77a556cba4e9ae63",
+      "required_for_local_phase_acceptance": true,
+      "python_tests_passed": 625
+    },
+    {
+      "id": "ts",
+      "actual_command": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "test/recovery_schema.test.ts",
+        "test/recovery_p1_schema.test.ts",
+        "test/recovery_p2_schema.test.ts",
+        "test/recovery_p3_schema.test.ts",
+        "test/recovery_p4_schema.test.ts",
+        "test/recovery_client.test.ts"
+      ],
+      "cwd": "sdks/typescript/packages/conformance",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791074354,
+      "duration_seconds": 2.031,
+      "log": "evidence/ts.log",
+      "log_sha256": "87cdff74b85818fcb15514e317818547af66f561a1b7db45d98e9f2b9d3ed976",
+      "required_for_local_phase_acceptance": true,
+      "typescript_tests_passed": 294
+    },
+    {
+      "id": "ts-node-build",
+      "actual_command": [
+        "node",
+        "node_modules/typescript/bin/tsc",
+        "-p",
+        "packages/node-http/tsconfig.json"
+      ],
+      "cwd": "sdks/typescript",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791074224,
+      "duration_seconds": 1.02,
+      "log": "evidence/ts-node-build.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "ts-conformance-build",
+      "actual_command": [
+        "node",
+        "node_modules/typescript/bin/tsc",
+        "-p",
+        "packages/conformance/tsconfig.json",
+        "--noEmit"
+      ],
+      "cwd": "sdks/typescript",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791074356,
+      "duration_seconds": 0.824,
+      "log": "evidence/ts-conformance-build.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "architecture",
+      "actual_command": [
+        "python3",
+        "docs/architecture/recoverable-agent-runtime/check.py",
+        "--source-revision",
+        "de84fc306"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791077977,
+      "duration_seconds": 1.955,
+      "log": "evidence/architecture.log",
+      "log_sha256": "84d434004a1139784c47ae14b64c4a28055c882de865ed26e43cab3867e5388a",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "api-refactor-compile-attempt",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--lib",
+        "p4_",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+      },
+      "exit_code": 101,
+      "status": "failed",
+      "started_unix_seconds": 1791074421,
+      "duration_seconds": 94.034,
+      "log": "evidence/api-refactor-compile-attempt.log",
+      "log_sha256": "51f8004e5770d05cfe867b2873fda84ab7f19ad62732bdb25b422b7c1fe95ef9",
+      "required_for_local_phase_acceptance": false
+    },
+    {
+      "id": "architecture-before-verification-attempt",
+      "actual_command": [
+        "python3",
+        "docs/architecture/recoverable-agent-runtime/check.py",
+        "--source-revision",
+        "de84fc306"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 1,
+      "status": "failed",
+      "started_unix_seconds": 1791075662,
+      "duration_seconds": 0.145,
+      "log": "evidence/architecture-before-verification-attempt.log",
+      "log_sha256": "40a5eb302454c1a3d52a3570a725c348bf808b22aa287aaf9e60b5a8850d8da8",
+      "required_for_local_phase_acceptance": false
+    },
+    {
+      "id": "p1-partial-ddl-attempt",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--lib",
+        "recovery_p1_",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+      },
+      "exit_code": 101,
+      "status": "failed",
+      "started_unix_seconds": 1791075869,
+      "duration_seconds": 581.238,
+      "log": "evidence/p1-partial-ddl-attempt.log",
+      "log_sha256": "cba941ca26e31e98be4a7a0e25ff4b9a74e999e43987fe851773bf56dc037693",
+      "required_for_local_phase_acceptance": false,
+      "rust_tests_passed": 15,
+      "rust_tests_failed": 1,
+      "rust_tests_ignored": 2,
+      "rust_test_binaries": 1
+    },
+    {
+      "id": "p1-strengthened-snapshot-attempt",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--lib",
+        "recovery_p1_",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+      },
+      "exit_code": 101,
+      "status": "failed",
+      "started_unix_seconds": 1791075297,
+      "duration_seconds": 458.966,
+      "log": "evidence/p1-strengthened-snapshot-attempt.log",
+      "log_sha256": "954877617fa38dcf4f1c653675c3ed65729db1a955ae93fb95e086d52365b607",
+      "required_for_local_phase_acceptance": false,
+      "rust_tests_passed": 15,
+      "rust_tests_failed": 1,
+      "rust_tests_ignored": 2,
+      "rust_test_binaries": 1
+    },
+    {
+      "id": "range-pattern-attempt",
+      "actual_command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-core-types",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-flow",
+        "-p",
+        "chio-recovery",
+        "-p",
+        "chio-semantic-contracts",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-process",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-conformance",
+        "-p",
+        "chio-spec-codegen",
+        "-p",
+        "xtask",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+      },
+      "exit_code": 101,
+      "status": "failed",
+      "started_unix_seconds": 1791074501,
+      "duration_seconds": 189.588,
+      "log": "evidence/range-pattern-attempt.log",
+      "log_sha256": "19c44d495609c44b464eb9f0208d33238736d4a68ca0310f4fbb9f335357baf8",
+      "required_for_local_phase_acceptance": false
+    },
+    {
+      "id": "store-schema-empty-filter-attempt",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "--lib",
+        "admission_operation_store_tests::schema",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791075358,
+      "duration_seconds": 1.22,
+      "log": "evidence/store-schema-empty-filter-attempt.log",
+      "log_sha256": "85f0e0b5c02f09615f0eadf7fd1553eb9e8ee8f2084095ac95423ab601bfaa77",
+      "required_for_local_phase_acceptance": false,
+      "note": "Original filter used a source filename rather than the compiled module namespace and executed zero tests. It is diagnostic only; the corrected required filter must run nonzero passing tests.",
+      "rust_tests_passed": 0,
+      "rust_tests_failed": 0,
+      "rust_tests_ignored": 0,
+      "rust_test_binaries": 1
+    }
+  ],
+  "qualification_limits": [
+    "Supported artifact backend is host-private Unix SQLite with bounded immutable blobs and buffered delivery. Arbitrary filesystem/object-store paths, writable aliases, non-Unix enforcement and chunked streams refuse or are absent.",
+    "Archive import/restore is restricted to the same process, tenant, authority domain and exact retained native provenance. No cross-process/domain transfer qualification.",
+    "All checkpoint revisions, evidence/native pins, receipt provenance and ownership tombstones are retained permanently. No history pruning/unpinning; bounded exhaustion refuses. No provider-copy recall or cryptographic erasure claim.",
+    "Model contexts are retained local provider/account/conversation/cache/side-file envelopes. Outbound provider requests still need their native effect contract; no live provider/cache lifecycle qualification.",
+    "Required store gates cover native participant state, global commit order, schema, focused restoring regression and doctests. Required kernel library excludes exactly the same 12 unchanged payment listener tests that fail socket EPERM in immutable P3 evidence. No unfiltered full-workspace/kernel/store green claim or substituted distinct-device Linux anchor.",
+    "Failed exploratory API/lint/test-fixture/codegen/cache attempts are retained as diagnostics; only final actual required successful gates qualify P4. Immutable P3 broad-run failures remain preserved.",
+    "Offline Node cache used Vitest 3.2.6 and esbuild 0.27.7, differing from unchanged Vitest 4.1.11/esbuild 0.28.1 lock pins. No exact clean-install or hosted CI qualification. TypeScript 5.7.3, AJV 8.20.0 and schema generator 15.0.4 used; current workspace SDK source was selected.",
+    "Complete source self-review is source-bound; no independent human signoff, Kani run, Linux confinement, comparative scale/performance, hosted CI, live gateway/provider or production deployment qualification."
+  ],
+  "next_phase": {
+    "id": "P5",
+    "title": "Confined returns",
+    "scope": "Host-issued lineage boundaries, enforced cage/broker launch, bounded parent returns and mediation of every enabled return, error, log and stream channel."
+  },
+  "phase_documents": [
+    {
+      "path": "OPERATIONS.md",
+      "sha256": "d77cab77d709437b382de22050dee58640c80919346b18619be1e97e231c6b1f"
+    },
+    {
+      "path": "PLAN.md",
+      "sha256": "be4ce083dfa8b9fc233b37e31e2e2c73e01fafffad264942afb8e85d0614aeb3"
+    },
+    {
+      "path": "REVIEW.md",
+      "sha256": "0365057bf8fa8a321f2c2691b0d621d6a7275d243b85cf29b5f3e103919c3003"
+    },
+    {
+      "path": "requirements-coverage.json",
+      "sha256": "2a16c21ba4423ce0d4bb5254646dc23a63c1934ac02a3dc1cca62c4c2873743d"
+    },
+    {
+      "path": "source-baseline.json",
+      "sha256": "fb156f97150dc3500b159c3484a09bc3f414a113122eb74df30ddca8c2047be1"
+    },
+    {
+      "path": "source-inventory.json",
+      "sha256": "e224975a7be4c915bbe2562841966667ff95352882cac83b30e169ec4f997b6e"
+    }
+  ],
+  "evidence_artifacts": [
+    {
+      "path": "evidence/alloc.log",
+      "sha256": "e2fd2c09fce50f3b98afc86b2741cd7ef279bb539eafd2a0b72babefdbcacf81"
+    },
+    {
+      "path": "evidence/alloc.result.json",
+      "sha256": "67fceb38296eabfc959084d92b569480970b980d9e76f1d0831e64659e063674"
+    },
+    {
+      "path": "evidence/api-refactor-compile-attempt.log",
+      "sha256": "51f8004e5770d05cfe867b2873fda84ab7f19ad62732bdb25b422b7c1fe95ef9"
+    },
+    {
+      "path": "evidence/api-refactor-compile-attempt.result.json",
+      "sha256": "55193df6da23aa3c3996c407ea5dcb8f4fd56a3dd3e09c8e3ccf57bc3daa994c"
+    },
+    {
+      "path": "evidence/architecture-before-verification-attempt.log",
+      "sha256": "40a5eb302454c1a3d52a3570a725c348bf808b22aa287aaf9e60b5a8850d8da8"
+    },
+    {
+      "path": "evidence/architecture-before-verification-attempt.result.json",
+      "sha256": "80e829713e6b8323409891fe93ce4583730b59b15648b28696c66db209f6a6a2"
+    },
+    {
+      "path": "evidence/architecture.log",
+      "sha256": "84d434004a1139784c47ae14b64c4a28055c882de865ed26e43cab3867e5388a"
+    },
+    {
+      "path": "evidence/architecture.result.json",
+      "sha256": "704f33df17f78f3993761c91b9775535788eab136e210c71c07b94ec93147445"
+    },
+    {
+      "path": "evidence/clippy.log",
+      "sha256": "3a04fad53ce11886f32f4096fa491f47ec3e5a791dd693cff2624439a9d5122a"
+    },
+    {
+      "path": "evidence/clippy.result.json",
+      "sha256": "a409d49b1d3a949d3fb9987c97add951c24c90026f5c3639de721be398d83a37"
+    },
+    {
+      "path": "evidence/conformance-lib.log",
+      "sha256": "49df299e2c52a84b45b12f8c8f6c752b3198f8469e222413d9bced12cf900a66"
+    },
+    {
+      "path": "evidence/conformance-lib.result.json",
+      "sha256": "1a9647857399f9bf77308b5612b21d951990b12f135ccef07a7ef10c16258d61"
+    },
+    {
+      "path": "evidence/current-source.tar.gz",
+      "sha256": "9ff429f2a1167b149d93cb47a2c06cd8011f88ed5c0a9e464a2eb0515c25947b"
+    },
+    {
+      "path": "evidence/diagnostic-attempts.json",
+      "sha256": "15424819791b854be3bb599a19fad791e5a12aac884d23aa60a0728911d936a3"
+    },
+    {
+      "path": "evidence/diagnostic-clippy-attempt.log",
+      "sha256": "99672638f28c8d09aa6d59b848dea74e042da21fdee9cc523d69f040411a119f"
+    },
+    {
+      "path": "evidence/diagnostic-codegen-ts-write-2.log",
+      "sha256": "f7ab63f5a0b568987fd22a2958b4cae44cab638af84602233bb7ddaba9049ed6"
+    },
+    {
+      "path": "evidence/diagnostic-contract-attempt.log",
+      "sha256": "d25a1b5bbb90a15c0970557f7996ec4fbacff7a8d36e2ab52581121c0609eb04"
+    },
+    {
+      "path": "evidence/diagnostic-native-attempt-4.log",
+      "sha256": "3d300c7691b8b6616bdf13ba72c1a7b34e72671581dfe6284040e60d8cfc4ec3"
+    },
+    {
+      "path": "evidence/diagnostic-native-attempt-5.log",
+      "sha256": "d2549ed0d9b505caaff3dea5b9855f642decab72f66e3ba521a9410b3d59b524"
+    },
+    {
+      "path": "evidence/diagnostic-python-attempt.log",
+      "sha256": "10882ac1355f08d09b582cf82e0dcab21ea32619b6c7c926f14dfbcf78333364"
+    },
+    {
+      "path": "evidence/diagnostic-sdk-gates.log",
+      "sha256": "825384f31e1ab0dbfa39346adc1862e7d40d2aad1fb5d8db372a4f43e22e586a"
+    },
+    {
+      "path": "evidence/diagnostic-ts-attempt.log",
+      "sha256": "5a5b633e9d8660c371940f7bfc9836ab217099dbdb09b0d9d31cb1480cab9e26"
+    },
+    {
+      "path": "evidence/diff.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/diff.result.json",
+      "sha256": "5e066dff1b05adcb7d52a177c0207d0d753802c7fe57abccbf18b61ca80aec07"
+    },
+    {
+      "path": "evidence/domains.log",
+      "sha256": "9660e42dc2a0efbad4e490330d6a6385e58a420c7c1648c95bc9031c502670af"
+    },
+    {
+      "path": "evidence/domains.result.json",
+      "sha256": "3e0455f92b8801dd33aa35081d8a0b97fe218692a917d69c27134a794478e5b4"
+    },
+    {
+      "path": "evidence/format.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/format.result.json",
+      "sha256": "fc2aea9e865697f03446d92b1339bfe29510d3909deff9e6fb3df55b0b8990a2"
+    },
+    {
+      "path": "evidence/generate-contracts.py",
+      "sha256": "11deff0110beca5b81de273ef0c0206a54c17979fcaccd6ca4546e69ceaebf17"
+    },
+    {
+      "path": "evidence/guard-mutations.log",
+      "sha256": "ab51ea60a180dcf83532117f0b671bba89aa7c055dfab26f507de72d874d2fb6"
+    },
+    {
+      "path": "evidence/guard-mutations.result.json",
+      "sha256": "119ba2face5d130a6c93d83ed216579e975346e69705a6441f297a2226cb2f62"
+    },
+    {
+      "path": "evidence/hygiene.log",
+      "sha256": "342b6326fc741f1df0e2a0821bacf2b919b0c1893f37921f161467e2648bc179"
+    },
+    {
+      "path": "evidence/hygiene.result.json",
+      "sha256": "913221faa2d0c227f0719ac2b313612801cfbcafad36023c900047812370b3f6"
+    },
+    {
+      "path": "evidence/kernel-doc-tests.log",
+      "sha256": "7be1c28046199bdf0a024e5d397db4201b3eff19a4c7eeeb2b390305a7f431c0"
+    },
+    {
+      "path": "evidence/kernel-doc-tests.result.json",
+      "sha256": "a6497d315a44837fd80f50d44919c6a76851d2e58de9fb0af015e7d6fe0c588c"
+    },
+    {
+      "path": "evidence/kernel-lib.log",
+      "sha256": "77164643b073b8be9eb8d7177db4e2828e7db8c0834d3f855ce849f621ef064b"
+    },
+    {
+      "path": "evidence/kernel-lib.result.json",
+      "sha256": "033da080af9ff4558be2b1dba3b310912d12c972114709c923f195275a84dce0"
+    },
+    {
+      "path": "evidence/layering.log",
+      "sha256": "d86efcdb613cfdb5c7cb93fbc663ad1379d53aa619f4b44377011ce820a3a8ea"
+    },
+    {
+      "path": "evidence/layering.result.json",
+      "sha256": "1ef1d35a2abd4e366e5b219b8091cba80a8a58b7fe4ed467c68f034193f95608"
+    },
+    {
+      "path": "evidence/lint-parity.log",
+      "sha256": "5cdbfdb13810b2e2e148e68b501cddfe136aa2de30eda0b7ef053818dbaf1f02"
+    },
+    {
+      "path": "evidence/lint-parity.result.json",
+      "sha256": "adc5d6e6cfe636a1dcb9315d0889f51f3fbeebd9ddfeacda430ca7a3e7074156"
+    },
+    {
+      "path": "evidence/msrv-alloc.log",
+      "sha256": "97105c57421b318c9d5c0e7a1d1691599c8b239f267e7ee96bb9f284db5b6c30"
+    },
+    {
+      "path": "evidence/msrv-alloc.result.json",
+      "sha256": "c5f8acfe766c4f0c41bb584dcc3d137062615a36dd4994e7b7a90b50febeb7e9"
+    },
+    {
+      "path": "evidence/msrv-std.log",
+      "sha256": "95b31972a16ccd289eb691c816fd6a851a96bc7de224c41db9d1b358d64170b4"
+    },
+    {
+      "path": "evidence/msrv-std.result.json",
+      "sha256": "4880a9dbbedc1c2592b7cf0d98f1253440e6e0dc239010a7e02ae90612abfdd1"
+    },
+    {
+      "path": "evidence/native.log",
+      "sha256": "aa8423a7c5b3ec80a146d0830c5b7dbf645753b965a533fb3d66c7c6af4fa7fc"
+    },
+    {
+      "path": "evidence/native.result.json",
+      "sha256": "1135873f54d18a7eeeaef162a0c6d6644bcbdf4199ef58b0337bfac277e81440"
+    },
+    {
+      "path": "evidence/owner-doc-tests.log",
+      "sha256": "6c2a848cebbf02c35238f7b614da1e7d340fbadd162510b28fc86b97ade3905a"
+    },
+    {
+      "path": "evidence/owner-doc-tests.result.json",
+      "sha256": "85f743c4ef708105a5539feb372cf3ff78c742c627e05c5f4656d2b64b491f20"
+    },
+    {
+      "path": "evidence/owning-tests.log",
+      "sha256": "63aa580430a7724bf5dc99aa85b6bf9c6365273b4f31c43eb4e95ecd6a327404"
+    },
+    {
+      "path": "evidence/owning-tests.result.json",
+      "sha256": "f2e69b362ee2c94f18f340b612631c1edb3a3349d54ec3b0834c5aa3b740b3da"
+    },
+    {
+      "path": "evidence/p1-native.log",
+      "sha256": "a83b749b3955ee002d8f9f9193f74a6c02ab31a88d7735090ddf6463e37540c7"
+    },
+    {
+      "path": "evidence/p1-native.result.json",
+      "sha256": "79e2b4837e2a989bfc518e15059627e4981fbacbf74dab02ee36afe01fd2e369"
+    },
+    {
+      "path": "evidence/p1-partial-ddl-attempt.log",
+      "sha256": "cba941ca26e31e98be4a7a0e25ff4b9a74e999e43987fe851773bf56dc037693"
+    },
+    {
+      "path": "evidence/p1-partial-ddl-attempt.result.json",
+      "sha256": "8f37a8615325b40d8e2c1530e642b966d3104b4b8252b93b7765b6cfd998653b"
+    },
+    {
+      "path": "evidence/p1-strengthened-snapshot-attempt.log",
+      "sha256": "954877617fa38dcf4f1c653675c3ed65729db1a955ae93fb95e086d52365b607"
+    },
+    {
+      "path": "evidence/p1-strengthened-snapshot-attempt.result.json",
+      "sha256": "807d377b5fb63e40324295b1b305d32e01a2c4ca90569ea41e776e8e82b2d5e8"
+    },
+    {
+      "path": "evidence/p2-native.log",
+      "sha256": "106f2d85704c53a12cd0493d387c01b8efee3c6685a1713a219dd18f4046c111"
+    },
+    {
+      "path": "evidence/p2-native.result.json",
+      "sha256": "fd664ae9b5b79fe4fec4196fd37e6b1ded766a2492d701eab6dcc28f6c1b9e13"
+    },
+    {
+      "path": "evidence/p3-native.log",
+      "sha256": "881f8529158016fddfbd8cf1da97aeb2239624379396cb29e9e1de16b353be43"
+    },
+    {
+      "path": "evidence/p3-native.result.json",
+      "sha256": "632d101608699022786f575095495500222731702b44196002b15d35c13469f2"
+    },
+    {
+      "path": "evidence/p3-source-baseline.tar.gz",
+      "sha256": "a882f0d8633f30c2a6f7983b42988e02890d56e2bee5baad149554b0d96e39da"
+    },
+    {
+      "path": "evidence/package-integrity.log",
+      "sha256": "c46302e915e64e988aaf47a6e33b050d363415ebe04c15e47cad200c49a9e753"
+    },
+    {
+      "path": "evidence/pure-guard.log",
+      "sha256": "833390d11d2e74f4ccffd89b62f912a30db6db7a3c5bdf9a8780581dc9f07480"
+    },
+    {
+      "path": "evidence/pure-guard.result.json",
+      "sha256": "02ca66d93582a887d5e0a41c414b7f758e75a71c88352716b507a548192a9b84"
+    },
+    {
+      "path": "evidence/python-codegen.log",
+      "sha256": "263879d30dc7e5071c6c48d88ef9aa791acbbe3a5f1b425649497a73045152fa"
+    },
+    {
+      "path": "evidence/python-codegen.result.json",
+      "sha256": "4680d7bd52f4413ce05c65237650a348249f3bc427ae92f92c2ee4643d516a5d"
+    },
+    {
+      "path": "evidence/python.log",
+      "sha256": "dc9b7faad5be497ae52d5f94019a414b6e656f6e7770ba9f77a556cba4e9ae63"
+    },
+    {
+      "path": "evidence/python.result.json",
+      "sha256": "50e2c9345320332cf441f5344e3137443c9cc2870c1de75142c409ca6b3a1bdf"
+    },
+    {
+      "path": "evidence/range-pattern-attempt.log",
+      "sha256": "19c44d495609c44b464eb9f0208d33238736d4a68ca0310f4fbb9f335357baf8"
+    },
+    {
+      "path": "evidence/range-pattern-attempt.result.json",
+      "sha256": "40dbbf4c810e7cf584ea4179aeb559281c2cb4dbec6ad909e05357a5df8b268c"
+    },
+    {
+      "path": "evidence/run-gates.py",
+      "sha256": "d980484a40de9630f58172abaf1547ffe7b4a2bfca8a1587f2fed3d38987e90a"
+    },
+    {
+      "path": "evidence/rust-codegen.log",
+      "sha256": "ea8fe1220f36dfa900d0a6c80d0115d96df53ad47f2a28dd52418de956d7cfb9"
+    },
+    {
+      "path": "evidence/rust-codegen.result.json",
+      "sha256": "98736a3b41810c2186d6442b7620c9efcffd335f7cf4aafe9b3199529c9bff85"
+    },
+    {
+      "path": "evidence/schemas.log",
+      "sha256": "f08ca40211ee4cf16919c55a0c548472ee01a0ff6808eadb1e60a66f4aa43553"
+    },
+    {
+      "path": "evidence/schemas.result.json",
+      "sha256": "09abe1a2fe18b89967af5979d83bfab40fc179c03bfc637d7fe3f1cae3f4f191"
+    },
+    {
+      "path": "evidence/seal-package.py",
+      "sha256": "b2cd5dbf754431d7fd60dfe6fb6de8f36c69acadcf9eb1d11a5c6f60d237fec4"
+    },
+    {
+      "path": "evidence/std.log",
+      "sha256": "0d990f8ce455eedbe9b1546c7d2141ff6d0c7e5de07f10865155e4c75bcd3001"
+    },
+    {
+      "path": "evidence/std.result.json",
+      "sha256": "e800016285eae09db73a5501515a9a7dbf6d84640b275863b17450d9ead444ed"
+    },
+    {
+      "path": "evidence/store-doc-tests.log",
+      "sha256": "7bff01be690849d11fe1baddf18d1e440fff222911ae3d4c3101a769efd4eb39"
+    },
+    {
+      "path": "evidence/store-doc-tests.result.json",
+      "sha256": "0db3d7eccb7fe69636219e2b6227291480dd918cfb94e4a5f7d67acea50b5462"
+    },
+    {
+      "path": "evidence/store-native.log",
+      "sha256": "e453889ae439e7fef524dcdd01ad047fdf09bbcc2d2a21b29ef2930ba26d82e7"
+    },
+    {
+      "path": "evidence/store-native.result.json",
+      "sha256": "8fcf84d690ffffe874eefe80f851bdf13f27a6e20d81111e1b766e9d20e2bee4"
+    },
+    {
+      "path": "evidence/store-ordering.log",
+      "sha256": "e9c3ec59cef988d3c322b4ead746ababc1b7c9590a3e3ffba514f714d67d07a1"
+    },
+    {
+      "path": "evidence/store-ordering.result.json",
+      "sha256": "e9e75bbb0906593712a0e38a4fb6fdb5e9c99386c7abc2a3943ac2dd2608bcad"
+    },
+    {
+      "path": "evidence/store-regression.log",
+      "sha256": "fba2212de389544379815a73439f2bdddb60876649ad27cacfa536548c0a5e1a"
+    },
+    {
+      "path": "evidence/store-regression.result.json",
+      "sha256": "d10c9823cd062a07c603ca4502cfd239c26bc92ba507c48d53f1a241b30de51c"
+    },
+    {
+      "path": "evidence/store-schema-empty-filter-attempt.log",
+      "sha256": "85f0e0b5c02f09615f0eadf7fd1553eb9e8ee8f2084095ac95423ab601bfaa77"
+    },
+    {
+      "path": "evidence/store-schema-empty-filter-attempt.result.json",
+      "sha256": "c91620e9ccae8d7f4c3921aa4498cfc6d91c42e1b9eac98c7c6aaa1db6229e6a"
+    },
+    {
+      "path": "evidence/store-schema.log",
+      "sha256": "84742e7cfd0328aad354654f24ae312e7b0655cb2c5c11b6e08dd8a74c1699d9"
+    },
+    {
+      "path": "evidence/store-schema.result.json",
+      "sha256": "501bb7b7d3efaa58bb052acddf4dfa3fca15d6c35de8bd25e3382f293820230e"
+    },
+    {
+      "path": "evidence/tool-cache-provenance.json",
+      "sha256": "b0e8b22d52f9d4e499aa1568eee0bd8d20e1df929f9c25a8e754695dad2d3e89"
+    },
+    {
+      "path": "evidence/toolchain-parity.log",
+      "sha256": "0663e9dc80bac7594693bac2c394f9b68eeff85feaae6622feb1d67ad41aa730"
+    },
+    {
+      "path": "evidence/toolchain-parity.result.json",
+      "sha256": "d40045f7c8306a118f5d2fc08a6feb61580652215b9e1764dd5abc0391e19f19"
+    },
+    {
+      "path": "evidence/ts-codegen.log",
+      "sha256": "6f3b674331a3c688c6b6bb4371c327d570aadfacf5e87927ec34cd0ce087f612"
+    },
+    {
+      "path": "evidence/ts-codegen.result.json",
+      "sha256": "45fc1411c9dbaa5ccfb0de5132b3a1d226a0231db8e869261b1c2e019ecc70d0"
+    },
+    {
+      "path": "evidence/ts-conformance-build.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/ts-conformance-build.result.json",
+      "sha256": "59d244f16f4191da019c1cde3b532e5fffca4c9524302a54a1201e7eeaecd9da"
+    },
+    {
+      "path": "evidence/ts-node-build.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/ts-node-build.result.json",
+      "sha256": "8036e11165bbd7d7659fb8a8fd08577c9718e98d9880658a787ae9977bca9d94"
+    },
+    {
+      "path": "evidence/ts.log",
+      "sha256": "87cdff74b85818fcb15514e317818547af66f561a1b7db45d98e9f2b9d3ed976"
+    },
+    {
+      "path": "evidence/ts.result.json",
+      "sha256": "a5eb531c7cbbcbded0c1054691983f0040dc168f1532157fb62ef73a1070c59e"
+    },
+    {
+      "path": "evidence/vector-recompute.log",
+      "sha256": "df43009eaf4943db37d3b823aa0bd591a8c183e35b75795402c75f8d5513e3bd"
+    },
+    {
+      "path": "evidence/vector-recompute.result.json",
+      "sha256": "e7169ab399544783dbbc34492e777f9b2b6286ce253ae360199c4dc3a0416502"
+    },
+    {
+      "path": "evidence/verify-package.py",
+      "sha256": "382548f24719ae4a96360dba4cd6f37ae1a645c098cf32cafaa7e1eeb2c18b4f"
+    },
+    {
+      "path": "evidence/verify-vectors.py",
+      "sha256": "a9810cea3c316e40b586bb7b754ea586049c26638bdb2f5969689f8d06bb65b4"
+    },
+    {
+      "path": "evidence/wasm.log",
+      "sha256": "2e27c684e213af3ec867fbf3cbe723718db2619702fe962872c6ba4b2bbf7df3"
+    },
+    {
+      "path": "evidence/wasm.result.json",
+      "sha256": "b1a1ab28e5dea6b81d7275249435a34c8ad0ae82d631339e7a203b045f7d3248"
+    },
+    {
+      "path": "evidence/wire-lock.log",
+      "sha256": "da291954c526561d6b46277a0846954253fca34f974ef3f1fd44de462c56718c"
+    },
+    {
+      "path": "evidence/wire-lock.result.json",
+      "sha256": "e7d5ae0dd05b0e9996c2728691fe506274f0abd4beeeb0df6193a94a74496d16"
+    }
+  ]
+}

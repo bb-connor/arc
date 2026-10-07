@@ -1,0 +1,75 @@
+{
+  "schema": "chio.recovery-p6-owned-resource-cleanup.v1",
+  "verified_at_utc": "2026-10-05T16:02:56.853542+00:00",
+  "task_instance": {
+    "id": "ocid1.instance.oc1.iad.redacted-1",
+    "state": "TERMINATED",
+    "owned_tags": {
+      "owner": "codex-task-20261004",
+      "purpose": "recovery-runtime-qualification",
+      "temporary": "true"
+    }
+  },
+  "task_boot_volume": {
+    "id": "ocid1.bootvolume.oc1.iad.redacted-1",
+    "state": "TERMINATED"
+  },
+  "sessions": [
+    {
+      "id": "ocid1.bastionsession.oc1.iad.redacted-1",
+      "state": "DELETED"
+    },
+    {
+      "id": "ocid1.bastionsession.oc1.iad.redacted-2",
+      "state": "DELETED"
+    },
+    {
+      "id": "ocid1.bastionsession.oc1.iad.redacted-3",
+      "state": "DELETED"
+    },
+    {
+      "id": "ocid1.bastionsession.oc1.iad.redacted-4",
+      "state": "DELETED"
+    },
+    {
+      "id": "ocid1.bastionsession.oc1.iad.redacted-5",
+      "state": "DELETED"
+    },
+    {
+      "id": "ocid1.bastionsession.oc1.iad.redacted-6",
+      "state": "DELETED"
+    },
+    {
+      "id": "ocid1.bastionsession.oc1.iad.redacted-7",
+      "state": "DELETED"
+    },
+    {
+      "id": "ocid1.bastionsession.oc1.iad.redacted-8",
+      "state": "DELETED"
+    }
+  ],
+  "bastion": {
+    "id": "ocid1.bastion.oc1.iad.redacted-1",
+    "removed_only_task_cidrs": [
+      "redacted-ipv4-1/32",
+      "redacted-ipv4-2/32",
+      "redacted-ipv4-3/32"
+    ],
+    "retained_cidrs": [
+      "redacted-ipv4-4/32"
+    ]
+  },
+  "task_console_history_deleted": true,
+  "task_private_ssh_key_removed_after_matching_registered_public_key": true,
+  "owned_ssh_tunnels_remaining": 0,
+  "shared_original": {
+    "id": "ocid1.instance.oc1.iad.redacted-2",
+    "state": "RUNNING",
+    "agent_configuration_unchanged_from_precleanup": true,
+    "no_shutdown_or_mutation_by_final_cleanup": true
+  },
+  "unrelated_mac_workloads": "No stop, pause or termination actions performed.",
+  "limitations": [
+    "Historical OCI command metadata remains retained; no definitive execution-terminal proof is claimed for the earlier shared-host read-only preflight. Task VM/boot termination prevents further task-host execution."
+  ]
+}

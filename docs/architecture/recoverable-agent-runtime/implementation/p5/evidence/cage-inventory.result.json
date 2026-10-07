@@ -1,0 +1,18 @@
+{
+  "id": "cage-inventory",
+  "actual_command": [
+    "python3",
+    "scripts/check-cage-all-target-inventory.py",
+    "--source-only"
+  ],
+  "cwd": ".",
+  "environment": {},
+  "exit_code": 0,
+  "status": "passed",
+  "started_unix_seconds": 1791161475,
+  "duration_seconds": 0.563,
+  "log": "evidence/cage-inventory.log",
+  "log_sha256": "6b5d8a812d7837471779558e6edf8e7f53ba68b38aa33c9babbdc4fe920ab873",
+  "required_for_local_phase_acceptance": true,
+  "source_binding": "562a3c3556f31e5afedbd7c7a426e542cc5e8cd51c28a7a43d8e9704ba4e9bc4"
+}

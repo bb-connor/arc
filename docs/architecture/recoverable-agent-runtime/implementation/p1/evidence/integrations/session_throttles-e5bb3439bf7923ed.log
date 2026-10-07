@@ -1,0 +1,9 @@
+
+running 4 tests
+test last_unit_race_allows_exactly_one_invocation ... ok
+test deterministic_boundary_rollover_and_invocation_replay_are_exact ... ok
+test overlapping_windows_are_a_conjunction_and_remove_out_of_order ... ok
+test command_recovery_survives_restart_and_rejects_rebinding_and_stale_fence ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+

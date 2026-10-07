@@ -1,0 +1,28 @@
+{
+  "system": "Linux",
+  "machine": "x86_64",
+  "kernel": "7.0.0-1012-oracle",
+  "rustc": "rustc 1.94.1 (e408947bf 2026-03-25)\nbinary: rustc\ncommit-hash: e408947bfd200af42db322daf0fadfe7e26d3bd1\ncommit-date: 2026-03-25\nhost: x86_64-unknown-linux-gnu\nrelease: 1.94.1\nLLVM version: 21.1.8\n",
+  "cargo": "cargo 1.94.1 (29ea6fb6a 2026-03-24)\n",
+  "profile": "debug",
+  "debug_info": "0",
+  "incremental": false,
+  "build_jobs": 8,
+  "default_stack": true,
+  "host_load_before": [
+    0.65771484375,
+    0.35302734375,
+    0.13818359375
+  ],
+  "processor": "AMD EPYC 9J45 128-Core Processor",
+  "declaration_sha256": "5239a0923f02da451f05c9f1f1d11ca0906ec672ff85584ee89f3f853d74bbd2",
+  "current_runtime_binding": "b1bcd48cadb7b9c7f1ff5dd4ad8d9910056590e22058527756114e21239c1063",
+  "shape": "VM.Standard.E6.Flex",
+  "ocpus": 8,
+  "memory_gib": 64,
+  "host_load_after": [
+    0.818359375,
+    0.41162109375,
+    0.1630859375
+  ]
+}

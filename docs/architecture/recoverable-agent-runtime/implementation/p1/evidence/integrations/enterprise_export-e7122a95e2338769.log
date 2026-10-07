@@ -1,0 +1,46 @@
+
+running 41 tests
+test enterprise_export_accepts_risk_payout_matched_lifecycle ... ok
+test enterprise_export_accepts_reverse_slash_net_reconciliation ... ok
+test enterprise_export_accepts_multiple_covered_claim_payouts ... ok
+test enterprise_export_accepts_market_slash_with_sanction_bridge ... ok
+test enterprise_export_accepts_valid_autonomous_commerce_fixture ... ok
+test enterprise_export_rejects_closed_risk_facility_with_unreconciled_reserve ... ok
+test enterprise_export_rejects_control_map_missing_gate ... ok
+test enterprise_export_rejects_duplicate_risk_reserve_receipt_id ... ok
+test enterprise_export_accepts_risk_settlement_counterparty_bound_claim_payout ... ok
+test enterprise_export_rejects_duplicate_risk_coverage_claim_id ... ok
+test enterprise_export_rejects_market_slash_consuming_facility_reserve ... ok
+test enterprise_export_rejects_export_bundle_digest_mismatch ... ok
+test enterprise_export_rejects_missing_approval_case ... ok
+test enterprise_export_rejects_market_slash_missing_jurisdiction_ref ... ok
+test enterprise_export_rejects_market_slash_without_sanction_reserve_ledger ... ok
+test enterprise_export_rejects_missing_risk_reserve_state ... ok
+test enterprise_export_rejects_open_appeal_claim_payout ... ok
+test enterprise_export_rejects_open_appeal_reserve_release ... ok
+test enterprise_export_rejects_open_appeal_market_slash ... ok
+test enterprise_export_rejects_open_appeal_write_off ... ok
+test enterprise_export_rejects_reverse_slash_exceeding_prior_penalty ... ok
+test enterprise_export_rejects_pii_overdisclosure ... ok
+test enterprise_export_rejects_reserve_release_with_settlement_counterparties ... ok
+test enterprise_export_rejects_reverse_slash_without_prior_penalty ... ok
+test enterprise_export_rejects_risk_capital_adequacy_breach ... ok
+test enterprise_export_rejects_risk_actuarial_backtest_breach ... ok
+test enterprise_export_rejects_risk_claim_outside_coverage ... ok
+test enterprise_export_rejects_risk_capital_allocatable_without_lifecycle_replay ... ok
+test enterprise_export_rejects_risk_claim_payout_without_counterparties ... ok
+test enterprise_export_rejects_risk_coverage_bound_without_lifecycle_replay ... ok
+test enterprise_export_rejects_risk_coverage_subject_mismatch ... ok
+test enterprise_export_rejects_risk_double_consumed_reserve ... ok
+test enterprise_export_rejects_risk_exposure_exceeding_capital ... ok
+test enterprise_export_rejects_risk_facility_lifecycle_authority_wrong_schema_kind ... ok
+test enterprise_export_rejects_risk_facility_lifecycle_missing_authority ... ok
+test enterprise_export_rejects_risk_facility_lifecycle_missing_initial_gates ... ok
+test enterprise_export_rejects_risk_settlement_counterparty_mismatch ... ok
+test enterprise_export_rejects_risk_insurance_copy_exceeding_actuarial_support ... ok
+test enterprise_export_rejects_risk_settlement_counterparty_unbound_payee ... ok
+test enterprise_export_rejects_risk_facility_lifecycle_missing_evidence ... ok
+test enterprise_export_rejects_telemetry_digest_mismatch ... ok
+
+test result: ok. 41 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+

@@ -1,0 +1,1570 @@
+
+ RUN  v4.1.8 /Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/sdks/typescript/packages/node-http
+
+ ❯ test/interceptor.test.ts (24 tests | 13 failed) 65054ms
+     × decodes plus signs in query parameters like URLSearchParams 5008ms
+     × allows known-empty parsed bodies to evaluate as empty requests 5002ms
+     × preserves IncomingMessage bodies for downstream consumers 5008ms
+     × does not hang when the request stream was already consumed 5001ms
+     × fails closed when a chunked request stream was already consumed 5006ms
+     × reads complete but not drained IncomingMessage bodies 5003ms
+     × preserves Web Request bodies by reading from a clone 5001ms
+     × forwards configured Node request headers to the sidecar 5001ms
+     × fails closed for Node sidecar errors even when fail-open is requested 5002ms
+     × returns a controlled error for malformed Node query encoding 5003ms
+     × forwards query capability tokens to the sidecar 5002ms
+     × denies duplicate query capability tokens before sidecar evaluation 5001ms
+     × fails closed when Web request bodies cannot be cloned 5001ms
+ ❯ test/sidecar-client.test.ts (35 tests | 28 failed) 140047ms
+     × returns allow only after receipt authority verification for caller_executed 5001ms
+     × returns allow only after receipt authority verification for host_executed_provider_reported 5001ms
+     × returns allow only after receipt authority verification for host_executed_unmediated 5002ms
+     × returns allow only after receipt authority verification for chio_internal 5006ms
+     × rejects invalid receipt origin untrusted_future_origin before verification 5003ms
+     × rejects invalid receipt origin null before verification 5001ms
+     × normalizes omitted receipt evidence to an empty array 5001ms
+     × rejects allow-shaped responses without structural receipt authority 5001ms
+     × rejects advisory receipts as execution authorization 5002ms
+     × rejects unverified authoritative allow receipts 5002ms
+     × rejects inconsistent deny verdict with allow-shaped receipt 5002ms
+     × does not verify non-allow responses 5001ms
+     × allows deny responses that omit the receipt field 5000ms
+     × rejects allow responses that omit the receipt field 5001ms
+     × rejects non-allow responses with receipts missing semantics fields 5002ms
+     × rejects mediated decision receipts with observation outcomes 5003ms
+     × rejects advisory receipts without observation outcomes 5001ms
+     × throws evaluation-failed SidecarError for malformed JSON evaluate responses 5001ms
+     × throws evaluation-failed SidecarError for incomplete evaluate responses 5000ms
+     × returns structured non-authorizing verifier reports 5000ms
+     × throws invalid-receipt SidecarError for definitive non-200 verifier bodies 5002ms
+     × throws evaluation-failed SidecarError for non-verdict 4xx verifier responses 5002ms
+     × throws sidecar-unavailable SidecarError for non-verdict unavailable verifier responses 5001ms
+     × throws sidecar-unavailable SidecarError for 5xx verifier responses 5001ms
+     × throws sidecar-unreachable SidecarError for network failure 5001ms
+     × throws evaluation-failed SidecarError for malformed JSON verifier responses 5001ms
+     × throws evaluation-failed SidecarError when verifier response omits valid 5001ms
+     × throws timeout SidecarError when verifier body read times out 5001ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 41 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/interceptor.test.ts > request body preservation > decodes plus signs in query parameters like URLSearchParams
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/interceptor.test.ts:336:3
+    334|
+    335| describe("request body preservation", () => {
+    336|   it("decodes plus signs in query parameters like URLSearchParams", as…
+       |   ^
+    337|     let observedQuery: Record<string, string> | undefined;
+    338|     const sidecar = await startMockSidecar((body) => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/41]⎯
+
+ FAIL  test/interceptor.test.ts > request body preservation > allows known-empty parsed bodies to evaluate as empty requests
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/interceptor.test.ts:363:3
+    361|   });
+    362|
+    363|   it("allows known-empty parsed bodies to evaluate as empty requests",…
+       |   ^
+    364|     let observed: { body_hash?: string; body_length?: number } | undef…
+    365|     const sidecar = await startMockSidecar((body) => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/41]⎯
+
+ FAIL  test/interceptor.test.ts > request body preservation > preserves IncomingMessage bodies for downstream consumers
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/interceptor.test.ts:393:3
+    391|   });
+    392|
+    393|   it("preserves IncomingMessage bodies for downstream consumers", asyn…
+       |   ^
+    394|     const sidecar = await startMockSidecar();
+    395|     const resolved = resolveConfig({ sidecarUrl: sidecar.url });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/41]⎯
+
+ FAIL  test/interceptor.test.ts > request body preservation > does not hang when the request stream was already consumed
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/interceptor.test.ts:430:3
+    428|   });
+    429|
+    430|   it("does not hang when the request stream was already consumed", asy…
+       |   ^
+    431|     let evaluateCalls = 0;
+    432|     const sidecar = await startMockSidecar(() => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/41]⎯
+
+ FAIL  test/interceptor.test.ts > request body preservation > fails closed when a chunked request stream was already consumed
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/interceptor.test.ts:478:3
+    476|   });
+    477|
+    478|   it("fails closed when a chunked request stream was already consumed"…
+       |   ^
+    479|     let evaluateCalls = 0;
+    480|     const sidecar = await startMockSidecar(() => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/41]⎯
+
+ FAIL  test/interceptor.test.ts > request body preservation > reads complete but not drained IncomingMessage bodies
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/interceptor.test.ts:522:3
+    520|   });
+    521|
+    522|   it("reads complete but not drained IncomingMessage bodies", async ()…
+       |   ^
+    523|     let lastEvaluateBody: string | undefined;
+    524|     const sidecar = await startMockSidecar((body) => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/41]⎯
+
+ FAIL  test/interceptor.test.ts > request body preservation > preserves Web Request bodies by reading from a clone
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/interceptor.test.ts:563:3
+    561|   });
+    562|
+    563|   it("preserves Web Request bodies by reading from a clone", async () …
+       |   ^
+    564|     let lastBodyHash: string | undefined;
+    565|     const sidecar = await startMockSidecar((body) => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/41]⎯
+
+ FAIL  test/interceptor.test.ts > request body preservation > forwards configured Node request headers to the sidecar
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/interceptor.test.ts:590:3
+    588|   });
+    589|
+    590|   it("forwards configured Node request headers to the sidecar", async …
+       |   ^
+    591|     let lastEvaluateBody: string | undefined;
+    592|     const sidecar = await startMockSidecar((body) => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/41]⎯
+
+ FAIL  test/interceptor.test.ts > request body preservation > fails closed for Node sidecar errors even when fail-open is requested
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/interceptor.test.ts:629:3
+    627|   });
+    628|
+    629|   it("fails closed for Node sidecar errors even when fail-open is requ…
+       |   ^
+    630|     const resolved = resolveConfig({
+    631|       sidecarUrl: "http://127.0.0.1:1",
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/41]⎯
+
+ FAIL  test/interceptor.test.ts > request body preservation > returns a controlled error for malformed Node query encoding
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/interceptor.test.ts:654:3
+    652|   });
+    653|
+    654|   it("returns a controlled error for malformed Node query encoding", a…
+       |   ^
+    655|     const resolved = resolveConfig({
+    656|       sidecarUrl: "http://127.0.0.1:1",
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/41]⎯
+
+ FAIL  test/interceptor.test.ts > request body preservation > forwards query capability tokens to the sidecar
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/interceptor.test.ts:699:3
+    697|   });
+    698|
+    699|   it("forwards query capability tokens to the sidecar", async () => {
+       |   ^
+    700|     let forwardedCapability: string | string[] | undefined;
+    701|     let evaluatedCapabilityId: string | undefined;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/41]⎯
+
+ FAIL  test/interceptor.test.ts > request body preservation > denies duplicate query capability tokens before sidecar evaluation
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/interceptor.test.ts:725:3
+    723|   });
+    724|
+    725|   it("denies duplicate query capability tokens before sidecar evaluati…
+       |   ^
+    726|     let called = false;
+    727|     const sidecar = await startMockSidecar(() => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/41]⎯
+
+ FAIL  test/interceptor.test.ts > request body preservation > fails closed when Web request bodies cannot be cloned
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/interceptor.test.ts:748:3
+    746|   });
+    747|
+    748|   it("fails closed when Web request bodies cannot be cloned", async ()…
+       |   ^
+    749|     const sidecar = await startMockSidecar();
+    750|     const resolved = resolveConfig({ sidecarUrl: sidecar.url });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/41]⎯
+
+ FAIL  test/sidecar-client.test.ts > ChioSidecarClient.evaluate > returns allow only after receipt authority verification for caller_executed
+ FAIL  test/sidecar-client.test.ts > ChioSidecarClient.evaluate > returns allow only after receipt authority verification for host_executed_provider_reported
+ FAIL  test/sidecar-client.test.ts > ChioSidecarClient.evaluate > returns allow only after receipt authority verification for host_executed_unmediated
+ FAIL  test/sidecar-client.test.ts > ChioSidecarClient.evaluate > returns allow only after receipt authority verification for chio_internal
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/sidecar-client.test.ts:277:13
+    275|     "caller_executed", "host_executed_provider_reported",
+    276|     "host_executed_unmediated", "chio_internal",
+    277|   ] as const)("returns allow only after receipt authority verification…
+       |             ^
+    278|     let verifyCalls = 0;
+    279|     const result: EvaluateResponse = {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/41]⎯
+
+ FAIL  test/sidecar-client.test.ts > ChioSidecarClient.evaluate > rejects invalid receipt origin untrusted_future_origin before verification
+ FAIL  test/sidecar-client.test.ts > ChioSidecarClient.evaluate > rejects invalid receipt origin null before verification
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/sidecar-client.test.ts:297:44
+    295|   });
+    296|
+    297|   it.each(["untrusted_future_origin", null])("rejects invalid receipt …
+       |                                            ^
+    298|     let verifyCalls = 0;
+    299|     const result: EvaluateResponse = {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/41]⎯
+
+ FAIL  test/sidecar-client.test.ts > ChioSidecarClient.evaluate > normalizes omitted receipt evidence to an empty array
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/sidecar-client.test.ts:316:3
+    314|   });
+    315|
+    316|   it("normalizes omitted receipt evidence to an empty array", async ()…
+       |   ^
+    317|     const receipt = authoritativeAllowReceipt() as Partial<HttpReceipt…
+    318|     delete receipt.evidence;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/41]⎯
+
+ FAIL  test/sidecar-client.test.ts > ChioSidecarClient.evaluate > rejects allow-shaped responses without structural receipt authority
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/sidecar-client.test.ts:335:3
+    333|   });
+    334|
+    335|   it("rejects allow-shaped responses without structural receipt author…
+       |   ^
+    336|     const result: EvaluateResponse = {
+    337|       verdict: { verdict: "allow" },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/41]⎯
+
+ FAIL  test/sidecar-client.test.ts > ChioSidecarClient.evaluate > rejects advisory receipts as execution authorization
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/sidecar-client.test.ts:354:3
+    352|   });
+    353|
+    354|   it("rejects advisory receipts as execution authorization", async () …
+       |   ^
+    355|     const result: EvaluateResponse = {
+    356|       verdict: { verdict: "allow" },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/41]⎯
+
+ FAIL  test/sidecar-client.test.ts > ChioSidecarClient.evaluate > rejects unverified authoritative allow receipts
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/sidecar-client.test.ts:373:3
+    371|   });
+    372|
+    373|   it("rejects unverified authoritative allow receipts", async () => {
+       |   ^
+    374|     const result: EvaluateResponse = {
+    375|       verdict: { verdict: "allow" },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/41]⎯
+
+ FAIL  test/sidecar-client.test.ts > ChioSidecarClient.evaluate > rejects inconsistent deny verdict with allow-shaped receipt
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/sidecar-client.test.ts:392:3
+    390|   });
+    391|
+    392|   it("rejects inconsistent deny verdict with allow-shaped receipt", as…
+       |   ^
+    393|     const result: EvaluateResponse = {
+    394|       verdict: { verdict: "deny", reason: "blocked", guard: "policy", …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/41]⎯
+
+ FAIL  test/sidecar-client.test.ts > ChioSidecarClient.evaluate > does not verify non-allow responses
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/sidecar-client.test.ts:411:3
+    409|   });
+    410|
+    411|   it("does not verify non-allow responses", async () => {
+       |   ^
+    412|     let verifyCalls = 0;
+    413|     const result: EvaluateResponse = {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/41]⎯
+
+ FAIL  test/sidecar-client.test.ts > ChioSidecarClient.evaluate > allows deny responses that omit the receipt field
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/sidecar-client.test.ts:435:3
+    433|   });
+    434|
+    435|   it("allows deny responses that omit the receipt field", async () => {
+       |   ^
+    436|     const result = {
+    437|       verdict: { verdict: "deny", reason: "blocked", guard: "policy", …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/41]⎯
+
+ FAIL  test/sidecar-client.test.ts > ChioSidecarClient.evaluate > rejects allow responses that omit the receipt field
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/sidecar-client.test.ts:450:3
+    448|   });
+    449|
+    450|   it("rejects allow responses that omit the receipt field", async () =…
+       |   ^
+    451|     const result = {
+    452|       verdict: { verdict: "allow" },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/41]⎯
+
+ FAIL  test/sidecar-client.test.ts > ChioSidecarClient.evaluate > rejects non-allow responses with receipts missing semantics fields
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/sidecar-client.test.ts:469:3
+    467|   });
+    468|
+    469|   it("rejects non-allow responses with receipts missing semantics fiel…
+       |   ^
+    470|     const result: EvaluateResponse = {
+    471|       verdict: { verdict: "deny", reason: "blocked", guard: "policy", …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/41]⎯
+
+ FAIL  test/sidecar-client.test.ts > ChioSidecarClient.evaluate > rejects mediated decision receipts with observation outcomes
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/sidecar-client.test.ts:491:3
+    489|   });
+    490|
+    491|   it("rejects mediated decision receipts with observation outcomes", a…
+       |   ^
+    492|     const result: EvaluateResponse = {
+    493|       verdict: { verdict: "deny", reason: "blocked", guard: "policy", …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/41]⎯
+
+ FAIL  test/sidecar-client.test.ts > ChioSidecarClient.evaluate > rejects advisory receipts without observation outcomes
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/sidecar-client.test.ts:515:3
+    513|   });
+    514|
+    515|   it("rejects advisory receipts without observation outcomes", async (…
+       |   ^
+    516|     const result: EvaluateResponse = {
+    517|       verdict: { verdict: "deny", reason: "blocked", guard: "policy", …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[26/41]⎯
+
+ FAIL  test/sidecar-client.test.ts > ChioSidecarClient.evaluate > throws evaluation-failed SidecarError for malformed JSON evaluate responses
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/sidecar-client.test.ts:539:3
+    537|   });
+    538|
+    539|   it("throws evaluation-failed SidecarError for malformed JSON evaluat…
+       |   ^
+    540|     const { server, url } = await startEvaluateRawSidecar("{not json");
+    541|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[27/41]⎯
+
+ FAIL  test/sidecar-client.test.ts > ChioSidecarClient.evaluate > throws evaluation-failed SidecarError for incomplete evaluate responses
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/sidecar-client.test.ts:553:3
+    551|   });
+    552|
+    553|   it("throws evaluation-failed SidecarError for incomplete evaluate re…
+       |   ^
+    554|     const { server, url } = await startEvaluateSidecar({}, true);
+    555|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[28/41]⎯
+
+ FAIL  test/sidecar-client.test.ts > ChioSidecarClient.verifyReceipt > returns structured non-authorizing verifier reports
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/sidecar-client.test.ts:569:3
+    567|
+    568| describe("ChioSidecarClient.verifyReceipt", () => {
+    569|   it("returns structured non-authorizing verifier reports", async () =…
+       |   ^
+    570|     const { server, url } = await startVerifySidecar((res) => {
+    571|       res.writeHead(200, { "Content-Type": "application/json" });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[29/41]⎯
+
+ FAIL  test/sidecar-client.test.ts > ChioSidecarClient.verifyReceipt > throws invalid-receipt SidecarError for definitive non-200 verifier bodies
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/sidecar-client.test.ts:585:3
+    583|   });
+    584|
+    585|   it("throws invalid-receipt SidecarError for definitive non-200 verif…
+       |   ^
+    586|     const cases: unknown[] = [{ valid: false }, { error: "chio_invalid…
+    587|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[30/41]⎯
+
+ FAIL  test/sidecar-client.test.ts > ChioSidecarClient.verifyReceipt > throws evaluation-failed SidecarError for non-verdict 4xx verifier responses
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/sidecar-client.test.ts:607:3
+    605|   });
+    606|
+    607|   it("throws evaluation-failed SidecarError for non-verdict 4xx verifi…
+       |   ^
+    608|     const cases = [400, 401, 403, 422];
+    609|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[31/41]⎯
+
+ FAIL  test/sidecar-client.test.ts > ChioSidecarClient.verifyReceipt > throws sidecar-unavailable SidecarError for non-verdict unavailable verifier responses
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/sidecar-client.test.ts:629:3
+    627|   });
+    628|
+    629|   it("throws sidecar-unavailable SidecarError for non-verdict unavaila…
+       |   ^
+    630|     const cases = [404, 429];
+    631|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[32/41]⎯
+
+ FAIL  test/sidecar-client.test.ts > ChioSidecarClient.verifyReceipt > throws sidecar-unavailable SidecarError for 5xx verifier responses
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/sidecar-client.test.ts:651:3
+    649|   });
+    650|
+    651|   it("throws sidecar-unavailable SidecarError for 5xx verifier respons…
+       |   ^
+    652|     const { server, url } = await startVerifySidecar((res) => {
+    653|       res.writeHead(503, { "Content-Type": "application/json" });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[33/41]⎯
+
+ FAIL  test/sidecar-client.test.ts > ChioSidecarClient.verifyReceipt > throws sidecar-unreachable SidecarError for network failure
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/sidecar-client.test.ts:669:3
+    667|   });
+    668|
+    669|   it("throws sidecar-unreachable SidecarError for network failure", as…
+       |   ^
+    670|     const { server, url } = await startVerifySidecar((res) => {
+    671|       res.writeHead(200, { "Content-Type": "application/json" });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[34/41]⎯
+
+ FAIL  test/sidecar-client.test.ts > ChioSidecarClient.verifyReceipt > throws evaluation-failed SidecarError for malformed JSON verifier responses
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/sidecar-client.test.ts:683:3
+    681|   });
+    682|
+    683|   it("throws evaluation-failed SidecarError for malformed JSON verifie…
+       |   ^
+    684|     const { server, url } = await startVerifySidecar((res) => {
+    685|       res.writeHead(200, { "Content-Type": "application/json" });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[35/41]⎯
+
+ FAIL  test/sidecar-client.test.ts > ChioSidecarClient.verifyReceipt > throws evaluation-failed SidecarError when verifier response omits valid
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/sidecar-client.test.ts:700:3
+    698|   });
+    699|
+    700|   it("throws evaluation-failed SidecarError when verifier response omi…
+       |   ^
+    701|     const { server, url } = await startVerifySidecar((res) => {
+    702|       res.writeHead(200, { "Content-Type": "application/json" });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[36/41]⎯
+
+ FAIL  test/sidecar-client.test.ts > ChioSidecarClient.verifyReceipt > throws timeout SidecarError when verifier body read times out
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/sidecar-client.test.ts:717:3
+    715|   });
+    716|
+    717|   it("throws timeout SidecarError when verifier body read times out", …
+       |   ^
+    718|     const { server, url } = await startVerifySidecar((res) => {
+    719|       res.writeHead(200, { "Content-Type": "application/json" });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[37/41]⎯
+
+⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯
+
+Vitest caught 41 unhandled errors during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/interceptor.test.ts:88:47
+     86|   });
+     87|
+     88|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+     89|   const address = server.address();
+     90|   if (address == null || typeof address === "string") {
+ ❯ startMockSidecar test/interceptor.test.ts:88:9
+ ❯ test/interceptor.test.ts:338:27
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/interceptor.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "decodes plus signs in query parameters like URLSearchParams". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/interceptor.test.ts:88:47
+     86|   });
+     87|
+     88|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+     89|   const address = server.address();
+     90|   if (address == null || typeof address === "string") {
+ ❯ startMockSidecar test/interceptor.test.ts:88:9
+ ❯ test/interceptor.test.ts:365:27
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/interceptor.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "allows known-empty parsed bodies to evaluate as empty requests". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/interceptor.test.ts:88:47
+     86|   });
+     87|
+     88|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+     89|   const address = server.address();
+     90|   if (address == null || typeof address === "string") {
+ ❯ startMockSidecar test/interceptor.test.ts:88:9
+ ❯ test/interceptor.test.ts:394:27
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/interceptor.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "preserves IncomingMessage bodies for downstream consumers". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/interceptor.test.ts:88:47
+     86|   });
+     87|
+     88|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+     89|   const address = server.address();
+     90|   if (address == null || typeof address === "string") {
+ ❯ startMockSidecar test/interceptor.test.ts:88:9
+ ❯ test/interceptor.test.ts:432:27
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/interceptor.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "does not hang when the request stream was already consumed". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/interceptor.test.ts:88:47
+     86|   });
+     87|
+     88|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+     89|   const address = server.address();
+     90|   if (address == null || typeof address === "string") {
+ ❯ startMockSidecar test/interceptor.test.ts:88:9
+ ❯ test/interceptor.test.ts:480:27
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/interceptor.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "fails closed when a chunked request stream was already consumed". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/interceptor.test.ts:88:47
+     86|   });
+     87|
+     88|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+     89|   const address = server.address();
+     90|   if (address == null || typeof address === "string") {
+ ❯ startMockSidecar test/interceptor.test.ts:88:9
+ ❯ test/interceptor.test.ts:524:27
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/interceptor.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "reads complete but not drained IncomingMessage bodies". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/interceptor.test.ts:88:47
+     86|   });
+     87|
+     88|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+     89|   const address = server.address();
+     90|   if (address == null || typeof address === "string") {
+ ❯ startMockSidecar test/interceptor.test.ts:88:9
+ ❯ test/interceptor.test.ts:565:27
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/interceptor.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "preserves Web Request bodies by reading from a clone". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/interceptor.test.ts:88:47
+     86|   });
+     87|
+     88|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+     89|   const address = server.address();
+     90|   if (address == null || typeof address === "string") {
+ ❯ startMockSidecar test/interceptor.test.ts:88:9
+ ❯ test/interceptor.test.ts:592:27
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/interceptor.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "forwards configured Node request headers to the sidecar". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/interceptor.test.ts:643:49
+    641|       expect(res.getHeader("X-Chio-Receipt-Id")).toBeUndefined();
+    642|     });
+    643|     await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                                 ^
+    644|
+    645|     try {
+ ❯ test/interceptor.test.ts:643:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/interceptor.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "fails closed for Node sidecar errors even when fail-open is requested". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/interceptor.test.ts:669:49
+    667|       }
+    668|     });
+    669|     await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                                 ^
+    670|
+    671|     try {
+ ❯ test/interceptor.test.ts:669:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/interceptor.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "returns a controlled error for malformed Node query encoding". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/interceptor.test.ts:88:47
+     86|   });
+     87|
+     88|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+     89|   const address = server.address();
+     90|   if (address == null || typeof address === "string") {
+ ❯ startMockSidecar test/interceptor.test.ts:88:9
+ ❯ test/interceptor.test.ts:703:27
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/interceptor.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "forwards query capability tokens to the sidecar". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/interceptor.test.ts:88:47
+     86|   });
+     87|
+     88|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+     89|   const address = server.address();
+     90|   if (address == null || typeof address === "string") {
+ ❯ startMockSidecar test/interceptor.test.ts:88:9
+ ❯ test/interceptor.test.ts:727:27
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/interceptor.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "denies duplicate query capability tokens before sidecar evaluation". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/interceptor.test.ts:88:47
+     86|   });
+     87|
+     88|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+     89|   const address = server.address();
+     90|   if (address == null || typeof address === "string") {
+ ❯ startMockSidecar test/interceptor.test.ts:88:9
+ ❯ test/interceptor.test.ts:749:27
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/interceptor.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "fails closed when Web request bodies cannot be cloned". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/sidecar-client.test.ts:165:47
+    163|   });
+    164|
+    165|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+    166|   const address = server.address();
+    167|   if (address == null || typeof address === "string") {
+ ❯ startEvaluateSidecar test/sidecar-client.test.ts:165:9
+ ❯ test/sidecar-client.test.ts:284:35
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2027:60
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/sidecar-client.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "returns allow only after receipt authority verification for caller_executed". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/sidecar-client.test.ts:165:47
+    163|   });
+    164|
+    165|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+    166|   const address = server.address();
+    167|   if (address == null || typeof address === "string") {
+ ❯ startEvaluateSidecar test/sidecar-client.test.ts:165:9
+ ❯ test/sidecar-client.test.ts:284:35
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2027:60
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/sidecar-client.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "returns allow only after receipt authority verification for host_executed_provider_reported". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/sidecar-client.test.ts:165:47
+    163|   });
+    164|
+    165|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+    166|   const address = server.address();
+    167|   if (address == null || typeof address === "string") {
+ ❯ startEvaluateSidecar test/sidecar-client.test.ts:165:9
+ ❯ test/sidecar-client.test.ts:284:35
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2027:60
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/sidecar-client.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "returns allow only after receipt authority verification for host_executed_unmediated". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/sidecar-client.test.ts:165:47
+    163|   });
+    164|
+    165|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+    166|   const address = server.address();
+    167|   if (address == null || typeof address === "string") {
+ ❯ startEvaluateSidecar test/sidecar-client.test.ts:165:9
+ ❯ test/sidecar-client.test.ts:284:35
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2027:60
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/sidecar-client.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "returns allow only after receipt authority verification for chio_internal". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/sidecar-client.test.ts:165:47
+    163|   });
+    164|
+    165|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+    166|   const address = server.address();
+    167|   if (address == null || typeof address === "string") {
+ ❯ startEvaluateSidecar test/sidecar-client.test.ts:165:9
+ ❯ test/sidecar-client.test.ts:304:35
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2027:60
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/sidecar-client.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "rejects invalid receipt origin untrusted_future_origin before verification". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/sidecar-client.test.ts:165:47
+    163|   });
+    164|
+    165|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+    166|   const address = server.address();
+    167|   if (address == null || typeof address === "string") {
+ ❯ startEvaluateSidecar test/sidecar-client.test.ts:165:9
+ ❯ test/sidecar-client.test.ts:304:35
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2027:60
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/sidecar-client.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "rejects invalid receipt origin null before verification". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/sidecar-client.test.ts:165:47
+    163|   });
+    164|
+    165|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+    166|   const address = server.address();
+    167|   if (address == null || typeof address === "string") {
+ ❯ startEvaluateSidecar test/sidecar-client.test.ts:165:9
+ ❯ test/sidecar-client.test.ts:324:35
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/sidecar-client.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "normalizes omitted receipt evidence to an empty array". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/sidecar-client.test.ts:165:47
+    163|   });
+    164|
+    165|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+    166|   const address = server.address();
+    167|   if (address == null || typeof address === "string") {
+ ❯ startEvaluateSidecar test/sidecar-client.test.ts:165:9
+ ❯ test/sidecar-client.test.ts:341:35
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/sidecar-client.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "rejects allow-shaped responses without structural receipt authority". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/sidecar-client.test.ts:165:47
+    163|   });
+    164|
+    165|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+    166|   const address = server.address();
+    167|   if (address == null || typeof address === "string") {
+ ❯ startEvaluateSidecar test/sidecar-client.test.ts:165:9
+ ❯ test/sidecar-client.test.ts:360:35
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/sidecar-client.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "rejects advisory receipts as execution authorization". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/sidecar-client.test.ts:165:47
+    163|   });
+    164|
+    165|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+    166|   const address = server.address();
+    167|   if (address == null || typeof address === "string") {
+ ❯ startEvaluateSidecar test/sidecar-client.test.ts:165:9
+ ❯ test/sidecar-client.test.ts:379:35
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/sidecar-client.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "rejects unverified authoritative allow receipts". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/sidecar-client.test.ts:165:47
+    163|   });
+    164|
+    165|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+    166|   const address = server.address();
+    167|   if (address == null || typeof address === "string") {
+ ❯ startEvaluateSidecar test/sidecar-client.test.ts:165:9
+ ❯ test/sidecar-client.test.ts:398:35
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/sidecar-client.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "rejects inconsistent deny verdict with allow-shaped receipt". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/sidecar-client.test.ts:165:47
+    163|   });
+    164|
+    165|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+    166|   const address = server.address();
+    167|   if (address == null || typeof address === "string") {
+ ❯ startEvaluateSidecar test/sidecar-client.test.ts:165:9
+ ❯ test/sidecar-client.test.ts:422:35
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/sidecar-client.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "does not verify non-allow responses". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/sidecar-client.test.ts:165:47
+    163|   });
+    164|
+    165|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+    166|   const address = server.address();
+    167|   if (address == null || typeof address === "string") {
+ ❯ startEvaluateSidecar test/sidecar-client.test.ts:165:9
+ ❯ test/sidecar-client.test.ts:440:35
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/sidecar-client.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "allows deny responses that omit the receipt field". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/sidecar-client.test.ts:165:47
+    163|   });
+    164|
+    165|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+    166|   const address = server.address();
+    167|   if (address == null || typeof address === "string") {
+ ❯ startEvaluateSidecar test/sidecar-client.test.ts:165:9
+ ❯ test/sidecar-client.test.ts:456:35
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/sidecar-client.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "rejects allow responses that omit the receipt field". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/sidecar-client.test.ts:165:47
+    163|   });
+    164|
+    165|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+    166|   const address = server.address();
+    167|   if (address == null || typeof address === "string") {
+ ❯ startEvaluateSidecar test/sidecar-client.test.ts:165:9
+ ❯ test/sidecar-client.test.ts:478:35
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/sidecar-client.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "rejects non-allow responses with receipts missing semantics fields". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/sidecar-client.test.ts:165:47
+    163|   });
+    164|
+    165|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+    166|   const address = server.address();
+    167|   if (address == null || typeof address === "string") {
+ ❯ startEvaluateSidecar test/sidecar-client.test.ts:165:9
+ ❯ test/sidecar-client.test.ts:502:35
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/sidecar-client.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "rejects mediated decision receipts with observation outcomes". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/sidecar-client.test.ts:165:47
+    163|   });
+    164|
+    165|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+    166|   const address = server.address();
+    167|   if (address == null || typeof address === "string") {
+ ❯ startEvaluateSidecar test/sidecar-client.test.ts:165:9
+ ❯ test/sidecar-client.test.ts:526:35
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/sidecar-client.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "rejects advisory receipts without observation outcomes". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/sidecar-client.test.ts:197:47
+    195|   });
+    196|
+    197|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+    198|   const address = server.address();
+    199|   if (address == null || typeof address === "string") {
+ ❯ startEvaluateRawSidecar test/sidecar-client.test.ts:197:9
+ ❯ test/sidecar-client.test.ts:540:35
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/sidecar-client.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "throws evaluation-failed SidecarError for malformed JSON evaluate responses". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/sidecar-client.test.ts:165:47
+    163|   });
+    164|
+    165|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+    166|   const address = server.address();
+    167|   if (address == null || typeof address === "string") {
+ ❯ startEvaluateSidecar test/sidecar-client.test.ts:165:9
+ ❯ test/sidecar-client.test.ts:554:35
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/sidecar-client.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "throws evaluation-failed SidecarError for incomplete evaluate responses". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/sidecar-client.test.ts:105:47
+    103|   });
+    104|
+    105|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+    106|   const address = server.address();
+    107|   if (address == null || typeof address === "string") {
+ ❯ startVerifySidecar test/sidecar-client.test.ts:105:9
+ ❯ test/sidecar-client.test.ts:570:35
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/sidecar-client.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "returns structured non-authorizing verifier reports". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/sidecar-client.test.ts:105:47
+    103|   });
+    104|
+    105|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+    106|   const address = server.address();
+    107|   if (address == null || typeof address === "string") {
+ ❯ startVerifySidecar test/sidecar-client.test.ts:105:9
+ ❯ test/sidecar-client.test.ts:589:37
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/sidecar-client.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "throws invalid-receipt SidecarError for definitive non-200 verifier bodies". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/sidecar-client.test.ts:105:47
+    103|   });
+    104|
+    105|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+    106|   const address = server.address();
+    107|   if (address == null || typeof address === "string") {
+ ❯ startVerifySidecar test/sidecar-client.test.ts:105:9
+ ❯ test/sidecar-client.test.ts:611:37
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/sidecar-client.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "throws evaluation-failed SidecarError for non-verdict 4xx verifier responses". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/sidecar-client.test.ts:105:47
+    103|   });
+    104|
+    105|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+    106|   const address = server.address();
+    107|   if (address == null || typeof address === "string") {
+ ❯ startVerifySidecar test/sidecar-client.test.ts:105:9
+ ❯ test/sidecar-client.test.ts:633:37
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/sidecar-client.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "throws sidecar-unavailable SidecarError for non-verdict unavailable verifier responses". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/sidecar-client.test.ts:105:47
+    103|   });
+    104|
+    105|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+    106|   const address = server.address();
+    107|   if (address == null || typeof address === "string") {
+ ❯ startVerifySidecar test/sidecar-client.test.ts:105:9
+ ❯ test/sidecar-client.test.ts:652:35
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/sidecar-client.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "throws sidecar-unavailable SidecarError for 5xx verifier responses". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/sidecar-client.test.ts:105:47
+    103|   });
+    104|
+    105|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+    106|   const address = server.address();
+    107|   if (address == null || typeof address === "string") {
+ ❯ startVerifySidecar test/sidecar-client.test.ts:105:9
+ ❯ test/sidecar-client.test.ts:670:35
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/sidecar-client.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "throws sidecar-unreachable SidecarError for network failure". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/sidecar-client.test.ts:105:47
+    103|   });
+    104|
+    105|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+    106|   const address = server.address();
+    107|   if (address == null || typeof address === "string") {
+ ❯ startVerifySidecar test/sidecar-client.test.ts:105:9
+ ❯ test/sidecar-client.test.ts:684:35
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/sidecar-client.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "throws evaluation-failed SidecarError for malformed JSON verifier responses". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/sidecar-client.test.ts:105:47
+    103|   });
+    104|
+    105|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+    106|   const address = server.address();
+    107|   if (address == null || typeof address === "string") {
+ ❯ startVerifySidecar test/sidecar-client.test.ts:105:9
+ ❯ test/sidecar-client.test.ts:701:35
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/sidecar-client.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "throws evaluation-failed SidecarError when verifier response omits valid". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 0.0.0.0
+ ❯ Server.setupListenHandle [as _listen2] node:net:2302:21
+ ❯ listenInCluster node:net:2433:12
+ ❯ Server.listen node:net:2558:7
+ ❯ test/sidecar-client.test.ts:105:47
+    103|   });
+    104|
+    105|   await new Promise<void>((resolve) => server.listen(0, resolve));
+       |                                               ^
+    106|   const address = server.address();
+    107|   if (address == null || typeof address === "string") {
+ ❯ startVerifySidecar test/sidecar-client.test.ts:105:9
+ ❯ test/sidecar-client.test.ts:718:35
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+ ❯ ../../../../../../arc/sdks/typescript/packages/conformance/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '0.0.0.0' }
+This error originated in "test/sidecar-client.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "throws timeout SidecarError when verifier body read times out". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+
+ Test Files  2 failed | 2 passed (4)
+      Tests  41 failed | 37 passed (78)
+     Errors  41 errors
+   Start at  17:40:43
+   Duration  205.91s (transform 102ms, setup 0ms, import 184ms, tests 205.11s, environment 0ms)
+

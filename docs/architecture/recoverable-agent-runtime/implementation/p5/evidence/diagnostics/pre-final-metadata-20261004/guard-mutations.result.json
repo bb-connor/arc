@@ -1,0 +1,17 @@
+{
+  "id": "guard-mutations",
+  "actual_command": [
+    "python3",
+    "scripts/tests/check-recovery-p0.test.py"
+  ],
+  "cwd": ".",
+  "environment": {},
+  "exit_code": 0,
+  "status": "passed",
+  "started_unix_seconds": 1791160360,
+  "duration_seconds": 0.424,
+  "log": "evidence/guard-mutations.log",
+  "log_sha256": "ab51ea60a180dcf83532117f0b671bba89aa7c055dfab26f507de72d874d2fb6",
+  "required_for_local_phase_acceptance": true,
+  "source_binding": "05aa889df57391692c09ef64d3ec178184f5d48c4bd4b6d3a654f470b00e079f"
+}

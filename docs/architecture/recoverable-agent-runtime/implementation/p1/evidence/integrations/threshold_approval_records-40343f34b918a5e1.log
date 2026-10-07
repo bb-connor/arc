@@ -1,0 +1,15 @@
+
+running 10 tests
+test creation_context_validates_deserialized_route_and_requirement ... ok
+test identical_vote_retry_is_idempotent_but_signer_reuse_is_replay ... ok
+test later_surplus_votes_preserve_the_original_quorum_time ... ok
+test persisted_vote_metadata_cannot_substitute_a_digest_or_signer ... ok
+test persisted_satisfaction_requires_a_quorum_received_by_that_time ... ok
+test duplicate_approvers_and_false_terminal_states_are_rejected ... ok
+test registration_preserves_algorithm_aware_submitter_keys ... ok
+test signed_vote_tampering_and_expired_reception_fail_closed ... ok
+test proposal_registration_rejects_changed_route_capability_and_deadline ... ok
+test validated_records_preserve_canonical_artifacts_and_reservation_identity ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+

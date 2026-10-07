@@ -1,0 +1,9 @@
+   Compiling chio-control-plane v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-control-plane)
+    Finished `test` profile [unoptimized] target(s) in 56.33s
+     Running unittests src/lib.rs (target/recovery-p5-linux/host/debug/deps/chio_control_plane-6f8003448d0ced3f)
+
+running 1 test
+test recovery::tests::overload::p6_overload_disconnected_intake_cannot_starve_existing_native_settlement ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1274 filtered out; finished in 63.35s
+

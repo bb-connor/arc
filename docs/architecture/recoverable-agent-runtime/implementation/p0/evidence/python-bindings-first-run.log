@@ -1,0 +1,61 @@
+..F........................FF..............F............................ [ 60%]
+................................................                         [100%]
+=================================== FAILURES ===================================
+__________ test_shared_recovery_shape[one-submission-effect-contract] __________
+
+vector = {'contract': 'effect_contract', 'name': 'one-submission-effect-contract', 'schema_valid': True, 'valid': True, ...}
+
+    @pytest.mark.parametrize("vector", VECTORS, ids=lambda vector: vector["name"])
+    def test_shared_recovery_shape(vector):
+        # JSON shape cannot preserve raw duplicate keys or enforce trusted host
+        # context. The Rust intake corpus checks those separate acceptance conditions.
+>       validator = Draft202012Validator(SCHEMAS[vector["contract"]], registry=REGISTRY)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'effect_contract'
+
+sdks/python/chio-sdk-python/tests/test_recovery_contracts.py:49: KeyError
+______________ test_shared_recovery_shape[hidden-transport-retry] ______________
+
+vector = {'contract': 'effect_contract', 'name': 'hidden-transport-retry', 'schema_valid': False, 'valid': False, ...}
+
+    @pytest.mark.parametrize("vector", VECTORS, ids=lambda vector: vector["name"])
+    def test_shared_recovery_shape(vector):
+        # JSON shape cannot preserve raw duplicate keys or enforce trusted host
+        # context. The Rust intake corpus checks those separate acceptance conditions.
+>       validator = Draft202012Validator(SCHEMAS[vector["contract"]], registry=REGISTRY)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'effect_contract'
+
+sdks/python/chio-sdk-python/tests/test_recovery_contracts.py:49: KeyError
+_____________ test_shared_recovery_shape[zero-effect-cardinality] ______________
+
+vector = {'contract': 'effect_contract', 'name': 'zero-effect-cardinality', 'schema_valid': False, 'valid': False, ...}
+
+    @pytest.mark.parametrize("vector", VECTORS, ids=lambda vector: vector["name"])
+    def test_shared_recovery_shape(vector):
+        # JSON shape cannot preserve raw duplicate keys or enforce trusted host
+        # context. The Rust intake corpus checks those separate acceptance conditions.
+>       validator = Draft202012Validator(SCHEMAS[vector["contract"]], registry=REGISTRY)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'effect_contract'
+
+sdks/python/chio-sdk-python/tests/test_recovery_contracts.py:49: KeyError
+_ test_generated_recovery_model_preserves_every_positive_field[one-submission-effect-contract] _
+
+vector = {'contract': 'effect_contract', 'name': 'one-submission-effect-contract', 'schema_valid': True, 'valid': True, ...}
+
+    @pytest.mark.parametrize(
+        "vector", [vector for vector in VECTORS if vector["valid"]], ids=lambda vector: vector["name"]
+    )
+    def test_generated_recovery_model_preserves_every_positive_field(vector):
+>       model = MODELS[vector["contract"]].model_validate_json(vector["wire"], strict=True)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'effect_contract'
+
+sdks/python/chio-sdk-python/tests/test_recovery_contracts.py:57: KeyError
+=========================== short test summary info ============================
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_contracts.py::test_shared_recovery_shape[one-submission-effect-contract]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_contracts.py::test_shared_recovery_shape[hidden-transport-retry]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_contracts.py::test_shared_recovery_shape[zero-effect-cardinality]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_contracts.py::test_generated_recovery_model_preserves_every_positive_field[one-submission-effect-contract]
+4 failed, 116 passed in 0.99s

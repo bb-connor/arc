@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/check.py", line 252, in <module>
+    main()
+    ~~~~^^
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/check.py", line 245, in main
+    result = validate(revision)
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/check.py", line 151, in validate
+    require(resolved.exists(), f"broken local link: {path.name} -> {target}")
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/check.py", line 31, in require
+    raise ValueError(message)
+ValueError: broken local link: OPERATIONS.md -> verification.json

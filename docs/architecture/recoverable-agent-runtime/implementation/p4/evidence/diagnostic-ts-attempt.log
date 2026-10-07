@@ -1,0 +1,25 @@
+
+ RUN  v3.2.6 /Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/sdks/typescript/packages/conformance
+
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/recovery_p4_schema.test.ts [ test/recovery_p4_schema.test.ts ]
+Error: Cannot find package 'ajv/dist/2020.js' imported from '/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/sdks/typescript/packages/node-http/src/wire-schema.ts'
+ ❯ ../node-http/src/wire-schema.ts:1:1
+      1| import { Ajv2020 } from "ajv/dist/2020.js";
+       | ^
+      2| 
+      3| /**
+
+Caused by: Error: Failed to load url ajv/dist/2020.js (resolved id: ajv/dist/2020.js) in /Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/sdks/typescript/packages/node-http/src/wire-schema.ts. Does the file exist?
+ ❯ loadAndTransform ../../../../../../arc/sdks/typescript/node_modules/vite/dist/node/chunks/config.js:22739:33
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  20:31:07
+   Duration  611ms (transform 146ms, setup 0ms, collect 0ms, tests 0ms, environment 0ms, prepare 72ms)
+

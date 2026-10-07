@@ -1,0 +1,71 @@
+   Compiling chio-core-types v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-core-types)
+    Finished `test` profile [unoptimized] target(s) in 27.06s
+     Running tests/_generated_check.rs (target/debug/deps/_generated_check-ccbf293670f47688)
+
+running 2 tests
+test generated_mod_rs_exists ... ok
+test every_generated_file_has_canonical_header ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/protocol_primitives_generated.rs (target/debug/deps/protocol_primitives_generated-c12c4ab840f9631a)
+
+running 1 test
+test generated_rust_shapes_parse_reject_and_round_trip_shared_fixtures ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/recovery_contracts.rs (target/debug/deps/recovery_contracts-2faf5ab41a4137e8)
+
+running 6 tests
+test nested_allocation_and_aggregate_budgets_refuse_before_typed_decode ... ok
+test malformed_tokens_and_nested_duplicates_have_no_permissive_fallback ... ok
+test domains_frame_canonical_bodies_and_refuse_cross_domain_substitution ... ok
+test public_errors_and_debug_do_not_expose_canaries ... ok
+test shared_negative_recovery_vectors ... ok
+test schemas_share_structural_vectors_with_typed_reader ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running tests/security_generated_vectors.rs (target/debug/deps/security_generated_vectors-4828f7a490fbbbe1)
+
+running 6 tests
+test generated_response_plan_requires_exact_execution_binding ... ok
+test legacy_response_transition_canonical_digest_is_unchanged ... ok
+test generated_recovery_models_preserve_every_positive_field ... ok
+test native_receipt_types_reject_unsafe_json_integers ... ok
+test generated_active_defense_types_decode_reencode_and_reject ... ok
+OK security wire vectors: indexes=5 positives=90 negatives=270
+test active_defense_schema_and_semantics_reject_mutation_corpus ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.53s
+
+     Running tests/workflow.rs (target/debug/deps/workflow-934dce157edd3317)
+
+running 4 tests
+test unresolved_admission_never_recommends_a_new_submission ... ok
+test useful_pre_admission_and_native_approval_advice_have_positive_controls ... ok
+test unknown_and_pending_operations_keep_identity_across_cancellation ... ok
+test settled_effects_do_not_become_another_submission_when_output_is_denied ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/recovery_bounds.rs (target/debug/deps/recovery_bounds-0ba12fc0605bb1be)
+
+running 3 tests
+test old_host_wrong_deployment_and_stripped_participant_refuse ... ok
+test collection_ceiling_precedes_next_element_decoding ... ok
+test identifier_and_integer_boundaries_are_closed ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/graph.rs (target/debug/deps/graph-c6c9f70000f27c54)
+
+running 4 tests
+test repeated_expansion_consumes_shared_budget_and_exhaustion_is_irreversible ... ok
+test cycles_duplicate_identities_missing_evidence_and_unsafe_costs_fail_closed ... ok
+test full_step_ceiling_has_a_successful_bounded_positive_control ... ok
+test deterministic_topology_and_cost_ignore_input_insertion_order ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

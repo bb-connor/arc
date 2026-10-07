@@ -1,0 +1,2 @@
+Kani Rust Verifier 0.67.0 (cargo plugin)
+error: Failed to get cargo metadata.: failed to start `cargo metadata`: No such file or directory (os error 2): No such file or directory (os error 2)

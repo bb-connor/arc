@@ -1,0 +1,2369 @@
+{
+  "schema": "chio.recovery-p0-verification.v1",
+  "phase": "P0",
+  "title": "Contracts and assurance baseline",
+  "status": "implemented_locally_verified_and_reviewed",
+  "scope": "P0 data contracts, pure libraries, exhaustive request review and assurance infrastructure; no live P1 recovery participant/driver/grant-v2 qualification",
+  "recorded_at_utc": "2026-10-02T16:23:15.956311+00:00",
+  "source_base": "de84fc306efbb4c8dd6de748d0ad2a8d695fd30e",
+  "branch": "feat/recoverable-agent-runtime-20261002",
+  "working_tree_changes_committed": false,
+  "architecture_revision": 3,
+  "confidence": "high within local phase scope",
+  "review": {
+    "reviewer": "Codex",
+    "all_handwritten_changes_reviewed": true,
+    "schemas_and_generation_boundaries_reviewed": true,
+    "open_p0_findings": 0,
+    "open_p1_findings": 0,
+    "independent_human_signoff": false,
+    "report": "REVIEW.md"
+  },
+  "tasks": [
+    {
+      "id": "P0-01",
+      "status": "implemented_locally_verified_and_reviewed",
+      "requirements": [
+        "SEC-08",
+        "RUST-03",
+        "OPS-02"
+      ]
+    },
+    {
+      "id": "P0-02",
+      "status": "implemented_locally_verified_and_reviewed",
+      "requirements": [
+        "SEC-08",
+        "RUST-07",
+        "RUST-10"
+      ]
+    },
+    {
+      "id": "P0-03",
+      "status": "implemented_locally_verified_and_reviewed",
+      "requirements": [
+        "SEC-01",
+        "RUST-01",
+        "RUST-08",
+        "RUST-11"
+      ]
+    },
+    {
+      "id": "P0-04",
+      "status": "implemented_locally_verified_and_reviewed",
+      "requirements": [
+        "SEC-02",
+        "RUST-02",
+        "RUST-11"
+      ]
+    },
+    {
+      "id": "P0-05",
+      "status": "implemented_locally_verified_and_reviewed",
+      "requirements": [
+        "OPS-03",
+        "TEST-01"
+      ]
+    },
+    {
+      "id": "P0-06",
+      "status": "implemented_locally_verified_and_reviewed",
+      "requirements": [
+        "RUST-06",
+        "RUST-08"
+      ]
+    }
+  ],
+  "requirements": [
+    {
+      "id": "SEC-01",
+      "owners": [
+        "chio-kernel",
+        "chio-flow",
+        "chio-store-sqlite"
+      ],
+      "normative_document": "01-security-model.md",
+      "proposed_acceptance_test": "security::no_alternate_dispatch_path",
+      "status": "implemented_and_local_phase_acceptance_passed",
+      "verification_limit": null
+    },
+    {
+      "id": "SEC-02",
+      "owners": [
+        "chio-kernel",
+        "chio-flow",
+        "chio-store-sqlite"
+      ],
+      "normative_document": "01-security-model.md",
+      "proposed_acceptance_test": "types::evidence_cannot_construct_dispatch_owner",
+      "status": "implemented_and_local_phase_acceptance_passed",
+      "verification_limit": null
+    },
+    {
+      "id": "SEC-08",
+      "owners": [
+        "chio-kernel",
+        "chio-flow",
+        "chio-store-sqlite"
+      ],
+      "normative_document": "01-security-model.md",
+      "proposed_acceptance_test": "wire::unknown_and_exhausted_inputs",
+      "status": "implemented_and_local_phase_acceptance_passed",
+      "verification_limit": null
+    },
+    {
+      "id": "RUST-01",
+      "owners": [
+        "chio-security-types",
+        "chio-core-types",
+        "chio-recovery (proposed)",
+        "owning crate maintainers"
+      ],
+      "normative_document": "02-rust-design.md",
+      "proposed_acceptance_test": "architecture::pure_dependency_graph",
+      "status": "implemented_and_local_phase_acceptance_passed",
+      "verification_limit": null
+    },
+    {
+      "id": "RUST-02",
+      "owners": [
+        "chio-security-types",
+        "chio-core-types",
+        "chio-recovery (proposed)",
+        "owning crate maintainers"
+      ],
+      "normative_document": "02-rust-design.md",
+      "proposed_acceptance_test": "compile_fail::wire_to_live_owner",
+      "status": "implemented_and_local_phase_acceptance_passed",
+      "verification_limit": null
+    },
+    {
+      "id": "RUST-03",
+      "owners": [
+        "chio-security-types",
+        "chio-core-types",
+        "chio-recovery (proposed)",
+        "owning crate maintainers"
+      ],
+      "normative_document": "02-rust-design.md",
+      "proposed_acceptance_test": "wire::bounds_and_identifier_domains",
+      "status": "implemented_and_local_phase_acceptance_passed",
+      "verification_limit": null
+    },
+    {
+      "id": "RUST-06",
+      "owners": [
+        "chio-security-types",
+        "chio-core-types",
+        "chio-recovery (proposed)",
+        "owning crate maintainers"
+      ],
+      "normative_document": "02-rust-design.md",
+      "proposed_acceptance_test": "architecture::owning_quality_gates",
+      "status": "implemented_and_local_phase_acceptance_passed",
+      "verification_limit": null
+    },
+    {
+      "id": "RUST-07",
+      "owners": [
+        "chio-security-types",
+        "chio-core-types",
+        "chio-recovery (proposed)",
+        "owning crate maintainers"
+      ],
+      "normative_document": "02-rust-design.md",
+      "proposed_acceptance_test": "observability::secret_and_payload_canaries",
+      "status": "implemented_and_local_phase_acceptance_passed",
+      "verification_limit": null
+    },
+    {
+      "id": "RUST-08",
+      "owners": [
+        "chio-core-types",
+        "chio-security-types",
+        "chio-recovery",
+        "chio-semantic-contracts"
+      ],
+      "normative_document": "02-rust-design.md",
+      "proposed_acceptance_test": "architecture::portable_feature_and_determinism_matrix",
+      "status": "implemented_and_local_phase_acceptance_passed",
+      "verification_limit": "Kani execution compatibility is unverified; Rust 1.93 and isolated/unified alloc/std/WASM compiler gates pass."
+    },
+    {
+      "id": "RUST-10",
+      "owners": [
+        "chio-security-types",
+        "chio-core-types",
+        "chio-recovery"
+      ],
+      "normative_document": "02-rust-design.md",
+      "proposed_acceptance_test": "wire::nested_allocation_and_verification_budget",
+      "status": "implemented_and_local_phase_acceptance_passed",
+      "verification_limit": null
+    },
+    {
+      "id": "RUST-11",
+      "owners": [
+        "chio-recovery",
+        "chio-kernel",
+        "chio-process",
+        "chio-control-plane"
+      ],
+      "normative_document": "02-rust-design.md",
+      "proposed_acceptance_test": "architecture::planner_driver_types_and_exhaustive_projection",
+      "status": "implemented_and_local_phase_acceptance_passed",
+      "verification_limit": null
+    },
+    {
+      "id": "OPS-02",
+      "owners": [
+        "chio-control-plane",
+        "chio-cli",
+        "SDK/codegen",
+        "chio-store-sqlite"
+      ],
+      "normative_document": "08-protocol-operations.md",
+      "proposed_acceptance_test": "protocol::old_host_and_stripped_extension",
+      "status": "implemented_and_local_phase_acceptance_passed",
+      "verification_limit": null
+    },
+    {
+      "id": "OPS-03",
+      "owners": [
+        "chio-control-plane",
+        "chio-cli",
+        "SDK/codegen",
+        "chio-store-sqlite"
+      ],
+      "normative_document": "08-protocol-operations.md",
+      "proposed_acceptance_test": "wire::shared_negative_recovery_vectors",
+      "status": "implemented_and_local_phase_acceptance_passed",
+      "verification_limit": null
+    },
+    {
+      "id": "TEST-01",
+      "owners": [
+        "chio-conformance",
+        "chio-trace-validate",
+        "owning integration suites"
+      ],
+      "normative_document": "09-conformance.md",
+      "proposed_acceptance_test": "conformance::trajectory_effect_assertions",
+      "status": "implemented_and_local_phase_acceptance_passed",
+      "verification_limit": null
+    }
+  ],
+  "host": {
+    "os": "26.4",
+    "os_build": "25E246",
+    "architecture": "aarch64-apple-darwin",
+    "cpu_model": "not available through sandbox sysctl",
+    "build_profile": "debug"
+  },
+  "tools": {
+    "rustc": "rustc 1.94.1 (e408947bf 2026-03-25)\nbinary: rustc\ncommit-hash: e408947bfd200af42db322daf0fadfe7e26d3bd1\ncommit-date: 2026-03-25\nhost: aarch64-apple-darwin\nrelease: 1.94.1\nLLVM version: 21.1.8",
+    "msrv_rustc": "rustc 1.93.0 (254b59607 2026-01-19)",
+    "edition": "2021",
+    "node": "25.5.0",
+    "typescript": "5.7.3",
+    "vitest": "4.1.8",
+    "ajv": "8.20.0",
+    "python": "3.13.5",
+    "pytest": "8.4.2",
+    "pydantic": "2.13.4",
+    "jsonschema": "4.26.0",
+    "referencing": "0.37.0",
+    "rust_codegen": "typify=0.4.3",
+    "typescript_codegen": "json-schema-to-typescript=15.0.4",
+    "python_codegen": "exact upstream datamodel-code-generator=0.34.0 with recorded source bootstrap"
+  },
+  "schema_vectors": {
+    "total": 41,
+    "positive": 6,
+    "refusal": 35,
+    "authoritative_contracts": 5
+  },
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-core-types",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-recovery",
+        "-p",
+        "chio-semantic-contracts",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-process",
+        "-p",
+        "chio-conformance",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "log": "evidence/clippy.log",
+      "log_sha256": "d32c311e938b07072a5115bbc51cf550bce56976732f643481a04bb1e188f791"
+    },
+    {
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-core-types",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-recovery",
+        "-p",
+        "chio-semantic-contracts",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-process",
+        "-p",
+        "chio-conformance",
+        "--lib"
+      ],
+      "exit_code": 0,
+      "log": "evidence/owning-build.log",
+      "log_sha256": "847757839707bd62355f13e919f1b110a01a530bf5a8ba3ef7d3bf2d89cf1390"
+    },
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log": "evidence/formatting-final.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log": "evidence/diff-check.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-core-types",
+        "--test",
+        "recovery_contracts",
+        "--test",
+        "security_generated_vectors",
+        "--test",
+        "protocol_primitives_generated",
+        "--test",
+        "_generated_check",
+        "-p",
+        "chio-security-types",
+        "--test",
+        "recovery_bounds",
+        "-p",
+        "chio-recovery",
+        "--test",
+        "workflow",
+        "-p",
+        "chio-semantic-contracts",
+        "--test",
+        "graph"
+      ],
+      "exit_code": 0,
+      "log": "evidence/contracts-final.log",
+      "log_sha256": "9b608888171b491a5d4a8d7538b31203a5183589da37a1b7ab389a02b051699e",
+      "passed": 26
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-core-types",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-recovery",
+        "-p",
+        "chio-semantic-contracts",
+        "-p",
+        "chio-flow",
+        "-p",
+        "chio-quarantine",
+        "-p",
+        "chio-conformance",
+        "--lib"
+      ],
+      "exit_code": 0,
+      "log": "evidence/owning-unit-tests.log",
+      "log_sha256": "8f48dcee71c4a13b5b3d2a1619a471236594cd93cb2984c5fe867a46cd6a13ce",
+      "passed": 559
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-process",
+        "--test",
+        "nonce_recovery",
+        "--test",
+        "recovery_p0_baseline"
+      ],
+      "exit_code": 0,
+      "log": "evidence/native-foundation.log",
+      "log_sha256": "28bf210509286d1221aef1ebdee2f960b8ce0422fa46a090b526c2342dcfda0f",
+      "passed_top_level": 4,
+      "ignored": 1,
+      "count_note": "Child test output is not added to the three top-level nonce cases; benchmark is run explicitly."
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-security-types",
+        "--doc"
+      ],
+      "exit_code": 0,
+      "log": "evidence/ownership-doctests.log",
+      "log_sha256": "cbf13de651595ee0df82c9cfa89ba2ec320156ba8317d33bd5a4c213a66ff5d2",
+      "passed": 12
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-kernel",
+        "--doc",
+        "recovery_review",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "log": "evidence/owner-compile-diagnostics.log",
+      "log_sha256": "6bf4df0ab653c03795a0aff7d5b0e2d8dc1651beaf7030d9141f208d82e8ce3b",
+      "passed": 3,
+      "expected_compile_errors": [
+        "E0277",
+        "E0596"
+      ]
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.93.0",
+        "check",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-core-types",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-recovery",
+        "-p",
+        "chio-semantic-contracts",
+        "--no-default-features"
+      ],
+      "exit_code": 0,
+      "log": "evidence/msrv.log",
+      "log_sha256": "30d1a3fe2e3940978cd7b312686c64272f547f1ef947fa2ec9c869c22f5b0733"
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.93.0",
+        "check",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "fixtures/recovery-portable-consumer/Cargo.toml",
+        "--no-default-features"
+      ],
+      "exit_code": 0,
+      "log": "evidence/isolated-msrv.log",
+      "log_sha256": "b0f7b04012322bafa5c966e8ea91a80d6e54c0cf6d3e960c7af6064aa7bf72a6",
+      "environment": {
+        "CARGO_TARGET_DIR": "target/recovery-p0-isolated"
+      }
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.93.0",
+        "check",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "fixtures/recovery-portable-consumer/Cargo.toml",
+        "--features",
+        "std"
+      ],
+      "exit_code": 0,
+      "log": "evidence/isolated-msrv-std.log",
+      "log_sha256": "51231f9dc3911e5faab13c6a367e6bcd2c488c6298b125892d6b4fb2051bee65",
+      "environment": {
+        "CARGO_TARGET_DIR": "target/recovery-p0-isolated"
+      }
+    },
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "fixtures/recovery-portable-consumer/Cargo.toml",
+        "--no-default-features",
+        "--target",
+        "wasm32-unknown-unknown"
+      ],
+      "exit_code": 0,
+      "log": "evidence/isolated-wasm.log",
+      "log_sha256": "5e847c6a7a355686f19227ad8c751e72f71ebb22e583802c5592b05d5bb35cd6",
+      "environment": {
+        "CARGO_TARGET_DIR": "target/recovery-p0-isolated"
+      }
+    },
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-core-types",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-recovery",
+        "-p",
+        "chio-semantic-contracts",
+        "--no-default-features",
+        "--target",
+        "wasm32-unknown-unknown"
+      ],
+      "exit_code": 0,
+      "log": "evidence/unified-wasm.log",
+      "log_sha256": "21c831d802f7c47ff64195e591b494184c90931fedc6cdc617cb5704518ab742"
+    },
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-core-types",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-recovery",
+        "-p",
+        "chio-semantic-contracts",
+        "--features",
+        "chio-core-types/std,chio-security-types/std,chio-recovery/std,chio-semantic-contracts/std"
+      ],
+      "exit_code": 0,
+      "log": "evidence/unified-std.log",
+      "log_sha256": "b4d8dc01c6482da352058b77dc0c7d4885c433bf8c98485f458812f255425861"
+    },
+    {
+      "command": [
+        "python3",
+        "scripts/check-recovery-p0.py",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "log": "evidence/pure-dependency-features.log",
+      "log_sha256": "5f5371c6eb969d27d35da26173faf77f3eae761851e7058d804fc378ebe387ef"
+    },
+    {
+      "command": [
+        "python3",
+        "scripts/tests/check-recovery-p0.test.py"
+      ],
+      "exit_code": 0,
+      "log": "evidence/dependency-guard-mutations.log",
+      "log_sha256": "afb934eecfc002418232ee43ad78dc164e28c4570bab294d47256ec66e0d130f"
+    },
+    {
+      "command": [
+        "bash",
+        "scripts/check-chio-schema-registry.sh"
+      ],
+      "exit_code": 0,
+      "log": "evidence/schema-registry.log",
+      "log_sha256": "f08ca40211ee4cf16919c55a0c548472ee01a0ff6808eadb1e60a66f4aa43553"
+    },
+    {
+      "command": [
+        "python3",
+        "scripts/check-domain-separation.py"
+      ],
+      "exit_code": 0,
+      "log": "evidence/domain-separation.log",
+      "log_sha256": "81a45d37f4cb3e9f2509484688d45c36f4ab949fa85832c5acb2a30af0fcb7d5"
+    },
+    {
+      "command": [
+        "python3",
+        "scripts/check-rust-file-hygiene.py"
+      ],
+      "exit_code": 0,
+      "log": "evidence/source-hygiene.log",
+      "log_sha256": "595f21f34da12a8b0c90696f0f5afffb32bf3fc379c1abd8c165eec77a57282d"
+    },
+    {
+      "command": [
+        "python3",
+        "scripts/check-wire-schemas.py"
+      ],
+      "exit_code": 0,
+      "log": "evidence/wire-identifiers.log",
+      "log_sha256": "43f7b2963d959ea841bc2018567d82527a51ea7dbc0f867da4ea295b901938ad"
+    },
+    {
+      "command": [
+        "bash",
+        "scripts/check-workspace-layering.sh"
+      ],
+      "exit_code": 0,
+      "log": "evidence/workspace-layering.log",
+      "log_sha256": "d86efcdb613cfdb5c7cb93fbc663ad1379d53aa619f4b44377011ce820a3a8ea"
+    },
+    {
+      "command": [
+        "python3",
+        "scripts/check-lint-parity.py"
+      ],
+      "exit_code": 0,
+      "log": "evidence/lint-parity.log",
+      "log_sha256": "5cdbfdb13810b2e2e148e68b501cddfe136aa2de30eda0b7ef053818dbaf1f02"
+    },
+    {
+      "command": [
+        "python3",
+        "scripts/check-rust-toolchain-parity.py"
+      ],
+      "exit_code": 0,
+      "log": "evidence/toolchain-parity.log",
+      "log_sha256": "0663e9dc80bac7594693bac2c394f9b68eeff85feaae6622feb1d67ad41aa730"
+    },
+    {
+      "command": [
+        "bash",
+        "deploy/docker/chio-workspace/regenerate.sh",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log": "evidence/docker-workspace.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "cargo",
+        "xtask",
+        "codegen",
+        "rust",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log": "evidence/codegen-rust-check.log",
+      "log_sha256": "2d92acee2f762fc22ca36729e9ea9f8078123eabcbc6f7a10669800ddd583e69"
+    },
+    {
+      "command": [
+        "cargo",
+        "xtask",
+        "codegen",
+        "ts",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log": "evidence/codegen-ts-check.log",
+      "log_sha256": "b4328d831d86d3761ff65460f09979eb4601236442c5f52a420d678b54f217e6"
+    },
+    {
+      "command": [
+        "cargo",
+        "xtask",
+        "codegen",
+        "python",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log": "evidence/codegen-python-check.log",
+      "log_sha256": "8687295280c00f6c6dd95881fa3cfa7b03aa4f501038aa0354838724d68adc1f",
+      "environment": {
+        "PATH_prefix": "target/recovery-p0-codegen-bin"
+      },
+      "provenance": "evidence/python-generator-source.json"
+    },
+    {
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "-o",
+        "cache_dir=target/recovery-p0-pytest-cache",
+        "sdks/python/chio-sdk-python/tests/test_recovery_contracts.py",
+        "sdks/python/chio-sdk-python/tests/test_models.py",
+        "sdks/python/chio-sdk-python/tests/test_generated_cage_roots.py",
+        "sdks/python/chio-sdk-python/tests/test_generated_manifest_v2.py"
+      ],
+      "exit_code": 0,
+      "log": "evidence/python-bindings.log",
+      "log_sha256": "ef9b9cb0c1ee9acadfd4d76ac25e5dbdfe266a588c9bc2a69ad121d02dcf3a13",
+      "passed": 121,
+      "environment": {
+        "PYTHONPATH": "sdks/python/chio-sdk-python/src",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "interpreter": "/Users/connor/Medica/backbay/standalone/arc/sdks/python/chio-crewai/.venv/bin/python"
+    },
+    {
+      "command": [
+        "python3",
+        "docs/architecture/recoverable-agent-runtime/implementation/p0/evidence/python-export-compatibility.py"
+      ],
+      "exit_code": 0,
+      "log": "evidence/python-export-compatibility.log",
+      "log_sha256": "4ba33100bea1361b77354a90782c0c5771edaf3aed1b4cdb6c085a5fe87e3bed"
+    },
+    {
+      "command": [
+        "vitest",
+        "run",
+        "sdks/typescript/packages/conformance/test/recovery_schema.test.ts"
+      ],
+      "exit_code": 0,
+      "log": "evidence/typescript-bindings.log",
+      "log_sha256": "052a228a873baa113a1f56cdaeddff6b1c3b190217755b38885e3c0b3d450877",
+      "passed": 42,
+      "runner_version": "4.1.8",
+      "package_lock_runner_not_installed": true
+    },
+    {
+      "command": [
+        "node",
+        "typescript/bin/tsc",
+        "-p",
+        "target/recovery-p0-tsconfig.json"
+      ],
+      "exit_code": 0,
+      "log": "evidence/typescript-compile.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "config": "evidence/typescript-compile-config.json",
+      "scope": "Strict checkout source and test checking, resolving checkout node-http and explicit Node declarations"
+    },
+    {
+      "command": [
+        "python3",
+        "docs/architecture/recoverable-agent-runtime/check.py",
+        "--source-revision",
+        "de84fc306"
+      ],
+      "exit_code": 0,
+      "log": "evidence/architecture-baseline.log",
+      "log_sha256": "f534fa490a1c143067461475741296f9eef1d41a855f70a5609044845fd82436",
+      "live_source_tree_checked": false
+    },
+    {
+      "command": [
+        "cargo",
+        "run",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-recovery",
+        "--example",
+        "p0_baseline"
+      ],
+      "exit_code": 0,
+      "log": "evidence/pure-baseline.log",
+      "log_sha256": "84a270160be2518d2d78fd371bd107f5e9a5fd70fd51642a71f5209e9d0fcfc3"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-process",
+        "--test",
+        "recovery_p0_baseline",
+        "measured_native_baseline",
+        "--",
+        "--ignored",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "log": "evidence/native-baseline.log",
+      "log_sha256": "40b9180c2c7526c0c599384d8b275c6926037e5c8d9657ed72b47ec3b1162b14"
+    }
+  ],
+  "baselines": {
+    "pure": {
+      "digest": {
+        "elapsed_ns": 25959209,
+        "max_ns": 194084,
+        "p50_ns": 24917,
+        "p95_ceiling_ns": 250000,
+        "p95_ns": 25917,
+        "p99_ns": 42667,
+        "samples": 1000,
+        "warmups": 100
+      },
+      "errors": 0,
+      "graph_16_steps": {
+        "elapsed_ns": 8445167,
+        "max_ns": 75208,
+        "p50_ns": 8000,
+        "p95_ceiling_ns": 1000000,
+        "p95_ns": 8334,
+        "p99_ns": 22500,
+        "samples": 1000,
+        "warmups": 100
+      },
+      "intake": {
+        "elapsed_ns": 133207458,
+        "max_ns": 1615042,
+        "p50_ns": 122458,
+        "p95_ceiling_ns": 5000000,
+        "p95_ns": 158125,
+        "p99_ns": 272250,
+        "samples": 1000,
+        "warmups": 100
+      },
+      "profile": "debug",
+      "reduction": {
+        "elapsed_ns": 87584,
+        "max_ns": 208,
+        "p50_ns": 42,
+        "p95_ceiling_ns": 250000,
+        "p95_ns": 84,
+        "p99_ns": 125,
+        "samples": 1000,
+        "warmups": 100
+      }
+    },
+    "native": {
+      "effect_count": 72,
+      "elapsed_ns": 12660851667,
+      "errors": 0,
+      "fixture": "native admission + SQLite authority/process stores + counting connector",
+      "logical_call_charges": 72,
+      "max_ns": 203390750,
+      "p50_ns": 171782041,
+      "p95_ns": 183069208,
+      "p99_ns": 203390750,
+      "profile": "debug",
+      "replays": 8,
+      "samples": 64,
+      "warmups": 8
+    },
+    "p1_native_p95_formula": "floor(6 * P0_p95_ns / 5) + 1000000",
+    "p1_native_p95_ceiling_ns": 220683049,
+    "comparison_requires": "Same fixture, toolchain, host and build profile, zero benign errors, unchanged effect/quota semantics",
+    "production_latency_or_throughput_qualified": false
+  },
+  "broader_verification_limits": [
+    {
+      "check": "Full existing kernel library suite",
+      "passed": 1447,
+      "blocked": 12,
+      "cause": "Sandbox EPERM at HTTP listener creation in existing payment/commerce fixtures",
+      "log": "evidence/kernel-full-sandbox-blocked.log",
+      "not_a_green_suite": true
+    },
+    {
+      "check": "Kani 0.67.0",
+      "status": "execution_unverified",
+      "cause": "Missing nightly-2025-11-21-aarch64-apple-darwin targeted by installed Kani toolchain link",
+      "log": "evidence/kani.log",
+      "formal_proof_claimed": false
+    },
+    {
+      "check": "Hosted CI / fresh TypeScript package-lock installation",
+      "status": "not_run"
+    },
+    {
+      "check": "Deployment / public release / supported live recovery profile",
+      "status": "not_attempted"
+    }
+  ],
+  "next_phase": "P1: exact durable recovery",
+  "source_inputs": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "b2df9d03e21a023e2dc9553ec56466c2ade349e0cfc14045f210fb4ff77f8554"
+    },
+    {
+      "path": ".kani/harnesses.toml",
+      "sha256": "3f12cf411266e86c99010bf031e3ad43420b39bdac59ef70cb592c0d33787c81"
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "da01a54e72333ad9440993a1225771a61a5c3beb441d7548658b8628821fbdea"
+    },
+    {
+      "path": "Cargo.toml",
+      "sha256": "e73704c3ea217048af0169ecd5f5de8f818f079e6e42e3b06c614f8fc4a5246a"
+    },
+    {
+      "path": "crates/core/chio-core-types/Cargo.toml",
+      "sha256": "f45568f636d0c5e638e4ed19ae4c6ef950f97297a954166af9829242993601ad"
+    },
+    {
+      "path": "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs",
+      "sha256": "8a0f91ee21ce0aa11db0bd6f2bbd60a979f35d1f5134129b9b622dac32fa67a0"
+    },
+    {
+      "path": "crates/core/chio-core-types/src/canonical/signed_json.rs",
+      "sha256": "35485d09d5e3afc533c19db2e6a02faaf7cc66b3891814369009b111d970aa3f"
+    },
+    {
+      "path": "crates/core/chio-core-types/src/declassification.rs",
+      "sha256": "0b3e89235ae1374ef60bcd789a89d4a11709fd4f1ca7c09f851919f3aff00c82"
+    },
+    {
+      "path": "crates/core/chio-core-types/src/lib.rs",
+      "sha256": "c3a5ddd1c4e2a0845edb9b32219b490096fb96a6b60afc72c1cdc946fb58a9b7"
+    },
+    {
+      "path": "crates/core/chio-core-types/src/recovery/decode.rs",
+      "sha256": "a1c5cc599c199619a3419389219d4e07f9a65255804250c014a31fca205b2df0"
+    },
+    {
+      "path": "crates/core/chio-core-types/src/recovery/domains.rs",
+      "sha256": "8c30b8ababdf1b36b388c1ba49dbb6c212bd8df50dbff60b92b3ae96f58dbd4e"
+    },
+    {
+      "path": "crates/core/chio-core-types/src/recovery/mod.rs",
+      "sha256": "1a1ae6df1943cfc4fc36f9cd729c14f14fe7ee20aa145fe01170e24eb764059d"
+    },
+    {
+      "path": "crates/core/chio-core-types/src/recovery/preflight.rs",
+      "sha256": "766835130b7d8c29fc7d39b8b5f47958519b9d7c75f7b728d4a1ba9bdb51990a"
+    },
+    {
+      "path": "crates/core/chio-core-types/tests/recovery_contracts.rs",
+      "sha256": "d151617e3d286e2bd20b5ca0da6004eb96c564f53d3b3299595d01bdf0c7f284"
+    },
+    {
+      "path": "crates/core/chio-core-types/tests/security_generated_vectors.rs",
+      "sha256": "6f214dcfc6d8bb81588e2c3e8e337c78c1e2d983729d48c69dc4b745fbc144ba"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/admission_operation.rs",
+      "sha256": "cdba318f1c4f0195109db9d7b0066bdac0b184719d8d08a91b82faf2bd3520b4"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/admission_operation/projection/outcome_unknown.rs",
+      "sha256": "ad093d7a6d2dfc572f90f4c3ef76055a40c7ffc652ecd6b6a36bdeb3a1a7d11f"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/admission_operation/retained_request.rs",
+      "sha256": "052130a5aa2e335c7438ad137cc7b68979386717eef9652bca357d36be8d08c0"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/active_response_simulation.rs",
+      "sha256": "38b551da16a27547af2de95067e5daf9fb17ffcc261cb2181cca6cc191c2afac"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs",
+      "sha256": "ec64cf0470d12b151272e11216bc66688200fc6f5776db5e1aba645a5c542729"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/execution_nonce.rs",
+      "sha256": "5507ab9f47bcfee5e6ebdbc2de8372a52cb2acc6c7f7a7f90c2d632003c8160c"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_acquisition/nonce_preflight.rs",
+      "sha256": "b224a7715b60df674a1bd74c919d2241e1fc1cc404016036966028b91de82442"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/capture.rs",
+      "sha256": "a03baca3a3ed40a6908ef3f1b7cff72b37f0ce19e162fb40e707cc082c3b98de"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/recovery.rs",
+      "sha256": "b56e6cf335f3a2c02c9a8a64f5ead286ba6b32bbc84c6502ba985f1dd8748fd3"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/response_simulation_report.rs",
+      "sha256": "1a0bb7fa505eded04197fe0f3cd7066200055cbec40ce28ed9506afeba936ec1"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/runtime.rs",
+      "sha256": "e2069b6854f532ea5b85652d016952415daa2e75b54f173cc2bc5c11062e5ea4"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/runtime/recovery_review.rs",
+      "sha256": "daaed7085f0dfe79c6fa5d6e2175d87642dfd5ca27fe6fbfe00dd7f5c716a28b"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/tool_outcome/release.rs",
+      "sha256": "905e1bdd1deb5ee8fddb04497ae404d82ae843c8c57dbc2367255c988bc3330f"
+    },
+    {
+      "path": "crates/kernel/chio-process/src/lib.rs",
+      "sha256": "ec6dc924f363b7bdc1ef381005951c0aaf1ba9a9bfedd7b896a5fdc712581624"
+    },
+    {
+      "path": "crates/kernel/chio-process/src/security.rs",
+      "sha256": "5b53ad63e237da529ba7018e81fd1af380e5219c51c9c6bc8778810791c5f234"
+    },
+    {
+      "path": "crates/kernel/chio-process/src/state_reader.rs",
+      "sha256": "8c81c9c465b10268f9c8cea8e71ad0a876eb461aa8153484f4d78d1c787c80b0"
+    },
+    {
+      "path": "crates/kernel/chio-process/src/store.rs",
+      "sha256": "b1f08866f54ca067a6e873fb3ba2a28585a9a67c3f91ccabc760ed922d482933"
+    },
+    {
+      "path": "crates/kernel/chio-process/src/store.sql",
+      "sha256": "53d92e2c34fe956cca18fc7db14ed3f52aaf9505f02267d91ec3e38acc74dad2"
+    },
+    {
+      "path": "crates/kernel/chio-process/src/store/blobs.rs",
+      "sha256": "726a28d19bc6597172404527c4ed9c732fdbb66a919dc7f2642f4cdd2790eac4"
+    },
+    {
+      "path": "crates/kernel/chio-process/src/store/nonces.rs",
+      "sha256": "06b82549daacfaceeb2fa27e488219654658d381455fdd2fabfed73a0fd02863"
+    },
+    {
+      "path": "crates/kernel/chio-process/src/types.rs",
+      "sha256": "26ba7f6468167f743f7ab33ed10217583da7ee9457e69cc67415a896d4d6f3fc"
+    },
+    {
+      "path": "crates/kernel/chio-process/tests/nonce_recovery.rs",
+      "sha256": "46fd81995e441421a64dd3b9b098f218733273b66de843dd63161e6b2cb690db"
+    },
+    {
+      "path": "crates/kernel/chio-process/tests/recovery_p0_baseline.rs",
+      "sha256": "d4dd1697069274b135c37f8a584d4f7592701612267b87096ea76ed6ba50acc3"
+    },
+    {
+      "path": "crates/kernel/chio-process/tests/support/mod.rs",
+      "sha256": "723d3c7fb53dcd07c1eff7fcd89e22c2bef69d6366c99ba43528afbee7198640"
+    },
+    {
+      "path": "crates/kernel/chio-process/tests/support/supplemental.rs",
+      "sha256": "d0c3e5c6fe86d1461880e5819735be552f23cf2a9a313301ec780e981cbb03c5"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/security/adapters/flow_policy.rs",
+      "sha256": "6b2c10c4a1401a7a3a2d63332541939b0a75014792116d92f910c7c1dbf5cc1b"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/security/adapters/native_flow.rs",
+      "sha256": "119a5be1a42d98ebd76e810c00035a0bbfa620693f5a8dea779703b12c3bcf68"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/security/adapters/native_flow/declassification.rs",
+      "sha256": "81f42b57b006b5a9e4f7e2d4b9013d6c2d43d6f89fa13d34c346a65007263ce3"
+    },
+    {
+      "path": "crates/platform/chio-manifest/src/admission.rs",
+      "sha256": "0c2607017443ff4a724fd2f910974724001165b2f7a5c6a277846b709d6ffb85"
+    },
+    {
+      "path": "crates/platform/chio-manifest/src/lib_parts/part_01.inc",
+      "sha256": "c8067ecb1e831ab4ea7b7da7a47248a23a7396b28473c9be35689ad2d93a8e6f"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/Cargo.toml",
+      "sha256": "7a061ed985cdc619897e26cac24389167487745a1d94093764d00068d3dfcda8"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/flow_state/egress.rs",
+      "sha256": "1fe869f97fb83f2f4c4abdd6dc6017f2ca7a645484047008205939b9f14c1c0e"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/flow_state/input_join.rs",
+      "sha256": "12f7ccd4fb24225ddf74ca8714f5438f4f385407da33c470a06785d8c6f35944"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/flow_state/mutations.rs",
+      "sha256": "1b2b190168ed31fc2fe214dac28ee846f3b0d85cf4aafaec4d088b0c01b3a1fa"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/flow_state/tests/native_scope/fences.rs",
+      "sha256": "e093ff3a624feb9db7f9b66e49c0ab8da3e06d9469418fff797a758386473c2a"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/serving_owner.rs",
+      "sha256": "df6e9a2e76c94ba1710e28d3caeadbe97c5bbdd8839a43c40b7e4643153836b0"
+    },
+    {
+      "path": "crates/platform/chio-workflow/src/authority.rs",
+      "sha256": "621152a24eb08794394fb6b913a26f37c7003adb7c80143eb5f47760e3f4757b"
+    },
+    {
+      "path": "crates/platform/chio-workflow/src/lib.rs",
+      "sha256": "cfa5682b3514ec663bf0260bb8c7a857d50abf63e058396e5a97f44039321bf0"
+    },
+    {
+      "path": "crates/platform/chio-workflow/src/manifest.rs",
+      "sha256": "21458f0b2145e6f27c95bee05978a24a558763516ce55caf0920bb82f841198d"
+    },
+    {
+      "path": "crates/protocol/chio-egress-contract/src/lib.rs",
+      "sha256": "d37658206f08f53baefaab841b7b9d24e0ca86a278c8611a09c6297981186fc1"
+    },
+    {
+      "path": "crates/security/chio-flow/Cargo.toml",
+      "sha256": "6ea3655a7a99a16472891d887bd0b8c2e5a28c55f40ac2a19712a2723f5ea440"
+    },
+    {
+      "path": "crates/security/chio-flow/src/declassification.rs",
+      "sha256": "0e121749b4bc7f6811cea537840bfdbe1cd7fac5183384cffa2ff3f89503b5bc"
+    },
+    {
+      "path": "crates/security/chio-flow/src/engine.rs",
+      "sha256": "dc9e7701adb2465b43e12b3ca183e7e4e2001d3ef02f091d6b3019300050ecb4"
+    },
+    {
+      "path": "crates/security/chio-flow/src/lattice.rs",
+      "sha256": "239d84fc48a654fb3e5f8679fa6ff873f7d0bfdf55e4c72138955a4291b35701"
+    },
+    {
+      "path": "crates/security/chio-quarantine/src/simulation.rs",
+      "sha256": "551dd47d480cf937e3debd35d238efe5c7b39a985f95d1189481f7d9545f321c"
+    },
+    {
+      "path": "crates/security/chio-recovery/Cargo.toml",
+      "sha256": "790535a86624e1fa8fa6d0997853f386b1de5f9fa15ea3108b3f7fa8036ab016"
+    },
+    {
+      "path": "crates/security/chio-recovery/README.md",
+      "sha256": "6e9cf8203644f1ca2dcb1f6360ea19535bf4ecac2af299041a89c24ee0e2a6cd"
+    },
+    {
+      "path": "crates/security/chio-recovery/examples/p0_baseline.rs",
+      "sha256": "a1d8c989f1e72d8f890de8b8850eed20e2128a6bc5f3f61c213ec1bc8c5df31f"
+    },
+    {
+      "path": "crates/security/chio-recovery/src/decision.rs",
+      "sha256": "6131769cbff9c931ecff9ef0113cc2b73ba31b4dbedc906637df9517ac422130"
+    },
+    {
+      "path": "crates/security/chio-recovery/src/lib.rs",
+      "sha256": "a4b7bb9e5f9bdc88fddfe33aa234e84a287582fe4081b9231a00ea855e582b1e"
+    },
+    {
+      "path": "crates/security/chio-recovery/src/workflow.rs",
+      "sha256": "a114b11fadf12282776bc5c2fe52f20168f8c96da3586efc641e5ed9b45059e1"
+    },
+    {
+      "path": "crates/security/chio-recovery/tests/workflow.rs",
+      "sha256": "a79dab41bc0eb388c2ca10f06ff0b20ffa5e258e67c324062dd71ee91b7748f6"
+    },
+    {
+      "path": "crates/security/chio-security-kernel/src/pre_invocation.rs",
+      "sha256": "77d7ae78883677842972b8cf3f4bb01342552139e7c32263eb6b5a6f3a037f1c"
+    },
+    {
+      "path": "crates/security/chio-security-types/Cargo.toml",
+      "sha256": "d869f83e7738cc9edbefbab059368582d4e2446bcff183e26efd4384a1a8b2e0"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/declassification.rs",
+      "sha256": "8b30ac70802e7864976e5b12be9ffee3073f71fef13fefc0cfc0697212c8a392"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/flow.rs",
+      "sha256": "724c50b89a36c0bcf0cb554ae56c494ac408b2fbcba17dcd181b50bd1e580304"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/lib.rs",
+      "sha256": "ebcaba5fd976643aeb204547026235960eeb9d0a2a1fe18acc33c85cdf866a61"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/recovery/bounds.rs",
+      "sha256": "584518ccfaeceb6c360224c0d813808bc02311cdaeb390d852c48020d8bdbbfd"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/recovery/identifiers.rs",
+      "sha256": "2f7a1e653429bffe209073c8c439d81eef336e003b1f75e594ba340692e056eb"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/recovery/mod.rs",
+      "sha256": "030505833c457a52860b0daaea7ca52f6a9a8bbd3f1ed68ee4297a3777c28db1"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/recovery/observation.rs",
+      "sha256": "979f59261a4e7ef5a1d120edc128c914a13cd0322c6ccf4635f7400ea61cc182"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/recovery/profile.rs",
+      "sha256": "02a0e0857745e31ba509250bde4ae26f3a84ba84ccac77395db637357ccdb95d"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/recovery/trajectory.rs",
+      "sha256": "a4ed913ec71a2fa92faef0eb4ea0737cc733469080cde561fabdb7ccf058b8ca"
+    },
+    {
+      "path": "crates/security/chio-security-types/tests/recovery_bounds.rs",
+      "sha256": "45ee8f6af353839f111300c976a87fc14c7ffd542a06501aec8349fb789305e3"
+    },
+    {
+      "path": "crates/security/chio-semantic-contracts/Cargo.toml",
+      "sha256": "4154021124316bdfd7209a77f7f9b13a88e6694c43c8a7e62b7fdcef6193922d"
+    },
+    {
+      "path": "crates/security/chio-semantic-contracts/README.md",
+      "sha256": "ed2f6fb9b400cc56586301777a72a47c2d7abde8ae731192e4a461d5a7832499"
+    },
+    {
+      "path": "crates/security/chio-semantic-contracts/src/effect.rs",
+      "sha256": "d67ff74394cddbd1fc0a66bf249e6fad59651a72a3a4044cb37c43d7652baa56"
+    },
+    {
+      "path": "crates/security/chio-semantic-contracts/src/graph.rs",
+      "sha256": "b91c999533d1035e64335fc2ba3acc7db9ca30f07e3352698fb4977493344f02"
+    },
+    {
+      "path": "crates/security/chio-semantic-contracts/src/lib.rs",
+      "sha256": "3134c53c18402ac4c8c09561330abd752812af2d0aa8e4a5ae1ec9b7fea6c66f"
+    },
+    {
+      "path": "crates/security/chio-semantic-contracts/src/work.rs",
+      "sha256": "e63e697ee775776910bdb443fbaafffb2e9b4ffd9da8a19d6b321da256163617"
+    },
+    {
+      "path": "crates/security/chio-semantic-contracts/tests/graph.rs",
+      "sha256": "e26b7879f7469499ab05303ea2130b0f27fdd6779efdf9725e8f7d02e6f652ab"
+    },
+    {
+      "path": "crates/tooling/chio-conformance/Cargo.toml",
+      "sha256": "32914b72c51107f9626eaab7fae4ba2260f0fedd98d7456a034262b4d9961bbf"
+    },
+    {
+      "path": "crates/tooling/chio-conformance/src/lib.rs",
+      "sha256": "542870ca64dbdc6df49934a12b05bbcdb414ae77b560f47b49d182dcf87f20ea"
+    },
+    {
+      "path": "crates/tooling/chio-conformance/src/recovery_trajectory.rs",
+      "sha256": "128e9e12f52a493272272d40c86b1b40646499f3601b31e86f6ff78706822030"
+    },
+    {
+      "path": "crates/tooling/chio-conformance/src/runner.rs",
+      "sha256": "a754844a6dca1d53f5eadaf570f890fd9605ae8a5d0e078b7c15c7e858ca18d5"
+    },
+    {
+      "path": "crates/trust/chio-disclosure-lineage/src/lib.rs",
+      "sha256": "f6bcceae68f96f9e3696f755317f6f9f801f7cb854d6052934f66d28a55a18b4"
+    },
+    {
+      "path": "deploy/docker/chio-workspace/Cargo.lock",
+      "sha256": "b3eeb50ab7a9f7f7dc1062053dbf229e80a2052cb5f373ed47e1d4ade3a3d99a"
+    },
+    {
+      "path": "deploy/docker/chio-workspace/Cargo.toml",
+      "sha256": "37ae1318b0e545921d82f42ad0f66b8c90fabff2be6b34c59bc00c1eb5173272"
+    },
+    {
+      "path": "docs/architecture/SWARM_EXECUTION_CONTRACT.md",
+      "sha256": "5c877303baf93cbf7f62c0882db5dde123ff1acef355495eb0aa4e39b6b7e467"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/02-rust-design.md",
+      "sha256": "c64494196045229cc5fd8a6cd6c2cc3fc3ff12fc846c8653b3cb38b38d9bc8f0"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/10-delivery-decisions.md",
+      "sha256": "ea0495d93991c513eddaf2c4717d7077df01ae15531e0f86df8d2f5861aaa3b9"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/11-contract-catalog.md",
+      "sha256": "fab53560b298ae852dfb5cbdd2d5833aaa966d1031387af784791ae1eb371cc0"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/README.md",
+      "sha256": "38814df133a2021c7cf2b3a07256197b57a5311cacebe9bfe9293efdb5f3dd45"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/check.py",
+      "sha256": "3e66f7172c5d9d179583435bb0ec25cb347729e24682c315337f70e66ee44aab"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p0/PLAN.md",
+      "sha256": "2154abf8bf63d98485036835ea09737aab2bbb45ffbeb2324cc68062c54d4ccf"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p0/REVIEW.md",
+      "sha256": "386a35d62f85271e47422cbc130855f22be0eed0709a9e95cbe214b6c6444293"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/requirements.json",
+      "sha256": "b3f56200499e037171c602fbbe815426620024073b73be4657fba785197cf125"
+    },
+    {
+      "path": "docs/reviews/2026-09-27-production-response-simulation.md",
+      "sha256": "6d8fb4b3db3825fe5100e95d115737a3f87a2c59f44aeda1d1bd935d6301472f"
+    },
+    {
+      "path": "fixtures/recovery-portable-consumer/Cargo.lock",
+      "sha256": "24457c8388da6114c94c227e8c3af36ea901819da26ff051b9201fdeb4ac2ac7"
+    },
+    {
+      "path": "fixtures/recovery-portable-consumer/Cargo.toml",
+      "sha256": "acaa878f38e821f218d092bec3f5a0d65f3d86726bdecefe05e015ebe9151998"
+    },
+    {
+      "path": "fixtures/recovery-portable-consumer/src/lib.rs",
+      "sha256": "d54fa401778eb406e69e5c951a5e6998aff1c86f464c4b1029b53fb8861f3545"
+    },
+    {
+      "path": "labs/openappa-recovery/evidence/source-manifest.json",
+      "sha256": "c06c1193fd9f680f8ccecf415b562a5e1bee17eb0225e15b46a374b090bd4696"
+    },
+    {
+      "path": "labs/openappa-recovery/evidence/test-results.json",
+      "sha256": "0312b861d4dce3d3b4d8cbbca12091cfa8fa89325074427647960285d2b61567"
+    },
+    {
+      "path": "rust-toolchain.toml",
+      "sha256": "d52c5633ea77aefd345519d0a6c87e19c2636a1e90178585c30db481b3de9de0"
+    },
+    {
+      "path": "scripts/check-recovery-p0.py",
+      "sha256": "b9694fd61f08f81e1903182addffd4659b76adfb4530a770cd3034ea1adb10e0"
+    },
+    {
+      "path": "scripts/tests/check-recovery-p0.test.py",
+      "sha256": "5e2512fb1900b2d2c3afba282eb79802d4b522bcb4fc8347698287a4728b5e09"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/pyproject.toml",
+      "sha256": "44dbb0000500ac03a657a164e3366840be1cec0705e05ecf76f2312d3866b34a"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/__init__.py",
+      "sha256": "1a21068256edffd072c0153e380c4ef568021cd66e05ab1875b56aac41700166"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/agent/__init__.py",
+      "sha256": "05ef9bde8f98a43aa9e6e758c6200e29675adcf43e1308f5326c3e91f22c34e0"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/agent/active_response_governed_intent_schema.py",
+      "sha256": "226f9d851484f4e52c8d77032ab439e99402f153f680a8ae72c976c84c7a4547"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/agent/governed_transaction_intent_schema.py",
+      "sha256": "97a7c8c673223d5825a40d348994390eee175d369ae7eadb0210bf4019f4cdd8"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/agent/heartbeat_schema.py",
+      "sha256": "6a8c91a46f9b066d3e57ed486b42fbffb2fbc96e65730fc480e87e3c537b1660"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/agent/list_capabilities_schema.py",
+      "sha256": "d85e72ae5592edb21e35ef73f4de394a08456378b94ce13e067ad0d857023fdf"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/agent/tool_call_request_schema.py",
+      "sha256": "c4e90283ddb974292bf2c905b02e0f161311319d3ee5fa2d7913f8d758b9b4f0"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/anchor/__init__.py",
+      "sha256": "56ff4fa17325486afd07474eab21b20e551cfe4b643b26e8d03c85b3028e98fb"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/anchor/batch_schema.py",
+      "sha256": "b025b316fe0a2cfdce1422ca3824f4d2b8e61a24c9bd2b5bc05fe6721e60eed2"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/__init__.py",
+      "sha256": "f88dbb0ec5ea2eaec33a0ab3f15b72c9ab953a3f211cfe7dc096c6e247b7fb56"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/aggregate_budget_root_schema.py",
+      "sha256": "f288af5af8b4915b766bc3c000ed0dd429a4f2eaf3db54d517502c37b15e6f7d"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/aggregate_invocation_budget_schema.py",
+      "sha256": "791e565336e75c7f6062144236f29f72a9572150eb9067b2f95fe8cfc74722be"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/capabilities_schema.py",
+      "sha256": "40ec164d6a46a5011c5d5e4e4f82712b45cb2042ff9a275c514ca6973d0ba193"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/cumulative_approval_root_schema.py",
+      "sha256": "b1d42dac670e12bd04312a2a492322abc76fb5076c3e43f47f2670c28ce4d031"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/governed_approval_token_schema.py",
+      "sha256": "d12b09b23cbe584bba72b48c9361db64a1782dabdf5b807b0b8be20c32ce2595"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/grant_schema.py",
+      "sha256": "e7bd957aa6c02ec5a1f4dbd558cff78a13b6404265cb06dfc5e6399562828d4d"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/revocation_schema.py",
+      "sha256": "387cc045df4cbd18ace0f67d9bebc4a019c844cf29c9f033f34c09ec1258aa2f"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/supplemental_authorization_schema.py",
+      "sha256": "895fbe1d24eb98e681f49dfdaca31e6d5bb42120a67b7d9869c13e8e0a88d664"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/threshold_approval_proposal_schema.py",
+      "sha256": "a27a1f94fb138c714e6819bbb71f41ca89a3c04dcf1cf7e167b159027006f17e"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/token_schema.py",
+      "sha256": "83da02f7d6a1eceaf217f00b745ec0b79634478df25a06652fbb8ef35221bf1e"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/verified_approval_set_schema.py",
+      "sha256": "21fe011d864f80634bab84a9f8ee532e34ac5e02446c8d333a1947bae28e2d28"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/error/__init__.py",
+      "sha256": "85adfe081d3c1adeff7ec77ce7a84a52b50913c11c2eb4bf4d28b0c1a44523db"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/error/capability_denied_schema.py",
+      "sha256": "be51b07cf68ffb7ac40b533b45337bfc8dcdaf3e38847f2b8d25c36f4df503dd"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/error/capability_expired_schema.py",
+      "sha256": "fc91c0fd40648fe7354c6e05fa61e14b42210834529241e0260bd0a2e69345ba"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/error/capability_revoked_schema.py",
+      "sha256": "5a4b7d98648e551d7600ee03b2ef22c471cc7de4539fa9c75992b5aab1b4d9b2"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/error/internal_error_schema.py",
+      "sha256": "24fb81f53a750251ed0ac1e2297a779ace752c2795196279fa3bc5ae5a4da093"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/error/policy_denied_schema.py",
+      "sha256": "b49eae12a4c307036741c46f5472b9edbf3d2647a8edd3ed6b073f440ed7ef05"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/error/tool_server_error_schema.py",
+      "sha256": "bf286a11e2eafa849c8668ee54179a933ca6002ed04040193e3386f1f410538e"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/federation/__init__.py",
+      "sha256": "46fa589eead5d0d7de9a1b269fbc723cea9bdcbfe76c74b4f36202323691a886"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/federation/bilateral_signature_slice_envelope_schema.py",
+      "sha256": "46c5ad4f21ff491af555944d108fd6b9546fad3efb72e478a6418634054101e4"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/federation/bilateral_signature_slice_schema.py",
+      "sha256": "2f1c38da96c1a2858d0b12c4fc23f34c5ecb2a04ed3a719c76ab76e262ee0414"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/jsonrpc/__init__.py",
+      "sha256": "aa692cf6b5cb59c87b258c91f7bdf9a904048f6f87ee596cc9b3f32ed9314703"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/jsonrpc/notification_schema.py",
+      "sha256": "025456292103337c1858035844d41de9d2dbcb2b60b82f279f7574372b9ac7cb"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/jsonrpc/request_schema.py",
+      "sha256": "affa3bcbddd6a7f0344eb2089ba76da9b93998f53644805077d5761821e35388"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/jsonrpc/response_schema.py",
+      "sha256": "33c774d2226a66070afb201c9dca8ed0ad07c2544cb5f65076846a2a2fa99d7f"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/kernel/__init__.py",
+      "sha256": "07819d0fbf51a4a634b9cc6814f41e6e7270279fed14b59d726cec1431a46abe"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/kernel/caller_delivery_report_schema.py",
+      "sha256": "806900525c81967203247b3b71de5a8e08b59f28c4d628f7d1edeace8bf42835"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/kernel/caller_dispatch_authorization_schema.py",
+      "sha256": "e41e081aa7598a4ee45e169e662f9684b1c82f985f3e4a7b0e4b7b1e13fe2b0b"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/kernel/capability_list_schema.py",
+      "sha256": "4c55e1c66cb04ae14b27314de7f05ad5e4e63c040768f1a45beeab455423959e"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/kernel/capability_revoked_schema.py",
+      "sha256": "34c613e2ff4576a9b46fc929a2662a854827628883115ebd5a715d9331461303"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/kernel/combined_capture_metadata_schema.py",
+      "sha256": "d03d40c1d26fd532e613b30af08a45bd17798d9600bd60c51eef6cdccde6c69d"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/kernel/execution_nonce_schema.py",
+      "sha256": "8590a5abf79dcd4e22cafda65b9ee57d4570e9e06f7179b36a8ddc7f4f9b2892"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/kernel/heartbeat_schema.py",
+      "sha256": "ed76601b1ca7a054c25a81b678c8997c02a345e7b41a82d8e6300bcd12a7ccca"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/kernel/tool_call_chunk_schema.py",
+      "sha256": "8fcbd790aa19a3bac24cb4200398469efdba8f4862ff90aebf28e7b7d1ff8a7d"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/kernel/tool_call_response_schema.py",
+      "sha256": "84052875772b83b822d1852f7c3ec991ff76f244f0c3ccc34fb57c47b3ea4b72"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/provenance/__init__.py",
+      "sha256": "69c6cc3016da1337119a01a4a4932a4eff90f7b9a4781e9e56cbbe43dfaaff5b"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/provenance/attestation_bundle_schema.py",
+      "sha256": "794c181cefe3b8e7b6107343311bab4eb0a00141203049fea84393a47679c32b"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/provenance/context_schema.py",
+      "sha256": "f6fb9f4f577ccc904c63b41bd38da556507d99c53e19c78d1acb35105e9071e6"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/provenance/stamp_schema.py",
+      "sha256": "f6f0488b206c6f222da7f6e6fc1e71ac3fe99a1300f2c2e8be9d113de9cb95e9"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/provenance/verdict_link_schema.py",
+      "sha256": "3159cd336dc23c68953562bd4bc020a134071eb06a73b7c6b657f6d6bafdab22"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/receipt/__init__.py",
+      "sha256": "83eec4484f497d88192ac9d849081cb336636ad71b6d3c1f2180b4112740f4d2"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/receipt/admission_metadata_schema.py",
+      "sha256": "8c74112e3214694ca0bbc359d26969ff01c0c64f9a623745f2cd1c39aa85d795"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/receipt/delivery_contract_schema.py",
+      "sha256": "80c6905e153ab061cbb0ae28fdd156c1c97fc224fa03115a159c35b6dd6c2ab4"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/receipt/finding_delivery_schema.py",
+      "sha256": "7ad2c85655d02aaed24d80a9abca8f7516bccce55d65379f1a8433c111b8d26b"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/receipt/inclusion_proof_schema.py",
+      "sha256": "f38949e7abcea976e3cada3fb4fa000f330506306c7a9c0d7b0e23eb7fd9f1ae"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/receipt/lineage_statement_schema.py",
+      "sha256": "ba60d4e11b9d0481f02cc81902f31d91c1279ac774801107234e8d662ee332c9"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/receipt/record_schema.py",
+      "sha256": "1631d4193bdc562e823abeef6681458cb67dc38000c84f9c6760060fb23cfe80"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/__init__.py",
+      "sha256": "3f654a0958c37acf7229cd139531b2f976c555e2d46ce5201a96dede548b0ab3"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/dependency_graph_schema.py",
+      "sha256": "52b2b9b9298c34a2431b997f567dcd66f683d5a0c0a8e7109136d8ab2373ab01"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/effect_contract_schema.py",
+      "sha256": "ae70cc582c9d85e3e00c2d672e6a1ea43a18a36e8bca17722071ff20279076a3"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/observation_schema.py",
+      "sha256": "2a431e59a35f539af3e65794935a47462e2d1a1d88f228e817b03f1599bd915e"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/profile_requirements_schema.py",
+      "sha256": "65c2c60b01ee2f5f843967dd5e5a599464cca79e6994294d10ef5a238889ac2c"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/trajectory_schema.py",
+      "sha256": "8bf41bcf278cea44f2afa77d5580a6507083d7df009137556fac278327c611dc"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/result/__init__.py",
+      "sha256": "3a17dfb737b3c972e45d439b5cb04f71e52f62ffeba45155f0e8111a0539e29d"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/result/cancelled_schema.py",
+      "sha256": "3099a3158f7e0ab662fdab27da23afcc9afb08e42d8f47199624cd4f3d37a343"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/result/err_schema.py",
+      "sha256": "7463f464d77d2244ccded5e558a12ab3a761586cbef30e306e320d55229f3053"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/result/incomplete_schema.py",
+      "sha256": "28170524636109a283c3519a09842bbd14234a5c6db72ae26d7df0cf6068eee7"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/result/ok_schema.py",
+      "sha256": "af28277935bc7818992d611e5d66d792d5ff6a8f96ebab9bab5baf4e0ff357c3"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/result/pending_approval_schema.py",
+      "sha256": "708c92fb027db8af6217f68fc396e9466ff85976556a4f2f8525009426ebc417"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/result/stream_complete_schema.py",
+      "sha256": "9c50d937b9543ed5187bbfcce0f8367c400d8889718cc08f7a399df39c3bc24a"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/__init__.py",
+      "sha256": "214f342c18461e4927e12eff9504a58fa6aea392638712a3a5492ecc0ca2b798"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_admin_control_receipt_body_v1_schema.py",
+      "sha256": "a21dde1ce15b32a686ce7c39acfe5fc40d017c4c83eefe7b53fe5c42ed37eb54"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_admin_control_receipt_envelope_v1_schema.py",
+      "sha256": "c9295592d6c9965b2d0891714f9053a48940f68bd9e05c6f46ffb2308b08d9f1"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_admin_mutation_receipt_body_v1_schema.py",
+      "sha256": "945ab0b808d39a3d00ee47b8cf88d0720f9f8120c9e19096852794a0da5a5a00"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_admin_mutation_receipt_envelope_v1_schema.py",
+      "sha256": "6e5e2d287c8ee23f81148e506791fcfababfc7491a5523df35a6821f57b3db99"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_attempt_registration_v1_schema.py",
+      "sha256": "509c86bc3216008a2fac7f3bb560a477188593c637870dd44833f9d8675770e0"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_audit_comparison_body_v1_schema.py",
+      "sha256": "68eb82072f5e02ad657e293615ffac9ed3cde0f403ca33d22099775260c520c7"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_audit_comparison_envelope_v1_schema.py",
+      "sha256": "85ed948bed0442e6f4f1db662fe430a631f8b9b8488604570ca43e336894f55a"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_audit_runner_authorization_body_v1_schema.py",
+      "sha256": "48c172c5cedb23696b900356ef281f945355b7f63a4a75d0200ca2853977bb1e"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_audit_runner_authorization_envelope_v1_schema.py",
+      "sha256": "e9be4e0da888b0c0f60b5a844ab265b112156e1bfe12e91e214fb95b09528198"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_authority_request_body_v1_schema.py",
+      "sha256": "8d4800a2c209d18206381858633921a4277cbe4a90ab8a6dc4ecacd5e1ce8e80"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_authority_request_envelope_v1_schema.py",
+      "sha256": "a7130c67072277085f5295462a07b503cbb7361cc3074fa1ca841d8467fa9920"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_authority_response_body_v1_schema.py",
+      "sha256": "a63b10c58e2f55807bfbcd670a9ac81f237ee2793c1db5b787f8516f72794dcc"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_authority_response_envelope_v1_schema.py",
+      "sha256": "3a511a4c7be46297068e50f0332eea45c8acb26afa16c3731c8c48b61e9ede89"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_capability_body_v1_schema.py",
+      "sha256": "df0eff8a95189a169db5cb72a0cb2b18332da3ca243e399f25905e67f26df81d"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_capability_envelope_v1_schema.py",
+      "sha256": "d356bcd9fec46a6aab6d30b6dc09914876cddc47b2e543f9a1172f770eaecce3"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_execute_failure_v1_schema.py",
+      "sha256": "3adc4f66379fe1db63dee57e1c536941b766af7b16d422f410f7e0556ab1aa50"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_execute_request_v1_schema.py",
+      "sha256": "2907502fd60874fa78c4b7587d2dc96a94b550c2dd60bbf7d4f19398d6cf54cb"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_execute_response_v1_schema.py",
+      "sha256": "8aeacd938ad30ff518b4e274b08eec12cdd3cc03a5bd6b24bc0086d5a2cbb941"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_execute_response_v2_schema.py",
+      "sha256": "74e165ff1d4020bab0435c743596a2ee2f3d1c8310f95862e53da9f439aecede"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_execution_evidence_v1_schema.py",
+      "sha256": "7d4f8052e5984000bda93e7008a278f130841e6021bba1e96e547e1c7ccc69f2"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_execution_evidence_v2_schema.py",
+      "sha256": "759ef127ec5a2aefc3a40025e1213fb2c9646b3e8d91af978a254d84e5375beb"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_execution_failure_receipt_body_v1_schema.py",
+      "sha256": "ae1db2574086e94228255840aa686aeb5cf6f20c6ef8def085b2f17ea4a8d038"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_execution_failure_receipt_envelope_v1_schema.py",
+      "sha256": "8910d7dfeb92af48d4ecb2edff7f8cd9d569b714da9747bebb105b45b4f8b74d"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_execution_receipt_body_v1_schema.py",
+      "sha256": "1bb5c5a900f136e60e1988a38ce14d6f98b8f3235dc3709b9afcceec30bded47"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_execution_receipt_body_v2_schema.py",
+      "sha256": "7056846c59f679c34f4bee4f27c4c90718c69751e1bf6a8a6e86eeb9d9bc3330"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_execution_receipt_envelope_v1_schema.py",
+      "sha256": "b23e530dfb88ce8cf0b713811282b1b7c8a07e0f6fe9b587c4bc7b2eb7b82f91"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_execution_receipt_envelope_v2_schema.py",
+      "sha256": "c59b5bb0f45f2c6ee53de3fc57e2ea919709a7c88c3747a66c62d0ca251c47c0"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_prepare_dispatch_acknowledgement_v1_schema.py",
+      "sha256": "54feb15ce7bcbb10d8d4d46217ad8410634ea1be1e7b512d50c68ac6c9df2e89"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_privileged_audit_challenge_v1_schema.py",
+      "sha256": "631e6910ab403ef4cc6a6463a320e77b0ad0eb4abf85b115a290c2e99b0d95e3"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_privileged_audit_commit_v1_schema.py",
+      "sha256": "cb77c324b901dfeca5980f1c06d4cbc99a2f830c859ba880078c2abcf4e07330"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_privileged_audit_evidence_v1_schema.py",
+      "sha256": "94214b7b9174e8eaa18b3a26feb436acc5961885eaa61a1c968bb931c0ed6f18"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_privileged_audit_open_v1_schema.py",
+      "sha256": "0326e6f097c9181406c7ca7b0fefe487b9c6a498e80ceb31f86707067f95bafb"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_register_attempt_acknowledgement_v1_schema.py",
+      "sha256": "3d325d7a9b9b34934727aa2e9743ed2de4cf1af0aefc66f5c4dffd972e4d1b54"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_register_attempt_authorization_body_v1_schema.py",
+      "sha256": "308ad78d8d835634ff59d6c29b9ec94c2b1e0b0ce87ce86d81fdf4ef80b8c6e7"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_register_attempt_authorization_envelope_v1_schema.py",
+      "sha256": "6314af57e42d2e97ba02ab473ac781a81d9182be3ed363b2856442bdffd722ea"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_release_attempt_acknowledgement_v1_schema.py",
+      "sha256": "3707ecc33ecd81e8ffbfb5bd8c11920c5abd4f104917519f255995ee0a41e1f8"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_request_proof_body_v1_schema.py",
+      "sha256": "bf02d76a70fae051c8787296fa796d9927e82e2bf55a116d4f55c29fc10fce4e"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_request_proof_envelope_v1_schema.py",
+      "sha256": "bfc6ac105a451d0876a04772c7d9446969026d68d60c8e4b3fff01bce29f3f67"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/cage_enforcement_failure_v1_schema.py",
+      "sha256": "9532d0141e002c95b840d435828f517ec411af6bebed0233878eb6206a7a9dfc"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/cage_enforcement_prepared_v1_schema.py",
+      "sha256": "324f274447093bd92147fa8629c54f67055b655149ce456b5c483b12d42c54d9"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/cage_enforcement_record_v1_schema.py",
+      "sha256": "160a16ad28ce8c63c048079f9e9f74e71a5f7d13f4e2616f80697b5f9115aa70"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/cage_exec_transition_observed_v1_schema.py",
+      "sha256": "6cbfceb55ffb54fa0b4787237ff61e76f81e9853a1a94d7f50378d86f87e04e2"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/cage_fully_enforced_evidence_v1_schema.py",
+      "sha256": "ab63fc7417573896292f3041744f8894857e619bf60ec7b8e8703af64c4f65c3"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/cage_init_plan_v2_schema.py",
+      "sha256": "0097544327da34bcaf0b743941808d367b0d4cb8873a2f3b2a19509141b38773"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/cage_process_exit_evidence_v1_schema.py",
+      "sha256": "0f5b6f5c893643bbec563acf0dd18f9d91fad78cec4a3835f764b8394315b162"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/cage_receipt_body_v1_schema.py",
+      "sha256": "d9e3d4e9c766314d7fb4fee4d63d389f1cebf237aff1b6808aa82879f1c6334a"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/cage_receipt_metadata_v1_schema.py",
+      "sha256": "b5046ff2c1c39e5ccd467a7db1a5fc800faff75e3bd195b38479724be0df76fa"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/correlated_finding_receipt_body_v1_schema.py",
+      "sha256": "8b95562cb7842ef9fed799dce351cdf0f4d17d43a31b0a6c3d8609b01add70bf"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/correlated_finding_v1_schema.py",
+      "sha256": "007b2b805eba66fefe204c5e4d343ac3938a7ec4461d7e4e028abaed49df38f1"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/declassification_consumption_receipt_body_v1_schema.py",
+      "sha256": "93399e4a3c1108f460f3aa59b6f22d98f34dcd0a0d6434ffdd5ef9c6cffa878b"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/declassification_grant_schema.py",
+      "sha256": "dcb0d7d5ce954e801502cfe158651a67da76af3dd38e6089cfc4da978d389606"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/declassification_outcome_receipt_body_v1_schema.py",
+      "sha256": "ae375fd324c1d4b555042ff76602535dcf0b50f1200add8b9490230fcb9fc78a"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/detector_health_receipt_body_v1_schema.py",
+      "sha256": "d7ccbd062ee02264a517a9c3a06fa241eacc1203449ea9daacfa789d96cb44c2"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/effect_transition_receipt_body_v1_schema.py",
+      "sha256": "c6b113ea9fe946ae08ce40793fcff47716db5c798cea13e53f72f095e92cf019"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/flow_denial_receipt_body_v1_schema.py",
+      "sha256": "36d491a4e3ce9b851130f9019118afa016ae04e6890d8da9c2e94c366e63aec3"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/information_label_schema.py",
+      "sha256": "556d0b99e01e28f196cac70963c58450805456db9a1123d44bd755e14f3a7aa6"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/key_log_activation_commit_body_v1_schema.py",
+      "sha256": "b813e885936e7ee301ce859ccc6948994915a859e8f583834dce16b874dce950"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/key_log_activation_commit_envelope_v1_schema.py",
+      "sha256": "aef094c8ca529ffc8a03442906f15f2ef6b03252f961a930567786a9d4623e2d"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/key_log_artifact_time_anchor_body_v1_schema.py",
+      "sha256": "7e02462b3376340b09ba6a5bc3f841a7a378d15c6fe721445f23bcc1a89692bc"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/key_log_artifact_time_anchor_envelope_v1_schema.py",
+      "sha256": "4207460813aff4260ec4912433c0ce5071af981641114040954e5dc4b4500104"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/key_log_audit_readiness_body_v1_schema.py",
+      "sha256": "80edba8f08221592d2f5e9111aeef269bf5bf4a349d9a24cac66fc4b149a492b"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/key_log_audit_readiness_proof_v1_schema.py",
+      "sha256": "97d64b05eb8b82b22aa81e1f68f0c380b5d241b8e3e2c13ce3f39caa1ce34bc3"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/key_log_checkpoint_body_v1_schema.py",
+      "sha256": "9ea4db6b5b0e29a50b283c1eec92dcff02fefc229dc236510dbc26232066d2c7"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/key_log_checkpoint_envelope_v1_schema.py",
+      "sha256": "c975c805bc88d5e3ad62c293ab6e084fa3b03a9dc97e0751e4e81ea142672230"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/key_log_enterprise_receipt_body_v1_schema.py",
+      "sha256": "a67fd135015627f6a50d9927c6857eccd0495ce18da503f46fa6e5dcbac2f8ec"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/key_log_enterprise_receipt_envelope_v1_schema.py",
+      "sha256": "5013999e162327f3ee8b9df1b0d4ddbb11b68f8fc18165427e6fb3a1fd7f20c0"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/key_log_event_body_v1_schema.py",
+      "sha256": "c0968b824fd254c8a6050f103a789520a44f4bb5c65f4f35fff764cbecf8b62f"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/key_log_event_envelope_v1_schema.py",
+      "sha256": "f41d53556b68105e9105c55d00d94a1b955f9d3d3213b1ccb1668c1f01d12290"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/key_log_sync_response_v1_schema.py",
+      "sha256": "07a24530679f5c537e0764bf4c91660d5a306dd7829cd704b3bbd0914abd5727"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/key_log_witness_readiness_body_v1_schema.py",
+      "sha256": "a1223d8c2e1bbb6209c4b8ab9c04746650b879937c178e265a5e9fc0f3e05e76"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/key_log_witness_readiness_proof_v1_schema.py",
+      "sha256": "814a1fc8ee6b14aa2935115849a6df4ab76d460dddfd152a3e7a7bf20dc96d67"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/key_log_witness_signature_v1_schema.py",
+      "sha256": "12c074dcdc83527de2a0a81fde822d8daa1ff533cbd592185008b76ddb22cd69"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/keyring_artifact_signature_v1_schema.py",
+      "sha256": "a271445ee865f631e5dffa8a38a678d6ebddf166d050d08f22e134e287ddaace"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/lift_rollback_completion_receipt_body_v1_schema.py",
+      "sha256": "5161901643bc695e871876c41a18f84df7d5dc9cfe3d42611f0b6392fbd12466"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/mcp_cage_launch_policy_v2_schema.py",
+      "sha256": "23d816a9cd1d23cee0f574d77fe44ee0822016a0869b5c87bcd870b98dabcbf4"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/response_completion_receipt_body_v1_schema.py",
+      "sha256": "22289427540cb7b6e6725168220045fa34df910e9ac8e53f34b1a138d6811d8b"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/response_effect_v1_schema.py",
+      "sha256": "37b956b2fa421e5252e7e5181c2bedff3dc736e00222ef43f8e76a94131c7488"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/response_plan_receipt_body_v1_schema.py",
+      "sha256": "9953948cbf089ef3a47b3cacbc15f9379cebf02a102320de27566c091c007f8e"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/response_plan_v1_schema.py",
+      "sha256": "eb39e0755145b34c0380dce1a2ab6c5ea9e944cc0d19a04cf4bfde504e6281ca"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/response_state_transition_receipt_body_v1_schema.py",
+      "sha256": "ad3184fc99796b17533224edda45828692c719e1ddea6df31ff7a202e7106ec1"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/scheduler_health_receipt_body_v1_schema.py",
+      "sha256": "30014402b6bbdd5c36e9b509b1ed9634b55748f97415e1db28292b50ac2eb633"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/security_event_body_v1_schema.py",
+      "sha256": "887a1ff1ccaddad9477d89a6a3462ac1ce7cdee572bf2d1273bc6f97bd10bfe2"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/signed_security_event_envelope_v1_schema.py",
+      "sha256": "0f2843d07ab556e32fd972e0690cc4a341c8a624353fbe22f901211c7e6ffb10"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/signed_tool_manifest_v2_schema.py",
+      "sha256": "635e8cef375c772c09b70fce12d166387e2ab896479f906dd54b56d306f69344"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/tool_flow_declaration_schema.py",
+      "sha256": "74f21374d7d5c3a7e450a8c1f4188782bf14eeb5fa37e48d5fb0791f6ae3cba9"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/tool_manifest_v2_schema.py",
+      "sha256": "8223c2c4a17525bddad796d6f109a84da4d4d6ee0fd650c665e56020c85a62a9"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/tripwire_observation_receipt_body_v1_schema.py",
+      "sha256": "4218db55df3831cc962e512b83031a0b5dac82a26aa9fc9fbe745c27bfeccdfb"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/trust_control/__init__.py",
+      "sha256": "6e56e85fedb1ea7e442d40e1bc9f24f96790378c618aac29e177b029c01ce594"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/trust_control/attestation_schema.py",
+      "sha256": "43ec9ee7a4d17eeb0e955f8ea39c0a807381c78ff3567c20cf79331a7de681bf"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/trust_control/budget_snapshot_anchor_provenance_schema.py",
+      "sha256": "91da48537cf0f145705e4520363eac732f7372851d3734d721fb7f7475fc8e1f"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/trust_control/heartbeat_schema.py",
+      "sha256": "0b558628a13b54040d44a75e5461a93b9c989f6d27f01d6599c78d896a7b1b61"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/trust_control/lease_schema.py",
+      "sha256": "95b4c2f0772c1b2110a7651ed97eed4fac7f40cc410d8ee48f0f3d2bd3047f8c"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/trust_control/terminate_schema.py",
+      "sha256": "31aca1ce471c563a0e6ac92e89812c054d42a7b006f849f723e844726523a3be"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/tests/test_recovery_contracts.py",
+      "sha256": "38a4679b542550f6f98c1b5cc116c38aab6c5896e0ee2fb0517fe7a03c5dc6b8"
+    },
+    {
+      "path": "sdks/typescript/packages/conformance/src/_generated/index.ts",
+      "sha256": "b530f98785a181333a638e663bf1e78d02b97acc7c39442682e4177e78746fa4"
+    },
+    {
+      "path": "sdks/typescript/packages/conformance/test/recovery_schema.test.ts",
+      "sha256": "57bd468aa152b599bf74d063a401b314e743072b8404a66ddf9de005743f8d24"
+    },
+    {
+      "path": "spec/schemas/MANIFEST.sha256",
+      "sha256": "b6185c6f808bd31ca2432abe5034980237a2cf564369c08f3fa13a10c228a9f3"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/dependency-graph.schema.json",
+      "sha256": "46b9cbe78ef63d1ff1327698d3e512549012414c55a29eb1002f197ed63911b6"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/effect-contract.schema.json",
+      "sha256": "16612254b2f701cb45ac8098560efc0b42a5d8ea0737fb968d3afb0883197032"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/observation.schema.json",
+      "sha256": "688bb9edb934ed37ecacc22919dde8703e3ec474921a66787eeff0c25c174cac"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/profile-requirements.schema.json",
+      "sha256": "3f14962c30f00848c7629f17e32c48d87e72c223ac4ac5a3e6a483215d950d89"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/trajectory.schema.json",
+      "sha256": "c2cf9f77dea67bbf512aa8cf033fd3105e9e80c380988de1e8025312281c4136"
+    },
+    {
+      "path": "spec/schemas/registry.json",
+      "sha256": "3dbd66f227b49ccb99b788611189c068bded83f1560113a160b6b623d1a7cbe2"
+    },
+    {
+      "path": "spec/vectors/recovery/v1/contracts.json",
+      "sha256": "1f7aa4e7b05d98df273c42cd9a8db316591c3fae5300e113f85afaa102328330"
+    },
+    {
+      "path": "spec/vectors/recovery/v1/dependency-graph.json",
+      "sha256": "c111afd99456e19e0dc36ccc64d85c555c4d4a3cfb9cc4f23e8a153d3a9807fd"
+    },
+    {
+      "path": "spec/vectors/recovery/v1/effect-contract.json",
+      "sha256": "5728de761f8ecf553519f787a83970ca55406735e31ff68b9b03a6b7bf82135e"
+    },
+    {
+      "path": "spec/vectors/recovery/v1/observation.json",
+      "sha256": "f6eb45971346763a749c7a8d8daa5be922e42a7f6958df0b4314ccd16ff43023"
+    },
+    {
+      "path": "spec/vectors/recovery/v1/profile.json",
+      "sha256": "2576104a13a9d6ccdf63c8261095ba1ed2e6629c346b5768f58e5c9d1063076c"
+    },
+    {
+      "path": "spec/vectors/recovery/v1/trajectory.json",
+      "sha256": "98001aa65b441603fde840ba39e8e64c894b6acef592cfe4e54e7115d2edff35"
+    },
+    {
+      "path": "xtask/codegen-tools.lock.toml",
+      "sha256": "89e373f80e3eeed5523646af30836c131360668e61a0ae4d9f32f164d31388b3"
+    }
+  ],
+  "source_inventory_sha256": "ef879a6269a04e6a3617aea372e84d19a3735a07fceee959bf23dccf3afa09f6",
+  "retained_artifacts": [
+    {
+      "path": "evidence/architecture-baseline.log",
+      "sha256": "f534fa490a1c143067461475741296f9eef1d41a855f70a5609044845fd82436"
+    },
+    {
+      "path": "evidence/architecture-live-drift-rejected.log",
+      "sha256": "2f37f6ad3c994046b7dc28dec2c65799499f37c80a67ea10f7f3d7b2127cc112"
+    },
+    {
+      "path": "evidence/clippy-first-run.log",
+      "sha256": "a7b19154ad914d674c6f147114f020a91d9a519c0bfc9346d22e1697a612717a"
+    },
+    {
+      "path": "evidence/clippy-second-run.log",
+      "sha256": "60ae2dfe0c7a8f88ebff2e1d4629272bf8a06049fdbf22f3125ece7640caabf9"
+    },
+    {
+      "path": "evidence/clippy.log",
+      "sha256": "d32c311e938b07072a5115bbc51cf550bce56976732f643481a04bb1e188f791"
+    },
+    {
+      "path": "evidence/codegen-python-check.log",
+      "sha256": "8687295280c00f6c6dd95881fa3cfa7b03aa4f501038aa0354838724d68adc1f"
+    },
+    {
+      "path": "evidence/codegen-python-new-uv.log",
+      "sha256": "92a8dee26acf9cf72eb653ceca5a281645cc7c7719153d680a284d85c9159b6a"
+    },
+    {
+      "path": "evidence/codegen-python-source.log",
+      "sha256": "36d8667d982e1cd887f2785b6477265b0e2eb91295af4766c15df9d1c597cf8c"
+    },
+    {
+      "path": "evidence/codegen-python.log",
+      "sha256": "d67907fd2ae15119c57530186e290fffe1bc2f4ae6e16badbea0a4627a99cf26"
+    },
+    {
+      "path": "evidence/codegen-rust-check.log",
+      "sha256": "2d92acee2f762fc22ca36729e9ea9f8078123eabcbc6f7a10669800ddd583e69"
+    },
+    {
+      "path": "evidence/codegen-rust.log",
+      "sha256": "a8b87210e11a2abb4b17ffbecddec532e31416caea68bf81d9fc12c28973cf63"
+    },
+    {
+      "path": "evidence/codegen-ts-check.log",
+      "sha256": "b4328d831d86d3761ff65460f09979eb4601236442c5f52a420d678b54f217e6"
+    },
+    {
+      "path": "evidence/codegen-ts.log",
+      "sha256": "2d3992bd4754d16f3638bf4c02251400364ea2f0ae1794a697723323a78e537f"
+    },
+    {
+      "path": "evidence/conformance.log",
+      "sha256": "272a6cd83f0afde24e891b61d222c668e6ca6857f2a1ec1bb7c029bdff914a54"
+    },
+    {
+      "path": "evidence/contracts-final.log",
+      "sha256": "9b608888171b491a5d4a8d7538b31203a5183589da37a1b7ab389a02b051699e"
+    },
+    {
+      "path": "evidence/contracts-first-run.log",
+      "sha256": "3b06c4c9a3457b9b0819b9ed17082c3feb2e50aee19476557918947ea780edfe"
+    },
+    {
+      "path": "evidence/contracts-second-run.log",
+      "sha256": "103e4a23f34d6be8bba4efe983cbc7787cbfb19c5a3151b79a2f06e7eeac4ae5"
+    },
+    {
+      "path": "evidence/contracts-third-run.log",
+      "sha256": "bbe169044657416da3c9e628adec26ff32c71e6c0ad98eacf77f1acbe5cfc72b"
+    },
+    {
+      "path": "evidence/dependency-guard-mutations.log",
+      "sha256": "afb934eecfc002418232ee43ad78dc164e28c4570bab294d47256ec66e0d130f"
+    },
+    {
+      "path": "evidence/diff-check.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/docker-workspace-first-run.log",
+      "sha256": "46b7c932996854ac21cc1493ff2d1cec162391cd5612784e777e4f6e7c2e609f"
+    },
+    {
+      "path": "evidence/docker-workspace-update.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/docker-workspace.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/domain-separation.log",
+      "sha256": "81a45d37f4cb3e9f2509484688d45c36f4ab949fa85832c5acb2a30af0fcb7d5"
+    },
+    {
+      "path": "evidence/formatting-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/formatting.log",
+      "sha256": "5fd9dae0bc1f5ab8853f3e9ef9a58b14f51072e17b9e51df96f1acbdf4e0cb39"
+    },
+    {
+      "path": "evidence/isolated-msrv-std.log",
+      "sha256": "51231f9dc3911e5faab13c6a367e6bcd2c488c6298b125892d6b4fb2051bee65"
+    },
+    {
+      "path": "evidence/isolated-msrv.log",
+      "sha256": "b0f7b04012322bafa5c966e8ea91a80d6e54c0cf6d3e960c7af6064aa7bf72a6"
+    },
+    {
+      "path": "evidence/isolated-wasm.log",
+      "sha256": "5e847c6a7a355686f19227ad8c751e72f71ebb22e583802c5592b05d5bb35cd6"
+    },
+    {
+      "path": "evidence/kani.log",
+      "sha256": "bd428c2a283f9a1df34e8ae8acc84076cc08962a9ed26ac5719a33d8e2c72e71"
+    },
+    {
+      "path": "evidence/kernel-full-sandbox-blocked.log",
+      "sha256": "cf5d0cc1ecb55e895734b6f05da83d10e0d1928cf8d4b4c1e34aadb8266052c0"
+    },
+    {
+      "path": "evidence/lint-parity.log",
+      "sha256": "5cdbfdb13810b2e2e148e68b501cddfe136aa2de30eda0b7ef053818dbaf1f02"
+    },
+    {
+      "path": "evidence/msrv.log",
+      "sha256": "30d1a3fe2e3940978cd7b312686c64272f547f1ef947fa2ec9c869c22f5b0733"
+    },
+    {
+      "path": "evidence/native-baseline.log",
+      "sha256": "40b9180c2c7526c0c599384d8b275c6926037e5c8d9657ed72b47ec3b1162b14"
+    },
+    {
+      "path": "evidence/native-foundation.log",
+      "sha256": "28bf210509286d1221aef1ebdee2f960b8ce0422fa46a090b526c2342dcfda0f"
+    },
+    {
+      "path": "evidence/owner-compile-diagnostics.log",
+      "sha256": "6bf4df0ab653c03795a0aff7d5b0e2d8dc1651beaf7030d9141f208d82e8ce3b"
+    },
+    {
+      "path": "evidence/ownership-doctests.log",
+      "sha256": "cbf13de651595ee0df82c9cfa89ba2ec320156ba8317d33bd5a4c213a66ff5d2"
+    },
+    {
+      "path": "evidence/owning-build.log",
+      "sha256": "847757839707bd62355f13e919f1b110a01a530bf5a8ba3ef7d3bf2d89cf1390"
+    },
+    {
+      "path": "evidence/owning-unit-tests-first-run.log",
+      "sha256": "caab199c153d97cac9592bfb075024c6bfb017ffbf2458fb1c173bd40ad6bfe3"
+    },
+    {
+      "path": "evidence/owning-unit-tests.log",
+      "sha256": "8f48dcee71c4a13b5b3d2a1619a471236594cd93cb2984c5fe867a46cd6a13ce"
+    },
+    {
+      "path": "evidence/pure-baseline.log",
+      "sha256": "84a270160be2518d2d78fd371bd107f5e9a5fd70fd51642a71f5209e9d0fcfc3"
+    },
+    {
+      "path": "evidence/pure-dependency-features.log",
+      "sha256": "5f5371c6eb969d27d35da26173faf77f3eae761851e7058d804fc378ebe387ef"
+    },
+    {
+      "path": "evidence/python-bindings-first-run.log",
+      "sha256": "f9e14869ae9f296c48ad11abb57a9d14eab470e81b617a43bf6c53bfa7d852de"
+    },
+    {
+      "path": "evidence/python-bindings.log",
+      "sha256": "ef9b9cb0c1ee9acadfd4d76ac25e5dbdfe266a588c9bc2a69ad121d02dcf3a13"
+    },
+    {
+      "path": "evidence/python-export-compatibility-first-run.log",
+      "sha256": "8e67592e03a087b4b1123b4f4e67b94e65a47ecbe0cec0d30f3d8fc605887bf1"
+    },
+    {
+      "path": "evidence/python-export-compatibility.log",
+      "sha256": "4ba33100bea1361b77354a90782c0c5771edaf3aed1b4cdb6c085a5fe87e3bed"
+    },
+    {
+      "path": "evidence/python-export-compatibility.py",
+      "sha256": "a068b6336ce63096487c275f44197645f76ae91163e8e4ddb9d60e96430aaa2a"
+    },
+    {
+      "path": "evidence/python-generator-source.json",
+      "sha256": "ca58c5b3cf6451b5fbdc213ced9c0fea254662c4d432aa779893eb66cbb9ceb3"
+    },
+    {
+      "path": "evidence/python-tool-install.log",
+      "sha256": "bd6f066bb31588fcb508c91849688ce471e7475462ecb1406dd5ba2664f0e047"
+    },
+    {
+      "path": "evidence/request-projection.log",
+      "sha256": "e7009b72622202ad93cc84a62a403d50edd9acd291da16dbd9a1b15a1d26e2b0"
+    },
+    {
+      "path": "evidence/schema-registry.log",
+      "sha256": "f08ca40211ee4cf16919c55a0c548472ee01a0ff6808eadb1e60a66f4aa43553"
+    },
+    {
+      "path": "evidence/source-hygiene.log",
+      "sha256": "595f21f34da12a8b0c90696f0f5afffb32bf3fc379c1abd8c165eec77a57282d"
+    },
+    {
+      "path": "evidence/toolchain-parity.log",
+      "sha256": "0663e9dc80bac7594693bac2c394f9b68eeff85feaae6622feb1d67ad41aa730"
+    },
+    {
+      "path": "evidence/typescript-bindings-first-run.log",
+      "sha256": "908f5d5be35a17b871361b42ffb8c291e44dbe2f2ad48c668dd757687d042654"
+    },
+    {
+      "path": "evidence/typescript-bindings.log",
+      "sha256": "052a228a873baa113a1f56cdaeddff6b1c3b190217755b38885e3c0b3d450877"
+    },
+    {
+      "path": "evidence/typescript-compile-config.json",
+      "sha256": "23cc6c43e4266e8f27d7d971a0aa82c8e5f52238fe74d4ce51db40fdd972adc2"
+    },
+    {
+      "path": "evidence/typescript-compile.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/typescript-missing-type-discovery.log",
+      "sha256": "bf299421080469d3861e6afb168446933c4290f6d8d82832a0785300715d8b3f"
+    },
+    {
+      "path": "evidence/typescript-stale-installed-package.log",
+      "sha256": "398dc98e805069882bfe3277afa08df9629226a0b7ce5fda11ec562e6da830ad"
+    },
+    {
+      "path": "evidence/typescript-test-compile.log",
+      "sha256": "bf299421080469d3861e6afb168446933c4290f6d8d82832a0785300715d8b3f"
+    },
+    {
+      "path": "evidence/unified-std.log",
+      "sha256": "b4d8dc01c6482da352058b77dc0c7d4885c433bf8c98485f458812f255425861"
+    },
+    {
+      "path": "evidence/unified-wasm.log",
+      "sha256": "21c831d802f7c47ff64195e591b494184c90931fedc6cdc617cb5704518ab742"
+    },
+    {
+      "path": "evidence/wire-identifiers-update.log",
+      "sha256": "23da9b74847c0171379cecdb7c72a9b8f927ea5a657cf095f2bac186978daac5"
+    },
+    {
+      "path": "evidence/wire-identifiers.log",
+      "sha256": "43f7b2963d959ea841bc2018567d82527a51ea7dbc0f867da4ea295b901938ad"
+    },
+    {
+      "path": "evidence/workspace-layering.log",
+      "sha256": "d86efcdb613cfdb5c7cb93fbc663ad1379d53aa619f4b44377011ce820a3a8ea"
+    }
+  ]
+}

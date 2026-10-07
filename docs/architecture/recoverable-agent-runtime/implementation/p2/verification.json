@@ -1,0 +1,1330 @@
+{
+  "schema": "chio.recovery-p2-verification.v1",
+  "phase": "P2",
+  "title": "Explanations",
+  "status": "implemented_locally_verified_and_reviewed",
+  "recorded_at_utc": "2026-10-03T03:59:37.583420+00:00",
+  "source_base": "de84fc306efbb4c8dd6de748d0ad2a8d695fd30e",
+  "branch": "feat/recoverable-agent-runtime-20261002",
+  "working_tree_changes_committed": false,
+  "architecture_revision": 3,
+  "scope": "Local acceptance of recovery-specific pure explicit-data explanations and the documented P1 sequential native support-ticket explanation profile. Advisory reports confer no live authority. No new semantic remedy, provider consult, production release or scale qualification.",
+  "confidence": "high within the declared local supported phase profile",
+  "review": {
+    "reviewer": "Codex",
+    "all_handwritten_changes_reviewed": true,
+    "schemas_generated_boundaries_sdk_and_manifests_reviewed": true,
+    "handwritten_rust_modules": 33,
+    "changed_phase_source_paths": 256,
+    "open_p0_findings": 0,
+    "open_p1_findings": 0,
+    "severity_scope": "Reviewed P2 changes and declared local profile. Phase numbers and issue severities are distinct. Broader unsuccessful stress runs remain separately unqualified.",
+    "independent_human_signoff": false,
+    "report": "REVIEW.md"
+  },
+  "tasks": [
+    {
+      "id": "P2-01",
+      "title": "Closed, bounded snapshots and resolved remedy facts; explicit per-source versions, gaps, integrity and information-flow context",
+      "obligations": "SIM-01, SIM-02",
+      "status": "implemented_locally_verified_and_reviewed"
+    },
+    {
+      "id": "P2-02",
+      "title": "Deterministic finite evaluation, complete dependency coverage, explicit search exhaustion and partial-order alternatives",
+      "obligations": "SIM-01, SIM-05",
+      "status": "implemented_locally_verified_and_reviewed"
+    },
+    {
+      "id": "P2-03",
+      "title": "Canonical classified report envelopes and expected-trust verification with independent pure recomputation",
+      "obligations": "SIM-06",
+      "status": "implemented_locally_verified_and_reviewed"
+    },
+    {
+      "id": "P2-04",
+      "title": "Audience-bound signed views, opaque random references and conservative projection without protected transitive commitments",
+      "obligations": "SIM-04, SIM-08",
+      "status": "implemented_locally_verified_and_reviewed"
+    },
+    {
+      "id": "P2-05",
+      "title": "Authenticated bounded read-only host explanation adapter, protected inspection and common transport; current native validation remains mandatory",
+      "obligations": "SIM-03, SIM-07",
+      "status": "implemented_locally_verified_and_reviewed"
+    },
+    {
+      "id": "P2-06",
+      "title": "Differential, mutation, leak, ownership, native-staleness and portability acceptance; complete source review and operating contract",
+      "obligations": "All eight",
+      "status": "implemented_locally_verified_and_reviewed"
+    }
+  ],
+  "requirements": {
+    "count": 8,
+    "ids": [
+      "SIM-01",
+      "SIM-02",
+      "SIM-03",
+      "SIM-04",
+      "SIM-05",
+      "SIM-06",
+      "SIM-07",
+      "SIM-08"
+    ],
+    "status": "all_implemented_and_local_phase_acceptance_passed",
+    "coverage": "requirements-coverage.json"
+  },
+  "bounds": {
+    "facts": 32,
+    "templates": 16,
+    "dependencies_per_template": 8,
+    "returned_alternatives": 16,
+    "combined_full_and_projected_work": 4096,
+    "evaluation_work_split": "half to each evaluation; no repeated projected planning in native response",
+    "validity_ms": 30000,
+    "http_ingress_bytes": 65536,
+    "capability_string_bytes": 32768,
+    "http_response_bytes": 262144,
+    "http_explanation_slots": 2,
+    "retained_actor_ids": 64,
+    "actor_probes_per_window": 32,
+    "intake_window_ms": 60000
+  },
+  "tools": {
+    "rustc": "1.94.1 (e408947bf 2026-03-25)",
+    "msrv_rustc": "1.93.0 (254b59607 2026-01-19)",
+    "edition": "2021",
+    "node": "25.5.0",
+    "typescript": "5.7.3",
+    "vitest_actual": "4.1.8",
+    "vitest_package_lock": "4.1.11",
+    "esbuild_actual": "0.27.7",
+    "esbuild_package_lock": "0.28.1",
+    "python": "3.13.5",
+    "pytest": "8.4.2",
+    "pydantic": "2.13.4",
+    "httpx": "0.28.1",
+    "jsonschema": "4.26.0",
+    "rust_codegen": "typify=0.4.3",
+    "typescript_codegen": "json-schema-to-typescript=15.0.4",
+    "python_codegen": "Exact upstream datamodel-code-generator=0.34.0 with unchanged retained P0 source bootstrap",
+    "python_generator_provenance": "../p0/evidence/python-generator-source.json",
+    "javascript_qualification": "Local source tests/builds with cached tool versions; lock-exact install/CI remains separate. No dependency pin changed to make checks pass."
+  },
+  "tools_observation": "evidence/recovery-p2-tools.json",
+  "host": {
+    "os": "macOS 26.4",
+    "architecture": "aarch64-apple-darwin",
+    "cpu_model": "Unavailable through sandbox sysctl",
+    "build_profile": "debug",
+    "sandbox_limits": [
+      "Network listeners and Unix-domain sockets denied with EPERM",
+      "Restricted DNS",
+      "Linux /dev/shm anchor fixture unavailable",
+      "Writes restricted to this worktree and temporary directories"
+    ]
+  },
+  "shared_wire_vectors": {
+    "path": "spec/vectors/recovery/v1/p2-contracts.json",
+    "count": 49,
+    "status": "rust_python_typescript_shared_corpus_passed"
+  },
+  "leak_corpus": {
+    "hidden_world_variants": 64,
+    "claim": "Identical signed safe-view payload/signature under fixed authorized inputs, public time and opaque reference, across valid hidden membership/candidate/cost/truth/deadline differences. No constant-time storage/network claim.",
+    "tests": "crates/security/chio-recovery/tests/explanations/privacy.rs"
+  },
+  "checks": [
+    {
+      "id": "p2_core_types_pure_and_semantic_contracts",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "reproduction_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-core-types",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-recovery",
+        "-p",
+        "chio-semantic-contracts"
+      ],
+      "command_note": "Equivalent reproduction command for the retained local gate; this field is not a claim of exact executed argv. The sealed Clippy run separately records executed argv.",
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-core-pure-final.log",
+      "log_sha256": "ae7d845ca0de3345ba838e276eca1beb4deb1019bbd5f9534c58070f2c0085e1",
+      "note": "693 owning Rust tests/doctests passed, including legacy vectors and the P2 wire/signature corpus. The pure tests have an additional final run after a test-only valid version substitution refinement. Counts overlap with that final pure run and are not summed.",
+      "rust_tests_passed": 693,
+      "rust_tests_ignored": 1,
+      "rust_test_binaries": 48
+    },
+    {
+      "id": "p2_final_pure_acceptance",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "reproduction_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-recovery"
+      ],
+      "command_note": "Equivalent reproduction command for the retained local gate; this field is not a claim of exact executed argv. The sealed Clippy run separately records executed argv.",
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-pure-final.log",
+      "log_sha256": "75263abe3791696fb820789f57847c1534a156d99a904231ca617f1e5d33c5cf",
+      "p2_explanation_tests_passed": 18,
+      "inherited_workflow_tests_passed": 4,
+      "compile_fail_tests_passed": 1,
+      "ignored_note": "Only the synthetic-vector export entrypoint is ignored; it was explicitly executed separately.",
+      "rust_tests_passed": 23,
+      "rust_tests_ignored": 1,
+      "rust_test_binaries": 4
+    },
+    {
+      "id": "p2_native_and_dry_service_acceptance",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "reproduction_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--lib",
+        "recovery_p2_",
+        "--",
+        "--test-threads=1"
+      ],
+      "command_note": "Equivalent reproduction command for the retained local gate; this field is not a claim of exact executed argv. The sealed Clippy run separately records executed argv.",
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-native-reviewed.log",
+      "log_sha256": "fa1aedfca0f75e18943025f1665e94c36e82d2c4c3fd860eb3b2a2ced8ba5f96",
+      "native_explanation_tests_passed": 7,
+      "dry_service_and_intake_tests_passed": 2,
+      "rust_tests_passed": 9,
+      "rust_tests_ignored": 0,
+      "rust_test_binaries": 1
+    },
+    {
+      "id": "p2_codegen_owning_tests",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "reproduction_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-spec-codegen",
+        "-p",
+        "xtask"
+      ],
+      "command_note": "Equivalent reproduction command for the retained local gate; this field is not a claim of exact executed argv. The sealed Clippy run separately records executed argv.",
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-codegen-tests.log",
+      "log_sha256": "448302a5f7415bf6c4508f6544448c88bda2dd3764fb012c02b646f82aa10f79",
+      "rust_tests_passed": 231,
+      "rust_tests_ignored": 0,
+      "rust_test_binaries": 8
+    },
+    {
+      "id": "p2_strict_owning_clippy",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "reproduction_command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-core-types",
+        "-p",
+        "chio-recovery",
+        "-p",
+        "chio-semantic-contracts",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-process",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-conformance",
+        "-p",
+        "chio-spec-codegen",
+        "-p",
+        "xtask",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "command_note": "Equivalent reproduction command for the retained local gate; this field is not a claim of exact executed argv. The sealed Clippy run separately records executed argv.",
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-clippy-sealed.log",
+      "log_sha256": "5ea6a22b80bf25c1cf9c975728e28e5a44d5c1917ec9bd156733cafb3ef39485",
+      "all_targets": true,
+      "warnings_denied": true,
+      "packages": [
+        "chio-security-types",
+        "chio-core-types",
+        "chio-recovery",
+        "chio-semantic-contracts",
+        "chio-kernel",
+        "chio-process",
+        "chio-store-sqlite",
+        "chio-control-plane",
+        "chio-conformance",
+        "chio-spec-codegen",
+        "xtask"
+      ],
+      "exact_executed_run": "evidence/recovery-p2-clippy-sealed.run.json"
+    },
+    {
+      "id": "p2_rust_format",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "reproduction_command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "command_note": "Equivalent reproduction command for the retained local gate; this field is not a claim of exact executed argv. The sealed Clippy run separately records executed argv.",
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-format-final.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "p2_diff_whitespace",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "reproduction_command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "command_note": "Equivalent reproduction command for the retained local gate; this field is not a claim of exact executed argv. The sealed Clippy run separately records executed argv.",
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-diff-check.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "p2_pinned_codegen_rust",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "reproduction_command": [
+        "target/debug/xtask",
+        "codegen",
+        "rust",
+        "--check"
+      ],
+      "command_note": "Equivalent reproduction command for the retained local gate; this field is not a claim of exact executed argv. The sealed Clippy run separately records executed argv.",
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-codegen-rust-check.log",
+      "log_sha256": "6a7b5060a69924c8bf1ee2ced222b39d0b645dec68bf2a68d54c760fcf4b0620",
+      "tool_environment": "Python uses the unchanged exact 0.34.0 P0 bootstrap; TypeScript uses pinned json-schema-to-typescript 15.0.4. Dependency-resolution overlays were removed after validation."
+    },
+    {
+      "id": "p2_pinned_codegen_python",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "reproduction_command": [
+        "target/debug/xtask",
+        "codegen",
+        "python",
+        "--check"
+      ],
+      "command_note": "Equivalent reproduction command for the retained local gate; this field is not a claim of exact executed argv. The sealed Clippy run separately records executed argv.",
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-codegen-python-check.log",
+      "log_sha256": "66d60788a23d018e6ddc60191f5246fce9eb5b84f3e13d92af4a8c43f6c8a202",
+      "tool_environment": "Python uses the unchanged exact 0.34.0 P0 bootstrap; TypeScript uses pinned json-schema-to-typescript 15.0.4. Dependency-resolution overlays were removed after validation."
+    },
+    {
+      "id": "p2_pinned_codegen_ts",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "reproduction_command": [
+        "target/debug/xtask",
+        "codegen",
+        "ts",
+        "--check"
+      ],
+      "command_note": "Equivalent reproduction command for the retained local gate; this field is not a claim of exact executed argv. The sealed Clippy run separately records executed argv.",
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-codegen-ts-check.log",
+      "log_sha256": "27f51f4ae0dbe0ffdbc2ebaa501e53543cfaabbf3a96eba443f5a01cbeb7f596",
+      "tool_environment": "Python uses the unchanged exact 0.34.0 P0 bootstrap; TypeScript uses pinned json-schema-to-typescript 15.0.4. Dependency-resolution overlays were removed after validation."
+    },
+    {
+      "id": "p2_pure_dependency_guard",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "reproduction_command": [
+        "python3",
+        "scripts/check-recovery-p0.py",
+        "--offline"
+      ],
+      "command_note": "Equivalent reproduction command for the retained local gate; this field is not a claim of exact executed argv. The sealed Clippy run separately records executed argv.",
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-dependency-guard.log",
+      "log_sha256": "d2ec8448b8cec892fca7adc45f7e3e079bb6466ddc87d92e012dff5f9e9ce96f"
+    },
+    {
+      "id": "p2_dependency_and_ambient_mutation_guard",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "reproduction_command": [
+        "python3",
+        "scripts/tests/check-recovery-p0.test.py"
+      ],
+      "command_note": "Equivalent reproduction command for the retained local gate; this field is not a claim of exact executed argv. The sealed Clippy run separately records executed argv.",
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-guard-mutations.log",
+      "log_sha256": "ab51ea60a180dcf83532117f0b671bba89aa7c055dfab26f507de72d874d2fb6"
+    },
+    {
+      "id": "p2_schema_registry",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "reproduction_command": [
+        "bash",
+        "scripts/check-chio-schema-registry.sh"
+      ],
+      "command_note": "Equivalent reproduction command for the retained local gate; this field is not a claim of exact executed argv. The sealed Clippy run separately records executed argv.",
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-schema-registry.log",
+      "log_sha256": "f08ca40211ee4cf16919c55a0c548472ee01a0ff6808eadb1e60a66f4aa43553"
+    },
+    {
+      "id": "p2_domain_separation",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "reproduction_command": [
+        "python3",
+        "scripts/check-domain-separation.py"
+      ],
+      "command_note": "Equivalent reproduction command for the retained local gate; this field is not a claim of exact executed argv. The sealed Clippy run separately records executed argv.",
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-domain-separation.log",
+      "log_sha256": "9660e42dc2a0efbad4e490330d6a6385e58a420c7c1648c95bc9031c502670af"
+    },
+    {
+      "id": "p2_wire_identifier_lock",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "reproduction_command": [
+        "python3",
+        "scripts/check-wire-schemas.py"
+      ],
+      "command_note": "Equivalent reproduction command for the retained local gate; this field is not a claim of exact executed argv. The sealed Clippy run separately records executed argv.",
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-wire-lock.log",
+      "log_sha256": "6d134a8ea63c2ddf3b7abf5b187b670d932071df0868d773551e2e9a4ef09976"
+    },
+    {
+      "id": "p2_lint_parity",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "reproduction_command": [
+        "python3",
+        "scripts/check-lint-parity.py"
+      ],
+      "command_note": "Equivalent reproduction command for the retained local gate; this field is not a claim of exact executed argv. The sealed Clippy run separately records executed argv.",
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-lint-parity.log",
+      "log_sha256": "5cdbfdb13810b2e2e148e68b501cddfe136aa2de30eda0b7ef053818dbaf1f02"
+    },
+    {
+      "id": "p2_toolchain_parity",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "reproduction_command": [
+        "python3",
+        "scripts/check-rust-toolchain-parity.py"
+      ],
+      "command_note": "Equivalent reproduction command for the retained local gate; this field is not a claim of exact executed argv. The sealed Clippy run separately records executed argv.",
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-toolchain-parity.log",
+      "log_sha256": "0663e9dc80bac7594693bac2c394f9b68eeff85feaae6622feb1d67ad41aa730"
+    },
+    {
+      "id": "p2_dependency_layering",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "reproduction_command": [
+        "bash",
+        "scripts/check-workspace-layering.sh"
+      ],
+      "command_note": "Equivalent reproduction command for the retained local gate; this field is not a claim of exact executed argv. The sealed Clippy run separately records executed argv.",
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-layering.log",
+      "log_sha256": "d86efcdb613cfdb5c7cb93fbc663ad1379d53aa619f4b44377011ce820a3a8ea"
+    },
+    {
+      "id": "p2_rust_file_hygiene",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "reproduction_command": [
+        "python3",
+        "scripts/check-rust-file-hygiene.py"
+      ],
+      "command_note": "Equivalent reproduction command for the retained local gate; this field is not a claim of exact executed argv. The sealed Clippy run separately records executed argv.",
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-hygiene-final.log",
+      "log_sha256": "7c1457341cacf7455261c5f051fce950f5937de6e5304dfa3f3cae08bfd0649a"
+    },
+    {
+      "id": "p2_portable_alloc",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "reproduction_command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "fixtures/recovery-portable-consumer/Cargo.toml"
+      ],
+      "command_note": "Equivalent reproduction command for the retained local gate; this field is not a claim of exact executed argv. The sealed Clippy run separately records executed argv.",
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-portable-alloc.log",
+      "log_sha256": "ad9e8d1954aca4b0a5e7d423826b3525e73638ab00940c642d35c6f3c86420a1",
+      "resolver": "Independent fixture workspace and normal dependencies; no dev/workspace feature unification."
+    },
+    {
+      "id": "p2_portable_std",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "reproduction_command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "fixtures/recovery-portable-consumer/Cargo.toml",
+        "--features",
+        "std"
+      ],
+      "command_note": "Equivalent reproduction command for the retained local gate; this field is not a claim of exact executed argv. The sealed Clippy run separately records executed argv.",
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-portable-std.log",
+      "log_sha256": "58f1c4763a68ff1143e094e434fccc7c89242d191f484cd0e7a6374791801287",
+      "resolver": "Independent fixture workspace and normal dependencies; no dev/workspace feature unification."
+    },
+    {
+      "id": "p2_portable_wasm",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "reproduction_command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "fixtures/recovery-portable-consumer/Cargo.toml",
+        "--target",
+        "wasm32-unknown-unknown"
+      ],
+      "command_note": "Equivalent reproduction command for the retained local gate; this field is not a claim of exact executed argv. The sealed Clippy run separately records executed argv.",
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-portable-wasm.log",
+      "log_sha256": "d251c51a9afccad94d19fceba3f75289b15bc68131f2a03bbb9a272841dd731e",
+      "resolver": "Independent fixture workspace and normal dependencies; no dev/workspace feature unification."
+    },
+    {
+      "id": "p2_msrv_alloc",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "reproduction_command": [
+        "cargo",
+        "+1.93.0",
+        "check",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "fixtures/recovery-portable-consumer/Cargo.toml"
+      ],
+      "command_note": "Equivalent reproduction command for the retained local gate; this field is not a claim of exact executed argv. The sealed Clippy run separately records executed argv.",
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-msrv-alloc.log",
+      "log_sha256": "f4131d137e54d77779e77b8b8e153d22a543192252e8eef3f44d8a02fceaf74b",
+      "resolver": "Independent fixture workspace and normal dependencies; no dev/workspace feature unification."
+    },
+    {
+      "id": "p2_msrv_std",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "reproduction_command": [
+        "cargo",
+        "+1.93.0",
+        "check",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "fixtures/recovery-portable-consumer/Cargo.toml",
+        "--features",
+        "std"
+      ],
+      "command_note": "Equivalent reproduction command for the retained local gate; this field is not a claim of exact executed argv. The sealed Clippy run separately records executed argv.",
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-msrv-std.log",
+      "log_sha256": "8f86423ff38d9b76f808fd4499e964947a6ed432be00851ec9503971a55f9d32",
+      "resolver": "Independent fixture workspace and normal dependencies; no dev/workspace feature unification."
+    },
+    {
+      "id": "p2_python_full_sdk",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "reproduction_command": [
+        "/Users/connor/Medica/backbay/standalone/arc/sdks/python/chio-crewai/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "sdks/python/chio-sdk-python/tests"
+      ],
+      "command_note": "Equivalent reproduction command for the retained local gate; this field is not a claim of exact executed argv. The sealed Clippy run separately records executed argv.",
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-python-sdk-all.log",
+      "log_sha256": "89abfabcf42fb598ecf65e9984e7b9e188685c99cc00605b57ec7320bba524fd",
+      "passed": 442,
+      "environment": {
+        "PYTHONPATH": "sdks/python/chio-sdk-python/src"
+      }
+    },
+    {
+      "id": "p2_typescript_recovery_conformance_and_clients",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "reproduction_command": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "test/recovery_schema.test.ts",
+        "test/recovery_p1_schema.test.ts",
+        "test/recovery_p2_schema.test.ts",
+        "test/recovery_client.test.ts"
+      ],
+      "command_note": "Equivalent reproduction command for the retained local gate; this field is not a claim of exact executed argv. The sealed Clippy run separately records executed argv.",
+      "cwd": "sdks/typescript/packages/conformance",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-ts-final.log",
+      "log_sha256": "1127b1643b78928062612eb72b9deacc82bf3bb0a63b9c3a1f8369b8ca9804be",
+      "passed": 201,
+      "test_files": 4,
+      "environment_note": "Use the declared package dependencies. Executed with cached Vitest 4.1.8 and esbuild 0.27.7 through a temporary local resolution overlay. Lock-exact installation is not qualified by this gate."
+    },
+    {
+      "id": "p2_typescript_node_http_build",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "reproduction_command": [
+        "node",
+        "node_modules/typescript/bin/tsc",
+        "-p",
+        "packages/node-http/tsconfig.json"
+      ],
+      "command_note": "Equivalent reproduction command for the retained local gate; this field is not a claim of exact executed argv. The sealed Clippy run separately records executed argv.",
+      "cwd": "sdks/typescript",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-ts-typecheck-final.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "typescript": "5.7.3"
+    },
+    {
+      "id": "p2_typescript_conformance_exports",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "reproduction_command": [
+        "node",
+        "node_modules/typescript/bin/tsc",
+        "-p",
+        "packages/conformance/tsconfig.json",
+        "--noEmit"
+      ],
+      "command_note": "Equivalent reproduction command for the retained local gate; this field is not a claim of exact executed argv. The sealed Clippy run separately records executed argv.",
+      "cwd": "sdks/typescript",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-ts-exports-final.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "typescript": "5.7.3"
+    },
+    {
+      "id": "p2_cli_build",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "reproduction_command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-cli"
+      ],
+      "command_note": "Equivalent reproduction command for the retained local gate; this field is not a claim of exact executed argv. The sealed Clippy run separately records executed argv.",
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-cli-build.log",
+      "log_sha256": "147534fe280c43c6d18c45f61d7f2cabfd19169d19466cdcae6c42e36c8cfe7c",
+      "note": "Existing P1 Host.keyring dead_code warning is retained; no strict CLI Clippy qualification is claimed."
+    },
+    {
+      "id": "p2_cli_explain_help",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "reproduction_command": [
+        "target/debug/chio",
+        "recovery",
+        "explain",
+        "--help"
+      ],
+      "command_note": "Equivalent reproduction command for the retained local gate; this field is not a claim of exact executed argv. The sealed Clippy run separately records executed argv.",
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-cli-help.log",
+      "log_sha256": "d5687e11996087ef8213af411c5d9eb94f5d666fadb4914b1036fe8fd5f038a6"
+    },
+    {
+      "id": "p2_p1_baseline_preserved",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-baseline-integrity.log",
+      "log_sha256": "303c67514f0b2a750c6919f09476cf057b7e6c4c502f5315fbbdb149693dfc15",
+      "note": "Archive verification, historical evidence preservation and package-pin preservation were executed locally; the readable recipe describes those assertions rather than runnable inline code.",
+      "verification_recipe": "Compare source-baseline.json hashes against the retained p1-source-baseline.tar.gz and historical P1 verification; compare old/new Cargo.lock package versions and checksums.",
+      "reproduction_command": [
+        "python3",
+        "docs/architecture/recoverable-agent-runtime/implementation/p2/evidence/verify-package.py"
+      ]
+    },
+    {
+      "id": "p2_temporary_tooling_cleaned",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-tooling-cleanup.log",
+      "log_sha256": "7a7438f4cdfe2175041847906d7be1e96dd6c2c4d26bd438e0097263e86a3ec7",
+      "note": "Three symlinks and one private overlay directory were removed. Shared external dependency caches were not modified.",
+      "verification_recipe": "Verify removal of the four task-owned TypeScript dependency-resolution overlays.",
+      "reproduction_command": [
+        "python3",
+        "docs/architecture/recoverable-agent-runtime/implementation/p2/evidence/verify-package.py"
+      ]
+    },
+    {
+      "id": "p1_focused_native_regression",
+      "status": "passed",
+      "required_for_local_phase_acceptance": false,
+      "reproduction_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--lib",
+        "recovery_p1_",
+        "--",
+        "--skip",
+        "recovery_p1_fresh_process_cutpoints_preserve_original_ownership",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "command_note": "Equivalent reproduction command for the retained local gate; this field is not a claim of exact executed argv. The sealed Clippy run separately records executed argv.",
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-p1-native-focused.log",
+      "log_sha256": "1c5c2e23ea80cf2cfb973bea346d9758e29aa71c3b0277cfb9401765dcd38c8f",
+      "ignored_note": "Crash-child and synthetic export entrypoints are invoked separately, not acceptance omissions.",
+      "rust_tests_passed": 15,
+      "rust_tests_ignored": 2,
+      "rust_test_binaries": 1
+    },
+    {
+      "id": "p1_final_cutpoint_in_isolation",
+      "status": "passed",
+      "required_for_local_phase_acceptance": false,
+      "reproduction_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--lib",
+        "recovery_p1_fresh_process_cutpoints_preserve_original_ownership",
+        "--",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "command_note": "Equivalent reproduction command for the retained local gate; this field is not a claim of exact executed argv. The sealed Clippy run separately records executed argv.",
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-p1-last-cutpoint-isolated.log",
+      "log_sha256": "61c7409393d7e00b1e37b85111c4d629b9749898dd12626e5db29c5acdfd475c",
+      "environment": {
+        "CHIO_RECOVERY_P1_SINGLE_POINT": "return-recorded-revoked"
+      },
+      "note": "Completes 27-case coverage alongside the first 26 successful cutpoints in the unsuccessful full serialized parent; it does not make that full run green.",
+      "rust_tests_passed": 1,
+      "rust_tests_ignored": 0,
+      "rust_test_binaries": 1
+    },
+    {
+      "id": "p2_architecture_traceability",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "reproduction_command": [
+        "python3",
+        "docs/architecture/recoverable-agent-runtime/check.py",
+        "--source-revision",
+        "de84fc306"
+      ],
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-architecture-validation.log",
+      "log_sha256": "3b5acddd4df61dfc052e3fbf7d54291055d57d1c5f77ed64566a45c349748307",
+      "note": "Historical architecture/source inputs and current document traceability/links only. This gate does not rerun implementation tests or qualify the modified runtime."
+    },
+    {
+      "id": "p2_final_source_and_evidence_integrity",
+      "status": "passed",
+      "required_for_local_phase_acceptance": true,
+      "reproduction_command": [
+        "python3",
+        "docs/architecture/recoverable-agent-runtime/implementation/p2/evidence/verify-package.py"
+      ],
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "evidence/recovery-p2-package-audit.log",
+      "log_sha256": "8f3cbe7b4134d2189a2581a55ec63b08c28c2f8bd95de3930cc1e077d78a280d",
+      "note": "Executes the retained source/evidence/archive/coverage/pin-preservation auditor. Integrity checks complement, and do not rerun or substitute for, semantic/native implementation tests."
+    }
+  ],
+  "broader_checks": [
+    {
+      "id": "p1_parallel_broad_regression_attempt",
+      "status": "failed",
+      "required_for_local_phase_acceptance": false,
+      "passed": 12,
+      "failed": 4,
+      "ignored": 2,
+      "log": "evidence/recovery-p2-p1-native-regression.log",
+      "note": "Retained unsuccessful broad run. Native admission refusals and timeouts were observed. Later focused tests passed; no proven stress/root-cause diagnosis or broad reliability qualification."
+    },
+    {
+      "id": "p1_serialized_broad_regression_attempt",
+      "status": "failed",
+      "required_for_local_phase_acceptance": false,
+      "passed": 14,
+      "failed": 2,
+      "ignored": 2,
+      "log": "evidence/recovery-p2-p1-native-serial.log",
+      "note": "26 successful crash cases preceded a child that did not reach the last requested cutpoint. Native once/replay also closed before effect in this run. Both passed subsequently in focused/isolated execution. No assertion, deadline or authority gate was weakened."
+    },
+    {
+      "id": "p1_current_cutpoint_case_coverage",
+      "status": "all_cases_covered_across_retained_runs",
+      "required_for_local_phase_acceptance": false,
+      "case_count": 27,
+      "single_full_stress_run_passed": false,
+      "evidence": "evidence/recovery-p2-p1-cutpoint-coverage.json"
+    },
+    {
+      "id": "node_http_full_suite",
+      "status": "blocked_by_sandbox_listeners",
+      "required_for_local_phase_acceptance": false,
+      "passed": 37,
+      "failed": 41,
+      "unhandled_errors": 41,
+      "log": "evidence/recovery-p2-node-http-suite.log",
+      "note": "listen EPERM: operation not permitted 0.0.0.0; 2 files passed and 2 socket-dependent files failed. Does not qualify the broader suite."
+    },
+    {
+      "id": "hosted_ci",
+      "status": "not_executed"
+    },
+    {
+      "id": "lock_exact_javascript_installation",
+      "status": "not_executed",
+      "note": "Cached versions differ as explicitly declared; dependency pins unchanged."
+    },
+    {
+      "id": "full_workspace_all_tests_and_cli_strict_clippy",
+      "status": "not_claimed",
+      "note": "Scoped owning tests/builds/gates executed; retained pre-existing CLI Host.keyring warning."
+    },
+    {
+      "id": "formal_proof_and_linux_platform_matrix",
+      "status": "not_executed",
+      "note": "P1 environment/tool limitations retained. Portable WASM compilation is not platform confinement qualification."
+    },
+    {
+      "id": "live_provider_deployment_or_production_scale",
+      "status": "not_executed"
+    }
+  ],
+  "source": {
+    "inventory": "source-inventory.json",
+    "inventory_sha256": "84bd230dd606849c2293bd5a93239b6ff4739713ff44b3489a0063ecaa5c6fe3",
+    "joined_changed_sources": 432,
+    "changed_phase_sources": 256,
+    "archive": "evidence/joined-source.tar.gz",
+    "archive_sha256": "4ee2d634fbce70a7531edece410295905335b16777432fcd19158e2d2f7e956b",
+    "archive_entries": 433,
+    "archive_manifest": "SOURCE-INVENTORY.json",
+    "p1_baseline_source_count": 389,
+    "p1_baseline_archive": "evidence/p1-source-baseline.tar.gz",
+    "p1_baseline_archive_sha256": "924c50237ac411b4649326f60166663d22dd26b90d73225084a7347ca5a12c50",
+    "p1_verification": "../p1/verification.json",
+    "p1_verification_sha256": "b07b8c0e8218aff4c30a9bc4deb98f07b05a69eb2590e6dd3c21248ddc9a8146",
+    "git_base_plus_archive_reconstructs_joined_dirty_source": true
+  },
+  "phase_documents": [
+    {
+      "path": "PLAN.md",
+      "sha256": "ddd57b29aefaa52e13768a8351a4b3e42fcc4035b05e4711c813c56ff0316001"
+    },
+    {
+      "path": "REVIEW.md",
+      "sha256": "3b5ede8e05c1642cac4faddab0a608b80aa16326035237accec223bb0b613e7b"
+    },
+    {
+      "path": "OPERATIONS.md",
+      "sha256": "3e7c86540604735834a0611622919993fda5722c2d1edecf0faf7ac7410a5be7"
+    },
+    {
+      "path": "requirements-coverage.json",
+      "sha256": "271f95c0f34c6205da45e43dd8644952c4e6e422d21fbeae0b8aef44151b26b5"
+    },
+    {
+      "path": "source-baseline.json",
+      "sha256": "2bc89ae2aa7cb65b0d321d9b7fec6c1c20078271212c26ffa2f8f40f77741334"
+    },
+    {
+      "path": "source-inventory.json",
+      "sha256": "84bd230dd606849c2293bd5a93239b6ff4739713ff44b3489a0063ecaa5c6fe3"
+    }
+  ],
+  "evidence_artifacts": [
+    {
+      "path": "evidence/joined-source.tar.gz",
+      "sha256": "4ee2d634fbce70a7531edece410295905335b16777432fcd19158e2d2f7e956b",
+      "bytes": 1291753
+    },
+    {
+      "path": "evidence/p1-source-baseline.tar.gz",
+      "sha256": "924c50237ac411b4649326f60166663d22dd26b90d73225084a7347ca5a12c50",
+      "bytes": 1203523
+    },
+    {
+      "path": "evidence/recovery-p2-architecture-validation.log",
+      "sha256": "3b5acddd4df61dfc052e3fbf7d54291055d57d1c5f77ed64566a45c349748307",
+      "bytes": 3061
+    },
+    {
+      "path": "evidence/recovery-p2-baseline-integrity.log",
+      "sha256": "303c67514f0b2a750c6919f09476cf057b7e6c4c502f5315fbbdb149693dfc15",
+      "bytes": 226
+    },
+    {
+      "path": "evidence/recovery-p2-cli-build.log",
+      "sha256": "147534fe280c43c6d18c45f61d7f2cabfd19169d19466cdcae6c42e36c8cfe7c",
+      "bytes": 12370
+    },
+    {
+      "path": "evidence/recovery-p2-cli-help.log",
+      "sha256": "d5687e11996087ef8213af411c5d9eb94f5d666fadb4914b1036fe8fd5f038a6",
+      "bytes": 1840
+    },
+    {
+      "path": "evidence/recovery-p2-clippy-final.log",
+      "sha256": "52d057f986fa21a112879524e2eed8ea2cd255de7cc405e9875faed55eb6c0d5",
+      "bytes": 1016
+    },
+    {
+      "path": "evidence/recovery-p2-clippy-reviewed.log",
+      "sha256": "b16a322fd543ca9891b1644218ca81b3c65040575951cf6959ab2b83f4291dba",
+      "bytes": 226
+    },
+    {
+      "path": "evidence/recovery-p2-clippy-sealed.log",
+      "sha256": "5ea6a22b80bf25c1cf9c975728e28e5a44d5c1917ec9bd156733cafb3ef39485",
+      "bytes": 7509
+    },
+    {
+      "path": "evidence/recovery-p2-clippy-sealed.run.json",
+      "sha256": "2b65408b1629b7b93c1dbbf3b7292529950b281c74877aabc4fa8b25c1020e69",
+      "bytes": 992
+    },
+    {
+      "path": "evidence/recovery-p2-clippy.log",
+      "sha256": "59854ad7d550d422eb6955632feb794cccee10de4ebb3b4a9bca8cd3eb45b1ca",
+      "bytes": 16154
+    },
+    {
+      "path": "evidence/recovery-p2-codegen-python-check.log",
+      "sha256": "66d60788a23d018e6ddc60191f5246fce9eb5b84f3e13d92af4a8c43f6c8a202",
+      "bytes": 202
+    },
+    {
+      "path": "evidence/recovery-p2-codegen-python.log",
+      "sha256": "9d915fbd192b91b7d6eae90f92fc6f82b2d2f00951b83a1e69a3e6e73ba78611",
+      "bytes": 273
+    },
+    {
+      "path": "evidence/recovery-p2-codegen-rust-check.log",
+      "sha256": "6a7b5060a69924c8bf1ee2ced222b39d0b645dec68bf2a68d54c760fcf4b0620",
+      "bytes": 368
+    },
+    {
+      "path": "evidence/recovery-p2-codegen-rust.log",
+      "sha256": "097d86130c3787997a471167f844b5b793157e197945f415e2562a2179eeed41",
+      "bytes": 369
+    },
+    {
+      "path": "evidence/recovery-p2-codegen-tests.log",
+      "sha256": "448302a5f7415bf6c4508f6544448c88bda2dd3764fb012c02b646f82aa10f79",
+      "bytes": 26008
+    },
+    {
+      "path": "evidence/recovery-p2-codegen-ts-check.log",
+      "sha256": "27f51f4ae0dbe0ffdbc2ebaa501e53543cfaabbf3a96eba443f5a01cbeb7f596",
+      "bytes": 616
+    },
+    {
+      "path": "evidence/recovery-p2-codegen-ts-final.log",
+      "sha256": "3452fd519c0ab7b59173afb43db2dba487cfaf0e88c58e1305eab5b6ede72a6f",
+      "bytes": 1216
+    },
+    {
+      "path": "evidence/recovery-p2-codegen-ts.log",
+      "sha256": "9e142eae2c265f8b920b662ff5cee2cffa05b94d749c4f8bc722b9ea12c4b8a6",
+      "bytes": 610
+    },
+    {
+      "path": "evidence/recovery-p2-core-pure-final.log",
+      "sha256": "ae7d845ca0de3345ba838e276eca1beb4deb1019bbd5f9534c58070f2c0085e1",
+      "bytes": 63317
+    },
+    {
+      "path": "evidence/recovery-p2-core-pure-suite.log",
+      "sha256": "f19a78f4aae7fb6245ca94a30497de1782eb9b96569f17de06a3a401ea14b8a4",
+      "bytes": 49779
+    },
+    {
+      "path": "evidence/recovery-p2-dependency-guard.log",
+      "sha256": "d2ec8448b8cec892fca7adc45f7e3e079bb6466ddc87d92e012dff5f9e9ce96f",
+      "bytes": 1012
+    },
+    {
+      "path": "evidence/recovery-p2-diff-check.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "evidence/recovery-p2-domain-separation.log",
+      "sha256": "9660e42dc2a0efbad4e490330d6a6385e58a420c7c1648c95bc9031c502670af",
+      "bytes": 155
+    },
+    {
+      "path": "evidence/recovery-p2-format-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "evidence/recovery-p2-format.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "evidence/recovery-p2-guard-mutations.log",
+      "sha256": "ab51ea60a180dcf83532117f0b671bba89aa7c055dfab26f507de72d874d2fb6",
+      "bytes": 139
+    },
+    {
+      "path": "evidence/recovery-p2-host-check.log",
+      "sha256": "a34030b1e30ced3ad54aedb98e0720729245dfb67bebd7f2dfa95314019f75cd",
+      "bytes": 13745
+    },
+    {
+      "path": "evidence/recovery-p2-hygiene-final.log",
+      "sha256": "7c1457341cacf7455261c5f051fce950f5937de6e5304dfa3f3cae08bfd0649a",
+      "bytes": 55547
+    },
+    {
+      "path": "evidence/recovery-p2-hygiene.log",
+      "sha256": "7c1457341cacf7455261c5f051fce950f5937de6e5304dfa3f3cae08bfd0649a",
+      "bytes": 55547
+    },
+    {
+      "path": "evidence/recovery-p2-layering.log",
+      "sha256": "d86efcdb613cfdb5c7cb93fbc663ad1379d53aa619f4b44377011ce820a3a8ea",
+      "bytes": 33
+    },
+    {
+      "path": "evidence/recovery-p2-lint-parity.log",
+      "sha256": "5cdbfdb13810b2e2e148e68b501cddfe136aa2de30eda0b7ef053818dbaf1f02",
+      "bytes": 135
+    },
+    {
+      "path": "evidence/recovery-p2-msrv-alloc.log",
+      "sha256": "f4131d137e54d77779e77b8b8e153d22a543192252e8eef3f44d8a02fceaf74b",
+      "bytes": 2805
+    },
+    {
+      "path": "evidence/recovery-p2-msrv-std.log",
+      "sha256": "8f86423ff38d9b76f808fd4499e964947a6ed432be00851ec9503971a55f9d32",
+      "bytes": 1542
+    },
+    {
+      "path": "evidence/recovery-p2-native-acceptance.log",
+      "sha256": "1be977b669d7025cb8c0f35e5cb09da1f297620294c09a35d6ada18febc02176",
+      "bytes": 13582
+    },
+    {
+      "path": "evidence/recovery-p2-native-final.log",
+      "sha256": "edcd0362e9212e78e2de1146c8f4b88587548bb8015fd789c138e4a30c680b10",
+      "bytes": 1360
+    },
+    {
+      "path": "evidence/recovery-p2-native-reviewed.log",
+      "sha256": "fa1aedfca0f75e18943025f1665e94c36e82d2c4c3fd860eb3b2a2ced8ba5f96",
+      "bytes": 1478
+    },
+    {
+      "path": "evidence/recovery-p2-node-http-suite.log",
+      "sha256": "0c6978bbe6d6c02f565155fe91de3614e58c87999b338d588f468a83443380ac",
+      "bytes": 96266
+    },
+    {
+      "path": "evidence/recovery-p2-p1-cutpoint-coverage.json",
+      "sha256": "e73398adcd2d71dfee56fee63f4e54ff9a7434a50c93a34d8dba891ba182bf76",
+      "bytes": 10996
+    },
+    {
+      "path": "evidence/recovery-p2-p1-disclosure-isolated.log",
+      "sha256": "7bd0e18446ed3d032149211e25652571a50464a8daa9426532a55a5b3b45c138",
+      "bytes": 205
+    },
+    {
+      "path": "evidence/recovery-p2-p1-last-cutpoint-isolated.log",
+      "sha256": "61c7409393d7e00b1e37b85111c4d629b9749898dd12626e5db29c5acdfd475c",
+      "bytes": 473
+    },
+    {
+      "path": "evidence/recovery-p2-p1-native-focused.log",
+      "sha256": "1c5c2e23ea80cf2cfb973bea346d9758e29aa71c3b0277cfb9401765dcd38c8f",
+      "bytes": 1890
+    },
+    {
+      "path": "evidence/recovery-p2-p1-native-regression.log",
+      "sha256": "f3f205bc70da2dede01119c39b9eca0846eb13f22923f9d21670d10e01ae3404",
+      "bytes": 4079
+    },
+    {
+      "path": "evidence/recovery-p2-p1-native-serial.log",
+      "sha256": "56cefe8925a4764ee2998b4311cbb3eda9311279d3a0ee4076830810db05fbd7",
+      "bytes": 10400
+    },
+    {
+      "path": "evidence/recovery-p2-p1-single-direct.log",
+      "sha256": "89ef90f0d527cde9725d7ff4fbffed9dbd8a12c749f7dbe0b4c321adc6493721",
+      "bytes": 218
+    },
+    {
+      "path": "evidence/recovery-p2-p1-single-investigation.log",
+      "sha256": "7f3fc5069c38ed5ecd8c64aab7dd0fb00175129582f68c3338762f282fdd589b",
+      "bytes": 427
+    },
+    {
+      "path": "evidence/recovery-p2-package-audit.log",
+      "sha256": "8f3cbe7b4134d2189a2581a55ec63b08c28c2f8bd95de3930cc1e077d78a280d",
+      "bytes": 168
+    },
+    {
+      "path": "evidence/recovery-p2-portable-alloc.log",
+      "sha256": "ad9e8d1954aca4b0a5e7d423826b3525e73638ab00940c642d35c6f3c86420a1",
+      "bytes": 2805
+    },
+    {
+      "path": "evidence/recovery-p2-portable-std.log",
+      "sha256": "58f1c4763a68ff1143e094e434fccc7c89242d191f484cd0e7a6374791801287",
+      "bytes": 1596
+    },
+    {
+      "path": "evidence/recovery-p2-portable-wasm.log",
+      "sha256": "d251c51a9afccad94d19fceba3f75289b15bc68131f2a03bbb9a272841dd731e",
+      "bytes": 3113
+    },
+    {
+      "path": "evidence/recovery-p2-pure-acceptance.log",
+      "sha256": "f8d75bda359ecad8de01c28e5f8470dea04d9e411f69dfc86a85deba1575d77f",
+      "bytes": 3146
+    },
+    {
+      "path": "evidence/recovery-p2-pure-final.log",
+      "sha256": "75263abe3791696fb820789f57847c1534a156d99a904231ca617f1e5d33c5cf",
+      "bytes": 3309
+    },
+    {
+      "path": "evidence/recovery-p2-pure-first-check.log",
+      "sha256": "9114f8bb208d483f55840564fe5a8f974ec5ba75086db7d54ef39807350c1591",
+      "bytes": 538
+    },
+    {
+      "path": "evidence/recovery-p2-pure-second-check.log",
+      "sha256": "a69ca23300caa173dcf4153e14d009baf426eb07aa005bb4d101647bd08a898f",
+      "bytes": 1083
+    },
+    {
+      "path": "evidence/recovery-p2-pure-tests-initial.log",
+      "sha256": "690888fb60df0208b85f74965cd5a82b534eb90a9c421a6d1fa410288e73cd8d",
+      "bytes": 1552
+    },
+    {
+      "path": "evidence/recovery-p2-python-acceptance.log",
+      "sha256": "e621954c3826473a4d52315279d1f60e8611ce42a690ec22c984df599e4dc7d2",
+      "bytes": 2568
+    },
+    {
+      "path": "evidence/recovery-p2-python-final.log",
+      "sha256": "e5a483f6f7014c26748f5c2f6d4a533750c918c91709222f513eef237c01c57a",
+      "bytes": 340
+    },
+    {
+      "path": "evidence/recovery-p2-python-sdk-all.log",
+      "sha256": "89abfabcf42fb598ecf65e9984e7b9e188685c99cc00605b57ec7320bba524fd",
+      "bytes": 580
+    },
+    {
+      "path": "evidence/recovery-p2-schema-registry.log",
+      "sha256": "f08ca40211ee4cf16919c55a0c548472ee01a0ff6808eadb1e60a66f4aa43553",
+      "bytes": 33
+    },
+    {
+      "path": "evidence/recovery-p2-source-review-inventory.log",
+      "sha256": "461c7520cad1915c81eb29a5e11b113158c410803d4e00c8eeab1caa9dfe82cc",
+      "bytes": 1923
+    },
+    {
+      "path": "evidence/recovery-p2-toolchain-parity.log",
+      "sha256": "0663e9dc80bac7594693bac2c394f9b68eeff85feaae6622feb1d67ad41aa730",
+      "bytes": 73
+    },
+    {
+      "path": "evidence/recovery-p2-tooling-cleanup.log",
+      "sha256": "7a7438f4cdfe2175041847906d7be1e96dd6c2c4d26bd438e0097263e86a3ec7",
+      "bytes": 279
+    },
+    {
+      "path": "evidence/recovery-p2-tools.json",
+      "sha256": "1e3939f681ab3926bdc9276d75dad87b36211bb95be560135ae3b0d1386e8cab",
+      "bytes": 787
+    },
+    {
+      "path": "evidence/recovery-p2-ts-acceptance.log",
+      "sha256": "deb0fc9e461e6c57c18e165fa222baa29f980cb8a50612846819529d0bd5fc0e",
+      "bytes": 1427
+    },
+    {
+      "path": "evidence/recovery-p2-ts-exports-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "evidence/recovery-p2-ts-final.log",
+      "sha256": "1127b1643b78928062612eb72b9deacc82bf3bb0a63b9c3a1f8369b8ca9804be",
+      "bytes": 313
+    },
+    {
+      "path": "evidence/recovery-p2-ts-typecheck-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "evidence/recovery-p2-ts-typecheck.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "evidence/recovery-p2-vector-export.log",
+      "sha256": "894076b500a1c46ed2fca93b9f35c9f16b5bf363f0a472d3d6e208ae7a682af7",
+      "bytes": 376
+    },
+    {
+      "path": "evidence/recovery-p2-wire-lock-update.log",
+      "sha256": "aa71a4b00213a8b827ad3962d1b23048e111bc185468db92a02daa0398810710",
+      "bytes": 157
+    },
+    {
+      "path": "evidence/recovery-p2-wire-lock.log",
+      "sha256": "6d134a8ea63c2ddf3b7abf5b187b670d932071df0868d773551e2e9a4ef09976",
+      "bytes": 189
+    },
+    {
+      "path": "evidence/verify-package.py",
+      "sha256": "866e4c364972621feb4067eb14549ad73050c4f114f1dc92ee76905aa93a23f5",
+      "bytes": 4755
+    }
+  ],
+  "compatibility": {
+    "existing_p0_p1_schema_and_signature_domains_preserved": true,
+    "new_schema_domain": "https://chio.computer/schemas/",
+    "finite_local_schema_resolution_only": true,
+    "dependency_package_versions_and_checksums_unchanged": true,
+    "store_migration_needed": false,
+    "unrelated_dirty_work_preserved": true,
+    "temporary_sdk_tooling_removed": true
+  },
+  "completion": {
+    "p2_required_checks_passed": 34,
+    "all_six_tasks_complete": true,
+    "all_eight_obligations_complete": true,
+    "open_p0_findings": 0,
+    "open_p1_findings": 0,
+    "next_phase": "P3: semantic remedies"
+  }
+}

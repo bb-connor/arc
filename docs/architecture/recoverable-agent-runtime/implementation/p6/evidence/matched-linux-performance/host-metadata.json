@@ -1,0 +1,13 @@
+{
+  "id": "ocid1.instance.oc1.iad.redacted-1",
+  "displayName": "recovery-runtime-p5-p6-20261004",
+  "shape": "VM.Standard.E6.Flex",
+  "shapeConfig": {
+    "maxVnicAttachments": 8,
+    "memoryInGBs": 64.0,
+    "networkingBandwidthInGbps": 8.0,
+    "ocpus": 8.0
+  },
+  "region": "iad",
+  "availabilityDomain": "redacted:US-ASHBURN-AD-1"
+}

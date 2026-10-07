@@ -1,0 +1,9 @@
+
+ RUN  v4.1.8 /Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002
+
+
+ Test Files  1 passed (1)
+      Tests  42 passed (42)
+   Start at  12:06:35
+   Duration  485ms (transform 110ms, setup 0ms, import 272ms, tests 10ms, environment 0ms)
+

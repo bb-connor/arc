@@ -1,0 +1,39 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling chio-security-types v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-security-types)
+   Compiling chio-core-types v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-core-types)
+   Compiling chio-semantic-contracts v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-semantic-contracts)
+   Compiling chio-recovery v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-recovery)
+    Finished `test` profile [unoptimized] target(s) in 1m 52s
+     Running tests/explanations.rs (target/debug/deps/explanations-7cb15a9428c266e5)
+
+running 17 tests
+test explanations::basis::unresolved_and_spent_effects_cannot_plan_a_replacement ... FAILED
+test explanations::basis::no_integrity_endorsement_is_inferred_from_native_provenance ... ok
+test explanations::basis::partial_order_retains_distinct_audiences_and_incomparable_labels ... ok
+test explanations::basis::bounded_search_reports_incompleteness_and_never_no_remedy ... ok
+test explanations::verification::export_p2_positive ... ignored, explicit regeneration of synthetic P2 cross-language signature fixtures
+test explanations::basis::permutations_are_canonical_without_claiming_store_atomicity ... ok
+test explanations::basis::mandatory_scoped_dependencies_reject_omission_aliasing_and_wrong_targets ... ok
+test explanations::privacy::hidden_full_search_exhaustion_cannot_exhaust_an_authorized_projection ... ok
+test explanations::privacy::restricted_views_do_not_commit_to_transitive_hidden_graphs_or_their_expiry ... ok
+test explanations::verification::advisory_bytes_are_rejected_as_every_live_authority_contract ... ok
+test explanations::basis::gaps_unverified_and_expired_positive_facts_never_become_feasible ... ok
+test explanations::privacy::debug_and_wire_bounds_never_expose_classified_objects ... ok
+test explanations::verification::original_basis_is_required_even_when_changes_leave_the_advice_identical ... ok
+test explanations::basis::mixed_versions_and_all_truth_assignments_preserve_fail_closed_meaning ... ok
+test explanations::verification::projection_provenance_requires_expected_key_recipient_and_domain ... ok
+test explanations::verification::recomputation_refuses_validly_resigned_semantic_substitutions ... ok
+test explanations::privacy::hidden_membership_candidates_costs_and_deadlines_have_identical_public_signatures ... ok
+
+failures:
+
+---- explanations::basis::unresolved_and_spent_effects_cannot_plan_a_replacement stdout ----
+Error: Error("unknown field `authority_domain`, expected one of `operation_id`, `native_admission_digest`, `operation_version`", line: 0, column: 0)
+
+
+failures:
+    explanations::basis::unresolved_and_spent_effects_cannot_plan_a_replacement
+
+test result: FAILED. 15 passed; 1 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.20s
+
+error: test failed, to rerun pass `-p chio-recovery --test explanations`

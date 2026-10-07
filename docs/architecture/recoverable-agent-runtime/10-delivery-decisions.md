@@ -14,6 +14,42 @@ Phases are dependency boundaries, not calendar estimates. Each must produce revi
 | P5: confined returns | Host-issued lineage boundary, cage/broker launch, bounded parent returns and full channel mediation | Process/security profile; cage/broker; flow/artifact release; host/SDK | Verified enforced launch, useful parent decision, all return/error/log/stream canaries, restart/cancellation and aggregate limits |
 | P6: product and qualification | Guided setup, policy feedback/review, two-host integration, overload tests and comparative workloads | CLI/SDK/host; conformance/evaluation; operator tooling | Source/profile-bound supported matrix, utility/effect results, installation evidence, operational and required release gates |
 
+The current implementation state is [remediation and pending requalification](implementation/STATUS.md).
+P0-P6 implementation exists, but historical phase completion flags and scoped
+review closure do not qualify the changed working tree. The retained
+[P0](implementation/p0/verification.json),
+[P1](implementation/p1/verification.json),
+[P2](implementation/p2/verification.json),
+[P3](implementation/p3/verification.json) and
+[P4](implementation/p4/verification.json) records preserve their exact source
+inventories, local acceptance, operating limits, broader failures and unavailable
+checks. Their original reviews remain historical evidence.
+
+The [P5 review](implementation/p5/REVIEW.md),
+[operating contract](implementation/p5/OPERATIONS.md) and
+[verification](implementation/p5/verification.json) retain real GNU/musl Linux
+acceptance for the Boolean-only, model-disabled, no-provider profile at source
+binding `562a3c35`. Its ten recovery cases, 72 cage tests, 27 runtime probes,
+ten helper mutants and eleven measured images describe that archived campaign.
+The original review findings and author fix evidence retain separate scopes.
+
+The [P6 review](implementation/p6/REVIEW.md),
+[verification](implementation/p6/verification.json) and
+[supported matrix](implementation/p6/supported-matrix.json) retain local, Linux
+and finite live qualification at runtime binding `b1bcd48c` and qualification
+binding `3a13a9bc`. Those records preserve all five live attempts, failed
+performance profiles, unknown measurements and the limits of the original fresh
+review and subsequent author fix pass. Full binding values and archived-source
+hashes are in [execution status](implementation/STATUS.md).
+
+The cumulative review found 113 of 735 P6-qualified source paths changed after
+the seal through naming cleanup. That is a review-snapshot count; current runtime
+repairs cause additional drift. Both retained package auditors refuse the current
+tree. The next work is to complete and review remediation, supply current runnable
+gates and requalify a new source/profile-bound candidate while preserving all
+historical records. Hosted CI, release integration and production acceptance
+remain separate gates. The architecture roadmap ends at P6.
+
 P2 and the contract-authoring portion of P3 can follow P0 independently of P1 development, but no live semantic remedy ships before its P1 authority/capture support. Persistent transform certificates require P4. Confined returns require P3/P4 and qualified platform enforcement. No feature flag may bypass these dependencies.
 
 P1's single connector uses a minimal pinned effect contract; the general package resolver remains P3. Every phase mediates all channels it enables and enforces bounded intake, safe diagnostics and recovery headroom. Later phases add new channels and scale qualification; they do not postpone those baseline protections. Phase gates refer to executable behavior under an explicitly supported profile.

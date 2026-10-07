@@ -1,0 +1,43 @@
+
+ RUN  v3.2.6 /Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/sdks/typescript/packages/conformance
+
+ ✓ test/recovery_schema.test.ts (42 tests) 8ms
+ ✓ test/recovery_client.test.ts (5 tests) 71ms
+stderr | test/recovery_p2_schema.test.ts
+unknown format "uri" ignored in schema at path "#/properties/leaderUrl"
+unknown format "uri" ignored in schema at path "#/properties/leaderUrl"
+unknown format "uri" ignored in schema at path "#/properties/leaderUrl"
+unknown format "uri" ignored in schema at path "#/properties/leaderUrl"
+
+stderr | test/recovery_p1_schema.test.ts
+unknown format "uri" ignored in schema at path "#/properties/leaderUrl"
+unknown format "uri" ignored in schema at path "#/properties/leaderUrl"
+unknown format "uri" ignored in schema at path "#/properties/leaderUrl"
+unknown format "uri" ignored in schema at path "#/properties/leaderUrl"
+
+ ✓ test/recovery_p2_schema.test.ts (51 tests) 41ms
+ ✓ test/recovery_p1_schema.test.ts (103 tests) 49ms
+stderr | test/recovery_p4_schema.test.ts
+unknown format "uri" ignored in schema at path "#/properties/leaderUrl"
+unknown format "uri" ignored in schema at path "#/properties/leaderUrl"
+unknown format "uri" ignored in schema at path "#/properties/leaderUrl"
+unknown format "uri" ignored in schema at path "#/properties/leaderUrl"
+
+ ✓ test/recovery_p4_schema.test.ts (42 tests) 8ms
+stderr | test/recovery_p3_schema.test.ts
+unknown format "uri" ignored in schema at path "#/properties/leaderUrl"
+unknown format "uri" ignored in schema at path "#/properties/leaderUrl"
+unknown format "uri" ignored in schema at path "#/properties/leaderUrl"
+unknown format "uri" ignored in schema at path "#/properties/leaderUrl"
+unknown format "uri" ignored in schema at path "#/properties/leaderUrl"
+unknown format "uri" ignored in schema at path "#/properties/leaderUrl"
+unknown format "uri" ignored in schema at path "#/properties/leaderUrl"
+unknown format "uri" ignored in schema at path "#/properties/leaderUrl"
+
+ ✓ test/recovery_p3_schema.test.ts (51 tests) 12ms
+
+ Test Files  6 passed (6)
+      Tests  294 passed (294)
+   Start at  20:39:15
+   Duration  1.63s (transform 378ms, setup 0ms, collect 4.24s, tests 188ms, environment 1ms, prepare 228ms)
+

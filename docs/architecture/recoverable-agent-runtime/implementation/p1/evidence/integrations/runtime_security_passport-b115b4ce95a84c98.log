@@ -1,0 +1,43 @@
+
+running 38 tests
+test advisory_observation_cannot_authorize_runtime_execution ... ok
+test advisory_observation_role_cannot_authorize_runtime_execution ... ok
+test receipt_totality_accepts_denial_terminal_receipt ... ok
+test receipt_totality_rejects_allowed_receipt_without_execution_lease_ref ... ok
+test receipt_totality_rejects_denial_receipt_without_execution_lease_ref_when_lease_present ... ok
+test receipt_totality_accepts_infrastructure_failure_receipt ... ok
+test receipt_totality_rejects_infrastructure_failure_without_incident_ref ... ok
+test runtime_security_rejects_unverified_required_claim ... ok
+test receipt_totality_rejects_second_execution_lease_without_terminal_receipt ... ok
+test receipt_totality_rejects_missing_denial_receipt ... ok
+test side_effecting_runtime_claim_accepts_runtime_terminal_receipt_schema ... ok
+test side_effecting_runtime_claim_rejects_ack_outside_execution_lease ... ok
+test side_effecting_runtime_claim_rejects_expired_execution_lease ... ok
+test side_effecting_runtime_claim_rejects_failed_attack_simulation_report ... ok
+test side_effecting_runtime_claim_rejects_forged_tool_server_bound_by_unsigned_lease ... ok
+test side_effecting_runtime_claim_rejects_failed_chaos_run_report ... ok
+test side_effecting_runtime_claim_accepts_bound_route_plan_receipt ... ok
+test side_effecting_runtime_claim_rejects_future_revocation_freshness ... ok
+test side_effecting_runtime_claim_rejects_multi_invocation_execution_lease ... ok
+test side_effecting_runtime_claim_rejects_policy_digest_mismatch ... ok
+test side_effecting_runtime_claim_rejects_request_digest_mismatch ... ok
+test side_effecting_runtime_claim_rejects_read_only_execution_lease ... ok
+test side_effecting_runtime_claim_rejects_route_plan_receipt_mismatch ... ok
+test side_effecting_runtime_claim_rejects_revocation_epoch_mismatch ... ok
+test side_effecting_runtime_claim_rejects_sandbox_mismatch ... ok
+test side_effecting_runtime_claim_rejects_reused_nonce ... ok
+test side_effecting_runtime_claim_rejects_stale_revocation ... ok
+test side_effecting_runtime_claim_rejects_tampered_revocation_signature ... ok
+test side_effecting_runtime_claim_rejects_revocation_stale_at_ack_time ... ok
+test side_effecting_runtime_claim_rejects_untrusted_revocation_oracle ... ok
+test side_effecting_runtime_claim_rejects_tampered_sandbox_signature ... ok
+test side_effecting_runtime_claim_rejects_untrusted_sandbox_attester ... ok
+test side_effecting_runtime_claim_rejects_sandbox_not_valid_for_lease ... ok
+test side_effecting_runtime_claim_requires_execution_lease ... ok
+test side_effecting_runtime_claim_rejects_widening_policy_activation_receipt ... ok
+test side_effecting_runtime_claim_rejects_untrusted_tool_server_ack ... ok
+test side_effecting_runtime_claim_verifies_with_online_enforcement_evidence ... ok
+test side_effecting_runtime_claim_rejects_tampered_tool_server_ack_signature ... ok
+
+test result: ok. 38 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+

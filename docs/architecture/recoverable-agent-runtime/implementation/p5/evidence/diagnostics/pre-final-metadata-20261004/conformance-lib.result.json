@@ -1,0 +1,26 @@
+{
+  "id": "conformance-lib",
+  "actual_command": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "chio-conformance",
+    "--lib"
+  ],
+  "cwd": ".",
+  "environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2",
+    "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+  },
+  "exit_code": 0,
+  "status": "passed",
+  "started_unix_seconds": 1791160040,
+  "duration_seconds": 78.924,
+  "log": "evidence/conformance-lib.log",
+  "log_sha256": "9d78a2dc15f99c658460f5c7875c19befb1c5c3dc34d5c8fd7e9e15054a56058",
+  "required_for_local_phase_acceptance": true,
+  "source_binding": "05aa889df57391692c09ef64d3ec178184f5d48c4bd4b6d3a654f470b00e079f"
+}

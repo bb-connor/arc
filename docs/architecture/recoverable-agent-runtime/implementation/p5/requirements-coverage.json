@@ -1,0 +1,319 @@
+{
+  "schema": "chio.recovery-p5-requirements-coverage.v1",
+  "phase": "P5",
+  "phase_accomplished": true,
+  "requirements": [
+    {
+      "id": "ISO-01",
+      "status": "verified_by_current_local_and_real_linux_acceptance",
+      "sources": [
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/confinement/context.rs",
+          "anchor": "resolve("
+        },
+        {
+          "path": "crates/kernel/chio-process/src/recovery.rs",
+          "anchor": "confined_context("
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/confinement.rs",
+          "anchor": "p5_native_ordinary_fork_retains_root_lineage_and_tainted_parent_control"
+        },
+        {
+          "path": "crates/kernel/chio-process/tests/processes.rs",
+          "anchor": "p5_ordinary_depth_64_keeps_root_context_and_normal_admission"
+        }
+      ],
+      "linux_acceptance_required": true,
+      "basis": "Absent native boundary preserves ordinary root context; known pending or cancelled boundary refuses ordinary fallback."
+    },
+    {
+      "id": "ISO-02",
+      "status": "verified_by_current_local_and_real_linux_acceptance",
+      "sources": [
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/confinement.rs",
+          "anchor": "reserve_confined_child("
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/confinement/context.rs",
+          "anchor": "validate_delegation("
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/confinement.rs",
+          "anchor": "p5_native_forged_seed_and_capability_substitution_cannot_fork_context"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/confinement.rs",
+          "anchor": "p5_native_cancelled_principal_cannot_be_reissued_into_a_fresh_observation"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/confinement/linux.rs",
+          "anchor": "p5_linux_unknown_input_provenance_withholds_a_correct_projection"
+        }
+      ],
+      "linux_acceptance_required": true,
+      "basis": "Protected host-generated IDs and exact signed delegation/seed references, permanent capability and principal indices."
+    },
+    {
+      "id": "ISO-03",
+      "status": "verified_by_current_local_and_real_linux_acceptance",
+      "sources": [
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/confinement/launch.rs",
+          "anchor": "record_confined_enforcement("
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/confinement/launch.rs",
+          "anchor": "admit_confined_input("
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/confinement/execution.rs",
+          "anchor": "validate_confined_attachment"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/confinement.rs",
+          "anchor": "p5_native_sensitive_observation_waits_for_real_enforcement"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/confinement/linux.rs",
+          "anchor": "p5_linux_useful_decision_exact_authority_and_parent_join_before_first_byte"
+        }
+      ],
+      "linux_acceptance_required": true,
+      "basis": "Only retained EnforcedChild custody can authorize observation. Model/provider channels are disabled, never reused."
+    },
+    {
+      "id": "ISO-04",
+      "status": "verified_by_current_local_and_real_linux_acceptance",
+      "sources": [
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/confinement/returns.rs",
+          "anchor": "check_evidence("
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/confinement/returns.rs",
+          "anchor": "admit_confined_return("
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/core/chio-core-types/tests/recovery_p5_contracts.rs",
+          "anchor": "p5_disclosure_cannot_substitute_for_integrity_and_exact_binding_mutations_fail"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/confinement/linux.rs",
+          "anchor": "p5_linux_valid_signatures_cannot_authorize_cross_parent_epoch_or_stale_returns"
+        }
+      ],
+      "linux_acceptance_required": true,
+      "basis": "Selected roots and whole exact return descriptors bind child, parent, lineage, epoch, artifact, launch and current policy."
+    },
+    {
+      "id": "ISO-05",
+      "status": "verified_by_current_local_and_real_linux_acceptance",
+      "sources": [
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/confinement/returns.rs",
+          "anchor": "KnowledgeJoin {"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/confinement.rs",
+          "anchor": "sink.deliver("
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/confinement/linux.rs",
+          "anchor": "p5_linux_useful_decision_exact_authority_and_parent_join_before_first_byte"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/confinement/linux.rs",
+          "anchor": "p5_linux_return_cutpoints_reopen_the_native_writer_without_second_disclosure"
+        }
+      ],
+      "linux_acceptance_required": true,
+      "basis": "Native knowledge join and stable admission commit before sink I/O. Sink checks independently committed join at first byte."
+    },
+    {
+      "id": "ISO-06",
+      "status": "verified_by_current_local_and_real_linux_acceptance",
+      "sources": [
+        {
+          "path": "crates/platform/chio-control-plane/src/confinement/channels.rs",
+          "anchor": "pub(super) fn read("
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/confinement/execution.rs",
+          "anchor": "channels::read(stdout, 8, deadline)"
+        },
+        {
+          "path": "crates/security/chio-cage/src/bin/chio-confined-reader.rs",
+          "anchor": "ExitCode::FAILURE"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/confinement/channels.rs",
+          "anchor": "p5_private_channel_overflow_returns_no_content_or_diagnostic_body"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/confinement/linux.rs",
+          "anchor": "p5_linux_channel_canaries_never_reach_parent_or_bypass_projection"
+        }
+      ],
+      "linux_acceptance_required": true,
+      "basis": "All private stdout/stderr candidates are finite. Every other route is withheld and selected cage denies file/network/callback escape."
+    },
+    {
+      "id": "ISO-07",
+      "status": "verified_by_current_local_and_real_linux_acceptance",
+      "sources": [
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/confinement/returns.rs",
+          "anchor": "disclosure required"
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/confinement/returns.rs",
+          "anchor": "endorsement required"
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/confinement/returns.rs",
+          "anchor": "record.expected_return"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/core/chio-core-types/tests/recovery_p5_contracts.rs",
+          "anchor": "p5_projection_and_packet_bounds_do_not_release_schema_only_predicates"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/confinement/linux.rs",
+          "anchor": "p5_linux_useful_decision_exact_authority_and_parent_join_before_first_byte"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/confinement/linux.rs",
+          "anchor": "p5_linux_channel_canaries_never_reach_parent_or_bypass_projection"
+        }
+      ],
+      "linux_acceptance_required": true,
+      "basis": "Canonical JSON and exact recomputation never replace independent narrowing or integrity authority."
+    },
+    {
+      "id": "ISO-08",
+      "status": "verified_by_current_local_and_real_linux_acceptance",
+      "sources": [
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/confinement/launch.rs",
+          "anchor": "quarantine_confined_child("
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/confinement/launch.rs",
+          "anchor": "cancel_confined_child("
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/confinement/returns.rs",
+          "anchor": "acknowledge_confined_return("
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/confinement.rs",
+          "anchor": "p5_native_lost_reservation_and_attachment_acknowledgements_keep_original_slot"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/confinement/linux.rs",
+          "anchor": "p5_linux_launch_cutpoints_never_duplicate_measurement_or_reset_observation"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/confinement/linux.rs",
+          "anchor": "p5_linux_return_cutpoints_reopen_the_native_writer_without_second_disclosure"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/confinement/linux.rs",
+          "anchor": "p5_linux_duplicate_launch_and_cancel_preserve_the_observation_and_consumed_slot"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/confinement/linux.rs",
+          "anchor": "p5_linux_parent_cancellation_withholds_returns_before_and_after_native_join"
+        }
+      ],
+      "linux_acceptance_required": true,
+      "basis": "Retained original boundary, observation, seals, evidence consumption and count survive every disposition and writer reopen."
+    },
+    {
+      "id": "ISO-09",
+      "status": "verified_by_current_local_and_real_linux_acceptance",
+      "sources": [
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/confinement.rs",
+          "anchor": "confined-count:"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/confinement.rs",
+          "anchor": "process\n                .spawn("
+        },
+        {
+          "path": "crates/security/chio-cage/src/launch.rs",
+          "anchor": "pub fn enforce_deadline("
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/confinement.rs",
+          "anchor": "p5_native_permanent_counts_stop_epoch_churn_at_tree_limit"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/confinement.rs",
+          "anchor": "p5_native_original_tree_quota_denies_attachment_without_refunding_native_slot"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/confinement/linux.rs",
+          "anchor": "p5_linux_absolute_deadline_kills_a_held_handle_without_parent_io"
+        }
+      ],
+      "linux_acceptance_required": true,
+      "basis": "Native permanent aggregate counts coexist with original process quotas; pidfd deadline cannot be renewed by retained custody or chunking."
+    },
+    {
+      "id": "ISO-10",
+      "status": "verified_by_current_local_and_real_linux_acceptance",
+      "sources": [
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/confinement/launch.rs",
+          "anchor": "admit_confined_input("
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/confinement.rs",
+          "anchor": "parent_control:"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/confinement/execution.rs",
+          "anchor": "plan.environment.len() != 3"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/confinement.rs",
+          "anchor": "p5_native_ordinary_fork_retains_root_lineage_and_tainted_parent_control"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/confinement/linux.rs",
+          "anchor": "p5_linux_useful_decision_exact_authority_and_parent_join_before_first_byte"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/confinement/linux.rs",
+          "anchor": "p5_linux_fixed_environment_rejects_parent_controlled_channels"
+        }
+      ],
+      "linux_acceptance_required": true,
+      "basis": "Fresh parent label/influence and full input dependencies join before stdin, with host-fixed argv/environment/profile and disabled egress."
+    }
+  ]
+}

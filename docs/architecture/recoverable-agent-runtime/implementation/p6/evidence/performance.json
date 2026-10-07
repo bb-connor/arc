@@ -1,0 +1,63 @@
+{
+  "native": {
+    "profile": "debug",
+    "elapsed_ns": 10171874769,
+    "warmups": 8,
+    "samples": 64,
+    "replays": 8,
+    "effect_count": 72,
+    "logical_call_charges": 72,
+    "errors": 0,
+    "p50_ns": 136870527,
+    "p95_ns": 142600820,
+    "p99_ns": 148440427,
+    "max_ns": 148440427,
+    "fixture": "native admission + SQLite authority/process stores + counting connector"
+  },
+  "pure": {
+    "digest": {
+      "elapsed_ns": 12036532,
+      "max_ns": 25070,
+      "p50_ns": 11829,
+      "p95_ceiling_ns": 250000,
+      "p95_ns": 12250,
+      "p99_ns": 15444,
+      "samples": 1000,
+      "warmups": 100
+    },
+    "errors": 0,
+    "graph_16_steps": {
+      "elapsed_ns": 6025848,
+      "max_ns": 12660,
+      "p50_ns": 5939,
+      "p95_ceiling_ns": 1000000,
+      "p95_ns": 5989,
+      "p99_ns": 8924,
+      "samples": 1000,
+      "warmups": 100
+    },
+    "intake": {
+      "elapsed_ns": 97885609,
+      "max_ns": 108749,
+      "p50_ns": 97162,
+      "p95_ceiling_ns": 5000000,
+      "p95_ns": 101568,
+      "p99_ns": 103442,
+      "samples": 1000,
+      "warmups": 100
+    },
+    "profile": "debug",
+    "reduction": {
+      "elapsed_ns": 85814,
+      "max_ns": 129,
+      "p50_ns": 60,
+      "p95_ceiling_ns": 250000,
+      "p95_ns": 61,
+      "p99_ns": 61,
+      "samples": 1000,
+      "warmups": 100
+    }
+  },
+  "passed": true,
+  "native_p95_ceiling_ns": 220683049
+}

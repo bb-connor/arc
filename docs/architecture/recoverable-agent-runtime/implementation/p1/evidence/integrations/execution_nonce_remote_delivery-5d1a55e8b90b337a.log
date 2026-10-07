@@ -1,0 +1,65 @@
+
+running 11 tests
+test crash_cutpoints::crash_after_delivery_is_outcome_unknown_and_never_redelivered ... FAILED
+test crash_cutpoints::crash_after_the_response_is_outcome_unknown_and_never_redelivered ... FAILED
+test crash_cutpoints::crash_after_the_evaluation_resolves_is_finished_by_the_next_process ... FAILED
+test crash_cutpoints::crash_after_the_evaluation_begins_is_finished_by_the_next_process ... FAILED
+test crash_cutpoints::crash_after_the_terminal_projection_replays_the_completed_receipt ... FAILED
+test crash_cutpoints::crash_before_delivery_is_compensated_by_the_next_process ... FAILED
+test crash_cutpoints::crash_after_the_return_is_recorded_is_finished_by_the_next_process ... FAILED
+test late_response_after_the_transport_deadline_is_outcome_unknown ... FAILED
+test remote_delivery_carries_the_operation_identity ... FAILED
+test unreachable_tool_server_is_compensated_before_dispatch ... FAILED
+test transport_failure_after_delivery_is_outcome_unknown ... FAILED
+
+failures:
+
+---- crash_cutpoints::crash_after_delivery_is_outcome_unknown_and_never_redelivered stdout ----
+Error: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- crash_cutpoints::crash_after_the_response_is_outcome_unknown_and_never_redelivered stdout ----
+Error: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- crash_cutpoints::crash_after_the_evaluation_resolves_is_finished_by_the_next_process stdout ----
+Error: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- crash_cutpoints::crash_after_the_evaluation_begins_is_finished_by_the_next_process stdout ----
+Error: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- crash_cutpoints::crash_after_the_terminal_projection_replays_the_completed_receipt stdout ----
+Error: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- crash_cutpoints::crash_before_delivery_is_compensated_by_the_next_process stdout ----
+Error: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- crash_cutpoints::crash_after_the_return_is_recorded_is_finished_by_the_next_process stdout ----
+Error: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- late_response_after_the_transport_deadline_is_outcome_unknown stdout ----
+Error: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- remote_delivery_carries_the_operation_identity stdout ----
+Error: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- unreachable_tool_server_is_compensated_before_dispatch stdout ----
+Error: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- transport_failure_after_delivery_is_outcome_unknown stdout ----
+Error: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+
+failures:
+    crash_cutpoints::crash_after_delivery_is_outcome_unknown_and_never_redelivered
+    crash_cutpoints::crash_after_the_evaluation_begins_is_finished_by_the_next_process
+    crash_cutpoints::crash_after_the_evaluation_resolves_is_finished_by_the_next_process
+    crash_cutpoints::crash_after_the_response_is_outcome_unknown_and_never_redelivered
+    crash_cutpoints::crash_after_the_return_is_recorded_is_finished_by_the_next_process
+    crash_cutpoints::crash_after_the_terminal_projection_replays_the_completed_receipt
+    crash_cutpoints::crash_before_delivery_is_compensated_by_the_next_process
+    late_response_after_the_transport_deadline_is_outcome_unknown
+    remote_delivery_carries_the_operation_identity
+    transport_failure_after_delivery_is_outcome_unknown
+    unreachable_tool_server_is_compensated_before_dispatch
+
+test result: FAILED. 0 passed; 11 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.82s
+

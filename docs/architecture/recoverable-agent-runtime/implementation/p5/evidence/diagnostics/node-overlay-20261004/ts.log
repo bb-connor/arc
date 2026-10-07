@@ -1,0 +1,82 @@
+
+ RUN  v4.1.8 /Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/sdks/typescript/packages/conformance
+
+ ❯ test/recovery_client.test.ts (5 tests | 5 failed) 23ms
+     × preserves exactly the same semantic bytes and identity across lost acknowledgements 4ms
+     × refuses redirect and oversized replies without retry or secret-bearing errors 15ms
+     × bounds intake before a transport is called 0ms
+     × refuses unsafe control endpoints 3ms
+     × bounds fetch and stream failures and keeps the original command 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/recovery_client.test.ts > Rust-owned recovery transport > preserves exactly the same semantic bytes and identity across lost acknowledgements
+TypeError: RecoveryClient is not a constructor
+ ❯ test/recovery_client.test.ts:18:20
+     16|       return new Response(JSON.stringify(reply), { status: requests.le…
+     17|     };
+     18|     const client = new RecoveryClient("https://host.example", transpor…
+       |                    ^
+     19|     await expect(client.execute("protected-capability", command)).reje…
+     20|     expect(requests).toHaveLength(1);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  test/recovery_client.test.ts > Rust-owned recovery transport > refuses redirect and oversized replies without retry or secret-bearing errors
+TypeError: RecoveryClient is not a constructor
+ ❯ test/recovery_client.test.ts:32:22
+     30|     for (const response of [new Response("private-canary", {status:302…
+     31|       let calls = 0;
+     32|       const client = new RecoveryClient("https://host.example", async …
+       |                      ^
+     33|       await expect(client.execute("private-canary", command)).rejects.…
+     34|       expect(calls).toBe(1);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  test/recovery_client.test.ts > Rust-owned recovery transport > bounds intake before a transport is called
+TypeError: RecoveryClient is not a constructor
+ ❯ test/recovery_client.test.ts:39:20
+     37|   it("bounds intake before a transport is called", async () => {
+     38|     let calls = 0;
+     39|     const client = new RecoveryClient("https://host.example", async ()…
+       |                    ^
+     40|     await expect(client.execute("x".repeat(65536), command)).rejects.t…
+     41|     expect(calls).toBe(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  test/recovery_client.test.ts > Rust-owned recovery transport > refuses unsafe control endpoints
+AssertionError: expected [Function] to throw error including 'recovery.invalid_endpoint' but got '__vite_ssr_import_1__.RecoveryClient …'
+
+Expected: "recovery.invalid_endpoint"
+Received: "__vite_ssr_import_1__.RecoveryClient is not a constructor"
+
+ ❯ test/recovery_client.test.ts:45:45
+     43|   it("refuses unsafe control endpoints", () => {
+     44|     for (const url of ["http://foreign.example", "https://token@host.e…
+     45|       expect(() => new RecoveryClient(url)).toThrow("recovery.invalid_…
+       |                                             ^
+     46|     }
+     47|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  test/recovery_client.test.ts > Rust-owned recovery transport > bounds fetch and stream failures and keeps the original command
+TypeError: RecoveryClient is not a constructor
+ ❯ test/recovery_client.test.ts:54:22
+     52|     ]) {
+     53|       let calls = 0;
+     54|       const client = new RecoveryClient("https://host.example", async …
+       |                      ^
+     55|       await expect(client.execute("private-canary", command)).rejects.…
+     56|       expect(calls).toBe(1);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  1 failed | 6 passed (7)
+      Tests  5 failed | 316 passed (321)
+   Start at  20:33:30
+   Duration  1.71s (transform 564ms, setup 0ms, import 6.41s, tests 193ms, environment 0ms)
+

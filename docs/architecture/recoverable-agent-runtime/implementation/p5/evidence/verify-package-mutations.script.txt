@@ -1,0 +1,112 @@
+#!/usr/bin/env python3
+"""Exercise the sealed package auditor against false completion and evidence drift.
+
+Run after sealing and with gate runners stopped. Every mutation is restored in
+finally; outputs are outside the sealed package so audits observe stable bytes.
+"""
+import json
+from pathlib import Path
+import subprocess
+import sys
+
+EVIDENCE = Path(__file__).resolve().parent
+PHASE = EVIDENCE.parent
+ROOT = EVIDENCE.parents[5]
+AUDITOR = EVIDENCE / "verify-package.py"
+LOG = ROOT / "target/recovery-p5-package-mutations.log"
+RESULT = ROOT / "target/recovery-p5-package-mutations.result.json"
+
+
+def audit():
+    return subprocess.run(
+        [sys.executable, str(AUDITOR)], cwd=ROOT, text=True,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False,
+    )
+
+
+def require_pass(label, log):
+    result = audit()
+    log.append(label + "\n" + result.stdout)
+    if result.returncode != 0:
+        raise RuntimeError("positive audit failed: " + label)
+
+
+def change_json(path, change):
+    document = json.loads(path.read_text())
+    change(document)
+    path.write_text(json.dumps(document, indent=2) + "\n")
+
+
+def main():
+    log = []
+    cases = []
+    require_pass("initial positive audit", log)
+    mutations = [
+        ("false phase completion", PHASE / "verification.json",
+         lambda p: change_json(p, lambda d: d.update(phase_accomplished=not d["phase_accomplished"])),
+         "P5 verification differs from recomputation"),
+        ("missing required gate", EVIDENCE / "contracts.result.json",
+         lambda p: p.unlink(), "FileNotFoundError"),
+        ("stale source gate", EVIDENCE / "native.result.json",
+         lambda p: change_json(p, lambda d: d.update(source_binding="0" * 64)),
+         "local gate absent, failed or stale: native"),
+        ("changed native log", EVIDENCE / "native.log",
+         lambda p: p.write_bytes(p.read_bytes() + b"altered evidence\n"),
+         "local gate absent, failed or stale: native"),
+        ("stale Rust review", PHASE / "review-manifest.json",
+         lambda p: change_json(p, lambda d: d["authored_rust"][0].update(sha256="0" * 64)),
+         "source review incomplete or stale"),
+        ("stale other-source review", PHASE / "review-manifest.json",
+         lambda p: change_json(p, lambda d: d["authored_other_sources"][0].update(sha256="0" * 64)),
+         "source review incomplete or stale"),
+        ("stale review binding", PHASE / "review-manifest.json",
+         lambda p: change_json(p, lambda d: d.update(source_binding="0" * 64)),
+         "source review incomplete or stale"),
+        ("open P1 review issue", PHASE / "review-manifest.json",
+         lambda p: change_json(p, lambda d: d.update(open_p1=["unresolved review finding"])),
+         "source review incomplete or stale"),
+        ("missing obligation anchor", PHASE / "requirements-coverage.json",
+         lambda p: change_json(p, lambda d: d["requirements"][0]["sources"][0].update(anchor="absent acceptance anchor")),
+         "crosswalk anchor drifted"),
+        ("fake Linux success", EVIDENCE / "linux-acceptance.result.json",
+         lambda p: change_json(p, lambda d: d.update(status="passed", exit_code=0, linux_tests=9)),
+         "Linux acceptance inventory incomplete"),
+        ("changed baseline archive digest", PHASE / "source-baseline.json",
+         lambda p: change_json(p, lambda d: d.update(archive_sha256="0" * 64)),
+         "P4 archive hash changed"),
+        ("changed phase documentation", PHASE / "OPERATIONS.md",
+         lambda p: p.write_bytes(p.read_bytes() + b"altered phase artifact\n"),
+         "P5 artifact changed: OPERATIONS.md"),
+        ("unregistered phase artifact", EVIDENCE / "unregistered-artifact.txt",
+         lambda p: p.write_text("unregistered evidence\n"),
+         "P5 artifact inventory differs"),
+    ]
+    try:
+        for name, path, mutate, expected in mutations:
+            original = path.read_bytes() if path.exists() else None
+            try:
+                mutate(path)
+                result = audit()
+                log.append(name + "\n" + result.stdout)
+                if result.returncode == 0 or expected not in result.stdout:
+                    raise RuntimeError("mutation did not fail for its expected reason: " + name)
+                cases.append({"name": name, "status": "rejected", "expected_reason": expected,
+                              "actual_exit_code": result.returncode})
+            finally:
+                if original is None:
+                    path.unlink(missing_ok=True)
+                else:
+                    path.write_bytes(original)
+            require_pass("restored positive audit: " + name, log)
+    finally:
+        LOG.write_text("\n".join(log))
+    require_pass("final positive audit", log)
+    LOG.write_text("\n".join(log))
+    RESULT.write_text(json.dumps({"schema": "chio.recovery-p5-package-mutations.v1",
+                                 "status": "passed", "rejected_mutations": cases,
+                                 "positive_audits": len(cases) + 2}, indent=2) + "\n")
+    print(f"PASS P5 package auditor: {len(cases)} rejected mutations; original evidence restored")
+
+
+if __name__ == "__main__":
+    main()

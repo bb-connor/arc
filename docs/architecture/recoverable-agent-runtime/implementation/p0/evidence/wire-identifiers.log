@@ -1,0 +1,3 @@
+Wire schemas: 1370 identifier constants, 1100 distinct values, 200 declared in more than one file, 1100 lock entries; 169 of 508 security-crate constants unpinned
+
+Wire schema check passed

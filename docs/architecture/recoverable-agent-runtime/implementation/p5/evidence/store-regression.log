@@ -1,0 +1,11 @@
+    Finished `test` profile [unoptimized] target(s) in 1.73s
+     Running unittests src/lib.rs (target/debug/deps/chio_store_sqlite-61803b4dfcc83d3d)
+
+running 4 tests
+test admission_operation_store::tests::security_participant_migration::integrity::restoring_destination_before_import_is_rejected_by_independent_anchor ... ok
+test admission_operation_store::tests::security_participant_state::integrity::restoring_private_database_before_hydration_cannot_erase_the_anchored_initialization ... ok
+test serving_owner::tests::relocation::restoring_pre_export_database_cannot_undo_retirement ... ok
+test admission_operation_store::tests::security_participant_state::mutations::faults::restoring_database_before_join_cannot_erase_acknowledged_mutation_history ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 1831 filtered out; finished in 5.38s
+

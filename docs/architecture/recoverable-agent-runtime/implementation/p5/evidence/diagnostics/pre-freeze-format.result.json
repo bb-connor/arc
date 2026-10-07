@@ -1,0 +1,24 @@
+{
+  "id": "format",
+  "actual_command": [
+    "cargo",
+    "fmt",
+    "--all",
+    "--",
+    "--check"
+  ],
+  "cwd": ".",
+  "environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2",
+    "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+  },
+  "exit_code": 0,
+  "status": "passed",
+  "started_unix_seconds": 1791088121,
+  "duration_seconds": 13.018,
+  "log": "evidence/format.log",
+  "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "required_for_local_phase_acceptance": true,
+  "source_binding": "8c21e583e48bb02a33691c509c18252385d30b659237cb899982fd3583a00b93"
+}

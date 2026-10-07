@@ -1,0 +1,14 @@
+{
+  "recorded_at_utc": "2026-10-03T21:38:04.504093+00:00",
+  "inventory_before": "target/debug/incremental: 126 GiB; target/debug/deps: 22 GiB; disk available: 162 MiB",
+  "removed": [
+    "target/debug/incremental"
+  ],
+  "scope": "Untracked disposable incremental compiler cache in this worktree only. Running task test/build sessions had completed; lsof found no open files. Source, phase evidence, tool bootstrap and compiled binaries were preserved.",
+  "available_after": "123 GiB",
+  "subsequent_cargo_environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "claim": "Removes the demonstrated disk-headroom failure; does not classify earlier failed tests as passing."
+}

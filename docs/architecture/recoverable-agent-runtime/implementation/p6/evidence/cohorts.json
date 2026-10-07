@@ -1,0 +1,32 @@
+{
+  "schema": "chio.recovery-p6-cohorts.v1",
+  "declared_at_utc": "2026-10-05T08:43:07.197163+00:00",
+  "manifest_sha256": "9d1b8dd1151b30eeeb6b3b833c7e6a0f2b41debe19b1ceb9b1184da5d1aeae88",
+  "cohorts": [
+    {
+      "id": "initial-account-quota-failure",
+      "trials": 96,
+      "manifest": "live-manifest/manifest.json",
+      "purpose": "Original predeclared corpus, all quota failures retained without replacement"
+    },
+    {
+      "id": "available-account-qualification",
+      "trials": 96,
+      "manifest": "live-manifest/manifest.json",
+      "purpose": "Independent identical complete corpus after exact-model account transport succeeds"
+    }
+  ],
+  "combined_trials": 192,
+  "diagnostic_requests": 3,
+  "diagnostic_tool_actions": 0,
+  "diagnostic_known_input_tokens": 15,
+  "diagnostic_known_output_tokens": 14,
+  "changes": "Provider credential only; exact model, authority, source hashes, cases, repetitions, native owners, host packages, four model/eight tool budgets and two-concurrent-trial limit remain identical. Cohorts execute sequentially.",
+  "interpretation": "Qualification requires the second entire corpus to satisfy the original positive-stratum threshold. Report both cohorts separately and all 192 denominators together; no superiority or account-independent availability claim.",
+  "initial_collection_status": "Interrupted by the earlier independent task-owned systemd deadline at 2026-10-05 08:53:21 UTC. Original retained rows remain exact, incomplete and unstarted slots remain in the planned denominator with unavailable measurements explicitly unknown.",
+  "initial_recorded_trials": 51,
+  "initial_started_unrecorded_trials": 2,
+  "initial_not_started_trials": 43,
+  "qualification_status": "Previously queued, verified never started; same predeclared 96-trial cohort starts after task VM restart and exact pinned dependency restoration.",
+  "original_declaration_sha256": "bf411a4895fa6a57d5ca571191039652245f0d16ea6e0c8eae302d4f44b5013c"
+}

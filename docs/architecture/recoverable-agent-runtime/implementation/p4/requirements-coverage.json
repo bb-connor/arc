@@ -1,0 +1,461 @@
+{
+  "schema": "chio.recovery-p4-requirements-coverage.v1",
+  "phase": "P4",
+  "count": 13,
+  "requirements": [
+    {
+      "id": "CON-09",
+      "obligation": "A one-shot crossing MUST NOT create reusable public artifact authority.",
+      "document": "05-semantic-contracts.md",
+      "proposed_acceptance_test": "transforms::one_shot_cannot_mint_projection_certificate",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/publication.rs",
+          "anchor": "verify_artifact_certificate"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/native.rs",
+          "anchor": "p4_artifacts_projection_recomputes_native_producer_and_refuses_one_shot_authority"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/native.rs",
+          "anchor": "p4_artifacts_withheld_native_output_cannot_gain_projection_authority"
+        }
+      ],
+      "evidence": [
+        "evidence/native.log",
+        "evidence/clippy.log",
+        "evidence/owning-tests.log",
+        "evidence/vector-recompute.log"
+      ],
+      "scope": "Declared host-private Unix SQLite buffered knowledge profile. Filesystem/object-store/stream, remote provider, cross-process transfer, hosted and platform qualification remain separate."
+    },
+    {
+      "id": "ART-01",
+      "obligation": "Artifact identity MUST bind content version and provenance without treating hashes as bearer authority.",
+      "document": "06-artifacts-memory.md",
+      "proposed_acceptance_test": "artifacts::equal_bytes_different_provenance",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/core/chio-core-types/src/recovery/knowledge.rs",
+          "anchor": "artifact_version_reference"
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/release.rs",
+          "anchor": "issue_artifact_handle"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge.rs",
+          "anchor": "p4_artifacts_equal_bytes_different_provenance_and_cross_tenant_oracle"
+        }
+      ],
+      "evidence": [
+        "evidence/native.log",
+        "evidence/clippy.log",
+        "evidence/owning-tests.log",
+        "evidence/vector-recompute.log"
+      ],
+      "scope": "Declared host-private Unix SQLite buffered knowledge profile. Filesystem/object-store/stream, remote provider, cross-process transfer, hosted and platform qualification remain separate."
+    },
+    {
+      "id": "ART-02",
+      "obligation": "Publication MUST recover safely across every byte-store/metadata-store cutpoint.",
+      "document": "06-artifacts-memory.md",
+      "proposed_acceptance_test": "artifacts::publication_commit_cutpoints",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/publication.rs",
+          "anchor": "finalize_artifact"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/knowledge.rs",
+          "anchor": "KnowledgeCutpoint::BlobStaged"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge.rs",
+          "anchor": "p4_artifacts_publication_commit_cutpoints_reconcile_original_identity"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/acceptance.rs",
+          "anchor": "p4_artifacts_unreachable_staging_is_collected_without_identity_reuse"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/acceptance.rs",
+          "anchor": "p4_artifacts_clearance_reduction_refuses_publication_metadata_and_checkpoint"
+        }
+      ],
+      "evidence": [
+        "evidence/native.log",
+        "evidence/clippy.log",
+        "evidence/owning-tests.log",
+        "evidence/vector-recompute.log"
+      ],
+      "scope": "Declared host-private Unix SQLite buffered knowledge profile. Filesystem/object-store/stream, remote provider, cross-process transfer, hosted and platform qualification remain separate."
+    },
+    {
+      "id": "ART-03",
+      "obligation": "Missing or corrupt metadata/bytes MUST quarantine the version without public fallback.",
+      "document": "06-artifacts-memory.md",
+      "proposed_acceptance_test": "artifacts::restart_with_missing_label_or_blob",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/publication.rs",
+          "anchor": "quarantine_artifact"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/knowledge.rs",
+          "anchor": "read_private"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge.rs",
+          "anchor": "p4_artifacts_missing_blob_quarantines_and_never_substitutes_same_digest"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/acceptance.rs",
+          "anchor": "p4_artifacts_corrupt_blob_quarantines_and_staging_cannot_hide_mutation"
+        }
+      ],
+      "evidence": [
+        "evidence/native.log",
+        "evidence/clippy.log",
+        "evidence/owning-tests.log",
+        "evidence/vector-recompute.log"
+      ],
+      "scope": "Declared host-private Unix SQLite buffered knowledge profile. Filesystem/object-store/stream, remote provider, cross-process transfer, hosted and platform qualification remain separate."
+    },
+    {
+      "id": "ART-04",
+      "obligation": "Reads MUST commit required knowledge and validate exact bytes before model/agent release.",
+      "document": "06-artifacts-memory.md",
+      "proposed_acceptance_test": "artifacts::taint_commit_before_first_chunk",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/release.rs",
+          "anchor": "admit_artifact_release"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/knowledge.rs",
+          "anchor": "release_into"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge.rs",
+          "anchor": "p4_artifacts_native_publication_and_taint_commit_before_first_byte"
+        }
+      ],
+      "evidence": [
+        "evidence/native.log",
+        "evidence/clippy.log",
+        "evidence/owning-tests.log",
+        "evidence/vector-recompute.log"
+      ],
+      "scope": "Declared host-private Unix SQLite buffered knowledge profile. Filesystem/object-store/stream, remote provider, cross-process transfer, hosted and platform qualification remain separate."
+    },
+    {
+      "id": "ART-05",
+      "obligation": "Copy/move/export/import MUST preserve governed provenance across aliases and tenants.",
+      "document": "06-artifacts-memory.md",
+      "proposed_acceptance_test": "artifacts::copy_restore_archive_and_aliases",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/platform/chio-control-plane/src/knowledge/transfer.rs",
+          "anchor": "import_archive"
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/transfer.rs",
+          "anchor": "retain_import_manifest"
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/lifecycle.rs",
+          "anchor": "move_artifact"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge.rs",
+          "anchor": "p4_artifacts_copy_restore_archive_and_aliases_preserve_every_origin"
+        }
+      ],
+      "evidence": [
+        "evidence/native.log",
+        "evidence/clippy.log",
+        "evidence/owning-tests.log",
+        "evidence/vector-recompute.log"
+      ],
+      "scope": "Declared host-private Unix SQLite buffered knowledge profile. Filesystem/object-store/stream, remote provider, cross-process transfer, hosted and platform qualification remain separate."
+    },
+    {
+      "id": "ART-06",
+      "obligation": "Derivation MUST join all inputs unless exact scoped projection authority is verified.",
+      "document": "06-artifacts-memory.md",
+      "proposed_acceptance_test": "artifacts::summary_and_dependency_overflow",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/traversal.rs",
+          "anchor": "dependencies"
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/publication.rs",
+          "anchor": "native_projection"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/acceptance.rs",
+          "anchor": "p4_artifacts_summary_and_dependency_overflow_refuse_missing_paths"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/native.rs",
+          "anchor": "p4_artifacts_projection_recomputes_native_producer_and_refuses_one_shot_authority"
+        }
+      ],
+      "evidence": [
+        "evidence/native.log",
+        "evidence/clippy.log",
+        "evidence/owning-tests.log",
+        "evidence/vector-recompute.log"
+      ],
+      "scope": "Declared host-private Unix SQLite buffered knowledge profile. Filesystem/object-store/stream, remote provider, cross-process transfer, hosted and platform qualification remain separate."
+    },
+    {
+      "id": "ART-07",
+      "obligation": "Checkpoint/model restore MUST join retained knowledge and preserve provider context identity.",
+      "document": "06-artifacts-memory.md",
+      "proposed_acceptance_test": "memory::old_checkpoint_cannot_reset_context",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/checkpoints.rs",
+          "anchor": "admit_checkpoint_restore"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/knowledge/checkpoints.rs",
+          "anchor": "restore_into"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge.rs",
+          "anchor": "p4_memory_old_checkpoint_cannot_reset_context_and_cas_pins"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/acceptance.rs",
+          "anchor": "p4_memory_model_context_and_side_files_remain_bound_on_restore"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/native.rs",
+          "anchor": "p4_artifacts_observed_model_influence_invalidates_old_scoped_endorsement"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/acceptance.rs",
+          "anchor": "p4_artifacts_clearance_reduction_refuses_publication_metadata_and_checkpoint"
+        }
+      ],
+      "evidence": [
+        "evidence/native.log",
+        "evidence/clippy.log",
+        "evidence/owning-tests.log",
+        "evidence/vector-recompute.log"
+      ],
+      "scope": "Declared host-private Unix SQLite buffered knowledge profile. Filesystem/object-store/stream, remote provider, cross-process transfer, hosted and platform qualification remain separate."
+    },
+    {
+      "id": "ART-08",
+      "obligation": "Legacy unlabeled state MUST require quarantine and explicit adoption.",
+      "document": "06-artifacts-memory.md",
+      "proposed_acceptance_test": "memory::legacy_state_activation",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/kernel/chio-process/src/store/knowledge.rs",
+          "anchor": "enable_knowledge"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/knowledge/transfer.rs",
+          "anchor": "adopt_legacy"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge.rs",
+          "anchor": "p4_memory_legacy_state_activation_and_exact_adoption"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/acceptance.rs",
+          "anchor": "p4_memory_open_legacy_reader_is_revoked_by_durable_activation"
+        }
+      ],
+      "evidence": [
+        "evidence/native.log",
+        "evidence/clippy.log",
+        "evidence/owning-tests.log",
+        "evidence/vector-recompute.log"
+      ],
+      "scope": "Declared host-private Unix SQLite buffered knowledge profile. Filesystem/object-store/stream, remote provider, cross-process transfer, hosted and platform qualification remain separate."
+    },
+    {
+      "id": "ART-09",
+      "obligation": "GC and deletion MUST retain ownership/replay tombstones and live version pins.",
+      "document": "06-artifacts-memory.md",
+      "proposed_acceptance_test": "artifacts::gc_races_with_unknown_operation",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/lifecycle.rs",
+          "anchor": "schedule_collection"
+        },
+        {
+          "path": "crates/kernel/chio-process/src/store/knowledge.rs",
+          "anchor": "knowledge_generation=?3"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge.rs",
+          "anchor": "p4_artifacts_collection_barrier_dedup_and_identity_tombstones"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/acceptance.rs",
+          "anchor": "p4_artifacts_delayed_collection_cannot_delete_a_new_storage_generation"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/native.rs",
+          "anchor": "p4_artifacts_gc_keeps_unknown_native_operation_and_receipt_pins"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/acceptance.rs",
+          "anchor": "p4_artifacts_pending_approval_has_a_native_version_pin"
+        }
+      ],
+      "evidence": [
+        "evidence/native.log",
+        "evidence/clippy.log",
+        "evidence/owning-tests.log",
+        "evidence/vector-recompute.log"
+      ],
+      "scope": "Declared host-private Unix SQLite buffered knowledge profile. Filesystem/object-store/stream, remote provider, cross-process transfer, hosted and platform qualification remain separate."
+    },
+    {
+      "id": "ART-10",
+      "obligation": "Existence, error, digest and deduplication channels MUST obey audience policy.",
+      "document": "06-artifacts-memory.md",
+      "proposed_acceptance_test": "artifacts::cross_tenant_existence_oracle",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/traversal.rs",
+          "anchor": "ensure_audience"
+        },
+        {
+          "path": "crates/kernel/chio-process/src/lib.rs",
+          "anchor": "pub fn storage"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge.rs",
+          "anchor": "p4_artifacts_equal_bytes_different_provenance_and_cross_tenant_oracle"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge.rs",
+          "anchor": "process.storage(\"root\").is_err()"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/acceptance.rs",
+          "anchor": "p4_artifacts_clearance_reduction_refuses_publication_metadata_and_checkpoint"
+        }
+      ],
+      "evidence": [
+        "evidence/native.log",
+        "evidence/clippy.log",
+        "evidence/owning-tests.log",
+        "evidence/vector-recompute.log"
+      ],
+      "scope": "Declared host-private Unix SQLite buffered knowledge profile. Filesystem/object-store/stream, remote provider, cross-process transfer, hosted and platform qualification remain separate."
+    },
+    {
+      "id": "ART-11",
+      "obligation": "Filesystem enforcement MUST mediate mutation rather than rely on observation after writes.",
+      "document": "06-artifacts-memory.md",
+      "proposed_acceptance_test": "artifacts::concurrent_writer_symlink_and_rename",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/kernel/chio-process/src/store.rs",
+          "anchor": "SQLITE_OPEN_NOFOLLOW"
+        },
+        {
+          "path": "crates/kernel/chio-process/src/store/knowledge.rs",
+          "anchor": "file.nlink() != 1"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/acceptance.rs",
+          "anchor": "p4_artifacts_journal_symlink_hard_link_and_rename_refuse_before_bytes"
+        }
+      ],
+      "evidence": [
+        "evidence/native.log",
+        "evidence/clippy.log",
+        "evidence/owning-tests.log",
+        "evidence/vector-recompute.log"
+      ],
+      "scope": "Declared host-private Unix SQLite buffered knowledge profile. Filesystem/object-store/stream, remote provider, cross-process transfer, hosted and platform qualification remain separate."
+    },
+    {
+      "id": "ART-12",
+      "obligation": "Artifact/return releases MUST join native scoped knowledge and retain release identity before delivery, including concurrent dispatch and uncertain acknowledgement.",
+      "document": "06-artifacts-memory.md",
+      "proposed_acceptance_test": "artifacts::join_egress_race_and_release_readback",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/knowledge.rs",
+          "anchor": "join_native_knowledge"
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/release.rs",
+          "anchor": "admit_artifact_release"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/native.rs",
+          "anchor": "p4_artifacts_join_and_native_capture_race_proves_both_commit_orders"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge.rs",
+          "anchor": "p4_artifacts_release_readback_uncertainty_and_live_revocation"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/acceptance.rs",
+          "anchor": "p4_artifacts_restart_folds_native_knowledge_and_reuses_release_identity"
+        }
+      ],
+      "evidence": [
+        "evidence/native.log",
+        "evidence/clippy.log",
+        "evidence/owning-tests.log",
+        "evidence/vector-recompute.log"
+      ],
+      "scope": "Declared host-private Unix SQLite buffered knowledge profile. Filesystem/object-store/stream, remote provider, cross-process transfer, hosted and platform qualification remain separate."
+    }
+  ]
+}

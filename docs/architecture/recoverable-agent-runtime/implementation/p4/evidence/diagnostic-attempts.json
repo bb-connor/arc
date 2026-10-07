@@ -1,0 +1,61 @@
+{
+  "phase": "P4",
+  "attempts": [
+    {
+      "path": "evidence/diagnostic-native-attempt-4.log",
+      "sha256": "3d300c7691b8b6616bdf13ba72c1a7b34e72671581dfe6284040e60d8cfc4ec3",
+      "origin": "target/recovery-p4-native-attempt-4.log",
+      "qualification": "exploratory_diagnostic_not_a_required_passing_gate",
+      "note": "Native 18/20 diagnostic; withholding was correctly refused before reservation, and a knowledge change after capture correctly allowed a fresh dispatch refusal. Assertions corrected to preserve actual captured ownership."
+    },
+    {
+      "path": "evidence/diagnostic-native-attempt-5.log",
+      "sha256": "d2549ed0d9b505caaff3dea5b9855f642decab72f66e3ba521a9410b3d59b524",
+      "origin": "target/recovery-p4-native-attempt-5.log",
+      "qualification": "exploratory_diagnostic_not_a_required_passing_gate",
+      "note": "Native 22/23 diagnostic; pending approval fixture omitted exact offer selection before approval-intent creation. Fixture corrected."
+    },
+    {
+      "path": "evidence/diagnostic-contract-attempt.log",
+      "sha256": "d25a1b5bbb90a15c0970557f7996ec4fbacff7a8d36e2ab52581121c0609eb04",
+      "origin": "target/recovery-p4-contract-attempt.log",
+      "qualification": "exploratory_diagnostic_not_a_required_passing_gate",
+      "note": "Contract vector output used a relative path evaluated from the crate test cwd. Corrected to an absolute destination and recomputed."
+    },
+    {
+      "path": "evidence/diagnostic-python-attempt.log",
+      "sha256": "10882ac1355f08d09b582cf82e0dcab21ea32619b6c7c926f14dfbcf78333364",
+      "origin": "target/recovery-p4-python-attempt.log",
+      "qualification": "exploratory_diagnostic_not_a_required_passing_gate",
+      "note": "Python imported cached older SDK without current-worktree PYTHONPATH. Current source selected for successful required run."
+    },
+    {
+      "path": "evidence/diagnostic-codegen-ts-write-2.log",
+      "sha256": "f7ab63f5a0b568987fd22a2958b4cae44cab638af84602233bb7ddaba9049ed6",
+      "origin": "target/recovery-p4-codegen-ts-write-2.log",
+      "qualification": "exploratory_diagnostic_not_a_required_passing_gate",
+      "note": "json-schema-to-typescript root $ref resolution failed on an encoded $defs path. Schema generator emits equivalent expanded root definitions; current Rust/Python/TypeScript regeneration checks pass."
+    },
+    {
+      "path": "evidence/diagnostic-ts-attempt.log",
+      "sha256": "5a5b633e9d8660c371940f7bfc9836ab217099dbdb09b0d9d31cb1480cab9e26",
+      "origin": "target/recovery-p4-ts-attempt.log",
+      "qualification": "exploratory_diagnostic_not_a_required_passing_gate",
+      "note": "Offline TypeScript conformance overlay lacked AJV. Existing cached AJV 8.20.0 was selected without altering lock pins."
+    },
+    {
+      "path": "evidence/diagnostic-sdk-gates.log",
+      "sha256": "825384f31e1ab0dbfa39346adc1862e7d40d2aad1fb5d8db372a4f43e22e586a",
+      "origin": "target/recovery-p4-sdk-gates.log",
+      "qualification": "exploratory_diagnostic_not_a_required_passing_gate",
+      "note": "TypeScript workspace scope links initially pointed at older cached SDK. Current @chio-protocol workspace sources selected for the successful rerun."
+    },
+    {
+      "path": "evidence/diagnostic-clippy-attempt.log",
+      "sha256": "99672638f28c8d09aa6d59b848dea74e042da21fdee9cc523d69f040411a119f",
+      "origin": "target/recovery-p4-clippy-attempt.log",
+      "qualification": "exploratory_diagnostic_not_a_required_passing_gate",
+      "note": "Strict lint API-shape diagnostics corrected by bounded checkpoint/join parameter structs and a test observer type alias; no lint suppression."
+    }
+  ]
+}

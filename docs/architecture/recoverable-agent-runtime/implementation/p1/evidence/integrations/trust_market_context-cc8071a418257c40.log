@@ -1,0 +1,25 @@
+
+running 20 tests
+test trust_market_rejects_ambiguous_top_rank_without_override ... ok
+test trust_market_rejects_facility_lifecycle_authority_with_wrong_evidence_kind ... ok
+test trust_market_context_accepts_marketplace_fixture ... ok
+test trust_market_accepts_facility_lifecycle_replay ... ok
+test trust_market_rejects_facility_lifecycle_replay_gap ... ok
+test trust_market_rejects_facility_lifecycle_missing_evidence ... ok
+test trust_market_rejects_global_scorecard_scope ... ok
+test trust_market_rejects_guarantee_without_backing ... ok
+test trust_market_rejects_guarantee_wrong_beneficiary ... ok
+test trust_market_rejects_required_unsupported_market_claim ... ok
+test trust_market_rejects_open_appeal_reserve_release ... ok
+test trust_market_rejects_reputation_import_overweight ... ok
+test trust_market_rejects_risk_double_consumed_reserve ... ok
+test trust_market_rejects_score_recompute_mismatch ... ok
+test trust_market_rejects_selected_provider_absent_from_discovery ... ok
+test trust_market_rejects_slash_authority_outside_jurisdiction ... ok
+test trust_market_rejects_sla_wrong_order ... ok
+test trust_market_rejects_stale_discovery_snapshot ... ok
+test trust_market_rejects_unsupported_guarantee_type ... ok
+test trust_market_rejects_unbound_risk_report_ref ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+

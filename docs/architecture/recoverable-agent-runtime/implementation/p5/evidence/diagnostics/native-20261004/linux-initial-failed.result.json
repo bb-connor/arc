@@ -1,0 +1,34 @@
+{
+  "id": "linux-acceptance",
+  "actual_command": [
+    "python3",
+    "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/run-linux-acceptance.py"
+  ],
+  "cwd": ".",
+  "required_for_phase_exit": true,
+  "required_for_local_phase_acceptance": false,
+  "host": {
+    "system": "Linux",
+    "machine": "x86_64"
+  },
+  "started_unix_seconds": 1791157253,
+  "status": "failed",
+  "exit_code": 1,
+  "source_binding": "f166a2282c16d4d5106e098a98250f459e7af08ab0aea6bf02f16713554239b6",
+  "kernel": "6.17.0-1020-oracle",
+  "toolchain": {
+    "rustc": "rustc 1.94.1 (e408947bf 2026-03-25)\nbinary: rustc\ncommit-hash: e408947bfd200af42db322daf0fadfe7e26d3bd1\ncommit-date: 2026-03-25\nhost: x86_64-unknown-linux-gnu\nrelease: 1.94.1\nLLVM version: 21.1.8",
+    "cargo": "cargo 1.94.1 (29ea6fb6a 2026-03-24)",
+    "cc": "cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+    "readelf": "GNU readelf (GNU Binutils for Ubuntu) 2.42\nCopyright (C) 2024 Free Software Foundation, Inc.\nThis program is free software; you may redistribute it under the terms of\nthe GNU General Public License version 3 or (at your option) any later version.\nThis program has absolutely no warranty."
+  },
+  "build_profile": {
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0"
+  },
+  "cage_challenge": "2b132827a97abeac787402fa0f5edb5504ea3354e200d720430d7c2919df1d6f",
+  "reason": "source changed during Linux acceptance",
+  "duration_seconds": 162.311,
+  "log": "evidence/linux-acceptance.log",
+  "log_sha256": "5ca79d8b17a99b82209667c3dfab3ab30d02b8503c27dbb6fa5cdc907301e166"
+}

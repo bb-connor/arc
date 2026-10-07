@@ -1,0 +1,22 @@
+   Compiling chio-control-plane v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-control-plane)
+    Finished `test` profile [unoptimized] target(s) in 56.03s
+     Running unittests src/lib.rs (target/recovery-p5-linux/host/debug/deps/chio_control_plane-6f8003448d0ced3f)
+
+running 1 test
+test recovery::tests::knowledge::product::p6_policy_selected_operator_alone_applies_exact_proposal_and_native_target ... P6 temporary native flow category: durable admission failed: admission operation invariant failed: native security state: InvalidData: store.invalid_data
+
+thread 'recovery::tests::knowledge::product::p6_policy_selected_operator_alone_applies_exact_proposal_and_native_target' (61938) panicked at crates/platform/chio-control-plane/src/recovery/tests/knowledge/product.rs:517:5:
+assertion `left == right` failed: Some("security dispatch outcome requires reconciliation: security native dispatch capture callback failed; authoritative recovery required")
+  left: Deny
+ right: Allow
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    recovery::tests::knowledge::product::p6_policy_selected_operator_alone_applies_exact_proposal_and_native_target
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1263 filtered out; finished in 88.29s
+
+error: test failed, to rerun pass `-p chio-control-plane --lib`

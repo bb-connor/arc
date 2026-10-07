@@ -1,0 +1,19 @@
+
+running 14 tests
+test attesting_servers_refuse_sends_without_a_kernel_caller ... ok
+test ambiguous_registry_caller_reports_authentication_failure ... ok
+test byte_capacity_frees_after_ack_and_full_results_need_a_new_poll ... ok
+test claims_require_an_attested_caller ... ok
+test attesting_hosts_record_the_kernel_selected_sender_and_bind_keys_to_it ... ok
+test capacity_serializes_across_independent_database_connections ... ok
+test committed_renewal_with_unknown_kernel_outcome_is_not_redispatched ... ok
+test pending_capacity_lifetime_limits_and_message_keys_survive_acknowledgement ... ok
+test receive_waits_for_a_send_within_its_bound ... ok
+test pre_sender_and_claim_schema_migrates_without_assigning_historical_ownership ... ok
+test real_kernel_scopes_handoffs_and_replays_acknowledged_payloads_after_restart ... ok
+test renewal_opt_in_preserves_legacy_configuration_and_manifest ... ok
+test competing_consumers_claim_disjoint_messages_under_fenced_leases ... ok
+test renewal_requires_its_grant_and_replays_the_original_deadline_after_restart ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.28s
+

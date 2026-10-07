@@ -1,0 +1,3652 @@
+{
+  "schema": "chio.recovery-p6-source-baseline.v1",
+  "phase": "P5",
+  "source_binding": "562a3c3556f31e5afedbd7c7a426e542cc5e8cd51c28a7a43d8e9704ba4e9bc4",
+  "sources": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "b2df9d03e21a023e2dc9553ec56466c2ade349e0cfc14045f210fb4ff77f8554"
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "5f11eb12166e9343f31a08ba802d6166822e86e525fb18a32505cc2cab0c08ac"
+    },
+    {
+      "path": "Cargo.toml",
+      "sha256": "e73704c3ea217048af0169ecd5f5de8f818f079e6e42e3b06c614f8fc4a5246a"
+    },
+    {
+      "path": "crates/core/chio-core-types/Cargo.toml",
+      "sha256": "f45568f636d0c5e638e4ed19ae4c6ef950f97297a954166af9829242993601ad"
+    },
+    {
+      "path": "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs",
+      "sha256": "e4d40a258fc32dbb21070d020c6606e35e44e941e60d9ae7d115444634301d8a"
+    },
+    {
+      "path": "crates/core/chio-core-types/src/declassification.rs",
+      "sha256": "14c85d11608c2453fb87cfa782ee349c354f1970e7c1684df3a13a844d9edeef"
+    },
+    {
+      "path": "crates/core/chio-core-types/src/lib.rs",
+      "sha256": "c3a5ddd1c4e2a0845edb9b32219b490096fb96a6b60afc72c1cdc946fb58a9b7"
+    },
+    {
+      "path": "crates/core/chio-core-types/src/recovery/authority.rs",
+      "sha256": "34d75cc9e95bfdf62ca65b066bdab8c796c7faa7bb74bcb5ff8b428a4b3315f5"
+    },
+    {
+      "path": "crates/core/chio-core-types/src/recovery/confinement.rs",
+      "sha256": "7d24d0b565894ed92f2bf6e854ba5da1898e941c6f85d10aeef2b78b4a102fd5"
+    },
+    {
+      "path": "crates/core/chio-core-types/src/recovery/decode.rs",
+      "sha256": "81e341aaa1d06281f06bed033e0cdc0261ec34f729c44fa2f8ca67e3ebced06a"
+    },
+    {
+      "path": "crates/core/chio-core-types/src/recovery/disclosure_grant.rs",
+      "sha256": "c6125affa0b503b359c016eb687ce1d95efbf6b1837cfdacfcd59876bd3e69a1"
+    },
+    {
+      "path": "crates/core/chio-core-types/src/recovery/domains.rs",
+      "sha256": "526452e3af4e0b67f94aab91f3f6907bf16518764bb157d06535e030b38ed2fa"
+    },
+    {
+      "path": "crates/core/chio-core-types/src/recovery/explanation.rs",
+      "sha256": "3164f31b8bc39ad1fa1ac4e72bb5ee34bc5c534c4ebaae9cc41c713f7572d72c"
+    },
+    {
+      "path": "crates/core/chio-core-types/src/recovery/knowledge.rs",
+      "sha256": "a2c83153f7cf6b62a33c10155d108faed70151f4db6240a664f99a678059e4f6"
+    },
+    {
+      "path": "crates/core/chio-core-types/src/recovery/mod.rs",
+      "sha256": "a0d846d48908839aae4ae3d1c838b7b01b559c0ff8528d7a15991654551f0565"
+    },
+    {
+      "path": "crates/core/chio-core-types/src/recovery/preflight.rs",
+      "sha256": "766835130b7d8c29fc7d39b8b5f47958519b9d7c75f7b728d4a1ba9bdb51990a"
+    },
+    {
+      "path": "crates/core/chio-core-types/src/recovery/semantic.rs",
+      "sha256": "86c110ba48e5fe39349aff4ac87a52f9257d751ee58fb84dc013c25b7fe18e5b"
+    },
+    {
+      "path": "crates/core/chio-core-types/tests/recovery_contracts.rs",
+      "sha256": "d151617e3d286e2bd20b5ca0da6004eb96c564f53d3b3299595d01bdf0c7f284"
+    },
+    {
+      "path": "crates/core/chio-core-types/tests/recovery_p1_contracts.rs",
+      "sha256": "2d1c82aa13cf5d01055980670a46750c5e728f929549654dc547c340c3bb6306"
+    },
+    {
+      "path": "crates/core/chio-core-types/tests/recovery_p2_contracts.rs",
+      "sha256": "963120828b782039096fbf5ada0f49250795940ab0d66f138a5eff88851316ec"
+    },
+    {
+      "path": "crates/core/chio-core-types/tests/recovery_p3_contracts.rs",
+      "sha256": "341ee577babca8a793c99bbb05bac24036eb725acc843b6e97d35a7cc9762a3f"
+    },
+    {
+      "path": "crates/core/chio-core-types/tests/recovery_p4_contracts.rs",
+      "sha256": "0b147d047bc1145d2f6505f6b98d1a71019c03e697dfd7091885ab738ca56208"
+    },
+    {
+      "path": "crates/core/chio-core-types/tests/recovery_p5_contracts.rs",
+      "sha256": "5d417ae780be7b219a0b372c764b779bb4774b71eda752b9973ce587a94b37a5"
+    },
+    {
+      "path": "crates/core/chio-core-types/tests/security_generated_vectors.rs",
+      "sha256": "6f214dcfc6d8bb81588e2c3e8e337c78c1e2d983729d48c69dc4b745fbc144ba"
+    },
+    {
+      "path": "crates/core/chio-core-types/tests/wire_protocol_schema.rs",
+      "sha256": "39cd6c5985086658b987a024a0eebf2b333b1886b27e95ceeab2b3130843a387"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/admission_operation/identity.rs",
+      "sha256": "09b1589b49476c63df717839cc2a98e19c9cdf09e85094aabc6e8ec4fd46cbc2"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/admission_operation/store.rs",
+      "sha256": "5559c9b65fbadf6ee8479ecd8112da7fcc221455a76a6b0e8f93c514aab4ac69"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs",
+      "sha256": "61b24ab09d87c0765a26d87b0cc21df51dc77f0c900a91caada4e5aa90e88d63"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress.rs",
+      "sha256": "5ea28da93d338260c839b6cb5a20abac1a11868d2218f2cdd08d75d2bf3e1ec4"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/capture.rs",
+      "sha256": "70104d5c47c87764b0c4c976ae97e5402f638a34dba6ef79fe57746d297229e9"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_output.rs",
+      "sha256": "c72b2cea73a9959db90edc715e7fbd6c54f31ef114998072d491b0c5d25eba03"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/recovery_runtime.rs",
+      "sha256": "efaf4468c66e7991c11bfe0c0bdab0816b7a15d56122316f6a4f5d6e28f2faf1"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/security_release.rs",
+      "sha256": "e16486f036cdae0a5c312ca17c1dd93180b6e995b3f517ca414ea016b060b0a9"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/security_release/recovery.rs",
+      "sha256": "e343e4a95003357901d47f666f648a9cb5a8a2046cff830ad44b7d231424ec12"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal.rs",
+      "sha256": "ad811fbe49e5029730a96307ff4dc23e3ec96d65311f564c10d0c1dffb0dd554"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/semantic.rs",
+      "sha256": "377939b994191df5ff1b68a8f65bbdf1b09fb41d2757e4f10ef059f7cbd6c0ce"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/construction.rs",
+      "sha256": "14031e9f59e6888bc0aa6d75c5d4637339067aa345b26b6654fab847f43bdb54"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/evaluation/caller_execution.rs",
+      "sha256": "29caf872c31caa8de10cc286f15005e1f013cb80fc4eaa97f63174a5c6ef51cb"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/kernel_struct.rs",
+      "sha256": "cf224882de8d5f333a69402d1c8c68b748c9807948480f044683474aaba41556"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/mod.rs",
+      "sha256": "17612cb2b741cfd2cdf60ec4f61f10e700cb6ce643d8eeeef6eb85e862988780"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/session_ops/nested_tool_call.rs",
+      "sha256": "39ef9ef6346c6dad57188335a79d8e5f428eeb7113239288d591753d202810e5"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/knowledge.rs",
+      "sha256": "317005d9eb3a8009d03831c7550f803fdea0c4def138803ff9afafd126e0d641"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/lib.rs",
+      "sha256": "c8654bb01570c6a160b401440ac7702e1a1d4d66ee2ba73cfdfaaa575936fd8b"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/recovery.rs",
+      "sha256": "6452637a6b3d17dcdca6e7169dae0100becdf4793cbd81a67e2231d812ede151"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/recovery/observation.rs",
+      "sha256": "051de4c1917dfbb14adf508676ae3d02a205f8dc7347e75f08cd98fb76b421ae"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/recovery/ports.rs",
+      "sha256": "308d695954ce8da1eb2220101f8937885b92fda4730d0e3501d732b6706933e5"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/recovery/records.rs",
+      "sha256": "91e4f3aa1329fac5488dbf81a4d805224a3e555d09cc0e0f5d69eca39e57a501"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/recovery/semantic.rs",
+      "sha256": "34c1a253d57ca044e327a147582811f10a16d86211dc6ff5acb13103a9ac0a5c"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/runtime.rs",
+      "sha256": "aa5404e29c060f5ee17a81a5ffaeca45f18daa420f98ed98230f6ae57ccc4e1c"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/runtime/connection.rs",
+      "sha256": "cc24bb7551c1108fa33321a0b2ff864aede89f383a5a99fe02b894d41ef5b781"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/runtime/recovery_custody.rs",
+      "sha256": "329bb8ba466e6bcebbe1c9c6d8ef575424227b38a3a469cd2a837eacca63d468"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/runtime/recovery_review.rs",
+      "sha256": "fd3e10fdebf89841d5739ae2d689547ed218d5e2c541ed54b5a2b1752e04baa7"
+    },
+    {
+      "path": "crates/kernel/chio-process/Cargo.toml",
+      "sha256": "11c55082a415af44e6fe0f13e3c19fd5615c324ee24ec473b561ff61ee965ff7"
+    },
+    {
+      "path": "crates/kernel/chio-process/src/binding.rs",
+      "sha256": "4483e3712b486d53f3a1d88b80f0c52cd59f94b39953270f02b4244ba84fc4ab"
+    },
+    {
+      "path": "crates/kernel/chio-process/src/knowledge.rs",
+      "sha256": "a9dfbe72769d000a7b80c0d60abfd11269466614031eaf873c042ad94f5b63e1"
+    },
+    {
+      "path": "crates/kernel/chio-process/src/lib.rs",
+      "sha256": "8ad16e3a151125943f663c2b15ea7820e1d93c38530178cc48ef28a6502c14e2"
+    },
+    {
+      "path": "crates/kernel/chio-process/src/recovery.rs",
+      "sha256": "cece727af1fa3fda607882f558d00b0ff6d591f35a110013ef6f49fbc66d26e3"
+    },
+    {
+      "path": "crates/kernel/chio-process/src/registry.rs",
+      "sha256": "70588b6aeb909f24f2a55ee4d5ed2dac662dd3edce816a264acf6018659b1690"
+    },
+    {
+      "path": "crates/kernel/chio-process/src/state_reader.rs",
+      "sha256": "98cb74c0a37abac8a129e0e7ec39e00963368bab181d6e9e976b59196a14d0cb"
+    },
+    {
+      "path": "crates/kernel/chio-process/src/store.rs",
+      "sha256": "2c72d59bf60dc83a5e9469498e51a3955f049122639c8b5cb4d220314f5fa31c"
+    },
+    {
+      "path": "crates/kernel/chio-process/src/store.sql",
+      "sha256": "2df52503b5f7ef98dad8eca092a37d810c49290d42a1aea17cb49916bb4cf265"
+    },
+    {
+      "path": "crates/kernel/chio-process/src/store/blobs.rs",
+      "sha256": "1ea56599abf44f0cbed37cc76d865276a61ff817c84ae92465098084cc379032"
+    },
+    {
+      "path": "crates/kernel/chio-process/src/store/knowledge.rs",
+      "sha256": "a79f31d133f2960086f24e5ae8e618c3946d2064265ad80bf7035fac6f8b6b9c"
+    },
+    {
+      "path": "crates/kernel/chio-process/src/store/recovery.rs",
+      "sha256": "a5d3d9606fa0e393c4627e2ec7f811be5b293eaf22af9c9bb9161eee21b51295"
+    },
+    {
+      "path": "crates/kernel/chio-process/tests/crash_recovery.rs",
+      "sha256": "4a8849124e365f307ea1b71081ea1faf0ef482460979fd06abe1cba21975345b"
+    },
+    {
+      "path": "crates/kernel/chio-process/tests/fixtures/recovery-p1-process-v1.sql",
+      "sha256": "53d92e2c34fe956cca18fc7db14ed3f52aaf9505f02267d91ec3e38acc74dad2"
+    },
+    {
+      "path": "crates/kernel/chio-process/tests/processes.rs",
+      "sha256": "f5c7426a030aa2858a44dc45c17ec59373c402a4fe581316645da891db606e0f"
+    },
+    {
+      "path": "crates/kernel/chio-process/tests/recovery_offer_binding_lab.rs",
+      "sha256": "5018b7d4520697125c1bd2c4e7810eba6f81348ab17d6c470f3f4fe1a88582aa"
+    },
+    {
+      "path": "crates/kernel/chio-process/tests/recovery_p0_baseline.rs",
+      "sha256": "a48e08ac51c521d13b7c16b50458a773ade514b9530562ddabfee385100888be"
+    },
+    {
+      "path": "crates/kernel/chio-process/tests/support/mod.rs",
+      "sha256": "b3efe577f3591d42bb75342163e669aa23631babd23f5a650192be7940f44f95"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/Cargo.toml",
+      "sha256": "413a5012c0c84c3e346826e391b1bbad3f90a376185dc711f3c77e7a2a76aef7"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/confinement.rs",
+      "sha256": "79c336e72c720f6172e5855e14933da8e5798e5b4d2b849d85ea378075f2dd29"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/confinement/channels.rs",
+      "sha256": "97f2dcc4e2a46d3069bf37b812239bbd8986d7dd86aa4e53d833832dbe371881"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/confinement/execution.rs",
+      "sha256": "9acebea5d6b2a869cb0827dacfcc37355a7c8634bde4a903f8c5bf90ed37ac08"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/knowledge.rs",
+      "sha256": "225eede46cf787697e979c66254d4d6199ec136672ec4492ea51144f632cb6e7"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/knowledge/checkpoints.rs",
+      "sha256": "b095cca3d7ea0c3a3401de2314baadce72d4661c4fecb7b847e3e9bbdd75be1f"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/knowledge/transfer.rs",
+      "sha256": "d3425e5cdcd50344307d25a820e984090d91c848ed81eeeb652e45082d87f485"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/lib.rs",
+      "sha256": "be5b1b600894283dd43dd8ea296b02623e5932c3d9319cb05758e4bde508eed1"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/recovery.rs",
+      "sha256": "816508906957c58ca321f71c79486efd6354670388c70026ee9dd61775bf1749"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/recovery/connector.rs",
+      "sha256": "91a53f97199f87e34ce160899e7c00491da95894314a26c4c0e7780ffe8fad45"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/recovery/explanation.rs",
+      "sha256": "478d75c8f85f2077fc9c177f69f25df4e3306398a40aa2351e54c0af0fd1d5bb"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/recovery/explanation/native.rs",
+      "sha256": "66819b3667218a4cda22dc63f9bcfb16fce751dff293170ca3e97057f2b8dc8b"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/recovery/explanation/service.rs",
+      "sha256": "749fa56201ee10dd0bf9e95a8f5d3f5f6e8e16e6c70556a07c20e1173ed67399"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/recovery/explanation/tests.rs",
+      "sha256": "4a6aacdd9a1f18cc9574f58d096c0dd8f27942cb23ac7ba7546196b53a9e07c1"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/recovery/explanation/transport.rs",
+      "sha256": "a3333e160ebff3036f01ec51e10bef8429f75d73bd73e7160017d7c5db354b54"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/recovery/materialize.rs",
+      "sha256": "34b535732d0b0e2071c877469842832a8792f8fb550722cfa391db3f38305ffd"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/recovery/runtime.rs",
+      "sha256": "cfb7d70ff7a8951276508e8f8f4501dcf11e2e9eecd8739758e23d7746966ce9"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+      "sha256": "57ba0f543fe631ec266269211540b3229910d48d998b63bf79eabd9fda43c2e0"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/recovery/tests/bootstrap.rs",
+      "sha256": "0c831838aa7fafaecf2b07ffb93e6a481424426f6d6e2f7ff8dae6c8e9a1d1cf"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/recovery/tests/explanations.rs",
+      "sha256": "8de401beb8cafc644bfa6500455decfeb67aaf2205d7bc1ffad5ad2fba2abed4"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge.rs",
+      "sha256": "4e899aaba3c4d78e5b183df820d29e62c2c48930b794b25854e6c44d34048379"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/acceptance.rs",
+      "sha256": "22296598ccc2a7b8828f5b2af9a6589b1c45c486e9eaf344fcd3927ede894934"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/confinement.rs",
+      "sha256": "7e03a1af38dba353dec6251ddaa39ff49a5cf2dd4fe854f8f0dc7f351b8b27d1"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/confinement/linux.rs",
+      "sha256": "1cac067a731118d6633527487c6c9b253222e32679004bb5d4401ec37ea73c20"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge/native.rs",
+      "sha256": "3547a94683fa5804cac3e7b7fe9d2c2350737e26d8de163b2d02a597b74fb3a5"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/recovery/tests/refusals.rs",
+      "sha256": "7c4fd6eba85a0cbf1bb215248b25f212cf526526c8b67c81ddb9e15c7da900ec"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/recovery/tests/semantic.rs",
+      "sha256": "b68c522bc8f08a3ca9548ab7a26f85b3fea770ae8019601d37a28790d6c5f9ca"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/recovery/tests/semantic/authority.rs",
+      "sha256": "53ff72e072e236eac3a101127cd4d5e0868cf8f4c7cfe6eab9f689a036f05eb7"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/recovery/tests/semantic/chains.rs",
+      "sha256": "9910372b302e562d32cb33634cb19ff9b3501703757111cb0371073d2edb10c3"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/recovery/transport.rs",
+      "sha256": "6ff9dfe911500efc97b003d5edf5d3839c2e3f95e18ddcfb0ab0a4fa5e8b6e89"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/security/adapters/flow_policy.rs",
+      "sha256": "f3c0298d9bde1be74b5c855f92d16bc582de5d260a2450f3665068532be9da58"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/security/adapters/native_flow.rs",
+      "sha256": "981089102c353bfaaa2ab851d34bde1536facffd3d1c5d9b9849a6ffa071673a"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/security/adapters/native_flow_caller_process_tests.rs",
+      "sha256": "9fe94c58721e2e839ac6c542e6f9f74bf398699774a72de4c85585b112f73517"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/security/adapters/native_flow_caller_tests.rs",
+      "sha256": "0d20be0491cf9ec0c6663ec6d82ac52b59190477dff17b06a40d490594fa9f88"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/security/adapters/native_flow_declassification_rejection_tests.rs",
+      "sha256": "8b47c6990e6b895645957d36c6c081b0820d1969cbd6618ce584ff95e6983009"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/security/adapters/native_flow_declassification_tests.rs",
+      "sha256": "78ff436faf9b5ab9b71f7e481b544a6f0913e634d1a468e85c07d9a0927095d6"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/security/adapters/native_flow_nested_credentials_tests.rs",
+      "sha256": "60342ae854c53a8f121c32e0191adbca5ada4d9bb308e306748f8cfdf5d59e68"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/security/adapters_parts/part_03.inc",
+      "sha256": "a16b8f84ae35769829f8b0328ff6361820ad12610aa6a6101963c03dfd7d531c"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/semantic.rs",
+      "sha256": "4fc1aa7229daeec1d5294e9cf5c330501db1794a5d1011aa587ff09373c6e904"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/semantic/connector.rs",
+      "sha256": "f59826baf73beba8dc7c1d482bf5dab737675f3a5e0c86a02ce83dfd414ea249"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/semantic/http.rs",
+      "sha256": "9216e7488343d95e78490537483cb4f7e953ed773021e6eff881c9708cbfc80e"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/semantic/http/tests.rs",
+      "sha256": "127c2ad0bf1d6a24698f4e2cb1b483d8d4c70efb552741a2d7573b7e79b0dac2"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/semantic/transport.rs",
+      "sha256": "ee3a8757d583f1588312eb958c09859dbabb7402dddf60ad88807f497c292c92"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/Cargo.toml",
+      "sha256": "d7b080daf1b570787ce25372fe08c804c7b09ac84f9de6ae3613efbc04ee238a"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_recovery.sql",
+      "sha256": "aa76c96287a5bf8b33737564a1c16e98fb80251dd2980a1ccb7373714de26e5e"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store.rs",
+      "sha256": "409264c918a4ca7ed6f561dd8e892607092bd46362395180d7c8c0160efc7e4d"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge.rs",
+      "sha256": "20d1f67900a1f360ac3c8b8c88c19c4a4060f88d79aa40e6ba15fe7395811ab5"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/checkpoints.rs",
+      "sha256": "ed8ea5130a07d0d3c06732ca8c428d7b6768ea5f11b513b30558140f097fe870"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/confinement.rs",
+      "sha256": "8d3f653454ce4c3a1c4d1b336c1d09077fae16d36f251d10c2131001565e45ae"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/confinement/context.rs",
+      "sha256": "5d63515884f2f99241d0717c32cee4969377da9d50177ff98f37d01b4a583a3c"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/confinement/launch.rs",
+      "sha256": "eee8c370547c32c7614306026ebb68f9b82435dfbd549264507b563286b058cb"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/confinement/returns.rs",
+      "sha256": "b6a454700e1a73c582ae36ec04ae22ca53aa69000398d5bc631989c03ccebd8d"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/lifecycle.rs",
+      "sha256": "e19eded0a1c8ee6154885bbe7d60a394e985bdd1af889766bfb53c25bf768b07"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/publication.rs",
+      "sha256": "f66cf144052b03a9e0f93b6b62c8eb836d439b1d8dc69a808ad277c07541ddd4"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/release.rs",
+      "sha256": "396c5339343ffe38af1865ae0f8da66af02feb9b96446f966bb9b37e3f9136a7"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/transfer.rs",
+      "sha256": "09bed0c445faa707ab51de440e1b38cb6d96727952d65638fef951e2a2e8e20f"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/knowledge/traversal.rs",
+      "sha256": "af54c31db7f4ff9bc5bd91c5ecc9babeb3e638df077f830a2f896495e33440e5"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery.rs",
+      "sha256": "0e9e00509ada7889163e37039d26d971b154da960bfd6b23dde88fc4b2f26184"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/commands.rs",
+      "sha256": "d6f6eda414028ce2453d9dd266dc6fbabf94f07d6ac963b2049cc5be7bfff257"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/issuance.rs",
+      "sha256": "cc6f9fdbc84d4ae579c07444b61f71b4bc7746331e88139b7eb73ca9add0b504"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/native.rs",
+      "sha256": "47aa5f85b3ec44adecf324e44578ae40bde23810ca1649a45f87cff800df3031"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/resources.rs",
+      "sha256": "cd8fa625c4847d5230925f4f963897a90bab71e255016992342d4e599ab34829"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/storage.rs",
+      "sha256": "620adf5afb44ab529d581478f3856f45a0f008ce7bcec1f34cd0dccc156e8b46"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/validation.rs",
+      "sha256": "892f31564fdeeef5641578ebdefab6257f9fa5a2c1a8f628910bdd0ffdb83982"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/retained_request.rs",
+      "sha256": "2c8378aa3d6c8ee2c3ce407cc490208ed44c29e9451e74d1bd69fe9aca762009"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs",
+      "sha256": "5840c319ab2db041f6f3ad60a8b93dee44613633bf97b1e4069f88d970b8ae5f"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/schema/clock.rs",
+      "sha256": "08132dc9deccf07b62aaf782aa4e1aff58de67c7284371f46491771c794ddf0d"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs",
+      "sha256": "b0cfa356b19e68bfae4f3ea3af509c38c7adfb07793d45158c31624eeab7a8b0"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger.rs",
+      "sha256": "4d34b8fb52979b51b57dc5e8474c7face1e42bae38e663312fa913550f80bb9b"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/capture.rs",
+      "sha256": "366976cf1625c08a66626656f550b31810abf0070fec1acc552acbd52bae3698"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs",
+      "sha256": "219aba87c3c516b80283e169693972102ddd1382513512d15b5c5ad09a1ccbf8"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/rows.rs",
+      "sha256": "ba1ce47a0555a9e18086f0965c6ff0f16d257f96b60e3a2847516c69689e837f"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/knowledge.rs",
+      "sha256": "620fa4fd94bf7757422a2e9e77f56a547afd1658f1e011ef48c3c4d6ff28ddb5"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/record.rs",
+      "sha256": "60b470f17060788ac9002dac8dc9b43bc7d8202bb0fd17f4e1ee6631fa9037ef"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/observation.rs",
+      "sha256": "2ac37417c6f13dc2b25e8ea4d0e30e27f5f9bf8d8cf1b90e4fe0fff39d08cba6"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/recovery_basis.rs",
+      "sha256": "f884b086cc6cc8fccf02ebcfa2163f1f0bd55f41c4074e15fb19fe72afd4fd0f"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/schema.rs",
+      "sha256": "1c480f1be3b9956e1f24ccd5f3501641805a1ad673f1374b24efbb99e3f3d78e"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/semantic.rs",
+      "sha256": "c6997b755098ff12c9b66d88a037082e092fad924b008282d030f567016a407b"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/semantic/capture.rs",
+      "sha256": "6ebf6c4ca826e24b1a26de0347dbd89198484e60b22c80c06afb1b9bebfd7c56"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/semantic/materialization.rs",
+      "sha256": "cae3678f791595ece0f003d0f63eaee7f65904200f7e66d5f39d99676b2778a3"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/store.rs",
+      "sha256": "bb3dfaaf12e2c141c12e243e8d167f67d41ed99776522d4b58aec6ab95ca4e37"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/dpop_replay/claims/kernel_routes/nested_session.rs",
+      "sha256": "788fcd6f2f76035ba6efe9301c3e64137921054ec32ece6d38e4337b85f84aee"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/fixtures/recovery-v34-global.sql",
+      "sha256": "0fa325f018e660a896871fbd58ca34f837b19e91c2e94005ccc387de5da5f70f"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/schema.rs",
+      "sha256": "f887100429c5ec3e04463c838c29a223585febd5ae2135490cac57bb080616f5"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/schema/caller_wait.rs",
+      "sha256": "a2ebccb6c14a5ae6e3da3f10ab9d5b4216a1e17a2f350caeb059733505940c28"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/schema/recovery.rs",
+      "sha256": "18496a1eb7f175238cd7e28a8075d2ce679be2511251b29742019d4ffbd8accf"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/security_participant_migration/integrity.rs",
+      "sha256": "e0fa49598938a9254d06a59e63f4f1d81f363591099df3519f6edf1615c47808"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/security_participant_state/integrity.rs",
+      "sha256": "f3edc98457d5813b37ca7d1a8e56b9f23ec794226fc91931552b07c9882370f9"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/security_participant_state/mutations/faults.rs",
+      "sha256": "b84f059e8325ccfbf033b08e18de7fac8fe4373d949d103be19f5346306b0667"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state.rs",
+      "sha256": "13216ee6020d84a651c182f6dfce163bf649211d0aae5947f6d135d653f10026"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/declassification/tests/equivalence.rs",
+      "sha256": "94e1b04d358252dc67b39d6d0917464b3dafc6580837d607b0946333dd0fb4e3"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/native_egress.rs",
+      "sha256": "4a6343de3cd04ea0c6f9bf674961868be783a78f9decf8cba3c67bc614615307"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/native_mutation.rs",
+      "sha256": "74b0b4bd1062b6103d99f539f74d73f572d07f2eed806057290164865c94fd29"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain.rs",
+      "sha256": "5c57c1793fbfcc3e9e5f44ffdf879483a3c867aa53d7dfabc87b12db0fd1f54a"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain/projection_coverage.rs",
+      "sha256": "1a6b2cdc1f175753ff4e5283b28ec2094f7dc6bdf6b9a5f573b4f4cdbfe51296"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain/projection_reference.rs",
+      "sha256": "a312b9f4e269c670a8fc30a816c3be693ec24ae44265fb0e05e3863328a69367"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain/schema_migration.rs",
+      "sha256": "010f2f13fb6b154b38f9dbc719fcacd232a72b2f703e778de9d8b08e72de17b7"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain/schema_tests.rs",
+      "sha256": "97ff925e804ece447d2edb2b07ae4f5680e806e9d47eac649180be56dd3418b6"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/tool_outcome_store.rs",
+      "sha256": "5c218df60a4dca2081716653a046d5c18c3c8ebd2359577e50d3005d162aae0c"
+    },
+    {
+      "path": "crates/products/chio-cli/src/cli/dispatch/mod.rs",
+      "sha256": "a64a9c579657f09a436bbdd946164bef34d10a9a8424b2562929bcc0fb9c0f0c"
+    },
+    {
+      "path": "crates/products/chio-cli/src/cli/types.rs",
+      "sha256": "af35bab245934019761b35f4c88a5b22b11c594427ee2fefffdda0a68b46584b"
+    },
+    {
+      "path": "crates/products/chio-cli/src/main.rs",
+      "sha256": "754fe9ef86102daf41dc0214d62eb602bd8bc9b513280958b982baa42ed5ebfa"
+    },
+    {
+      "path": "crates/products/chio-cli/src/recovery.rs",
+      "sha256": "eaf8e27ef409c03a6db569a74bd87a9fa21299353de3784cca115ed37fc9f96d"
+    },
+    {
+      "path": "crates/security/chio-cage/Cargo.toml",
+      "sha256": "a6b9e5a09bb05f7895038411db080db267462f9959ede12d5cd8269547bdeabf"
+    },
+    {
+      "path": "crates/security/chio-cage/README.md",
+      "sha256": "2bd952ce33d359505233261da5294034affa3abd15b461815833261eda1869a8"
+    },
+    {
+      "path": "crates/security/chio-cage/examples/confined-return-canary.rs",
+      "sha256": "40ecfc20e7b5a7824a9ba0813e566bef7bcfc383740f2e236e53b524be3179a6"
+    },
+    {
+      "path": "crates/security/chio-cage/scripts/check-linux-enforcement.sh",
+      "sha256": "67d8455408e3716390b23517738a244a7d8603af1db784b1233e7cb4575effda"
+    },
+    {
+      "path": "crates/security/chio-cage/src/bin/chio-cage-init.rs",
+      "sha256": "899127f6204e62687b46af9f342f098b1df88780835bd0a055e0ecfa35e170c2"
+    },
+    {
+      "path": "crates/security/chio-cage/src/bin/chio-confined-reader.rs",
+      "sha256": "fc4780ae71a5325233d64257d48e7605f52d6171c299c4cc2fc2b789e572198e"
+    },
+    {
+      "path": "crates/security/chio-cage/src/enforcement.rs",
+      "sha256": "5776f90d729fef7159ee15964b94c2fb34273ba21baa1e8cdeb927a53a325398"
+    },
+    {
+      "path": "crates/security/chio-cage/src/execution_identity.rs",
+      "sha256": "232e0ac5d35aed4570edfc220e109affe7df64f621f156ec9513212caddde76d"
+    },
+    {
+      "path": "crates/security/chio-cage/src/launch.rs",
+      "sha256": "a8dd9f2fabc70d59d6e70f275514f84fee2fe27909108458c4fd7eec40462032"
+    },
+    {
+      "path": "crates/security/chio-cage/src/launch/linux.rs",
+      "sha256": "fd87773bca7f8286a086c8928922855c807c90b17e7649281919bd2d92b6517b"
+    },
+    {
+      "path": "crates/security/chio-cage/src/launch/linux/preparation.rs",
+      "sha256": "9d6ca3ce815f7e42b5d6575414ed0c11521c5b483dceb4cbb6fa50b2572755b7"
+    },
+    {
+      "path": "crates/security/chio-cage/src/launch/linux_parts/part_01.rs",
+      "sha256": "0de5a069b60c206c2593c399848ae7857a2475e0647492ef1a8b639515c110a2"
+    },
+    {
+      "path": "crates/security/chio-cage/src/launch/linux_parts/part_01_sections/bootstrap.inc",
+      "sha256": "a6b9657aa56f2956e67b0098bafba86d0a3ca0a0a3fdbe48986a1d6f1aa736a4"
+    },
+    {
+      "path": "crates/security/chio-cage/src/launch/linux_parts/part_01_sections/sandbox.inc",
+      "sha256": "aab23bc33d79cde78ed7f5dbc7aa2ce9cf3d7019c7762c689c3dcffc49dc49c7"
+    },
+    {
+      "path": "crates/security/chio-cage/src/launch/linux_parts/part_02.rs",
+      "sha256": "57a299e0d99ddb69665b14cc2dad197d7cec4ea7408a3ccba3228438698ad592"
+    },
+    {
+      "path": "crates/security/chio-cage/src/lib.rs",
+      "sha256": "8b5372939ec280f37876d4dbf3a4f694b2baa1c9846b238d255d89315c2a379d"
+    },
+    {
+      "path": "crates/security/chio-cage/src/lib_parts/part_01.rs",
+      "sha256": "8bf1e81a0d97f2d4cdf0db4038a80c070c2af270374f931fc33a525f146ac4db"
+    },
+    {
+      "path": "crates/security/chio-cage/src/lib_parts/part_02.rs",
+      "sha256": "1e3b65691d83db7863d9997f662a0078d994173d6fd4eb284c5cb20365407f17"
+    },
+    {
+      "path": "crates/security/chio-cage/src/linux.rs",
+      "sha256": "bb25f38dfec5bf54106100974e26844166c4dab875aa0ec30f0ee9d11d06f47e"
+    },
+    {
+      "path": "crates/security/chio-cage/src/receipt.rs",
+      "sha256": "008bb9a22f89c379b1f615f07ff869f010df6fedccd73f8f07014d7067f084ca"
+    },
+    {
+      "path": "crates/security/chio-cage/tests/enforcement_evidence.rs",
+      "sha256": "8eb6d7b49e9ae37b0a3043fc8fe7dc67023250263f8282d4c033291ec710c0b8"
+    },
+    {
+      "path": "crates/security/chio-cage/tests/fixtures/cage_dynamic_probe.c",
+      "sha256": "bed58c3270e7a5e1443697d65704ae6b42fe3a94c0cdc0a97d6db2769ad7138e"
+    },
+    {
+      "path": "crates/security/chio-cage/tests/fixtures/cage_probe.c",
+      "sha256": "29e5a5564bb81ed699b704d3dd22c05637c1fc3f149c6c63f5028a0ef6e672e6"
+    },
+    {
+      "path": "crates/security/chio-cage/tests/linux_compile.rs",
+      "sha256": "a50aa27133433cb8f431b0690ed4a7878268333f8c4df770629a6f3ba9535b55"
+    },
+    {
+      "path": "crates/security/chio-cage/tests/linux_enforcement.rs",
+      "sha256": "6589da377dcbd3f456b0cdb32840361df59ba778d10f426e28776b2d5880fd99"
+    },
+    {
+      "path": "crates/security/chio-cage/tests/support/broker_status.inc",
+      "sha256": "008b175f55db850851643c851e63080367ccc042a48c87d67c7afee45fe5b179"
+    },
+    {
+      "path": "crates/security/chio-flow/src/declassification.rs",
+      "sha256": "3a7407df19c8b5f1b3855fd468b7c40283efa6ad5ff82b5218945c0a26b47722"
+    },
+    {
+      "path": "crates/security/chio-flow/src/lib.rs",
+      "sha256": "68587c870d3a2645f9f5be9d025eb2a660e5fafac105433f71f7169a8cdfcf5a"
+    },
+    {
+      "path": "crates/security/chio-flow/src/recovery_authority.rs",
+      "sha256": "f5e77a40d7aac547d11325baa28aacc3fb57a7e1d5323c975b8bee25340c2294"
+    },
+    {
+      "path": "crates/security/chio-flow/tests/recovery_authority.rs",
+      "sha256": "e948fa4d7d59a3a624dec6bf933b4b5bfd632e082a16504c7a41a00aa481e9c2"
+    },
+    {
+      "path": "crates/security/chio-quarantine/src/simulation.rs",
+      "sha256": "551dd47d480cf937e3debd35d238efe5c7b39a985f95d1189481f7d9545f321c"
+    },
+    {
+      "path": "crates/security/chio-recovery/Cargo.toml",
+      "sha256": "192b6c1064a075aa7e3bc64314153d26f8be473d90acad585f678c59f23e429d"
+    },
+    {
+      "path": "crates/security/chio-recovery/README.md",
+      "sha256": "6e9cf8203644f1ca2dcb1f6360ea19535bf4ecac2af299041a89c24ee0e2a6cd"
+    },
+    {
+      "path": "crates/security/chio-recovery/examples/p0_baseline.rs",
+      "sha256": "a1d8c989f1e72d8f890de8b8850eed20e2128a6bc5f3f61c213ec1bc8c5df31f"
+    },
+    {
+      "path": "crates/security/chio-recovery/src/decision.rs",
+      "sha256": "6131769cbff9c931ecff9ef0113cc2b73ba31b4dbedc906637df9517ac422130"
+    },
+    {
+      "path": "crates/security/chio-recovery/src/evaluation.rs",
+      "sha256": "350c7b7e9a830ba139ec04c368b9364cff54c8843199ae1176fe7f71a1bd086c"
+    },
+    {
+      "path": "crates/security/chio-recovery/src/lib.rs",
+      "sha256": "8363d330cca11c8ecde2fd2d53eddd7883a4d486158e74121ad273c87d95830c"
+    },
+    {
+      "path": "crates/security/chio-recovery/src/projection.rs",
+      "sha256": "ad7c6925c4b43d3e9623ab2373cabbec270e28b4a46b078c29b7ed7c4d0602e6"
+    },
+    {
+      "path": "crates/security/chio-recovery/src/report.rs",
+      "sha256": "69b56a815874682ab063e188ac679bb76839d8dded6e4cd036395d50e0707e40"
+    },
+    {
+      "path": "crates/security/chio-recovery/src/workflow.rs",
+      "sha256": "a114b11fadf12282776bc5c2fe52f20168f8c96da3586efc641e5ed9b45059e1"
+    },
+    {
+      "path": "crates/security/chio-recovery/tests/explanations.rs",
+      "sha256": "39ffe0e856481c6173aa9f7dd72bc9d4c9bb760a2c0fec76a1dcac2bbcea1d78"
+    },
+    {
+      "path": "crates/security/chio-recovery/tests/explanations/basis.rs",
+      "sha256": "0458247c25bce1ac5aef595fed57b68019e9eed365377d3840bcf8935b553ddd"
+    },
+    {
+      "path": "crates/security/chio-recovery/tests/explanations/common.rs",
+      "sha256": "8803fabadbeec5c23674103d1fd1645928cd8812f4ebea3e6dd384ae0922bbbf"
+    },
+    {
+      "path": "crates/security/chio-recovery/tests/explanations/privacy.rs",
+      "sha256": "8b38f0230411cdf7263eb0fd57e9a62ed801943f8cccc6e3500d4165cf6e403d"
+    },
+    {
+      "path": "crates/security/chio-recovery/tests/explanations/verification.rs",
+      "sha256": "5cf90c9dbd1a8fd34bb2ac7230a90fb2f8db8c4b9a7f2ef708a81cad171fb24d"
+    },
+    {
+      "path": "crates/security/chio-recovery/tests/workflow.rs",
+      "sha256": "a79dab41bc0eb388c2ca10f06ff0b20ffa5e258e67c324062dd71ee91b7748f6"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/confinement.rs",
+      "sha256": "0ff6ba977cd16724352d0f27ebd1fd5235d30ae66aa7afc6c2bef9ad7f130983"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/knowledge/artifact.rs",
+      "sha256": "51915dc730ffe57aaaa32e489504e56398cdc882121b480fd4c2bda5673cff20"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/knowledge/checkpoint.rs",
+      "sha256": "9e05fa953cc022f5bda5bcfe31e1cd7853e6eadf71b445d63de53632c593470a"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/knowledge/mod.rs",
+      "sha256": "c2e22c4486670e0814d26e40a1fe6bd708c75f86d04376595b45ead3169fdfe0"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/knowledge/release.rs",
+      "sha256": "c2b6d6dfd4f706d26c104101f26ca1fea3bec1585dc27d7a91c9a4e4c1bfc20b"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/lib.rs",
+      "sha256": "35d014588e36b26303d3ff0c1cdc42dd600446f23809637fb0a8c9baba78270e"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/recovery/authorization.rs",
+      "sha256": "7f29d5b7b486cd936283f188aff8ccafa8962c3d9a1663a2d9bd56f4d2752626"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/recovery/bounds.rs",
+      "sha256": "e69cb3722b8f6eee6f9a1e97c412bdc49863a1774f2c3e1a489060dd3e7bbafe"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/recovery/commands.rs",
+      "sha256": "1f57963abc25e2cbe003f6e7561e147c2b216ca114f4853b0a569d4459e8537b"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/recovery/explanation/mod.rs",
+      "sha256": "d48e711a295f9dc9232bfa81efcc040336f1287a783882cde3ca18f6e15fcc31"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/recovery/explanation/registry.rs",
+      "sha256": "f804a5d3f8868e132fc910cd93078a451075b5fb0a7fd673519e5c5506209b58"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/recovery/explanation/result.rs",
+      "sha256": "b8f99a8d9d0f1ac9bd4f4ca85919879b9a9cc797c967998f4420d896de3564f1"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/recovery/explanation/snapshot.rs",
+      "sha256": "917b00ef7511953868fb3814f76c9f32ac6f5685ce150068ed042f4aa13e2827"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/recovery/identifiers.rs",
+      "sha256": "273d21b957f8d529a2da5c9085b637b913690a3dcb3253177b7a22ae5c09d4c4"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/recovery/mod.rs",
+      "sha256": "0ae266c88ce81309d9c6038ac6c4c5f9727d9091f686e60201c971c23f2e69a5"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/recovery/observation.rs",
+      "sha256": "979f59261a4e7ef5a1d120edc128c914a13cd0322c6ccf4635f7400ea61cc182"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/recovery/profile.rs",
+      "sha256": "02a0e0857745e31ba509250bde4ae26f3a84ba84ccac77395db637357ccdb95d"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/recovery/provider.rs",
+      "sha256": "578136c5c1f08615b96a40c5483c6abe4de0799a12da1435278bd1ccad63f355"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/recovery/trajectory.rs",
+      "sha256": "a4ed913ec71a2fa92faef0eb4ea0737cc733469080cde561fabdb7ccf058b8ca"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/semantic/action.rs",
+      "sha256": "a20f506fbc9614edf71ef80736364ba918b8c289b13fb26dee62a3b566da2dc5"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/semantic/evidence.rs",
+      "sha256": "f1225f6f0eb694e4e57e89e5ef3fc75a632c0349f2469bc2dbd0c5e1cc463ece"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/semantic/mod.rs",
+      "sha256": "345db68703a10ca9b0f8ec9b42cca740e415b9230419be7c6f13e17c7616a5c6"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/semantic/package.rs",
+      "sha256": "e5ff2b8f8f1d93b5da830597481f87d1177f96c2575d0f7b8cea44e314dd8c38"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/semantic/plan.rs",
+      "sha256": "18aa1a0e3f1d2c909ab555c8ff20392510e0ddb3eda6a9701197f24514002c35"
+    },
+    {
+      "path": "crates/security/chio-security-types/tests/recovery_bounds.rs",
+      "sha256": "45ee8f6af353839f111300c976a87fc14c7ffd542a06501aec8349fb789305e3"
+    },
+    {
+      "path": "crates/security/chio-semantic-contracts/Cargo.toml",
+      "sha256": "174743453ca1de410b64ccb2c651eff42c2848f39216fee1048317adf32e8cc0"
+    },
+    {
+      "path": "crates/security/chio-semantic-contracts/README.md",
+      "sha256": "ed2f6fb9b400cc56586301777a72a47c2d7abde8ae731192e4a461d5a7832499"
+    },
+    {
+      "path": "crates/security/chio-semantic-contracts/examples/p3_vectors.rs",
+      "sha256": "ab8096d49e9fc14b76cca7df550ee52b6b404511336931380a03de5a65e87da5"
+    },
+    {
+      "path": "crates/security/chio-semantic-contracts/src/effect.rs",
+      "sha256": "d67ff74394cddbd1fc0a66bf249e6fad59651a72a3a4044cb37c43d7652baa56"
+    },
+    {
+      "path": "crates/security/chio-semantic-contracts/src/graph.rs",
+      "sha256": "b91c999533d1035e64335fc2ba3acc7db9ca30f07e3352698fb4977493344f02"
+    },
+    {
+      "path": "crates/security/chio-semantic-contracts/src/lib.rs",
+      "sha256": "6b27e8882cba5dd789dd127706571ce49ee1f4530e97068abb0ca77f9ca0a508"
+    },
+    {
+      "path": "crates/security/chio-semantic-contracts/src/plans.rs",
+      "sha256": "85467c8f3960bec3e9f39e7958ce1c8b6b1150860f2f4e2ea28d772d4e84fcd2"
+    },
+    {
+      "path": "crates/security/chio-semantic-contracts/src/registry.rs",
+      "sha256": "331e2de6ce165edb65d6105bed5d02bd1004be54126b09eb64248641a52a04b0"
+    },
+    {
+      "path": "crates/security/chio-semantic-contracts/src/selectors.rs",
+      "sha256": "64b438a4538e6c8f9b102d5a1dd1019aa1827a35d33c127341c45354a6d5427f"
+    },
+    {
+      "path": "crates/security/chio-semantic-contracts/src/verification.rs",
+      "sha256": "a78f5e5c5ec74efaf9af1c771d10fdb2ff0484d6ebaae2f389ed7f6222e021d9"
+    },
+    {
+      "path": "crates/security/chio-semantic-contracts/src/work.rs",
+      "sha256": "e63e697ee775776910bdb443fbaafffb2e9b4ffd9da8a19d6b321da256163617"
+    },
+    {
+      "path": "crates/security/chio-semantic-contracts/tests/graph.rs",
+      "sha256": "e26b7879f7469499ab05303ea2130b0f27fdd6779efdf9725e8f7d02e6f652ab"
+    },
+    {
+      "path": "crates/security/chio-semantic-contracts/tests/semantic_p3.rs",
+      "sha256": "26596c4e1adb6774a80c185b0c894c782cd5863a940e4d59d6734b3c4eda54c3"
+    },
+    {
+      "path": "crates/tooling/chio-conformance/Cargo.toml",
+      "sha256": "32914b72c51107f9626eaab7fae4ba2260f0fedd98d7456a034262b4d9961bbf"
+    },
+    {
+      "path": "crates/tooling/chio-conformance/src/lib.rs",
+      "sha256": "542870ca64dbdc6df49934a12b05bbcdb414ae77b560f47b49d182dcf87f20ea"
+    },
+    {
+      "path": "crates/tooling/chio-conformance/src/recovery_trajectory.rs",
+      "sha256": "128e9e12f52a493272272d40c86b1b40646499f3601b31e86f6ff78706822030"
+    },
+    {
+      "path": "crates/tooling/chio-conformance/src/runner.rs",
+      "sha256": "a754844a6dca1d53f5eadaf570f890fd9605ae8a5d0e078b7c15c7e858ca18d5"
+    },
+    {
+      "path": "crates/tooling/chio-spec-codegen/src/lib.rs",
+      "sha256": "58315ffc120aa9fc8e448c630487a5dc52c738f44e70d071616f0fb2d1a2d924"
+    },
+    {
+      "path": "crates/tooling/chio-spec-codegen/src/schema_catalog.rs",
+      "sha256": "308601a9a4e62544d473ca236aab89b881abbe1d8b04f0d1788c4108c2a43d47"
+    },
+    {
+      "path": "crates/tooling/chio-spec-codegen/src/statemachines_pass.rs",
+      "sha256": "28de05221876895753c7adcb6b7d458136919aff1d298a22bbef953449594228"
+    },
+    {
+      "path": "deploy/docker/chio-workspace/Cargo.lock",
+      "sha256": "f01e0f5272ac684a81663bbb02db3f3aa14a21d05145e7aba2fdc40cae390d90"
+    },
+    {
+      "path": "deploy/docker/chio-workspace/Cargo.toml",
+      "sha256": "37ae1318b0e545921d82f42ad0f66b8c90fabff2be6b34c59bc00c1eb5173272"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/10-delivery-decisions.md",
+      "sha256": "33ef85947472ba9128585e9e0b0550baa630f23d15f15251f5966ebd769aa0b8"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/README.md",
+      "sha256": "6e662a4d46c3eb5c0a4489c6bdcfb30c382e699d6d3db5648a10240f2fd00568"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/check.py",
+      "sha256": "3e66f7172c5d9d179583435bb0ec25cb347729e24682c315337f70e66ee44aab"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/check-linux-cross.py",
+      "sha256": "26ae5bfb2e9a9fdc4b76df721ff55659c71a9def940ebb7c579a1ae466346485"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/inventory.py",
+      "sha256": "e1c4e2d8d207040662c09859b008306fabf95e81791e0b83aa262112fda13a02"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/run-gates.py",
+      "sha256": "3f162b7db5b939133896c3cbda83904ca6183a717cc44afbb2e10a7ec32c0d4f"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/run-linux-acceptance.py",
+      "sha256": "7c76e56d934427d58db3d7a25756b7076b6056633edf696f55f6c5a04dbd0a7f"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/seal-package.py",
+      "sha256": "7f83893e901d2ca1769bc2ea88fdd40202d64eb28f323ac74a72ca1a00bc2c27"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/verify-package.py",
+      "sha256": "6001cc9715872f9044d1635edb2ae7ed998864223a0990a668bc9ef6f468e3d9"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/verify-vectors.py",
+      "sha256": "a77dbef21f8c58d80c9d821622068f3bf6a1a15e79272d2f19e6fba650ddf930"
+    },
+    {
+      "path": "fixtures/recovery-confined-profile.rs",
+      "sha256": "614232e324d1b17fc17bd6d2c844d8e3170896ec2813b160e748471676ec8d28"
+    },
+    {
+      "path": "fixtures/recovery-knowledge-profile.rs",
+      "sha256": "d20d1f8573c347493c923e3cb49b87ba10f22482cdc0a44ba126e755cc889cde"
+    },
+    {
+      "path": "fixtures/recovery-portable-consumer/Cargo.lock",
+      "sha256": "88c60bd344c92c7bfa970480780e26311a609e70492aec8b71c99a253cb567bd"
+    },
+    {
+      "path": "fixtures/recovery-portable-consumer/Cargo.toml",
+      "sha256": "acaa878f38e821f218d092bec3f5a0d65f3d86726bdecefe05e015ebe9151998"
+    },
+    {
+      "path": "fixtures/recovery-portable-consumer/src/lib.rs",
+      "sha256": "08b25b531576bbc34cb52f5bc07ec24aa5ebcad8329622c1f8cc131ed11aa1cc"
+    },
+    {
+      "path": "fixtures/recovery-semantic-profile.rs",
+      "sha256": "ca18e2064a1683ff9c209a45a3233293a11a1121224ff93b7059a28abd2cecd4"
+    },
+    {
+      "path": "rust-toolchain.toml",
+      "sha256": "d52c5633ea77aefd345519d0a6c87e19c2636a1e90178585c30db481b3de9de0"
+    },
+    {
+      "path": "scripts/check-cage-all-target-inventory.py",
+      "sha256": "22d10568b1489232753a9e19f159f11aa2f25012e5595839158bdb80ef38690c"
+    },
+    {
+      "path": "scripts/check-recovery-p0.py",
+      "sha256": "f0c955329ddf92624ab0820732a72498394c13733deecf4f63644c4b995c2dd9"
+    },
+    {
+      "path": "scripts/tests/check-cage-all-target-inventory.test.py",
+      "sha256": "49c68b7137d72d65aa52e95ef000ec72078cc8031ca390cdd6cea2a68f6b93bd"
+    },
+    {
+      "path": "scripts/tests/check-cage-enforcement.test.sh",
+      "sha256": "4dab1646126af204673efa115586423d423581dc70811b31334c605f5655f052"
+    },
+    {
+      "path": "scripts/tests/check-recovery-p0.test.py",
+      "sha256": "1a8976f3f5182fb84ea8a3d7de3b6ac0991ef5b14483d1d5ce5b28fde0b3e6cd"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/pyproject.toml",
+      "sha256": "44dbb0000500ac03a657a164e3366840be1cec0705e05ecf76f2312d3866b34a"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/__init__.py",
+      "sha256": "0e85285999eb19a806c354cb05b3f89ab06df0d0e4e45f793f6df0899c3aceac"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/__init__.py",
+      "sha256": "45496c3fc2e67dff77965646af3bf699ca6c03520280c943f6aafa8c286d6261"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/agent/__init__.py",
+      "sha256": "89bc74c7cfb520e12dd99cdd6948d6e6861463b0464b9f07eb05cb70e59f6c92"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/agent/active_response_governed_intent_schema.py",
+      "sha256": "4512eb9ec846353b03b10614b97180854e88cafc46ce4bd7e4acee09e83af84a"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/agent/governed_transaction_intent_schema.py",
+      "sha256": "f82876915d61994b6a580b72554b5dfe9139c4a81d7d2993ea1646f8221818fd"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/agent/heartbeat_schema.py",
+      "sha256": "99ff60a7d5e0b5d57eca2bdfb5efb58eb81c2428005591995dc432e1bdb7e093"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/agent/list_capabilities_schema.py",
+      "sha256": "e150bdcbba54d0cebee56e9c686999c32ef9bb5c2b302444b8621064380d0e57"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/agent/tool_call_request_schema.py",
+      "sha256": "07e283fd2092acff0f832d4b12c918eb28f32af249934b350e7afc0a28b897fb"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/anchor/__init__.py",
+      "sha256": "c0dd999c397c2ca89257137f7cfce8f0e9c7832e69813dfd524b32dabe299cb9"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/anchor/batch_schema.py",
+      "sha256": "ee915fdfd25310994a0a6bdd17fc49d5d4ea538829f9d10d39f7f5dbebbc9bfa"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/__init__.py",
+      "sha256": "7de5b999de0f88e7349c1081d85bf07457327e945d9873a9a3bf14fa02c2e8b7"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/aggregate_budget_root_schema.py",
+      "sha256": "aede2b18ee584f30cdffc27dcd0edb2126622350b72a94426ea471b91e08269d"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/aggregate_invocation_budget_schema.py",
+      "sha256": "28cd82028cfff0e64a2d41d85eeb3cfb2d95431ab7b76cab70d0a9b3137c9fde"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/capabilities_schema.py",
+      "sha256": "6fded5a73dd7650c78fd0ab81534f1c480890633e011c0111f2d4cc24f602a12"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/cumulative_approval_root_schema.py",
+      "sha256": "8a6dca0084887ee77af8cdbaff1078f9dda5adf2974964abec3f98875412074e"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/governed_approval_token_schema.py",
+      "sha256": "08b80fdc2d6cfcea11608770c57be12e2ec89c58a300d693fb4a5d65ef946c14"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/grant_schema.py",
+      "sha256": "b57a3b544f75128f349d67feca41ffff5365a534c9d0c043169e8a2b25efc3eb"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/revocation_schema.py",
+      "sha256": "f5b20b40c08e8b16397d569b6a58257a75cab1331876752d3c575e1b9b371e9f"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/supplemental_authorization_schema.py",
+      "sha256": "a0887b58f31afeaf34f8cf77b7e538693d969d68f5ee68f0b052b3b488b80791"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/threshold_approval_proposal_schema.py",
+      "sha256": "a63dc80421c39bdd4dc156e6794a836e78dffb2aa3f9c6db3f682ad73fe4b760"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/token_schema.py",
+      "sha256": "97bffeae88496bd2951288df49ac3084e7e3b0571c333bbc3e83b023a89325db"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/verified_approval_set_schema.py",
+      "sha256": "12d5d876c002da03eb43af284eca9cf2b02bbad030fd0395045e5d58a7064aae"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/error/__init__.py",
+      "sha256": "2a42984cadfc2f0f1101639d44caab58a3532df80f66d0737aa4e20f45606975"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/error/capability_denied_schema.py",
+      "sha256": "42f92a1f6bc20b9c5e9f4b9ec08b4d9c680df5bf69930aa751a344ade9ca9bb7"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/error/capability_expired_schema.py",
+      "sha256": "f4f15ec4974f2d2ecae90bb17621ca98b7cf31f8dd245536a4899ca566c0773e"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/error/capability_revoked_schema.py",
+      "sha256": "ee37eac9cf61d8d01d3f6c62ab777b8c225370f811b7ee96d361e9d5b6c7b13a"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/error/internal_error_schema.py",
+      "sha256": "1ac5712f6aa63bd03114be278e48c46cbc90580c86616f6446dfef8e3e9590b2"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/error/policy_denied_schema.py",
+      "sha256": "9bbb00941b17c6a0385d16bab18c3233e84885fe68eda9a482ea48648aa45154"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/error/tool_server_error_schema.py",
+      "sha256": "0a3519e0bb297fbd3683ca33d697f0f3497b3731539408f9afd43a707b411af0"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/federation/__init__.py",
+      "sha256": "95743efe9b5510c0e601f87618a541da9f03f31d36449733ec67d8c5b5297fed"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/federation/bilateral_signature_slice_envelope_schema.py",
+      "sha256": "643798827671a9593ff41c5b4f83a4a2d7d90a3a748d828ea8d23d9837831bb2"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/federation/bilateral_signature_slice_schema.py",
+      "sha256": "2e42e5a6703e2c7bccccc1d8b14f9c6a4438ad7443a068d71e6a7df0e783cfc5"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/jsonrpc/__init__.py",
+      "sha256": "34e109546161337408adf3c73a5a6ce8f38adcfc8b7191dd8c12612102e3e1f8"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/jsonrpc/notification_schema.py",
+      "sha256": "fbc39d4e20510f9aecd829a7d8af4759f1a61c0470345f6aa1cfdbe3f07d79df"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/jsonrpc/request_schema.py",
+      "sha256": "a31f8577c7ae21493d581277a46027c0c9e5a0f527f85c087532cb3fcd2ce9d2"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/jsonrpc/response_schema.py",
+      "sha256": "096b3e7f49cfcd4fb89c0efb15ef44835a68e8a83c88ebc5573ad2560f17a9b0"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/kernel/__init__.py",
+      "sha256": "b5591f0176b52653b012590e0b825f9ee56d6f18d343be9475821f136ac4d433"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/kernel/caller_delivery_report_schema.py",
+      "sha256": "d9a25b67b30b9c7b793cd34f2c384957ddbb29577f716fe4fc1b2b88c7d3ddf9"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/kernel/caller_dispatch_authorization_schema.py",
+      "sha256": "ef4f89f9a75a3d1f9276aa371ef9bff3b29c6809d228b358b36eace12a386a7f"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/kernel/capability_list_schema.py",
+      "sha256": "0765b2c1ad5cc2991717883344e92ae29c574e3d977d5285996f9c8b218cc55f"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/kernel/capability_revoked_schema.py",
+      "sha256": "844b0e0b053d3563b44bd12a3f73f25a3d08a323834855f41865261e04039a1d"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/kernel/combined_capture_metadata_schema.py",
+      "sha256": "df33f7e339daccd3fb4752eb3794d871152811a1e4d585cb7d4260d4a6182973"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/kernel/execution_nonce_schema.py",
+      "sha256": "86b96e7c3d7b913c7531f810f05fd367a7676960b4ee7ac05c8b737194fa9a1a"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/kernel/heartbeat_schema.py",
+      "sha256": "3d8fc7cee8d49f5ccefba4eeaa0569d9f6ccf857c771de14c2a0b444d0360ecb"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/kernel/tool_call_chunk_schema.py",
+      "sha256": "1ec537ce325d2d0a9237ac5d858491f92baec00d3a80d74ff230d6e710bc544f"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/kernel/tool_call_response_schema.py",
+      "sha256": "4239ce8d0a1a847c51023c1d4bf5161545fd887dd56f4bdf77fba11609a5e30d"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/provenance/__init__.py",
+      "sha256": "ec8201c5cf6e8d04ed274f5f1aaaddda81ad0acb689c4918f76d17744116cfd4"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/provenance/attestation_bundle_schema.py",
+      "sha256": "b97c4fcf6ebfd32aedf0b1b8553117879d230444f8291a9ba871eeff5b9d090a"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/provenance/context_schema.py",
+      "sha256": "8e292cab0502a5b17ef08d0382dffe1d2183a93e14b3cc65c805b55499078f2a"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/provenance/stamp_schema.py",
+      "sha256": "92c6cea8d20630d9360219619cac1afbf67e3103b3d59aa7d042e83aa0492530"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/provenance/verdict_link_schema.py",
+      "sha256": "f6860dbdacd74dd69526bf633dcf2cf49cdae5b78bb6494ac022bbbc21130486"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/receipt/__init__.py",
+      "sha256": "58421a8b06c626059de6669c08b19afe1494c5f73d4c950f525b5a925e1526ef"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/receipt/admission_metadata_schema.py",
+      "sha256": "957b67f42aae0e369b6e2c19b1f2574bae60608a1ddb122d27a33b53e98c3ae9"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/receipt/delivery_contract_schema.py",
+      "sha256": "82b16834747dc7a5b58c57f1fcbb9d45ddd6c5a342de145f206b6c76cccdf182"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/receipt/finding_delivery_schema.py",
+      "sha256": "180be7ad76569c63febcdfcb6ddb06e4cb7fc174224a59fb0117d45157a19e14"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/receipt/inclusion_proof_schema.py",
+      "sha256": "468be862e75897b03fe5fdbb039f898e9d014b662df9b0c410652b18aed704d1"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/receipt/lineage_statement_schema.py",
+      "sha256": "bacb81fae324cb792cfda30b3901fb2f82053cc30671c70f8eabca526f9dab8d"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/receipt/record_schema.py",
+      "sha256": "069610eaf64860b61d3cd7d5906f36dd9d57659ed64e56b9eda5f37a9ef9c1e1"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/__init__.py",
+      "sha256": "048d156e6b0d3d0d51a4ab7b66bb15138a78f628d9504ec6463329cd395c876a"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/action_intent_schema.py",
+      "sha256": "3873177a8cc645707d1de7f0d526ad6563e83ef84cd996adc77b7847902492f6"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/approval_intent_schema.py",
+      "sha256": "24955245e8111b16c1d11cc0e961ed4b0dedb4f567cc22cf26b28f787d74dd85"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/approval_submission_schema.py",
+      "sha256": "ce24d4aab902a5c48c8ca5fbdde8057d6d0b68a554e90aed5c681b1e29b565d0"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/artifact_archive_manifest_schema.py",
+      "sha256": "957021237ab462fcccbbb2bdbc61290953ef708c856e0bc9e0f8cdd4dec8dcb6"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/artifact_certificate_schema.py",
+      "sha256": "0268d66f5b041fe1c344158fc413fe80ca4ccb3227583fbae2d79a6a6fa79b8a"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/artifact_handle_schema.py",
+      "sha256": "12408738541622155df41a0088efd62c29de029864c9cc29922a31e89e843605"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/artifact_influence_schema.py",
+      "sha256": "e39b9e1bee3508f1c70cb40be362150e1f7c5e693e1635c9e4de9583c45b8a29"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/artifact_producer_schema.py",
+      "sha256": "9899948892dc4a4d17e927945006bc878656e04b274a77478f207df732786734"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/artifact_recipient_schema.py",
+      "sha256": "ca1a0b94cce46dce938b66bd06cb1797f2a7443837694efd37aa158a880a76af"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/artifact_reference_schema.py",
+      "sha256": "7948215a84b72edd9d796e44830416bbbad759e639ef0881af9d79e0ebf1c805"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/artifact_release_intent_schema.py",
+      "sha256": "47ade0cfc4319408fcda15fd6dca41985c3a02a7987be805cc59fcf03e0de74f"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/artifact_version_schema.py",
+      "sha256": "fc7aec6bf7033617ef6a542b501c57b3041e1c9597d17d7c365a1d94b5da83b1"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/authority_coverage_schema.py",
+      "sha256": "71daf011fec40f02e86bb36bd164d06fe333af0c2350337666009d2c6401167e"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/authorization_requirements_schema.py",
+      "sha256": "df327b3c742d27024d62beaf8c630681997d35ba055dbf422c9ed9b4b1c064bf"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/command_response_schema.py",
+      "sha256": "df23e132148956ad9dbdb5b65c0c805f0137821bcf7c4343a64eed8ef3980fe2"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/command_result_schema.py",
+      "sha256": "9666eb25890d6e03eaa2f4c59e7aa56911089efe266d64b4b54e9656d03a9291"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/command_schema.py",
+      "sha256": "bb824a6df5df2031c7e51f9b68528a23da6c5c9241b3ec50bcb8902b24f30c5c"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/confined_execution_profile_schema.py",
+      "sha256": "e28017824fe87c179b233b83cc8282f12549a180ab60df244d6139b98b0d55ae"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/confined_limits_schema.py",
+      "sha256": "17e00978dd61d584d8cd14a190a386ce9f40d5edb43d9134a9a9f58506945f77"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/confined_return_evidence_schema.py",
+      "sha256": "62fc934f9a93fa2e5ff48976d49d1f7480bc56a1f5447392dc32de45a2147161"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/dependency_graph_schema.py",
+      "sha256": "b9351e86107cb6b402a6368c7349f11a3fa198eb1efc1c48f1a15e2ffc24bb8f"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/disclosure_grant_schema.py",
+      "sha256": "c308ee6d126c5c1f2cd8b92998f5499023f2de5abe1a9811891a84f957fc64b4"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/effect_contract_schema.py",
+      "sha256": "9718a48578c67ef34354f681c3877cc9ffbf852cd00acf68e3f585869576a4fc"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/explanation_evaluation_schema.py",
+      "sha256": "4cd98975623780668bba9d37de3c6666723b6020ec05cfe782714eae0d21e18d"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/explanation_report_schema.py",
+      "sha256": "8f411e73da21fdffd37feca0706654259bcaec0c313a5e3baffc2e622e5ec56a"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/explanation_request_schema.py",
+      "sha256": "e3037b6d35ddb50ff60d82eb49c2c22b5ac07e9668c28056f09406dff8b59515"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/explanation_snapshot_schema.py",
+      "sha256": "9ad383752c2cefc153f35663edc60e528c88bc27fb1ae197840bb2d29d97f8ba"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/explanation_view_schema.py",
+      "sha256": "bcb3b69f27886c43925089596911f03e9500133ad8af0805f6bfe6c5491ac272"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/grant_binding_schema.py",
+      "sha256": "d538a851a92a141b3d27846cb81b9c23bfdaa44bfb59fc3ebb68bfd8e93f830d"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/isolation_boundary_schema.py",
+      "sha256": "40b88310d0710104d3ea54cbf6d9be973b4c6b32b7e85a024e440dd0b7c6bb61"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/labeled_checkpoint_schema.py",
+      "sha256": "d867263153e0c5b4fbd1a2cae956b57ee9ab31a0a338bd09d8bd0adb094f742a"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/model_context_schema.py",
+      "sha256": "d615dfed32084cee5a02359db2509c94d6599566263d8596ac3d6a1e250d0426"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/observation_schema.py",
+      "sha256": "91975e32c2ef4f71b671670c773a5f7564ef963293aaf46751794ad4ed9f32d6"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/profile_requirements_schema.py",
+      "sha256": "f173a54674b93a49086cabd3d8ad6230b522de11a6bc29b9f4e5a5ab806cd837"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/provider_finality_schema.py",
+      "sha256": "6681d294dc0e65e41850dc20fb68581f8090072757bf34c24f1426d787cd1cce"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/remedy_registry_schema.py",
+      "sha256": "d638c5dd8e4bc0f804b2212a872d5d9096645dd2c19e09c3b928d80256ef8dab"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/return_admission_schema.py",
+      "sha256": "3c8fbe0ec4f1cf4a0924c68b90c3d1f216c06d28afda6a6aaa443f2d63f45461"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/return_contract_schema.py",
+      "sha256": "8b25c3c1908f055d405800d1bed504ca8ed44d60bac0905f19caf376084779e4"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/review_document_schema.py",
+      "sha256": "2bd64b8cdc9a05e6a0256906fdd47523f01e91c9af78a8c0a40a89276c631d98"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/review_request_schema.py",
+      "sha256": "a869ad303f12f5405058b47ba63f4e82d3b99b30299017c908a3855d2c2f05f4"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/scoped_endorsement_schema.py",
+      "sha256": "baa0214e0486d43e3eb946e3f156b6f3077d98254c4e9117da2adeeda7779ae5"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/semantic_action_schema.py",
+      "sha256": "75289c93cfbbb02e34139385ed12ec6a570e044c6dd7536b062883f3e863d9d7"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/semantic_annotation_schema.py",
+      "sha256": "6b8900c726a036e1ceef2bf2ecedb32c713becca57ab3edf45d1d13c53511d17"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/semantic_audience_schema.py",
+      "sha256": "d3853df7ceac12a0a1df19dea33c54bb5a2e7b362d80da3037921f19266ee27d"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/semantic_deployment_schema.py",
+      "sha256": "6609d530b22cf1c61e847f3a6bfe4f8b4f104cd86ff90aa00ee6abbd3176dc60"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/semantic_invocation_schema.py",
+      "sha256": "afdf8b5b4477b9c69dcb447ff053c026a1a89e8503addf73a315579858cadb1e"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/semantic_package_schema.py",
+      "sha256": "8c7e8f40f0b05a52c4be45e823201a5bc8f6cf62e499b0aaeefe582cd5405831"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/semantic_payload_schema.py",
+      "sha256": "dc48e343746918c4f67ff4bb9c76161a7d26469dc736267b29428f29b35b9ac9"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/semantic_plan_schema.py",
+      "sha256": "2deb7e7fd4c97e1a240d46caa57babfb3eda79673fbfad450e795c029a93b902"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/semantic_prerequisite_schema.py",
+      "sha256": "a7bf045d5bc81a4d08d1efb36f8bd4ebbe193097a7e528e126660268ebfd1441"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/semantic_provider_request_schema.py",
+      "sha256": "fb6a9f15d95bc0bb66bdb1b740b67c02190dbfe16a08e4d1f666f80eebf185b7"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/semantic_provider_response_schema.py",
+      "sha256": "c6116d3f832cb073327dc752513324438f5a3edaabc8c0a6e54dfeaac8fb7764"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/semantic_transformation_schema.py",
+      "sha256": "cd98e4a788fd21379ff3f69536f397810041630cd3dcd711f9ce5f03d31cb949"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/signed_artifact_archive_manifest_schema.py",
+      "sha256": "fcfdaa1e18a127bf6f682e414894a253f039abbbf396cc3f92ccec80cfc91592"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/signed_artifact_certificate_schema.py",
+      "sha256": "df4af15c30b1440b176925fc49cff90ac59997ed9865e17ead1a0351386e6cff"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/signed_authority_coverage_schema.py",
+      "sha256": "b50939c0045d5bfc49eb54a2c0dbed8fa68589f345848d87063064f7d9bc51a8"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/signed_confined_disclosure_schema.py",
+      "sha256": "a79117f8aa491f79335e4adeabab8cdfe6306feb531163564cb865c5c2594065"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/signed_confined_endorsement_schema.py",
+      "sha256": "6749caf74ff71c8255a3837c80a7cbb295c8a013dddaf9cade8213c36aa9dd86"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/signed_explanation_report_schema.py",
+      "sha256": "727b4cdee5360e955fc8e4c4667fb270fca712708b12630780fc0691b88dd674"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/signed_explanation_view_schema.py",
+      "sha256": "b664d16da2c19e26e02b153ab89cc987cb765ae8bac85bfd57aea26f10b22239"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/signed_grant_v2_schema.py",
+      "sha256": "3fed798b6dafae2b9e117564c09683273bd6fa67aa8d587fb7fd4a10b480c633"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/signed_provider_finality_schema.py",
+      "sha256": "7a6c27668a48ea3a87fcfffdf84523178d0ed5e59a4de0fd9db0e464b0e90a0b"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/signed_scoped_endorsement_schema.py",
+      "sha256": "61f646d19f49f1b1b49503378474759759a73fe41dae66cb269ddfee519c5298"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/signed_semantic_annotation_schema.py",
+      "sha256": "34cb5cb829363c6ffb73c21eb9023b675d21064e943cfcda293c5ad2625b1a24"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/signed_semantic_audience_schema.py",
+      "sha256": "ac4fd87775fa2153b189055a7d4ecb5d4bc5f8ef2579dfc5528cf5fb522a2fec"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/signed_semantic_deployment_schema.py",
+      "sha256": "5505735375f2877abebf2c070217585e13ac650ebca9dd4140974646abf90c14"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/signed_semantic_package_schema.py",
+      "sha256": "540fe9a06f3cfc4adcbc97bf4e8a0dd27afb773aa3cebe0161ddeda2acaf0ffb"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/signed_semantic_prerequisite_schema.py",
+      "sha256": "582a28ef2f1da3f482d4ab4bb725a158cd0f0fad85d4eb9eb3d6b1f98f2a6003"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/signed_semantic_transformation_schema.py",
+      "sha256": "fa237ab3206bb5306e438ee736bb18c7d6dc3ef2e05e5b86f45c50ed09abbd9e"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/support_issue_effect_schema.py",
+      "sha256": "ca19abd2081c4c28d67fc851224a10b214a2b9217156d6f02b09cac4ef6ab4f1"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/support_issue_input_schema.py",
+      "sha256": "2efca69c63fd45642effe2225cc005921efae031ff7bdedbda646f9a8158995c"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/trajectory_schema.py",
+      "sha256": "9c515aa1227361ec3b8572aff9c3c3f52b04d269f837cad8caafdb315727a91b"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/recovery/transport_request_schema.py",
+      "sha256": "4ca9f332541a0b47ebef4d9eaf3863e4d1387d69d906c9036520d5f81fcfe994"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/result/__init__.py",
+      "sha256": "b59f06cab587cc36f6769128917b836cb7994cb17413a751dc54a6badd385ff1"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/result/cancelled_schema.py",
+      "sha256": "e9e8f511de6ecaefbd09658ab4eb5473838d2ae947d725c60a83aa9a8d2f67b1"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/result/err_schema.py",
+      "sha256": "b59fb7c1ffbbd03c0917fd43284c939d913fa579159279715b7604446880e455"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/result/incomplete_schema.py",
+      "sha256": "4d2d094660d69f197e6276b07268644a9913135f9eb601e639fc671e47485627"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/result/ok_schema.py",
+      "sha256": "758d393974e4ef7e448a48e450455dd36274d28626fd5b36d147ac6489f1cc3b"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/result/pending_approval_schema.py",
+      "sha256": "ab10b9f6962bad96c8e421a58dc638d59b977e528099e1f4b7a21e2378222d0b"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/result/stream_complete_schema.py",
+      "sha256": "2a54eb688bb33a26b09ba120d6e589bef9b895d6ddf54930805474b8a2f278b7"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/__init__.py",
+      "sha256": "310b76fd7006831fc285e798cb25fcc1d6d604ee9060df6fdd791196f4c0f572"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_admin_control_receipt_body_v1_schema.py",
+      "sha256": "7b344312217da04e55e355d57e8f9f9528c51c8f491009d709f94b4ff665dfa3"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_admin_control_receipt_envelope_v1_schema.py",
+      "sha256": "fff2577dff0ce5685754a5c05128d7ec1a189c28420dc5c6c2644200ee2fa333"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_admin_mutation_receipt_body_v1_schema.py",
+      "sha256": "330e1e05a58d96b782ed3fe61b7234eb6ef191765a2fcdd9e02b009fd0615213"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_admin_mutation_receipt_envelope_v1_schema.py",
+      "sha256": "e1788a03bb5e4989cd1828a5c1569a4221d8e6e14d8572b54a66ee02c38dd00d"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_attempt_registration_v1_schema.py",
+      "sha256": "8067f468e951bd799471156fd2ef114d0d36ed509d19c423e6735f7449b39e33"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_audit_comparison_body_v1_schema.py",
+      "sha256": "454132041d6ff9a79f9c5d0c0163da5d3e32bedc173d82641dee182dae4ac78d"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_audit_comparison_envelope_v1_schema.py",
+      "sha256": "9d7ec129062320da2d9edcdc0d23a0220fc4528572b63c7569234ab120826640"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_audit_runner_authorization_body_v1_schema.py",
+      "sha256": "da0a7c2a4d66751885b3a24c149e99d8ea06fa8dc8eed86a0d5049c69678358f"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_audit_runner_authorization_envelope_v1_schema.py",
+      "sha256": "69ec29da63c56d3a1b7a027b5c2300e9f8c518e928df25dda634ea4bbf9cd3bc"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_authority_request_body_v1_schema.py",
+      "sha256": "b564b74cfe0d2f8adb7df8cdd770128c63e06e8a1d20242146691042e85d81fe"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_authority_request_envelope_v1_schema.py",
+      "sha256": "7ef2af2b3926b52dceab2f38308ec4959cd078fd2e7ca2d5d4e02c0341591b0d"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_authority_response_body_v1_schema.py",
+      "sha256": "0272c4cf1f348ab8c616a7e5e6566a52ed586fc873174006ac6e415e22607cf8"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_authority_response_envelope_v1_schema.py",
+      "sha256": "a6b97fa4e8d9001d7853ec26608dfdfd56df7f6af6f61686fdf1a073632976aa"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_capability_body_v1_schema.py",
+      "sha256": "fb9c3506f41650315f1044d3b0246b1e99dacaf11bf64e688dd10251dfc3ab24"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_capability_envelope_v1_schema.py",
+      "sha256": "a3f47644fd15f2dee425f32788b0acfaf937353b9dbfb31aefe7cf86571c9b4b"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_execute_failure_v1_schema.py",
+      "sha256": "33abcf7036505691e5359231abd8353d64567589e6da5e92a927f918ddd38dc8"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_execute_request_v1_schema.py",
+      "sha256": "ec06843d38f64e7a87f5fb80b2f51b1cdb40b8b533e5e1e3318bc5398568ef27"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_execute_response_v1_schema.py",
+      "sha256": "a9759e5bf50090ac9b48a0f750a27d6c80efa6296c9f177d8b902ac8b89a841e"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_execute_response_v2_schema.py",
+      "sha256": "5279a3d79ce0551ff08fd1a172f1918e5e2151763a6c3ca84f7056f5c7ae4b59"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_execution_evidence_v1_schema.py",
+      "sha256": "8daec209ad9631ca4aae1998c7ed778fd5b22f0716fc32738b5e523c2a49a0d9"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_execution_evidence_v2_schema.py",
+      "sha256": "fa36e705f8f5c7b11c9a46027837cf478b7c2b45b4236a5ef55be600a55de7c5"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_execution_failure_receipt_body_v1_schema.py",
+      "sha256": "b174822c5d3d1ec027ea9c0b318108b0c5f800c75723f9f64ad726669b8c84a5"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_execution_failure_receipt_envelope_v1_schema.py",
+      "sha256": "69c7dfbd0505687cdf460c767db7a3b84278955bfde095758e3e82ea055b590b"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_execution_receipt_body_v1_schema.py",
+      "sha256": "a4be31091969377d5b5c0dfaaccefcc9052e1abbc31e36c0253e84ea67991387"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_execution_receipt_body_v2_schema.py",
+      "sha256": "31cc06d7c020eb632ebf904d9ff16738f4b5c7bff657720760edc02328441588"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_execution_receipt_envelope_v1_schema.py",
+      "sha256": "766b6874a6a18833a87932bb63d955477d25dff6d3073d5eebd301e81c769aaa"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_execution_receipt_envelope_v2_schema.py",
+      "sha256": "0b1abbb7e3a23cf7fb1bcc6d39f6c78bedf9d204134fc5488b12049d30a2f114"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_prepare_dispatch_acknowledgement_v1_schema.py",
+      "sha256": "c5f97b00609a9b934d45755c9ac5201bfb2d89cf78ba63f9fa7b26a2c24de543"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_privileged_audit_challenge_v1_schema.py",
+      "sha256": "51777801d62e26abe1e9d712eeb1633d855616bcc3f91e2668515dc3b7957463"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_privileged_audit_commit_v1_schema.py",
+      "sha256": "07667baf57ca29b368b1f8611c7c4aa8a64e261fef733810abcb6266861377fc"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_privileged_audit_evidence_v1_schema.py",
+      "sha256": "12fba529f71ef147c14d423ee55c9b5f09126e1fb2ca91abdd4c0198cdafe7d3"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_privileged_audit_open_v1_schema.py",
+      "sha256": "bfb316f50ce04cfc1a0d256e92e025e30c629bb5385ccacf7cdb041457a36a62"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_register_attempt_acknowledgement_v1_schema.py",
+      "sha256": "9523bba2041b6cb373d72a90b38b6101edcc1eb4cef0d7880738f675f2903f4f"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_register_attempt_authorization_body_v1_schema.py",
+      "sha256": "1493bc923a21d86ecf047b098213dfcbb78975f9d120b0131bf99b06a5e2a4c3"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_register_attempt_authorization_envelope_v1_schema.py",
+      "sha256": "153868cbd4e349509177606a47151622d627c152827fc5dd12ed777a79616cb5"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_release_attempt_acknowledgement_v1_schema.py",
+      "sha256": "e1a8d4a43d1ea7f0d04ca81b592dc9cb02fbbe93942b97cb211e9cedecc475ab"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_request_proof_body_v1_schema.py",
+      "sha256": "5ba5ba1ea84bf9bfdda41557411389455693f35bce7003d329429b00b7e5d91e"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/broker_request_proof_envelope_v1_schema.py",
+      "sha256": "1eb195ec748ea5027cfa907fc32fc4be61fa8ba9c12d6e221db76fd69f7d886f"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/cage_enforcement_failure_v1_schema.py",
+      "sha256": "ec2350a571242ba94fb9603b5e2ccbc02551bb1aaaf203a8303b47e06cc84619"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/cage_enforcement_prepared_v1_schema.py",
+      "sha256": "dff53b1c6d4c055ac0c14a65941c98e4ff50f7cc5e0d4a0bdd308384a64927a9"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/cage_enforcement_record_v1_schema.py",
+      "sha256": "d1cee5112b7af931e2389bcff63ae70824b16b4fd01307262c097e081748cbaa"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/cage_exec_transition_observed_v1_schema.py",
+      "sha256": "6f17bd83e9f814598dbca7152cf1a4eebc7cea6b96b83b1d76df4161e224e67c"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/cage_fully_enforced_evidence_v1_schema.py",
+      "sha256": "e293db53ef8dac3d53fba9f9514025e4fe0a0962a37a421dcdb29746a39ce2f0"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/cage_init_plan_v2_schema.py",
+      "sha256": "2519dcea147fbcfe87d4c9a07deb05bc548ef31128ccd55f7bf92d3eab9391ff"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/cage_process_exit_evidence_v1_schema.py",
+      "sha256": "df3f5a6232adfe7b8a441704343ba413163f4ce2290104c8fa96bec80977cb5c"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/cage_receipt_body_v1_schema.py",
+      "sha256": "6428335e63eb09281e3772a39a7741e1d50e64bec39b785070e572f36b472b9f"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/cage_receipt_metadata_v1_schema.py",
+      "sha256": "1d1fe00032e967348e546982b901f76dd1db8447613250e59be52d3da055ab9e"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/correlated_finding_receipt_body_v1_schema.py",
+      "sha256": "e055852035b7198ca953649e8a6daa750b49ee04a4d4a23c2275e85bb89ac259"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/correlated_finding_v1_schema.py",
+      "sha256": "ca82bb5686b42abaea06bc1ca2f11a6eab8444a1495a21a3f72e50e42522c9c2"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/declassification_consumption_receipt_body_v1_schema.py",
+      "sha256": "ad03e4b5f3d280f62d824f525e51468cc691f515bca334b6a9a9e1d60c6cc0f2"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/declassification_grant_schema.py",
+      "sha256": "0b5ba7a2c7bd98b84c8dc4ac175bb18953965c65b7322599c9eaed774dde3742"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/declassification_outcome_receipt_body_v1_schema.py",
+      "sha256": "36821cf577afda5c58f411db3b52f0c09410944d77691ab1b23866cb8cc1c98d"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/detector_health_receipt_body_v1_schema.py",
+      "sha256": "ad02311c51da55c18e89e28ab011cd393001b530e0c233a2a993ef9dd1b28b36"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/effect_transition_receipt_body_v1_schema.py",
+      "sha256": "08cc8b55b7d8316448b031e4ac783b726100f4143b201fde3fb355d97881f50e"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/flow_denial_receipt_body_v1_schema.py",
+      "sha256": "49ba3089fe4d849f02e5a581e672a44553564a6ae6c10b691ba6ba22b855b4af"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/information_label_schema.py",
+      "sha256": "e7e63269f0d19c564c460821245c43948feafe0a574ae9ce0a3f1ba2575e7a97"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/key_log_activation_commit_body_v1_schema.py",
+      "sha256": "fcb008b12fc6f3e7dfb685bb3345f4056afc10f0b7c579c67af7b4f2f6dc9db9"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/key_log_activation_commit_envelope_v1_schema.py",
+      "sha256": "c5e2255085388f18e16414c91d9a41b6ad68218e0c56f666248ed64de4edf7ed"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/key_log_artifact_time_anchor_body_v1_schema.py",
+      "sha256": "87edf3def19aa42b07855d9f3d52f70078f25838276b98577b0c810a1a086673"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/key_log_artifact_time_anchor_envelope_v1_schema.py",
+      "sha256": "b65c782a7cadf8cc6868dfb91daace329a62162a36b415e72110b64983fc0dcf"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/key_log_audit_readiness_body_v1_schema.py",
+      "sha256": "303aa690e9158e9cddfc71a92ab117e6c9f8e8d50e41706e47279718ebf51628"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/key_log_audit_readiness_proof_v1_schema.py",
+      "sha256": "9ff3a76b7dc755c9775da2f2feb4550bfa7548d69ff9f77fa85d5c62e49aa953"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/key_log_checkpoint_body_v1_schema.py",
+      "sha256": "6affb1f3a5e5fd4aded94128871146ede71c62a65400982f455c7b8f4e2fd2b1"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/key_log_checkpoint_envelope_v1_schema.py",
+      "sha256": "cbcc6c1fa4403c7eca67bc7deec3b72b806938b1cd341219901eb9b64461d070"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/key_log_enterprise_receipt_body_v1_schema.py",
+      "sha256": "ac98db3134109916f416d894c9b57709b84a44146732f0912de1b8eac184409e"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/key_log_enterprise_receipt_envelope_v1_schema.py",
+      "sha256": "8c70f8d6a745949974777639c85a4bf21dfa0904d0fbdfc020ab444cd4e6dfad"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/key_log_event_body_v1_schema.py",
+      "sha256": "a4fcbf11548f50603555f7a204e2e851967b891398e844562282df79ddc1aaf2"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/key_log_event_envelope_v1_schema.py",
+      "sha256": "5c188917340bd1618c288c5de06819012ca9998ef714dbac70f19e425180baec"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/key_log_sync_response_v1_schema.py",
+      "sha256": "33eab183d076669f965ea9cfef845c17758c31e3dc7e11fc198123c520b1567a"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/key_log_witness_readiness_body_v1_schema.py",
+      "sha256": "45b498845d5ff2ed759fde5f6d456190984eeb26c51a368d7abb29cfc678299b"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/key_log_witness_readiness_proof_v1_schema.py",
+      "sha256": "01bfd7eb1152da43d056bce823566ff1f7e62a6f97cca58c75e1e6ec1369d6e8"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/key_log_witness_signature_v1_schema.py",
+      "sha256": "9f6f7c061c19196235a2135590100bfe2d729582aaef13cff93bfc533e9a1378"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/keyring_artifact_signature_v1_schema.py",
+      "sha256": "c168e48a16baae86ff57f468dd7c29ce44126f08503115f8ca8367b433cf55f7"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/lift_rollback_completion_receipt_body_v1_schema.py",
+      "sha256": "0d10834185c75e6d4f556a262e6a29057db0c964e37f316d08869df6bb154028"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/mcp_cage_launch_policy_v2_schema.py",
+      "sha256": "9b8699c6014818eda0c0582fd94699d4a4fc0c8e8184415dd73bc62d7bc50ad8"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/response_completion_receipt_body_v1_schema.py",
+      "sha256": "841a12f8ac3717d60820857a4eb6a28b208696726ea269b99820444f84b6c384"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/response_effect_v1_schema.py",
+      "sha256": "c2589de1338ffcac289e3d1faad85b051c139dd26e5c743be4af3726940dd377"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/response_plan_receipt_body_v1_schema.py",
+      "sha256": "8065afcc7a2a0c826a97227496cb30c27ac07fa24cf43e7ee85800f017b875c3"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/response_plan_v1_schema.py",
+      "sha256": "6c563367a6ca3ab55465997000c5b388b28e72ddd02053d5235181f828e84578"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/response_state_transition_receipt_body_v1_schema.py",
+      "sha256": "c12d1755c9225a938847e093b1f0881129df2813a07c3ea5797641658b9f752b"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/scheduler_health_receipt_body_v1_schema.py",
+      "sha256": "98717acfaae089f32023fb16d1c76c6d3b750690dc397a17d9c49e47230b9672"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/security_event_body_v1_schema.py",
+      "sha256": "794a65586a7c8ab286269e0b171256add598e569ef8ba1042132597274923ded"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/signed_security_event_envelope_v1_schema.py",
+      "sha256": "7717110fa07c21b909497f2d091abb7ee8ab40ef0d227501b71ea91d195ada78"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/signed_tool_manifest_v2_schema.py",
+      "sha256": "b46732cec1a29d8486f8b3b2d89ff717d5378617ae713976326bdc867fd6091c"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/tool_flow_declaration_schema.py",
+      "sha256": "9d652932e644c530b7057832ab89f9b2048e24790b1a2676f7915ed12f54adb4"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/tool_manifest_v2_schema.py",
+      "sha256": "c8d182ed33e125102e12a21abcaa5a9a7bf975b291c1dbd7d5394d5ce32fe4c4"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/security/tripwire_observation_receipt_body_v1_schema.py",
+      "sha256": "236ccef133f9e1fd457bc6ab0b887540519ff00c548201c65bcd6008140e3de9"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/trust_control/__init__.py",
+      "sha256": "a9cd59b6405891e7c41dee3279bac85793ae1ff8130afb5b42eeefc5eb360955"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/trust_control/attestation_schema.py",
+      "sha256": "083a7a8bd03fc05f58e46fe78385d3d8e39bea79dbcf04a4c2181af7eebaa6f5"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/trust_control/budget_snapshot_anchor_provenance_schema.py",
+      "sha256": "72f6c156407eb5aedc0d2ceacc24132d82ecda490c4bc1e1d88282e089f94718"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/trust_control/heartbeat_schema.py",
+      "sha256": "97b585ef2efaf9144577f25974756b61113539e26f50bdfead4eaa0a12010bcd"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/trust_control/lease_schema.py",
+      "sha256": "893136b54e55af05898ffc1386c5afba43d7a0e648d8759871a2765ed1bb3e76"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/_generated/trust_control/terminate_schema.py",
+      "sha256": "552ddc45dc174e97c8f6a268690c143bc44fd0914b5f6fb92bd7ce31281eaee5"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/models.py",
+      "sha256": "fa6564c0260fbd00581d8f822033faf0a9f1a5b903fbbf87834c3b07b95efec6"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/models_supplemental.py",
+      "sha256": "eec3aad9adc81f7c82cfeb6de0e628f78a6582e0fc53f63e79365aed3a0d0c7f"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/recovery.py",
+      "sha256": "fda5aac854f988339885b1a10e2c6d7b91cb44cacc996ed283a1dd1c44bf298e"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/tests/test_recovery_client.py",
+      "sha256": "2c6ad7756362d6ebe66dbfd4e645f48145bbafae8ca68e9d730d3f029deaeefe"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/tests/test_recovery_contracts.py",
+      "sha256": "38a4679b542550f6f98c1b5cc116c38aab6c5896e0ee2fb0517fe7a03c5dc6b8"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/tests/test_recovery_explanations.py",
+      "sha256": "6b02441d2ea3c6cf6d9b04291962cbfe828c6833f5af0569b60776f0c4ab507e"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/tests/test_recovery_p1_contracts.py",
+      "sha256": "987b20fe91ec4cfb14dfc675d146e1059fd094c9aaab7236a16b8f37a4f02ac5"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/tests/test_recovery_p2_contracts.py",
+      "sha256": "fec353c728f323bac89fa2a46afcabedcfe24178034a74bd8cf28d57ebb6a6a2"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/tests/test_recovery_p3_contracts.py",
+      "sha256": "c183df124b6c570a0770c253d46d3df1dc2cd16cebc3c0dda0425aee2d506ea7"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py",
+      "sha256": "a152aa4b27a0cdd8c254955125cab9afe6723004469caed452fe767557e37758"
+    },
+    {
+      "path": "sdks/python/chio-sdk-python/tests/test_recovery_p5_contracts.py",
+      "sha256": "64cc1d16b99b93e6341e0135d607eaf22ac00d67c286b95d83fdc6ef022c4e37"
+    },
+    {
+      "path": "sdks/typescript/packages/conformance/src/_generated/index.ts",
+      "sha256": "758f85721c696ee00c933e2be34c4e070902fff5a7a58c49a4f324036ea1ba06"
+    },
+    {
+      "path": "sdks/typescript/packages/conformance/src/canonical.ts",
+      "sha256": "213ca5467a162fdac48a838074ed4b3d47041794bdeaa16960453ef040695436"
+    },
+    {
+      "path": "sdks/typescript/packages/conformance/src/index.ts",
+      "sha256": "4870a57c4957ec47a2454ea6a430877f7827dc5ec308ca61463557780479fcf4"
+    },
+    {
+      "path": "sdks/typescript/packages/conformance/src/recovery.ts",
+      "sha256": "c368210f3a56d5f22dee2f43cd1ea9c7b3910cf34a03346f6d8d51b004651f0b"
+    },
+    {
+      "path": "sdks/typescript/packages/conformance/test/recovery_client.test.ts",
+      "sha256": "8a18bebcd9a6b8d5223ef0d74648402d8395ada330cd71d8a694d5595e0bddf5"
+    },
+    {
+      "path": "sdks/typescript/packages/conformance/test/recovery_p1_schema.test.ts",
+      "sha256": "760ef82f8c6588077249fe4dfa2c83a3af2b6850eb952a7015cf2c307f6ab784"
+    },
+    {
+      "path": "sdks/typescript/packages/conformance/test/recovery_p2_schema.test.ts",
+      "sha256": "8bf7a625067417cb68a2120a0e41bb9d386e1d6e313609092643efb861813feb"
+    },
+    {
+      "path": "sdks/typescript/packages/conformance/test/recovery_p3_schema.test.ts",
+      "sha256": "b3990c53103c7f14ef560ec6aced8b96e51065a3d7ff9d13175a0edec9a6d3c4"
+    },
+    {
+      "path": "sdks/typescript/packages/conformance/test/recovery_p4_schema.test.ts",
+      "sha256": "23776d1220bed877f8e205ff1acc0e251d49202f43f80f59cd23aec8dcdcc63d"
+    },
+    {
+      "path": "sdks/typescript/packages/conformance/test/recovery_p5_schema.test.ts",
+      "sha256": "a506dfc160ef1e97a84e0945e5b45faca34aff12066fc6eb0c72fcb1819080ea"
+    },
+    {
+      "path": "sdks/typescript/packages/conformance/test/recovery_schema.test.ts",
+      "sha256": "57bd468aa152b599bf74d063a401b314e743072b8404a66ddf9de005743f8d24"
+    },
+    {
+      "path": "sdks/typescript/packages/node-http/src/_generated/index.ts",
+      "sha256": "758f85721c696ee00c933e2be34c4e070902fff5a7a58c49a4f324036ea1ba06"
+    },
+    {
+      "path": "sdks/typescript/packages/node-http/src/_generated/recovery-schemas.ts",
+      "sha256": "f6958fb66ef3382daa289cdae43774acc8d9c45dd0edf39b105d8e3605f7a4a7"
+    },
+    {
+      "path": "sdks/typescript/packages/node-http/src/canonical.ts",
+      "sha256": "0236d86da74a9121141dcfe47e132e7df1ecaa4a6a00a87006ff0b4bde968f45"
+    },
+    {
+      "path": "sdks/typescript/packages/node-http/src/index.ts",
+      "sha256": "083ab3a0db1b30be92ed587032fb6e4d48ac523548d8edfcf548444e38c43ff2"
+    },
+    {
+      "path": "sdks/typescript/packages/node-http/src/recovery.ts",
+      "sha256": "cc14b3649bb74908abae190b46458a3fe2841467dd495f4a35bae3491c0346bd"
+    },
+    {
+      "path": "spec/schemas/MANIFEST.sha256",
+      "sha256": "69ee793fb8c467de68634fca60632ccc775950f1eeb6da6318c94dbfca6b4cae"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/action-intent.schema.json",
+      "sha256": "8cfc20d811346d6cb4167eb41f77c624a93c2c27f6813a614251bd705abc9a8d"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/approval-intent.schema.json",
+      "sha256": "6f485c83f0d75e1542432f6403fadc6eed8541205e173db833d8813e1bac5584"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/approval-submission.schema.json",
+      "sha256": "4d411ccbe5b4e34b4fa7d0a1472ff31118b9014ebe4dd60212a97f42e0a24be3"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/artifact-archive-manifest.schema.json",
+      "sha256": "e746ebcc1a7804fbffe9e243c973fb6d1cb20de8fcade93b7de7109ef4b08ae5"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/artifact-certificate.schema.json",
+      "sha256": "d3dda26907640926a248d1f1a3806d1671bb3d9bbfe408aa0f800d405c0c85a1"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/artifact-handle.schema.json",
+      "sha256": "052f0d967585f504fffd5df3f2ffbd83b67c47b6386f0ca16d4f88e0e890ef1d"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/artifact-influence.schema.json",
+      "sha256": "145e43fe47aeddcfb3785d0a8821295a69e4f29450ec60cdca63d4b771b295b2"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/artifact-producer.schema.json",
+      "sha256": "67d9da0eb2c1bc006bb668f11cf44900c642236db909657aead8f0d160d7817e"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/artifact-recipient.schema.json",
+      "sha256": "75c99e8aa3cbe3274a8afd26e741d08ac85f176377064d387209de3ed220d0ad"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/artifact-reference.schema.json",
+      "sha256": "9ba5ca0c9d8a6f860237b9223ede7a54ba21de2efa455e68af359f443040f962"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/artifact-release-intent.schema.json",
+      "sha256": "7e262ee6d3c6492733ca6c17f74f440db5f2a2b0edf6bc6d396a764d0952c694"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/artifact-version.schema.json",
+      "sha256": "9a094d68978381242f2ad6f677bb8d3b43526224ab2b498111445e5d5baf285c"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/authority-coverage.schema.json",
+      "sha256": "38edaf2ddebf06803b2a1d1a066ba19aae0d6d53abf5aa6a8bc7e8fc06e8fd2c"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/authorization-requirements.schema.json",
+      "sha256": "54e37652bc1105f9a50b61237f463f619824700b216fc8b21048647877e67675"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/command-response.schema.json",
+      "sha256": "a0a518d78c40dc95030f1ed24cbe98c9fd0715845b64ce05edbb770efe77574b"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/command-result.schema.json",
+      "sha256": "f7d7fd96cf9ab1e162cd388c556b8c9a3565fdbb66fe3752f44ddfb0a886f3b2"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/command.schema.json",
+      "sha256": "a8d4b3cc10d74f30acf81b6d81434723860d1ff9ca8fd54a23ebe42818174601"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/confined-execution-profile.schema.json",
+      "sha256": "7493422939e6515749eabb150f57afac36725c45da831a14e7b8265fb7b38a2a"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/confined-limits.schema.json",
+      "sha256": "dd3949cc30a6f7e588ffc9380246965f14d2ce4fda602f6aaedb540379c23c53"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/confined-return-evidence.schema.json",
+      "sha256": "cc8466829dcda051da5b98faab2f9e601052a5086259ec4e98c6c55decfc93b9"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/dependency-graph.schema.json",
+      "sha256": "46b9cbe78ef63d1ff1327698d3e512549012414c55a29eb1002f197ed63911b6"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/disclosure-grant.schema.json",
+      "sha256": "61e9ceca3f80ed227619d053eeaf8d7225dc5b6eb2231a6a5649962c0d2619c3"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/effect-contract.schema.json",
+      "sha256": "16612254b2f701cb45ac8098560efc0b42a5d8ea0737fb968d3afb0883197032"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/explanation-evaluation.schema.json",
+      "sha256": "f57e8dc3ccff048c0b12f2cdca0b66da3563fc741ba6d65cf4f2603ed3ca4816"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/explanation-report.schema.json",
+      "sha256": "8c51ae7aad9aad0b7534145bfee4f63a8c56cb3b7082f241b74b602c693b99ba"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/explanation-request.schema.json",
+      "sha256": "f7d3fc3f6c3d2a0461c0107cf6f40c3517b8987737d1956026f859a45dcd2f87"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/explanation-snapshot.schema.json",
+      "sha256": "07e924acb0228bec77c52a32fb6127ab63a8917ab1a8e9b2317d2ec332054c08"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/explanation-view.schema.json",
+      "sha256": "4e16b5d2f7d3b24bc6e3c5886a513893d2e7ba9fefddfdc9de83c5abc443fd16"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/grant-binding.schema.json",
+      "sha256": "fea074a673935d39091c90bfdde16d79a8a4bda86efb51e030fc86be661ad235"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/isolation-boundary.schema.json",
+      "sha256": "e8507b52e84ff1c3c3225f4580e26be98e66035939f33fb26ca88468794c2237"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/labeled-checkpoint.schema.json",
+      "sha256": "d341a515fdd5ee5280dee482819ee6f4a648bef9e92849e55a96bfe8ca3d991b"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/model-context.schema.json",
+      "sha256": "0492ea414be04539975ad85190bce59b1c1dceb5481176cf34b451fef20a71bb"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/observation.schema.json",
+      "sha256": "688bb9edb934ed37ecacc22919dde8703e3ec474921a66787eeff0c25c174cac"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/profile-requirements.schema.json",
+      "sha256": "3f14962c30f00848c7629f17e32c48d87e72c223ac4ac5a3e6a483215d950d89"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/provider-finality.schema.json",
+      "sha256": "1547c31bcab660d2e8373eb9d1572090c0dc6363d6b1aebba5006e8c47841ec3"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/remedy-registry.schema.json",
+      "sha256": "b913d7abce2813666679206aed8049e9bb75d115c423cd7f906881f9f43b296c"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/return-admission.schema.json",
+      "sha256": "9add2dcbdc8cf413f7338de45da016d99e4ee633bec84c5d5dfff4c14140aaad"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/return-contract.schema.json",
+      "sha256": "c85ee4625b04bcf74f88c34d5ca8fec41e8058025ac63f69a3aa99ffeeb3885f"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/review-document.schema.json",
+      "sha256": "dfe2db4d4d201b0abc9f5d4b5125665b011c8bb81bb44eb160ab99bd2429dfe9"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/review-request.schema.json",
+      "sha256": "f6a33960d0384fcb20dd28a55ca25b1067db4452a1a7131d991e21bc97a2e656"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/scoped-endorsement.schema.json",
+      "sha256": "d9979489e2f3eeb1a2c8676e49cde8379f9709ee3c6232f5b323171f335bf36b"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/semantic-action.schema.json",
+      "sha256": "fbe4e0ba63f5c0d29e23b95568671389bbd10b85ab1437faa2a15b8370b1683e"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/semantic-annotation.schema.json",
+      "sha256": "145f0768661155d2731d7c627c9a2b287bb40c086288c4cc4ce651e4176ab85b"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/semantic-audience.schema.json",
+      "sha256": "dfdc0839e7717eb220fc705aa748b254ba13ffb314ffdc76403acb64e8853cf9"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/semantic-deployment.schema.json",
+      "sha256": "4239f5b0e6496a57655433614b35d58de8e9f44becb8a9f5ec7959b7266a0570"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/semantic-invocation.schema.json",
+      "sha256": "65cfd3105dcfd12feec2966727b148d91df1d1509d1c08f8541764766631de2e"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/semantic-package.schema.json",
+      "sha256": "83e1e063ec408e0f13ab92c5672d5e29ba452c26923f5e75792fa2d45336c1dc"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/semantic-payload.schema.json",
+      "sha256": "6ca0658d7fd0cdfebd449a590e5ccc2f9beec55cd4eaa7c6e76ab2358035fa11"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/semantic-plan.schema.json",
+      "sha256": "c40813230d819b58ff3a837d436937950481fc4c5da70babbd4c8f3f37c861e2"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/semantic-prerequisite.schema.json",
+      "sha256": "c8181ae2efa56eefdd1f2d84a97e4f6b9347cad9cc067d675f4c496e12d11dbd"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/semantic-provider-request.schema.json",
+      "sha256": "15c989053bb5c4b8b1cc501fb1e462a0a3ab471cc0dd4b916761d4bf00244b9b"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/semantic-provider-response.schema.json",
+      "sha256": "841ab42422d3908fc34181f3bedae5f2a71d5f95fd4b24212df6a72948fe8a66"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/semantic-transformation.schema.json",
+      "sha256": "da9be257095de29fadeeba5a610404fe2b789f154f99a6fe9f6cb6abf04f049a"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/signed-artifact-archive-manifest.schema.json",
+      "sha256": "1b4e1eddb0cae12cd1d4bf16ea70bd61182f059421a447110f2a8d0ea6af6345"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/signed-artifact-certificate.schema.json",
+      "sha256": "deffa837e3778ad73d3908c248037cc3220c4f0cb0ed8781183c482424f43c8a"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/signed-authority-coverage.schema.json",
+      "sha256": "2aa9351a70d831bf5cac504329d1be3808e539c8ed6b8a8a692569802e2f3715"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/signed-confined-disclosure.schema.json",
+      "sha256": "2665bd0bc3b564424a775ee4650b8f9cb73c58e9e9963c306fa8790ba1dec3e4"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/signed-confined-endorsement.schema.json",
+      "sha256": "9b7a6ed0948a17c95eec5cb1cda9e8b87f997428fd34c7a81fa88db5ffd00d11"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/signed-explanation-report.schema.json",
+      "sha256": "412a47f45faff8368de64ca8151d3d21de52242b59eaef59a835d5b9fb087ce7"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/signed-explanation-view.schema.json",
+      "sha256": "7a8227c4a168687611b69ecd4852e7092c9a995e8a9cab1ef78b88f51ce66f7b"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/signed-grant-v2.schema.json",
+      "sha256": "6ff06f3f851334a5eb461f034aa1286a03359006af76e9590ee64d7c8fe55bbe"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/signed-provider-finality.schema.json",
+      "sha256": "c4cea9187bb8961fbebd515598b72abcab007b2f38bf4f6e561c638110cd0162"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/signed-scoped-endorsement.schema.json",
+      "sha256": "e6077a5b7aabf9f67335bd10ada26fa3e17a8c16b0bdf2a56eddf5b788ff899e"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/signed-semantic-annotation.schema.json",
+      "sha256": "c650d45a3e7f20ac36699e2d269f77ad9e09423fed33981f433870a107b72c56"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/signed-semantic-audience.schema.json",
+      "sha256": "e12b4d81b0da8cc5fa480e51bbb934e2f268ba2874146020c97ffe6efaaafa58"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/signed-semantic-deployment.schema.json",
+      "sha256": "1d8127a02d531ec5cb298c5723f700ceb715002cfca60da288933c2a6b37c4b4"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/signed-semantic-package.schema.json",
+      "sha256": "7c9e22542327b420891927768634241b286046d06bd71096d6b7f7885002d5e4"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/signed-semantic-prerequisite.schema.json",
+      "sha256": "88201352c6fa31615e7ef9fd19a03e8f800dd6db38acb03deaaf0e0c4f9e7adc"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/signed-semantic-transformation.schema.json",
+      "sha256": "a1ba54b9b1c5dae4846aad3abf981bda661287e4e17d839574509792e6a6641c"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/support-issue-effect.schema.json",
+      "sha256": "a63f2bb9834da99f503f7f03f0ea933953d6b6702770a338c60d9ed037887263"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/support-issue-input.schema.json",
+      "sha256": "c86f470fd43361c176b954a498ad7590ba7edc2302693595c4608bbae280aa69"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/trajectory.schema.json",
+      "sha256": "c2cf9f77dea67bbf512aa8cf033fd3105e9e80c380988de1e8025312281c4136"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/recovery/transport-request.schema.json",
+      "sha256": "e7667944b998d86281a05950ce62d61ad70d0b8bd2ad8ec95420ed575260a101"
+    },
+    {
+      "path": "spec/schemas/registry.json",
+      "sha256": "f8387fb8ffa8c30d9b613a60eb9f0e9cd6f88e4bdca940335b701e10ee8ebf45"
+    },
+    {
+      "path": "spec/vectors/recovery/v1/contracts.json",
+      "sha256": "1f7aa4e7b05d98df273c42cd9a8db316591c3fae5300e113f85afaa102328330"
+    },
+    {
+      "path": "spec/vectors/recovery/v1/dependency-graph.json",
+      "sha256": "c111afd99456e19e0dc36ccc64d85c555c4d4a3cfb9cc4f23e8a153d3a9807fd"
+    },
+    {
+      "path": "spec/vectors/recovery/v1/effect-contract.json",
+      "sha256": "5728de761f8ecf553519f787a83970ca55406735e31ff68b9b03a6b7bf82135e"
+    },
+    {
+      "path": "spec/vectors/recovery/v1/legacy-process-binding.json",
+      "sha256": "d98c1caa8100eacea07badb2dfdb3872d3e976f93f70e6fa2e8fda1559406d2f"
+    },
+    {
+      "path": "spec/vectors/recovery/v1/observation.json",
+      "sha256": "f6eb45971346763a749c7a8d8daa5be922e42a7f6958df0b4314ccd16ff43023"
+    },
+    {
+      "path": "spec/vectors/recovery/v1/p1-contracts.json",
+      "sha256": "8c1191c372c16130c9cb66fe81b03d862f61cebeb011fd15c6117c0a59f5ffe9"
+    },
+    {
+      "path": "spec/vectors/recovery/v1/p1-positive.json",
+      "sha256": "0ff35f3f0f2fd118d372b8d9d929e6768e9cbde80d509da81fc2baa8733a2b26"
+    },
+    {
+      "path": "spec/vectors/recovery/v1/p2-contracts.json",
+      "sha256": "b00018b117d9cb67c8fd7eddcc2d477bd6cbd5e9f3e504bca645214294889394"
+    },
+    {
+      "path": "spec/vectors/recovery/v1/p2-inputs.json",
+      "sha256": "075a66ac5831b0db7392141f0f9fa9809a5f8745db51167edef4483f174d6299"
+    },
+    {
+      "path": "spec/vectors/recovery/v1/p2-positive.json",
+      "sha256": "dc94e382c4da3d7762f483d7b8fc5cd46ce5558271703bbba05db5a49b3dcba1"
+    },
+    {
+      "path": "spec/vectors/recovery/v1/p3-contracts.json",
+      "sha256": "3bf501165e8ccb055e5ecf5867fa1d7dc28af86ee58b57efafec673ca0092222"
+    },
+    {
+      "path": "spec/vectors/recovery/v1/p4-contracts.json",
+      "sha256": "0c1aae35b2d49ecff2605bf4cd242e457c319a0a5d81a4ffd8ac0b8ce58cedea"
+    },
+    {
+      "path": "spec/vectors/recovery/v1/p5-contracts.json",
+      "sha256": "a2e7a8f5354b0d923967b07a21436aedf0de76ec1ddb97693a0db33b054f3c8d"
+    },
+    {
+      "path": "spec/vectors/recovery/v1/profile.json",
+      "sha256": "2576104a13a9d6ccdf63c8261095ba1ed2e6629c346b5768f58e5c9d1063076c"
+    },
+    {
+      "path": "spec/vectors/recovery/v1/trajectory.json",
+      "sha256": "98001aa65b441603fde840ba39e8e64c894b6acef592cfe4e54e7115d2edff35"
+    },
+    {
+      "path": "spec/wire-schemas-unpinned.md",
+      "sha256": "72d53b5009691c2c35f1ae314bcaa1b811f6f4ee83f30b42fe428d07f7d19bef"
+    },
+    {
+      "path": "spec/wire-schemas.lock",
+      "sha256": "54c00871cc53b232faa1bd88fe71e92b1c3819661c3c00cd58d27bc00af582cf"
+    },
+    {
+      "path": "xtask/src/codegen/python.rs",
+      "sha256": "289a12946c3cf42d54cedbfc29c038606fe43f1a69f9d8f80174fdc7eaba765e"
+    },
+    {
+      "path": "xtask/src/codegen/ts.rs",
+      "sha256": "05b4361f798fa8e27fab47aeac58957d882eb8741601c76237d824cc7ccce108"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/FRESH-REVIEW.md",
+      "sha256": "b4eaf877be2b5f66c5b978a6840736e9f6b6b5e599207562d7b70577a4daffbc"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/OPERATIONS.md",
+      "sha256": "f2d1d796616d9dce48217f741ccc052433000e1f534cce20a2561eafd24b1029"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/PLAN.md",
+      "sha256": "12d25d26b2d69498ceb3d110b1739bb0daaa909e27cc643793ccc6d149a192a3"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/RESOLUTIONS.md",
+      "sha256": "1d840fcc03de9112336e7a3f42eadc167676df2c79bb58156b23bfc0426e67ae"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/REVIEW.md",
+      "sha256": "48fb228ee99ef15d8ed7fd62cb4a2e4d61902cc9029129f85a346e199fcdcec9"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/RULINGS.md",
+      "sha256": "db0fe417be84541e3206e9ab71a0dd5250d7048b973beffe528fdb7e3611b75b"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/alloc.log",
+      "sha256": "fecede7c2157efe2f16c8c8b9dce94b0fb4dd384dca8207046c8bf7636eb0ffe"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/alloc.result.json",
+      "sha256": "cffffcc37dea1766468584ee3f4c327dbcf5c3217ea259ff4423859874bd3a30"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/architecture.log",
+      "sha256": "2b13d449dd03c986e6898a9a92c019bfae96969faf6fd23e1ffb7349fd443a62"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/architecture.result.json",
+      "sha256": "a3c91191bd501ef2fe6687c2049c447b8447fa28290973f5225f8f332d85e300"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/cage-inventory-mutations.log",
+      "sha256": "11c829812bb65eb812374840d244893368fc881fb901b9fde68fd042790b24dd"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/cage-inventory-mutations.result.json",
+      "sha256": "a7d0915390aeb88546bff9e823c737b2575d59140a9607e57a41f71eba30f53a"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/cage-inventory.log",
+      "sha256": "6b5d8a812d7837471779558e6edf8e7f53ba68b38aa33c9babbdc4fe920ab873"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/cage-inventory.result.json",
+      "sha256": "5d75de96a461bfa3a9f5a17c2c633c368eb469c044bc43b9e05dc077317b9e27"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/cage-script-mutations.log",
+      "sha256": "3279c61c6da9453f2870e4c2b2864be4e48585ff92e7198a7383a48d8c03e012"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/cage-script-mutations.result.json",
+      "sha256": "6e186483326c5839c0418b82c533b9307ee4dd5098ce6eaf21928b6e2fd52259"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/check-linux-cross.py",
+      "sha256": "26ae5bfb2e9a9fdc4b76df721ff55659c71a9def940ebb7c579a1ae466346485"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/clippy.log",
+      "sha256": "d22a8efee48c7bdbd596bb28561f92badbfd722dbfc5a2234fa040a27021c071"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/clippy.result.json",
+      "sha256": "12e1ac5ed056daec9a27de732bb2001d81a48eaaffece01a9ca6cd567f183e74"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/conformance-lib.log",
+      "sha256": "1500fb0721f39a343bbb069bd745668aa87df525fe857cfb5247feb435f3998c"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/conformance-lib.result.json",
+      "sha256": "14d1ddd6b4186d0f2f1e0ba4359f4431483dd09d1c7726345575ea22d59d641a"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/contracts.log",
+      "sha256": "e2469c274da3cddb9ced86933d322719a13cdcae68e35df0f00d1d44fef2fe1f"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/contracts.result.json",
+      "sha256": "587e3c816dbc1d0b1e522d2b5a64f9f95b737fae3ee6986f6e85e7759ef3bcfc"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/README.md",
+      "sha256": "d086dec7c3f3d2c85478e65e6bd296c9c22a9bbe0933c5f06b0a009ea24d90cd"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/broad-owning-diagnostic.log",
+      "sha256": "cf837fd96f4e6635a3e1e44178816c15f0c0b5e6243c23500f9cc786df31e1a6"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/native-20261004/cage-diagnostic-fixed.log",
+      "sha256": "4323504a7e968d7ccbb894c1437fa50daed3a6aa0611e81eb6707d84374293cd"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/native-20261004/cage-diagnostic.log",
+      "sha256": "8a728bf1076d418199e050bd996cb223d6a621debd7523d9a2c18762e4363c9e"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/native-20261004/environment-green.log",
+      "sha256": "07a517eb6d0569599a6d565c19dec1270f91608ec4dda9f3c60021f3800f069e"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/native-20261004/environment-red.log",
+      "sha256": "5f9b8d9910f293949d58d5b6b9a8b190753f2cb57ea49069527673b05c4c9a06"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/native-20261004/linux-initial-9-of-10.log",
+      "sha256": "5ca79d8b17a99b82209667c3dfab3ab30d02b8503c27dbb6fa5cdc907301e166"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/native-20261004/linux-initial-failed.result.json",
+      "sha256": "ab87f5b9fc698779451e135f89e4409442682005c50fff66d1e7941da226c8b7"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/native-20261004/ordinary-depth-green.log",
+      "sha256": "75c9c433fa8bab8ba7f690c465dee8e39040ae8f343c821da9460ab32c6fbd7d"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/native-20261004/ordinary-depth-red.log",
+      "sha256": "7c934a687095215d8d6700e02b8fba39bd550f4cab7f0ff0aafce6113be8ad0d"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/native-20261004/ordinary-depth-suite.log",
+      "sha256": "9065cdd86139df1df9ebb5e49a7cc748fa49319219a261c081da25c2a8936292"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/native-20261004/p1-green-final.log",
+      "sha256": "4cea4fbad62fc52c35ae6c60ac4f95ee64387bb3670f0a3408df55fc0057845e"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/native-20261004/p1-red-complete-fixture.log",
+      "sha256": "3d64f17df6c014d18f756ef65056fe36bd6cdb5bd2915d9cbd7ef15d230d46f4"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/node-overlay-20261004/npm-ci.log",
+      "sha256": "f5c55a32088682866aca19661acdac3665e0cf38b53f8504f0935956e93dc77c"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/node-overlay-20261004/npm-scripts-ci.log",
+      "sha256": "b70bbb7125dae0ff93af25e897764945669e9df0d1da8d2954b166c60f35fba8"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/node-overlay-20261004/tooling.before.json",
+      "sha256": "fa9a1ecc8e601481e7e760bf6adcc7db490fba0d0d562b32d5c7f6ae5acc9b1e"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/node-overlay-20261004/ts-conformance-build.log",
+      "sha256": "337fc75f83bb805402fc63f2592eb801dd39868f8efd2053187520a2099020d9"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/node-overlay-20261004/ts-conformance-build.result.json",
+      "sha256": "6c0793d76aec4cb891b6d4b6f5ad35f4e8da17ef066f845730f02a3179a4d061"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/node-overlay-20261004/ts-node-build.log",
+      "sha256": "1bd92af3d19a3a028f718734569e32a424b4f8a8aaa6c555870244a1418b49b0"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/node-overlay-20261004/ts-node-build.result.json",
+      "sha256": "9270c19c2b50a74213daf0b040b3363c82d4c61e0b2a2a4d4edde4beec79c39f"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/node-overlay-20261004/ts.log",
+      "sha256": "3653452a6bcca6be54548a3659cea87db97ff1c69a49700ef64d10a36b2113a4"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/node-overlay-20261004/ts.result.json",
+      "sha256": "b56a4f243b87d241653f0e83361f3535c32a1548f4f3e9870b44fb515805f79e"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/alloc.log",
+      "sha256": "4f27ac380b22e1d975eee20ce727fa8cbc09061177f6253af0777fd4de7b7506"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/alloc.result.json",
+      "sha256": "d7e833d0dcd87704dfaf7620818da20c4bf2ec1eeaaef34ff8ad087664e266ac"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/architecture.log",
+      "sha256": "2b13d449dd03c986e6898a9a92c019bfae96969faf6fd23e1ffb7349fd443a62"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/architecture.result.json",
+      "sha256": "06758d484a12947ab8996fc1dcca7bc48a2546a2e42e7771f24da6af3a593b45"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/cage-inventory-mutations.log",
+      "sha256": "11c829812bb65eb812374840d244893368fc881fb901b9fde68fd042790b24dd"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/cage-inventory-mutations.result.json",
+      "sha256": "5c31495a1cd5d0b8ba43938e5b7f5ed7794859c4b3d3ea205e09d00c5931ace1"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/cage-inventory.log",
+      "sha256": "6b5d8a812d7837471779558e6edf8e7f53ba68b38aa33c9babbdc4fe920ab873"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/cage-inventory.result.json",
+      "sha256": "e0ceaf11c9c8a47ead74d5c2cd49a20e82c1d292d69fe1884622e0d6257e85f0"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/cage-script-mutations.log",
+      "sha256": "3279c61c6da9453f2870e4c2b2864be4e48585ff92e7198a7383a48d8c03e012"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/cage-script-mutations.result.json",
+      "sha256": "0582cd935cdc9b2ab2b71fff4a3dc2fd70357fed40e80d55f47ea896f092dde6"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/clippy.log",
+      "sha256": "4368c7c7c1258d8f6fe684e397902b99e91150d787e89e5badf60f4ff77f9dbd"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/clippy.result.json",
+      "sha256": "bdef0db4905be2c9d6e4331265c7ef3ffcc332aa0d5dae693a96cb49eb7b9906"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/conformance-lib.log",
+      "sha256": "9d78a2dc15f99c658460f5c7875c19befb1c5c3dc34d5c8fd7e9e15054a56058"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/conformance-lib.result.json",
+      "sha256": "e8b603f665b644cce510b94c264afeff2bcc20fc01b93b51d5347bc604660003"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/contracts.log",
+      "sha256": "4882daaf5cc198db90fb6a5949ab47af5205a6fabbb83c2b27e131bef1601235"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/contracts.result.json",
+      "sha256": "5a0593932aaa3d3321ee3fa61dc1fc22f2391ee468d8b6d434e024f07500ea1f"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/diff.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/diff.result.json",
+      "sha256": "37c3a6b1b694960d0e380b4830cfbe3c66bf853f97e6949b62c34dc0211c18e3"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/domains.log",
+      "sha256": "9660e42dc2a0efbad4e490330d6a6385e58a420c7c1648c95bc9031c502670af"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/domains.result.json",
+      "sha256": "b458c9944655768e37e016945604c473bd8dde867d3eb75460d3cfa124f600aa"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/format.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/format.result.json",
+      "sha256": "a9f24b3f74c984a4ddd02c04901f9e3a23e2a49a424148515380d08ddee2acc0"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/guard-mutations.log",
+      "sha256": "ab51ea60a180dcf83532117f0b671bba89aa7c055dfab26f507de72d874d2fb6"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/guard-mutations.result.json",
+      "sha256": "ce1af27b2197bbd772023e8f4e49845685f8df4bfd8262659dd4bebb55e16850"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/hygiene.log",
+      "sha256": "8a042dc9be100f4bb26acbd559187ef2d12a01a1a8f2688721bac34201c9e679"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/hygiene.result.json",
+      "sha256": "232c311a22e9e8b29d722ef280e156a8fb65e75a025fcde6fb70eafdd4862bad"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/kernel-doc-tests.log",
+      "sha256": "fc08247f15397c8be38bcd27553d65fca1d7bce00a2dd177ca58fcda960145c7"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/kernel-doc-tests.result.json",
+      "sha256": "ac379d023e5a8b51c0a00b999156c8f024f2223f8d703c064873cad572e605fd"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/kernel-lib.log",
+      "sha256": "487e7ac4e5dccecfe5a85f87531233c308e1be291d8bf0ac358b5b426d6a72dc"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/kernel-lib.result.json",
+      "sha256": "1c420be3e291c10c57387186f8a46d47f6b040479c5c74ebf79f4b0386d07a6c"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/layering.log",
+      "sha256": "d86efcdb613cfdb5c7cb93fbc663ad1379d53aa619f4b44377011ce820a3a8ea"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/layering.result.json",
+      "sha256": "12f1850f086a60868c7e79a3c8a4af93eba1a3d8ce113da61d18267c9a37b85d"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/lint-parity.log",
+      "sha256": "5cdbfdb13810b2e2e148e68b501cddfe136aa2de30eda0b7ef053818dbaf1f02"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/lint-parity.result.json",
+      "sha256": "65db6ac50ec4542b1fabb6ddf7d233d01b7ccf5a0e844358aa0c37ec669d99b0"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/linux-acceptance.log",
+      "sha256": "00cb8ecc93ce8a19ab62e0477cd607035b3e12efd32a74b01a5ceeeb8561f1c0"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/linux-acceptance.result.json",
+      "sha256": "8e6eb86b007a69ff0078449f264c9ba1ea5ec819bf2d2f7835928e340563d904"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/linux-cross.log",
+      "sha256": "f31c86eba6663cc8f495abf9aab80bc650b9c5006900bdbf08e81e85e9829790"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/linux-cross.result.json",
+      "sha256": "f08d494abdf31019056b5f794623454acd41cd19cea98eb93ab1588e1a9e263b"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/msrv-alloc.log",
+      "sha256": "0b9c85a57402765a9638848a90eec54abbd9a68f42a071a97aaa9d8acc5ba131"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/msrv-alloc.result.json",
+      "sha256": "cf4f4ac4c3cff981caa1fe03fd05eb32452fac5fc2d44b329053f237ed26eb21"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/msrv-std.log",
+      "sha256": "ee1d3fffa2022e962e63e0dbe4d35c9c198450a20c29fc09030f635dbb38bfcd"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/msrv-std.result.json",
+      "sha256": "9430d8a55b26acb38488290c4eacb87f7d6e617995ec38073e300eef0ac9957a"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/native.log",
+      "sha256": "b2c77f14cd14c3b21f331e2fcfd9e6c91e1ae70ac027f81a3f9b227c1083d242"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/native.result.json",
+      "sha256": "ba2f62557f3d7887d675320547fb55391b5d8ca1e0e88fb6ab691287db1dbd37"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/owner-doc-tests.log",
+      "sha256": "34652e765ffd530c823b06a143afd407deb122a216831974794e1ad8b11c4cc1"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/owner-doc-tests.result.json",
+      "sha256": "2b1c5c56c57625bd755b4ea525d73caf03babbedbc2962532e7e6fb79c38ff34"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/owning-tests.log",
+      "sha256": "d3c7f14472533c10f3f8fc71d0c399690a7d36a0a8ba17b39cdd300e113ac197"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/owning-tests.result.json",
+      "sha256": "fe977da3cb1040b1005db79029a2fc172f8e6fbc8af564be09da9d6fcafb153f"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/p1-native.log",
+      "sha256": "5635050ae0af31c3ee269b99f0e917761ff224e028358e9259db76c3b4729009"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/p1-native.result.json",
+      "sha256": "9b93ba045d063d7fe5c1c2c5e5a3fe7793382b62bf516cdfb9c3d619faf84ca8"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/p2-native.log",
+      "sha256": "fd700e14c332874795890560a384a2d6b60cc3e72a8beeeb84fba78133cadaed"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/p2-native.result.json",
+      "sha256": "6165cdeaa0c43ecf62f39070674b4e7696218f4d3441fefba97c203b04aee0ca"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/p3-native.log",
+      "sha256": "003709d97d2afd7f9caad1b1dc8fbd296d18fd110cd8c02988505d4035c20c2a"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/p3-native.result.json",
+      "sha256": "2f879183f679ec8725b4b1a6f98f41af7b232725b6561cde2465b8f2ad8fe1c5"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/p4-native.log",
+      "sha256": "43e4f560802d307030d8d715c1b7da05e50318158c65ad0069e6dcffd0c9fe8f"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/p4-native.result.json",
+      "sha256": "c304cfb011278b81b760cd7146ae76e53f2220bef652744aa525959c06dd31ab"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/pure-guard.log",
+      "sha256": "833390d11d2e74f4ccffd89b62f912a30db6db7a3c5bdf9a8780581dc9f07480"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/pure-guard.result.json",
+      "sha256": "9cd222def433e509dc7205bf8541eb6f3991950f6e6456d234cfaffd4fb8d3fd"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/python-codegen.log",
+      "sha256": "d7136f17e964a095ebe3f34a4687ac606bacc824bbb3eb6ec12a23872b611e13"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/python-codegen.result.json",
+      "sha256": "7f1f4692d4691fdd35c68b57decfbf77aa81b7b759fbce25d1c4a7ac6b797188"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/python.log",
+      "sha256": "7052b85acda95a2752ecfe1aec8665eb68e1171ee8a8b0860ebdc580aa8a9dc0"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/python.result.json",
+      "sha256": "191eeb9791fe639c721805822960713dd470eb8abec23ec7ac1d90bba0c14e0b"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/rust-codegen.log",
+      "sha256": "7ebaa967d9e31b579f9af4065c00b37f0f2ee18761a1ac930f11cbc5e9083169"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/rust-codegen.result.json",
+      "sha256": "d24784ae2da1886414eed8a88d14b3a9026ff0771764fddb9d75ea069642b594"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/schemas.log",
+      "sha256": "f08ca40211ee4cf16919c55a0c548472ee01a0ff6808eadb1e60a66f4aa43553"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/schemas.result.json",
+      "sha256": "e47a107b0ac82bd195f5a9197c6f11aa661f8114168771c928ed8b9f4e64c1cc"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/std.log",
+      "sha256": "99f71393b9903dca098310bb446022a4bdee195ea9996f351a787195555210a6"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/std.result.json",
+      "sha256": "44d49894989e0798ca359b6099e0c7a9e7d9a9cdf262227de186a687b2835cbd"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/store-doc-tests.log",
+      "sha256": "fc1cedfa86d04ac0e3d32a3c203f2fba83ebdeb385b291349194a0240460c728"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/store-doc-tests.result.json",
+      "sha256": "8709aff793bde3aa0d7b413a3986a2c627d30cb0c1e377beac65ce9e64f05ad9"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/store-native.log",
+      "sha256": "4a9af8481ec7fdea7c1052b78f04e68f22e3a8ebd7e6cb7694bfe7f765632bcf"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/store-native.result.json",
+      "sha256": "4f02e6171857ffc882f53eec0e78b32f28ae6543b4e06135468621ba12914d61"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/store-ordering.log",
+      "sha256": "28db6325341269c8b8010c291c9c43e35a6a3ed1ee5f85f16d27b05dfbf6410f"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/store-ordering.result.json",
+      "sha256": "a7f8ca673ca6931cc30d3e2d50119bbc16d132b638abb88b1294aa5004fdeba4"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/store-regression.log",
+      "sha256": "ccd692b4e70d738fa465c62ba942e0c0da1f71a59e8ea24e021abef3aa38bd39"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/store-regression.result.json",
+      "sha256": "fcc923b53ed634f18113b98066e39200bd9c6cdc7a8b7f2a62ef7d043a4b06f1"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/store-schema.log",
+      "sha256": "09341f2246073faecdd696141c68da4215e68f2cb2c560ee83934f4ca46087ff"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/store-schema.result.json",
+      "sha256": "50de11f056dc121080370e981066a609647a4ac729c1975dc188dae92de58465"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/toolchain-parity.log",
+      "sha256": "0663e9dc80bac7594693bac2c394f9b68eeff85feaae6622feb1d67ad41aa730"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/toolchain-parity.result.json",
+      "sha256": "3fd8448cf035445896cdbdd764ca0036dbf47f798110b3772bc30011e7ba349e"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/ts-codegen.log",
+      "sha256": "20b92a21272f0139eec093e5aa3ee3bee30a9d2990b2a330d2218cc56e8b561a"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/ts-codegen.result.json",
+      "sha256": "717d13b9c78591035ca90de879466f08fc550628b3102d8a2959317517b8ea72"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/ts-conformance-build.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/ts-conformance-build.result.json",
+      "sha256": "b735ca91bb367dbc429de85a726ddee86f532a68d5f056271cf4b531a7cc2b5b"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/ts-node-build.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/ts-node-build.result.json",
+      "sha256": "86294932358470f762e79bf9d477360088c66d0f26dbb150c358e5c79f1f27a2"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/ts.log",
+      "sha256": "0aba39b8bfa941086612aa39d52849bfcc3913b9eaa9524cac2cd67cd63001e9"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/ts.result.json",
+      "sha256": "96fa723359805755f7f469c5e47b16ff99e751232ada432e0fd77c55c127345e"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/vector-recompute.log",
+      "sha256": "3d4d454c4f6d5f71b65bb4f2deb436d76f4544f8951163df6da1ad3766903872"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/vector-recompute.result.json",
+      "sha256": "39d6e0b1c497eae1b410e71a2451a9a2dc47cedc2859c53cdaeb69a1ccbd111d"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/wasm.log",
+      "sha256": "2bc683fb4e4f4f21ee9ee39e2b8ecce2efe20d3b1be57bda5316aa519ab3d30a"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/wasm.result.json",
+      "sha256": "9c7c42224c59dcd73d9f3da8bda8c7fdd12fcf8e979fccdd86272aee3d642204"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/wire-lock.log",
+      "sha256": "cefe653e5de2ca0bc0f9277bff864886f744e8eeb125371f7c71cd1d94b51789"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-metadata-20261004/wire-lock.result.json",
+      "sha256": "e210221375273e7f2c8ca12e619468f868d65fbb08926447c261d97a6225ab30"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-regression-native.log",
+      "sha256": "b175156ebcbc7e37e71545c9d90e34afa7d4c0381d90569dba7d4724f181d09b"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-regression-native.result.json",
+      "sha256": "4b8da7d50020dc346aafdf3f86a522c83010627398456d628e81d6ae29f1b604"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-regression-owning-tests.log",
+      "sha256": "520412b86333bd23833bb890803b7797c9cb040ab34e8142dfb3db6a6469c0ac"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-regression-owning-tests.result.json",
+      "sha256": "2f588ea723be406085e53240f543b22a3114215ead5fc04b721daaafac1dbcc3"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-regression-ts-node-build.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-regression-ts-node-build.result.json",
+      "sha256": "0e1d904df6716026406efbec0358b5c8a34353a6e52064e6d67a7a8b15991a6a"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-regression-ts.log",
+      "sha256": "827d8be3e748b6ab8563fc48c747bca21c8cd696b1a74863e568b26617196b85"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-final-regression-ts.result.json",
+      "sha256": "864abe3f1f0ce514c339b4beb2c29e8da9b88ab7cf6c5a6955f6bdb73f1eb97f"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-freeze-clippy.log",
+      "sha256": "166bf2e93990dcf48d596b97c1584d7c13c6de121c2499f10d06bd67e0f1130f"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-freeze-clippy.result.json",
+      "sha256": "eefd366f51c555f6b56775b42eafc6ee8b3cf3ebc0ba712906d596a3f055819f"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-freeze-contracts.log",
+      "sha256": "be8fcbdf758298b4b5beded309d7e5513ca56f07e554d5b31a8037e17f5e1d6f"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-freeze-contracts.result.json",
+      "sha256": "317f7d92bcc283b6ec6cb7180ed524334fbdb1d8e2fd8b70b54d39f100577877"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-freeze-format.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-freeze-format.result.json",
+      "sha256": "d9e2ad682ffac0c2475ff3b3c96944b0cc9314a98073ff01ff849dd1f551573a"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-freeze-hygiene.log",
+      "sha256": "39e9af61662de4e9d7925316c8641c1dc2aa98f28380ee6f41da84c9580eb933"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-freeze-hygiene.result.json",
+      "sha256": "00d3a921d0f05dc85a187dae7c992010ea97ebcfa60523ef3d28249f6a7d1534"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-freeze-linux-cross.log",
+      "sha256": "420a15d75a46d802e9f06bfaa94786ca17632d7f9dcf0bd187d7b241ce9b57bc"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-freeze-linux-cross.result.json",
+      "sha256": "8b1360b7732904d89c65fbe0330c62b12db6b773596eb32d045f1eeda7fa8899"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-freeze-native.log",
+      "sha256": "10588046ff0362f05fe40b13258b1431963f28a69855a298f80fe83fbbfae346"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/pre-freeze-native.result.json",
+      "sha256": "fc826ab5b2bcd973697a26c79de390ffcc658afd63f2209e83581af7610e5182"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/registry-followup-stale-p3-native.log",
+      "sha256": "1f42a534d0c8558cb20e0f5638a85c6eb75f851ccbcc1f49c12b68c21c373f23"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/registry-followup-stale-p3-native.result.json",
+      "sha256": "dd995d9ee55fd8587d7168d5435f06d4f0a7eef76fe030cc89b389b97c1f3587"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/registry-order-attempt.log",
+      "sha256": "1e451c3a4af18b7348bcd49f7bbc57b174a3c5bb423b23e5db62b4ae3be2e55c"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/registry-order-attempt.result.json",
+      "sha256": "a42e0cf0da9635d7a9154fcee2a7ab7b8828d2e5faad09c405242ef0cddf0321"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/wire-registry-attempt-owning-tests.log",
+      "sha256": "7bc3e3e97fc59bca412bfa0dbd51540e7c1757f25c2a5e10f389381d1ad69746"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/wire-registry-attempt-owning-tests.result.json",
+      "sha256": "aa1d822154dcf8f13fb090006bcf3f99acdecccd6279100935e690c726e7f03b"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/wire-registry-attempt-schemas.log",
+      "sha256": "c041435dc8babd2de696f61e2175750212c5416e67a609578bef8a1e857385e4"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diagnostics/wire-registry-attempt-schemas.result.json",
+      "sha256": "557c7e63f07099d5fa29800e6f22c074df3e53053f965cc5b24a7d37e6404c09"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diff.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/diff.result.json",
+      "sha256": "a3bd186429678a7d2d31cd4f257462df2d4e9f4385db9af4c2653cf60bb929d0"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/domains.log",
+      "sha256": "9660e42dc2a0efbad4e490330d6a6385e58a420c7c1648c95bc9031c502670af"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/domains.result.json",
+      "sha256": "c8d4f98722104e45a4000c2162954fac005c19e6540a78ad529d699accbfdf74"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/format.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/format.result.json",
+      "sha256": "aa0455e95152c95ec20a7eb525f62e4c821f808dd5cd7359e4757876873634fb"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/fresh-review-package.json",
+      "sha256": "cada576c051ba43fd1d0d5a4085e780b406a4a462537a8ecbdf64fb78ebbbc7f"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/guard-mutations.log",
+      "sha256": "ab51ea60a180dcf83532117f0b671bba89aa7c055dfab26f507de72d874d2fb6"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/guard-mutations.result.json",
+      "sha256": "b231aedcda859f280fe148441e89429a1aa86c8cc30bb4fedf87e27bd362c0dc"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/hygiene.log",
+      "sha256": "8a042dc9be100f4bb26acbd559187ef2d12a01a1a8f2688721bac34201c9e679"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/hygiene.result.json",
+      "sha256": "8aadd7ee57829f1cacd24967cda757733c93037ba170ac77971a8df555de4a70"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/inventory.py",
+      "sha256": "e1c4e2d8d207040662c09859b008306fabf95e81791e0b83aa262112fda13a02"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/kernel-doc-tests.log",
+      "sha256": "c0de5bb2c4de3484acd6f4b44f2b9a4f4f55e1c54122ee6e95539545aaae81a4"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/kernel-doc-tests.result.json",
+      "sha256": "83944fe4a5ddf672a19fded22410b13c7dc8e6e4979b012b35c25f364146bf78"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/kernel-lib.log",
+      "sha256": "01a1d4c57e480a6718b75a0c12594774a673cf1715b1a23f52c9116ccfa1d3b1"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/kernel-lib.result.json",
+      "sha256": "cdee7340fd44d086ee73199d1432209e845af045be6d2bf74d482e77fea09ed9"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/layering.log",
+      "sha256": "d86efcdb613cfdb5c7cb93fbc663ad1379d53aa619f4b44377011ce820a3a8ea"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/layering.result.json",
+      "sha256": "f48601d37ce1162c81a461f03812a97aa722a601c43a6fe6c9b2768f47c9e4ae"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/lint-parity.log",
+      "sha256": "5cdbfdb13810b2e2e148e68b501cddfe136aa2de30eda0b7ef053818dbaf1f02"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/lint-parity.result.json",
+      "sha256": "cb83008a8661ca4580dafa4882c49a5728c27aea488713ad5fe85f4760ee5864"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/linux-acceptance.log",
+      "sha256": "6358b5b3e44729e5fb9e1a1d2894b6a1ce026fc8ac0f8a0ccf3fc0b2333e30cf"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/linux-acceptance.result.json",
+      "sha256": "fe77931bfbca59a234ec4d0e5aa8400ebfcaf0c06482c1a584b8f9864779d5fe"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/linux-cross.log",
+      "sha256": "b9a09c9d7d57eb5cac3dd5bf71e05e5b4b6b59c0b9a52200eb7d26e790c973a3"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/linux-cross.result.json",
+      "sha256": "4fdf0d6634faa55ee864ae945a4714e64fef253a34284e3a932308f4c0b76a06"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/measured-linux-images.tar.gz",
+      "sha256": "3f6207d380949a52b0a9e41cef53a72fbc6523729e245c4b91d693db25296fa4"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/msrv-alloc.log",
+      "sha256": "dd621e9ff7c9eac161c730aa8a79332dd68698435a7a84d044d9ad39dfa1f5d2"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/msrv-alloc.result.json",
+      "sha256": "3132adcbe088f6f1dd522aa56674773a9736f4e638f8b3c1c4a318231625ede6"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/msrv-std.log",
+      "sha256": "8c233a54790c4800d3dd585436af679aa838da259bfdb129412e2d51cdb75cdc"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/msrv-std.result.json",
+      "sha256": "b329710a268d90eb253f71a21867e288b8c67a2912ce003a46743b2af6629dad"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/native.log",
+      "sha256": "86a09539bfce49b51ba394caea4bd194e75f3f8ca765c715a00dc5374833b67e"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/native.result.json",
+      "sha256": "e529191ada74fff790ffc3efbe26e4cf16e745a7dbd68ff487d972fdf511338d"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/owner-doc-tests.log",
+      "sha256": "f5001dc049004cc95c330c24c4810794bbee0a16179011168e7c80f851a8d3f8"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/owner-doc-tests.result.json",
+      "sha256": "28585e64166d4e4b2a03b33cfef8d65de81e81db4abbec5dae798a9fb7fa489c"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/owning-tests.log",
+      "sha256": "c6518ddc4b00809d73208e8cdfd2c429d9f2c4a6b0b1a9fc212f6a0c4c32ac0a"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/owning-tests.result.json",
+      "sha256": "26566145bc7155fd6237bb5bc23bd1fa0c4c208a3bd195463399d41e284dfb23"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/p1-native.log",
+      "sha256": "9eac81430a7b85b537bce8aeb23725fd0e0ccfdb9aa3effa91bba4d3eb67d0fc"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/p1-native.result.json",
+      "sha256": "c73ecb99d4dd747492c26ae0d4cb567f74e0afe4683507a108c6109a9ab97670"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/p2-native.log",
+      "sha256": "eb207bae14de493b0926203c900db4cfbfaae90c94f1c5003ac2fbf9e16c2d71"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/p2-native.result.json",
+      "sha256": "0460c5a6e7225d60e7bb0af0c21636c864323092615b8f94e9371d895222e959"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/p3-native.log",
+      "sha256": "6161a222bae7c0433a8bcd177925941d3992c79bea2f0ebc385fa7f87068ca52"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/p3-native.result.json",
+      "sha256": "005c93121df7dd7ced8f0b2a424697a7a5a51d2a78a5448ca8072c48bf278339"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/p4-native.log",
+      "sha256": "e3447ef5f639f76a7d76ec5324d41c36ed79089b76eeaff403361126b59cd367"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/p4-native.result.json",
+      "sha256": "e5ccd7a87cfb9642c748f10d40a2b6db4d2f42571a8cbff991b0f2415029a4c0"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/p4-source-baseline.tar.gz",
+      "sha256": "2537de39f1763b0db16a6b0d8ef0ec608c52356009b9040ff5a9b52f99ec7fdf"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/p5-final-sources.tar.gz",
+      "sha256": "85c9c7f4903c3a3c8a9e89c89141ade9a23caf3b1ad3120b0a4d42284d801085"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/package-mutations.log",
+      "sha256": "7d8f29c8bef62a1e97beadd5ebc9243ba9b074c6ecfd309f2c284a66a84363b4"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/package-mutations.result.json",
+      "sha256": "fad7219de21e4a89958d718ea541a55c54e2a6cebfaa7fa8a1ed3d891eb1662c"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/pure-guard.log",
+      "sha256": "833390d11d2e74f4ccffd89b62f912a30db6db7a3c5bdf9a8780581dc9f07480"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/pure-guard.result.json",
+      "sha256": "5d7faba98522ef248fa972e1ae6e2f77a17be22ff24b86525f437a560dbf1407"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/python-codegen.log",
+      "sha256": "d7136f17e964a095ebe3f34a4687ac606bacc824bbb3eb6ec12a23872b611e13"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/python-codegen.result.json",
+      "sha256": "f1acfa00fb313535bcad136c93796a0870b3de3c5a83c1c7e37009e1138c59fc"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/python.log",
+      "sha256": "551afa82290451580fd3c678c0ce36768695db7ac339e9f5160f17ce4eb3c6bd"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/python.result.json",
+      "sha256": "37c8e14c7c0b52633b162bde7dd4bcd645d611b099e02bc47874c1989b6f3643"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/run-gates.py",
+      "sha256": "3f162b7db5b939133896c3cbda83904ca6183a717cc44afbb2e10a7ec32c0d4f"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/run-linux-acceptance.py",
+      "sha256": "7c76e56d934427d58db3d7a25756b7076b6056633edf696f55f6c5a04dbd0a7f"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/rust-codegen.log",
+      "sha256": "7ebaa967d9e31b579f9af4065c00b37f0f2ee18761a1ac930f11cbc5e9083169"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/rust-codegen.result.json",
+      "sha256": "d5e3e9d0bfb4ce2771dc143504d7feff57f28830ec8e18540ae655ea17e5522d"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/schemas.log",
+      "sha256": "f08ca40211ee4cf16919c55a0c548472ee01a0ff6808eadb1e60a66f4aa43553"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/schemas.result.json",
+      "sha256": "105c57d93ec752a16e4decee62b8cba9e862ac78539dba87e16ee29d77c3bc5b"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/seal-package.py",
+      "sha256": "7f83893e901d2ca1769bc2ea88fdd40202d64eb28f323ac74a72ca1a00bc2c27"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/std.log",
+      "sha256": "8c233a54790c4800d3dd585436af679aa838da259bfdb129412e2d51cdb75cdc"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/std.result.json",
+      "sha256": "3caa493df2d55b8a7f39d407243206b459a40eec6ec44415129edae10ce6ac71"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/store-doc-tests.log",
+      "sha256": "2dbb44debe33b2bca5dea24a5315ac35396f776b79b84749bfe5b78dcf8ef0eb"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/store-doc-tests.result.json",
+      "sha256": "1aac11bc629fa3175f942912e32e8d60b82fb17fa7a94e0dfcc0a9423e032854"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/store-native.log",
+      "sha256": "73b07c10b48fc94ba2c85ef80a7747f21e8b810aefbb224fbfcd30bf9762227c"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/store-native.result.json",
+      "sha256": "9c3c59307f24a6407e8e294a95187af48664f4483c52b92746a48baa64263863"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/store-ordering.log",
+      "sha256": "2363be14dc550813dc7652f9dd3b10fcfe3d8425d9c6ba01615d78c42af7acd7"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/store-ordering.result.json",
+      "sha256": "9954d17461336c21646bcf7150c25644a888d6c80d34aa79b0607e8367b1a2da"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/store-regression.log",
+      "sha256": "8e7bd1be8ad0d8f7ea19e19d97529caf88f430b55a1a0a5dfc7de64f6702c3b4"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/store-regression.result.json",
+      "sha256": "fd5a62c26979a0973c38e3ec6c1e82387f1e250b94464e1498a0e6c032dc9831"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/store-schema.log",
+      "sha256": "9f071b962ff0b1145ed1693a4d44846ff8c34d0648cfe237751fdf26e18f87cf"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/store-schema.result.json",
+      "sha256": "5c600e673868b474168439803e8abd27aa408b31a543d963448d79e7fb0c1435"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/toolchain-parity.log",
+      "sha256": "0663e9dc80bac7594693bac2c394f9b68eeff85feaae6622feb1d67ad41aa730"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/toolchain-parity.result.json",
+      "sha256": "601924b8c8c687c824ddb8c968fea34989732afd0e1db736ee6ff5d54a755ce5"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/tooling.json",
+      "sha256": "3b93572b8b7752e9df0c8dc64d6b143751e188cabec309681dae8f2e553f59a2"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/ts-codegen.log",
+      "sha256": "20b92a21272f0139eec093e5aa3ee3bee30a9d2990b2a330d2218cc56e8b561a"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/ts-codegen.result.json",
+      "sha256": "1ec0c9ca9936084f201cb23ee737a8bfc437fe640c976b797e17dbdca3cb7988"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/ts-conformance-build.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/ts-conformance-build.result.json",
+      "sha256": "9a6342bef6600201f15bd2015c482a3b3bd1a49b534788ca6f220e3dc357dd4d"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/ts-node-build.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/ts-node-build.result.json",
+      "sha256": "60897f85d20e21a7cac599551ac7ef7b3a2d1dcbb8d3f77ed0ab453df12bdf0f"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/ts.log",
+      "sha256": "d41d1855be3e67f2c229940c47f0e38b41d6705f2637d7dd11a150491c03d5ae"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/ts.result.json",
+      "sha256": "1db563d9324876561538486889d4ea22447873b49e59a2fef9dab9bd96d2c104"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/vector-recompute.log",
+      "sha256": "6379b8705b14bd7c14b4966b0bb42145a3cf185fd2a65299c6949b858776ccf2"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/vector-recompute.result.json",
+      "sha256": "628515860f02a607362479954ad392e43bfb02657a4790d8c2a257082011c8eb"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/verify-package-mutations.script.txt",
+      "sha256": "f352e0f9a312de0c57c11391eb826a9240143d0316c59f8c776f06bc03d1208b"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/verify-package.py",
+      "sha256": "6001cc9715872f9044d1635edb2ae7ed998864223a0990a668bc9ef6f468e3d9"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/verify-vectors.py",
+      "sha256": "a77dbef21f8c58d80c9d821622068f3bf6a1a15e79272d2f19e6fba650ddf930"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/wasm.log",
+      "sha256": "f2066ca264b9a8598ecd436c70919e1efe1acea4098ad2a13b5d82d67bc049ec"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/wasm.result.json",
+      "sha256": "b62d96f9c664bdbd1566d6563106141ff4ad584bdff879d6af5f3aadb5c8a329"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/wire-lock.log",
+      "sha256": "cefe653e5de2ca0bc0f9277bff864886f744e8eeb125371f7c71cd1d94b51789"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/wire-lock.result.json",
+      "sha256": "d998c90d10e2c9c22f5ec68ddef89bb1bcf0462ad9b3d292a59db9ace6988fb7"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/final-source-snapshot.json",
+      "sha256": "309833d820f59f7cc2b6a7879c2433d81e98efdb734fb3197e786e57a6a25c9a"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/package-integrity.json",
+      "sha256": "95f97066981d3d7daf91bee2557e47f94b149c290f1c62f9bbc5a76f62f766f7"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/requirements-coverage.json",
+      "sha256": "1b6d1a4b0bb9ff8d0d2ccac77276ad93b3b76c134bb01a9fa1e964c5550d26d8"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/review-manifest.json",
+      "sha256": "e9f6fa136dfac57f4e9fc2f8868d71bdbedc17a1ed71ae6b2cbb45260978abc6"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/source-baseline.json",
+      "sha256": "1d2a188e44ad2e91ba206d3f9b952fd7a7d92eae9233a3a6274c38a07adfc82e"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/implementation/p5/verification.json",
+      "sha256": "b86e41aa402f12973d9e93c7df0b2dac035d4beaa362582b893d2fba06b1ab60"
+    }
+  ],
+  "archive": "evidence/p5-sealed-package.tar.gz",
+  "archive_sha256": "07043522f659e9b25ae6c9509a1a9e2d57a8425d93e07b241d7d89980b3a412a",
+  "p5_source_snapshot": {
+    "schema": "chio.recovery-p5-final-source-snapshot.v1",
+    "source_binding": "562a3c3556f31e5afedbd7c7a426e542cc5e8cd51c28a7a43d8e9704ba4e9bc4",
+    "source_count": 643,
+    "source_archive": "evidence/p5-final-sources.tar.gz",
+    "source_archive_sha256": "85c9c7f4903c3a3c8a9e89c89141ade9a23caf3b1ad3120b0a4d42284d801085",
+    "measured_image_archive": "evidence/measured-linux-images.tar.gz",
+    "measured_image_archive_sha256": "3f6207d380949a52b0a9e41cef53a72fbc6523729e245c4b91d693db25296fa4"
+  }
+}

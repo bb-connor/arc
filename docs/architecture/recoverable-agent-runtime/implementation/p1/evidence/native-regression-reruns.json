@@ -1,0 +1,72 @@
+[
+  {
+    "command": [
+      "target/debug/deps/chio_control_plane-5c9ace6eaedcddb3",
+      "security::adapters::tests::native_flow::support::capture::combined_credentials::nested::native_declassification_supports_public_nested_sync_and_async_with_all_credentials",
+      "--exact",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "exit_code": 0,
+    "log": "evidence/native-regression-reruns/native_declassification_supports_public_nested_sync_and_async_with_all_credentials.log",
+    "sha256": "13eae78d387ccd48efd57edd0c210dbb49f4fb92fe9f2260bfb5dbbbe2db1235",
+    "elapsed_seconds": 103.747,
+    "original_log_path": "target/recovery-p1-native-regression-reruns/native_declassification_supports_public_nested_sync_and_async_with_all_credentials.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/chio_control_plane-5c9ace6eaedcddb3",
+      "security::adapters::tests::native_flow::support::capture::combined_credentials::nested::native_captured_lifecycle_supports_public_nested_sync_and_async_dispatch",
+      "--exact",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "exit_code": 0,
+    "log": "evidence/native-regression-reruns/native_captured_lifecycle_supports_public_nested_sync_and_async_dispatch.log",
+    "sha256": "85126937ded6397697f3baac40aaf82c7856cf378dcfacafab71aa947d87084f",
+    "elapsed_seconds": 59.449,
+    "original_log_path": "target/recovery-p1-native-regression-reruns/native_captured_lifecycle_supports_public_nested_sync_and_async_dispatch.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/chio_control_plane-5c9ace6eaedcddb3",
+      "security::adapters::tests::native_flow::support::capture::combined_credentials::nested::public_nested_native_capture_retains_runtime_approval_and_dpop_for_local_and_egress",
+      "--exact",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "exit_code": 0,
+    "log": "evidence/native-regression-reruns/public_nested_native_capture_retains_runtime_approval_and_dpop_for_local_and_egress.log",
+    "sha256": "f8ab267bf44e2f944e65c9dc703fe31f23e54592532e666281cc8cf068098a29",
+    "elapsed_seconds": 24.867,
+    "original_log_path": "target/recovery-p1-native-regression-reruns/public_nested_native_capture_retains_runtime_approval_and_dpop_for_local_and_egress.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/chio_control_plane-5c9ace6eaedcddb3",
+      "security::adapters::tests::native_flow::support::capture::native_atomic_capture_faults_roll_back_budget_and_operation_together",
+      "--exact",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "exit_code": 0,
+    "log": "evidence/native-regression-reruns/native_atomic_capture_faults_roll_back_budget_and_operation_together.log",
+    "sha256": "f899dd4f748243d2726ccf0c212fb521fbd8ae711d1e4c73babdbc86fd0f04b0",
+    "elapsed_seconds": 14.773,
+    "original_log_path": "target/recovery-p1-native-regression-reruns/native_atomic_capture_faults_roll_back_budget_and_operation_together.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/chio_control_plane-5c9ace6eaedcddb3",
+      "security::adapters::tests::native_flow::support::capture::native_atomic_capture_retains_quota_and_ledger_without_tool_effect",
+      "--exact",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "exit_code": 0,
+    "log": "evidence/native-regression-reruns/native_atomic_capture_retains_quota_and_ledger_without_tool_effect.log",
+    "sha256": "377909f92052905a043530dbfe1fb4fac09aaaa01c08dc3a8f0896fd37335fab",
+    "elapsed_seconds": 7.775,
+    "original_log_path": "target/recovery-p1-native-regression-reruns/native_atomic_capture_retains_quota_and_ledger_without_tool_effect.log"
+  }
+]

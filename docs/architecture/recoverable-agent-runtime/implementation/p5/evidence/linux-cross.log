@@ -1,0 +1,2 @@
+Cross compilation only: cargo clippy --offline --locked -p chio-cage -p chio-control-plane --all-targets --features chio-cage/enforcement-mutants --target x86_64-unknown-linux-musl -- -D warnings
+    Finished `dev` profile [unoptimized] target(s) in 1.82s

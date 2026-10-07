@@ -1,0 +1,20 @@
+.E........
+======================================================================
+ERROR: test_baseline (unittest.loader._FailedTest.test_baseline)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_baseline
+Traceback (most recent call last):
+  File "/opt/homebrew/Cellar/python@3.14/3.14.4/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/loader.py", line 426, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/opt/homebrew/Cellar/python@3.14/3.14.4/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/loader.py", line 367, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/fixtures/recovery-product/test_baseline.py", line 4, in <module>
+    import httpx
+ModuleNotFoundError: No module named 'httpx'
+
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.020s
+
+FAILED (errors=1)

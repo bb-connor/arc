@@ -1,0 +1,11 @@
+
+running 6 tests
+test dispatch_rejects_audience_mismatch_fail_closed ... ok
+test dispatch_rejects_empty_signature_fail_closed ... ok
+test dispatch_rejects_expired_capability_fail_closed ... ok
+test dispatch_accepts_valid_capability ... ok
+test dispatch_rejects_foreign_issuer_signature_fail_closed ... ok
+test verifier_is_send_sync_and_shared_behind_arc ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

@@ -1,0 +1,1 @@
+Both public ESM and CommonJS RecoveryClient exports pass endpoint refusal and benign construction.

@@ -1,0 +1,18 @@
+   Compiling chio-control-plane v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-control-plane)
+    Finished `test` profile [unoptimized] target(s) in 58.33s
+     Running unittests src/lib.rs (target/recovery-p5-linux/host/debug/deps/chio_control_plane-6f8003448d0ced3f)
+
+running 10 tests
+test recovery::tests::knowledge::host::p6_setup_new_work_native_capture_after_real_qualified_restart ... ok
+test recovery::tests::knowledge::setup::cli_host::p6_setup_cli_qualification_host ... ignored, private CLI host; execute with CHIO_P6_CLI_EXCHANGE and an actual CLI controller
+test recovery::tests::knowledge::setup::p6_setup_cannot_accept_a_new_native_semantic_plan_before_ready ... ok
+test recovery::tests::knowledge::setup::p6_setup_every_foreign_binding_and_old_profile_refuses ... ok
+test recovery::tests::knowledge::setup::p6_setup_initial_operator_bootstrap_binds_after_approval_and_restarts_once ... ok
+test recovery::tests::knowledge::setup::p6_setup_lost_live_broker_refuses_the_protected_review_route ... ok
+test recovery::tests::knowledge::setup::p6_setup_missing_broker_and_failed_benign_cannot_unlock_work ... ok
+test recovery::tests::knowledge::setup::p6_setup_preapproval_pin_binds_once_without_changing_after_capture ... ok
+test recovery::tests::knowledge::setup::p6_setup_profile_change_between_preflight_and_native_capture_refuses ... ok
+test recovery::tests::knowledge::setup::p6_setup_real_restart_recovers_the_identical_operation_once ... ok
+
+test result: ok. 9 passed; 0 failed; 1 ignored; 0 measured; 1272 filtered out; finished in 235.07s
+

@@ -24,9 +24,35 @@ The first deliverable is a private support ticket converted into one owner-appro
 10. [Delivery plan and architectural decisions](10-delivery-decisions.md): dependency-ordered implementation, rejection criteria and unresolved deployment choices.
 11. [Contract catalog](11-contract-catalog.md): required signed fields, digest framing, authority ports and storage constraints.
 
-[Requirements](requirements.json) map every numbered acceptance obligation to its owning specification, proposed test and delivery phase. The [source crosswalk](source-map.md) explains current-code evidence, and [source inventory](source-map.json) records input hashes. [Validation](validation.json) reports document checks; [model evidence](model/results.txt) reports bounded architecture exploration. Neither substitutes for implementation qualification.
+[Requirements](requirements.json) map every numbered acceptance obligation to its owning specification, proposed test and delivery phase. The [source crosswalk](source-map.md) explains the historical architecture inputs, and [source inventory](source-map.json) records input hashes. [Validation](validation.json) retains historical document checks; [model evidence](model/results.txt) reports bounded architecture exploration. Neither substitutes for implementation qualification.
 
-From the development checkout root, run `python3 docs/architecture/recoverable-agent-runtime/check.py --write-report` to verify document traceability, local links and pinned source inputs. The [model instructions](model/README.md) reproduce the separate Rust protocol exploration. The validator checks retained model evidence; it does not compile or rerun the model itself.
+From the development checkout root, run `python3 docs/architecture/recoverable-agent-runtime/check.py --source-revision de84fc306` to verify document traceability, local links and the architecture's historical source inputs after implementation begins. Omitting `--source-revision` checks the working tree and rejects source/build-input drift from the architecture baseline. Historical validation reports its explicit revision and does not qualify the changed implementation. The [model instructions](model/README.md) reproduce the separate Rust protocol exploration. The validator checks retained model and foundation-test evidence; it does not compile or rerun either itself.
+
+The current implementation state is [remediation and pending requalification](implementation/STATUS.md).
+The P0-P6 implementation is present. Phase completion and review closure in the
+retained records apply to their exact source inventories and declared profiles,
+which precede the naming cleanup and current runtime repairs. They do not
+establish current-source qualification or absence of open review findings.
+
+| Historical phase record | Retained scope |
+|---|---|
+| [P0 plan](implementation/p0/PLAN.md), [review](implementation/p0/REVIEW.md), [verification](implementation/p0/verification.json) | Contracts, pure dependency boundaries, resource ceilings and local assurance baseline. |
+| [P1 plan](implementation/p1/PLAN.md), [review](implementation/p1/REVIEW.md), [verification](implementation/p1/verification.json), [operations](implementation/p1/OPERATIONS.md) | Sequential native support disclosure, exact durable recovery and its recorded local acceptance. |
+| [P2 plan](implementation/p2/PLAN.md), [review](implementation/p2/REVIEW.md), [verification](implementation/p2/verification.json), [operations](implementation/p2/OPERATIONS.md) | Bounded advisory explanations, audience projection and fresh native refusal. |
+| [P3 plan](implementation/p3/PLAN.md), [review](implementation/p3/REVIEW.md), [verification](implementation/p3/verification.json), [operations](implementation/p3/OPERATIONS.md) | Bounded native support reads, issue creation and field projection. |
+| [P4 plan](implementation/p4/PLAN.md), [review](implementation/p4/REVIEW.md), [verification](implementation/p4/verification.json), [operations](implementation/p4/OPERATIONS.md) | Host-private Unix SQLite artifacts, labeled checkpoints, restore, adoption and collection. |
+| [P5 plan](implementation/p5/PLAN.md), [review](implementation/p5/REVIEW.md), [verification](implementation/p5/verification.json), [operations](implementation/p5/OPERATIONS.md) | Sealed Boolean-only, model-disabled GNU/musl Linux acceptance at source binding `562a3c35`. |
+| [P6 plan](implementation/p6/P6-PRODUCT-PLAN.md), [review](implementation/p6/REVIEW.md), [verification](implementation/p6/verification.json), [supported matrix](implementation/p6/supported-matrix.json) | Archived local, Linux and finite live qualification at runtime binding `b1bcd48c` and qualification binding `3a13a9bc`. |
+
+Full bindings, archive hashes, review scopes, retained failures and unknown
+outcomes are stated in [execution status](implementation/STATUS.md). At the
+cumulative review snapshot, 113 of 735 P6-qualified sources differed after naming
+cleanup; subsequent repairs add further drift. The retained package auditors
+refuse the current working tree. Fresh repair review, owning regressions and
+source/profile-bound requalification are required before a qualified candidate
+can enter release integration. Linux, live providers, formal tools, hosted CI
+and production acceptance remain separate evidence dimensions. The roadmap ends
+at P6; the next work is remediation and requalification.
 
 The [October 2 principal-engineering review](review-2026-10-02.md) records the material corrections in revision 2, their rationale, and the limits of the retained verification.
 
@@ -91,7 +117,7 @@ There are three different classes of object: untrusted requests, authenticated h
 
 ## Design confidence
 
-High: preserving immutable call identity, using native capture, separating effect truth from receipt verdict, refusing unknown-outcome retries, and keeping labels through memory/return mediation. These decisions are grounded in inspected current source and the earlier 104-test research result.
+High: preserving immutable call identity, using native capture, separating effect truth from receipt verdict, refusing unknown-outcome retries, and keeping labels through memory/return mediation. These decisions are grounded in the inspected architecture-baseline source and the earlier 104-test research result.
 
 Moderate: the proposed recovery participant can be added without broad changes to capture latency or storage contention; scoped version observations can make approval practical; artifact and isolated-return mediation can share existing guards. These require the implementation phases and their failure campaigns.
 

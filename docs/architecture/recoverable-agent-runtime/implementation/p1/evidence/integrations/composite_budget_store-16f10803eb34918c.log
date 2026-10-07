@@ -1,0 +1,41 @@
+
+running 36 tests
+test authority_mismatch_does_not_consume_capture_event_or_reservation ... ok
+test capture_event_identity_includes_trusted_time ... ok
+test capture_and_terminal_authorization_replay_require_exact_events ... ok
+test authorization_replay_fails_after_release_or_approval_attachment ... ok
+test composite_admission_cannot_omit_an_existing_grant_quota ... ok
+test composite_authorization_requires_leaf_revocation_coverage ... ok
+test composite_authorization_reserves_and_captures_every_quota ... ok
+test cumulative_threshold_boundary_requires_approval_before_capture ... ok
+test concurrency_and_properties::real_threads_serialize_cumulative_sixty_plus_sixty ... ok
+test denied_legacy_calls_do_not_define_quota_maxima ... ok
+test concurrency_and_properties::real_threads_cannot_partially_reserve_overlapping_quota_sets ... ok
+test direct_legacy_authorization_inherits_legacy_quota_and_rejects_structured_history ... ok
+test exact_authorization_replay_is_stable_and_identifier_reuse_fails_closed ... ok
+test family_siblings_share_authority_account_but_keep_effective_thresholds ... ok
+test exhausted_member_denies_without_reserving_other_quotas_or_exposure ... ok
+test fully_released_monetary_hold_cannot_capture_invocation ... ok
+test held_monetary_settlement_requires_dispatch_capture_without_poisoning_state ... ok
+test legacy_admission_cannot_bypass_denied_or_reversed_composite_history ... ok
+test legacy_admission_cannot_skip_a_live_composite_quota ... ok
+test legacy_charge_cannot_bypass_or_redefine_structured_grant_maximum ... ok
+test malformed_quota_sets_are_rejected_before_state_changes ... ok
+test legacy_increment_reverse_restores_grant_quota_and_allows_retry ... ok
+test operation_id_cannot_move_to_a_different_hold_or_event ... ok
+test concurrency_and_properties::any_exhausted_quota_keeps_the_other_composite_members_unchanged ... ok
+test no_hold_legacy_mutations_cannot_touch_live_composite_hold ... ok
+test partially_released_legacy_capture_cancels_remaining_exposure ... ok
+test quota_maximum_is_immutable_and_failed_change_does_not_mutate_usage ... ok
+test pending_approval_timeout_and_attachment_have_one_cas_winner ... ok
+test raw_legacy_mutations_reject_invalid_and_reserved_identities ... ok
+test supplemental_capture_rechecks_exclusive_artifact_expiry ... ok
+test reversing_composite_hold_restores_every_reservation_and_exposure ... ok
+test supplemental_capture_missing_time_can_retry_without_state_change ... ok
+test unstructured_rich_authorization_remains_reversible ... ok
+test zero_exposure_invocation_reverse_preserves_released_monetary_state ... ok
+test zero_unit_monetary_mutations_cannot_cross_captured_composite_fence ... ok
+test unheld_legacy_terminals_cannot_mutate_after_structured_history ... ok
+
+test result: ok. 36 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

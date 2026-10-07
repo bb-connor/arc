@@ -1,0 +1,85 @@
+    Blocking waiting for file lock on artifact directory
+    Finished `test` profile [unoptimized] target(s) in 2.19s
+     Running unittests src/lib.rs (target/debug/deps/chio_control_plane-6d760a2608e455ae)
+
+running 18 tests
+test recovery::tests::additional_refusals::recovery_p1_constrained_control_tokens_cannot_skip_their_enforcement ... ok
+test recovery::tests::additional_refusals::recovery_p1_current_preview_clearance_does_not_leak_the_retained_payload ... ok
+test recovery::tests::additional_refusals::recovery_p1_equal_labels_with_a_new_foreign_generation_are_stale ... ok
+test recovery::tests::additional_refusals::recovery_p1_protected_identity_and_history_tampering_fail_closed ... ok
+test recovery::tests::recovery_p1_cancel_after_capture_preserves_effect_and_no_lock_spans_await ... ok
+test recovery::tests::recovery_p1_cancel_negative_lookup_fences_late_original_admission ... ok
+test recovery::tests::recovery_p1_command_replay_conflict_rotation_and_revocation ... ok
+test recovery::tests::recovery_p1_crash_child ... ignored, only the fresh-process P1 parent starts this child
+test recovery::tests::recovery_p1_expired_initiating_authority_cannot_renew_pending_work ... ok
+test recovery::tests::recovery_p1_export_signed_vectors ... ignored, explicit regeneration of public synthetic P1 conformance vectors
+test recovery::tests::recovery_p1_fresh_process_cutpoints_preserve_original_ownership ... FAILED
+test recovery::tests::recovery_p1_frozen_denial_gets_a_distinct_successful_native_continuation ... ok
+test recovery::tests::recovery_p1_native_disclosure_once_and_exact_receipt_replay ... FAILED
+test recovery::tests::recovery_p1_partial_finality_is_positive_scoped_and_spends_the_original ... ok
+test recovery::tests::recovery_p1_rotated_scope_refuses_pending_approval_without_replacing_identity ... ok
+test recovery::tests::recovery_p1_transport_closed_replay_and_audience_refusals ... ok
+test recovery::tests::recovery_p1_two_coordinators_select_once_and_review_exact_payload ... ok
+test recovery::tests::recovery_p1_workflow_flood_retains_settlement_and_tombstones ... ok
+
+failures:
+
+---- recovery::tests::recovery_p1_fresh_process_cutpoints_preserve_original_ownership stdout ----
+P1_CUTPOINT creation before=0 after=1 effect=Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }
+P1_CUTPOINT action before=0 after=1 effect=Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }
+P1_CUTPOINT reservation before=0 after=1 effect=Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }
+P1_CUTPOINT reservation-attached before=0 after=1 effect=Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }
+P1_CUTPOINT selection before=0 after=1 effect=Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }
+P1_CUTPOINT review before=0 after=1 effect=Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }
+P1_CUTPOINT approval before=0 after=1 effect=Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }
+P1_CUTPOINT issuance before=0 after=1 effect=Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }
+P1_CUTPOINT signed before=0 after=1 effect=Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }
+P1_CUTPOINT signature-attached before=0 after=1 effect=Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }
+P1_CUTPOINT envelope before=0 after=1 effect=Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }
+P1_CUTPOINT process-finalized before=0 after=1 effect=Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }
+P1_CUTPOINT admission before=0 after=0 effect=ClosedBeforeEffect { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(6) }, closure: EvidenceRef([redacted]) }
+P1_CUTPOINT capture-before-commit before=0 after=0 effect=ClosedBeforeEffect { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(6) }, closure: EvidenceRef([redacted]) }
+P1_CUTPOINT capture-before-anchor before=0 after=0 effect=Unknown { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(7) } }
+P1_CUTPOINT effect before=1 after=1 effect=Unknown { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(7) } }
+P1_CUTPOINT return-recorded before=1 after=1 effect=Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }
+P1_CUTPOINT evaluation before=1 after=1 effect=Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }
+P1_CUTPOINT resolved before=1 after=1 effect=Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }
+P1_CUTPOINT release-ack before=1 after=1 effect=Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }
+P1_CUTPOINT release-checkpoint before=1 after=1 effect=Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }
+P1_CUTPOINT terminal before=1 after=1 effect=Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }
+P1_CUTPOINT returned-response before=1 after=1 effect=Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }
+P1_CUTPOINT projection before=1 after=1 effect=Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }
+P1_CUTPOINT nonce-preflight before=0 after=1 effect=Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(10) }, effect_count: SafeInteger(1) }
+P1_CUTPOINT nonce-attached before=0 after=1 effect=Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(10) }, effect_count: SafeInteger(1) }
+
+thread 'recovery::tests::recovery_p1_fresh_process_cutpoints_preserve_original_ownership' (20454098) panicked at crates/platform/chio-control-plane/src/recovery/tests.rs:923:9:
+assertion `left == right` failed: return-recorded-revoked: 
+running 1 test
+Error: "child did not reach its declared cutpoint"
+test recovery::tests::recovery_p1_crash_child ... FAILED
+
+failures:
+
+failures:
+    recovery::tests::recovery_p1_crash_child
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1178 filtered out; finished in 5.07s
+
+
+  left: None
+ right: Some(6)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- recovery::tests::recovery_p1_native_disclosure_once_and_exact_receipt_replay stdout ----
+
+thread 'recovery::tests::recovery_p1_native_disclosure_once_and_exact_receipt_replay' (20480391) panicked at crates/platform/chio-control-plane/src/recovery/tests.rs:545:9:
+RecoveryCommandResponseV1 { command_id: CommandId([redacted]), workflow_id: WorkflowId([redacted]), revision: SafeInteger(11), control: Active, effect: ClosedBeforeEffect { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, closure: EvidenceRef([redacted]) }, release: NotAvailable }
+
+
+failures:
+    recovery::tests::recovery_p1_fresh_process_cutpoints_preserve_original_ownership
+    recovery::tests::recovery_p1_native_disclosure_once_and_exact_receipt_replay
+
+test result: FAILED. 14 passed; 2 failed; 2 ignored; 0 measured; 1160 filtered out; finished in 502.51s
+
+error: test failed, to rerun pass `-p chio-control-plane --lib`

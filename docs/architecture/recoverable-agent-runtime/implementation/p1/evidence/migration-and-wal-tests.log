@@ -1,0 +1,216 @@
+   Compiling chio-store-sqlite v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-store-sqlite)
+    Finished `test` profile [unoptimized] target(s) in 37.18s
+     Running unittests src/lib.rs (target/debug/deps/chio_store_sqlite-f6bc21373ae2eaa6)
+
+running 4 tests
+test admission_operation_store::recovery::resources::tests::recovery_p1_pinned_reader_wal_headroom_refuses_intake_and_preserves_committed_data ... ok
+test admission_operation_store::tests::schema::recovery::recovery_p1_migration_crash_child ... ignored, only the fresh-process migration parent starts this child
+test admission_operation_store::tests::schema::recovery::recovery_p1_os_death_before_upgrade_commit_is_restartable_and_byte_preserving ... ok
+test admission_operation_store::tests::schema::recovery::recovery_p1_populated_v34_upgrade_preserves_original_operations_and_global_chain ... ok
+
+test result: ok. 3 passed; 0 failed; 1 ignored; 0 measured; 1831 filtered out; finished in 3.79s
+
+     Running tests/approval_store.rs (target/debug/deps/approval_store-55d21878dd90059f)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/caller_execution_ledger.rs (target/debug/deps/caller_execution_ledger-8289b1e03d8eace8)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+     Running tests/capability_set_suspensions.rs (target/debug/deps/capability_set_suspensions-9e01b6f165e77b85)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+     Running tests/containment_overlay_commands.rs (target/debug/deps/containment_overlay_commands-0d17fe2164f153c5)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+     Running tests/egress_restrictions.rs (target/debug/deps/egress_restrictions-073479cae2c09127)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+     Running tests/enterprise_migration_state.rs (target/debug/deps/enterprise_migration_state-3aea772401d93196)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s
+
+     Running tests/execution_nonce_caller_execution.rs (target/debug/deps/execution_nonce_caller_execution-d2560c6e37b02f6b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 0.00s
+
+     Running tests/execution_nonce_cumulative_approval.rs (target/debug/deps/execution_nonce_cumulative_approval-8e38e854989f6fd7)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+     Running tests/execution_nonce_kernel_lifecycle.rs (target/debug/deps/execution_nonce_kernel_lifecycle-455ed804a405cb8d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 17 filtered out; finished in 0.00s
+
+     Running tests/execution_nonce_remote_delivery.rs (target/debug/deps/execution_nonce_remote_delivery-0af797c70b2d99e9)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.00s
+
+     Running tests/execution_nonce_store.rs (target/debug/deps/execution_nonce_store-e6eec8fc747d2300)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+     Running tests/finding_pool_ledger.rs (target/debug/deps/finding_pool_ledger-1b532dbde325f3cd)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 38 filtered out; finished in 0.00s
+
+     Running tests/formal_projection.rs (target/debug/deps/formal_projection-5446e29639fc5971)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+     Running tests/frost_coordinator.rs (target/debug/deps/frost_coordinator-c36acc53589151c2)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+     Running tests/frost_rotation.rs (target/debug/deps/frost_rotation-787ea4e78f17f29d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+     Running tests/frost_rotation_activation.rs (target/debug/deps/frost_rotation_activation-4f95a3134690b5bf)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running tests/frost_signer.rs (target/debug/deps/frost_signer-cb3e6dd0f14315c5)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/governed_approval_kernel_replay.rs (target/debug/deps/governed_approval_kernel_replay-f22f422535f4f867)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running tests/integration_smoke.rs (target/debug/deps/integration_smoke-cca3cb81fdcc0971)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+     Running tests/issuance_freezes.rs (target/debug/deps/issuance_freezes-def5f400e149a45d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/loom_receipt_writer.rs (target/debug/deps/loom_receipt_writer-4f4854a043cc1005)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/memory_provenance_store.rs (target/debug/deps/memory_provenance_store-3f4c534d6ede6287)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s
+
+     Running tests/native_authority_binding.rs (target/debug/deps/native_authority_binding-a4d5b7d999ca945e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s
+
+     Running tests/receipt_retention_liveness.rs (target/debug/deps/receipt_retention_liveness-d55ef59fb7704e05)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+     Running tests/response_dispatch.rs (target/debug/deps/response_dispatch-b74ccf5cc8da9876)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.00s
+
+     Running tests/sealed_decoy_registry.rs (target/debug/deps/sealed_decoy_registry-234656cb8780623f)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 24 filtered out; finished in 0.00s
+
+     Running tests/security_release_recovery.rs (target/debug/deps/security_release_recovery-a97e4e9ef6a41308)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 25 filtered out; finished in 0.00s
+
+     Running tests/security_state.rs (target/debug/deps/security_state-4051f6e9167f3ac0)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 0.00s
+
+     Running tests/security_state_contract.rs (target/debug/deps/security_state_contract-da1ad2cfa3c665b9)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+     Running tests/session_throttles.rs (target/debug/deps/session_throttles-d531414feb1dfbf6)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+     Running tests/settle_attempts_races.rs (target/debug/deps/settle_attempts_races-35f34c6d71a7bc67)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running tests/tenant_isolation.rs (target/debug/deps/tenant_isolation-7d04d0b97f8bf18c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+     Running tests/threshold_collector_recovery.rs (target/debug/deps/threshold_collector_recovery-d1d5d7b6b3518b38)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.00s
+
+     Running tests/threshold_kernel_lifecycle.rs (target/debug/deps/threshold_kernel_lifecycle-721d58a9af2b3ed4)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+

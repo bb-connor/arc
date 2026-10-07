@@ -1,0 +1,19 @@
+{
+  "id": "ts-node-build",
+  "actual_command": [
+    "node",
+    "node_modules/typescript/bin/tsc",
+    "-p",
+    "packages/node-http/tsconfig.json"
+  ],
+  "cwd": "sdks/typescript",
+  "environment": {},
+  "exit_code": 2,
+  "status": "failed",
+  "started_unix_seconds": 1791160412,
+  "duration_seconds": 1.563,
+  "log": "evidence/ts-node-build.log",
+  "log_sha256": "1bd92af3d19a3a028f718734569e32a424b4f8a8aaa6c555870244a1418b49b0",
+  "required_for_local_phase_acceptance": true,
+  "source_binding": "05aa889df57391692c09ef64d3ec178184f5d48c4bd4b6d3a654f470b00e079f"
+}

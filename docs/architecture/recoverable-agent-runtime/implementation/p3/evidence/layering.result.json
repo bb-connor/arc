@@ -1,0 +1,16 @@
+{
+  "id": "layering",
+  "actual_command": [
+    "bash",
+    "scripts/check-workspace-layering.sh"
+  ],
+  "cwd": ".",
+  "environment": {},
+  "exit_code": 0,
+  "status": "passed",
+  "started_unix_seconds": 1791062731,
+  "duration_seconds": 0.19,
+  "log": "evidence/layering.log",
+  "log_sha256": "d86efcdb613cfdb5c7cb93fbc663ad1379d53aa619f4b44377011ce820a3a8ea",
+  "required_for_local_phase_acceptance": true
+}

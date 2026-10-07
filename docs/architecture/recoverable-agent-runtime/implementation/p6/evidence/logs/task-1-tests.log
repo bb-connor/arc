@@ -1,0 +1,13 @@
+contracts-full-suite 0
+alloc 0
+std 0
+wasm 0
+msrv-alloc 0
+msrv-std 0
+rust-codegen-check 0
+ts-codegen-check 0
+python-codegen-check 0
+python-full-sdk 0
+ts-p6-vectors 0
+registry 0
+format 0

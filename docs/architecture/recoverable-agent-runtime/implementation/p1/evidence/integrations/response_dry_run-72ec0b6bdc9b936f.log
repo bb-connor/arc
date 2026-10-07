@@ -1,0 +1,8 @@
+
+running 3 tests
+test response_dry_run_sqlite_capture_reads_all_five_stateful_targets_without_creating_work ... ok
+test response_dry_run_verification_refuses_tampering_wrong_trust_and_configuration ... ok
+test response_dry_run_signed_report_round_trips_real_receipt_store_and_restart ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.46s
+

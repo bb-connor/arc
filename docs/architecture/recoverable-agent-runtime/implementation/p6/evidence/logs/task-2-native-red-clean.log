@@ -1,0 +1,88 @@
+   Compiling chio-control-plane v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-control-plane)
+error[E0432]: unresolved import `crate::recovery::RecoveryMaintenanceRuntime`
+ --> crates/platform/chio-control-plane/src/recovery/tests/knowledge/product.rs:3:5
+  |
+3 | use crate::recovery::RecoveryMaintenanceRuntime;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `RecoveryMaintenanceRuntime` in `recovery`
+
+error[E0599]: no variant or associated item named `Maintain` found for enum `chio_kernel::recovery::RecoveryPermission` in the current scope
+  --> crates/platform/chio-control-plane/src/recovery/tests/knowledge/product.rs:19:42
+   |
+19 |     permissions.push(RecoveryPermission::Maintain);
+   |                                          ^^^^^^^^ variant or associated item not found in `chio_kernel::recovery::RecoveryPermission`
+
+error[E0599]: no method named `read_semantic_installation` found for struct `chio_store_sqlite::SqliteAdmissionOperationStore` in the current scope
+   --> crates/platform/chio-control-plane/src/recovery/tests/knowledge/product.rs:135:21
+    |
+135 |     let old = store.read_semantic_installation(f.f.runtime.scope(), &f.f.authority.mutation_fence(), now_ms()?)?;
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^ method not found in `chio_store_sqlite::SqliteAdmissionOperationStore`
+
+error[E0599]: no method named `apply_reviewed_semantic_deployment` found for struct `chio_store_sqlite::SqliteAdmissionOperationStore` in the current scope
+   --> crates/platform/chio-control-plane/src/recovery/tests/knowledge/product.rs:168:19
+    |
+168 |     assert!(store.apply_reviewed_semantic_deployment(&foreign, &target).is_err());
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: there is a method `configure_semantic_deployment` with a similar name, but with different arguments
+   --> crates/platform/chio-store-sqlite/src/admission_operation_store/semantic.rs:171:5
+    |
+171 | /     pub fn configure_semantic_deployment(
+172 | |         &self,
+173 | |         value: &NativeSemanticInstallationV1,
+174 | |     ) -> Result<(), AdmissionOperationStoreError> {
+    | |_________________________________________________^
+
+error[E0599]: no method named `apply_reviewed_semantic_deployment` found for struct `chio_store_sqlite::SqliteAdmissionOperationStore` in the current scope
+   --> crates/platform/chio-control-plane/src/recovery/tests/knowledge/product.rs:175:23
+    |
+175 |         assert!(store.apply_reviewed_semantic_deployment(&mutation, &target).is_err(), "{field}");
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: there is a method `configure_semantic_deployment` with a similar name, but with different arguments
+   --> crates/platform/chio-store-sqlite/src/admission_operation_store/semantic.rs:171:5
+    |
+171 | /     pub fn configure_semantic_deployment(
+172 | |         &self,
+173 | |         value: &NativeSemanticInstallationV1,
+174 | |     ) -> Result<(), AdmissionOperationStoreError> {
+    | |_________________________________________________^
+
+error[E0599]: no method named `apply_reviewed_semantic_deployment` found for struct `chio_store_sqlite::SqliteAdmissionOperationStore` in the current scope
+   --> crates/platform/chio-control-plane/src/recovery/tests/knowledge/product.rs:178:25
+    |
+178 |     let applied = store.apply_reviewed_semantic_deployment(&signed, &target)?;
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: there is a method `configure_semantic_deployment` with a similar name, but with different arguments
+   --> crates/platform/chio-store-sqlite/src/admission_operation_store/semantic.rs:171:5
+    |
+171 | /     pub fn configure_semantic_deployment(
+172 | |         &self,
+173 | |         value: &NativeSemanticInstallationV1,
+174 | |     ) -> Result<(), AdmissionOperationStoreError> {
+    | |_________________________________________________^
+
+error[E0599]: no method named `apply_reviewed_semantic_deployment` found for struct `chio_store_sqlite::SqliteAdmissionOperationStore` in the current scope
+   --> crates/platform/chio-control-plane/src/recovery/tests/knowledge/product.rs:180:22
+    |
+180 |     assert_eq!(store.apply_reviewed_semantic_deployment(&signed, &target)?, applied);
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: there is a method `configure_semantic_deployment` with a similar name, but with different arguments
+   --> crates/platform/chio-store-sqlite/src/admission_operation_store/semantic.rs:171:5
+    |
+171 | /     pub fn configure_semantic_deployment(
+172 | |         &self,
+173 | |         value: &NativeSemanticInstallationV1,
+174 | |     ) -> Result<(), AdmissionOperationStoreError> {
+    | |_________________________________________________^
+
+error[E0599]: no method named `read_semantic_installation` found for struct `chio_store_sqlite::SqliteAdmissionOperationStore` in the current scope
+   --> crates/platform/chio-control-plane/src/recovery/tests/knowledge/product.rs:181:27
+    |
+181 |     let installed = store.read_semantic_installation(f.f.runtime.scope(), &f.f.authority.mutation_fence(), now_ms()?)?;
+    |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^ method not found in `chio_store_sqlite::SqliteAdmissionOperationStore`
+
+Some errors have detailed explanations: E0432, E0599.
+For more information about an error, try `rustc --explain E0432`.
+error: could not compile `chio-control-plane` (lib test) due to 8 previous errors

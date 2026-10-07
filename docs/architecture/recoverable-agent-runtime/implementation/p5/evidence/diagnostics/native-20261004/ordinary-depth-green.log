@@ -1,0 +1,10 @@
+   Compiling chio-store-sqlite v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-store-sqlite)
+   Compiling chio-process v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-process)
+    Finished `test` profile [unoptimized] target(s) in 36.06s
+     Running tests/processes.rs (target/debug/deps/processes-d922f54dd5f7011e)
+
+running 1 test
+test p5_ordinary_depth_64_keeps_root_context_and_normal_admission ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 16 filtered out; finished in 22.52s
+

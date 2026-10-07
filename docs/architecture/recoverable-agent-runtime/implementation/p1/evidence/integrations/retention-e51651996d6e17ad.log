@@ -1,0 +1,16 @@
+
+running 11 tests
+test retention::archive_copies_and_deletes_child_receipts ... ok
+test retention::archive_copies_capability_lineage_for_archived_receipts ... ok
+test retention::archive_with_no_checkpoints_is_a_noop ... ok
+test retention::archive_preserves_checkpoint_rows ... ok
+test retention::archived_receipt_id_cannot_be_reappended ... ok
+test retention::kernel_maintenance_task_rotates_when_configured ... ok
+test retention::archived_receipt_verifies_against_checkpoint ... ok
+test retention::retention_retry_is_idempotent ... ok
+test retention::tenant_scoped_rotation_is_rejected_and_leaves_counts_unchanged ... ok
+test retention::retention_rotates_at_time_boundary ... ok
+test retention::retention_rotates_at_size_boundary ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.75s
+

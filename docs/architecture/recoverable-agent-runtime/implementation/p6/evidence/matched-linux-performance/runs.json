@@ -1,0 +1,86 @@
+[
+  {
+    "subject": "p0",
+    "name": "native",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "chio-process",
+      "--test",
+      "recovery_p0_baseline",
+      "measured_native_baseline",
+      "--",
+      "--ignored",
+      "--nocapture"
+    ],
+    "exit_code": 0,
+    "seconds": 10.268,
+    "log": "p0-native.log",
+    "log_sha256": "98cc62443856ccc1d1dad90514ed2837855ea18f7239e65746aa9250eb3b1b48",
+    "source_binding": "3b40209ae2daad842d38745f86a12c382953906fba51e44aa31f53b1f3933270"
+  },
+  {
+    "subject": "p0",
+    "name": "pure",
+    "command": [
+      "cargo",
+      "run",
+      "--offline",
+      "--locked",
+      "-p",
+      "chio-recovery",
+      "--example",
+      "p0_baseline"
+    ],
+    "exit_code": 0,
+    "seconds": 0.371,
+    "log": "p0-pure.log",
+    "log_sha256": "67392d9fc70731d4a3e6c2cd47488ec626e8c1f552357bf8cb0344c74d16d5c9",
+    "source_binding": "3b40209ae2daad842d38745f86a12c382953906fba51e44aa31f53b1f3933270"
+  },
+  {
+    "subject": "p6",
+    "name": "native",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "chio-process",
+      "--test",
+      "recovery_p0_baseline",
+      "measured_native_baseline",
+      "--",
+      "--ignored",
+      "--nocapture"
+    ],
+    "exit_code": 0,
+    "seconds": 11.438,
+    "log": "p6-native.log",
+    "log_sha256": "55d51a711b0451bff06bc98d809da2dec0168392b4363195ce10045d58b1f94f",
+    "source_binding": "b1bcd48cadb7b9c7f1ff5dd4ad8d9910056590e22058527756114e21239c1063"
+  },
+  {
+    "subject": "p6",
+    "name": "pure",
+    "command": [
+      "cargo",
+      "run",
+      "--offline",
+      "--locked",
+      "-p",
+      "chio-recovery",
+      "--example",
+      "p0_baseline"
+    ],
+    "exit_code": 0,
+    "seconds": 0.381,
+    "log": "p6-pure.log",
+    "log_sha256": "7a7090a5e9ea3ab4f690dda9781a4f94546129979e346bc3a3e5480385fd16c9",
+    "source_binding": "b1bcd48cadb7b9c7f1ff5dd4ad8d9910056590e22058527756114e21239c1063"
+  }
+]

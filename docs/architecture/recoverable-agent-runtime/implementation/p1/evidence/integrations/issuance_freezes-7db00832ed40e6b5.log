@@ -1,0 +1,12 @@
+
+running 7 tests
+test apply_journal_reports_completed_not_generic_failure ... ok
+test fence_maintenance_is_scheduler_fenced_idempotent_and_lifts_after_takeover ... ok
+test overlapping_freezes_remain_active_until_each_release_completes ... ok
+test pending_release_and_completed_journal_survive_restart ... ok
+test stale_scheduler_rebinding_and_journal_tamper_fail_closed ... ok
+test active_freeze_is_claimed_only_in_renewal_horizon_and_maintained_before_active ... ok
+test installed_freeze_is_maintained_while_applying_and_rolling_back_but_not_after_restore ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.68s
+

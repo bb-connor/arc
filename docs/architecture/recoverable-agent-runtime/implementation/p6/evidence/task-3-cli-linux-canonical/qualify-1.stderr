@@ -1,0 +1,3 @@
+error [urn:chio:error:cli:other]: recovery.restart_required: the operator must restart the native writer
+context: {"domain":"cli","severity":"error","stability":"deprecated","string_code":"CHIO-CLI-OTHER"}
+suggested fix: Preserve the original message and migrate the call site to a specific registry code when touched.

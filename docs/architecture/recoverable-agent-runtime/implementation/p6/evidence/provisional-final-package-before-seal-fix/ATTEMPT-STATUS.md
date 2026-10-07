@@ -1,0 +1,1 @@
+This provisional source package was not accepted. The joined record passed but its first read-only artifact audit rejected different producer/verifier ordering for prefix directories. All original bytes remain here. Original fresh review evidence is separate and unchanged. The final qualification source snapshot includes the test-first sealer correction.

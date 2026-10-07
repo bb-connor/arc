@@ -1,0 +1,7 @@
+
+running 2 tests
+test aggregate_issuance_requires_the_existing_durable_authority ... ok
+test authenticated_siblings_share_issued_budget_across_contention_and_restart ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.29s
+

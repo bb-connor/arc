@@ -1,0 +1,2097 @@
+{
+  "schema": "chio.recovery-p3-verification.v1",
+  "phase": "P3",
+  "title": "Semantic remedies",
+  "status": "implemented_locally_verified_and_reviewed",
+  "recorded_at_utc": "2026-10-03T23:08:21.915181+00:00",
+  "source_base": "de84fc306efbb4c8dd6de748d0ad2a8d695fd30e",
+  "branch": "feat/recoverable-agent-runtime-20261002",
+  "working_tree_changes_committed": false,
+  "architecture_revision": 3,
+  "scope": "Local sequential native support-read, issue-creation and field-projection semantic profiles, protected ACL/endorsement/prerequisite state and pure bounded contracts. Trusted gateway/host setup remains explicit. No live provider, hosted CI, production release or scale qualification.",
+  "confidence": "high within the declared locally verified supported phase profile",
+  "review": {
+    "reviewer": "Codex",
+    "review_kind": "complete source self-review",
+    "independent_human_signoff": false,
+    "all_handwritten_changes_reviewed": true,
+    "schemas_generated_boundaries_sdk_and_manifests_reviewed": true,
+    "handwritten_rust_sources": 51,
+    "phase_changed_source_paths": 300,
+    "reviewed_rust_sources": [
+      {
+        "path": "crates/core/chio-core-types/src/recovery/mod.rs",
+        "sha256": "4732a51f9417b1abbba1fc0fa8fab283d4c0dd448945ce97a34880943165c1dd"
+      },
+      {
+        "path": "crates/core/chio-core-types/src/recovery/semantic.rs",
+        "sha256": "86c110ba48e5fe39349aff4ac87a52f9257d751ee58fb84dc013c25b7fe18e5b"
+      },
+      {
+        "path": "crates/core/chio-core-types/tests/recovery_p3_contracts.rs",
+        "sha256": "341ee577babca8a793c99bbb05bac24036eb725acc843b6e97d35a7cc9762a3f"
+      },
+      {
+        "path": "crates/kernel/chio-kernel/src/admission_operation/identity.rs",
+        "sha256": "09b1589b49476c63df717839cc2a98e19c9cdf09e85094aabc6e8ec4fd46cbc2"
+      },
+      {
+        "path": "crates/kernel/chio-kernel/src/admission_operation/store.rs",
+        "sha256": "2316de807642553efce921d0d8805464e9c1b7652ba708a24e5c2e09d5786eb7"
+      },
+      {
+        "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/recovery_runtime.rs",
+        "sha256": "44208d50cd0343a64526d7e48c9161a4c59e12de52f21f5004393f2853439e03"
+      },
+      {
+        "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal.rs",
+        "sha256": "ad811fbe49e5029730a96307ff4dc23e3ec96d65311f564c10d0c1dffb0dd554"
+      },
+      {
+        "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/semantic.rs",
+        "sha256": "377939b994191df5ff1b68a8f65bbdf1b09fb41d2757e4f10ef059f7cbd6c0ce"
+      },
+      {
+        "path": "crates/kernel/chio-kernel/src/recovery.rs",
+        "sha256": "6452637a6b3d17dcdca6e7169dae0100becdf4793cbd81a67e2231d812ede151"
+      },
+      {
+        "path": "crates/kernel/chio-kernel/src/recovery/semantic.rs",
+        "sha256": "34c1a253d57ca044e327a147582811f10a16d86211dc6ff5acb13103a9ac0a5c"
+      },
+      {
+        "path": "crates/platform/chio-control-plane/src/lib.rs",
+        "sha256": "4ead3266076f45c910087bd16083c17ec6def7b88994a8a640b22244b0f8d879"
+      },
+      {
+        "path": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+        "sha256": "fe33ad3ddefeccf1410d20ae5c9bc0c61da4dd59c5f02647a7912cf672afb5d1"
+      },
+      {
+        "path": "crates/platform/chio-control-plane/src/recovery/tests/semantic.rs",
+        "sha256": "6305e4d9c666afc4f2ea5abd0b513a7de681459fdf6ea2b0c38f79baf6843a38"
+      },
+      {
+        "path": "crates/platform/chio-control-plane/src/recovery/tests/semantic/authority.rs",
+        "sha256": "53ff72e072e236eac3a101127cd4d5e0868cf8f4c7cfe6eab9f689a036f05eb7"
+      },
+      {
+        "path": "crates/platform/chio-control-plane/src/recovery/tests/semantic/chains.rs",
+        "sha256": "9910372b302e562d32cb33634cb19ff9b3501703757111cb0371073d2edb10c3"
+      },
+      {
+        "path": "crates/platform/chio-control-plane/src/semantic.rs",
+        "sha256": "a28433333f1c13cd71e495ca45efbabbd49c39d171da1fd1ee7827156000747d"
+      },
+      {
+        "path": "crates/platform/chio-control-plane/src/semantic/connector.rs",
+        "sha256": "f59826baf73beba8dc7c1d482bf5dab737675f3a5e0c86a02ce83dfd414ea249"
+      },
+      {
+        "path": "crates/platform/chio-control-plane/src/semantic/http.rs",
+        "sha256": "9216e7488343d95e78490537483cb4f7e953ed773021e6eff881c9708cbfc80e"
+      },
+      {
+        "path": "crates/platform/chio-control-plane/src/semantic/http/tests.rs",
+        "sha256": "127c2ad0bf1d6a24698f4e2cb1b483d8d4c70efb552741a2d7573b7e79b0dac2"
+      },
+      {
+        "path": "crates/platform/chio-control-plane/src/semantic/transport.rs",
+        "sha256": "ee3a8757d583f1588312eb958c09859dbabb7402dddf60ad88807f497c292c92"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store.rs",
+        "sha256": "1af57a6375246a02c9728ff4bbfb51adbce0c705910b896e242d13fce92264d0"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery.rs",
+        "sha256": "9e31afaaeda2c995ffcf9da7765f03ed1f9d86052c01a56a0358175f4d8fabb7"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/storage.rs",
+        "sha256": "620adf5afb44ab529d581478f3856f45a0f008ce7bcec1f34cd0dccc156e8b46"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs",
+        "sha256": "47872a2b2a57397f945cf63b116c891574677f7cce3aafb2903d8d96e3105bad"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger.rs",
+        "sha256": "4d34b8fb52979b51b57dc5e8474c7face1e42bae38e663312fa913550f80bb9b"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/capture.rs",
+        "sha256": "366976cf1625c08a66626656f550b31810abf0070fec1acc552acbd52bae3698"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/recovery_basis.rs",
+        "sha256": "f884b086cc6cc8fccf02ebcfa2163f1f0bd55f41c4074e15fb19fe72afd4fd0f"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/semantic.rs",
+        "sha256": "c6997b755098ff12c9b66d88a037082e092fad924b008282d030f567016a407b"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/semantic/capture.rs",
+        "sha256": "cedc0d5e8c501d7ca1e523c95a4acb9012b4af0f11aeb534015d15bf53bb7e86"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/semantic/materialization.rs",
+        "sha256": "f0ff6e08cc71fc301f4640a79504ca4e3e2c0adb17c7ea8daff7b52c7e766c53"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/store.rs",
+        "sha256": "896947ae0194c81aafbbc9b08ca5c1c73643da9b1efdc538739c933d2cca833e"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/security_participant_migration/integrity.rs",
+        "sha256": "e0fa49598938a9254d06a59e63f4f1d81f363591099df3519f6edf1615c47808"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/security_participant_state/integrity.rs",
+        "sha256": "f3edc98457d5813b37ca7d1a8e56b9f23ec794226fc91931552b07c9882370f9"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/security_participant_state/mutations/faults.rs",
+        "sha256": "b84f059e8325ccfbf033b08e18de7fac8fe4373d949d103be19f5346306b0667"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/tool_outcome_store.rs",
+        "sha256": "5c218df60a4dca2081716653a046d5c18c3c8ebd2359577e50d3005d162aae0c"
+      },
+      {
+        "path": "crates/security/chio-security-types/src/lib.rs",
+        "sha256": "f068356fd43a65a08995fe83f745d94f8e3599e0debbd149206d3776377fbf78"
+      },
+      {
+        "path": "crates/security/chio-security-types/src/recovery/identifiers.rs",
+        "sha256": "ea8e04f72acc813dafd11318fa7c607ce229747e894dfdbd2d3e105967ca18d0"
+      },
+      {
+        "path": "crates/security/chio-security-types/src/semantic/action.rs",
+        "sha256": "a20f506fbc9614edf71ef80736364ba918b8c289b13fb26dee62a3b566da2dc5"
+      },
+      {
+        "path": "crates/security/chio-security-types/src/semantic/evidence.rs",
+        "sha256": "f1225f6f0eb694e4e57e89e5ef3fc75a632c0349f2469bc2dbd0c5e1cc463ece"
+      },
+      {
+        "path": "crates/security/chio-security-types/src/semantic/mod.rs",
+        "sha256": "345db68703a10ca9b0f8ec9b42cca740e415b9230419be7c6f13e17c7616a5c6"
+      },
+      {
+        "path": "crates/security/chio-security-types/src/semantic/package.rs",
+        "sha256": "e5ff2b8f8f1d93b5da830597481f87d1177f96c2575d0f7b8cea44e314dd8c38"
+      },
+      {
+        "path": "crates/security/chio-security-types/src/semantic/plan.rs",
+        "sha256": "18aa1a0e3f1d2c909ab555c8ff20392510e0ddb3eda6a9701197f24514002c35"
+      },
+      {
+        "path": "crates/security/chio-semantic-contracts/examples/p3_vectors.rs",
+        "sha256": "ab8096d49e9fc14b76cca7df550ee52b6b404511336931380a03de5a65e87da5"
+      },
+      {
+        "path": "crates/security/chio-semantic-contracts/src/lib.rs",
+        "sha256": "6b27e8882cba5dd789dd127706571ce49ee1f4530e97068abb0ca77f9ca0a508"
+      },
+      {
+        "path": "crates/security/chio-semantic-contracts/src/plans.rs",
+        "sha256": "85467c8f3960bec3e9f39e7958ce1c8b6b1150860f2f4e2ea28d772d4e84fcd2"
+      },
+      {
+        "path": "crates/security/chio-semantic-contracts/src/registry.rs",
+        "sha256": "331e2de6ce165edb65d6105bed5d02bd1004be54126b09eb64248641a52a04b0"
+      },
+      {
+        "path": "crates/security/chio-semantic-contracts/src/selectors.rs",
+        "sha256": "64b438a4538e6c8f9b102d5a1dd1019aa1827a35d33c127341c45354a6d5427f"
+      },
+      {
+        "path": "crates/security/chio-semantic-contracts/src/verification.rs",
+        "sha256": "a78f5e5c5ec74efaf9af1c771d10fdb2ff0484d6ebaae2f389ed7f6222e021d9"
+      },
+      {
+        "path": "crates/security/chio-semantic-contracts/tests/semantic_p3.rs",
+        "sha256": "26596c4e1adb6774a80c185b0c894c782cd5863a940e4d59d6734b3c4eda54c3"
+      },
+      {
+        "path": "fixtures/recovery-semantic-profile.rs",
+        "sha256": "ca18e2064a1683ff9c209a45a3233293a11a1121224ff93b7059a28abd2cecd4"
+      },
+      {
+        "path": "xtask/src/codegen/python.rs",
+        "sha256": "289a12946c3cf42d54cedbfc29c038606fe43f1a69f9d8f80174fdc7eaba765e"
+      }
+    ],
+    "open_p0_findings": 0,
+    "open_p1_findings": 0,
+    "severity_scope": "Reviewed P3 changes and declared supported local profile; unrelated workspace and broader qualification are separate.",
+    "report": "REVIEW.md"
+  },
+  "tasks": [
+    {
+      "id": "P3-01",
+      "title": "Signed contracts, complete coverage, selectors and registry generations",
+      "obligations": [
+        "CON-01",
+        "CON-02",
+        "CON-03",
+        "CON-11"
+      ],
+      "status": "implemented_locally_verified_and_reviewed"
+    },
+    {
+      "id": "P3-02",
+      "title": "Scoped complete ACL evidence, annotator powers and influence",
+      "obligations": [
+        "CON-04",
+        "CON-05",
+        "CON-06",
+        "CON-07"
+      ],
+      "status": "implemented_locally_verified_and_reviewed"
+    },
+    {
+      "id": "P3-03",
+      "title": "Independent exact-action endorsement and native one-shot consumption",
+      "obligations": [
+        "SEC-11",
+        "CON-07"
+      ],
+      "status": "implemented_locally_verified_and_reviewed"
+    },
+    {
+      "id": "P3-04",
+      "title": "Exact native transformations, alternate destinations and withholding",
+      "obligations": [
+        "CON-04",
+        "CON-08",
+        "CON-10",
+        "REC-13",
+        "REC-17"
+      ],
+      "status": "implemented_locally_verified_and_reviewed"
+    },
+    {
+      "id": "P3-05",
+      "title": "Bounded plans, materialization and historical/current/held prerequisites",
+      "obligations": [
+        "REC-12",
+        "REC-17",
+        "CON-13"
+      ],
+      "status": "implemented_locally_verified_and_reviewed"
+    },
+    {
+      "id": "P3-06",
+      "title": "Fresh physical native capture, dispatch and release for support read and issue creation",
+      "obligations": [
+        "SEC-11",
+        "CON-02",
+        "CON-04",
+        "CON-05",
+        "CON-08",
+        "CON-10",
+        "CON-11",
+        "CON-13"
+      ],
+      "status": "implemented_locally_verified_and_reviewed"
+    },
+    {
+      "id": "P3-07",
+      "title": "Shared wire/native/refusal/restart/portability acceptance and complete source review",
+      "obligations": [
+        "SEC-11",
+        "REC-12",
+        "REC-13",
+        "REC-17",
+        "CON-01",
+        "CON-02",
+        "CON-03",
+        "CON-04",
+        "CON-05",
+        "CON-06",
+        "CON-07",
+        "CON-08",
+        "CON-10",
+        "CON-11",
+        "CON-13"
+      ],
+      "status": "implemented_locally_verified_and_reviewed"
+    }
+  ],
+  "requirements": {
+    "count": 15,
+    "ids": [
+      "SEC-11",
+      "REC-12",
+      "REC-13",
+      "REC-17",
+      "CON-01",
+      "CON-02",
+      "CON-03",
+      "CON-04",
+      "CON-05",
+      "CON-06",
+      "CON-07",
+      "CON-08",
+      "CON-10",
+      "CON-11",
+      "CON-13"
+    ],
+    "status": "all_implemented_and_local_phase_acceptance_passed",
+    "coverage": "requirements-coverage.json"
+  },
+  "bounds": {
+    "packages_operations_routes_steps_selectors": 16,
+    "step_dependencies": 8,
+    "assertions_projection_fields": 8,
+    "aggregate_observed_facts": 32,
+    "shared_pure_work_units": 4096,
+    "semantic_lifetime_ms": 60000,
+    "wire_provider_bytes": 65536,
+    "protected_record_bytes": 262144,
+    "connector_owned_slots": 8,
+    "http_total_timeout_secs": 10,
+    "http_connect_timeout_secs": 3
+  },
+  "source": {
+    "inventory": "source-inventory.json",
+    "inventory_sha256": "821bbc01b86bcb6dcb9d66e07cf6c311aaa41c4b084b40821632dbebde11fb01",
+    "archive": "evidence/current-source.tar.gz",
+    "archive_sha256": "21d5efd516b2d9e598aee9ac75b8474dbf9cc71958062760d39f55d2b44412c6",
+    "baseline": "source-baseline.json",
+    "baseline_sha256": "e308fa28d91409364bdeec98f44882b24f83b004e98f5b646893a4786c3648c7",
+    "p2_baseline_archive": "evidence/p2-source-baseline.tar.gz",
+    "p2_baseline_archive_sha256": "e021a7003043e1a6b6770de7ab89f84e6a7dc8186c45e54c413e4081a8f3f327",
+    "p2_verification": "../p2/verification.json",
+    "p2_verification_sha256": "419bbe28b759f796f17e26d62b05dd94b8f53e8d6045412eb0a0c6a251ebdb55",
+    "p1_verification": "../p1/verification.json",
+    "p1_verification_sha256": "b07b8c0e8218aff4c30a9bc4deb98f07b05a69eb2590e6dd3c21248ddc9a8146"
+  },
+  "checks": [
+    {
+      "id": "native",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--lib",
+        "p3_",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791063483,
+      "duration_seconds": 630.908,
+      "log": "evidence/native.log",
+      "log_sha256": "243b7dd31345b2c5496d8852a923ac3a552d558b61dc9c69de9192f3c66f2331",
+      "required_for_local_phase_acceptance": true,
+      "rust_tests_passed": 16,
+      "rust_tests_failed": 0,
+      "rust_tests_ignored": 0,
+      "rust_test_binaries": 1
+    },
+    {
+      "id": "owner-doc-tests",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--doc"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791064128,
+      "duration_seconds": 42.401,
+      "log": "evidence/owner-doc-tests.log",
+      "log_sha256": "61f6a378b405ec0d2c7cc527f3eef079157bb9b019e82cf4e2c991be87c13b96",
+      "required_for_local_phase_acceptance": true,
+      "rust_tests_passed": 5,
+      "rust_tests_failed": 0,
+      "rust_tests_ignored": 0,
+      "rust_test_binaries": 1
+    },
+    {
+      "id": "p2-native",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--lib",
+        "recovery_p2_",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791064114,
+      "duration_seconds": 14.67,
+      "log": "evidence/p2-native.log",
+      "log_sha256": "e94716db066aa8774b7a7b909137c46a1e1c014141c6e39d20a0c1502b09c95d",
+      "required_for_local_phase_acceptance": true,
+      "rust_tests_passed": 9,
+      "rust_tests_failed": 0,
+      "rust_tests_ignored": 0,
+      "rust_test_binaries": 1
+    },
+    {
+      "id": "owning-tests",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-core-types",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-flow",
+        "-p",
+        "chio-recovery",
+        "-p",
+        "chio-semantic-contracts",
+        "-p",
+        "chio-process",
+        "-p",
+        "chio-spec-codegen",
+        "-p",
+        "xtask",
+        "--",
+        "--test-threads=2"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791068310,
+      "duration_seconds": 165.962,
+      "log": "evidence/owning-tests.log",
+      "log_sha256": "6ffd18c5156a1bcae0f371660b6f0b75fd39e447230a3bbfca898bc42197fbea",
+      "required_for_local_phase_acceptance": true,
+      "rust_tests_passed": 1078,
+      "rust_tests_failed": 0,
+      "rust_tests_ignored": 2,
+      "rust_test_binaries": 94
+    },
+    {
+      "id": "store-regression",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "--lib",
+        "restoring",
+        "--",
+        "--test-threads=2",
+        "--skip",
+        "capability_lineage::tests::qualified_capability_snapshots_advance_the_external_rollback_generation",
+        "--skip",
+        "dead_letters::tests::qualified_alongside_store_rejects_dead_letter_rollback",
+        "--skip",
+        "finding_pool_ledger::tests::claimed_admission_operation_scan_is_bounded_and_cursor_ordered",
+        "--skip",
+        "finding_pool_ledger::tests::leased_outbox_rows_remain_observable_as_pending",
+        "--skip",
+        "finding_pool_ledger::tests::qualified_ledger_binds_validation_to_the_borrowed_database_file",
+        "--skip",
+        "finding_pool_ledger::tests::qualified_ledger_persists_one_receipt_sink",
+        "--skip",
+        "finding_pool_ledger::tests::qualified_ledger_rejects_a_writable_parent_directory",
+        "--skip",
+        "finding_pool_ledger::tests::qualified_ledger_rejects_unusable_domains",
+        "--skip",
+        "finding_pool_ledger::tests::qualified_schema_indexes_pending_outbox_and_expiration_reclamation",
+        "--skip",
+        "finding_pool_ledger::tests::recovered_mutation_loads_the_reservations_persisted_tenant",
+        "--skip",
+        "finding_pool_ledger::tests::unknown_dispatch_exact_replay_ignores_later_allocation_totals",
+        "--skip",
+        "iou_store::tests::qualified_alongside_store_rejects_iou_rollback",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_allows_explicitly_false_immutable_sqlite_uris",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_anchors_background_checkpoint_commits",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_anchors_checkpoint_publication_bindings",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_anchors_imported_checkpoint_commits",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_anchors_lineage_only_duplicate_mutations",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_anchors_retention_rotation",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_anchors_standalone_checkpoint_commits",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_anchors_standalone_lineage_mutations",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_refuses_to_seed_an_archive_only_store",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_rejects_atomic_database_replacement",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_rejects_internal_sink_identity_change",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_rejects_nonlocal_sqlite_uri_authorities",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_rejects_read_only_sqlite_uris",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_verifies_rollback_anchor_before_metadata_jobs",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_settlement_state_writes_advance_the_rollback_anchor",
+        "--skip",
+        "receipt_store::tests::verified_head::qualified_reader_and_reopen_reject_live_rollback_after_writer_routed_receipt",
+        "--skip",
+        "receipt_store::tests::verified_head::qualified_receipt_sink_rejects_locking_disabled_sqlite_uris"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791068476,
+      "duration_seconds": 75.603,
+      "log": "evidence/store-regression.log",
+      "log_sha256": "5ef4827ba574fc340a24328579a1de5530e208e0b2259fd8ef95174d7b569ef1",
+      "required_for_local_phase_acceptance": true,
+      "rust_tests_passed": 4,
+      "rust_tests_failed": 0,
+      "rust_tests_ignored": 0,
+      "rust_test_binaries": 1
+    },
+    {
+      "id": "store-doc-tests",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "--doc"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791068552,
+      "duration_seconds": 27.187,
+      "log": "evidence/store-doc-tests.log",
+      "log_sha256": "0a3d9e66e915714bdf47a4e3ee1cca7cf000495bc7547bbcb9c3a217f9696b41",
+      "required_for_local_phase_acceptance": true,
+      "rust_tests_passed": 0,
+      "rust_tests_failed": 0,
+      "rust_tests_ignored": 0,
+      "rust_test_binaries": 1
+    },
+    {
+      "id": "conformance-lib",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-conformance",
+        "--lib"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791064450,
+      "duration_seconds": 169.802,
+      "log": "evidence/conformance-lib.log",
+      "log_sha256": "8d1d260addd9314204a21940829e6ae1c7970d09e40438c71154dd33f7b87573",
+      "required_for_local_phase_acceptance": true,
+      "rust_tests_passed": 45,
+      "rust_tests_failed": 0,
+      "rust_tests_ignored": 0,
+      "rust_test_binaries": 1
+    },
+    {
+      "id": "kernel-lib",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-kernel",
+        "--lib",
+        "--",
+        "--skip",
+        "kernel::tests::governed_acp_hold_flow_records_commerce_scope_and_payment_metadata",
+        "--skip",
+        "kernel::tests::governed_x402_authorization_failure_denies_before_tool_execution",
+        "--skip",
+        "kernel::tests::governed_x402_prepaid_flow_records_governed_authorization_and_receipt_metadata",
+        "--skip",
+        "payment::tests::acp_adapter_externalizes_capture_release_and_refund",
+        "--skip",
+        "payment::tests::acp_adapter_posts_authorize_request_with_commerce_context_and_returns_hold",
+        "--skip",
+        "payment::tests::acp_adapter_queries_bound_settlement_state",
+        "--skip",
+        "payment::tests::acp_adapter_rejects_unbound_terminal_response",
+        "--skip",
+        "payment::tests::payment_error_bodies_are_not_reflected",
+        "--skip",
+        "payment::tests::payment_response_body_is_bounded",
+        "--skip",
+        "payment::tests::x402_adapter_maps_http_402_to_insufficient_funds",
+        "--skip",
+        "payment::tests::x402_adapter_posts_authorize_request_and_returns_settled_payment",
+        "--skip",
+        "payment::tests::x402_adapter_uses_custom_path_bearer_token_and_governed_payload"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791066389,
+      "duration_seconds": 133.081,
+      "log": "evidence/kernel-lib.log",
+      "log_sha256": "738d827a9dc9e11d24c52feedf216b9e51b9851a8631c8838e1a8c2da73b99b0",
+      "required_for_local_phase_acceptance": true,
+      "rust_tests_passed": 1448,
+      "rust_tests_failed": 0,
+      "rust_tests_ignored": 0,
+      "rust_test_binaries": 1
+    },
+    {
+      "id": "kernel-doc-tests",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-kernel",
+        "--doc"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791066522,
+      "duration_seconds": 6.41,
+      "log": "evidence/kernel-doc-tests.log",
+      "log_sha256": "bd8b954a5d40c64c16c0d7c0423051a0fd5a5ceb1dd28fbd76e85754993af88d",
+      "required_for_local_phase_acceptance": true,
+      "rust_tests_passed": 13,
+      "rust_tests_failed": 0,
+      "rust_tests_ignored": 0,
+      "rust_test_binaries": 1
+    },
+    {
+      "id": "clippy",
+      "actual_command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-core-types",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-flow",
+        "-p",
+        "chio-recovery",
+        "-p",
+        "chio-semantic-contracts",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-process",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-conformance",
+        "-p",
+        "chio-spec-codegen",
+        "-p",
+        "xtask",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791066598,
+      "duration_seconds": 222.463,
+      "log": "evidence/clippy.log",
+      "log_sha256": "f029cf004abbe4a10f2483cbf5661ca35cc0c9672f0f818fe68789ee0c6d18f1",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "format",
+      "actual_command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791065851,
+      "duration_seconds": 16.417,
+      "log": "evidence/format.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "diff",
+      "actual_command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791068709,
+      "duration_seconds": 0.197,
+      "log": "evidence/diff.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "rust-codegen",
+      "actual_command": [
+        "target/debug/xtask",
+        "codegen",
+        "rust",
+        "--check"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791062722,
+      "duration_seconds": 5.386,
+      "log": "evidence/rust-codegen.log",
+      "log_sha256": "ed7f9090ce1c30f0849d31346689dc20e3f138fe6e6f0f1e1bfe19f4b66a5cda",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "vector-recompute",
+      "actual_command": [
+        "python3",
+        "docs/architecture/recoverable-agent-runtime/implementation/p3/evidence/verify-vectors.py"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791063007,
+      "duration_seconds": 89.685,
+      "log": "evidence/vector-recompute.log",
+      "log_sha256": "8848b49daf8469cb23271d21ce5bcb6c646e024dcc4f46e58e19a3ced38b813c",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "ts-codegen",
+      "actual_command": [
+        "target/debug/xtask",
+        "codegen",
+        "ts",
+        "--check"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791062734,
+      "duration_seconds": 40.592,
+      "log": "evidence/ts-codegen.log",
+      "log_sha256": "13d937085f574fa38186d7e5bf942e6c030f43dc86ee1b2ad98b67286c0dc411",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "python-codegen",
+      "actual_command": [
+        "target/debug/xtask",
+        "codegen",
+        "python",
+        "--check"
+      ],
+      "cwd": ".",
+      "environment": {
+        "PATH": "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/target/recovery-p0-codegen-bin:/Users/connor/.codex/packages/app-server-daemon/releases/0.160.0-aarch64-apple-darwin/codex-path:/opt/homebrew/bin:/Users/connor/bin:/usr/local/bin:/Users/connor/.elan/bin:/opt/homebrew/opt/openjdk@21/bin:/Users/connor/.local/share/solana/install/active_release/bin:/Users/connor/.pyenv/shims:/Users/connor/.local/go/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/opt/pkg/env/active/bin:/opt/pmk/env/global/bin:/Library/Apple/usr/bin:/Library/TeX/texbin:/Applications/VMware Fusion.app/Contents/Public:/usr/local/share/dotnet:~/.dotnet/tools:/usr/local/hatch/bin:/Users/connor/.codex/tmp/arg0/codex-arg0UEQ3PA:/Users/connor/.codex/packages/app-server-daemon/releases/0.160.0-aarch64-apple-darwin/codex-path:/Users/connor/.codex/tmp/arg0/codex-arg0S2tY1s:/Users/connor/.codex/packages/app-server-daemon/releases/0.159.3-aarch64-apple-darwin/codex-path:/Users/connor/.codex/tmp/arg0/codex-arg05RTEbr:/Users/connor/.codex/packages/app-server-daemon/releases/0.159.2-aarch64-apple-darwin/codex-path:/Users/connor/.codex/tmp/arg0/codex-arg055DeEw:/Users/connor/.codex/packages/app-server-daemon/releases/0.159.1-aarch64-apple-darwin/codex-path:/Users/connor/.codex/tmp/arg0/codex-arg0UxdSRW:/Users/connor/.bun/install/global/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/codex-path:/opt/homebrew/opt/openjdk@21/bin:/Users/connor/.local/bin:/Users/connor/.antigravity/antigravity/bin:/Users/connor/.proto/shims:/Users/connor/.proto/bin:/Users/connor/.bun/bin:/Users/connor/.codeium/windsurf/bin:/opt/homebrew/opt/libpq/bin:/opt/homebrew/bin:/Users/connor/bin:/Users/connor/.elan/bin:/Users/connor/.local/share/solana/install/active_release/bin:/Users/connor/.local/go/bin:/opt/homebrew/sbin:/Users/connor/.railway/bin:/Users/connor/Library/Application Support/carapace/bin:/Users/connor/.wasmedge/bin:/Users/connor/.cargo/bin:/Applications/Ghostty.app/Contents/MacOS:/Users/connor/.cache/lm-studio/bin:/Users/connor/.local/bin"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791062728,
+      "duration_seconds": 6.471,
+      "log": "evidence/python-codegen.log",
+      "log_sha256": "853ef1e53ede36559e74e0873894fea3370764acaeb57cbda772dde7996f7084",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "pure-guard",
+      "actual_command": [
+        "python3",
+        "scripts/check-recovery-p0.py",
+        "--offline"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791062722,
+      "duration_seconds": 0.582,
+      "log": "evidence/pure-guard.log",
+      "log_sha256": "833390d11d2e74f4ccffd89b62f912a30db6db7a3c5bdf9a8780581dc9f07480",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "guard-mutations",
+      "actual_command": [
+        "python3",
+        "scripts/tests/check-recovery-p0.test.py"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791062723,
+      "duration_seconds": 0.057,
+      "log": "evidence/guard-mutations.log",
+      "log_sha256": "ab51ea60a180dcf83532117f0b671bba89aa7c055dfab26f507de72d874d2fb6",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "schemas",
+      "actual_command": [
+        "bash",
+        "scripts/check-chio-schema-registry.sh"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791062723,
+      "duration_seconds": 0.271,
+      "log": "evidence/schemas.log",
+      "log_sha256": "f08ca40211ee4cf16919c55a0c548472ee01a0ff6808eadb1e60a66f4aa43553",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "domains",
+      "actual_command": [
+        "python3",
+        "scripts/check-domain-separation.py"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791062723,
+      "duration_seconds": 1.548,
+      "log": "evidence/domains.log",
+      "log_sha256": "9660e42dc2a0efbad4e490330d6a6385e58a420c7c1648c95bc9031c502670af",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "wire-lock",
+      "actual_command": [
+        "python3",
+        "scripts/check-wire-schemas.py"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791062725,
+      "duration_seconds": 5.416,
+      "log": "evidence/wire-lock.log",
+      "log_sha256": "2578bc582d112583423567d8051b03ccbc0f34b79c4dd5b25819534e049e84ae",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "lint-parity",
+      "actual_command": [
+        "python3",
+        "scripts/check-lint-parity.py"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791062730,
+      "duration_seconds": 0.273,
+      "log": "evidence/lint-parity.log",
+      "log_sha256": "5cdbfdb13810b2e2e148e68b501cddfe136aa2de30eda0b7ef053818dbaf1f02",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "toolchain-parity",
+      "actual_command": [
+        "python3",
+        "scripts/check-rust-toolchain-parity.py"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791062731,
+      "duration_seconds": 0.077,
+      "log": "evidence/toolchain-parity.log",
+      "log_sha256": "0663e9dc80bac7594693bac2c394f9b68eeff85feaae6622feb1d67ad41aa730",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "layering",
+      "actual_command": [
+        "bash",
+        "scripts/check-workspace-layering.sh"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791062731,
+      "duration_seconds": 0.19,
+      "log": "evidence/layering.log",
+      "log_sha256": "d86efcdb613cfdb5c7cb93fbc663ad1379d53aa619f4b44377011ce820a3a8ea",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "hygiene",
+      "actual_command": [
+        "python3",
+        "scripts/check-rust-file-hygiene.py"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791067999,
+      "duration_seconds": 4.854,
+      "log": "evidence/hygiene.log",
+      "log_sha256": "0ed3fa2545ad7c1a66d32ba84a109728af4d7246a722d3beb00d3c061105082d",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "alloc",
+      "actual_command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "fixtures/recovery-portable-consumer/Cargo.toml"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791062802,
+      "duration_seconds": 12.91,
+      "log": "evidence/alloc.log",
+      "log_sha256": "cb79b57f73539c5b133dc9cab97f8cbd475a3a57b8ffe20deb3779ca8bc32348",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "std",
+      "actual_command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "fixtures/recovery-portable-consumer/Cargo.toml",
+        "--features",
+        "std"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791062815,
+      "duration_seconds": 18.539,
+      "log": "evidence/std.log",
+      "log_sha256": "212929594a57303c8f1f44810a03bf36bf43d63e7e427f03da0613bac03671d5",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "wasm",
+      "actual_command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "fixtures/recovery-portable-consumer/Cargo.toml",
+        "--target",
+        "wasm32-unknown-unknown"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791062834,
+      "duration_seconds": 20.145,
+      "log": "evidence/wasm.log",
+      "log_sha256": "9fe6c697aba154847c9d39cd89fd98d757781a7a5c178a976decc409b4260556",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "msrv-alloc",
+      "actual_command": [
+        "cargo",
+        "+1.93.0",
+        "check",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "fixtures/recovery-portable-consumer/Cargo.toml"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791062854,
+      "duration_seconds": 16.807,
+      "log": "evidence/msrv-alloc.log",
+      "log_sha256": "4830ed68df6aa3c4d23dd3389bb68982fafa531f3b6047da4be64e5b13f26fd3",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "msrv-std",
+      "actual_command": [
+        "cargo",
+        "+1.93.0",
+        "check",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "fixtures/recovery-portable-consumer/Cargo.toml",
+        "--features",
+        "std"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791062871,
+      "duration_seconds": 16.502,
+      "log": "evidence/msrv-std.log",
+      "log_sha256": "201487da20b52218bf34f677073a3b87fdc236817416bfc2d2d1e1c2b0364339",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "python",
+      "actual_command": [
+        "/Users/connor/Medica/backbay/standalone/arc/sdks/python/chio-crewai/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "sdks/python/chio-sdk-python/tests"
+      ],
+      "cwd": ".",
+      "environment": {
+        "PYTHONPATH": "sdks/python/chio-sdk-python/src"
+      },
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791062775,
+      "duration_seconds": 3.696,
+      "log": "evidence/python.log",
+      "log_sha256": "1e334061c5d4e2d344b2e0ec41fcd1ed603aee9c6d39149690abcab06f3ada02",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "ts",
+      "actual_command": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "test/recovery_schema.test.ts",
+        "test/recovery_p1_schema.test.ts",
+        "test/recovery_p2_schema.test.ts",
+        "test/recovery_p3_schema.test.ts",
+        "test/recovery_client.test.ts"
+      ],
+      "cwd": "sdks/typescript/packages/conformance",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791062779,
+      "duration_seconds": 1.998,
+      "log": "evidence/ts.log",
+      "log_sha256": "8cfdad8d0da37d686e71f86f62b8038103249382bda4520dabbbacec062fc339",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "ts-node-build",
+      "actual_command": [
+        "node",
+        "node_modules/typescript/bin/tsc",
+        "-p",
+        "packages/node-http/tsconfig.json"
+      ],
+      "cwd": "sdks/typescript",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791062781,
+      "duration_seconds": 1.183,
+      "log": "evidence/ts-node-build.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "ts-conformance-build",
+      "actual_command": [
+        "node",
+        "node_modules/typescript/bin/tsc",
+        "-p",
+        "packages/conformance/tsconfig.json",
+        "--noEmit"
+      ],
+      "cwd": "sdks/typescript",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791062782,
+      "duration_seconds": 0.889,
+      "log": "evidence/ts-conformance-build.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "architecture",
+      "actual_command": [
+        "python3",
+        "docs/architecture/recoverable-agent-runtime/check.py",
+        "--source-revision",
+        "de84fc306"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791068707,
+      "duration_seconds": 1.654,
+      "log": "evidence/architecture.log",
+      "log_sha256": "496eddc5fca3377550236b30b6cf9bba28a82a471ac77d694207408dab313221",
+      "required_for_local_phase_acceptance": true
+    },
+    {
+      "id": "broad-owning-attempt",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-core-types",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-flow",
+        "-p",
+        "chio-recovery",
+        "-p",
+        "chio-semantic-contracts",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-process",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-conformance",
+        "-p",
+        "chio-spec-codegen",
+        "-p",
+        "xtask"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 101,
+      "status": "failed",
+      "started_unix_seconds": 1791062801,
+      "duration_seconds": 269.584,
+      "log": "evidence/broad-owning-attempt.log",
+      "log_sha256": "da59dfb9aea31fde2840ad2fbc2c33565fd594f73751f5de6c29c242abe43546",
+      "required_for_local_phase_acceptance": false,
+      "qualification": "Unavailable broad network-listener conformance qualification; six bind EPERM failures, no implementation or lock relaxation",
+      "rust_tests_passed": 71,
+      "rust_tests_failed": 6,
+      "rust_tests_ignored": 0,
+      "rust_test_binaries": 12
+    },
+    {
+      "id": "disk-exhaustion-native",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--lib",
+        "p3_",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 101,
+      "status": "failed",
+      "started_unix_seconds": 1791062749,
+      "duration_seconds": 482.883,
+      "log": "evidence/disk-exhaustion-native.log",
+      "log_sha256": "5b8d87531d1b5aeb6e1051f96a13ed0f8a80529920b21ba4ac932022ef2391c8",
+      "required_for_local_phase_acceptance": false,
+      "qualification": "Unqualified diagnostic run during disk exhaustion; native/SQLite/LLVM I/O failures were retained and not counted as passing.",
+      "rust_tests_passed": 11,
+      "rust_tests_failed": 5,
+      "rust_tests_ignored": 0,
+      "rust_test_binaries": 1
+    },
+    {
+      "id": "disk-exhaustion-owning-tests",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-core-types",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-flow",
+        "-p",
+        "chio-recovery",
+        "-p",
+        "chio-semantic-contracts",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-process",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-spec-codegen",
+        "-p",
+        "xtask"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 101,
+      "status": "failed",
+      "started_unix_seconds": 1791063134,
+      "duration_seconds": 109.279,
+      "log": "evidence/disk-exhaustion-owning-tests.log",
+      "log_sha256": "2f001983988efbd6c14b325c7946280c6a6542db92bdabe98665f8701888e32e",
+      "required_for_local_phase_acceptance": false,
+      "qualification": "Unqualified diagnostic run during disk exhaustion; native/SQLite/LLVM I/O failures were retained and not counted as passing."
+    },
+    {
+      "id": "disk-exhaustion-p2-native",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--lib",
+        "recovery_p2_",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 101,
+      "status": "failed",
+      "started_unix_seconds": 1791063232,
+      "duration_seconds": 25.782,
+      "log": "evidence/disk-exhaustion-p2-native.log",
+      "log_sha256": "dcc4a00d9da1981a81bf7a35c770f7317c5a81901370da05a1677fdf6b87c674",
+      "required_for_local_phase_acceptance": false,
+      "qualification": "Unqualified diagnostic run during disk exhaustion; native/SQLite/LLVM I/O failures were retained and not counted as passing.",
+      "rust_tests_passed": 6,
+      "rust_tests_failed": 3,
+      "rust_tests_ignored": 0,
+      "rust_test_binaries": 1
+    },
+    {
+      "id": "egress-custody-diagnostic",
+      "actual_command": [
+        "target/debug/deps/chio_store_sqlite-f12c8dd52e54f54f",
+        "admission_operation_store::tests::security_participant_state::egress::portable::portable_commands_recheck_selected_binding_live_material_and_actual_lease",
+        "--exact",
+        "--nocapture"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791065739,
+      "duration_seconds": 4.777,
+      "log": "evidence/egress-custody-diagnostic.log",
+      "log_sha256": "c99b61eb71dc1df1b1fef540a34902196167cf53c188588d6f1c4488947d2361",
+      "required_for_local_phase_acceptance": false,
+      "rust_tests_passed": 1,
+      "rust_tests_failed": 0,
+      "rust_tests_ignored": 0,
+      "rust_test_binaries": 1
+    },
+    {
+      "id": "egress-cutpoint-diagnostic",
+      "actual_command": [
+        "target/debug/deps/chio_store_sqlite-f12c8dd52e54f54f",
+        "admission_operation_store::tests::security_participant_state::egress::faults::acquisition_and_commit_errors_recover_exactly_one_event_per_phase",
+        "--exact",
+        "--nocapture"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 0,
+      "status": "passed",
+      "started_unix_seconds": 1791065709,
+      "duration_seconds": 29.697,
+      "log": "evidence/egress-cutpoint-diagnostic.log",
+      "log_sha256": "5acc53c494b728999250ace022dff678bcbec85dec1bacf0462ea629586bb249",
+      "required_for_local_phase_acceptance": false,
+      "rust_tests_passed": 1,
+      "rust_tests_failed": 0,
+      "rust_tests_ignored": 0,
+      "rust_test_binaries": 1
+    },
+    {
+      "id": "kernel-listener-attempt",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-core-types",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-flow",
+        "-p",
+        "chio-recovery",
+        "-p",
+        "chio-semantic-contracts",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-process",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-spec-codegen",
+        "-p",
+        "xtask"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2"
+      },
+      "exit_code": 101,
+      "status": "failed",
+      "started_unix_seconds": 1791064171,
+      "duration_seconds": 278.992,
+      "log": "evidence/kernel-listener-attempt.log",
+      "log_sha256": "d224fdc9aff0c1be34fcd3975fefd447a78bae3203c81ab8797207492131c6bb",
+      "required_for_local_phase_acceptance": false,
+      "qualification": "Kernel broad owning run: 1448 kernel library tests passed; 12 exact native payment HTTP listener tests failed to bind EPERM. Retained as a failed broad run.",
+      "rust_tests_passed": 2118,
+      "rust_tests_failed": 12,
+      "rust_tests_ignored": 0,
+      "rust_test_binaries": 33
+    },
+    {
+      "id": "rollback-anchor-diagnostic",
+      "actual_command": [
+        "target/debug/deps/chio_store_sqlite-f12c8dd52e54f54f",
+        "admission_operation_store::tests::security_participant_migration::integrity::restoring_destination_before_import_is_rejected_by_independent_anchor",
+        "--exact",
+        "--nocapture"
+      ],
+      "cwd": ".",
+      "environment": {},
+      "exit_code": 101,
+      "status": "failed",
+      "started_unix_seconds": 1791065495,
+      "duration_seconds": 1.106,
+      "log": "evidence/rollback-anchor-diagnostic.log",
+      "log_sha256": "be37739ee7b657587188f4af9e03d9e34d9b06e0e4a53d9f9160a2a4ec24757d",
+      "required_for_local_phase_acceptance": false,
+      "rust_tests_passed": 0,
+      "rust_tests_failed": 1,
+      "rust_tests_ignored": 0,
+      "rust_test_binaries": 1
+    },
+    {
+      "id": "store-integration-attempt",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-core-types",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-flow",
+        "-p",
+        "chio-recovery",
+        "-p",
+        "chio-semantic-contracts",
+        "-p",
+        "chio-process",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-spec-codegen",
+        "-p",
+        "xtask",
+        "--",
+        "--test-threads=2",
+        "--skip",
+        "capability_lineage::tests::qualified_capability_snapshots_advance_the_external_rollback_generation",
+        "--skip",
+        "dead_letters::tests::qualified_alongside_store_rejects_dead_letter_rollback",
+        "--skip",
+        "finding_pool_ledger::tests::claimed_admission_operation_scan_is_bounded_and_cursor_ordered",
+        "--skip",
+        "finding_pool_ledger::tests::leased_outbox_rows_remain_observable_as_pending",
+        "--skip",
+        "finding_pool_ledger::tests::qualified_ledger_binds_validation_to_the_borrowed_database_file",
+        "--skip",
+        "finding_pool_ledger::tests::qualified_ledger_persists_one_receipt_sink",
+        "--skip",
+        "finding_pool_ledger::tests::qualified_ledger_rejects_a_writable_parent_directory",
+        "--skip",
+        "finding_pool_ledger::tests::qualified_ledger_rejects_unusable_domains",
+        "--skip",
+        "finding_pool_ledger::tests::qualified_schema_indexes_pending_outbox_and_expiration_reclamation",
+        "--skip",
+        "finding_pool_ledger::tests::recovered_mutation_loads_the_reservations_persisted_tenant",
+        "--skip",
+        "finding_pool_ledger::tests::unknown_dispatch_exact_replay_ignores_later_allocation_totals",
+        "--skip",
+        "iou_store::tests::qualified_alongside_store_rejects_iou_rollback",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_allows_explicitly_false_immutable_sqlite_uris",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_anchors_background_checkpoint_commits",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_anchors_checkpoint_publication_bindings",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_anchors_imported_checkpoint_commits",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_anchors_lineage_only_duplicate_mutations",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_anchors_retention_rotation",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_anchors_standalone_checkpoint_commits",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_anchors_standalone_lineage_mutations",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_refuses_to_seed_an_archive_only_store",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_rejects_atomic_database_replacement",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_rejects_internal_sink_identity_change",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_rejects_nonlocal_sqlite_uri_authorities",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_rejects_read_only_sqlite_uris",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_receipt_sink_verifies_rollback_anchor_before_metadata_jobs",
+        "--skip",
+        "receipt_store::tests::qualified_finding_pool::qualified_settlement_state_writes_advance_the_rollback_anchor",
+        "--skip",
+        "receipt_store::tests::verified_head::qualified_reader_and_reopen_reject_live_rollback_after_writer_routed_receipt",
+        "--skip",
+        "receipt_store::tests::verified_head::qualified_receipt_sink_rejects_locking_disabled_sqlite_uris"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+      },
+      "exit_code": 101,
+      "status": "failed",
+      "started_unix_seconds": 1791066821,
+      "duration_seconds": 1178.215,
+      "log": "evidence/store-integration-attempt.log",
+      "log_sha256": "4b40dbf30ab093f575067eda97c02ca45cbf1a12a24b407954457c42fd969057",
+      "required_for_local_phase_acceptance": false,
+      "rust_tests_passed": 2771,
+      "rust_tests_failed": 11,
+      "rust_tests_ignored": 6,
+      "rust_test_binaries": 95
+    },
+    {
+      "id": "store-platform-attempt",
+      "actual_command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "chio-core-types",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-flow",
+        "-p",
+        "chio-recovery",
+        "-p",
+        "chio-semantic-contracts",
+        "-p",
+        "chio-process",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-spec-codegen",
+        "-p",
+        "xtask"
+      ],
+      "cwd": ".",
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2"
+      },
+      "exit_code": 101,
+      "status": "failed",
+      "started_unix_seconds": 1791064647,
+      "duration_seconds": 1742.885,
+      "log": "evidence/store-platform-attempt.log",
+      "log_sha256": "8a6f16fe7077f3f7841101914aa107a6eb99d5f051dacdb93b713323cff0103c",
+      "required_for_local_phase_acceptance": false,
+      "rust_tests_passed": 2659,
+      "rust_tests_failed": 45,
+      "rust_tests_ignored": 6,
+      "rust_test_binaries": 85
+    }
+  ],
+  "qualification_limits": [
+    "Broad conformance listener attempt: six tiny_http bind EPERM failures; separately retained as failed and not required local profile evidence.",
+    "Broad owning kernel run: 1448 kernel library tests passed, 12 unchanged payment listener tests failed EPERM; required kernel-lib explicitly filters only those exact names. No unfiltered kernel green claim.",
+    "Broad store run: 1786 passed, 45 failed, 4 ignored; 29 unavailable separate Linux /dev/shm anchor fixtures, 14 macOS path-alias failures and 2 generic native InvalidData egress failures. Unchanged isolated egress diagnostics passed. A corrected component passed 1802 supported store library tests with 4 ignored and 29 exact filters; its aggregate later failed 11 remote-delivery cases with socket EPERM and remains a failed attempt. Final required gates cover eight complete owning packages, focused store rollback regression and store doctests alongside native P3/P2 tests. No colocated anchor substitution, unfiltered-store, default-concurrency, remote-delivery or distinct-device qualification.",
+    "Disk-exhaustion diagnostic runs are retained as failed. Clean required runs followed worktree-only incremental-cache cleanup and restored headroom.",
+    "Prior exploratory clock/late-capture refusals were not promoted to passing evidence; final complete native P3/P2 gates qualify only the declared local profile.",
+    "Historical broad P1 stress and Node HTTP socket failures remain in immutable P2 evidence; no full-workspace or all socket-suite green claim.",
+    "Offline Vitest/esbuild cache versions differ from unchanged lock pins; exact clean-install and hosted CI qualification are unavailable.",
+    "Trusted gateway must independently enforce its declared account/resource and atomic provider precondition contract; no live vendor or network qualification.",
+    "No Linux confinement, Kani execution, comparative scale/performance or production release qualification."
+  ],
+  "next_phase": {
+    "id": "P4",
+    "title": "Durable knowledge",
+    "scope": "Mediated artifact publication/read, labeled checkpoints and model contexts, restore/export, retention, adoption and safe garbage collection."
+  },
+  "phase_documents": [
+    {
+      "path": "OPERATIONS.md",
+      "sha256": "92e4870ab354cbdf7aae402c52934d02d4eeebdd0ad68261ea3736fa113924fd"
+    },
+    {
+      "path": "PLAN.md",
+      "sha256": "e057de41ae932d34337b87547e68d9a54beee2f5f98d85b89c66f2734e499eda"
+    },
+    {
+      "path": "REVIEW.md",
+      "sha256": "cda2d65a583bf953be3f6afe18258b675ca3bdfbf94f47abae34d2fca5568bbb"
+    },
+    {
+      "path": "requirements-coverage.json",
+      "sha256": "02c8b2909adcf7ad5beeb15076df4092c12c62cea32a590e7540cc00c09b705c"
+    },
+    {
+      "path": "source-baseline.json",
+      "sha256": "e308fa28d91409364bdeec98f44882b24f83b004e98f5b646893a4786c3648c7"
+    },
+    {
+      "path": "source-inventory.json",
+      "sha256": "821bbc01b86bcb6dcb9d66e07cf6c311aaa41c4b084b40821632dbebde11fb01"
+    }
+  ],
+  "evidence_artifacts": [
+    {
+      "path": "evidence/alloc.log",
+      "sha256": "cb79b57f73539c5b133dc9cab97f8cbd475a3a57b8ffe20deb3779ca8bc32348"
+    },
+    {
+      "path": "evidence/alloc.result.json",
+      "sha256": "676255585a29a89899da7d7739e810ca4b720b1f36748c21e1b53325dd0d04bc"
+    },
+    {
+      "path": "evidence/architecture.log",
+      "sha256": "496eddc5fca3377550236b30b6cf9bba28a82a471ac77d694207408dab313221"
+    },
+    {
+      "path": "evidence/architecture.result.json",
+      "sha256": "4519375fee225ea6eff31068448d12108f05ca7feb21be1d106b89b3f20775e7"
+    },
+    {
+      "path": "evidence/broad-owning-attempt.log",
+      "sha256": "da59dfb9aea31fde2840ad2fbc2c33565fd594f73751f5de6c29c242abe43546"
+    },
+    {
+      "path": "evidence/broad-owning-attempt.result.json",
+      "sha256": "39d5ac8cfc84e19595cdfc7fb4895ec33567fcf2eb81b06f4dc5e9fda52cfb74"
+    },
+    {
+      "path": "evidence/build-cache-cleanup.json",
+      "sha256": "76b3af7790fe95d5db3da9f36f6c8d27a6085924d6859b5b7fc15f45459fbec3"
+    },
+    {
+      "path": "evidence/clippy.log",
+      "sha256": "f029cf004abbe4a10f2483cbf5661ca35cc0c9672f0f818fe68789ee0c6d18f1"
+    },
+    {
+      "path": "evidence/clippy.result.json",
+      "sha256": "1ad5c5c3ce50267793ab8a551fc5bfee570aa08d46b4440471a4492cedd69d61"
+    },
+    {
+      "path": "evidence/conformance-lib.log",
+      "sha256": "8d1d260addd9314204a21940829e6ae1c7970d09e40438c71154dd33f7b87573"
+    },
+    {
+      "path": "evidence/conformance-lib.result.json",
+      "sha256": "da637d7e6dd96f45a644911b14896ec046ba0106668a09788301d886dc12b1ce"
+    },
+    {
+      "path": "evidence/current-source.tar.gz",
+      "sha256": "21d5efd516b2d9e598aee9ac75b8474dbf9cc71958062760d39f55d2b44412c6"
+    },
+    {
+      "path": "evidence/diff.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/diff.result.json",
+      "sha256": "16e74ad44e0308e234c8b4ad955f817e225826f0a0577e36b17841a7d5fff8e4"
+    },
+    {
+      "path": "evidence/disk-exhaustion-native.log",
+      "sha256": "5b8d87531d1b5aeb6e1051f96a13ed0f8a80529920b21ba4ac932022ef2391c8"
+    },
+    {
+      "path": "evidence/disk-exhaustion-native.result.json",
+      "sha256": "ab83835f1c97705c1a9942735dd572456a9efb51f82152c40b6e9e00fdb1809b"
+    },
+    {
+      "path": "evidence/disk-exhaustion-owning-tests.log",
+      "sha256": "2f001983988efbd6c14b325c7946280c6a6542db92bdabe98665f8701888e32e"
+    },
+    {
+      "path": "evidence/disk-exhaustion-owning-tests.result.json",
+      "sha256": "a765f2e947e9f574564591504f5ea408efa9c4e8bf37063cc813bef53f20331e"
+    },
+    {
+      "path": "evidence/disk-exhaustion-p2-native.log",
+      "sha256": "dcc4a00d9da1981a81bf7a35c770f7317c5a81901370da05a1677fdf6b87c674"
+    },
+    {
+      "path": "evidence/disk-exhaustion-p2-native.result.json",
+      "sha256": "b4bcafb9c6d739ac041f8dd48ce9fdf6127850ea21a6aa0f4bcfc8949d4ba64c"
+    },
+    {
+      "path": "evidence/domains.log",
+      "sha256": "9660e42dc2a0efbad4e490330d6a6385e58a420c7c1648c95bc9031c502670af"
+    },
+    {
+      "path": "evidence/domains.result.json",
+      "sha256": "3f9dcc0a239f0ab23801e4db6f2a9895537840e10865acb5fef655031595cc63"
+    },
+    {
+      "path": "evidence/egress-custody-diagnostic.log",
+      "sha256": "c99b61eb71dc1df1b1fef540a34902196167cf53c188588d6f1c4488947d2361"
+    },
+    {
+      "path": "evidence/egress-custody-diagnostic.result.json",
+      "sha256": "ae55fb7d6524b378605e27407d4b1836ee6751c6125216aef51c7c9c42ad4f9f"
+    },
+    {
+      "path": "evidence/egress-cutpoint-diagnostic.log",
+      "sha256": "5acc53c494b728999250ace022dff678bcbec85dec1bacf0462ea629586bb249"
+    },
+    {
+      "path": "evidence/egress-cutpoint-diagnostic.result.json",
+      "sha256": "8c70bea1aa8cd3db3078dcb4743c1a63bd08670eee51f530d5c34bd4d1415fcb"
+    },
+    {
+      "path": "evidence/format.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/format.result.json",
+      "sha256": "ff363f228e5678a35fb25f9638e4f2a03fe27a7721c05ce3ff1d17c3cfa82d74"
+    },
+    {
+      "path": "evidence/generate-contracts.py",
+      "sha256": "c6b7c881c3d44a74bfebc48dfbfcfca1275bf2b44555b0bc75a0ff47149388e5"
+    },
+    {
+      "path": "evidence/guard-mutations.log",
+      "sha256": "ab51ea60a180dcf83532117f0b671bba89aa7c055dfab26f507de72d874d2fb6"
+    },
+    {
+      "path": "evidence/guard-mutations.result.json",
+      "sha256": "d5078cfb80ec837229cabb77cbb2d5f9c62c86ccba87da1016203b7eaafb7bca"
+    },
+    {
+      "path": "evidence/hygiene.log",
+      "sha256": "0ed3fa2545ad7c1a66d32ba84a109728af4d7246a722d3beb00d3c061105082d"
+    },
+    {
+      "path": "evidence/hygiene.result.json",
+      "sha256": "d1187cc035da1a9d6ba7ef2f6d66994fa10a43ea62a6659858d687255b254654"
+    },
+    {
+      "path": "evidence/kernel-doc-tests.log",
+      "sha256": "bd8b954a5d40c64c16c0d7c0423051a0fd5a5ceb1dd28fbd76e85754993af88d"
+    },
+    {
+      "path": "evidence/kernel-doc-tests.result.json",
+      "sha256": "20e0d9701468c1dc96ca9c44c08ec90774f5dec051dc21ac924667397bb9d5b8"
+    },
+    {
+      "path": "evidence/kernel-lib.log",
+      "sha256": "738d827a9dc9e11d24c52feedf216b9e51b9851a8631c8838e1a8c2da73b99b0"
+    },
+    {
+      "path": "evidence/kernel-lib.result.json",
+      "sha256": "ad871ff61ce0686a9dacf04fcb4afc875ea44793c69916b4f5be7e7836a1687a"
+    },
+    {
+      "path": "evidence/kernel-listener-attempt.log",
+      "sha256": "d224fdc9aff0c1be34fcd3975fefd447a78bae3203c81ab8797207492131c6bb"
+    },
+    {
+      "path": "evidence/kernel-listener-attempt.result.json",
+      "sha256": "8bf30a9824eddea6fec3f6112957a83eef3cb061c2379367f8595dcd45d3e914"
+    },
+    {
+      "path": "evidence/layering.log",
+      "sha256": "d86efcdb613cfdb5c7cb93fbc663ad1379d53aa619f4b44377011ce820a3a8ea"
+    },
+    {
+      "path": "evidence/layering.result.json",
+      "sha256": "c16808cdff471bef0e0afc4ab48e2757833c2ed3a31e045d33ad91b0ce1f9845"
+    },
+    {
+      "path": "evidence/lint-parity.log",
+      "sha256": "5cdbfdb13810b2e2e148e68b501cddfe136aa2de30eda0b7ef053818dbaf1f02"
+    },
+    {
+      "path": "evidence/lint-parity.result.json",
+      "sha256": "8dc44c08fce19cecee1eb231709ea3be4cc0098b27e503f97ddae285f148ffdf"
+    },
+    {
+      "path": "evidence/msrv-alloc.log",
+      "sha256": "4830ed68df6aa3c4d23dd3389bb68982fafa531f3b6047da4be64e5b13f26fd3"
+    },
+    {
+      "path": "evidence/msrv-alloc.result.json",
+      "sha256": "67b16351eca33829b38523997712cd647afcc3d7b01a092a259f33bc147994b7"
+    },
+    {
+      "path": "evidence/msrv-std.log",
+      "sha256": "201487da20b52218bf34f677073a3b87fdc236817416bfc2d2d1e1c2b0364339"
+    },
+    {
+      "path": "evidence/msrv-std.result.json",
+      "sha256": "686369c2df9908331bb64a3d482919aa3036c153ed514d0acf603277c405473c"
+    },
+    {
+      "path": "evidence/native.log",
+      "sha256": "243b7dd31345b2c5496d8852a923ac3a552d558b61dc9c69de9192f3c66f2331"
+    },
+    {
+      "path": "evidence/native.result.json",
+      "sha256": "b84241ac4f4f4856d0823e09585688b8d31bd377b2fe34b12fde977ccd068cba"
+    },
+    {
+      "path": "evidence/owner-doc-tests.log",
+      "sha256": "61f6a378b405ec0d2c7cc527f3eef079157bb9b019e82cf4e2c991be87c13b96"
+    },
+    {
+      "path": "evidence/owner-doc-tests.result.json",
+      "sha256": "03cfbb8ec3048a852407e96d9049d3c3884502abddac92c1838ab9f4aed41c1d"
+    },
+    {
+      "path": "evidence/owning-tests.log",
+      "sha256": "6ffd18c5156a1bcae0f371660b6f0b75fd39e447230a3bbfca898bc42197fbea"
+    },
+    {
+      "path": "evidence/owning-tests.result.json",
+      "sha256": "52f37999f412c3364c8ee430f2e507184986a42eae04aeb2a6f606936a457f7d"
+    },
+    {
+      "path": "evidence/p2-native.log",
+      "sha256": "e94716db066aa8774b7a7b909137c46a1e1c014141c6e39d20a0c1502b09c95d"
+    },
+    {
+      "path": "evidence/p2-native.result.json",
+      "sha256": "0abdb26515929f0f2ae23404f80923aa38230123fb7626bf6cd16daf991fdaf8"
+    },
+    {
+      "path": "evidence/p2-source-baseline.tar.gz",
+      "sha256": "e021a7003043e1a6b6770de7ab89f84e6a7dc8186c45e54c413e4081a8f3f327"
+    },
+    {
+      "path": "evidence/package-integrity.log",
+      "sha256": "b5859c27839fc98268043418ffd07fc6dc1e84cfbd6c8d929d0f83f1de3522b3"
+    },
+    {
+      "path": "evidence/pure-guard.log",
+      "sha256": "833390d11d2e74f4ccffd89b62f912a30db6db7a3c5bdf9a8780581dc9f07480"
+    },
+    {
+      "path": "evidence/pure-guard.result.json",
+      "sha256": "2518dc349a190d6a8f7d006476924fec6ea4545f08a5657ba8c399b8356f5c34"
+    },
+    {
+      "path": "evidence/python-codegen.log",
+      "sha256": "853ef1e53ede36559e74e0873894fea3370764acaeb57cbda772dde7996f7084"
+    },
+    {
+      "path": "evidence/python-codegen.result.json",
+      "sha256": "10e8659633f3a2d95096283208cecc0bab74ef353fc1c9928d2af8b71c9251ec"
+    },
+    {
+      "path": "evidence/python.log",
+      "sha256": "1e334061c5d4e2d344b2e0ec41fcd1ed603aee9c6d39149690abcab06f3ada02"
+    },
+    {
+      "path": "evidence/python.result.json",
+      "sha256": "6ab24e5137273e33c69fce04578e1d45aa1d8c3b80696ee050faa3f90312329f"
+    },
+    {
+      "path": "evidence/rollback-anchor-diagnostic.log",
+      "sha256": "be37739ee7b657587188f4af9e03d9e34d9b06e0e4a53d9f9160a2a4ec24757d"
+    },
+    {
+      "path": "evidence/rollback-anchor-diagnostic.result.json",
+      "sha256": "d04e2c5e829fac1c165282a9ec6795b0c2a43d93a405611b2e5c9897eca9d6d2"
+    },
+    {
+      "path": "evidence/run-gates.py",
+      "sha256": "237498b7e088dd6f6b5637c156f06be110e6b58b63f707d723cc864d1ef1b541"
+    },
+    {
+      "path": "evidence/rust-codegen.log",
+      "sha256": "ed7f9090ce1c30f0849d31346689dc20e3f138fe6e6f0f1e1bfe19f4b66a5cda"
+    },
+    {
+      "path": "evidence/rust-codegen.result.json",
+      "sha256": "f256163993f30fa1c637568b8bb244348bece61ba02fcc1bf391f0d13f80a467"
+    },
+    {
+      "path": "evidence/schemas.log",
+      "sha256": "f08ca40211ee4cf16919c55a0c548472ee01a0ff6808eadb1e60a66f4aa43553"
+    },
+    {
+      "path": "evidence/schemas.result.json",
+      "sha256": "cc66803da5457530155bf8fc98062317f1888e57aeee67f95725293638046d65"
+    },
+    {
+      "path": "evidence/seal-package.py",
+      "sha256": "ae21793d67fc05b1aed4acc4bbdf40be1ef0073b2000aac04a97da8ef77eee1d"
+    },
+    {
+      "path": "evidence/std.log",
+      "sha256": "212929594a57303c8f1f44810a03bf36bf43d63e7e427f03da0613bac03671d5"
+    },
+    {
+      "path": "evidence/std.result.json",
+      "sha256": "5e82c2418ac86d2f83fdeca6b36c8f9a3492bb1e103e2f3d41428236104e8cdd"
+    },
+    {
+      "path": "evidence/store-doc-tests.log",
+      "sha256": "0a3d9e66e915714bdf47a4e3ee1cca7cf000495bc7547bbcb9c3a217f9696b41"
+    },
+    {
+      "path": "evidence/store-doc-tests.result.json",
+      "sha256": "8021fea7eb3b8aa7c09b1fcfe366ccc42654f083d9eb927c1615572e76481091"
+    },
+    {
+      "path": "evidence/store-integration-attempt.log",
+      "sha256": "4b40dbf30ab093f575067eda97c02ca45cbf1a12a24b407954457c42fd969057"
+    },
+    {
+      "path": "evidence/store-integration-attempt.result.json",
+      "sha256": "f915e74e0ac589474e092a8da06727cd743de8de84fa5f8d2f351ba6ff70d2e9"
+    },
+    {
+      "path": "evidence/store-platform-attempt.log",
+      "sha256": "8a6f16fe7077f3f7841101914aa107a6eb99d5f051dacdb93b713323cff0103c"
+    },
+    {
+      "path": "evidence/store-platform-attempt.result.json",
+      "sha256": "698999e1ea3c8a23b0968ce95de4eab71a01d0f5239dd6096a3661dc02d942d3"
+    },
+    {
+      "path": "evidence/store-regression.log",
+      "sha256": "5ef4827ba574fc340a24328579a1de5530e208e0b2259fd8ef95174d7b569ef1"
+    },
+    {
+      "path": "evidence/store-regression.result.json",
+      "sha256": "6ef5e8c781f91d7a4da4cdcd1febf6c689c867b8d09c2c919a548ff896762962"
+    },
+    {
+      "path": "evidence/tool-environment.json",
+      "sha256": "0aa59f63e9b981a59dec9e07121d776c4c59e5653d5f355fef26ec1756cafff9"
+    },
+    {
+      "path": "evidence/toolchain-parity.log",
+      "sha256": "0663e9dc80bac7594693bac2c394f9b68eeff85feaae6622feb1d67ad41aa730"
+    },
+    {
+      "path": "evidence/toolchain-parity.result.json",
+      "sha256": "93cd41a5c1c45ac46a0b7b2a34c98a4bf43562200abe6cd8d767af2f023bde72"
+    },
+    {
+      "path": "evidence/tooling-cleanup.json",
+      "sha256": "2d422385bf71ff0177ee71e4923b88766c46a2a034c955f50e48856a4a9601b5"
+    },
+    {
+      "path": "evidence/ts-codegen.log",
+      "sha256": "13d937085f574fa38186d7e5bf942e6c030f43dc86ee1b2ad98b67286c0dc411"
+    },
+    {
+      "path": "evidence/ts-codegen.result.json",
+      "sha256": "7991393524a17f6260bd52c86a07d49587f74a94c5eae29b24bf4a191aa29bd5"
+    },
+    {
+      "path": "evidence/ts-conformance-build.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/ts-conformance-build.result.json",
+      "sha256": "69f40674cf20bd7892a6a08d49065771e4e69d397859d63742b80539df8e3b75"
+    },
+    {
+      "path": "evidence/ts-node-build.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/ts-node-build.result.json",
+      "sha256": "cc656cd014086e8ab2616936d26ab8d3f4b76806ace07611ef23b306319eedc5"
+    },
+    {
+      "path": "evidence/ts.log",
+      "sha256": "8cfdad8d0da37d686e71f86f62b8038103249382bda4520dabbbacec062fc339"
+    },
+    {
+      "path": "evidence/ts.result.json",
+      "sha256": "e673f6192f26ff8231dc073fe2391b1fbc79877e2f72f4b6513b0f6fd22ec664"
+    },
+    {
+      "path": "evidence/vector-recompute.log",
+      "sha256": "8848b49daf8469cb23271d21ce5bcb6c646e024dcc4f46e58e19a3ced38b813c"
+    },
+    {
+      "path": "evidence/vector-recompute.result.json",
+      "sha256": "de30720db8508e1d5fcdde28830f6b954f905a9e314d8ff198f22f83eb81f349"
+    },
+    {
+      "path": "evidence/verify-package.py",
+      "sha256": "7a091a5a49bba6e6bffbd1b7ee4b47a4f0314ff56ef322f257fa3c46321ff51f"
+    },
+    {
+      "path": "evidence/verify-vectors.py",
+      "sha256": "dbff3fe42b4f619598974c525d841ece8574a3611afddc86b0458b45a20fd79a"
+    },
+    {
+      "path": "evidence/wasm.log",
+      "sha256": "9fe6c697aba154847c9d39cd89fd98d757781a7a5c178a976decc409b4260556"
+    },
+    {
+      "path": "evidence/wasm.result.json",
+      "sha256": "be1d1d4c90279b2ed36a1674edca03a54be3d734d0808d9603e12dcc6e788e02"
+    },
+    {
+      "path": "evidence/wire-lock.log",
+      "sha256": "2578bc582d112583423567d8051b03ccbc0f34b79c4dd5b25819534e049e84ae"
+    },
+    {
+      "path": "evidence/wire-lock.result.json",
+      "sha256": "93015642f764e4d53c1bcdbe429a5f2bde9c7ce897cbc644730bbb9ad859ed3b"
+    }
+  ]
+}

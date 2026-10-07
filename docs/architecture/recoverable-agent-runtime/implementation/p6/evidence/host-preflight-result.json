@@ -1,0 +1,309 @@
+{
+  "cases": [
+    {
+      "host": "langgraph",
+      "workflow": "support",
+      "arm": "baseline",
+      "case": "authorized",
+      "native": {
+        "approval_records": 2,
+        "artifact_deliveries": 0,
+        "artifact_releases": 0,
+        "artifacts": 0,
+        "charges": 1,
+        "duplicate_effects": 0,
+        "effects": 1,
+        "extra_approvals": 0,
+        "fence": {
+          "lease_id": "01a10b2a-bb20-76a1-8191-2d6768f2c9d4",
+          "owner_epoch": 2,
+          "store_uuid": "01a10b2a-72bf-7fe2-908a-82205fefd8a9"
+        },
+        "native_actions": 1,
+        "preexisting_effects": 0,
+        "provider_effects_total": 2,
+        "recovery_success": false,
+        "setup_effects": 1,
+        "source_label_retained": true,
+        "unauthorized_effects": 0,
+        "unresolved": 0,
+        "unresolved_age_ms": 0,
+        "useful_completion": true
+      },
+      "outcome": {
+        "category": "complete",
+        "command_id": "trial-owned-original",
+        "workflow_id": "workflow:16c2c6307959a13a752671a3e255692a88908ecdc04d8052dee9d6899f047bdc"
+      },
+      "model_free_actions": 1,
+      "authority_policy": "6cbea0e86b177e31ed3863462505826b686b5e6c133f1b0dc62b1bef0777ff41"
+    },
+    {
+      "host": "langgraph",
+      "workflow": "support",
+      "arm": "product",
+      "case": "authorized",
+      "native": {
+        "approval_records": 2,
+        "artifact_deliveries": 0,
+        "artifact_releases": 0,
+        "artifacts": 0,
+        "charges": 1,
+        "duplicate_effects": 0,
+        "effects": 1,
+        "extra_approvals": 0,
+        "fence": {
+          "lease_id": "01a10b2b-b1f5-7a21-8a2f-25b3c8c64d47",
+          "owner_epoch": 2,
+          "store_uuid": "01a10b2b-69a5-7a42-a7a5-751b3f478f5d"
+        },
+        "native_actions": 1,
+        "preexisting_effects": 0,
+        "provider_effects_total": 2,
+        "recovery_success": false,
+        "setup_effects": 1,
+        "source_label_retained": true,
+        "unauthorized_effects": 0,
+        "unresolved": 0,
+        "unresolved_age_ms": 0,
+        "useful_completion": true
+      },
+      "outcome": {
+        "category": "complete",
+        "command_id": "trial-owned-original",
+        "workflow_id": "workflow:f4b1cb8ab10b8fef9b8cefb36348219013830d85394e437103910e81fac39b8b"
+      },
+      "model_free_actions": 1,
+      "authority_policy": "6cbea0e86b177e31ed3863462505826b686b5e6c133f1b0dc62b1bef0777ff41"
+    },
+    {
+      "host": "langgraph",
+      "workflow": "artifact",
+      "arm": "baseline",
+      "case": "authorized",
+      "native": {
+        "approval_records": 1,
+        "artifact_deliveries": 1,
+        "artifact_releases": 1,
+        "artifacts": 1,
+        "charges": 0,
+        "duplicate_effects": 0,
+        "effects": 1,
+        "extra_approvals": 0,
+        "fence": {
+          "lease_id": "01a10b2c-a476-79f1-b282-90a171038d80",
+          "owner_epoch": 2,
+          "store_uuid": "01a10b2c-5ba8-7ad3-b113-daa0c86c2c25"
+        },
+        "native_actions": 1,
+        "preexisting_effects": 0,
+        "provider_effects_total": 1,
+        "recovery_success": false,
+        "setup_effects": 1,
+        "source_label_retained": true,
+        "unauthorized_effects": 0,
+        "unresolved": 0,
+        "unresolved_age_ms": 0,
+        "useful_completion": true
+      },
+      "outcome": {
+        "category": "complete",
+        "command_id": "trial-owned-original",
+        "workflow_id": "workflow:3549a12fe61c5bebf8458672c90316630e61dccf92d18da48b5cb02f58d3a805"
+      },
+      "model_free_actions": 1,
+      "authority_policy": "6cbea0e86b177e31ed3863462505826b686b5e6c133f1b0dc62b1bef0777ff41"
+    },
+    {
+      "host": "langgraph",
+      "workflow": "artifact",
+      "arm": "product",
+      "case": "authorized",
+      "native": {
+        "approval_records": 1,
+        "artifact_deliveries": 1,
+        "artifact_releases": 1,
+        "artifacts": 1,
+        "charges": 0,
+        "duplicate_effects": 0,
+        "effects": 1,
+        "extra_approvals": 0,
+        "fence": {
+          "lease_id": "01a10b2d-042a-74d1-af09-a046beec563f",
+          "owner_epoch": 2,
+          "store_uuid": "01a10b2c-bb51-7f21-93a4-4566f1108ba2"
+        },
+        "native_actions": 1,
+        "preexisting_effects": 0,
+        "provider_effects_total": 1,
+        "recovery_success": false,
+        "setup_effects": 1,
+        "source_label_retained": true,
+        "unauthorized_effects": 0,
+        "unresolved": 0,
+        "unresolved_age_ms": 0,
+        "useful_completion": true
+      },
+      "outcome": {
+        "category": "complete",
+        "command_id": "trial-owned-original",
+        "workflow_id": "workflow:a13bf625c66a3e3cc13284f70b4cd39cbf5340abe025e7f2051d1fa9b0595e2d"
+      },
+      "model_free_actions": 1,
+      "authority_policy": "6cbea0e86b177e31ed3863462505826b686b5e6c133f1b0dc62b1bef0777ff41"
+    },
+    {
+      "host": "crewai",
+      "workflow": "support",
+      "arm": "baseline",
+      "case": "authorized",
+      "native": {
+        "approval_records": 2,
+        "artifact_deliveries": 0,
+        "artifact_releases": 0,
+        "artifacts": 0,
+        "charges": 1,
+        "duplicate_effects": 0,
+        "effects": 1,
+        "extra_approvals": 0,
+        "fence": {
+          "lease_id": "01a10b2d-62f9-7dc3-95f0-802424ffa887",
+          "owner_epoch": 2,
+          "store_uuid": "01a10b2d-1af0-7c31-b100-c6acc24c24ed"
+        },
+        "native_actions": 1,
+        "preexisting_effects": 0,
+        "provider_effects_total": 2,
+        "recovery_success": false,
+        "setup_effects": 1,
+        "source_label_retained": true,
+        "unauthorized_effects": 0,
+        "unresolved": 0,
+        "unresolved_age_ms": 0,
+        "useful_completion": true
+      },
+      "outcome": {
+        "category": "complete",
+        "command_id": "trial-owned-original",
+        "workflow_id": "workflow:17c2e40001d4013a4b3aae7742efa5e62bff0433acddd69c21ac31bad5eef62a"
+      },
+      "model_free_actions": 1,
+      "authority_policy": "6cbea0e86b177e31ed3863462505826b686b5e6c133f1b0dc62b1bef0777ff41"
+    },
+    {
+      "host": "crewai",
+      "workflow": "support",
+      "arm": "product",
+      "case": "authorized",
+      "native": {
+        "approval_records": 2,
+        "artifact_deliveries": 0,
+        "artifact_releases": 0,
+        "artifacts": 0,
+        "charges": 1,
+        "duplicate_effects": 0,
+        "effects": 1,
+        "extra_approvals": 0,
+        "fence": {
+          "lease_id": "01a10b2e-5c99-7fd1-8b31-dedc8869efa6",
+          "owner_epoch": 2,
+          "store_uuid": "01a10b2e-1405-7873-ac43-8a694f6df550"
+        },
+        "native_actions": 1,
+        "preexisting_effects": 0,
+        "provider_effects_total": 2,
+        "recovery_success": false,
+        "setup_effects": 1,
+        "source_label_retained": true,
+        "unauthorized_effects": 0,
+        "unresolved": 0,
+        "unresolved_age_ms": 0,
+        "useful_completion": true
+      },
+      "outcome": {
+        "category": "complete",
+        "command_id": "trial-owned-original",
+        "workflow_id": "workflow:d385aebf1b1f9fb016e30e52639a1eaecf574c32538b59f7c04504b776fe19a5"
+      },
+      "model_free_actions": 1,
+      "authority_policy": "6cbea0e86b177e31ed3863462505826b686b5e6c133f1b0dc62b1bef0777ff41"
+    },
+    {
+      "host": "crewai",
+      "workflow": "artifact",
+      "arm": "baseline",
+      "case": "authorized",
+      "native": {
+        "approval_records": 1,
+        "artifact_deliveries": 1,
+        "artifact_releases": 1,
+        "artifacts": 1,
+        "charges": 0,
+        "duplicate_effects": 0,
+        "effects": 1,
+        "extra_approvals": 0,
+        "fence": {
+          "lease_id": "01a10b2f-5044-7740-8c4c-ab0085127c1e",
+          "owner_epoch": 2,
+          "store_uuid": "01a10b2f-06fe-7ef3-93a3-0cb87db0d6f1"
+        },
+        "native_actions": 1,
+        "preexisting_effects": 0,
+        "provider_effects_total": 1,
+        "recovery_success": false,
+        "setup_effects": 1,
+        "source_label_retained": true,
+        "unauthorized_effects": 0,
+        "unresolved": 0,
+        "unresolved_age_ms": 0,
+        "useful_completion": true
+      },
+      "outcome": {
+        "category": "complete",
+        "command_id": "trial-owned-original",
+        "workflow_id": "workflow:cd9bd96b3c8b57fa8d87b5511f64bf5f205df687032e1a7fca7efb9ff1e25e5c"
+      },
+      "model_free_actions": 1,
+      "authority_policy": "6cbea0e86b177e31ed3863462505826b686b5e6c133f1b0dc62b1bef0777ff41"
+    },
+    {
+      "host": "crewai",
+      "workflow": "artifact",
+      "arm": "product",
+      "case": "authorized",
+      "native": {
+        "approval_records": 1,
+        "artifact_deliveries": 1,
+        "artifact_releases": 1,
+        "artifacts": 1,
+        "charges": 0,
+        "duplicate_effects": 0,
+        "effects": 1,
+        "extra_approvals": 0,
+        "fence": {
+          "lease_id": "01a10b2f-afd1-7063-9b4b-3c24c05046c6",
+          "owner_epoch": 2,
+          "store_uuid": "01a10b2f-6722-7381-a087-c1b651ebc268"
+        },
+        "native_actions": 1,
+        "preexisting_effects": 0,
+        "provider_effects_total": 1,
+        "recovery_success": false,
+        "setup_effects": 1,
+        "source_label_retained": true,
+        "unauthorized_effects": 0,
+        "unresolved": 0,
+        "unresolved_age_ms": 0,
+        "useful_completion": true
+      },
+      "outcome": {
+        "category": "complete",
+        "command_id": "trial-owned-original",
+        "workflow_id": "workflow:a3ef810cd6003228a398a416024e0ecfd0b3de0e586e1b87d1d2cd3a46abaac4"
+      },
+      "model_free_actions": 1,
+      "authority_policy": "6cbea0e86b177e31ed3863462505826b686b5e6c133f1b0dc62b1bef0777ff41"
+    }
+  ],
+  "passed": true
+}

@@ -1,0 +1,10 @@
+
+running 5 tests
+test frost_coordinator_cancellation_publishes_external_tombstone_before_fanout ... ok
+test frost_coordinator_burns_changed_messages_and_rejects_late_shares ... ok
+test frost_preaggregate_snapshot_recovers_exact_external_completion_without_resigning ... ok
+test frost_stale_sqlite_serving_owner_cannot_advance_coordinator ... ok
+test frost_coordinator_recovers_every_persisted_transition_and_exact_terminal_proof ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.03s
+

@@ -1,0 +1,19 @@
+native 0 102.968
+pure 0 2.992
+Traceback (most recent call last):
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/target/recovery-next-20261004/p6-final-performance.py", line 53, in <module>
+    audit_performance_logs(record, (OUT/"task-5-final-native-performance.log").read_text(),
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                           (OUT/"task-5-final-pure-performance.log").read_text())
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p6/evidence/package_measurements.py", line 35, in audit_performance_logs
+    audit_performance(row)
+    ~~~~~~~~~~~~~~~~~^^^^^
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p6/evidence/package_measurements.py", line 21, in audit_performance
+    refuse(type(native["p95_ns"]) is int and 0 < native["p95_ns"] <= 220683049,
+    ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+           "performance_latency")
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p6/evidence/package_audit.py", line 11, in refuse
+    raise ValueError("qualification." + reason)
+ValueError: qualification.performance_latency

@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/sdks/typescript/packages/conformance
+
+
+ Test Files  1 passed (1)
+      Tests  41 passed (41)
+   Start at  21:27:30
+   Duration  1.00s (transform 23ms, setup 0ms, import 883ms, tests 7ms, environment 0ms)
+

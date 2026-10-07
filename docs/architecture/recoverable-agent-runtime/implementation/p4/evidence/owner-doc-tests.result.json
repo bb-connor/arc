@@ -1,0 +1,25 @@
+{
+  "id": "owner-doc-tests",
+  "actual_command": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "chio-control-plane",
+    "--doc"
+  ],
+  "cwd": ".",
+  "environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2",
+    "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+  },
+  "exit_code": 0,
+  "status": "passed",
+  "started_unix_seconds": 1791075756,
+  "duration_seconds": 91.963,
+  "log": "evidence/owner-doc-tests.log",
+  "log_sha256": "6c2a848cebbf02c35238f7b614da1e7d340fbadd162510b28fc86b97ade3905a",
+  "required_for_local_phase_acceptance": true
+}

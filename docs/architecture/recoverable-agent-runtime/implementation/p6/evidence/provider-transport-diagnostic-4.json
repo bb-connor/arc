@@ -1,0 +1,9 @@
+{
+  "separate_diagnostic": true,
+  "tools": 0,
+  "requested_model": "gpt-5.4-2026-03-05",
+  "returned_model": "gpt-5.4-2026-03-05",
+  "input_tokens": 9,
+  "output_tokens": 4,
+  "transport_retries": 0
+}

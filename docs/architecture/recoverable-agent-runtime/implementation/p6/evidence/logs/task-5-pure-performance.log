@@ -1,0 +1,7 @@
+   Compiling chio-security-types v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-security-types)
+   Compiling chio-core-types v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-core-types)
+   Compiling chio-semantic-contracts v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-semantic-contracts)
+   Compiling chio-recovery v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-recovery)
+    Finished `dev` profile [unoptimized] target(s) in 20.46s
+     Running `target/debug/examples/p0_baseline`
+P0_PURE_BASELINE {"digest":{"elapsed_ns":24436167,"max_ns":66000,"p50_ns":24083,"p95_ceiling_ns":250000,"p95_ns":26166,"p99_ns":28000,"samples":1000,"warmups":100},"errors":0,"graph_16_steps":{"elapsed_ns":8308083,"max_ns":33250,"p50_ns":8125,"p95_ceiling_ns":1000000,"p95_ns":8833,"p99_ns":9250,"samples":1000,"warmups":100},"intake":{"elapsed_ns":123466458,"max_ns":221334,"p50_ns":121584,"p95_ceiling_ns":5000000,"p95_ns":131292,"p99_ns":183583,"samples":1000,"warmups":100},"profile":"debug","reduction":{"elapsed_ns":94542,"max_ns":959,"p50_ns":42,"p95_ceiling_ns":250000,"p95_ns":84,"p99_ns":84,"samples":1000,"warmups":100}}

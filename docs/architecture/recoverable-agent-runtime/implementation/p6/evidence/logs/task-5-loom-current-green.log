@@ -1,0 +1,62 @@
+   Compiling chio-kernel v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-kernel)
+warning: methods `try_mark_dispatch_started` and `mark_dispatch_finished` are never used
+   --> crates/kernel/chio-kernel/src/session.rs:315:19
+    |
+182 | impl InflightRegistry {
+    | --------------------- methods in this implementation
+...
+315 |     pub(crate) fn try_mark_dispatch_started(
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+336 |     pub(crate) fn mark_dispatch_finished(&self, request_id: &RequestId) {
+    |                   ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: enum `DispatchStartFailure` is never used
+   --> crates/kernel/chio-kernel/src/session.rs:387:17
+    |
+387 | pub(crate) enum DispatchStartFailure {
+    |                 ^^^^^^^^^^^^^^^^^^^^
+
+warning: methods `request_cancellation_with_reason`, `try_mark_request_dispatch_started`, and `mark_request_dispatch_finished` are never used
+    --> crates/kernel/chio-kernel/src/session.rs:1472:19
+     |
+ 820 | impl Session {
+     | ------------ methods in this implementation
+...
+1472 |     pub(crate) fn request_cancellation_with_reason(
+     |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+1481 |     pub(crate) fn try_mark_request_dispatch_started(
+     |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+1491 |     pub(crate) fn mark_request_dispatch_finished(&self, request_id: &RequestId) {
+     |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `chio-kernel` (lib) generated 3 warnings
+    Finished `release` profile [optimized] target(s) in 29.68s
+     Running tests/loom_concurrency.rs (target/recovery-p6-loom/release/deps/loom_concurrency-b5b4775d98b9b029)
+
+running 18 tests
+test loom_disarmed_drop_guard_is_noop ... ok
+test loom_emergency_stop_arcswap ... ok
+test loom_parent_signs_receipt_while_child_spawns ... ok
+test loom_approval_attachment_and_pending_reverse_have_one_winner ... ok
+test loom_real_session_admission_never_outlives_terminal ... ok
+test protocol_primitives_capture_versus_reverse ... ok
+test loom_post_admission_drop_guards_race_on_receipt_store_write_lock ... ok
+test protocol_primitives_immutable_maximum_race ... ok
+test protocol_primitives_idempotent_compensation ... ok
+test loom_cumulative_approval_serializes_concurrent_threshold_crossing ... ok
+test protocol_primitives_three_key_all_or_nothing_admission ... ok
+test protocol_primitives_last_unit_contention ... ok
+test loom_receipt_channel_producer_drain ... ok
+test receipt_writer_liveness_no_lost_wakeup ... ok
+test loom_revocation_race_eval ... ok
+test loom_dashmap_session_insert_remove_concurrent ... ok
+test loom_session_create_lookup_terminal_same_id ... ok
+test loom_inflight_increment_decrement_storm ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.85s
+

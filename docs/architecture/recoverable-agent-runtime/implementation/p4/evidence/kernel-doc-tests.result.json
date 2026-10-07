@@ -1,0 +1,25 @@
+{
+  "id": "kernel-doc-tests",
+  "actual_command": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "chio-kernel",
+    "--doc"
+  ],
+  "cwd": ".",
+  "environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2",
+    "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+  },
+  "exit_code": 0,
+  "status": "passed",
+  "started_unix_seconds": 1791075635,
+  "duration_seconds": 31.107,
+  "log": "evidence/kernel-doc-tests.log",
+  "log_sha256": "7be1c28046199bdf0a024e5d397db4201b3eff19a4c7eeeb2b390305a7f431c0",
+  "required_for_local_phase_acceptance": true
+}

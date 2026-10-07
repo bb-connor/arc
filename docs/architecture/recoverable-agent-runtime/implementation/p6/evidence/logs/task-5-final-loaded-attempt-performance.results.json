@@ -1,0 +1,42 @@
+[
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "chio-process",
+      "--test",
+      "recovery_p0_baseline",
+      "measured_native_baseline",
+      "--",
+      "--ignored",
+      "--nocapture"
+    ],
+    "exit_code": 0,
+    "source_stable": true,
+    "source_binding": "b1bcd48cadb7b9c7f1ff5dd4ad8d9910056590e22058527756114e21239c1063",
+    "log": ".superpowers/sdd/P6-PRODUCT-PLAN/task-5-final-native-performance.log",
+    "log_sha256": "9e6db3f6107d35250df02cc363c2496e1ccc1de88011d88c7c4be5120814c97a",
+    "seconds": 102.968
+  },
+  {
+    "command": [
+      "cargo",
+      "run",
+      "--offline",
+      "--locked",
+      "-p",
+      "chio-recovery",
+      "--example",
+      "p0_baseline"
+    ],
+    "exit_code": 0,
+    "source_stable": true,
+    "source_binding": "b1bcd48cadb7b9c7f1ff5dd4ad8d9910056590e22058527756114e21239c1063",
+    "log": ".superpowers/sdd/P6-PRODUCT-PLAN/task-5-final-pure-performance.log",
+    "log_sha256": "cea28d076f8736c46a4631f3ba15f49ec11b37b476266a82a028210070d1e825",
+    "seconds": 2.992
+  }
+]

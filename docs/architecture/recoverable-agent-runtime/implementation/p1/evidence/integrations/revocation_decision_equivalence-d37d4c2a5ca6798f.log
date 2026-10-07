@@ -1,0 +1,7 @@
+
+running 2 tests
+test lazy_lookup_projection_distinguishes_token_and_ancestor_flags ... ok
+test snapshot_decision_matches_store_projection ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

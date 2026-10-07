@@ -1,0 +1,2 @@
+error: toolchain 'nightly-2025-11-21-aarch64-apple-darwin' is not installed
+help: run `rustup toolchain install nightly-2025-11-21-aarch64-apple-darwin` to install it

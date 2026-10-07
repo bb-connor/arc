@@ -1,0 +1,23 @@
+{
+  "phase": "P4",
+  "offline_cache": "/Users/connor/Medica/backbay/standalone/arc/sdks/typescript",
+  "observed_package_versions": {
+    "vitest": "3.2.6",
+    "vite": "7.3.5",
+    "esbuild": "0.27.7",
+    "typescript": "5.7.3",
+    "ajv": "8.20.0",
+    "json-schema-to-typescript": "15.0.4"
+  },
+  "workspace_sources_selected": true,
+  "dependency_lock_pins_changed_by_p4": false,
+  "exact_clean_install_qualified": false,
+  "temporary_overlays_removed": [
+    "sdks/typescript/node_modules",
+    "sdks/typescript/scripts/node_modules",
+    "sdks/typescript/packages/node-http/node_modules",
+    "sdks/typescript/packages/conformance/node_modules"
+  ],
+  "python_interpreter": "/Users/connor/Medica/backbay/standalone/arc/sdks/python/chio-crewai/.venv/bin/python",
+  "python_sdk_source": "sdks/python/chio-sdk-python/src"
+}

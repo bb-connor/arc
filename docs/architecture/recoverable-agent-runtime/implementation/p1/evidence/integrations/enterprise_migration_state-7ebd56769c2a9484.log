@@ -1,0 +1,17 @@
+
+running 12 tests
+test legacy_mutable_row_authority_is_rejected ... ok
+test load_rejects_raw_append_with_invalid_signature ... ok
+test raw_sql_cannot_skip_update_or_delete ... ok
+test duplicate_generation_is_classified_without_replace ... ok
+test runtime_binding_rejects_downgrade_advance_and_posture_rebinding ... ok
+test schema_trigger_removal_is_detected_before_load ... ok
+test symlink_hardlink_and_live_path_replacement_are_rejected ... ok
+test independently_anchored_head_rejects_valid_restored_prefix ... ok
+test signed_hash_linked_chain_survives_reopen ... ok
+test volatile_and_relative_paths_are_rejected ... ok
+test valid_signature_from_untrusted_signer_is_rejected ... ok
+test two_connections_race_one_promotion_and_one_conflict ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+

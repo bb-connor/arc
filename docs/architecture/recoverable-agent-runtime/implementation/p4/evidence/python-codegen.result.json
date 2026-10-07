@@ -1,0 +1,20 @@
+{
+  "id": "python-codegen",
+  "actual_command": [
+    "target/debug/xtask",
+    "codegen",
+    "python",
+    "--check"
+  ],
+  "cwd": ".",
+  "environment": {
+    "PATH": "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/target/recovery-p0-codegen-bin:/Users/connor/.codex/packages/app-server-daemon/releases/0.160.0-aarch64-apple-darwin/codex-path:/Users/connor/.codex/tmp/arg0/codex-arg0UEQ3PA:/Users/connor/.codex/tmp/arg0/codex-arg0S2tY1s:/Users/connor/.codex/packages/app-server-daemon/releases/0.159.3-aarch64-apple-darwin/codex-path:/Users/connor/.codex/tmp/arg0/codex-arg05RTEbr:/Users/connor/.codex/packages/app-server-daemon/releases/0.159.2-aarch64-apple-darwin/codex-path:/Users/connor/.codex/tmp/arg0/codex-arg055DeEw:/Users/connor/.codex/packages/app-server-daemon/releases/0.159.1-aarch64-apple-darwin/codex-path:/Users/connor/.codex/tmp/arg0/codex-arg0UxdSRW:/Users/connor/.bun/install/global/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/codex-path:/opt/homebrew/opt/openjdk@21/bin:/Users/connor/.local/bin:/Users/connor/.antigravity/antigravity/bin:/Users/connor/.proto/shims:/Users/connor/.proto/bin:/Users/connor/.bun/bin:/Users/connor/.codeium/windsurf/bin:/opt/homebrew/opt/libpq/bin:/opt/homebrew/bin:/Users/connor/bin:/usr/local/bin:/Users/connor/.elan/bin:/opt/homebrew/opt/openjdk@21/bin:/Users/connor/.local/share/solana/install/active_release/bin:/Users/connor/.pyenv/shims:/Users/connor/.local/go/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/opt/pkg/env/active/bin:/opt/pmk/env/global/bin:/Library/Apple/usr/bin:/Library/TeX/texbin:/Applications/VMware Fusion.app/Contents/Public:/usr/local/share/dotnet:~/.dotnet/tools:/usr/local/hatch/bin:/Users/connor/.railway/bin:/opt/homebrew/opt/openjdk@21/bin:/Users/connor/.local/bin:/Users/connor/.antigravity/antigravity/bin:/Users/connor/.proto/shims:/Users/connor/.proto/bin:/Users/connor/.bun/bin:/Users/connor/.codeium/windsurf/bin:/opt/homebrew/opt/libpq/bin:/Users/connor/Library/Application Support/carapace/bin:/Users/connor/bin:/Users/connor/.elan/bin:/Users/connor/.local/share/solana/install/active_release/bin:/Users/connor/.local/go/bin:/Users/connor/.wasmedge/bin:/Users/connor/.cargo/bin:/Applications/Ghostty.app/Contents/MacOS:/Users/connor/.cache/lm-studio/bin:/Users/connor/.local/bin:/Users/connor/.cache/lm-studio/bin"
+  },
+  "exit_code": 0,
+  "status": "passed",
+  "started_unix_seconds": 1791074462,
+  "duration_seconds": 7.627,
+  "log": "evidence/python-codegen.log",
+  "log_sha256": "263879d30dc7e5071c6c48d88ef9aa791acbbe3a5f1b425649497a73045152fa",
+  "required_for_local_phase_acceptance": true
+}

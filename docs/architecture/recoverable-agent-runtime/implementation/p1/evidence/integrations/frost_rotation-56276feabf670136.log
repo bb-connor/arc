@@ -1,0 +1,8 @@
+
+running 3 tests
+test frost_rotation_ceremony_rejects_changed_config_and_wrong_custody_generation ... ok
+test frost_rotation_ceremony_never_persists_round_material_in_plaintext ... ok
+test frost_rotation_ceremony_commits_each_round_before_replay_after_restart ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.87s
+

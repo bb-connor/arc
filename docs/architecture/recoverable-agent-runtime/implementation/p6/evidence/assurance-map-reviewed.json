@@ -1,0 +1,237 @@
+{
+  "schema": "chio.recovery-p6-assurance-map.v1",
+  "full_system_proof": false,
+  "sources": [
+    {
+      "path": "crates/core/chio-core-types/src/recovery/decode.rs",
+      "sha256": "81e341aaa1d06281f06bed033e0cdc0261ec34f729c44fa2f8ca67e3ebced06a"
+    },
+    {
+      "path": "crates/core/chio-core-types/tests/recovery_contracts.rs",
+      "sha256": "d151617e3d286e2bd20b5ca0da6004eb96c564f53d3b3299595d01bdf0c7f284"
+    },
+    {
+      "path": "crates/core/chio-core-types/tests/recovery_p1_contracts.rs",
+      "sha256": "2d1c82aa13cf5d01055980670a46750c5e728f929549654dc547c340c3bb6306"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/tests/loom_concurrency.rs",
+      "sha256": "ce040ffd2e4e65c06658937b77c9cc5a0d4e237af718a03aad1d516e17f8a04e"
+    },
+    {
+      "path": "crates/kernel/chio-process/src/recovery.rs",
+      "sha256": "cece727af1fa3fda607882f558d00b0ff6d591f35a110013ef6f49fbc66d26e3"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/knowledge.rs",
+      "sha256": "d5a36b4f716650af98af145b53adae9ef2ef4ffc7eabcdfabed8915cfafd0a95"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+      "sha256": "3ae85dfea73b01c1a568363ed903ab2def804a9de9427c22585f528051367536"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/recovery/tests/knowledge.rs",
+      "sha256": "842d974ec78c4452c4a6652f06efa8b1827d027baed70cd74fbe35c6f84dc039"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/commands.rs",
+      "sha256": "478f73e4e7f97a74feb8da54fd721ac16e9f87ed222c53b65b062951cccaf8bb"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/issuance.rs",
+      "sha256": "cc6f9fdbc84d4ae579c07444b61f71b4bc7746331e88139b7eb73ca9add0b504"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/native.rs",
+      "sha256": "552170eef178b9bd9daf239152ed44638982e7f623dbd8f042bc102a5690f494"
+    },
+    {
+      "path": "crates/security/chio-flow/src/recovery_authority.rs",
+      "sha256": "f5e77a40d7aac547d11325baa28aacc3fb57a7e1d5323c975b8bee25340c2294"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/model/recovery.rs",
+      "sha256": "d5e821972460f58d60e1b7e754f522857e09094633e1dd7de72ce0246bd5b4bc"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/model/review.rs",
+      "sha256": "124e0818c0e5a9c569dc681de0974d15efe7eac3edcc09c9f5fc0579be24d6fd"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/model/review_states.rs",
+      "sha256": "6648b0335b71819e10060dd1e8aad503fd842c9c9446a9a59bb41434bbe4d231"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/model/state.rs",
+      "sha256": "deead8a7cd36d0beb20d54c7048b70a9184c6793ac378ccf2529d13d8f397100"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/model/third.rs",
+      "sha256": "11cce2818c30d5577a08d91c331de7dc94d7d8631ccbf1fb419aa134533b3af7"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/model/third_contracts.rs",
+      "sha256": "b1d9c65459ac960b34841663fde5baa8dcaadef0e11f9074b64e08d9c46e66cb"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/model/third_nonce.rs",
+      "sha256": "8a6a2dfbc37701e26441df54f2111107646d962614f468503bff243146ffce6a"
+    }
+  ],
+  "transitions": [
+    {
+      "transitions": "ownership.select/approve",
+      "model": "docs/architecture/recoverable-agent-runtime/model/state.rs",
+      "owner": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/commands.rs",
+      "function": "apply",
+      "cutpoint_file": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+      "cutpoint": "recovery_p1_two_coordinators_select_once_and_review_exact_payload"
+    },
+    {
+      "transitions": "ownership.close/cancel",
+      "model": "docs/architecture/recoverable-agent-runtime/model/state.rs",
+      "owner": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/native.rs",
+      "function": "begin_tx",
+      "cutpoint_file": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+      "cutpoint": "recovery_p1_cancel_negative_lookup_fences_late_original_admission"
+    },
+    {
+      "transitions": "ownership.acquire/capture/stale-epoch",
+      "model": "docs/architecture/recoverable-agent-runtime/model/state.rs",
+      "owner": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/native.rs",
+      "function": "verify_capture_tx",
+      "cutpoint_file": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+      "cutpoint": "recovery_p1_two_coordinators_select_once_and_review_exact_payload"
+    },
+    {
+      "transitions": "ownership.effect/crash/observe/terminal-close",
+      "model": "docs/architecture/recoverable-agent-runtime/model/state.rs",
+      "owner": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/native.rs",
+      "function": "settle",
+      "cutpoint_file": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+      "cutpoint": "recovery_p1_fresh_process_cutpoints_preserve_original_ownership"
+    },
+    {
+      "transitions": "admission.intent/submit/native-project",
+      "model": "docs/architecture/recoverable-agent-runtime/model/review_states.rs",
+      "owner": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/native.rs",
+      "function": "begin_tx",
+      "cutpoint_file": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+      "cutpoint": "recovery_p1_fresh_process_cutpoints_preserve_original_ownership"
+    },
+    {
+      "transitions": "admission.cancel/late-admission/capture",
+      "model": "docs/architecture/recoverable-agent-runtime/model/review_states.rs",
+      "owner": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/native.rs",
+      "function": "verify_capture_tx",
+      "cutpoint_file": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+      "cutpoint": "recovery_p1_cancel_negative_lookup_fences_late_original_admission"
+    },
+    {
+      "transitions": "knowledge.prepare/observation/release/delivery/fence",
+      "model": "docs/architecture/recoverable-agent-runtime/model/review_states.rs",
+      "owner": "crates/platform/chio-control-plane/src/knowledge.rs",
+      "function": "release_into",
+      "cutpoint_file": "crates/platform/chio-control-plane/src/recovery/tests/knowledge.rs",
+      "cutpoint": "p4_artifacts_native_publication_and_taint_commit_before_first_byte"
+    },
+    {
+      "transitions": "replay.original-revision/fresh-authorization/cached-refusal",
+      "model": "docs/architecture/recoverable-agent-runtime/model/review_states.rs",
+      "owner": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/commands.rs",
+      "function": "apply",
+      "cutpoint_file": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+      "cutpoint": "recovery_p1_command_replay_conflict_rotation_and_revocation"
+    },
+    {
+      "transitions": "partial-effect.observation/consumption/no-new-effect",
+      "model": "docs/architecture/recoverable-agent-runtime/model/review_states.rs",
+      "owner": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/native.rs",
+      "function": "attach_provider_finality",
+      "cutpoint_file": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+      "cutpoint": "recovery_p1_partial_finality_is_positive_scoped_and_spends_the_original"
+    },
+    {
+      "transitions": "nonce.reserve/frozen-envelope/custody/finalize",
+      "model": "docs/architecture/recoverable-agent-runtime/model/third_nonce.rs",
+      "owner": "crates/kernel/chio-process/src/recovery.rs",
+      "function": "finalize_recovery_call",
+      "cutpoint_file": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+      "cutpoint": "recovery_p1_fresh_process_cutpoints_preserve_original_ownership"
+    },
+    {
+      "transitions": "nonce.intent/preflight/exact-native-attachment",
+      "model": "docs/architecture/recoverable-agent-runtime/model/third_nonce.rs",
+      "owner": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/issuance.rs",
+      "function": "attach",
+      "cutpoint_file": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+      "cutpoint": "recovery_p1_fresh_process_cutpoints_preserve_original_ownership"
+    },
+    {
+      "transitions": "nonce.original-capture/death/missing-ack/restart",
+      "model": "docs/architecture/recoverable-agent-runtime/model/third_nonce.rs",
+      "owner": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/native.rs",
+      "function": "settle",
+      "cutpoint_file": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+      "cutpoint": "recovery_p1_fresh_process_cutpoints_preserve_original_ownership"
+    },
+    {
+      "transitions": "nonce.expired-initiator/historical-settlement",
+      "model": "docs/architecture/recoverable-agent-runtime/model/third_nonce.rs",
+      "owner": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/native.rs",
+      "function": "historical_release",
+      "cutpoint_file": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+      "cutpoint": "recovery_p1_expired_initiating_authority_cannot_renew_pending_work"
+    },
+    {
+      "transitions": "coverage.four-obligations/four-context-bindings/principal-alias",
+      "model": "docs/architecture/recoverable-agent-runtime/model/third_contracts.rs",
+      "owner": "crates/security/chio-flow/src/recovery_authority.rs",
+      "function": "verify_recovery_coverage",
+      "cutpoint_file": "crates/core/chio-core-types/tests/recovery_p1_contracts.rs",
+      "cutpoint": "recovery_p1_shared_closed_wire_and_signature_corpus"
+    },
+    {
+      "transitions": "parser.closed-versioned-wire/duplicates/allocation-bounds",
+      "model": null,
+      "owner": "crates/core/chio-core-types/src/recovery/decode.rs",
+      "function": "decode_contract",
+      "cutpoint_file": "crates/core/chio-core-types/tests/recovery_contracts.rs",
+      "cutpoint": "malformed_tokens_and_nested_duplicates_have_no_permissive_fallback"
+    },
+    {
+      "transitions": "concurrency.native-two-coordinator-interleaving",
+      "model": null,
+      "owner": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/commands.rs",
+      "function": "apply",
+      "cutpoint_file": "crates/platform/chio-control-plane/src/recovery/tests.rs",
+      "cutpoint": "recovery_p1_two_coordinators_select_once_and_review_exact_payload"
+    },
+    {
+      "transitions": "concurrency.foundation-session/revocation/receipt-lock",
+      "model": null,
+      "owner": "crates/kernel/chio-kernel/tests/loom_concurrency.rs",
+      "function": "loom_revocation_race_eval",
+      "cutpoint_file": "crates/kernel/chio-kernel/tests/loom_concurrency.rs",
+      "cutpoint": "loom_real_session_admission_never_outlives_terminal"
+    }
+  ],
+  "assumptions": [
+    "Finite bounds only",
+    "Atomic authoritative model transitions",
+    "Authentic scoped approvals and provider evidence",
+    "Correct storage bytes and provider idempotency",
+    "Abstract cryptography, clocks and scheduling fairness"
+  ],
+  "uncovered": [
+    "Complete production SQL transaction proof",
+    "Complete two-store reservation bridge",
+    "General prerequisite DAG model",
+    "Full artifact publication/custody/retention model",
+    "Provider correctness theorem",
+    "Covert channels",
+    "End-to-end liveness/fairness"
+  ],
+  "interpretation": "The models verify their finite abstractions. Function/cutpoint hashes map those abstractions to tested owners; that crosswalk does not prove implementation refinement or complete-system correctness."
+}
