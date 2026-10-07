@@ -396,7 +396,7 @@ fn response_dispatch_refusals_preserve_registered_codes_without_durable_commit()
                 "urn:chio:error:kernel:response-dispatch-lease-outside-window",
             )
         };
-        let directory = tempfile::tempdir().expect("dispatch refusal directory");
+        let directory = chio_test_support::private_tempdir().expect("dispatch refusal directory");
         let store = Arc::new(
             chio_store_sqlite::SqliteSecurityStateStore::open(directory.path().join("state.db"))
                 .expect("dispatch refusal store"),
@@ -431,9 +431,13 @@ fn response_dispatch_refusals_preserve_registered_codes_without_durable_commit()
                 .and_then(|source| source.downcast_ref::<DispatchRejection>()),
             Some(&expected),
         );
+        // Reach the private adapter-to-kernel error seam. This fixture does
+        // not establish public runtime readiness or admission authority.
+        kernel.governed_active_response_plans_enabled = true;
         let readback_error = kernel
             .recover_committed_active_response(&plan, request.dispatch_id())
             .expect_err("invalid dispatch readback must fail");
+        kernel.governed_active_response_plans_enabled = false;
         assert_eq!(readback_error.report().code, code);
         assert_eq!(
             readback_error
