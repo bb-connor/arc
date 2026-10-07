@@ -19,7 +19,7 @@
 <p align="center">
   <picture>
     <source media="(max-width: 500px)" srcset="docs/assets/subhead-mobile.svg" />
-    <img src="docs/assets/subhead.svg" alt="A signed receipt for every call &middot; Authority that can only narrow &middot; Agents that pay each other" width="880" />
+    <img src="docs/assets/subhead.svg" alt="Signed receipts for routed calls &middot; Authority that can only narrow &middot; Agents that pay each other" width="880" />
   </picture>
 </p>
 
@@ -70,7 +70,7 @@ shrink the budget, or shorten the expiry. **It cannot add anything back.** Each 
 [delegation link](crates/core/chio-core-types/src/capability/attenuation.rs) carrying an
 [attenuation proof](spec/PROTOCOL.md#capability-attenuation), a basis-point budget split, and
 [caveats](crates/core/chio-core-types/src/capability/caveat.rs), and the kernel rechecks the whole
-chain against a [Merkle revocation oracle](crates/trust/chio-revocation-oracle) on every call. A swarm of
+chain against a [Merkle revocation oracle](crates/trust/chio-revocation-oracle) on each routed call. A swarm of
 sub-agents never holds more authority than the agent that spawned it, and
 [one hop is shown in full below](#delegation-and-swarms).
 
@@ -169,12 +169,12 @@ tools, shrink the budget, or shorten the expiry, and nothing can be added back.
   </picture>
 </p>
 
-Each hop is a signed link that the kernel rechecks on every call the child makes.
+Each hop is a signed link that the kernel rechecks on each call the child routes through Chio.
 
 <p align="center">
   <picture>
     <source media="(max-width: 500px)" srcset="docs/assets/hop-mobile.svg" />
-    <img src="docs/assets/hop.svg" alt="Inside one delegation hop from planner to worker: the signed delegation link, the attenuation proof whose parent scope hash must equal the last chain link, the basis-point budget split checked against siblings, the caveats, and the revocation epoch. The kernel rechecks all of it on every call." width="900" />
+    <img src="docs/assets/hop.svg" alt="Inside one delegation hop from planner to worker: the signed delegation link, the attenuation proof whose parent scope hash must equal the last chain link, the basis-point budget split checked against siblings, the caveats, and the revocation epoch. The kernel rechecks these bindings on calls routed through Chio." width="900" />
   </picture>
 </p>
 
@@ -255,8 +255,8 @@ curl -fsSL https://www.chio.computer/install.sh | sh
 
 ### 2. Put Claude or Hermes under policy
 
-Coding agents reach their file, shell, and git tools over MCP. Wrap that server with Chio so
-every call is checked by the kernel and sealed into a signed receipt. The bundled `code-agent`
+Route selected file, shell, and git tools through a Chio-wrapped MCP server so
+calls to that server are checked by the kernel and sealed into signed receipts. The bundled `code-agent`
 preset is a safe starting policy: reads are allowed, writes to `.env`, `.git/`, and `.ssh/` are
 denied, and so is `git push --force`.
 
@@ -635,7 +635,7 @@ receipts).
 <p align="center">
   <picture>
     <source media="(max-width: 500px)" srcset="docs/assets/security-mobile.svg" />
-    <img src="docs/assets/security.svg" alt="Chio defense in depth: a trusted core, fail-closed admission, a guard pipeline, active defense, and signed evidence" width="900" />
+    <img src="docs/assets/security.svg" alt="Chio defense in depth for routed calls: the kernel and native authority services form the trusted path, with fail-closed admission, guards, active defense, and signed evidence. Host isolation depends on the selected runtime profile." width="900" />
   </picture>
 </p>
 
@@ -699,7 +699,7 @@ Report vulnerabilities privately per [SECURITY.md](SECURITY.md).
 
 Chio has an implementation-linked verified core, defined in
 [`formal/proof-manifest.toml`](formal/proof-manifest.toml). The admission path the kernel runs
-on every call, verify, resolve, evaluate, sign, is modeled in Lean 4, and the model is tied to
+on each routed call, verify, resolve, evaluate, sign, is modeled in Lean 4, and the model is tied to
 the production Rust instead of sitting beside it. Every explicit axiom in the Lean tree is a
 named cryptographic idealization in [`formal/assumptions.toml`](formal/assumptions.toml). No
 serializer, protocol, or kernel behavior is axiomatized.

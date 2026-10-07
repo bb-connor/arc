@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 740" width="480" height="740" role="img" aria-label="Life of a tool call in Chio, stacked for small screens.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 740" width="480" height="740" role="img" aria-label="Life of a Chio-routed tool call: token verification, budget reservation, guards, dispatch, metering, signing, and receipt commitment.">
   <defs>
     <linearGradient id="lcmbg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#130d0a"/><stop offset="1" stop-color="#1b140d"/></linearGradient>
     <radialGradient id="lcmglow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#8f7ff2" stop-opacity="0.32"/><stop offset="0.6" stop-color="#8f7ff2" stop-opacity="0.07"/><stop offset="1" stop-color="#8f7ff2" stop-opacity="0"/></radialGradient>
@@ -47,5 +47,5 @@
   <text x="104" y="612" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#9a8f7e">sha256:9c1e&#8230; &#183; Merkle checkpoint</text>
   <path d="M90.0 686 H390.0" stroke="#b08d5b" stroke-opacity="0.3" stroke-width="1"/>
   <rect x="234.0" y="680" width="12" height="12" transform="rotate(45 240.0 686)" fill="#1b140d" stroke="#b08d5b" stroke-opacity="0.7"/>
-  <text x="240.0" y="716" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="14.5" font-style="italic" fill="#d8cfc0" fill-opacity="0.75">Every outcome becomes a signed receipt.</text>
+  <text x="240.0" y="716" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="14.5" font-style="italic" fill="#d8cfc0" fill-opacity="0.75">Signed receipts record Chio-routed outcomes.</text>
 </svg>

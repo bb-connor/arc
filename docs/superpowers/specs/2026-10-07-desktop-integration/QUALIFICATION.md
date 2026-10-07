@@ -115,7 +115,7 @@ a complete inventory of every predecessor obligation.
 
 | Profile | Mandatory acceptance | Runtime gate |
 | --- | --- | --- |
-| Observe | Q04, Q09-Q11, Q16-Q17, Q21; add Q01-Q03 only if the build exposes W1 views or recovery capability | S5 A/B, authenticated bounded non-persisting reads, selected trust-control GETs and truthful hook source attribution; W1/M20 are not basic receipt/hook observation gates |
+| Observe | Q04, Q09-Q11, Q16-Q17, Q21; Q15 projection cases when a budget view is exposed; add Q01-Q03 only if the build exposes W1 views or recovery capability | S5 A/B, authenticated bounded non-persisting reads, selected trust-control GETs and truthful hook source attribution; W1/M20 are not basic receipt/hook observation gates |
 | Approve | Q02-Q06, Q09-Q10, Q16-Q17 | Qualified native approval owner, S28 identity, production verifier and installed utility binding; no stop capability implied |
 | Per-task stop | Q02-Q04, Q07, Q09-Q10, Q16-Q17, Q19 | Qualified S4/process closure and its native route authorization; Q05/Q06 are not prerequisites when approval is absent |
 | Kernel stop | Q02-Q04, Q08-Q10, Q16-Q17; Q19 additionally for any claimed process cleanup | Qualified S8 phase-1 scope, durability and native route authorization; no S28 approval or per-task closure prerequisite and no implied process termination |
@@ -129,6 +129,17 @@ time. "Applicable" must not let a release omit a gate silently: the manifest
 names the owner-approved exclusion and its reason; an unclassified case fails
 qualification. A profile may fail while another independently qualifies.
 
+The Q identifiers are not an exhaustive replacement for the consumed operator
+contract. Each platform's source reconciliation must map every applicable
+OPERATOR normative obligation and protocol-freeze acceptance row, as well as
+each Q-row stimulus and annex requirement, to its owner, implementation packet,
+actual test command, positive control and independent negative observation.
+Include negotiation/reconnect, raw decoding, pagination consistency, review
+invalidation and hook-to-receipt attribution whenever those surfaces are exposed.
+Release qualification removes each required case individually from a passing
+manifest and proves the affected surface cannot be promoted; omitted, skipped
+or unclassified cases cannot disappear behind a broader passing Q label.
+
 For basic Observe, Q04 binds the actual receipt/hook/read request parameters;
 it does not require a nonexistent work handle. Q09/Q21 prove bounded idle/active
 observation and no recovery-command polling or settlement-reserve consumption;
@@ -139,6 +150,14 @@ capability adds Q01-Q03 with owner-justified applicability recorded per case.
 Absent optional work/recovery/approval/stop capabilities remain explicitly
 unavailable and cannot be exercised through Observe. Packet 2's operator lane
 continues to gate selected mutations independently of a read-only candidate.
+
+An exposed read-only budget view adds Q15 projection checks for duplicate
+dimensions, exact numeric domains/units, zero and unavailable/measured-only
+states, owner/scope/revision binding and truthful rendering. Missing projection
+evidence keeps that view unavailable. These checks do not require execution
+budget enforcement or an S7 backend; the UI cannot claim enforcement from a
+read response, and native enforcement qualification remains a separate gate for
+profiles that actually exercise it.
 
 ## Performance, privacy and operations
 
