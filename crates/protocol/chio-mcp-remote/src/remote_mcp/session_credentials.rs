@@ -544,6 +544,12 @@ fn fence_error() -> Response {
     )
 }
 
+/// The native typed reader every stored credential call row must pass.
+fn parse_call(encoded: &str) -> Result<CredentialCall, Response> {
+    decode_json(encoded.as_bytes(), MAX_SESSION_JSON_BYTES)
+        .map_err(|error| input::with_source(storage_error(error.code()), error))
+}
+
 fn decode_call(
     keypair: &Keypair,
     session_id: &str,
@@ -551,8 +557,7 @@ fn decode_call(
     encoded: &str,
     signature: &str,
 ) -> Result<CredentialCall, Response> {
-    let call: CredentialCall = decode_json(encoded.as_bytes(), MAX_SESSION_JSON_BYTES)
-        .map_err(|error| input::with_source(storage_error(error.code()), error))?;
+    let call = parse_call(encoded)?;
     let signature = Ed25519Signature::from_hex(signature).map_err(storage_error)?;
     if call.schema != "chio.mcp.session-credential-call.v1"
         || call.session_id != session_id
@@ -594,6 +599,8 @@ fn write_call(
     call: &CredentialCall,
 ) -> Result<(), Response> {
     let encoded = input::encode_session(call).map_err(storage_error)?;
+    // A row is signed and stored only if the reader that reopens it accepts it.
+    parse_call(&encoded)?;
     let (signature, _) = keypair.sign_canonical(call).map_err(storage_error)?;
     conn.execute(
         &format!(
