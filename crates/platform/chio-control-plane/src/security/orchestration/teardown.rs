@@ -20,6 +20,8 @@ pub(super) struct ActiveDefenseTeardownPermit {
 
 pub(super) struct RetainedActiveDefenseCleanup {
     work: RetainedActiveDefenseCleanupWork,
+    retry: ActiveDefenseTeardownRetry,
+    restarted: bool,
     _permit: ActiveDefenseTeardownPermit,
 }
 
@@ -33,6 +35,52 @@ pub(super) enum RetainedActiveDefenseCleanupWork {
 pub(super) struct InFlightActiveDefenseCleanup {
     supervisor: Arc<ActiveDefenseTeardownSupervisor>,
     job: Option<RetainedActiveDefenseCleanup>,
+}
+
+/// Bounded retry pacing for one retained cleanup. Once its bounded attempts
+/// are spent the cleanup is parked: it keeps its reservation and permit and
+/// retries at the parked interval.
+pub(super) struct ActiveDefenseTeardownRetry {
+    attempts: u32,
+    attempts_before_park: u32,
+    parked_interval: Duration,
+}
+
+impl Default for ActiveDefenseTeardownRetry {
+    fn default() -> Self {
+        Self {
+            attempts: 0,
+            attempts_before_park: ACTIVE_DEFENSE_TEARDOWN_ATTEMPTS_BEFORE_PARK,
+            parked_interval: ACTIVE_DEFENSE_TEARDOWN_PARKED_RETRY_INTERVAL,
+        }
+    }
+}
+
+impl ActiveDefenseTeardownRetry {
+    #[cfg(test)]
+    pub(super) fn bounded_for_test(attempts_before_park: u32, parked_interval: Duration) -> Self {
+        Self {
+            attempts: 0,
+            attempts_before_park,
+            parked_interval,
+        }
+    }
+
+    async fn wait(&mut self) {
+        self.attempts = self.attempts.saturating_add(1);
+        if self.attempts < self.attempts_before_park {
+            tokio::time::sleep(ACTIVE_DEFENSE_TEARDOWN_RETRY_INTERVAL).await;
+            return;
+        }
+        if self.attempts == self.attempts_before_park {
+            tracing::error!(
+                attempts = self.attempts,
+                audit_fault = "active_defense_teardown_cleanup_parked",
+                "active-defense teardown cleanup spent its bounded retries and is parked with its reservation retained"
+            );
+        }
+        tokio::time::sleep(self.parked_interval).await;
+    }
 }
 
 pub(super) static ACTIVE_DEFENSE_TEARDOWN_SUPERVISOR: OnceLock<
@@ -169,9 +217,12 @@ impl ActiveDefenseTeardownSupervisor {
         }
     }
 
+    /// Each retained cleanup runs as its own task, so a cleanup that cannot
+    /// finish never delays an independent one.
     pub(super) fn run(self: &Arc<Self>) {
+        let mut runtime = None;
         loop {
-            let Some(mut cleanup) = self.take_next() else {
+            let Some(cleanup) = self.take_next() else {
                 return;
             };
             #[cfg(test)]
@@ -181,31 +232,8 @@ impl ActiveDefenseTeardownSupervisor {
             {
                 panic!("injected active-defense teardown service panic");
             }
-            let runtime = loop {
-                match tokio::runtime::Builder::new_current_thread()
-                    .enable_all()
-                    .build()
-                {
-                    Ok(runtime) => break runtime,
-                    Err(error) => {
-                        tracing::error!(
-                            error = %error,
-                            audit_fault = "active_defense_teardown_runtime_retry",
-                            "active-defense teardown runtime could not start and will retry with ownership retained"
-                        );
-                        std::thread::sleep(ACTIVE_DEFENSE_TEARDOWN_RETRY_INTERVAL);
-                    }
-                }
-            };
-            if let Some(work) = cleanup.work_mut() {
-                runtime.block_on(work.run());
-            } else {
-                tracing::error!(
-                    audit_fault = "active_defense_teardown_missing_inflight_job",
-                    "active-defense teardown supervisor lost its in-flight job marker"
-                );
-            }
-            cleanup.complete();
+            let runtime = runtime.get_or_insert_with(build_active_defense_teardown_runtime);
+            drop(runtime.spawn(cleanup.run()));
         }
     }
 
@@ -274,9 +302,28 @@ impl ActiveDefenseTeardownSupervisor {
 
 impl ActiveDefenseTeardownPermit {
     pub(super) fn enqueue(self, work: RetainedActiveDefenseCleanupWork) {
+        self.enqueue_with_retry(work, ActiveDefenseTeardownRetry::default());
+    }
+
+    #[cfg(test)]
+    pub(super) fn enqueue_with_retry_for_test(
+        self,
+        work: RetainedActiveDefenseCleanupWork,
+        retry: ActiveDefenseTeardownRetry,
+    ) {
+        self.enqueue_with_retry(work, retry);
+    }
+
+    fn enqueue_with_retry(
+        self,
+        work: RetainedActiveDefenseCleanupWork,
+        retry: ActiveDefenseTeardownRetry,
+    ) {
         let supervisor = Arc::clone(&self.supervisor);
         supervisor.enqueue(RetainedActiveDefenseCleanup {
             work,
+            retry,
+            restarted: false,
             _permit: self,
         });
     }
@@ -289,8 +336,19 @@ impl Drop for ActiveDefenseTeardownPermit {
 }
 
 impl InFlightActiveDefenseCleanup {
-    pub(super) fn work_mut(&mut self) -> Option<&mut RetainedActiveDefenseCleanupWork> {
-        self.job.as_mut().map(|job| &mut job.work)
+    async fn run(mut self) {
+        if let Some(job) = self.job.as_mut() {
+            if job.restarted {
+                job.retry.wait().await;
+            }
+            job.work.run(&mut job.retry).await;
+        } else {
+            tracing::error!(
+                audit_fault = "active_defense_teardown_missing_inflight_job",
+                "active-defense teardown supervisor lost its in-flight job marker"
+            );
+        }
+        self.complete();
     }
 
     pub(super) fn complete(mut self) {
@@ -300,9 +358,10 @@ impl InFlightActiveDefenseCleanup {
 
 impl Drop for InFlightActiveDefenseCleanup {
     fn drop(&mut self) {
-        let Some(job) = self.job.take() else {
+        let Some(mut job) = self.job.take() else {
             return;
         };
+        job.restarted = true;
         {
             let mut state = self.supervisor.lock_state();
             state.jobs.push_front(job);
@@ -312,12 +371,33 @@ impl Drop for InFlightActiveDefenseCleanup {
 }
 
 impl RetainedActiveDefenseCleanupWork {
-    async fn run(&mut self) {
+    async fn run(&mut self, retry: &mut ActiveDefenseTeardownRetry) {
         match self {
-            Self::Reserved(cleanup) => cleanup.run().await,
-            Self::Published(teardown) => teardown.run().await,
+            Self::Reserved(cleanup) => cleanup.run(retry).await,
+            Self::Published(teardown) => teardown.run(retry).await,
             #[cfg(test)]
             Self::Test(test) => test(),
+        }
+    }
+}
+
+fn build_active_defense_teardown_runtime() -> tokio::runtime::Runtime {
+    loop {
+        match tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(ACTIVE_DEFENSE_TEARDOWN_RUNTIME_WORKERS)
+            .thread_name("chio-active-defense-teardown-job")
+            .enable_all()
+            .build()
+        {
+            Ok(runtime) => return runtime,
+            Err(error) => {
+                tracing::error!(
+                    error = %error,
+                    audit_fault = "active_defense_teardown_runtime_retry",
+                    "active-defense teardown runtime could not start and will retry with ownership retained"
+                );
+                std::thread::sleep(ACTIVE_DEFENSE_TEARDOWN_RETRY_INTERVAL);
+            }
         }
     }
 }
@@ -341,7 +421,7 @@ pub(super) struct ReservedActiveDefenseCleanup {
 }
 
 impl ReservedActiveDefenseCleanup {
-    async fn run(&mut self) {
+    async fn run(&mut self, retry: &mut ActiveDefenseTeardownRetry) {
         loop {
             match self.lifecycle.close_runtime_admission() {
                 Ok(()) => break,
@@ -351,7 +431,7 @@ impl ReservedActiveDefenseCleanup {
                         audit_fault = "active_defense_reserved_admission_close_retry",
                         "reserved active-defense admission close failed and will retry"
                     );
-                    tokio::time::sleep(ACTIVE_DEFENSE_TEARDOWN_RETRY_INTERVAL).await;
+                    retry.wait().await;
                 }
             }
         }
@@ -376,7 +456,7 @@ impl ReservedActiveDefenseCleanup {
                         audit_fault = "active_defense_reserved_worker_shutdown_retry",
                         "active-defense reserved worker shutdown failed and will retry"
                     );
-                    tokio::time::sleep(ACTIVE_DEFENSE_TEARDOWN_RETRY_INTERVAL).await;
+                    retry.wait().await;
                 }
             }
         }
@@ -393,7 +473,7 @@ impl ReservedActiveDefenseCleanup {
                         audit_fault = "active_defense_reserved_cleanup_retry",
                         "active-defense exact startup reservation cleanup failed and will retry"
                     );
-                    tokio::time::sleep(ACTIVE_DEFENSE_TEARDOWN_RETRY_INTERVAL).await;
+                    retry.wait().await;
                 }
             }
         }
@@ -959,7 +1039,9 @@ impl ProductionActiveDefenseHost {
                 .await?;
             teardown.prepare_worker_stop().await?;
         }
-        teardown.quiesce_and_stop().await;
+        teardown
+            .quiesce_and_stop(&mut ActiveDefenseTeardownRetry::default())
+            .await;
         teardown.worker_stopped = true;
         if !teardown.unpublished {
             let lifecycle = teardown.lifecycle.clone();
@@ -1114,7 +1196,7 @@ impl DetachedActiveDefenseTeardown {
         result.map_err(|_| ProductionActiveDefenseHostError::TeardownStorageWorkerFailed)?
     }
 
-    async fn run(&mut self) {
+    async fn run(&mut self, retry: &mut ActiveDefenseTeardownRetry) {
         if !self.admission_closed {
             loop {
                 match self.lifecycle.close_runtime_admission() {
@@ -1131,7 +1213,7 @@ impl DetachedActiveDefenseTeardown {
                             audit_fault = "active_defense_detached_admission_close_retry",
                             "detached active-defense admission close failed and will retry"
                         );
-                        tokio::time::sleep(ACTIVE_DEFENSE_TEARDOWN_RETRY_INTERVAL).await;
+                        retry.wait().await;
                     }
                 }
             }
@@ -1141,7 +1223,7 @@ impl DetachedActiveDefenseTeardown {
             self.operation_quiescent = true;
         }
         if !self.worker_stopped {
-            self.quiesce_and_stop().await;
+            self.quiesce_and_stop(retry).await;
             self.worker_stopped = true;
         }
         if !self.unpublished {
@@ -1163,7 +1245,7 @@ impl DetachedActiveDefenseTeardown {
                             audit_fault = "active_defense_detached_exact_unpublish_retry",
                             "detached active-defense exact unpublish failed and will retry"
                         );
-                        tokio::time::sleep(ACTIVE_DEFENSE_TEARDOWN_RETRY_INTERVAL).await;
+                        retry.wait().await;
                     }
                 }
             }
@@ -1173,7 +1255,7 @@ impl DetachedActiveDefenseTeardown {
         }
     }
 
-    async fn quiesce_and_stop(&mut self) {
+    async fn quiesce_and_stop(&mut self, retry: &mut ActiveDefenseTeardownRetry) {
         'worker_phase: loop {
             loop {
                 match self.prepare_worker_stop().await {
@@ -1191,7 +1273,7 @@ impl DetachedActiveDefenseTeardown {
                             audit_fault = "active_defense_detached_pre_stop_drain_retry",
                             "detached active-defense pre-stop drain failed and will retry while the worker remains live"
                         );
-                        tokio::time::sleep(ACTIVE_DEFENSE_TEARDOWN_RETRY_INTERVAL).await;
+                        retry.wait().await;
                     }
                 }
             }
@@ -1217,7 +1299,7 @@ impl DetachedActiveDefenseTeardown {
                             audit_fault = "active_defense_detached_worker_shutdown_retry",
                             "detached active-defense worker shutdown failed and will retry"
                         );
-                        tokio::time::sleep(ACTIVE_DEFENSE_TEARDOWN_RETRY_INTERVAL).await;
+                        retry.wait().await;
                     }
                 }
             }
@@ -1231,7 +1313,7 @@ impl DetachedActiveDefenseTeardown {
                             audit_fault = "active_defense_detached_post_stop_overlay_race",
                             "active-defense overlay appeared during worker shutdown; recovery will resume"
                         );
-                        tokio::time::sleep(ACTIVE_DEFENSE_TEARDOWN_RETRY_INTERVAL).await;
+                        retry.wait().await;
                         continue 'worker_phase;
                     }
                     Err(error) => {
@@ -1240,7 +1322,7 @@ impl DetachedActiveDefenseTeardown {
                             audit_fault = "active_defense_detached_final_inventory_retry",
                             "detached active-defense final receipt drain or inventory failed and will retry"
                         );
-                        tokio::time::sleep(ACTIVE_DEFENSE_TEARDOWN_RETRY_INTERVAL).await;
+                        retry.wait().await;
                         continue;
                     }
                 }

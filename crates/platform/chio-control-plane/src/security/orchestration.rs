@@ -42,6 +42,9 @@ use super::AttestedCorrelationWriter;
 const MAX_RETAINED_ACTIVE_DEFENSE_TEARDOWNS: usize = 64;
 const MAX_ACTIVE_DEFENSE_TEARDOWN_SERVICE_SPAWN_ATTEMPTS: usize = 3;
 const ACTIVE_DEFENSE_TEARDOWN_RETRY_INTERVAL: Duration = Duration::from_millis(100);
+const ACTIVE_DEFENSE_TEARDOWN_ATTEMPTS_BEFORE_PARK: u32 = 50;
+const ACTIVE_DEFENSE_TEARDOWN_PARKED_RETRY_INTERVAL: Duration = Duration::from_secs(5);
+const ACTIVE_DEFENSE_TEARDOWN_RUNTIME_WORKERS: usize = 2;
 
 #[derive(Clone)]
 pub struct ProductionActiveDefenseConfig {
