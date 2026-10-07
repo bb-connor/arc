@@ -4,6 +4,7 @@ use super::*;
 use chio_kernel::security_admission_operation::{
     AdmissionCleanupActionKind, AdmissionDispatchState,
 };
+use chio_test_support::prelude::TestResultOk;
 
 const OPERATOR_CANCEL_REASON: &str = "operator cancelled the governed response";
 
@@ -77,7 +78,7 @@ fn dispatch_commit_fault_fixture(fail_next: &Arc<AtomicBool>) -> RealAdapterFixt
 fn terminal_receipt_actions(store: &SqliteSecurityAdmissionOperationStore, id: &str) -> usize {
     store
         .load_cleanup_actions(id)
-        .unwrap()
+        .test_unwrap()
         .iter()
         .filter(|action| action.kind() == AdmissionCleanupActionKind::TerminalReceipt)
         .count()
@@ -102,7 +103,7 @@ fn committed_approval_window(
         .runtime
         .kernel
         .prepare_active_response_admission(request)
-        .unwrap();
+        .test_unwrap();
     let id = operation_id(&prepared);
     fail_next.store(true, Ordering::Release);
     let commit = fixture
@@ -121,8 +122,8 @@ fn committed_approval_window(
         .runtime
         .admission_operations
         .load(id)
-        .unwrap()
-        .unwrap();
+        .test_unwrap()
+        .test_unwrap();
     assert_eq!(operation.state(), AdmissionOperationState::ApprovalReserved);
     assert_eq!(
         operation.dispatch_state(),
@@ -133,8 +134,8 @@ fn committed_approval_window(
             .runtime
             .approvals
             .get_approval_reservation(id)
-            .unwrap()
-            .unwrap()
+            .test_unwrap()
+            .test_unwrap()
             .state(),
         ReplayReservationState::Committed
     );
@@ -157,7 +158,7 @@ fn operator_cancel_cannot_compensate_already_committed_threshold_approval() {
         .runtime
         .approvals
         .get_approval_reservation(&id)
-        .unwrap();
+        .test_unwrap();
     let approvals_before = approval_rows(&fixture.paths);
 
     let cancels = [
@@ -174,8 +175,8 @@ fn operator_cancel_cannot_compensate_already_committed_threshold_approval() {
         .runtime
         .admission_operations
         .load(&id)
-        .unwrap()
-        .unwrap();
+        .test_unwrap()
+        .test_unwrap();
     assert_eq!(
         operation.state(),
         AdmissionOperationState::DispatchCommitted,
@@ -204,14 +205,14 @@ fn operator_cancel_cannot_compensate_already_committed_threshold_approval() {
             .runtime
             .approvals
             .get_approval_reservation(&id)
-            .unwrap(),
+            .test_unwrap(),
         committed_approval
     );
     assert_eq!(approval_rows(&fixture.paths), approvals_before);
     assert_eq!(fixture.runtime.executor.calls(), 0);
     assert_eq!(fixture.runtime.effects.executions(), 0);
 
-    let binding = prepared.durable_dispatch_binding(&plan).unwrap();
+    let binding = prepared.durable_dispatch_binding(&plan).test_unwrap();
     drop(fixture.runtime);
     let mut total_effects = 0;
     for expected_new_effects in [1, 0] {
@@ -238,14 +239,18 @@ fn operator_cancel_cannot_compensate_already_committed_threshold_approval() {
         assert_eq!(evidence.dispatch_id(), &binding.dispatch_id);
         assert_eq!(cold.effects.executions(), expected_new_effects);
         total_effects += cold.effects.executions();
-        let completed = cold.admission_operations.load(&id).unwrap().unwrap();
+        let completed = cold
+            .admission_operations
+            .load(&id)
+            .test_unwrap()
+            .test_unwrap();
         assert_eq!(completed.state(), AdmissionOperationState::Completed);
         assert_eq!(
             completed.dispatch_state(),
             AdmissionDispatchState::EffectCompleted
         );
         assert_eq!(
-            cold.approvals.get_approval_reservation(&id).unwrap(),
+            cold.approvals.get_approval_reservation(&id).test_unwrap(),
             committed_approval
         );
         assert_eq!(approval_rows(&fixture.paths), approvals_before);
@@ -376,7 +381,7 @@ fn assert_committed_window_retained(
             .runtime
             .admission_operations
             .load(id)
-            .unwrap()
+            .test_unwrap()
             .as_ref(),
         Some(operation)
     );
@@ -389,7 +394,7 @@ fn assert_committed_window_retained(
             .runtime
             .approvals
             .get_approval_reservation(id)
-            .unwrap()
+            .test_unwrap()
             .as_ref(),
         Some(approval)
     );
@@ -414,8 +419,8 @@ fn assert_refused_after_reconciliation(
         .runtime
         .admission_operations
         .load(id)
-        .unwrap()
-        .unwrap();
+        .test_unwrap()
+        .test_unwrap();
     assert_eq!(
         operation.state(),
         AdmissionOperationState::DispatchCommitted
@@ -437,7 +442,7 @@ fn operator_cancel_still_compensates_an_uncommitted_reserved_approval() {
         .runtime
         .kernel
         .prepare_active_response_admission(fixture.native_request())
-        .unwrap();
+        .test_unwrap();
     let id = operation_id(&prepared).to_owned();
     let chio_kernel::PreparedActiveResponseAdmission::Governed(reservation) = &prepared else {
         panic!("governed preparation required");
@@ -447,8 +452,8 @@ fn operator_cancel_still_compensates_an_uncommitted_reserved_approval() {
             .runtime
             .approvals
             .get_approval_reservation(&id)
-            .unwrap()
-            .unwrap()
+            .test_unwrap()
+            .test_unwrap()
             .state(),
         ReplayReservationState::Reserved
     );
@@ -456,13 +461,13 @@ fn operator_cancel_still_compensates_an_uncommitted_reserved_approval() {
         .runtime
         .kernel
         .cancel_prepared_active_response_admission(&prepared, OPERATOR_CANCEL_REASON)
-        .unwrap();
+        .test_unwrap();
     let compensated = fixture
         .runtime
         .admission_operations
         .load(&id)
-        .unwrap()
-        .unwrap();
+        .test_unwrap()
+        .test_unwrap();
     assert_eq!(
         compensated.state(),
         AdmissionOperationState::CompensatedBeforeDispatch
@@ -475,26 +480,26 @@ fn operator_cancel_still_compensates_an_uncommitted_reserved_approval() {
         .runtime
         .approvals
         .get_approval_reservation(&id)
-        .unwrap()
-        .unwrap();
+        .test_unwrap()
+        .test_unwrap();
     assert_eq!(cancelled.state(), ReplayReservationState::Cancelled);
 
     fixture
         .runtime
         .kernel
         .cancel_active_response_admission(reservation, OPERATOR_CANCEL_REASON)
-        .unwrap();
+        .test_unwrap();
     fixture
         .runtime
         .kernel
         .cancel_prepared_active_response_admission(&prepared, OPERATOR_CANCEL_REASON)
-        .unwrap();
+        .test_unwrap();
     assert_eq!(
         fixture
             .runtime
             .admission_operations
             .load(&id)
-            .unwrap()
+            .test_unwrap()
             .as_ref(),
         Some(&compensated)
     );
@@ -507,7 +512,7 @@ fn operator_cancel_still_compensates_an_uncommitted_reserved_approval() {
             .runtime
             .approvals
             .get_approval_reservation(&id)
-            .unwrap()
+            .test_unwrap()
             .as_ref(),
         Some(&cancelled)
     );
@@ -529,14 +534,14 @@ fn operator_cancel_propagates_a_reconciliation_store_failure_without_compensatin
         .runtime
         .admission_operations
         .load(&id)
-        .unwrap()
-        .unwrap();
+        .test_unwrap()
+        .test_unwrap();
     let approval = fixture
         .runtime
         .approvals
         .get_approval_reservation(&id)
-        .unwrap()
-        .unwrap();
+        .test_unwrap()
+        .test_unwrap();
 
     fail_next.store(true, Ordering::Release);
     let failed = fixture
@@ -575,14 +580,14 @@ fn operator_cancel_refuses_a_substituted_approval_binding_without_compensating()
         .runtime
         .admission_operations
         .load(&id)
-        .unwrap()
-        .unwrap();
+        .test_unwrap()
+        .test_unwrap();
     let approval = fixture
         .runtime
         .approvals
         .get_approval_reservation(&id)
-        .unwrap()
-        .unwrap();
+        .test_unwrap()
+        .test_unwrap();
 
     substitute.store(true, Ordering::Release);
     for refused in [
