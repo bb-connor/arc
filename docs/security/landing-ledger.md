@@ -1,5 +1,9 @@
 # Security and process landing ledger
 
+## Current integration resume (2026-10-07)
+
+The machine ledger now includes 1,777 individually indexed requirements. The latest pinned [integration checkpoint](audits/integration-resume-20261007.json) records 28 additional review, native-consumer and distribution obligations, with local evidence and remaining acceptance. Existing requirements and historical failed campaigns are preserved. At published source `89d79ac6ab`, hosted CI is terminal with 118 successful, 21 failed and 12 skipped checks. The local repair batch is unpublished; canonical artifact-binding validation, Claude lane integration, native/trusted evidence and protected landing remain open. Source repair and local focused Green do not establish whole-candidate qualification.
+
 > Execution owner: use `superpowers:executing-plans` inline, with one independent
 > review before each protected landing. This is the authoritative landing order.
 
@@ -7,6 +11,26 @@
 superseded PRs without losing source or review obligations, and retain an exact
 remaining-work ledger.
 
+
+## October 7 current integration boundary
+
+The authoritative JSON has 1,749 requirement records. All 1,739 earlier records
+remain unchanged; ten newly confirmed fragment, pipeline and effect obligations
+are individually indexed against their original review checkpoint. Its
+`current_requirement_states` records component evidence and remaining acceptance.
+The historical snapshots below retain their original dates and outcomes.
+
+PR #1176 is merged at `6573b8980a1e5331028b7e688169f033a39d0384`.
+PR #1160's published head is `89d79ac6ab`; the local integration continues beyond
+that head and is not qualified or merged. F092's default-off store surface,
+F017's real SQLite DPoP oracle, and F024's installed runtime-hook controls have
+bounded passing evidence. F075's r1 repair is integrated; its larger binary and
+source distribution remains unpublished with independent review repairs open.
+
+The [current repair extension](../superpowers/plans/2026-10-07-bound-preparation-and-native-closeout.md)
+records the active-response binding, native capture, recovery, MCP and remaining
+qualification contracts. Source integration, focused tests and local audit
+success cannot establish hosted, trusted, native or protected landing acceptance.
 
 ## October 6 current production repair boundary
 

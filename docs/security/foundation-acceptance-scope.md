@@ -163,3 +163,22 @@ completion, hardware quote verification, a FIPS-validated executable, complete
 compliance evidence, an enabled automatic response deployment, release readiness
 or pilot acceptance. The original roadmap gates remain authoritative for those
 claims.
+
+## Operator delivery and desktop support boundary
+
+The current SIEM `page` port admits a durable outbox command. That admission does
+not establish delivery to an operator. Until a qualified production delivery loop
+and exhausted-alert health path are integrated, the rollout's stage 6 operator
+paging gate remains open. Expiry and restrictive rollback recovery retain their
+own mandatory acceptance. The F041 delivery implementation is preserved in its
+separate follow-up track.
+
+The desktop integration review also identifies future consumers of this
+foundation. Current process revoke/cancel commands require a stopped host, status
+is a snapshot, and shared secure IPC requires Linux peer credentials. The selected
+cage profile qualifies Linux x86_64 and rejects unsupported architectures; it does
+not confine general threaded or socket-using Node agent hosts. Live operator
+control/events, Darwin shared IPC and additional host isolation backends require
+separate implementation and native qualification. These limits do not declare
+those valuable follow-ups retired or complete. The proposed OpenShell ADR is a
+separate scope decision and is not adopted by this foundation landing.

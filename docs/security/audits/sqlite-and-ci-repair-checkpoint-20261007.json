@@ -632,15 +632,30 @@
   "review_reports": [
     {
       "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/payment-repair-source-review.json",
-      "sha256": "0c54ee0e4343941168aefec7c294ee51cf217f4ee0112c9af16e98c4f845aad4"
+      "sha256": "467c814bc635b7dc9f94ef357d6dba4d9ae6aa49c650e4c52abcc736d2187ab8",
+      "original_bytes": {
+        "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/payment-repair-source-review.json.original.gz",
+        "sha256": "0c54ee0e4343941168aefec7c294ee51cf217f4ee0112c9af16e98c4f845aad4",
+        "compressed_sha256": "b01729b925267ab25643551249905c0374189391204282649a174dfaa55c31f7"
+      }
     },
     {
       "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/compaction-composed-source-review.json",
-      "sha256": "e6145d508373ca1b4eac7c425a97da322311866e4da2f58951d21850684216d8"
+      "sha256": "f6b7b493f0f7c0541cea2509a2f92c2cb8d11c620ad5b2b6e60cf1e3ffc2f07e",
+      "original_bytes": {
+        "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/compaction-composed-source-review.json.original.gz",
+        "sha256": "e6145d508373ca1b4eac7c425a97da322311866e4da2f58951d21850684216d8",
+        "compressed_sha256": "fe1635a6542420e8b9049b4544c1767c967f184c691e2204545c0446eeaef7a1"
+      }
     },
     {
       "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/session-producer-source-review.json",
-      "sha256": "518a8aebbc4e93159c828e67a343513f7870c047b681525f964cb5216cc8ef8c"
+      "sha256": "0bcdec40493c5eb360a0f9803526a7f079bcc8f213f0e5c1718af5de46bd2517",
+      "original_bytes": {
+        "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/session-producer-source-review.json.original.gz",
+        "sha256": "518a8aebbc4e93159c828e67a343513f7870c047b681525f964cb5216cc8ef8c",
+        "compressed_sha256": "0a80d3e9e28c87efe263d48a7e97ff7b43e487905c6bd1c89f20375d6502dee3"
+      }
     },
     {
       "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/source-accepted-report.json",
@@ -659,5 +674,15 @@
     },
     "updated_utc": "2026-10-07T16:32:44.435136+00:00"
   },
-  "remaining_local_failures_semantics": "No failures in this completed repair batch; this is not a claim that the remaining source/default/PQ/native/hosted qualification matrix has passed."
+  "remaining_local_failures_semantics": "No failures in this completed repair batch; this is not a claim that the remaining source/default/PQ/native/hosted qualification matrix has passed.",
+  "review_report_whitespace_repair": {
+    "reason": "hosted merge-base patch-integrity rejects blank final lines",
+    "parsed_report_contents_unchanged": true,
+    "original_exact_bytes_retained": true,
+    "changed_paths": [
+      "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/payment-repair-source-review.json",
+      "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/compaction-composed-source-review.json",
+      "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/session-producer-source-review.json"
+    ]
+  }
 }
