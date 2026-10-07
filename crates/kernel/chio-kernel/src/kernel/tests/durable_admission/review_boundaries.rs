@@ -241,9 +241,13 @@ fn pre_dispatch_cleanup_runs_when_its_deny_timestamp_clock_sample_fails() -> Tes
         assert_eq!(denied.verdict, Verdict::Deny);
         assert!(denied.output.is_none());
         assert!(denied.receipt.verify_signature()?);
-        assert!(store
-            .payment_journal()
-            .is_some_and(|journal| journal.state == PaymentJournalState::Closed));
+        let journal = store.payment_journal().ok_or("payment journal")?;
+        assert_eq!(journal.state, PaymentJournalState::Settled);
+        assert_eq!(
+            journal.settle_action,
+            Some(crate::payment::PaymentSettleAction::Release)
+        );
+        assert!(journal.is_compensated_before_dispatch(), "{journal:?}");
         assert_eq!(
             store.operation().state(),
             AdmissionOperationState::CompensatedBeforeDispatch
