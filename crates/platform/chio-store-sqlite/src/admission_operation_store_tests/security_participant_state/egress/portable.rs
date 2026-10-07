@@ -60,6 +60,7 @@ fn portable_history_distinguishes_missing_operation_from_missing_custody() -> An
 
 #[test]
 fn portable_commands_preserve_both_phases_and_read_current_operation() -> AnchoredTestResult {
+    let _fixture_clock = chio_test_support::clock::scope_unix_secs(now_ms().div_ceil(1_000));
     let fixture = fixture();
     hydrate(&fixture, &imported(&fixture, "source")?)?;
     let mut pending = pending(&fixture, "portable-egress", None)?;
@@ -209,6 +210,7 @@ fn portable_commands_recheck_selected_binding_live_material_and_actual_lease() -
 
 #[test]
 fn portable_owner_rotation_preserves_history_without_reviving_old_custody() -> AnchoredTestResult {
+    let _fixture_clock = chio_test_support::clock::scope_unix_secs(now_ms().div_ceil(1_000));
     let fixture = fixture();
     hydrate(&fixture, &imported(&fixture, "source")?)?;
     let mut pending = pending(&fixture, "portable-takeover", None)?;

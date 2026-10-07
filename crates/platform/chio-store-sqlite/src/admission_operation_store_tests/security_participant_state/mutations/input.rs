@@ -13,6 +13,7 @@ pub(super) fn label() -> TestResult<InformationLabel> {
 
 #[test]
 fn input_join_records_original_intent_and_one_complete_resolved_command() -> TestResult {
+    let _fixture_clock = chio_test_support::clock::scope_unix_secs(now_ms().div_ceil(1_000));
     let fixture = fixture();
     let initialized = hydrate(&fixture, &imported(&fixture, "source")?)?;
     let (context, raw) = request("unused-raw-command")?;
@@ -129,6 +130,7 @@ fn input_retry_cannot_change_input_or_adopt_the_raw_command_family() -> TestResu
 
 #[test]
 fn raw_history_preserves_v1_bytes_and_cannot_be_inferred_as_input_history() -> TestResult {
+    let _fixture_clock = chio_test_support::clock::scope_unix_secs(now_ms().div_ceil(1_000));
     let fixture = fixture();
     let initialized = hydrate(&fixture, &imported(&fixture, "source")?)?;
     let (context, mut raw) = request("raw")?;
@@ -195,6 +197,7 @@ fn raw_history_preserves_v1_bytes_and_cannot_be_inferred_as_input_history() -> T
 #[test]
 fn input_resolution_uses_current_inherited_state_but_retry_returns_original_history() -> TestResult
 {
+    let _fixture_clock = chio_test_support::clock::scope_unix_secs(now_ms().div_ceil(1_000));
     let fixture = fixture();
     let initialized = hydrate(&fixture, &imported(&fixture, "source")?)?;
     let binding = initialized.admission_binding()?;
@@ -273,6 +276,7 @@ fn input_resolution_uses_current_inherited_state_but_retry_returns_original_hist
 
 #[test]
 fn input_join_preserves_actual_lease_and_original_context_checks() -> TestResult {
+    let _fixture_clock = chio_test_support::clock::scope_unix_secs(now_ms().div_ceil(1_000));
     let fixture = fixture();
     let initialized = hydrate(&fixture, &imported(&fixture, "source")?)?;
     let (context, raw) = request("raw")?;

@@ -314,6 +314,7 @@ fn shared_generation_changes_are_captured_and_old_retry_is_historical_only() -> 
 
 #[test]
 fn excessive_row_capture_aborts_the_complete_owned_join() -> TestResult {
+    let _fixture_clock = chio_test_support::clock::scope_unix_secs(now_ms().div_ceil(1_000));
     use rusqlite::functions::FunctionFlags;
     use std::sync::atomic::{AtomicUsize, Ordering};
     let fixture = fixture();

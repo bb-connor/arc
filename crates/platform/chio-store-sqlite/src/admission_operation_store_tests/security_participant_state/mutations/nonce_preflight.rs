@@ -77,6 +77,7 @@ fn prepare(
 
 #[test]
 fn native_journal_checkpoint_preserves_nonce_preflight_and_current_label() -> TestResult {
+    let _fixture_clock = chio_test_support::clock::scope_unix_secs(now_ms().div_ceil(1_000));
     let fixture = fixture();
     let initialized = hydrate(&fixture, &imported(&fixture, "source")?)?;
     let (context, _) = request("checkpoint-nonce")?;
@@ -142,6 +143,7 @@ fn native_journal_checkpoint_preserves_nonce_preflight_and_current_label() -> Te
 
 #[test]
 fn preflight_is_anchored_once_and_never_satisfies_dispatch_input_custody() -> TestResult {
+    let _fixture_clock = chio_test_support::clock::scope_unix_secs(now_ms().div_ceil(1_000));
     let fixture = fixture();
     let initialized = hydrate(&fixture, &imported(&fixture, "source")?)?;
     let (context, _) = request("unused")?;

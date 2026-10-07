@@ -2,6 +2,7 @@ use super::*;
 
 #[test]
 fn native_journal_capacity_resumes_after_operator_checkpoint() -> TestResult {
+    let _fixture_clock = chio_test_support::clock::scope_unix_secs(now_ms().div_ceil(1_000));
     native::with_test_journal_bounds(2, 67_108_864, || {
         let fixture = fixture();
         let source = imported(&fixture, "source")?;
