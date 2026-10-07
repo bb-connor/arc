@@ -220,6 +220,31 @@ fn native_dispatch_ledger_retains_exact_policy_and_custody_after_compensation() 
             record["schema"],
             "chio.native-dispatch-preparation-ledger.v2"
         );
+        let context: chio_kernel::SecurityInvocationContext =
+            serde_json::from_value(record["context"].clone())?;
+        let original =
+            chio_kernel::admission_operation::NativeSecurityDispatchRequestBindingV1::from_live_request(
+                &fixture.request,
+                &context,
+            )?;
+        let commitment = record["original_dispatch_commitment_id"]
+            .as_str()
+            .ok_or("original dispatch ID")?;
+        assert!(
+            commitment.starts_with("dispatch-commitment:"),
+            "{commitment}"
+        );
+        assert_eq!(commitment, original.dispatch_commitment_id().as_str());
+        assert_eq!(
+            record["live_request_digest"]
+                .as_str()
+                .ok_or("original full request digest")?,
+            original.live_request_digest().as_str()
+        );
+        assert_eq!(
+            original.live_request_digest().as_str(),
+            hex::encode(custody.live_request_digest().as_bytes())
+        );
         assert_eq!(
             record["policy"],
             serde_json::from_slice::<serde_json::Value>(
