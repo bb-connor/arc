@@ -73,6 +73,8 @@ jobs:
         run: |
           set -euo pipefail
           rustup toolchain install --profile minimal
+          # chio-wasm-guards tests compile example guards to WASM (AGENTS.md toolchain prerequisites).
+          rustup target add wasm32-unknown-unknown
           rustup show active-toolchain
 
       - name: Install protobuf compiler
@@ -107,6 +109,13 @@ jobs:
           filter=()
           if [ -n "$FILTER" ]; then filter+=("$FILTER"); fi
           cargo test --locked "${args[@]}" -- "${filter[@]}" 2>&1 | tee lane-test.log
+          # libtest exits 0 when a filter matches nothing; a lane that executed no test is not a pass.
+          executed=$(awk '/^test result:/ { for (i = 2; i <= NF; i++) if ($i ~ /^(passed|failed);$/) n += $(i - 1) } END { print n + 0 }' lane-test.log)
+          echo "executed tests: $executed"
+          if [ "$executed" -eq 0 ]; then
+            echo "::error::no test executed for packages '$PACKAGES' with filter '$FILTER'"
+            exit 1
+          fi
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
