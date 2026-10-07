@@ -712,24 +712,58 @@ mod tests {
     }
 
     #[test]
-    fn invalid_x_chio_flow_fails_generation() {
-        let input = serde_json::json!({
-            "openapi": "3.1.0",
-            "info": {"title": "Flow", "version": "1"},
-            "paths": {
-                "/records": {
-                    "post": {
-                        "operationId": "storeRecord",
-                        "x-chio-flow": {"egress": true, "unexpected": true},
-                        "responses": {"200": {"description": "OK"}}
+    fn invalid_x_chio_flow_fails_load_and_generation() {
+        let flow_spec = |flow: serde_json::Value| {
+            serde_json::json!({
+                "openapi": "3.1.0",
+                "info": {"title": "Flow", "version": "1"},
+                "paths": {
+                    "/records": {
+                        "post": {
+                            "operationId": "storeRecord",
+                            "x-chio-flow": flow,
+                            "responses": {"200": {"description": "OK"}}
+                        }
                     }
                 }
+            })
+        };
+        let invalid = serde_json::json!({"egress": true, "unexpected": true});
+
+        let Err(error) = OpenApiSpec::from_value(flow_spec(invalid.clone())) else {
+            panic!("invalid x-chio-flow was accepted at load");
+        };
+        assert!(matches!(
+            error,
+            crate::OpenApiError::InvalidExtension {
+                field: "x-chio-flow",
+                ..
             }
-        });
-        let spec = OpenApiSpec::from_value(input)
+        ));
+        assert_eq!(
+            error.to_string(),
+            "urn:chio:error:transport:invalid-request-shape"
+        );
+
+        // Generation revalidates the retained raw operation, so a parsed spec
+        // whose operation is replaced afterwards still fails closed.
+        let mut spec = OpenApiSpec::from_value(flow_spec(serde_json::json!({"egress": true})))
             .unwrap_or_else(|error| panic!("parse flow spec: {error}"));
-        assert!(ManifestGenerator::new(GeneratorConfig::default())
-            .generate_tools(&spec)
-            .is_err());
+        spec.paths[0].1.operations[0].1.raw["x-chio-flow"] = invalid;
+        let Err(error) = ManifestGenerator::new(GeneratorConfig::default()).generate_tools(&spec)
+        else {
+            panic!("invalid x-chio-flow was accepted at generation");
+        };
+        assert!(matches!(
+            error,
+            crate::OpenApiError::InvalidExtension {
+                field: "x-chio-flow",
+                ..
+            }
+        ));
+        assert_eq!(
+            error.to_string(),
+            "urn:chio:error:transport:invalid-request-shape"
+        );
     }
 }
