@@ -411,6 +411,13 @@ async fn closed_admission_ticks_start_no_new_response_work_but_still_expire_over
         )
     });
     assert_eq!(coordinator.executions.load(Ordering::Acquire), 1);
+    tokio::time::timeout(HOST_LIFECYCLE_TEST_TIMEOUT, async {
+        while host.ensure_ready().is_err() {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap_or_else(|_| panic!("host did not return to readiness after the first response"));
 
     host.consume(&signed_host_event(
         CLOSED_EVENT_ID,
