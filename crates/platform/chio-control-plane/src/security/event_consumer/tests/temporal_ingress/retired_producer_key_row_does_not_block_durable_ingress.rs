@@ -514,3 +514,226 @@ fn rotation_still_refuses_retired_key_and_forged_events() {
         );
     }
 }
+
+fn with_signature_from(
+    event: &UnverifiedSecurityEvent,
+    donor: &UnverifiedSecurityEvent,
+) -> (UnverifiedSecurityEvent, SecurityEventVerificationRecord) {
+    let mut envelope: serde_json::Value = serde_json::from_slice(event.source_evidence.as_bytes())
+        .unwrap_or_else(|error| panic!("decode envelope: {error}"));
+    let donor_envelope: serde_json::Value =
+        serde_json::from_slice(donor.source_evidence.as_bytes())
+            .unwrap_or_else(|error| panic!("decode donor envelope: {error}"));
+    envelope["signature"] = donor_envelope["signature"].clone();
+    let source_evidence = canonical_json_bytes(&envelope)
+        .unwrap_or_else(|error| panic!("canonical spliced envelope: {error}"));
+    let signed: SignedSecurityEvent = serde_json::from_slice(&source_evidence)
+        .unwrap_or_else(|error| panic!("spliced envelope shape: {error}"));
+    let body = signed.body();
+    assert!(
+        matches!(
+            signed.verify_trusted_producer(
+                &body.producer_id,
+                &body.producer_key_id,
+                signed.producer_key()
+            ),
+            Ok(false)
+        ),
+        "the spliced envelope must not verify under its own producer key"
+    );
+    let mut preimage = chio_core::security_event::EVENT_EVIDENCE_HASH_DOMAIN.to_vec();
+    preimage.extend_from_slice(&source_evidence);
+    let mut corrupt = event.clone();
+    corrupt.source_evidence = CanonicalBody::new(source_evidence)
+        .unwrap_or_else(|error| panic!("spliced source evidence: {error}"));
+    let record = SecurityEventVerificationRecord {
+        tenant_id: corrupt.tenant_id.clone(),
+        event_id: corrupt.event_id.clone(),
+        producer_id: corrupt.producer_id.clone(),
+        trust_class: ProducerTrustClass::InternalDetector,
+        event_time_unix_ms: corrupt.event_time_unix_ms,
+        received_at_unix_ms: corrupt.received_at_unix_ms,
+        canonical_body: corrupt.canonical_body.clone(),
+        body_hash: corrupt.body_hash,
+        evidence_hash: Digest32::new(*chio_core::sha256(&preimage).as_bytes()),
+    };
+    (corrupt, record)
+}
+
+fn acknowledged_flag(connection: &Connection, event: &UnverifiedSecurityEvent) -> i64 {
+    connection
+        .query_row(
+            "SELECT acknowledged FROM security_correlation_ingress \
+             WHERE tenant_id = ?1 AND event_id = ?2",
+            [event.tenant_id.as_str(), event.event_id.as_str()],
+            |row| row.get(0),
+        )
+        .unwrap_or_else(|error| panic!("ingress row {}: {error}", event.event_id.as_str()))
+}
+
+fn assert_corrupt_head_row_aborts_every_drain(
+    envelope_signer: &Keypair,
+    envelope_key_id: &str,
+    current_signer: &Keypair,
+    current_key_id: &str,
+) {
+    let bystander = Keypair::from_seed(&[113_u8; 32]);
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let path = directory.path().join("corrupt-head-row.sqlite");
+    let store = Arc::new(
+        SqliteSecurityStateStore::open(&path)
+            .unwrap_or_else(|error| panic!("open ingress store: {error}")),
+    );
+    let connection =
+        Connection::open(&path).unwrap_or_else(|error| panic!("inspect ingress store: {error}"));
+    let clock = Arc::new(MutableClock::new(10_000));
+    let (corrupt, corrupt_record) = with_signature_from(
+        &detector_event(
+            tenant(),
+            "corrupt-spliced-signature",
+            envelope_key_id,
+            "lineage-corrupt-head",
+            9_900,
+            10_000,
+            envelope_signer,
+        ),
+        &detector_event(
+            tenant(),
+            "corrupt-signature-donor",
+            envelope_key_id,
+            "lineage-corrupt-donor",
+            9_900,
+            10_000,
+            envelope_signer,
+        ),
+    );
+    assert_eq!(
+        store
+            .enqueue_verified_correlation_event(&corrupt, &corrupt_record)
+            .unwrap_or_else(|error| panic!("store the corrupt row: {error}")),
+        EventAppend::Inserted
+    );
+    let runtime = start_runtime(
+        &store,
+        &clock,
+        vec![
+            trusted_detector(tenant(), current_key_id, current_signer),
+            trusted_detector(bystander_tenant(), "bystander-key-v1", &bystander),
+        ],
+    );
+    let healthy = detector_event(
+        tenant(),
+        "corrupt-head-later-same-tenant",
+        current_key_id,
+        "lineage-corrupt-head-later",
+        9_950,
+        10_000,
+        current_signer,
+    );
+    let bystander_event = detector_event(
+        bystander_tenant(),
+        "corrupt-head-other-tenant",
+        "bystander-key-v1",
+        "lineage-corrupt-head-bystander",
+        9_960,
+        10_000,
+        &bystander,
+    );
+    for event in [&healthy, &bystander_event] {
+        assert_eq!(
+            runtime
+                .ingress
+                .verify_and_append(event)
+                .unwrap_or_else(|error| panic!("ingest a healthy event: {error}")),
+            EventAppend::Inserted
+        );
+    }
+    assert_eq!(
+        pending_event_ids(&store),
+        vec![
+            corrupt.event_id.clone(),
+            healthy.event_id.clone(),
+            bystander_event.event_id.clone(),
+        ]
+    );
+    let corrupt_error = rejected(
+        runtime.consumer.verify_durable(&corrupt),
+        "a stored envelope with a foreign signature reverified",
+    );
+    assert_eq!(corrupt_error.kind(), PortErrorKind::IntegrityFailure);
+    for event in [&healthy, &bystander_event] {
+        assert_eq!(
+            runtime
+                .consumer
+                .verify_durable(event)
+                .unwrap_or_else(|error| panic!("healthy reverification: {error}"))
+                .event_id,
+            event.event_id
+        );
+    }
+
+    clock.set(10_500);
+    for pass in ["first", "second"] {
+        let error = rejected(
+            runtime.drainer.drain_once(16),
+            &format!("the {pass} drain progressed past a corrupt stored row"),
+        );
+        assert_eq!(
+            error.kind(),
+            PortErrorKind::IntegrityFailure,
+            "{pass} drain"
+        );
+        assert_eq!(
+            error.code().as_str(),
+            "store.integrity_failure",
+            "{pass} drain"
+        );
+        for event in [&corrupt, &healthy, &bystander_event] {
+            assert_eq!(
+                acknowledged_flag(&connection, event),
+                0,
+                "{} was acknowledged after the {pass} drain",
+                event.event_id.as_str()
+            );
+            assert_eq!(
+                event_rows(&connection, "security_correlation_outcomes", event),
+                0,
+                "{} was correlated after the {pass} drain",
+                event.event_id.as_str()
+            );
+        }
+        assert_eq!(
+            pending_event_ids(&store),
+            vec![
+                corrupt.event_id.clone(),
+                healthy.event_id.clone(),
+                bystander_event.event_id.clone(),
+            ],
+            "{pass} drain"
+        );
+    }
+}
+
+#[test]
+fn corrupt_stored_row_aborts_the_drain_without_acknowledging_later_rows() {
+    let original = Keypair::from_seed(&[111_u8; 32]);
+    assert_corrupt_head_row_aborts_every_drain(
+        &original,
+        "detector-key-v1",
+        &original,
+        "detector-key-v1",
+    );
+}
+
+#[test]
+fn corrupt_stored_row_from_a_retired_producer_key_still_aborts_the_drain() {
+    let retired = Keypair::from_seed(&[111_u8; 32]);
+    let rotated = Keypair::from_seed(&[112_u8; 32]);
+    assert_corrupt_head_row_aborts_every_drain(
+        &retired,
+        "detector-key-v1",
+        &rotated,
+        "detector-key-v2",
+    );
+}
