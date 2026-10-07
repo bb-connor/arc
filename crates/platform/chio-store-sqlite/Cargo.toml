@@ -26,6 +26,9 @@ cognition-market-test-support = []
 # Fail-only, owner-connection cutpoints for cross-crate admission tests.
 # Default-off; no arbitrary SQL or fault controls are exposed in production.
 admission-test-support = []
+# Exposes the standalone security admission operation store to tests and
+# benches. Default-off; production builds neither compile nor export it.
+security-admission-test-support = []
 # Deterministic fault-injection hooks used only by the separate-process chaos
 # harness. Default-off so production store builds expose no environment-driven
 # pause points.
@@ -74,6 +77,10 @@ base64.workspace = true
 async-trait = { workspace = true }
 chio-kernel = { workspace = true, features = ["admission-test-support"] }
 chio-quarantine = { workspace = true }
+# Benches and integration tests link the regular (non-`cfg(test)`) library;
+# this self edge enables the security admission store under `cargo test` and
+# `cargo bench` only.
+chio-store-sqlite = { workspace = true, features = ["security-admission-test-support"] }
 chio-test-support = { workspace = true }
 chio-swarm-authority = { workspace = true }
 chio-open-market = { workspace = true }
