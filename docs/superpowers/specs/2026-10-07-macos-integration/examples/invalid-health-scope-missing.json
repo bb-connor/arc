@@ -91,6 +91,7 @@
         "age_ms": 15,
         "max_age_ms": 30000
       }
-    }
+    },
+    "request_binding": {}
   }
 }

@@ -13,6 +13,15 @@
       "native_id": "synthetic-wrong-operation",
       "generation": "1",
       "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "request_binding": {
+      "operation_ref": {
+        "kind": "operation",
+        "issuer": "synthetic-authority",
+        "native_id": "synthetic-operation-1",
+        "generation": "1",
+        "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
     }
   }
 }

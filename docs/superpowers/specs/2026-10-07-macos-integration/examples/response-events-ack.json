@@ -5,6 +5,9 @@
   "ok": true,
   "result": {
     "subscription_id": "synthetic-subscription",
-    "disposition": "acknowledged"
+    "disposition": "acknowledged",
+    "request_binding": {
+      "subscription_id": "synthetic-subscription"
+    }
   }
 }

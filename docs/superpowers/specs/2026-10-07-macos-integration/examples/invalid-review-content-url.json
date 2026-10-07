@@ -65,6 +65,15 @@
         "max_cost_minor": "0",
         "currency": "USD"
       }
+    },
+    "request_binding": {
+      "operation_ref": {
+        "kind": "operation",
+        "issuer": "synthetic-authority",
+        "native_id": "synthetic-operation-1",
+        "generation": "1",
+        "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
     }
   }
 }

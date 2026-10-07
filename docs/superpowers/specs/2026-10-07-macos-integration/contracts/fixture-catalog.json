@@ -1482,6 +1482,741 @@
           "policy_generation"
         ]
       }
+    },
+    {
+      "file": "invalid-hello-binding-missing.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-hello.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-hello.json",
+        "path": [
+          "result",
+          "request_binding"
+        ]
+      }
+    },
+    {
+      "file": "response-hello-recovery.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-hello.json",
+      "pair_valid": true
+    },
+    {
+      "file": "invalid-hello-error-binding-missing.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-hello.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-hello-recovery.json",
+        "path": [
+          "error",
+          "request_binding"
+        ]
+      }
+    },
+    {
+      "file": "invalid-health-get-binding-missing.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-health-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-health-get.json",
+        "path": [
+          "result",
+          "request_binding"
+        ]
+      }
+    },
+    {
+      "file": "response-health-get-recovery.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-health-get.json",
+      "pair_valid": true
+    },
+    {
+      "file": "invalid-health-get-error-binding-missing.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-health-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-health-get-recovery.json",
+        "path": [
+          "error",
+          "request_binding"
+        ]
+      }
+    },
+    {
+      "file": "invalid-tasks-list-binding-missing.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-tasks-list.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-tasks-list.json",
+        "path": [
+          "result",
+          "request_binding"
+        ]
+      }
+    },
+    {
+      "file": "response-tasks-list-recovery.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-tasks-list.json",
+      "pair_valid": true
+    },
+    {
+      "file": "invalid-tasks-list-error-binding-missing.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-tasks-list.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-tasks-list-recovery.json",
+        "path": [
+          "error",
+          "request_binding"
+        ]
+      }
+    },
+    {
+      "file": "invalid-task-get-binding-missing.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-task-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-task-get.json",
+        "path": [
+          "result",
+          "request_binding"
+        ]
+      }
+    },
+    {
+      "file": "response-task-get-recovery.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-task-get.json",
+      "pair_valid": true
+    },
+    {
+      "file": "invalid-task-get-error-binding-missing.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-task-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-task-get-recovery.json",
+        "path": [
+          "error",
+          "request_binding"
+        ]
+      }
+    },
+    {
+      "file": "invalid-operation-get-binding-missing.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-operation-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-operation-get.json",
+        "path": [
+          "result",
+          "request_binding"
+        ]
+      }
+    },
+    {
+      "file": "response-operation-get-recovery.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-operation-get.json",
+      "pair_valid": true
+    },
+    {
+      "file": "invalid-operation-get-error-binding-missing.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-operation-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-operation-get-recovery.json",
+        "path": [
+          "error",
+          "request_binding"
+        ]
+      }
+    },
+    {
+      "file": "invalid-review-open-binding-missing.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-review-open.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-review-open.json",
+        "path": [
+          "result",
+          "request_binding"
+        ]
+      }
+    },
+    {
+      "file": "response-review-open-recovery.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-review-open.json",
+      "pair_valid": true
+    },
+    {
+      "file": "invalid-review-open-error-binding-missing.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-review-open.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-review-open-recovery.json",
+        "path": [
+          "error",
+          "request_binding"
+        ]
+      }
+    },
+    {
+      "file": "invalid-events-subscribe-binding-missing.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-events-subscribe.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-events-subscribe.json",
+        "path": [
+          "result",
+          "request_binding"
+        ]
+      }
+    },
+    {
+      "file": "response-events-subscribe-recovery.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-events-subscribe.json",
+      "pair_valid": true
+    },
+    {
+      "file": "invalid-events-subscribe-error-binding-missing.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-events-subscribe.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-events-subscribe-recovery.json",
+        "path": [
+          "error",
+          "request_binding"
+        ]
+      }
+    },
+    {
+      "file": "invalid-events-ack-binding-missing.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-events-ack.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-events-ack.json",
+        "path": [
+          "result",
+          "request_binding"
+        ]
+      }
+    },
+    {
+      "file": "response-events-ack-recovery.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-events-ack.json",
+      "pair_valid": true
+    },
+    {
+      "file": "invalid-events-ack-error-binding-missing.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-events-ack.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-events-ack-recovery.json",
+        "path": [
+          "error",
+          "request_binding"
+        ]
+      }
+    },
+    {
+      "file": "invalid-hello-binding-client-nonce.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-hello.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-hello.json",
+        "path": [
+          "result",
+          "request_binding",
+          "client_nonce"
+        ]
+      }
+    },
+    {
+      "file": "invalid-hello-error-binding-client-nonce.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-hello.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-hello-recovery.json",
+        "path": [
+          "error",
+          "request_binding",
+          "client_nonce"
+        ]
+      }
+    },
+    {
+      "file": "invalid-hello-binding-supported-versions.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-hello.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-hello.json",
+        "path": [
+          "result",
+          "request_binding",
+          "supported_versions"
+        ]
+      }
+    },
+    {
+      "file": "invalid-hello-error-binding-supported-versions.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-hello.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-hello-recovery.json",
+        "path": [
+          "error",
+          "request_binding",
+          "supported_versions"
+        ]
+      }
+    },
+    {
+      "file": "invalid-health-get-binding-unexpected-authority.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-health-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-health-get.json",
+        "path": [
+          "result",
+          "request_binding",
+          "unexpected_authority"
+        ]
+      }
+    },
+    {
+      "file": "invalid-health-get-error-binding-unexpected-authority.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-health-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-health-get-recovery.json",
+        "path": [
+          "error",
+          "request_binding",
+          "unexpected_authority"
+        ]
+      }
+    },
+    {
+      "file": "invalid-task-get-binding-task-id.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-task-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-task-get.json",
+        "path": [
+          "result",
+          "request_binding",
+          "task_id"
+        ]
+      }
+    },
+    {
+      "file": "invalid-task-get-error-binding-task-id.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-task-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-task-get-recovery.json",
+        "path": [
+          "error",
+          "request_binding",
+          "task_id"
+        ]
+      }
+    },
+    {
+      "file": "invalid-operation-get-binding-operation-ref.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-operation-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-operation-get.json",
+        "path": [
+          "result",
+          "request_binding",
+          "operation_ref",
+          "digest"
+        ]
+      }
+    },
+    {
+      "file": "invalid-operation-get-error-binding-operation-ref.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-operation-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-operation-get-recovery.json",
+        "path": [
+          "error",
+          "request_binding",
+          "operation_ref",
+          "digest"
+        ]
+      }
+    },
+    {
+      "file": "invalid-review-open-binding-operation-ref.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-review-open.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-review-open.json",
+        "path": [
+          "result",
+          "request_binding",
+          "operation_ref",
+          "generation"
+        ]
+      }
+    },
+    {
+      "file": "invalid-review-open-error-binding-operation-ref.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-review-open.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-review-open-recovery.json",
+        "path": [
+          "error",
+          "request_binding",
+          "operation_ref",
+          "generation"
+        ]
+      }
+    },
+    {
+      "file": "invalid-events-ack-binding-subscription-id.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-events-ack.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-events-ack.json",
+        "path": [
+          "result",
+          "request_binding",
+          "subscription_id"
+        ]
+      }
+    },
+    {
+      "file": "invalid-events-ack-error-binding-subscription-id.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-events-ack.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-events-ack-recovery.json",
+        "path": [
+          "error",
+          "request_binding",
+          "subscription_id"
+        ]
+      }
+    },
+    {
+      "file": "request-tasks-list-cursor-a.json",
+      "schema": "operator-request.schema.json",
+      "schema_valid": true
+    },
+    {
+      "file": "response-tasks-list-cursor-a.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-tasks-list-cursor-a.json",
+      "pair_valid": true
+    },
+    {
+      "file": "invalid-tasks-list-binding-cursor-a-to-b.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-tasks-list-cursor-a.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-tasks-list-cursor-a.json",
+        "path": [
+          "result",
+          "request_binding",
+          "cursor"
+        ]
+      }
+    },
+    {
+      "file": "invalid-tasks-list-binding-cursor-string-to-null.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-tasks-list-cursor-a.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-tasks-list-cursor-a.json",
+        "path": [
+          "result",
+          "request_binding",
+          "cursor"
+        ]
+      }
+    },
+    {
+      "file": "invalid-tasks-list-binding-cursor-null-to-string.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-tasks-list.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-tasks-list.json",
+        "path": [
+          "result",
+          "request_binding",
+          "cursor"
+        ]
+      }
+    },
+    {
+      "file": "invalid-tasks-list-binding-limit.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-tasks-list.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-tasks-list.json",
+        "path": [
+          "result",
+          "request_binding",
+          "limit"
+        ]
+      }
+    },
+    {
+      "file": "invalid-tasks-list-binding-limit-0.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-tasks-list.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-tasks-list.json",
+        "path": [
+          "result",
+          "request_binding",
+          "limit"
+        ]
+      }
+    },
+    {
+      "file": "invalid-tasks-list-binding-limit-101.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-tasks-list.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-tasks-list.json",
+        "path": [
+          "result",
+          "request_binding",
+          "limit"
+        ]
+      }
+    },
+    {
+      "file": "invalid-tasks-list-binding-cursor-overlong.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-tasks-list.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-tasks-list.json",
+        "path": [
+          "result",
+          "request_binding",
+          "cursor"
+        ]
+      }
+    },
+    {
+      "file": "invalid-tasks-list-error-binding-cursor.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-tasks-list.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-tasks-list-recovery.json",
+        "path": [
+          "error",
+          "request_binding",
+          "cursor"
+        ]
+      }
+    },
+    {
+      "file": "request-events-subscribe-cursor-a.json",
+      "schema": "operator-request.schema.json",
+      "schema_valid": true
+    },
+    {
+      "file": "response-events-subscribe-cursor-a.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-events-subscribe-cursor-a.json",
+      "pair_valid": true
+    },
+    {
+      "file": "invalid-events-subscribe-binding-cursor-a-to-b.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-events-subscribe-cursor-a.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-events-subscribe-cursor-a.json",
+        "path": [
+          "result",
+          "request_binding",
+          "after_cursor"
+        ]
+      }
+    },
+    {
+      "file": "response-events-subscribe-rebase.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-events-subscribe-cursor-a.json",
+      "pair_valid": true
+    },
+    {
+      "file": "invalid-events-subscribe-binding-cursor-rebase.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-events-subscribe-cursor-a.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-events-subscribe-rebase.json",
+        "path": [
+          "result",
+          "request_binding",
+          "after_cursor"
+        ]
+      }
+    },
+    {
+      "file": "invalid-events-subscribe-binding-cursor-string-to-null.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-events-subscribe-cursor-a.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-events-subscribe-cursor-a.json",
+        "path": [
+          "result",
+          "request_binding",
+          "after_cursor"
+        ]
+      }
+    },
+    {
+      "file": "invalid-events-subscribe-binding-cursor-null-to-string.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-events-subscribe.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-events-subscribe.json",
+        "path": [
+          "result",
+          "request_binding",
+          "after_cursor"
+        ]
+      }
+    },
+    {
+      "file": "invalid-events-subscribe-binding-cursor-overlong.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-events-subscribe.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-events-subscribe.json",
+        "path": [
+          "result",
+          "request_binding",
+          "after_cursor"
+        ]
+      }
+    },
+    {
+      "file": "invalid-events-subscribe-error-binding-cursor.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-events-subscribe.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-events-subscribe-recovery.json",
+        "path": [
+          "error",
+          "request_binding",
+          "after_cursor"
+        ]
+      }
     }
   ]
 }

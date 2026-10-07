@@ -26,3 +26,7 @@ Addressed four further findings: authenticated lab-to-verifier artifact custody,
 ## Fourth hosted review repair
 
 Addressed task stop-state consistency, complete bounded health observations, and evidence-export request binding. The related correlation audit extends exact retained-request binding across the four mutation methods, while preserving native ownership and verification. Stopped execution can retain an unresolved external outcome; health remains observation rather than authority. Concrete negative fixtures and independent review cover the revised wire shapes before another current-head hosted review.
+
+## Fifth hosted review repair
+
+Closed cursor-based response substitution for task pagination and event subscription. The correlation audit applies a uniform retained-parameter binding to successful method replies, including exact null/string cursor identity, rather than assuming an envelope ID or page-length check binds the result to its initiating parameters. Rebase remains a separate native disposition and cannot silently change the requested starting point.

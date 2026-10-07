@@ -99,6 +99,7 @@
         "vm-project-v1",
         "vm-project-v1"
       ]
-    }
+    },
+    "request_binding": {}
   }
 }

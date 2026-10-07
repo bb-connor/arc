@@ -12,6 +12,15 @@
       "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     },
     "state": "pending",
-    "evidence_ref": null
+    "evidence_ref": null,
+    "request_binding": {
+      "operation_ref": {
+        "kind": "operation",
+        "issuer": "synthetic-authority",
+        "native_id": "synthetic-operation-1",
+        "generation": "1",
+        "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    }
   }
 }

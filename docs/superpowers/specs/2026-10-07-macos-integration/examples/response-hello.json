@@ -7,6 +7,12 @@
     "selected_version": "chio.desktop.operator.v1",
     "session_id": "synthetic-session",
     "server_nonce": "synthetic-server",
-    "capability_state": "prerequisites_missing"
+    "capability_state": "prerequisites_missing",
+    "request_binding": {
+      "supported_versions": [
+        "chio.desktop.operator.v1"
+      ],
+      "client_nonce": "synthetic-client"
+    }
   }
 }

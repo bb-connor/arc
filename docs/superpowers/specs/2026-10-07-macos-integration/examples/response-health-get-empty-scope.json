@@ -96,6 +96,7 @@
       "kind": "authenticated_session",
       "session_id": "synthetic-session",
       "evaluated_profiles": []
-    }
+    },
+    "request_binding": {}
   }
 }

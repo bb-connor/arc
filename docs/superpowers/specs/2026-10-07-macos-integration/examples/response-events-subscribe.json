@@ -6,6 +6,9 @@
   "result": {
     "subscription_id": "synthetic-subscription",
     "cursor": "synthetic-cursor",
-    "rebase_required": false
+    "rebase_required": false,
+    "request_binding": {
+      "after_cursor": null
+    }
   }
 }

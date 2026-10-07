@@ -10,7 +10,13 @@
       "response_example": "response-hello.json",
       "negative_examples": [
         "invalid-hello-negotiation.json",
-        "invalid-retry-hello.json"
+        "invalid-retry-hello.json",
+        "invalid-hello-binding-missing.json",
+        "invalid-hello-error-binding-missing.json",
+        "invalid-hello-binding-client-nonce.json",
+        "invalid-hello-error-binding-client-nonce.json",
+        "invalid-hello-binding-supported-versions.json",
+        "invalid-hello-error-binding-supported-versions.json"
       ]
     },
     {
@@ -38,7 +44,11 @@
         "invalid-health-profile-outside-scope.json",
         "invalid-health-stale-null-age.json",
         "invalid-health-stale-null-source.json",
-        "invalid-health-ready-null-generation.json"
+        "invalid-health-ready-null-generation.json",
+        "invalid-health-get-binding-missing.json",
+        "invalid-health-get-error-binding-missing.json",
+        "invalid-health-get-binding-unexpected-authority.json",
+        "invalid-health-get-error-binding-unexpected-authority.json"
       ]
     },
     {
@@ -51,7 +61,17 @@
         "invalid-tasks-page-limit.json",
         "invalid-retry-tasks-list.json",
         "invalid-tasks-list-stopped-null.json",
-        "invalid-tasks-list-request-limit.json"
+        "invalid-tasks-list-request-limit.json",
+        "invalid-tasks-list-binding-missing.json",
+        "invalid-tasks-list-error-binding-missing.json",
+        "invalid-tasks-list-binding-cursor-a-to-b.json",
+        "invalid-tasks-list-binding-cursor-string-to-null.json",
+        "invalid-tasks-list-binding-cursor-null-to-string.json",
+        "invalid-tasks-list-binding-limit.json",
+        "invalid-tasks-list-binding-limit-0.json",
+        "invalid-tasks-list-binding-limit-101.json",
+        "invalid-tasks-list-binding-cursor-overlong.json",
+        "invalid-tasks-list-error-binding-cursor.json"
       ]
     },
     {
@@ -71,7 +91,11 @@
         "invalid-task-get-stopped-scope.json",
         "invalid-task-get-running-with-stop.json",
         "invalid-task-get-completed-cleanup.json",
-        "invalid-task-get-completed-external_outcome.json"
+        "invalid-task-get-completed-external_outcome.json",
+        "invalid-task-get-binding-missing.json",
+        "invalid-task-get-error-binding-missing.json",
+        "invalid-task-get-binding-task-id.json",
+        "invalid-task-get-error-binding-task-id.json"
       ]
     },
     {
@@ -101,7 +125,11 @@
       "response_example": "response-operation-get.json",
       "negative_examples": [
         "invalid-operation-substitution.json",
-        "invalid-retry-operation-get.json"
+        "invalid-retry-operation-get.json",
+        "invalid-operation-get-binding-missing.json",
+        "invalid-operation-get-error-binding-missing.json",
+        "invalid-operation-get-binding-operation-ref.json",
+        "invalid-operation-get-error-binding-operation-ref.json"
       ]
     },
     {
@@ -128,7 +156,11 @@
       "response_example": "response-review-open.json",
       "negative_examples": [
         "invalid-review-content-digest.json",
-        "invalid-retry-review-open.json"
+        "invalid-retry-review-open.json",
+        "invalid-review-open-binding-missing.json",
+        "invalid-review-open-error-binding-missing.json",
+        "invalid-review-open-binding-operation-ref.json",
+        "invalid-review-open-error-binding-operation-ref.json"
       ]
     },
     {
@@ -156,7 +188,15 @@
       "response_example": "response-events-subscribe.json",
       "negative_examples": [
         "invalid-subscribe-cursor.json",
-        "invalid-retry-events-subscribe.json"
+        "invalid-retry-events-subscribe.json",
+        "invalid-events-subscribe-binding-missing.json",
+        "invalid-events-subscribe-error-binding-missing.json",
+        "invalid-events-subscribe-binding-cursor-a-to-b.json",
+        "invalid-events-subscribe-binding-cursor-rebase.json",
+        "invalid-events-subscribe-binding-cursor-string-to-null.json",
+        "invalid-events-subscribe-binding-cursor-null-to-string.json",
+        "invalid-events-subscribe-binding-cursor-overlong.json",
+        "invalid-events-subscribe-error-binding-cursor.json"
       ]
     },
     {
@@ -167,7 +207,11 @@
       "response_example": "response-events-ack.json",
       "negative_examples": [
         "invalid-subscription-substitution.json",
-        "invalid-retry-events-ack.json"
+        "invalid-retry-events-ack.json",
+        "invalid-events-ack-binding-missing.json",
+        "invalid-events-ack-error-binding-missing.json",
+        "invalid-events-ack-binding-subscription-id.json",
+        "invalid-events-ack-error-binding-subscription-id.json"
       ]
     },
     {

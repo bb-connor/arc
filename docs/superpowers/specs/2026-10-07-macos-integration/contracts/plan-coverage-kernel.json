@@ -666,12 +666,12 @@
         {
           "plan": "02-protocol-controller.md",
           "heading": "Task 2: Correlate replies and preserve native references",
-          "action": "Require `result.request_binding` for all four successful mutation methods, generated from the same closed per-method params definition as the request. Compare the entire typed binding to the initiating validated params, including intent, all native reference fields, profile/template/input/workspace, limits, decision/review/endorsement, stop scope and export task/destination/grant/format. Preserve existing direct result echoes and check them independently."
+          "action": "Require `result.request_binding` for all twelve successful methods, generated from the same closed per-method params definition as the request. Compare the entire typed binding to initiating params, including null/string cursors, page limit, hello nonce/version list, empty health params, native references, intent, profile/template/resources, limits and decision/scope. Preserve direct result echoes and check them independently."
         },
         {
           "plan": "02-protocol-controller.md",
           "heading": "Task 2: Correlate replies and preserve native references",
-          "action": "Apply the same full parameter binding to mutation errors that expose a nonnull native operation reference: require `error.request_binding`, compare it with the initiating params and resolve the original operation through its native owner. Test missing binding, same-shape foreign original, changed intent/reference/limit and a truthful unknown outcome for each mutation."
+          "action": "Apply full parameter binding to every method's error that exposes a nonnull native operation reference: require `error.request_binding`, compare it with the initiating params and resolve the original through its native owner. Test missing binding, foreign original, changed cursor/reference/intent/limit and a truthful unknown outcome. Errors without an operation may omit binding, but any present binding must equal the complete original params."
         }
       ]
     },
@@ -762,6 +762,11 @@
           "plan": "00-kernel-prerequisites.md",
           "heading": "Task 5: Drive native race and failure acceptance",
           "action": "Keep sensor event positions, transport sequences, native stable subscription IDs and native crossing positions distinct in adapter types. Add substitution and hint-replay tests: no hint can authorize a mutation or clear a gap; a valid hint only schedules an authenticated native reread. Inject a stale projection immediately before a crossing and require the writer's current stop, revocation, integrity and budget checks to decide."
+        },
+        {
+          "plan": "02-protocol-controller.md",
+          "heading": "Task 5: Stable subscriptions, export and migration",
+          "action": "Add `cursor_reply_binding` cases for null and nonnull `tasks.list.cursor` and `events.subscribe.after_cursor`, changed echoed limit, and same-shaped replies from another request. Require the original requested binding even when an allowed subscription rebase returns a new cursor with `rebase_required`; that owner-controlled cursor is output, not a replacement request position."
         }
       ]
     },
@@ -771,12 +776,17 @@
         {
           "plan": "02-protocol-controller.md",
           "heading": "Task 5: Stable subscriptions, export and migration",
-          "action": "Implement and test principal/session-scoped pagination and cursor verification before reading records: reject page sizes above 100, invalid spelling, foreign/guessed/expired cursors, cross-session replay and excessive in-flight/queue use. Bind cursor scope/revision to the native subject or report a gap; no cursor can select another principal or silently discard native obligations. Run two-user pagination/subscription exhaustion with canaries and bounded memory observations."
+          "action": "Implement and test principal/session-scoped pagination and cursor verification before reading records: reject page sizes above 100, invalid spelling, foreign/guessed cursors, expired page cursors, cross-session replay and excessive in-flight/queue use. Bind cursor scope/revision to the native subject or report a gap; no cursor can select another principal or silently discard native obligations. Run two-user pagination/subscription exhaustion with canaries and bounded memory observations."
         },
         {
           "plan": "02-protocol-controller.md",
           "heading": "Task 5: Stable subscriptions, export and migration",
           "action": "Implement bounded hint projection, explicit gaps, principal-scoped cursors and stable-ID acknowledgement through the delivered native owner. Define controller cursors as transport-only values. On restart, restore native binding or allocate a new transport subscription with a gap; never infer acknowledgement from an old sequence number. Rerun for green."
+        },
+        {
+          "plan": "02-protocol-controller.md",
+          "heading": "Task 5: Stable subscriptions, export and migration",
+          "action": "Add `cursor_reply_binding` cases for null and nonnull `tasks.list.cursor` and `events.subscribe.after_cursor`, changed echoed limit, and same-shaped replies from another request. Require the original requested binding even when an allowed subscription rebase returns a new cursor with `rebase_required`; that owner-controlled cursor is output, not a replacement request position."
         }
       ]
     },

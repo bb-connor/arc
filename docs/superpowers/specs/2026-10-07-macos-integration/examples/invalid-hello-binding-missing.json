@@ -1,0 +1,12 @@
+{
+  "version": "chio.desktop.operator.v1",
+  "request_id": "synthetic-request-hello",
+  "method": "hello",
+  "ok": true,
+  "result": {
+    "selected_version": "chio.desktop.operator.v1",
+    "session_id": "synthetic-session",
+    "server_nonce": "synthetic-server",
+    "capability_state": "prerequisites_missing"
+  }
+}

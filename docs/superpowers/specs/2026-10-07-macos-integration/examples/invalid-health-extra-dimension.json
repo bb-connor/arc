@@ -106,6 +106,7 @@
       "evaluated_profiles": [
         "vm-project-v1"
       ]
-    }
+    },
+    "request_binding": {}
   }
 }

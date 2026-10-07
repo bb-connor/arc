@@ -16,26 +16,7 @@
           "const": "hello"
         },
         "params": {
-          "type": "object",
-          "properties": {
-            "supported_versions": {
-              "type": "array",
-              "items": {
-                "const": "chio.desktop.operator.v1"
-              },
-              "minItems": 1,
-              "maxItems": 1
-            },
-            "client_nonce": {
-              "type": "string",
-              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
-            }
-          },
-          "required": [
-            "supported_versions",
-            "client_nonce"
-          ],
-          "additionalProperties": false
+          "$ref": "#/$defs/hello_params"
         }
       },
       "required": [
@@ -60,10 +41,7 @@
           "const": "health.get"
         },
         "params": {
-          "type": "object",
-          "properties": {},
-          "required": [],
-          "additionalProperties": false
+          "$ref": "#/$defs/health_get_params"
         }
       },
       "required": [
@@ -88,30 +66,7 @@
           "const": "tasks.list"
         },
         "params": {
-          "type": "object",
-          "properties": {
-            "cursor": {
-              "oneOf": [
-                {
-                  "type": "string",
-                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "limit": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100
-            }
-          },
-          "required": [
-            "cursor",
-            "limit"
-          ],
-          "additionalProperties": false
+          "$ref": "#/$defs/tasks_list_params"
         }
       },
       "required": [
@@ -136,17 +91,7 @@
           "const": "task.get"
         },
         "params": {
-          "type": "object",
-          "properties": {
-            "task_id": {
-              "type": "string",
-              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
-            }
-          },
-          "required": [
-            "task_id"
-          ],
-          "additionalProperties": false
+          "$ref": "#/$defs/task_get_params"
         }
       },
       "required": [
@@ -196,27 +141,7 @@
           "const": "operation.get"
         },
         "params": {
-          "type": "object",
-          "properties": {
-            "operation_ref": {
-              "allOf": [
-                {
-                  "$ref": "common.schema.json#/$defs/native_ref"
-                },
-                {
-                  "properties": {
-                    "kind": {
-                      "const": "operation"
-                    }
-                  }
-                }
-              ]
-            }
-          },
-          "required": [
-            "operation_ref"
-          ],
-          "additionalProperties": false
+          "$ref": "#/$defs/operation_get_params"
         }
       },
       "required": [
@@ -266,27 +191,7 @@
           "const": "review.open"
         },
         "params": {
-          "type": "object",
-          "properties": {
-            "operation_ref": {
-              "allOf": [
-                {
-                  "$ref": "common.schema.json#/$defs/native_ref"
-                },
-                {
-                  "properties": {
-                    "kind": {
-                      "const": "operation"
-                    }
-                  }
-                }
-              ]
-            }
-          },
-          "required": [
-            "operation_ref"
-          ],
-          "additionalProperties": false
+          "$ref": "#/$defs/review_open_params"
         }
       },
       "required": [
@@ -336,24 +241,7 @@
           "const": "events.subscribe"
         },
         "params": {
-          "type": "object",
-          "properties": {
-            "after_cursor": {
-              "oneOf": [
-                {
-                  "type": "string",
-                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            }
-          },
-          "required": [
-            "after_cursor"
-          ],
-          "additionalProperties": false
+          "$ref": "#/$defs/events_subscribe_params"
         }
       },
       "required": [
@@ -378,17 +266,7 @@
           "const": "events.ack"
         },
         "params": {
-          "type": "object",
-          "properties": {
-            "subscription_id": {
-              "type": "string",
-              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
-            }
-          },
-          "required": [
-            "subscription_id"
-          ],
-          "additionalProperties": false
+          "$ref": "#/$defs/events_ack_params"
         }
       },
       "required": [
@@ -660,6 +538,152 @@
         "format",
         "destination_ref",
         "grant_ref"
+      ],
+      "additionalProperties": false
+    },
+    "hello_params": {
+      "type": "object",
+      "properties": {
+        "supported_versions": {
+          "type": "array",
+          "items": {
+            "const": "chio.desktop.operator.v1"
+          },
+          "minItems": 1,
+          "maxItems": 1
+        },
+        "client_nonce": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        }
+      },
+      "required": [
+        "supported_versions",
+        "client_nonce"
+      ],
+      "additionalProperties": false
+    },
+    "health_get_params": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "tasks_list_params": {
+      "type": "object",
+      "properties": {
+        "cursor": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "required": [
+        "cursor",
+        "limit"
+      ],
+      "additionalProperties": false
+    },
+    "task_get_params": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        }
+      },
+      "required": [
+        "task_id"
+      ],
+      "additionalProperties": false
+    },
+    "operation_get_params": {
+      "type": "object",
+      "properties": {
+        "operation_ref": {
+          "allOf": [
+            {
+              "$ref": "common.schema.json#/$defs/native_ref"
+            },
+            {
+              "properties": {
+                "kind": {
+                  "const": "operation"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "required": [
+        "operation_ref"
+      ],
+      "additionalProperties": false
+    },
+    "review_open_params": {
+      "type": "object",
+      "properties": {
+        "operation_ref": {
+          "allOf": [
+            {
+              "$ref": "common.schema.json#/$defs/native_ref"
+            },
+            {
+              "properties": {
+                "kind": {
+                  "const": "operation"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "required": [
+        "operation_ref"
+      ],
+      "additionalProperties": false
+    },
+    "events_subscribe_params": {
+      "type": "object",
+      "properties": {
+        "after_cursor": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "after_cursor"
+      ],
+      "additionalProperties": false
+    },
+    "events_ack_params": {
+      "type": "object",
+      "properties": {
+        "subscription_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        }
+      },
+      "required": [
+        "subscription_id"
       ],
       "additionalProperties": false
     }

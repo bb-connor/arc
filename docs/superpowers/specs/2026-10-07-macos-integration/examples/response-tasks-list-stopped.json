@@ -35,6 +35,10 @@
         }
       }
     ],
-    "next_cursor": null
+    "next_cursor": null,
+    "request_binding": {
+      "cursor": null,
+      "limit": 20
+    }
   }
 }

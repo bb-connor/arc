@@ -1,0 +1,22 @@
+{
+  "version": "chio.desktop.operator.v1",
+  "request_id": "synthetic-request-tasks-list",
+  "method": "tasks.list",
+  "ok": false,
+  "error": {
+    "code": "internal_unavailable",
+    "retry": "reread",
+    "message_key": "synthetic-bound-operation-reference",
+    "operation_ref": {
+      "kind": "operation",
+      "issuer": "synthetic-authority",
+      "native_id": "synthetic-operation-1",
+      "generation": "1",
+      "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "request_binding": {
+      "cursor": "synthetic-page-a",
+      "limit": 20
+    }
+  }
+}

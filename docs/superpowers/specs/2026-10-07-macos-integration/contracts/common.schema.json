@@ -68,144 +68,12 @@
       ]
     },
     "task": {
-      "type": "object",
-      "properties": {
-        "task_id": {
-          "type": "string",
-          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
-        },
-        "operation_ref": {
-          "allOf": [
-            {
-              "$ref": "common.schema.json#/$defs/native_ref"
-            },
-            {
-              "properties": {
-                "kind": {
-                  "const": "operation"
-                }
-              }
-            }
-          ]
-        },
-        "profile": {
-          "$ref": "common.schema.json#/$defs/profile"
-        },
-        "state": {
-          "enum": [
-            "created",
-            "running",
-            "awaiting_review",
-            "blocked",
-            "stopping",
-            "completed",
-            "failed",
-            "unresolved",
-            "stopped",
-            "unavailable"
-          ]
-        },
-        "revision": {
-          "type": "string",
-          "pattern": "^(0|[1-9][0-9]{0,19})$",
-          "format": "uint64-decimal"
-        },
-        "stop_state": {
-          "oneOf": [
-            {
-              "$ref": "common.schema.json#/$defs/stop_state"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      },
-      "required": [
-        "task_id",
-        "operation_ref",
-        "profile",
-        "state",
-        "revision",
-        "stop_state"
-      ],
-      "additionalProperties": false,
       "allOf": [
         {
-          "if": {
-            "properties": {
-              "state": {
-                "enum": [
-                  "stopping",
-                  "stopped"
-                ]
-              }
-            }
-          },
-          "then": {
-            "properties": {
-              "stop_state": {
-                "$ref": "#/$defs/stop_state"
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "state": {
-                "const": "stopped"
-              }
-            }
-          },
-          "then": {
-            "properties": {
-              "stop_state": {
-                "$ref": "#/$defs/execution_stopped_state"
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "state": {
-                "enum": [
-                  "created",
-                  "running",
-                  "awaiting_review"
-                ]
-              }
-            }
-          },
-          "then": {
-            "properties": {
-              "stop_state": {
-                "type": "null"
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "state": {
-                "const": "completed"
-              },
-              "stop_state": {
-                "type": "object"
-              }
-            }
-          },
-          "then": {
-            "properties": {
-              "stop_state": {
-                "$ref": "#/$defs/closed_stop_state"
-              }
-            }
-          }
+          "$ref": "#/$defs/task_projection_fields"
         }
-      ]
+      ],
+      "unevaluatedProperties": false
     },
     "stop_state": {
       "type": "object",
@@ -870,6 +738,145 @@
                 "closed",
                 "not_applicable"
               ]
+            }
+          }
+        }
+      ]
+    },
+    "task_projection_fields": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "operation_ref": {
+          "allOf": [
+            {
+              "$ref": "common.schema.json#/$defs/native_ref"
+            },
+            {
+              "properties": {
+                "kind": {
+                  "const": "operation"
+                }
+              }
+            }
+          ]
+        },
+        "profile": {
+          "$ref": "common.schema.json#/$defs/profile"
+        },
+        "state": {
+          "enum": [
+            "created",
+            "running",
+            "awaiting_review",
+            "blocked",
+            "stopping",
+            "completed",
+            "failed",
+            "unresolved",
+            "stopped",
+            "unavailable"
+          ]
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$",
+          "format": "uint64-decimal"
+        },
+        "stop_state": {
+          "oneOf": [
+            {
+              "$ref": "common.schema.json#/$defs/stop_state"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "task_id",
+        "operation_ref",
+        "profile",
+        "state",
+        "revision",
+        "stop_state"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "stopping",
+                  "stopped"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "stop_state": {
+                "$ref": "#/$defs/stop_state"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "stopped"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "stop_state": {
+                "$ref": "#/$defs/execution_stopped_state"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "created",
+                  "running",
+                  "awaiting_review"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "stop_state": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "completed"
+              },
+              "stop_state": {
+                "type": "object"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "stop_state": {
+                "$ref": "#/$defs/closed_stop_state"
+              }
             }
           }
         }

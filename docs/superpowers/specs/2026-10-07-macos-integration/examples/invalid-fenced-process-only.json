@@ -30,6 +30,9 @@
       },
       "durability": "process_only",
       "scope": "task_and_descendants"
+    },
+    "request_binding": {
+      "task_id": "synthetic-task"
     }
   }
 }

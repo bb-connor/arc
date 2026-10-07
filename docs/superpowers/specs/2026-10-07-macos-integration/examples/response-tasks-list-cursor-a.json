@@ -1,0 +1,29 @@
+{
+  "version": "chio.desktop.operator.v1",
+  "request_id": "synthetic-request-tasks-list",
+  "method": "tasks.list",
+  "ok": true,
+  "result": {
+    "tasks": [
+      {
+        "task_id": "synthetic-task",
+        "operation_ref": {
+          "kind": "operation",
+          "issuer": "synthetic-authority",
+          "native_id": "synthetic-operation-1",
+          "generation": "1",
+          "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "profile": "vm-project-v1",
+        "state": "running",
+        "revision": "1",
+        "stop_state": null
+      }
+    ],
+    "next_cursor": "synthetic-next-page",
+    "request_binding": {
+      "cursor": "synthetic-page-a",
+      "limit": 20
+    }
+  }
+}

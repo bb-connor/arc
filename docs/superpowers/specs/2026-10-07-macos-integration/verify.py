@@ -19,7 +19,6 @@ REPO = ROOT.parents[3]
 MAX_BYTES = 65536
 MAX_DEPTH = 16
 SAFE_INTEGER = 9007199254740991
-MUTATION_METHODS = {"task.create", "task.stop", "approval.submit", "evidence.export"}
 REQUIREMENT_PREFIXES = {
     "PRD", "UX", "KER", "AUT", "ARC", "IPC", "VM", "ES", "NE", "RES",
     "REC", "DST", "PRV", "OPS", "HST", "DEL", "VER", "CLW", "RDM",
@@ -90,13 +89,12 @@ def pair_matches(request: dict, response: dict) -> bool:
             return False
         original = request["params"].get("operation_ref")
         echoed = response["error"].get("operation_ref")
-        if request["method"] in MUTATION_METHODS:
-            binding = response["error"].get("request_binding")
-            if (echoed is not None or binding is not None) and binding != request["params"]:
-                return False
+        binding = response["error"].get("request_binding")
+        if (echoed is not None or binding is not None) and binding != request["params"]:
+            return False
         return original is None or echoed is None or original == echoed
     params, result = request["params"], response["result"]
-    if request["method"] in MUTATION_METHODS and result.get("request_binding") != params:
+    if result.get("request_binding") != params:
         return False
     required_bindings = {
         "task.get": ("task_id",), "task.stop": ("task_id", "scope"),
@@ -107,6 +105,8 @@ def pair_matches(request: dict, response: dict) -> bool:
     for key in required_bindings.get(request["method"], ()):
         if key not in params or key not in result or params[key] != result[key]:
             return False
+    if request["method"] == "hello" and result["selected_version"] not in params["supported_versions"]:
+        return False
     if request["method"] == "health.get":
         # Shapes/sources are closed by the schema. JSON Schema cannot compare
         # two fields, so freshness also needs this mandatory semantic check.
@@ -396,19 +396,20 @@ def check_rejection_repairs(loaded: dict, entries: dict, values: dict) -> int:
 
 
 def semantic_self_test(loaded: dict, methods: list[dict], entries: dict, values: dict) -> int:
-    """Exercise full authority-tuple correlation and independent state dimensions."""
+    """Exercise all-method parameter correlation and independent state dimensions."""
     checked = check_rejection_repairs(loaded, entries, values)
     response_schema = loaded["operator-response.schema.json"]
 
     def accepts(request: dict, response: dict) -> bool:
         return response_schema.is_valid(response) and pair_matches(request, response)
 
-    def leaves(value: dict, prefix: tuple = ()):
-        for key, item in value.items():
-            if isinstance(item, dict):
+    def leaves(value: object, prefix: tuple = ()):
+        if isinstance(value, (dict, list)):
+            items = value.items() if isinstance(value, dict) else enumerate(value)
+            for key, item in items:
                 yield from leaves(item, prefix + (key,))
-            else:
-                yield prefix + (key,), item
+        else:
+            yield prefix, value
 
     def substitute(key: str, value: object) -> object:
         if isinstance(value, int):
@@ -425,14 +426,12 @@ def semantic_self_test(loaded: dict, methods: list[dict], entries: dict, values:
         return "synthetic-substitution"
 
     for method in methods:
-        if not method["mutation"]:
-            continue
         request = values[method["request_example"]]
         for location, filename in (("result", method["response_example"]),
                                    ("error", "response-" + method["name"].replace(".", "-") + "-recovery.json")):
             response = values[filename]
             if not accepts(request, response):
-                raise ValueError(f"Invalid mutation binding positive control: {filename}")
+                raise ValueError(f"Invalid request binding positive control: {filename}")
             checked += 1
             # Change every scalar, including each native reference field, every
             # resource/endorsement, every limit, the scope and logical intent.
@@ -443,12 +442,17 @@ def semantic_self_test(loaded: dict, methods: list[dict], entries: dict, values:
                     node = node[key]
                 node[path[-1]] = substitute(path[-1], value)
                 if accepts(request, mutant):
-                    raise ValueError(f"Mutation correlation accepted {method['name']} {location} {path}")
+                    raise ValueError(f"Parameter correlation accepted {method['name']} {location} {path}")
                 checked += 1
+            mutant = copy.deepcopy(response)
+            del mutant[location]["request_binding"]
+            if response_schema.is_valid(mutant) or pair_matches(request, mutant):
+                raise ValueError(f"Missing request binding accepted: {method['name']} {location}")
+            checked += 1
             mutant = copy.deepcopy(response)
             mutant[location]["request_binding"]["unexpected_authority"] = True
             if response_schema.is_valid(mutant):
-                raise ValueError(f"Open mutation binding shape: {method['name']} {location}")
+                raise ValueError(f"Open request binding shape: {method['name']} {location}")
             checked += 1
         # A refusal without an operation reference can be returned before a
         # request is valid; it asserts no recoverable operation or authority.
@@ -458,6 +462,43 @@ def semantic_self_test(loaded: dict, methods: list[dict], entries: dict, values:
         if not accepts(request, refusal):
             raise ValueError(f"Unbound no-operation refusal rejected: {method['name']}")
         checked += 1
+
+    # Limits constrain page size independently of the exact echoed request;
+    # subscription rebasing changes the issued cursor, not the requested start.
+    for limit in (1, 100):
+        request = copy.deepcopy(values["request-tasks-list.json"])
+        request["params"]["limit"] = limit
+        response = copy.deepcopy(values["response-tasks-list.json"])
+        response["result"]["request_binding"] = copy.deepcopy(request["params"])
+        task = response["result"]["tasks"][0]
+        response["result"]["tasks"] = []
+        for index in range(limit):
+            item = copy.deepcopy(task)
+            item["task_id"] = f"synthetic-boundary-task-{index}"
+            item["operation_ref"]["native_id"] = f"synthetic-boundary-operation-{index}"
+            response["result"]["tasks"].append(item)
+        if not loaded["operator-request.schema.json"].is_valid(request) or not accepts(request, response):
+            raise ValueError(f"Page limit positive boundary failed: {limit}")
+        checked += 1
+    for rebased in (False, True):
+        for cursor in (None, "synthetic-requested-cursor"):
+            request = copy.deepcopy(values["request-events-subscribe.json"])
+            request["params"]["after_cursor"] = cursor
+            response = copy.deepcopy(values["response-events-subscribe.json"])
+            response["result"].update(request_binding=copy.deepcopy(request["params"]), rebase_required=rebased)
+            if not accepts(request, response):
+                raise ValueError(f"Exact subscription start rejected: {rebased} {cursor}")
+            response["result"]["request_binding"]["after_cursor"] = "synthetic-other-cursor"
+            if not response_schema.is_valid(response) or pair_matches(request, response):
+                raise ValueError(f"Subscription start substitution accepted: {rebased} {cursor}")
+            checked += 2
+    # The shared task fields stay closed in pages; request binding belongs to
+    # the outer method result and must not leak into nested task projections.
+    response = copy.deepcopy(values["response-tasks-list.json"])
+    response["result"]["tasks"][0]["request_binding"] = {"task_id": "synthetic-task"}
+    if response_schema.is_valid(response):
+        raise ValueError("Nested task projection accepted a request binding")
+    checked += 1
 
     health_request = values["request-health-get.json"]
     health = values["response-health-get-ready.json"]
