@@ -1,5 +1,7 @@
 use super::*;
 
+mod retired_producer_key_row_does_not_block_durable_ingress;
+
 fn resign_event(
     mut event: UnverifiedSecurityEvent,
     body: SecurityEventBody,
