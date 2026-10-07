@@ -18,6 +18,8 @@ mod continuation_controls;
 #[cfg(feature = "finding-market")]
 #[path = "payment_recovery/publication.rs"]
 mod publication;
+#[path = "payment_recovery/session_cancellation.rs"]
+mod session_cancellation;
 #[path = "payment_recovery/status_only_refund.rs"]
 mod status_only_refund;
 #[path = "payment_recovery/terminal_native_cause.rs"]
