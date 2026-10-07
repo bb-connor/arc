@@ -131,4 +131,52 @@ impl SqliteAdmissionOperationStore {
             .map_err(sqlite_error)?;
         rows.collect::<Result<Vec<_>, _>>().map_err(sqlite_error)
     }
+
+    pub(super) fn pending_cleanup_action_page(
+        &self,
+        operation_kind: AdmissionOperationKind,
+        action_kind: AdmissionCleanupActionKind,
+        after_operation_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<String>, AdmissionOperationError> {
+        if limit == 0 {
+            return Ok(Vec::new());
+        }
+        let limit = i64::try_from(limit).map_err(|_| {
+            AdmissionOperationError::Overflow("pending journal page limit exceeds i64".into())
+        })?;
+        let connection = self.connection()?;
+        let mut statement = connection
+            .prepare(
+                r#"
+                SELECT operation.operation_id
+                FROM admission_operations AS operation
+                WHERE operation.kind = ?1
+                  AND (?3 IS NULL OR operation.operation_id > ?3)
+                  AND NOT (?2 = 'terminal_receipt' AND operation.state = 'compensation_pending')
+                  AND EXISTS (
+                      SELECT 1
+                      FROM admission_cleanup_actions AS cleanup
+                      WHERE cleanup.operation_id = operation.operation_id
+                        AND cleanup.kind = ?2
+                        AND cleanup.state != 'completed'
+                  )
+                ORDER BY operation.operation_id ASC
+                LIMIT ?4
+                "#,
+            )
+            .map_err(sqlite_error)?;
+        let rows = statement
+            .query_map(
+                params![
+                    operation_kind.as_str(),
+                    action_kind.as_str(),
+                    after_operation_id,
+                    limit
+                ],
+                |row| row.get::<_, String>(0),
+            )
+            .map_err(sqlite_error)?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(sqlite_error)
+    }
 }

@@ -974,85 +974,106 @@ impl ChioKernel {
         self.ensure_receipt_persistence_ready()?;
         let mut recovered = 0usize;
         let mut errors = Vec::new();
-        let operation_ids = store.list_operations_with_pending_cleanup_action(
-            kind,
-            AdmissionCleanupActionKind::TerminalReceipt,
-            MAX_TERMINAL_RECEIPT_RECOVERY_OPERATIONS_PER_ACTIVATION,
-        )?;
-        for operation_id in operation_ids {
-            if store.load(&operation_id)?.is_some_and(|operation| {
-                operation.state() == AdmissionOperationState::CompensationPending
-            }) {
-                continue;
-            }
-            let result = (|| {
-                let operation = store.load(&operation_id)?.ok_or_else(|| {
-                    KernelError::Internal(format!(
-                        "terminal receipt operation {operation_id} disappeared during recovery"
-                    ))
-                })?;
-                if expected_coordinator_authority_id
-                    .is_some_and(|expected| operation.coordinator_authority_id() != expected)
-                {
-                    return Err(KernelError::Internal(format!(
-                        "terminal receipt operation {operation_id} belongs to a different coordinator authority"
-                    )));
-                }
-                let mut actions = store
-                    .load_cleanup_actions(&operation_id)?
-                    .into_iter()
-                    .filter(|action| {
-                        action.kind() == AdmissionCleanupActionKind::TerminalReceipt
-                            && action.state() != AdmissionCleanupActionState::Completed
-                    });
-                let action = actions.next().ok_or_else(|| {
-                    KernelError::Internal(format!(
-                        "terminal receipt operation {operation_id} has no pending signed outbox"
-                    ))
-                })?;
-                if actions.next().is_some() {
-                    return Err(KernelError::Internal(format!(
-                        "terminal receipt operation {operation_id} has multiple pending signed outboxes"
-                    )));
-                }
-                if action.operation_id() != operation.operation_id()
-                    || action.request_binding_hash() != operation.request_binding_hash()
-                {
-                    return Err(KernelError::Internal(format!(
-                        "terminal receipt outbox for operation {operation_id} changed its immutable binding"
-                    )));
-                }
-                let payload: TerminalReceiptOutboxPayload =
-                    chio_core::canonical::UntrustedJsonText::from_wire(
-                        (action.payload_json()).as_bytes(),
-                        crate::security_admission_operation::MAX_ADMISSION_CLEANUP_PAYLOAD_BYTES,
-                    )
-                    .and_then(|input| input.decode_signed())
-                    .map_err(crate::KernelError::from)?;
-                self.persist_and_acknowledge_terminal_receipt(store, &operation, &payload)
-            })();
-            match result {
-                Ok(()) => {
-                    recovered = recovered.checked_add(1).ok_or_else(|| {
-                        KernelError::Internal(
-                            "terminal receipt recovery count overflowed usize".to_string(),
-                        )
-                    })?;
-                }
-                Err(error) => errors.push(format!("operation {operation_id}: {error}")),
-            }
-        }
-        if !store
-            .list_operations_with_pending_cleanup_action(
+        let mut cursor: Option<String> = None;
+        loop {
+            let mut operation_ids = store.list_operations_with_pending_cleanup_action_page(
                 kind,
                 AdmissionCleanupActionKind::TerminalReceipt,
-                1,
-            )?
-            .is_empty()
+                cursor.as_deref(),
+                MAX_TERMINAL_RECEIPT_RECOVERY_OPERATIONS_PER_ACTIVATION + 1,
+            )?;
+            let more_remaining =
+                operation_ids.len() > MAX_TERMINAL_RECEIPT_RECOVERY_OPERATIONS_PER_ACTIVATION;
+            operation_ids.truncate(MAX_TERMINAL_RECEIPT_RECOVERY_OPERATIONS_PER_ACTIVATION);
+            for operation_id in operation_ids {
+                if cursor
+                    .as_deref()
+                    .is_some_and(|last| operation_id.as_str() <= last)
+                {
+                    return Err(KernelError::Internal(
+                        "terminal receipt recovery page did not advance its exact cursor"
+                            .to_string(),
+                    ));
+                }
+                cursor = Some(operation_id.clone());
+                if store.load(&operation_id)?.is_some_and(|operation| {
+                    operation.state() == AdmissionOperationState::CompensationPending
+                }) {
+                    continue;
+                }
+                let result = (|| {
+                    let operation = store.load(&operation_id)?.ok_or_else(|| {
+                        KernelError::Internal(format!(
+                            "terminal receipt operation {operation_id} disappeared during recovery"
+                        ))
+                    })?;
+                    if expected_coordinator_authority_id
+                        .is_some_and(|expected| operation.coordinator_authority_id() != expected)
+                    {
+                        return Err(KernelError::Internal(format!(
+                            "terminal receipt operation {operation_id} belongs to a different coordinator authority"
+                        )));
+                    }
+                    let mut actions = store
+                        .load_cleanup_actions(&operation_id)?
+                        .into_iter()
+                        .filter(|action| {
+                            action.kind() == AdmissionCleanupActionKind::TerminalReceipt
+                                && action.state() != AdmissionCleanupActionState::Completed
+                        });
+                    let action = actions.next().ok_or_else(|| {
+                        KernelError::Internal(format!(
+                            "terminal receipt operation {operation_id} has no pending signed outbox"
+                        ))
+                    })?;
+                    if actions.next().is_some() {
+                        return Err(KernelError::Internal(format!(
+                            "terminal receipt operation {operation_id} has multiple pending signed outboxes"
+                        )));
+                    }
+                    if action.operation_id() != operation.operation_id()
+                        || action.request_binding_hash() != operation.request_binding_hash()
+                    {
+                        return Err(KernelError::Internal(format!(
+                            "terminal receipt outbox for operation {operation_id} changed its immutable binding"
+                        )));
+                    }
+                    let payload: TerminalReceiptOutboxPayload =
+                        chio_core::canonical::UntrustedJsonText::from_wire(
+                            (action.payload_json()).as_bytes(),
+                            crate::security_admission_operation::MAX_ADMISSION_CLEANUP_PAYLOAD_BYTES,
+                        )
+                        .and_then(|input| input.decode_signed())
+                        .map_err(crate::KernelError::from)?;
+                    self.persist_and_acknowledge_terminal_receipt(store, &operation, &payload)
+                })();
+                match result {
+                    Ok(()) => {
+                        recovered = recovered.checked_add(1).ok_or_else(|| {
+                            KernelError::Internal(
+                                "terminal receipt recovery count overflowed usize".to_string(),
+                            )
+                        })?;
+                    }
+                    Err(error) => errors.push(format!("operation {operation_id}: {error}")),
+                }
+            }
+            if !more_remaining {
+                break;
+            }
+        }
+        if errors.is_empty()
+            && !store
+                .list_operations_with_pending_cleanup_action_page(
+                    kind,
+                    AdmissionCleanupActionKind::TerminalReceipt,
+                    None,
+                    1,
+                )?
+                .is_empty()
         {
-            errors.push(format!(
-                "more terminal receipt outboxes remain after the bounded {MAX_TERMINAL_RECEIPT_RECOVERY_OPERATIONS_PER_ACTIVATION}-operation recovery batch"
-            ));
+            errors
+                .push("terminal receipt outboxes remain after the paged recovery pass".to_string());
         }
         if errors.is_empty() {
             Ok(recovered)

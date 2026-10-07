@@ -1290,6 +1290,29 @@ pub trait AdmissionOperationStore: Send + Sync {
         ))
     }
 
+    /// Bounded pending-journal inventory with an exclusive operation-ID cursor.
+    /// Rows whose recovery keeps failing stay in ID order and cannot starve
+    /// later IDs.
+    fn list_operations_with_pending_cleanup_action_page(
+        &self,
+        operation_kind: AdmissionOperationKind,
+        action_kind: AdmissionCleanupActionKind,
+        after_operation_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<String>, AdmissionOperationError> {
+        if let Some(delegate) = self.cleanup_journal_delegate() {
+            return delegate.list_operations_with_pending_cleanup_action_page(
+                operation_kind,
+                action_kind,
+                after_operation_id,
+                limit,
+            );
+        }
+        Err(AdmissionOperationError::Unavailable(
+            "paged pending admission journal inventory is unavailable".to_string(),
+        ))
+    }
+
     fn claim_cleanup_action(
         &self,
         action_id: &str,

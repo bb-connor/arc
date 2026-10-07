@@ -514,6 +514,16 @@ impl AdmissionOperationStore for InMemoryAdmissionOperationStore {
         Ok(operation_ids)
     }
 
+    fn list_operations_with_pending_cleanup_action_page(
+        &self,
+        operation_kind: AdmissionOperationKind,
+        action_kind: AdmissionCleanupActionKind,
+        after_operation_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<String>, AdmissionOperationError> {
+        self.pending_cleanup_action_page(operation_kind, action_kind, after_operation_id, limit)
+    }
+
     fn claim_cleanup_action(
         &self,
         action_id: &str,

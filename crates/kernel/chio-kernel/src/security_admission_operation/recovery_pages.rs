@@ -149,4 +149,38 @@ impl InMemoryAdmissionOperationStore {
         operation_ids.truncate(limit);
         Ok(operation_ids)
     }
+
+    pub(super) fn pending_cleanup_action_page(
+        &self,
+        operation_kind: AdmissionOperationKind,
+        action_kind: AdmissionCleanupActionKind,
+        after_operation_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<String>, AdmissionOperationError> {
+        if limit == 0 {
+            return Ok(Vec::new());
+        }
+        let state = self.lock()?;
+        let mut page = std::collections::BTreeSet::new();
+        for action in state.cleanup_actions.values().filter(|action| {
+            action.kind() == action_kind
+                && action.state() != AdmissionCleanupActionState::Completed
+                && after_operation_id.is_none_or(|cursor| action.operation_id() > cursor)
+        }) {
+            let Some(operation) = state.operations.get(action.operation_id()) else {
+                continue;
+            };
+            if operation.kind() != operation_kind
+                || (action_kind == AdmissionCleanupActionKind::TerminalReceipt
+                    && operation.state() == AdmissionOperationState::CompensationPending)
+            {
+                continue;
+            }
+            page.insert(operation.operation_id());
+            if page.len() > limit {
+                page.pop_last();
+            }
+        }
+        Ok(page.into_iter().map(str::to_owned).collect())
+    }
 }

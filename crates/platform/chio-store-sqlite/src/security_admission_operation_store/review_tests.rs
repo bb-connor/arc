@@ -186,12 +186,13 @@ fn receipt_state(
 
 fn pending_receipt_page(
     store: &SqliteAdmissionOperationStore,
-    _after_operation_id: Option<&str>,
+    after_operation_id: Option<&str>,
     limit: usize,
 ) -> Result<Vec<String>, AdmissionOperationError> {
-    store.list_operations_with_pending_cleanup_action(
+    store.list_operations_with_pending_cleanup_action_page(
         AdmissionOperationKind::GovernedActiveResponse,
         AdmissionCleanupActionKind::TerminalReceipt,
+        after_operation_id,
         limit,
     )
 }
@@ -565,6 +566,74 @@ fn out_of_band_terminal_receipt_cannot_wedge_the_atomic_terminal_commit() -> Tes
     assert_eq!(
         store.load_cleanup_actions(committed.operation_id())?,
         vec![genuine]
+    );
+    Ok(())
+}
+
+#[test]
+fn pending_receipt_page_lists_only_unfinished_terminal_outboxes_after_the_cursor() -> TestResult {
+    let store = SqliteAdmissionOperationStore::open_in_memory()?;
+    let prepared = governed_response("compensated-page")?;
+    store.create_prepared(prepared.clone())?;
+    let receipt = AdmissionCleanupAction::pending(
+        &prepared,
+        AdmissionCleanupActionKind::TerminalReceipt,
+        &serde_json::json!({"terminal": "compensated_before_dispatch"}),
+    )?;
+    let compensation_pending = applied(store.compare_and_swap_with_cleanup_action(
+        transition(
+            &prepared,
+            AdmissionOperationState::CompensationPending,
+            AdmissionDispatchState::NotStarted,
+            7,
+            Some("deny"),
+        ),
+        receipt.clone(),
+    )?)?;
+    assert_eq!(
+        pending_receipt_page(&store, None, PAGE_LIMIT)?,
+        Vec::<String>::new()
+    );
+
+    let compensated = applied(store.compare_and_swap_with_cleanup_action(
+        transition(
+            &compensation_pending,
+            AdmissionOperationState::CompensatedBeforeDispatch,
+            AdmissionDispatchState::NotStarted,
+            7,
+            Some("deny"),
+        ),
+        receipt.clone(),
+    )?)?;
+    let operation_id = compensated.operation_id().to_string();
+    assert_eq!(
+        pending_receipt_page(&store, None, PAGE_LIMIT)?,
+        vec![operation_id.clone()]
+    );
+    assert_eq!(
+        pending_receipt_page(&store, Some(&operation_id), PAGE_LIMIT)?,
+        Vec::<String>::new()
+    );
+    assert_eq!(pending_receipt_page(&store, None, 0)?, Vec::<String>::new());
+    assert_eq!(
+        store.list_operations_with_pending_cleanup_action_page(
+            AdmissionOperationKind::ToolDispatch,
+            AdmissionCleanupActionKind::TerminalReceipt,
+            None,
+            PAGE_LIMIT,
+        )?,
+        Vec::<String>::new()
+    );
+
+    let claimed =
+        match store.claim_cleanup_action(receipt.action_id(), "outbox-worker", 100, 200)? {
+            AdmissionCleanupActionClaimOutcome::Claimed(claimed) => claimed,
+            other => return Err(format!("terminal receipt was not claimable: {other:?}").into()),
+        };
+    store.acknowledge_cleanup_action(claimed.action_id(), claimed.version(), "outbox-worker")?;
+    assert_eq!(
+        pending_receipt_page(&store, None, PAGE_LIMIT)?,
+        Vec::<String>::new()
     );
     Ok(())
 }
