@@ -1,5 +1,7 @@
 # Reproduce internal design inputs
 
+> Historical research snapshot retained for provenance. [ADR-0038](../../../../adr/ADR-0038-desktop-operator-program.md), the [program map](../../../../architecture/PROGRAM-MAP.md) and [macOS annex](../ANNEX.md) supersede this document's former implementation choices. Old NK identifiers and platform methods below are historical proposal labels, not current APIs or blanket desktop prerequisites. The shared program retains the needed admission, crossing and ABI safety properties through their owning contracts; it does not require all three redesign keystones before the first product.
+
 The source registry distinguishes public upstream repositories from internal design branches in the **same authenticated working repository as this specification set**. The `origin` remote in an authorized checkout must point to that repository. These locators are internal research provenance, not public installation or checkout instructions. A clone of the public distribution does not contain these unmerged inputs.
 
 A shallow checkout of this PR need not contain the design objects. Fetch their named branches explicitly, then inspect the immutable recorded object rather than assuming the branch tip is still the reviewed version:

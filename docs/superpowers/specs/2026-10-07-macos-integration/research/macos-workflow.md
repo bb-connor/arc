@@ -1,5 +1,7 @@
 # Mac workflow and resource API research
 
+> Historical research snapshot retained for provenance. [ADR-0038](../../../../adr/ADR-0038-desktop-operator-program.md), the [program map](../../../../architecture/PROGRAM-MAP.md) and [macOS annex](../ANNEX.md) supersede this document's former implementation choices. Old NK identifiers and platform methods below are historical proposal labels, not current APIs or blanket desktop prerequisites. The shared program retains the needed admission, crossing and ABI safety properties through their owning contracts; it does not require all three redesign keystones before the first product.
+
 Inspected 2026-10-07. This file supplements the approved [decision record](decision-record.md) with primary API findings for the product, native experience and resource contracts. Apple references describe API behavior, not a qualified Chio implementation. Confidence is high in the documentation findings below, moderate in applying them to the proposed architecture, and unknown for untested installed behavior. The specification's macOS 15 arm64 candidate is a product qualification choice, not an inference from individual API availability.
 
 The referenced Markdown content of Apple's documentation was retrieved directly after the web renderer returned JavaScript shells. No complete Apple source or documentation copy is redistributed here. Findings distinguish documented semantics from design inference.

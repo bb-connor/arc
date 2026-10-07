@@ -1,5 +1,7 @@
 # Research decision record
 
+> Historical research snapshot retained for provenance. [ADR-0038](../../../../adr/ADR-0038-desktop-operator-program.md), the [program map](../../../../architecture/PROGRAM-MAP.md) and [macOS annex](../ANNEX.md) supersede this document's former implementation choices. Old NK identifiers and platform methods below are historical proposal labels, not current APIs or blanket desktop prerequisites. The shared program retains the needed admission, crossing and ABI safety properties through their owning contracts; it does not require all three redesign keystones before the first product.
+
 Researched 2026-10-07. This program expands the user-approved Mac research direction and the Omarchy specification method. The earlier local research brief is an input, not a current runtime qualification or normative specification. Current source findings below and in the sibling research files take precedence over that earlier snapshot.
 
 ## Approaches considered
@@ -27,3 +29,7 @@ Confidence is high in inspected-source distinctions and the need for one authori
 A Linux VM supplies neither Darwin-only developer tools nor automatic transfer of x86_64 Linux confinement evidence to Apple Silicon. A sensor event supplies neither a signed kernel decision nor proof that a missing event means no effect. A code signature supplies software identity, not trustworthy task content. An internally consistent restored log supplies no independent proof that authority is current.
 
 The resulting program preserves those boundaries through normative requirements and explicit negative cases. Primary sources, immutable public source links and implementation paths are retained in the research files and [source identity registry](source-pins.json).
+
+## Accepted consolidation amendment
+
+A restricted launcher can provide a useful OS boundary, but only qualified gateway-routed operations are Chio-mediated. Permitted local shell/file effects inside the workspace remain `cannot_see`, not per-write receipts. Hook-only observation remains `detect_only`. The native Seatbelt candidate is retained alongside a VM evaluation; boundary-interactive use remains deferred pending its distinct evidence. The first execution product stays sealed W1 work through existing owners, and `chio run` is not a general coding-agent launcher. No acceptance boolean from the desktop replaces W1's configured evaluator evidence.
