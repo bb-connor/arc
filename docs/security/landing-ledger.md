@@ -1,8 +1,12 @@
 # Security and process landing ledger
 
+## Artifact, terminal and SIEM source checkpoint (2026-10-07)
+
+The [artifact and SIEM checkpoint](audits/artifact-and-siem-integration-checkpoint-20261007.json) pins source repair `aaa62b32e1`. Its bounded evidence includes 66 focused artifact/terminal controls, 167 distinct affected integration/module cases, the 24-case SIEM evidence target, six conformance/proof/signer controls, and strict all-targets lint for five owners. Original runtime failures and fixture/setup failures remain separate. The current source inventory needs the new automatic-preparation and moved-reader classifications, and the other owner/native handoffs and full default/PQ, trusted/hosted and protected-merge acceptance remain open. This local checkpoint is unpublished and does not qualify the full foundation.
+
 ## Current integration resume (2026-10-07)
 
-The machine ledger now includes 1,777 individually indexed requirements. The latest pinned [integration checkpoint](audits/integration-resume-20261007.json) records 28 additional review, native-consumer and distribution obligations, with local evidence and remaining acceptance. Existing requirements and historical failed campaigns are preserved. At published source `89d79ac6ab`, hosted CI is terminal with 118 successful, 21 failed and 12 skipped checks. The local repair batch is unpublished; canonical artifact-binding validation, Claude lane integration, native/trusted evidence and protected landing remain open. Source repair and local focused Green do not establish whole-candidate qualification.
+The machine ledger now includes 1,778 individually indexed requirements. The latest pinned [integration checkpoint](audits/integration-resume-20261007.json) records 28 additional review, native-consumer and distribution obligations, with local evidence and remaining acceptance. Existing requirements and historical failed campaigns are preserved. At published source `89d79ac6ab`, hosted CI is terminal with 118 successful, 21 failed and 12 skipped checks. The local repair batch is unpublished; canonical artifact-binding validation, Claude lane integration, native/trusted evidence and protected landing remain open. Source repair and local focused Green do not establish whole-candidate qualification.
 
 > Execution owner: use `superpowers:executing-plans` inline, with one independent
 > review before each protected landing. This is the authoritative landing order.

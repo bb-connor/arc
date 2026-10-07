@@ -1919,6 +1919,14 @@
         "incoming-pr1160-review-20261007:resume:F075-IR06",
         "incoming-pr1160-review-20261007:resume:F075-IR07"
       ]
+    },
+    {
+      "path": "docs/security/audits/artifact-and-siem-integration-checkpoint-20261007.json",
+      "commit": "9423113ed7a49bd59418d659a5f8ceceb0707d52",
+      "sha256": "a60c4b96353df856d7483a983de67ec660e214a3a3e09a8fc2cfc376bdbbd583",
+      "requirement_ids": [
+        "incoming-pr1160-review-20261007:resume:AR-TERM-EVIDENCE"
+      ]
     }
   ],
   "pull_requests": [
@@ -7693,6 +7701,48 @@
       "review_scope": "now",
       "work_status": "in-progress",
       "owner": "claude",
+      "review_thread_urls": []
+    },
+    {
+      "id": "incoming-pr1160-review-20261007:resume:AR-TERM-EVIDENCE",
+      "label": "AR-TERM-EVIDENCE",
+      "priority": "P2",
+      "requirement": "Completed signed executor evidence must bind the exact original artifact, schema and canonical dispatch identifier before terminal outbox publication or recovery.",
+      "source": {
+        "path": "docs/security/audits/artifact-and-siem-integration-checkpoint-20261007.json",
+        "line": 9,
+        "line_sha256": "918be4bf8d0a8754ad65223a9e8682ee67803e3e4bf0ed82094bb6d5650d6f8a",
+        "checkpoint": "9423113ed7a49bd59418d659a5f8ceceb0707d52",
+        "reviewed_source": "aaa62b32e1884b9f942f57a0713222f7fb87a4bf"
+      },
+      "disposition": "source-repaired-scoped-local-acceptance-final-candidate-pending",
+      "source_repair": {
+        "checkpoint": "aaa62b32e1884b9f942f57a0713222f7fb87a4bf",
+        "files": [
+          "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.inc",
+          "crates/kernel/chio-kernel/src/kernel/active_response_executor.rs",
+          "crates/kernel/chio-kernel/src/kernel/active_response_executor/dispatch_identity.rs"
+        ],
+        "application": "Original signed mismatch controls reproduced after retaining the failed fixture setup; exact anchor/schema/canonical ID comparisons preserve legacy bytes and all signature gates."
+      },
+      "verification_evidence": [
+        {
+          "checkpoint": "9423113ed7a49bd59418d659a5f8ceceb0707d52",
+          "path": "docs/security/audits/artifact-and-siem-integration-checkpoint-20261007.json",
+          "scope": "66 scoped controls,167 distinct owning cases,24 SIEM target,6 conformance/proof/signer controls; strict5 and format0; not full-candidate/native acceptance"
+        }
+      ],
+      "remaining_acceptance": [
+        "Record and verify the new automatic-preparation table and exact moved/shared reader inventory; current source gate failed until this classification is complete.",
+        "Integrate current MCP/native/fuzz/monetary/TTL/effect/F016/ingress handoffs with genuine Originals, source review and owning checks.",
+        "Finish full default/PQ, independent full-candidate slices, native/cold/trusted evidence, terminal exact-SHA hosted checks and protected landing before claiming readiness."
+      ],
+      "landing_unit": "foundation",
+      "landing_pr": 1160,
+      "main_ancestry_verified": false,
+      "review_scope": "now",
+      "work_status": "source-integrated",
+      "owner": "codex",
       "review_thread_urls": []
     }
   ],
@@ -129754,44 +129804,58 @@
       ]
     },
     "incoming-pr1160-review-20261007:resume:AR-OUT": {
-      "state": "source-repaired-current22-green-final-acceptance-pending",
-      "source_checkpoint": "61b4272bf929f205db2bc3a38130e89c8f8a8ea1",
+      "state": "source-integrated-scoped-green-final-acceptance-pending",
+      "source_repair": "aaa62b32e1884b9f942f57a0713222f7fb87a4bf",
+      "evidence_checkpoint": "9423113ed7a49bd59418d659a5f8ceceb0707d52",
+      "evidence_path": "docs/security/audits/artifact-and-siem-integration-checkpoint-20261007.json",
       "qualified": false,
       "merged": false
     },
     "incoming-pr1160-review-20261007:resume:AR-CAS": {
-      "state": "source-repaired-current22-green-final-acceptance-pending",
-      "source_checkpoint": "61b4272bf929f205db2bc3a38130e89c8f8a8ea1",
+      "state": "source-integrated-scoped-green-final-acceptance-pending",
+      "source_repair": "aaa62b32e1884b9f942f57a0713222f7fb87a4bf",
+      "evidence_checkpoint": "9423113ed7a49bd59418d659a5f8ceceb0707d52",
+      "evidence_path": "docs/security/audits/artifact-and-siem-integration-checkpoint-20261007.json",
       "qualified": false,
       "merged": false
     },
     "incoming-pr1160-review-20261007:resume:AR-TERM": {
-      "state": "partial-source-repair-original-artifact-binding-still-open",
-      "source_checkpoint": "61b4272bf929f205db2bc3a38130e89c8f8a8ea1",
+      "state": "source-integrated-scoped-green-final-acceptance-pending",
+      "source_repair": "aaa62b32e1884b9f942f57a0713222f7fb87a4bf",
+      "evidence_checkpoint": "9423113ed7a49bd59418d659a5f8ceceb0707d52",
+      "evidence_path": "docs/security/audits/artifact-and-siem-integration-checkpoint-20261007.json",
       "qualified": false,
       "merged": false
     },
     "incoming-pr1160-review-20261007:resume:AR-PROOF": {
-      "state": "five-current-artifact-and-canonical-counterexamples-red-producer-staged",
-      "source_checkpoint": "61b4272bf929f205db2bc3a38130e89c8f8a8ea1",
+      "state": "source-integrated-scoped-green-final-acceptance-pending",
+      "source_repair": "aaa62b32e1884b9f942f57a0713222f7fb87a4bf",
+      "evidence_checkpoint": "9423113ed7a49bd59418d659a5f8ceceb0707d52",
+      "evidence_path": "docs/security/audits/artifact-and-siem-integration-checkpoint-20261007.json",
       "qualified": false,
       "merged": false
     },
     "incoming-pr1160-review-20261007:resume:AR-LATE": {
-      "state": "source-repaired-current-owning-control-green-final-acceptance-pending",
-      "source_checkpoint": "61b4272bf929f205db2bc3a38130e89c8f8a8ea1",
+      "state": "source-integrated-scoped-green-final-acceptance-pending",
+      "source_repair": "aaa62b32e1884b9f942f57a0713222f7fb87a4bf",
+      "evidence_checkpoint": "9423113ed7a49bd59418d659a5f8ceceb0707d52",
+      "evidence_path": "docs/security/audits/artifact-and-siem-integration-checkpoint-20261007.json",
       "qualified": false,
       "merged": false
     },
     "incoming-pr1160-review-20261007:resume:AR-EXPIRY": {
-      "state": "source-repaired-current-owning-control-green-final-acceptance-pending",
-      "source_checkpoint": "61b4272bf929f205db2bc3a38130e89c8f8a8ea1",
+      "state": "source-integrated-scoped-green-final-acceptance-pending",
+      "source_repair": "aaa62b32e1884b9f942f57a0713222f7fb87a4bf",
+      "evidence_checkpoint": "9423113ed7a49bd59418d659a5f8ceceb0707d52",
+      "evidence_path": "docs/security/audits/artifact-and-siem-integration-checkpoint-20261007.json",
       "qualified": false,
       "merged": false
     },
     "incoming-pr1160-review-20261007:resume:AR-VIEW": {
-      "state": "source-repaired-current-owning-controls-green-final-acceptance-pending",
-      "source_checkpoint": "61b4272bf929f205db2bc3a38130e89c8f8a8ea1",
+      "state": "source-integrated-scoped-green-final-acceptance-pending",
+      "source_repair": "aaa62b32e1884b9f942f57a0713222f7fb87a4bf",
+      "evidence_checkpoint": "9423113ed7a49bd59418d659a5f8ceceb0707d52",
+      "evidence_path": "docs/security/audits/artifact-and-siem-integration-checkpoint-20261007.json",
       "qualified": false,
       "merged": false
     },
@@ -129802,14 +129866,18 @@
       "merged": false
     },
     "incoming-pr1160-review-20261007:resume:SIEM-BE": {
-      "state": "ready-claude-source-and-schema-amendment-integration-pending",
-      "source_checkpoint": "61b4272bf929f205db2bc3a38130e89c8f8a8ea1",
+      "state": "source-integrated-scoped-green-final-acceptance-pending",
+      "source_repair": "03cceb5aa7",
+      "evidence_checkpoint": "9423113ed7a49bd59418d659a5f8ceceb0707d52",
+      "evidence_path": "docs/security/audits/artifact-and-siem-integration-checkpoint-20261007.json",
       "qualified": false,
       "merged": false
     },
     "incoming-pr1160-review-20261007:resume:SIEM-SCHEMA": {
-      "state": "genuine-rust-red-green-on-claude-integration-pending",
-      "source_checkpoint": "61b4272bf929f205db2bc3a38130e89c8f8a8ea1",
+      "state": "source-integrated-scoped-green-final-acceptance-pending",
+      "source_repair": "03cceb5aa7",
+      "evidence_checkpoint": "9423113ed7a49bd59418d659a5f8ceceb0707d52",
+      "evidence_path": "docs/security/audits/artifact-and-siem-integration-checkpoint-20261007.json",
       "qualified": false,
       "merged": false
     },
@@ -129844,14 +129912,18 @@
       "merged": false
     },
     "incoming-pr1160-review-20261007:resume:AR-BIND": {
-      "state": "source-verified-original-first-controls-staging",
-      "source_checkpoint": "61b4272bf929f205db2bc3a38130e89c8f8a8ea1",
+      "state": "source-integrated-scoped-green-final-acceptance-pending",
+      "source_repair": "aaa62b32e1884b9f942f57a0713222f7fb87a4bf",
+      "evidence_checkpoint": "9423113ed7a49bd59418d659a5f8ceceb0707d52",
+      "evidence_path": "docs/security/audits/artifact-and-siem-integration-checkpoint-20261007.json",
       "qualified": false,
       "merged": false
     },
     "incoming-pr1160-review-20261007:resume:AR-SCHEMA": {
-      "state": "source-hypothesis-runtime-original-pending",
-      "source_checkpoint": "61b4272bf929f205db2bc3a38130e89c8f8a8ea1",
+      "state": "source-integrated-scoped-green-final-acceptance-pending",
+      "source_repair": "aaa62b32e1884b9f942f57a0713222f7fb87a4bf",
+      "evidence_checkpoint": "9423113ed7a49bd59418d659a5f8ceceb0707d52",
+      "evidence_path": "docs/security/audits/artifact-and-siem-integration-checkpoint-20261007.json",
       "qualified": false,
       "merged": false
     },
@@ -129918,6 +129990,14 @@
     "incoming-pr1160-review-20261007:resume:F075-IR07": {
       "state": "local-proposal-independent-request-changes-claude-original-first-repair-pending",
       "source_checkpoint": "61b4272bf929f205db2bc3a38130e89c8f8a8ea1",
+      "qualified": false,
+      "merged": false
+    },
+    "incoming-pr1160-review-20261007:resume:AR-TERM-EVIDENCE": {
+      "state": "source-integrated-scoped-green-final-acceptance-pending",
+      "source_repair": "aaa62b32e1884b9f942f57a0713222f7fb87a4bf",
+      "evidence_checkpoint": "9423113ed7a49bd59418d659a5f8ceceb0707d52",
+      "evidence_path": "docs/security/audits/artifact-and-siem-integration-checkpoint-20261007.json",
       "qualified": false,
       "merged": false
     }
@@ -131174,6 +131254,60 @@
       "all_terminal": true,
       "qualification": false
     },
+    "candidate_qualified": false,
+    "foundation_merged": false
+  },
+  "artifact_siem_integration_checkpoint_20261007": {
+    "checkpoint": "9423113ed7a49bd59418d659a5f8ceceb0707d52",
+    "path": "docs/security/audits/artifact-and-siem-integration-checkpoint-20261007.json",
+    "source_repair": "aaa62b32e1884b9f942f57a0713222f7fb87a4bf",
+    "local_evidence": {
+      "artifact_terminal_focus": {
+        "passed": 66,
+        "failed": 0
+      },
+      "distinct_affected_integration_and_modules": {
+        "passed": 167,
+        "failed": 0,
+        "historical_failed_owning_attempt_retained": true
+      },
+      "siem_full_target": {
+        "passed": 24,
+        "failed": 0
+      },
+      "conformance_rollback": {
+        "passed": 1,
+        "failed": 0
+      },
+      "quarantine_proof": {
+        "passed": 1,
+        "failed": 0
+      },
+      "signer_global_fault_controls": {
+        "passed": 4,
+        "failed": 0
+      },
+      "strict_owning_alltargets": {
+        "crates": [
+          "chio-kernel",
+          "chio-control-plane",
+          "chio-store-sqlite",
+          "chio-security-types",
+          "chio-quarantine"
+        ],
+        "exit": 0
+      },
+      "format_exit": 0,
+      "hygiene_exit": 0,
+      "negative_assertions": 1248,
+      "debt_removed": "exact one retired SIEM ack-loss assertion; no additions or waiver",
+      "umask": "0002"
+    },
+    "remaining_acceptance": [
+      "Record and verify the new automatic-preparation table and exact moved/shared reader inventory; current source gate failed until this classification is complete.",
+      "Integrate current MCP/native/fuzz/monetary/TTL/effect/F016/ingress handoffs with genuine Originals, source review and owning checks.",
+      "Finish full default/PQ, independent full-candidate slices, native/cold/trusted evidence, terminal exact-SHA hosted checks and protected landing before claiming readiness."
+    ],
     "candidate_qualified": false,
     "foundation_merged": false
   }
