@@ -1,0 +1,4 @@
+#!/bin/sh
+# Keep Git LFS working in swarm worktrees, whose core.hooksPath points here.
+command -v git-lfs >/dev/null 2>&1 || exit 0
+exec git lfs post-checkout "$@"

@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Swarm role guard for lane worktrees (installed with core.hooksPath by `swarm worktree`).
+set -euo pipefail
+
+remote_name="$1"
+remote_url="$2"
+role="${SWARM_ROLE:-}"
+item="$(git config --get swarm.item || true)"
+zero="0000000000000000000000000000000000000000"
+input="$(cat)"
+
+deny() {
+  echo "swarm pre-push: refused: $*" >&2
+  exit 1
+}
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -n "${remote_ref:-}" ] || continue
+  case "$remote_ref" in
+    refs/heads/main) deny "agents never push main" ;;
+    refs/heads/swarm) deny "only the swarm CLI writes the swarm branch, from ~/swarm" ;;
+    refs/heads/integration/beta-next) [ "$role" = integrator ] || deny "only the integrator pushes integration/beta-next" ;;
+    refs/heads/integration/process-security-m4) [ "$role" = security ] || deny "only the security pair pushes the #1160 branch" ;;
+  esac
+  if [ "$local_sha" = "$zero" ]; then
+    deny "deleting $remote_ref is not allowed from a swarm worktree"
+  fi
+  if [ "$remote_sha" != "$zero" ]; then
+    if ! git cat-file -e "${remote_sha}^{commit}" 2>/dev/null || ! git merge-base --is-ancestor "$remote_sha" "$local_sha"; then
+      case "$remote_ref" in
+        refs/heads/lane/"$item"-*) ;;
+        *) deny "rewriting $remote_ref (only this worktree's own lane/$item-* branch may be force-pushed)" ;;
+      esac
+    fi
+  fi
+done <<< "$input"
+
+if [ "${SWARM_HOOK_SKIP_LFS:-0}" != 1 ] && command -v git-lfs >/dev/null 2>&1; then
+  printf '%s\n' "$input" | git lfs pre-push "$remote_name" "$remote_url"
+fi
