@@ -18,6 +18,12 @@ enum Role {
     Observer,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Fault {
+    Unavailable,
+    Regress,
+}
+
 #[derive(Default)]
 struct ClockState {
     elapsed_ms: u64,
@@ -25,11 +31,12 @@ struct ClockState {
     reads: Vec<(Role, Option<u64>)>,
     advance_after_store_read: Option<(usize, u64)>,
     advanced_after_read: Option<usize>,
+    kernel_fault: Option<(usize, Fault)>,
 }
 
 /// Every read advances one millisecond on both the wall and monotonic axes.
-/// While armed, reads are traced by role and a scheduled store read can be
-/// followed by a real time advance.
+/// While armed, reads are traced by role, a scheduled store read can be
+/// followed by a real time advance, and one kernel read can fail.
 struct SweepClock {
     epoch_ms: u64,
     state: Mutex<ClockState>,
@@ -80,6 +87,16 @@ impl SweepClock {
         state.reads.clear();
         state.advance_after_store_read = advance_after_store_read;
         state.advanced_after_read = None;
+        state.kernel_fault = None;
+        Ok(())
+    }
+
+    /// Fail the `ordinal`th kernel read after arming.
+    fn fail_kernel_read(&self, ordinal: usize, fault: Fault) -> TestResult {
+        self.state
+            .lock()
+            .map_err(|_| "clock state lock")?
+            .kernel_fault = Some((ordinal, fault));
         Ok(())
     }
 
@@ -99,6 +116,25 @@ impl SweepClock {
 
     fn read_as(&self, role: Role) -> Result<ClockReading, ClockError> {
         let mut state = self.state.lock().map_err(|_| ClockError::Unavailable)?;
+        let fault = if state.armed && role == Role::Kernel {
+            let ordinal = state
+                .reads
+                .iter()
+                .filter(|(read, _)| *read == Role::Kernel)
+                .count()
+                .checked_add(1)
+                .ok_or(ClockError::Overflow)?;
+            state
+                .kernel_fault
+                .filter(|(at, _)| *at == ordinal)
+                .map(|(_, fault)| fault)
+        } else {
+            None
+        };
+        if fault == Some(Fault::Unavailable) {
+            state.reads.push((role, None));
+            return Err(ClockError::Unavailable);
+        }
         state.elapsed_ms = state
             .elapsed_ms
             .checked_add(1)
@@ -113,8 +149,15 @@ impl SweepClock {
                 .checked_mul(1_000_000)
                 .ok_or(ClockError::Overflow)?,
         );
+        let emitted = if fault == Some(Fault::Regress) {
+            self.epoch_ms
+                .checked_sub(1)
+                .ok_or(ClockError::BeforeEpoch)?
+        } else {
+            now
+        };
         if state.armed {
-            state.reads.push((role, Some(now)));
+            state.reads.push((role, Some(emitted)));
             let store_reads = state
                 .reads
                 .iter()
@@ -132,7 +175,7 @@ impl SweepClock {
                 }
             }
         }
-        Ok(ClockReading::new(UnixMillis::new(now), monotonic))
+        Ok(ClockReading::new(UnixMillis::new(emitted), monotonic))
     }
 }
 

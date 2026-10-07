@@ -252,3 +252,47 @@ fn sqlite_single_page_sweep_samples_authority_time_once() -> TestResult {
     assert!(page > start);
     sweep.assert_deferred_untouched()
 }
+
+fn second_page_clock_failure(fault: Fault, expected: ClockError) -> TestResult {
+    let sweep = Sweep::new(PAGE, true)?;
+    let tail = sweep.assert_two_pages()?;
+    sweep.clock.arm(None)?;
+    sweep.clock.fail_kernel_read(2, fault)?;
+    let result = sweep.kernel.reconcile_recoverable_admissions();
+    let reads = sweep.clock.disarm()?;
+    assert!(
+        matches!(&result, Err(KernelError::Clock(error)) if *error == expected),
+        "second-page clock failure must abort the sweep: {result:?}"
+    );
+    let [(Role::Kernel, Some(_)), (Role::Store, Some(first_page)), (Role::Kernel, second_page)] =
+        reads.as_slice()
+    else {
+        return Err(
+            format!("the failed sample must precede any second-page read: {reads:?}").into(),
+        );
+    };
+    match fault {
+        Fault::Unavailable => assert_eq!(*second_page, None),
+        Fault::Regress => assert!(second_page.is_some_and(|second| second < *first_page)),
+    }
+    assert_eq!(sweep.state(&tail)?, AdmissionOperationState::Prepared);
+    assert_eq!(
+        sweep.serving.operations.load_recovery_status(
+            tail.binding().operation_id(),
+            &sweep.serving.fence,
+            sweep.clock.now_ms()?,
+        )?,
+        None
+    );
+    sweep.assert_deferred_untouched()
+}
+
+#[test]
+fn sqlite_second_page_clock_unavailable_aborts_before_the_page_is_read() -> TestResult {
+    second_page_clock_failure(Fault::Unavailable, ClockError::Unavailable)
+}
+
+#[test]
+fn sqlite_second_page_clock_regression_aborts_before_the_page_is_read() -> TestResult {
+    second_page_clock_failure(Fault::Regress, ClockError::WallClockRegression)
+}
