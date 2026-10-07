@@ -737,3 +737,170 @@ fn operator_cancel_refuses_a_substituted_approval_binding_without_compensating()
         .cancel_prepared_active_response_admission(&prepared, OPERATOR_CANCEL_REASON);
     assert_refused_after_reconciliation(&fixture, &id, refused);
 }
+
+fn assert_retry_reconciled(
+    fixture: &RealAdapterFixture,
+    id: &str,
+    retry: Result<(), chio_kernel::KernelError>,
+) {
+    assert!(retry.is_ok(), "{retry:?}");
+    let operation = fixture
+        .runtime
+        .admission_operations
+        .load(id)
+        .test_unwrap()
+        .test_unwrap();
+    assert_eq!(
+        operation.state(),
+        AdmissionOperationState::DispatchCommitted
+    );
+    assert_eq!(
+        operation.dispatch_state(),
+        AdmissionDispatchState::Committed
+    );
+    assert_eq!(
+        terminal_receipt_actions(&fixture.runtime.admission_operations, id),
+        0
+    );
+    assert_eq!(fixture.runtime.executor.calls(), 0);
+    assert_eq!(fixture.runtime.effects.executions(), 0);
+}
+
+#[test]
+fn uncommitted_reserved_approval_retry_after_expiry_still_compensates() {
+    let fixture = real_adapter_fixture();
+    let prepared = fixture
+        .runtime
+        .kernel
+        .prepare_active_response_admission(fixture.native_request())
+        .test_unwrap();
+    let id = operation_id(&prepared).to_owned();
+    assert_eq!(
+        fixture
+            .runtime
+            .approvals
+            .get_approval_reservation(&id)
+            .test_unwrap()
+            .test_unwrap()
+            .state(),
+        ReplayReservationState::Reserved
+    );
+    let _expired = at_plan_expiry(&fixture);
+
+    let retry = fixture
+        .runtime
+        .kernel
+        .commit_prepared_active_response_admission(fixture.native_request(), &prepared);
+    assert!(retry.is_err(), "{retry:?}");
+    assert_eq!(
+        fixture
+            .runtime
+            .admission_operations
+            .load(&id)
+            .test_unwrap()
+            .test_unwrap()
+            .state(),
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    assert_eq!(
+        terminal_receipt_actions(&fixture.runtime.admission_operations, &id),
+        1
+    );
+    assert_eq!(
+        fixture
+            .runtime
+            .approvals
+            .get_approval_reservation(&id)
+            .test_unwrap()
+            .test_unwrap()
+            .state(),
+        ReplayReservationState::Cancelled
+    );
+    assert_eq!(fixture.runtime.executor.calls(), 0);
+    assert_eq!(fixture.runtime.effects.executions(), 0);
+}
+
+#[test]
+fn committed_threshold_approval_retry_propagates_a_reconciliation_store_failure() {
+    let fail_next = Arc::new(AtomicBool::new(false));
+    let substitute = Arc::new(AtomicBool::new(false));
+    let fixture = reconciliation_fault_fixture(&fail_next, &substitute);
+    let prepared = committed_approval_window(&fixture, &fail_next);
+    let id = operation_id(&prepared).to_owned();
+    let operation = fixture
+        .runtime
+        .admission_operations
+        .load(&id)
+        .test_unwrap()
+        .test_unwrap();
+    let approval = fixture
+        .runtime
+        .approvals
+        .get_approval_reservation(&id)
+        .test_unwrap()
+        .test_unwrap();
+    let _expired = at_plan_expiry(&fixture);
+
+    fail_next.store(true, Ordering::Release);
+    let failed = fixture
+        .runtime
+        .kernel
+        .commit_prepared_active_response_admission(fixture.native_request(), &prepared);
+    assert!(
+        !fail_next.load(Ordering::Acquire),
+        "the retry did not attempt reconciliation"
+    );
+    assert!(
+        matches!(&failed, Err(chio_kernel::KernelError::Internal(reason))
+            if reason.contains("injected dispatch commitment CAS failure")),
+        "{failed:?}"
+    );
+    assert_committed_window_retained(&fixture, &id, &operation, &approval);
+
+    let retry = fixture
+        .runtime
+        .kernel
+        .commit_prepared_active_response_admission(fixture.native_request(), &prepared);
+    assert_retry_reconciled(&fixture, &id, retry);
+}
+
+#[test]
+fn committed_threshold_approval_retry_refuses_a_substituted_approval_binding() {
+    let fail_next = Arc::new(AtomicBool::new(false));
+    let substitute = Arc::new(AtomicBool::new(false));
+    let fixture = reconciliation_fault_fixture(&fail_next, &substitute);
+    let prepared = committed_approval_window(&fixture, &fail_next);
+    let id = operation_id(&prepared).to_owned();
+    let operation = fixture
+        .runtime
+        .admission_operations
+        .load(&id)
+        .test_unwrap()
+        .test_unwrap();
+    let approval = fixture
+        .runtime
+        .approvals
+        .get_approval_reservation(&id)
+        .test_unwrap()
+        .test_unwrap();
+    let _expired = at_plan_expiry(&fixture);
+
+    substitute.store(true, Ordering::Release);
+    let refused = fixture
+        .runtime
+        .kernel
+        .commit_prepared_active_response_admission(fixture.native_request(), &prepared);
+    assert!(
+        matches!(&refused, Err(chio_kernel::KernelError::Internal(reason))
+            if reason.contains("changed its exact binding")),
+        "{refused:?}"
+    );
+    assert_committed_window_retained(&fixture, &id, &operation, &approval);
+
+    substitute.store(false, Ordering::Release);
+    let retry = fixture
+        .runtime
+        .kernel
+        .commit_prepared_active_response_admission(fixture.native_request(), &prepared);
+    assert_retry_reconciled(&fixture, &id, retry);
+}
