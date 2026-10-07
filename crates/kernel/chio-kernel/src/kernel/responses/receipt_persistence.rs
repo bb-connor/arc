@@ -72,6 +72,7 @@ impl ChioKernel {
             },
             &chio_core::crypto::Ed25519Backend::new(authority.clone()),
             None,
+            &self.config.policy_hash,
         )
     }
 
@@ -84,20 +85,24 @@ impl ChioKernel {
             params,
             self.signing_authority.backend.as_ref(),
             None,
+            &self.config.policy_hash,
         )
     }
 
-    /// Pin the body to the admission-time key. The core primitive requires the
-    /// backend's atomic identity-bound signature, including after re-entrancy.
+    /// Pin the body to the authenticated admission policy and key. The core
+    /// primitive requires the backend's atomic identity-bound signature,
+    /// including after re-entrancy.
     pub(crate) fn build_and_sign_receipt_for_identity(
         &self,
         params: ReceiptParams<'_>,
         key: &chio_core::PublicKey,
+        policy_hash: &str,
     ) -> Result<ChioReceipt, KernelError> {
         self.build_and_sign_receipt_with_authority(
             params,
             self.signing_authority.backend.as_ref(),
             Some(key),
+            policy_hash,
         )
     }
 
@@ -106,6 +111,7 @@ impl ChioKernel {
         params: ReceiptParams<'_>,
         authority: &dyn chio_core::crypto::SigningBackend,
         expected_key: Option<&chio_core::PublicKey>,
+        policy_hash: &str,
     ) -> Result<ChioReceipt, KernelError> {
         if !self
             .signing_authority
@@ -143,10 +149,19 @@ impl ChioKernel {
                 }
             })
         });
+        let native_policy_evidence =
+            self.native_policy_refusal_receipt_evidence(&params, &params.metadata)?;
         let metadata = merge_metadata_objects(params.metadata, request_metadata);
 
         let mut evidence = current_pre_invocation_guard_evidence();
         evidence.extend(current_post_invocation_guard_evidence());
+        // Registered guards cannot claim the reserved native owner by returning
+        // its name or an extension-controlled reason.
+        evidence
+            .retain(|item| item.guard_name != admission_coordinator::RESERVED_NATIVE_POLICY_OWNER);
+        if let Some(native) = native_policy_evidence {
+            evidence.push(native);
+        }
 
         let body = ChioReceiptBody {
             id: next_receipt_id("rcpt")?,
@@ -163,7 +178,7 @@ impl ChioKernel {
             redaction_mode: RedactionMode::None,
             actor_chain: Vec::new(),
             content_hash: params.content_hash,
-            policy_hash: self.config.policy_hash.clone(),
+            policy_hash: policy_hash.to_owned(),
             evidence,
             metadata,
             trust_level: params.trust_level,
@@ -180,7 +195,7 @@ impl ChioKernel {
             action: &expected_action,
             decision: &expected_decision,
             content_hash: &expected_content_hash,
-            policy_hash: &self.config.policy_hash,
+            policy_hash,
             trust_level: params.trust_level,
         };
         require_receipt_body_fields_coupled(&body, &expected)?;

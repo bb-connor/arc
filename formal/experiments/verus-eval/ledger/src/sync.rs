@@ -1,4 +1,4 @@
-//! FV-B5 Phase 2: the FV-B3 conservation law for concurrently held
+//! The reservation conservation law for concurrently held
 //! reservations, as a VerusSync tokenized state machine. Multiple actors
 //! concurrently authorize, dispose, and reconcile distinct holds against
 //! one ledger; the invariants below hold for every interleaving and every

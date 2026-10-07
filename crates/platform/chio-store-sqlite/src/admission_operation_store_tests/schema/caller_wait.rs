@@ -52,6 +52,7 @@ fn rebuild_predecessor(connection: &Connection) -> rusqlite::Result<()> {
     if !sql.contains("'awaiting_caller_report'") {
         return Ok(());
     }
+    super::recovery::remove_empty_recovery_tables(connection)?;
     connection.execute_batch(
         "DROP INDEX admission_operations_replay_key;
         DROP INDEX admission_operations_request_id;

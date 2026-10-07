@@ -2,6 +2,8 @@ use super::*;
 
 #[path = "schema/caller_wait.rs"]
 mod caller_wait;
+#[path = "schema/recovery.rs"]
+mod recovery;
 pub(super) use caller_wait::{
     remove_caller_share_index, remove_caller_wait_state, remove_empty_checkpoint_catalog,
 };

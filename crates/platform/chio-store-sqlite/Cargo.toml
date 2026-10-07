@@ -23,9 +23,9 @@ lineage = []
 # Cross-crate cognition-market tests may seed already-verified sibling
 # records without exposing those fixture helpers in production builds.
 cognition-market-test-support = []
-# Fail-only, owner-connection cutpoints for cross-crate admission tests.
+# Native fault and modeled predecessor fixtures for cross-crate admission tests.
 # Default-off; no arbitrary SQL or fault controls are exposed in production.
-admission-test-support = []
+admission-test-support = ["chio-semantic-contracts/admission-test-support"]
 # Exposes the standalone security admission operation store to tests and
 # benches. Default-off; production builds neither compile nor export it.
 security-admission-test-support = []
@@ -38,6 +38,8 @@ chaos-test-hooks = []
 # standalone `chio-fuzz` workspace at `../../../fuzz`.
 fuzz = []
 [dependencies]
+chio-cage = { workspace = true }
+chio-semantic-contracts = { path = "../../security/chio-semantic-contracts", features = ["std"] }
 chacha20poly1305 = { workspace = true }
 chio-agent-web-interop = { workspace = true }
 chio-core = { version = "=0.1.0", package = "chio-core-types", path = "../../core/chio-core-types" }
@@ -49,6 +51,7 @@ chio-fiscal = { workspace = true }
 chio-kernel = { workspace = true, features = ["finding-market"] }
 chio-kernel-core = { workspace = true }
 chio-security-types = { workspace = true, features = ["std"] }
+chio-flow = { workspace = true }
 chio-settle = { workspace = true }
 chio-sqlite-file-identity = { version = "=0.1.0", path = "../chio-sqlite-file-identity" }
 chio-supervisor = { workspace = true }

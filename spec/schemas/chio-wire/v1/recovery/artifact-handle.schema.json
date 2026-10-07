@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.computer/schemas/chio-wire/v1/recovery/artifact-handle.schema.json",
+  "title": "Artifact Handle V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "handle",
+    "recipient"
+  ],
+  "properties": {
+    "handle": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "recipient": {
+      "$ref": "#/$defs/opaqueId"
+    }
+  },
+  "$defs": {
+    "opaqueId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "not": { "pattern": "[\\r\\n]" }
+    }
+  }
+}

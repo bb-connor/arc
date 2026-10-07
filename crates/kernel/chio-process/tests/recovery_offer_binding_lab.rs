@@ -78,7 +78,7 @@ async fn a_denied_operation_cannot_be_rewritten_with_a_grant_after_store_reopen(
     // Reopen durable process state while retaining the same serving kernel.
     let reopened = ProcessRuntime::open(&database, kernel)?;
     let mut changed = original.clone();
-    changed.declassification_grant = Some(binding_fixture(&reader.id)?);
+    changed.declassification_grant = Some(binding_fixture(&reader.id)?.into());
     assert!(matches!(
         reopened.invoke("reader", "denied", &changed).await,
         Err(ProcessError::Conflict)
@@ -98,7 +98,7 @@ async fn a_denied_operation_cannot_be_rewritten_with_a_grant_after_store_reopen(
         "append",
         json!({}),
     )?;
-    continuation.declassification_grant = Some(binding_fixture(&reader.id)?);
+    continuation.declassification_grant = Some(binding_fixture(&reader.id)?.into());
     assert_ne!(continuation.request_id, original.request_id);
     let denied_again = reopened
         .invoke("reader", "denied-continuation-1", &continuation)
@@ -122,7 +122,7 @@ async fn attaching_a_grant_to_a_completed_operation_cannot_repeat_its_effect() -
     assert_eq!(completed.verdict, Verdict::Allow);
     assert!(completed.receipt.verify_signature()?);
     let mut changed = original.clone();
-    changed.declassification_grant = Some(binding_fixture(&capability.id)?);
+    changed.declassification_grant = Some(binding_fixture(&capability.id)?.into());
     assert!(matches!(
         runtime.invoke("root", "publish", &changed).await,
         Err(ProcessError::Conflict)

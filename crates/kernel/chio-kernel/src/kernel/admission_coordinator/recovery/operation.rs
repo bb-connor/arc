@@ -71,6 +71,11 @@ impl ChioKernel {
                 Ok(true)
             }
             AdmissionOperationState::Finalizing => {
+                if self.quarantine_unavailable_recovery(operation, now)? {
+                    // One typed durable hold retains this exact captured
+                    // operation. It grants no replay or replacement rights.
+                    return Ok(false);
+                }
                 let retained_request =
                     self.load_original_request_for_finalization(operation, now)?;
                 let mut admission = DurableToolAdmission {

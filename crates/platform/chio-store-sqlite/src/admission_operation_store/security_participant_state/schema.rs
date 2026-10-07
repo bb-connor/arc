@@ -175,10 +175,10 @@ pub(super) fn recorded_version(
     match version {
         28 => Ok(28),
         // Later admission versions add independent journals and the v34 caller
-        // wait state, v35 recovery deferrals, v36 retained checkpoints and the
-        // v37 caller-share parent index. They do not change the v29 native row
-        // catalog/digest.
-        29..=37 => Ok(29),
+        // wait state, v35 recovery deferrals, v36 retained checkpoints, the
+        // v37 caller-share parent index and the recovery runtime formats. They
+        // do not change the v29 native row catalog/digest.
+        29..=40 => Ok(29),
         _ => Err(invalid("native security schema version is unsupported")),
     }
 }

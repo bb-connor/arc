@@ -229,7 +229,7 @@ def main():
         "exit_signal": native["exit"]["signal"],
         "worker_image": args.worker_image,
         "runner": report,
-        "m5_acceptance_complete": False,
+        "qualification_complete": False,
         "limits": [
             "not a complete scenario artifact",
             "raw native readback is not an inclusion audit",

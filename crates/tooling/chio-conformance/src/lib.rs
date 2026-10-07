@@ -12,6 +12,7 @@ mod load;
 mod model;
 mod native_suite;
 pub mod peers;
+pub mod recovery_trajectory;
 mod report;
 mod runner;
 

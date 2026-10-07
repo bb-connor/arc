@@ -1,0 +1,351 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.computer/schemas/chio-wire/v1/recovery/isolation-boundary.schema.json",
+  "title": "Isolation Boundary V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "domain_version",
+    "boundary",
+    "request",
+    "scope",
+    "parent_capability",
+    "parent",
+    "child",
+    "child_principal",
+    "child_capability",
+    "ancestry",
+    "lineage",
+    "isolation_epoch",
+    "seed_artifacts",
+    "observation",
+    "parent_control",
+    "seed_label",
+    "seed_influence",
+    "execution",
+    "return_contract",
+    "limits",
+    "deadline_unix_ms",
+    "policy"
+  ],
+  "properties": {
+    "domain_version": {
+      "const": 1
+    },
+    "boundary": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "request": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "scope": {
+      "$ref": "#/$defs/scope"
+    },
+    "parent_capability": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "parent": {
+      "$ref": "#/$defs/artifactRecipient"
+    },
+    "child": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "child_principal": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "child_capability": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "ancestry": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/opaqueId"
+      },
+      "minItems": 1,
+      "maxItems": 8
+    },
+    "lineage": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "isolation_epoch": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "seed_artifacts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/artifactReference"
+      },
+      "minItems": 0,
+      "maxItems": 8
+    },
+    "observation": {
+      "$ref": "#/$defs/artifactReference"
+    },
+    "parent_control": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "seed_label": {
+      "$ref": "../security/information-label.schema.json"
+    },
+    "seed_influence": {
+      "$ref": "#/$defs/artifactInfluence"
+    },
+    "execution": {
+      "$ref": "confined-execution-profile.schema.json"
+    },
+    "return_contract": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "limits": {
+      "$ref": "confined-limits.schema.json"
+    },
+    "deadline_unix_ms": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "policy": {
+      "$ref": "#/$defs/recoveryDigest32"
+    }
+  },
+  "$defs": {
+    "artifactInfluence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commitment",
+        "externally_influenced",
+        "unknown"
+      ],
+      "properties": {
+        "commitment": {
+          "$ref": "#/$defs/recoveryDigest32"
+        },
+        "externally_influenced": {
+          "type": "boolean"
+        },
+        "unknown": {
+          "type": "boolean"
+        }
+      }
+    },
+    "artifactRecipient": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "recipient",
+        "scope",
+        "runtime",
+        "principal",
+        "lineage",
+        "isolation_epoch",
+        "context_generation",
+        "clearance",
+        "sink"
+      ],
+      "properties": {
+        "recipient": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "runtime": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "x-maxUtf8Bytes": 128
+        },
+        "principal": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "x-maxUtf8Bytes": 256
+        },
+        "lineage": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "isolation_epoch": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "x-maxUtf8Bytes": 128
+        },
+        "context_generation": {
+          "$ref": "#/$defs/safeInteger"
+        },
+        "clearance": {
+          "$ref": "../security/information-label.schema.json"
+        },
+        "sink": {
+          "$ref": "#/$defs/artifactSink"
+        }
+      }
+    },
+    "artifactReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope",
+        "artifact",
+        "version",
+        "provenance"
+      ],
+      "properties": {
+        "scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "artifact": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "version": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "provenance": {
+          "$ref": "#/$defs/recoveryDigest32"
+        }
+      }
+    },
+    "artifactSink": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "agent"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "context"
+          ],
+          "properties": {
+            "kind": {
+              "const": "model"
+            },
+            "context": {
+              "$ref": "#/$defs/modelContext"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "archive"
+            }
+          }
+        }
+      ]
+    },
+    "modelContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "context",
+        "provider",
+        "account",
+        "conversation",
+        "cache",
+        "side_files",
+        "contract"
+      ],
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "provider": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "account": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "conversation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "x-maxUtf8Bytes": 128
+        },
+        "cache": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "x-maxUtf8Bytes": 128
+        },
+        "side_files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/artifactReference"
+          },
+          "minItems": 0,
+          "maxItems": 8
+        },
+        "contract": {
+          "$ref": "#/$defs/recoveryDigest32"
+        }
+      }
+    },
+    "opaqueId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "not": {
+        "pattern": "[\\r\\n]"
+      }
+    },
+    "recoveryDigest32": {
+      "type": "array",
+      "minItems": 32,
+      "maxItems": 32,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255,
+        "title": "Recovery digest octet"
+      },
+      "title": "Recovery digest32"
+    },
+    "safeInteger": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority_domain",
+        "tenant_id",
+        "process_id"
+      ],
+      "properties": {
+        "authority_domain": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "tenant_id": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "process_id": {
+          "$ref": "#/$defs/opaqueId"
+        }
+      }
+    }
+  }
+}

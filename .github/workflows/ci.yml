@@ -264,6 +264,12 @@ jobs:
           run_gate python3 scripts/tests/check-fuzz-manifest-selection.test.py
           run_gate bash scripts/tests/check-drogon-consumer-gate.test.sh
           run_gate bash ./scripts/tests/check-flow-security.test.sh
+          run_gate python3 ./scripts/check-portable-recovery-lock.py
+          run_gate python3 ./scripts/tests/check-portable-recovery-lock.test.py
+          run_gate python3 ./scripts/check-recovery-boundaries.py
+          run_gate python3 ./scripts/tests/check-recovery-boundaries.test.py
+          run_gate python3 ./scripts/check-source-names.py
+          run_gate python3 ./scripts/tests/check-source-names.test.py
           run_gate bash ./scripts/tests/check-deception-security.test.sh
           run_gate /bin/bash -p ./scripts/tests/check-temporal-security.test.sh
           run_gate bash ./scripts/tests/check-response-recovery.test.sh

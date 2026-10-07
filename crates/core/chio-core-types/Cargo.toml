@@ -87,6 +87,7 @@ delegation_v2 = ["delegation"]
 
 [dev-dependencies]
 uuid = { workspace = true, features = ["serde"] }
+chio-semantic-contracts = { path = "../../security/chio-semantic-contracts", default-features = false }
 chio-test-support = { workspace = true }
 jsonschema = { version = "0.46.0", default-features = false }
 proptest = { workspace = true }

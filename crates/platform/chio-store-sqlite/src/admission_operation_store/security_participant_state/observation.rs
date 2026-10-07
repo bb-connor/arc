@@ -45,3 +45,15 @@ impl SqliteAdmissionOperationStore {
         )
     }
 }
+
+pub(in crate::admission_operation_store) fn verify_recovery_initialization(
+    tx: &Connection,
+    binding: &NativeSecurityAuthorityBindingV1,
+) -> Result<(), AdmissionOperationStoreError> {
+    let initialized = records::load_metadata(tx, binding.security_authority_id().as_str())?
+        .ok_or_else(|| invalid("recovery native initialization is absent"))?;
+    if initialized.admission_binding()? != *binding {
+        return Err(invalid("recovery native initialization differs"));
+    }
+    records::verify_all(tx).map(|_| ())
+}

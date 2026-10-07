@@ -9,8 +9,8 @@ use super::{
     NativeEgressResult,
 };
 use crate::admission_operation_store::{
-    NativeEgressAuthority, NativeFlowJoinAuthority, NativeNoncePreflightJoinAuthority,
-    NativeOutputJoinAuthority,
+    NativeEgressAuthority, NativeFlowJoinAuthority, NativeKnowledgeJoinAuthority,
+    NativeNoncePreflightJoinAuthority, NativeOutputJoinAuthority,
 };
 use chio_security_types::ports::{FlowJoinRequest, FlowStateSnapshot, PortError, PortResult};
 use rusqlite::functions::{Context, FunctionFlags};
@@ -204,6 +204,7 @@ enum JoinAuthorization {
     Input(NativeFlowJoinAuthority),
     Output(NativeOutputJoinAuthority),
     NoncePreflight(NativeNoncePreflightJoinAuthority),
+    Knowledge(NativeKnowledgeJoinAuthority),
 }
 
 impl JoinAuthorization {
@@ -212,6 +213,7 @@ impl JoinAuthorization {
             Self::Input(owner) => owner.authority(),
             Self::Output(owner) => owner.authority(),
             Self::NoncePreflight(owner) => owner.authority(),
+            Self::Knowledge(owner) => owner.authority(),
         }
     }
     fn request(&self) -> &FlowJoinRequest {
@@ -219,6 +221,7 @@ impl JoinAuthorization {
             Self::Input(owner) => owner.request(),
             Self::Output(owner) => owner.request(),
             Self::NoncePreflight(owner) => owner.request(),
+            Self::Knowledge(owner) => owner.request(),
         }
     }
 }
@@ -286,6 +289,17 @@ pub(crate) fn join_native_nonce_preflight<'connection>(
         transaction,
         JoinAuthorization::NoncePreflight(authorization),
     )
+}
+
+pub(crate) fn join_native_knowledge<'connection>(
+    transaction: Transaction<'connection>,
+    authorization: NativeKnowledgeJoinAuthority,
+) -> PortResult<(
+    Transaction<'connection>,
+    FlowStateSnapshot,
+    Vec<NativeRowChange>,
+)> {
+    join_native(transaction, JoinAuthorization::Knowledge(authorization))
 }
 
 fn join_native<'connection>(

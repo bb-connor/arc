@@ -68,7 +68,7 @@ impl Record {
             },
         })
     }
-    pub(super) fn validate(
+    pub(in crate::admission_operation_store::security_participant_state) fn validate(
         &self,
         connection: &Connection,
     ) -> Result<(), AdmissionOperationStoreError> {

@@ -21,6 +21,19 @@ pub struct SignedDeclassificationGrant {
 }
 
 impl SignedDeclassificationGrant {
+    pub(crate) fn from_untrusted_parts(
+        body: DeclassificationGrantBody,
+        authority_key: PublicKey,
+        algorithm: SigningAlgorithm,
+        signature: Signature,
+    ) -> Self {
+        Self {
+            body,
+            authority_key,
+            algorithm,
+            signature,
+        }
+    }
     pub fn sign(body: DeclassificationGrantBody, keypair: &Keypair) -> Result<Self> {
         Self::sign_with_backend(body, &Ed25519Backend::new(keypair.clone()))
     }

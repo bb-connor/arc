@@ -2943,6 +2943,7 @@ dependencies = [
  "chio-cage-init",
  "chio-cage-plan",
  "chio-core",
+ "chio-core-types",
  "chio-manifest",
  "chio-test-support",
  "libc",
@@ -2973,6 +2974,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+ "zeroize",
 ]
 
 [[package]]
@@ -3249,6 +3251,7 @@ dependencies = [
  "chio-agent-web-interop",
  "chio-anchor",
  "chio-appraisal",
+ "chio-cage",
  "chio-commerce-order",
  "chio-conformance",
  "chio-core",
@@ -3282,7 +3285,9 @@ dependencies = [
  "chio-metrics-spec",
  "chio-open-market",
  "chio-policy",
+ "chio-process",
  "chio-quarantine",
+ "chio-recovery",
  "chio-reputation",
  "chio-revocation-oracle",
  "chio-risk-comptroller",
@@ -3291,6 +3296,7 @@ dependencies = [
  "chio-secure-ipc",
  "chio-security-kernel",
  "chio-security-types",
+ "chio-semantic-contracts",
  "chio-settle",
  "chio-siem",
  "chio-signing-remote",
@@ -3325,6 +3331,7 @@ dependencies = [
  "tempfile",
  "thiserror 1.0.69",
  "tokio",
+ "tokio-rustls",
  "tower 0.5.3",
  "tower-http",
  "tracing",
@@ -3369,6 +3376,7 @@ version = "0.1.0"
 dependencies = [
  "aws-lc-rs",
  "chio-security-types",
+ "chio-semantic-contracts",
  "chio-spec-codegen",
  "chio-test-support",
  "ed25519-dalek 2.2.0",
@@ -4878,6 +4886,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-recovery"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-security-types",
+ "chio-semantic-contracts",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "chio-reference-tools"
 version = "0.1.0"
 dependencies = [
@@ -5165,6 +5184,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-semantic-contracts"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-security-types",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "chio-settle"
 version = "0.1.0"
 dependencies = [
@@ -5271,17 +5300,20 @@ dependencies = [
  "base64 0.22.1",
  "chacha20poly1305",
  "chio-agent-web-interop",
+ "chio-cage",
  "chio-core-types",
  "chio-credit",
  "chio-federation",
  "chio-federation-authority",
  "chio-finding",
  "chio-fiscal",
+ "chio-flow",
  "chio-kernel",
  "chio-kernel-core",
  "chio-open-market",
  "chio-quarantine",
  "chio-security-types",
+ "chio-semantic-contracts",
  "chio-settle",
  "chio-sqlite-file-identity",
  "chio-store-sqlite",
@@ -11959,6 +11991,7 @@ dependencies = [
  "futures-channel",
  "futures-core",
  "futures-util",
+ "h2",
  "http 1.4.0",
  "http-body 1.0.1",
  "http-body-util",

@@ -2,7 +2,7 @@
 //! into the Verus dialect. No drift hash binds this file to the production
 //! module and no claim rests on it; it exists to calibrate proof effort
 //! against the known Creusot and Lean proofs of the same algebra (FV-B5
-//! Phase 1). Checked adds appear here as explicit boundary comparisons,
+//! sequential ledger evaluation). Checked adds appear here as explicit boundary comparisons,
 //! which Verus proves overflow-free; the accept/reject semantics are
 //! unchanged.
 

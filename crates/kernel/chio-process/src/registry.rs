@@ -18,6 +18,7 @@ use crate::{ProcessError, ProcessSnapshot};
 pub struct ProcessRegistry {
     pub(crate) store: Arc<Mutex<Store>>,
     pub(crate) namespace: String,
+    pub(crate) enforcement: chio_kernel::knowledge::DurableKnowledgeEnforcement,
 }
 
 /// Committed child work. Executable selection remains with the trusted host.
@@ -63,16 +64,21 @@ impl ProcessRegistry {
                 .ok_or(ProcessError::Configuration(
                     "a qualified durable admission store is required",
                 ))?;
-        let store = Store::open(
+        let mut store = Store::open(
             path.as_ref(),
             authority,
             &kernel.public_key().to_hex(),
             kernel.authority_clock(),
         )?;
+        let enforcement = kernel.durable_knowledge_enforcement()?;
+        if enforcement.enforced(&store.namespace)? {
+            store.enable_knowledge()?;
+        }
         let namespace = store.namespace.clone();
         Ok(Self {
             store: Arc::new(Mutex::new(store)),
             namespace,
+            enforcement,
         })
     }
 
@@ -82,7 +88,7 @@ impl ProcessRegistry {
     }
 
     pub fn process(&self, id: &str) -> Result<ProcessSnapshot, ProcessError> {
-        self.with_store(|store| store.process(id))
+        self.with_public_store(|store| store.public_process(id))
     }
 
     /// Install private subject keys for an explicitly enabled native delegation
@@ -117,7 +123,23 @@ impl ProcessRegistry {
 
     /// Resolve an admitted call to exactly one live persisted process.
     pub fn caller(&self, context: &ToolInvocationContext) -> Result<ProcessSnapshot, ProcessError> {
-        self.with_store(|store| store.caller(context))
+        self.with_public_store(|store| {
+            let process = store.caller(context)?;
+            store.public_process(&process.id)
+        })
+    }
+
+    fn with_public_store<T>(
+        &self,
+        read: impl FnOnce(&mut Store) -> Result<T, ProcessError>,
+    ) -> Result<T, ProcessError> {
+        let enforced = self.enforcement.enforced(&self.namespace)?;
+        self.with_store(|store| {
+            if enforced {
+                store.enable_knowledge()?;
+            }
+            read(store)
+        })
     }
 
     /// Commit a signed child, its key and work binding in one transaction.

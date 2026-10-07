@@ -1,9 +1,13 @@
 //! Original capture hands one live owner to the common durable finalizer.
 //! Historical readback can validate that owner, but can never construct it.
+//! Exact physically captured, recorded returns can restore only release custody.
 use super::fault::NativeDispatchFault;
 use super::*;
 use crate::kernel::credential_reservation::DispatchCredentialReservation;
 use crate::tool_outcome::DurableSecurityReleaseContext;
+
+#[path = "lifecycle/recorded_return.rs"]
+mod recorded_return;
 
 pub(super) struct CapturedLifecycle {
     pub context: DurableToolReturnContext,
@@ -231,15 +235,30 @@ impl ChioKernel {
             store_entered: false,
             failed: false,
             fault: None,
+            policy_refusal: None,
             return_input: Some(input),
             captured_lifecycle: None,
         };
         // Absent only when the capture hook itself returned an error.
         let mut fault = None;
-        let result = crate::kernel::security_dispatch::callback("native dispatch capture", || {
-            hook.commit_native_dispatch(&mut authority)
-        });
-        let result = result.and_then(|()| {
+        let result = crate::kernel::security_dispatch::callback_with_failure_kind(
+            "native dispatch capture",
+            || hook.commit_native_dispatch(&mut authority),
+        );
+        let refusal = if !authority.attempted
+            && !authority.failed
+            && matches!(
+                &result,
+                Err((
+                    _,
+                    crate::kernel::security_dispatch::SecurityCallbackFailureKind::ReturnedError
+                ))
+            ) {
+            authority.policy_refusal
+        } else {
+            None
+        };
+        let result = result.map_err(|(error, _)| error).and_then(|()| {
             if authority.failed {
                 fault = Some(NativeDispatchFault::HookSuppressedCaptureFailure);
                 return Err(invalid(
@@ -272,6 +291,12 @@ impl ChioKernel {
                 native_dispatch_fault = fault.as_str(),
                 "native dispatch failed"
             );
+            if let Some(refusal) = refusal {
+                return DurableDispatchCommitError::RejectedNativePolicyBeforeCommit {
+                    error,
+                    refusal,
+                };
+            }
             authority.classify_failure(error)
         })
     }

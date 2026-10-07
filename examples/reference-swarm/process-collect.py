@@ -1,6 +1,6 @@
 """Verify reader responses against operator-pinned identity and input hashes.
 
-This checks a useful result. Complete M5 accounting, terminal authority and
+This checks a useful result. Complete accounting, terminal authority and
 confinement-chain verification remain separate acceptance requirements.
 """
 
@@ -101,7 +101,7 @@ def main():
         "schema": "chio.reference-swarm.repository-report.v1",
         "files": results,
         "total_bytes": sum(item["bytes"] for item in results),
-        "m5_acceptance_complete": False,
+        "qualification_complete": False,
     }
     with args.output.open("x") as stream:
         json.dump(report, stream, indent=2)

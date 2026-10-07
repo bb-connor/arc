@@ -81,12 +81,16 @@ def source_inventory(root: Path) -> dict[str, list[str]]:
         raise InventoryError(
             "chio-cage example or benchmark target inventory is not empty"
         )
-    for directory_name in ("examples", "benches"):
+    expected_files = {
+        "src/bin": {"chio-cage-init.rs", "chio-confined-reader.rs"},
+        "examples": {"confined-return-canary.rs"},
+        "benches": set(),
+    }
+    for directory_name, expected in expected_files.items():
         directory = crate / directory_name
-        if directory.is_dir() and any(directory.rglob("*.rs")):
-            raise InventoryError(
-                f"chio-cage implicit {directory_name} target inventory is not empty"
-            )
+        observed = {p.relative_to(directory).as_posix() for p in directory.rglob("*.rs")}
+        if observed != expected:
+            raise InventoryError(f"chio-cage implicit {directory_name} target inventory changed")
 
     integration_files = {
         path.relative_to(tests).as_posix() for path in tests.rglob("*.rs")
@@ -121,6 +125,9 @@ def source_inventory(root: Path) -> dict[str, list[str]]:
                 continue
             inventory[target].append(name)
 
+    inventory["example_confined_return_canary"] = [
+        name for name, _ in test_declarations(crate / "examples/confined-return-canary.rs")
+    ]
     for target in EXPECTED_COUNTS:
         inventory.setdefault(target, [])
         duplicates = sorted(
@@ -161,6 +168,10 @@ def header_target(kind: str, path: str, executable: str) -> str:
         return targets[name]
     if kind == "unittests" and path == "src/main.rs" and Path(executable).name.startswith("chio_cage_init-"):
         return "bin_chio_cage_init"
+    if kind == "unittests" and path == "src/bin/chio-confined-reader.rs":
+        return "bin_chio_confined_reader"
+    if kind == "unittests" and path == "examples/confined-return-canary.rs":
+        return "example_confined_return_canary"
     if kind == "tests/" and path.endswith(".rs"):
         return Path(path).stem
     raise InventoryError(f"unrecognized chio-cage target header: {kind}{path}")

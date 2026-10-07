@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.computer/schemas/chio-wire/v1/recovery/semantic-provider-response.schema.json",
+  "title": "Semantic Provider Response V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "provider",
+    "account",
+    "resource",
+    "checked_provider_version",
+    "operation",
+    "attempt",
+    "payload"
+  ],
+  "properties": {
+    "provider": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "account": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "resource": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "checked_provider_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "x-maxUtf8Bytes": 128
+    },
+    "operation": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "attempt": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "x-maxUtf8Bytes": 128
+    },
+    "payload": {
+      "$ref": "semantic-payload.schema.json"
+    }
+  },
+  "$defs": {
+    "opaqueId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "not": { "pattern": "[\\r\\n]" }
+    }
+  }
+}

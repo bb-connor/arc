@@ -24,12 +24,14 @@ pub mod event;
 pub mod flow;
 pub mod migration;
 pub mod ports;
+pub mod recovery;
 pub mod response;
 pub mod response_dispatch;
 mod response_domains;
 pub mod response_execution;
 pub mod response_simulation;
 pub mod response_state;
+pub mod semantic;
 
 pub use response_dispatch::DispatchRejection;
 pub use response_execution::{
@@ -95,3 +97,5 @@ pub use response::{
 
 #[cfg(kani)]
 pub mod kani_public_harnesses;
+pub mod confinement;
+pub mod knowledge;

@@ -12,6 +12,7 @@ pub(super) fn projection_reference_digest(
         "security_participant_checkpoint" => {
             crate::admission_operation_store::security_participant_checkpoint_projection_reference(connection,key,sequence)
         }
+        "recovery" => crate::admission_operation_store::recovery_projection_reference(connection,key,sequence),
         "native_dispatch_ledger" => {
             crate::admission_operation_store::native_dispatch_ledger_projection_reference(
                 connection, key, sequence,

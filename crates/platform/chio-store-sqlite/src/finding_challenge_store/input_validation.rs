@@ -168,6 +168,10 @@ pub(super) fn admission_error(error: AdmissionOperationStoreError) -> FindingCha
         AdmissionOperationStoreError::Invariant(detail) => {
             FindingChallengeStoreError::Invariant(detail)
         }
+        AdmissionOperationStoreError::RecoveryAuthorityDenied
+        | AdmissionOperationStoreError::RecoveryMediationRequired => {
+            invariant("recovery preview refusal is outside this store")
+        }
         AdmissionOperationStoreError::Operation(error) => invariant(error.to_string()),
     }
 }

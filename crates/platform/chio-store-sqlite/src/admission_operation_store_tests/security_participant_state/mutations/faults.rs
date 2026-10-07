@@ -108,7 +108,8 @@ fn restoring_database_before_join_cannot_erase_acknowledged_mutation_history() -
     let initialized = hydrate(&fixture, &source)?;
     let (context, request) = request("native-join")?;
     let (operation, lease) = setup(&fixture, "native-operation", &context)?;
-    let backup = fixture._temp.path().join("before-join.db");
+    // Preserve SQLite's no-symlink policy when temporary paths use an alias.
+    let backup = fs::canonicalize(fixture._temp.path())?.join("before-join.db");
     fixture
         .store
         .connection()?

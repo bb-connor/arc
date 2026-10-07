@@ -31,7 +31,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
-          ref: project/roadmap-04-25-2026
+          # Override this repository variable for a non-default release branch.
+          ref: ${{ vars.CHIO_RELEASE_BRANCH || github.event.repository.default_branch }}
           token: ${{ secrets.GITHUB_TOKEN }}
           persist-credentials: true
 
@@ -122,7 +123,7 @@ jobs:
       - name: Open PR
         uses: peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c
         with:
-          base: project/roadmap-04-25-2026
+          base: ${{ vars.CHIO_RELEASE_BRANCH || github.event.repository.default_branch }}
           branch: chore/release-tagged-${{ steps.compute.outputs.tag }}
           title: "chore(replay): append ${{ steps.compute.outputs.tag }} to release_compat_matrix.toml"
           body: |

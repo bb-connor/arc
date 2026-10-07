@@ -438,7 +438,7 @@ async fn manager_cursor_advances_past_dlq() {
 
     drop(conn);
 
-    // Phase 1: fail all 5 receipts.
+    // Failing exporter: fail all 5 receipts.
     let mut mgr1 = ExporterManager::new(SiemConfig {
         db_path: db_path.clone(),
         poll_interval: Duration::from_millis(60),
@@ -460,13 +460,16 @@ async fn manager_cursor_advances_past_dlq() {
         mgr1
     });
     tokio::time::sleep(Duration::from_millis(200)).await;
-    tx1.send(true).expect("cancel phase 1");
-    let mgr1 = h1.await.expect("phase 1 manager completes");
+    tx1.send(true).expect("cancel failing exporter");
+    let mgr1 = h1.await.expect("failing exporter manager completes");
 
     // All 5 receipts should be DLQ'd.
-    assert!(mgr1.dlq_len() > 0, "phase 1: events must be in DLQ");
+    assert!(
+        mgr1.dlq_len() > 0,
+        "failing exporter: events must be in DLQ"
+    );
 
-    // Phase 2: Insert 3 more receipts, run with counting exporter.
+    // Counting exporter: insert 3 more receipts, run with counting exporter.
     let conn2 = Connection::open(&db_path).expect("reopen db");
     for i in 5..8usize {
         insert_receipt(&conn2, &make_receipt(&format!("mgr-dlq-rcpt-{i:04}")));
@@ -495,16 +498,16 @@ async fn manager_cursor_advances_past_dlq() {
         mgr2
     });
     tokio::time::sleep(Duration::from_millis(200)).await;
-    tx2.send(true).expect("cancel phase 2");
-    h2.await.expect("phase 2 manager completes");
+    tx2.send(true).expect("cancel counting exporter");
+    h2.await.expect("counting exporter manager completes");
 
-    // Phase 2 manager starts from cursor=0 and exports all 8 receipts successfully.
-    // This proves that the DLQ'd phase 1 receipts did not corrupt the database,
+    // The counting exporter manager starts from cursor=0 and exports all 8 receipts successfully.
+    // This proves that the DLQ'd failed receipts did not corrupt the database,
     // and that after cursor advancement, new receipts can be exported cleanly.
     assert_eq!(
         counter.total(),
         8,
-        "phase 2 counting exporter must export all 8 receipts (5 original + 3 new)"
+        "counting exporter must export all 8 receipts (5 original + 3 new)"
     );
 
     let _ = std::fs::remove_file(&db_path);

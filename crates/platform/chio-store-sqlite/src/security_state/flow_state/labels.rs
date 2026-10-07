@@ -1,5 +1,69 @@
 use super::*;
 
+/// Effective source data before the exact lineage has performed its first
+/// join. Reading inherited restrictions neither creates the missing epoch nor
+/// substitutes an effective generation for an absent stored context.
+pub(super) fn load_observed_flow_snapshot(
+    connection: FlowReader<'_>,
+    key: &FlowStateKey,
+) -> PortResult<Option<FlowStateSnapshot>> {
+    if isolation_epoch_exists(connection, key)? {
+        return load_scoped_flow_snapshot(connection, key);
+    }
+    let principal = load_principal_label(connection, key)?;
+    let lineage = load_lineage_label(connection, key)?;
+    let session = load_session_label(connection, key)?;
+    let session_membership = session_membership_exists(connection, key)?;
+    if load_context_generation(connection, key)?.is_some()
+        || session.is_some() != session_membership
+    {
+        return Err(PortError::integrity_failure());
+    }
+    // A shared principal or session must belong to this same authority's
+    // established principal epoch. A colliding row cannot bootstrap an epoch.
+    let principal_epoch_exists: bool = connection
+        .query_row(
+            sql::HAS_PRINCIPAL_EPOCH,
+            params![
+                key.tenant_id.as_str(),
+                key.principal_id.as_str(),
+                key.isolation_epoch_id.as_str()
+            ],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)?;
+    if principal.is_some() != principal_epoch_exists || session.is_some() && principal.is_none() {
+        return Err(PortError::integrity_failure());
+    }
+    let generation = [principal.as_ref(), lineage.as_ref(), session.as_ref()]
+        .into_iter()
+        .flatten()
+        .map(|(_, generation)| *generation)
+        .max();
+    let Some(context_generation) = generation else {
+        return Ok(None);
+    };
+    let principal_label = principal
+        .map(|(label, _)| label)
+        .unwrap_or_else(InformationLabel::bottom);
+    let lineage_label = lineage
+        .map(|(label, _)| label)
+        .unwrap_or_else(InformationLabel::bottom);
+    let session_label = session
+        .map(|(label, _)| label)
+        .unwrap_or_else(InformationLabel::bottom)
+        .join_restrictions(&principal_label)
+        .and_then(|label| label.join_restrictions(&lineage_label))
+        .map_err(|_| PortError::integrity_failure())?;
+    Ok(Some(FlowStateSnapshot {
+        key: key.clone(),
+        principal_label,
+        lineage_label,
+        session_label,
+        context_generation,
+    }))
+}
+
 pub(super) fn load_scoped_flow_snapshot(
     connection: FlowReader<'_>,
     key: &FlowStateKey,

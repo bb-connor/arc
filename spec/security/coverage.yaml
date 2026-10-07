@@ -1,34 +1,34 @@
 # Threat-model coverage map.
 #
 # Source of truth: spec/security/chio-threat-model.v1.json.
-# File shape pinned by M05 P5.T1 (chio-threat-model.schema.json
-# coverage_state enum = {covered, partial, pending}).
+# File shape: chio-threat-model.schema.json, with
+# coverage_state enum = {covered, partial, pending}.
 #
 # CI gate: scripts/check-threat-coverage.sh treats `covered` as PASS,
 # fails on `partial`, and accepts `pending` only with a non-empty
 # `deferred_to` field.
 #
-# Each entry records the threat ID, its coverage_state, the milestone
-# that handed it to coverage, and the in-tree backing tests / fixtures
+# Each entry records the threat ID, its coverage_state, the owning component
+# and the in-tree backing tests / fixtures
 # the operator can grep to verify the claim.
 
 schema: chio.security.coverage/v1
 updated_at: "2026-05-03"
 
 threats:
-  # The initial threat register (six initial IDs) is owned by M05 P5.T3 test
+  # The initial threat register (six initial IDs) is owned by conformance test
   # bodies and is not surfaced here until the chio-conformance threat
   # tests land. The gate evaluates any ID present in the threat-model
   # JSON; missing entries surface as `pending` without `deferred_to`
   # which fails the gate closed by design.
 
-  # M10 P2 closes passkey_credential_theft via:
+  # Passkey credential-theft coverage uses:
   #   - crates/trust/chio-custody-hw/src/verifier.rs (PasskeyVerifier)
   #   - crates/trust/chio-custody-hw/src/nonce_store.rs (replay-resistant store)
-  #   - crates/trust/chio-custody-hw/src/revocation.rs (M04 oracle cascade)
+  #   - crates/trust/chio-custody-hw/src/revocation.rs (oracle cascade)
   #   - crates/trust/chio-custody-hw/tests/replay_resistance.rs
   #   - crates/trust/chio-custody-hw/tests/revocation_cascade.rs
-  #   - crates/trust/chio-custody-hw/tests/end_to_end.rs (M10.P2.T6)
+  #   - crates/trust/chio-custody-hw/tests/end_to_end.rs
   - id: passkey_credential_theft
     coverage_state: covered
     owned_by: M10
@@ -41,7 +41,7 @@ threats:
       - crates/trust/chio-custody-hw/tests/revocation_cascade.rs
       - crates/trust/chio-custody-hw/tests/end_to_end.rs
 
-  # M10 P2.T4 audience-confusion property test exercises bit-flips on
+  # The audience-confusion property test exercises bit-flips on
   # the audience field of every minted PasskeyCapability and asserts
   # cross-audience presentation rejects fail-closed.
   - id: audience_confusion
@@ -52,7 +52,7 @@ threats:
       - crates/trust/chio-custody-hw/src/capability.rs
       - crates/trust/chio-custody-hw/tests/audience_confusion.rs
 
-  # M05 P1 closes weights_hash_spoof by adding a loaded-weight digest
+  # Weight-hash spoofing coverage uses a loaded-weight digest
   # surface to the provider conformance contract. Local providers can
   # recompute the digest from loaded bytes; hosted APIs and protocol
   # bridges return LoadedWeightsUnavailable, which the kernel binding
@@ -99,7 +99,7 @@ threats:
       - crates/kernel/chio-kernel/tests/pq_key_load_after_self_quote.rs
       - crates/tooling/chio-conformance/tests/threats/tee_quote_forgery.rs
 
-  # M05 closes the initial register threats via chio-conformance threat
+  # The initial register threats are covered by chio-conformance threat
   # tests + chio-adversarial-suite cases. coveredBy mirrors the JSON
   # source-of-truth in spec/security/chio-threat-model.v1.json.
   - id: capability_token_theft

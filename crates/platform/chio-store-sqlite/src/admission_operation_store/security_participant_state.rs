@@ -9,9 +9,16 @@ mod cold;
 pub(super) mod dispatch_ledger;
 pub(super) mod egress;
 pub(super) mod nonce_preflight;
+mod recovery_basis;
+pub(in crate::admission_operation_store) use recovery_basis::{
+    prove_recovery_source_history, prove_semantic_before_input_source_history,
+    prove_semantic_source_history,
+};
 pub(super) mod output;
 pub(crate) use nonce_preflight::NativeNoncePreflightJoinAuthority;
 pub(crate) use output::NativeOutputJoinAuthority;
+pub(super) mod knowledge;
+pub(crate) use knowledge::NativeKnowledgeJoinAuthority;
 mod history;
 #[cfg(feature = "admission-test-support")]
 mod image_visit_test_support;
@@ -302,3 +309,5 @@ fn cutpoint(stage: u8) -> Result<(), AdmissionOperationStoreError> {
 fn cutpoint(_: u8) -> Result<(), AdmissionOperationStoreError> {
     Ok(())
 }
+
+pub(super) use observation::verify_recovery_initialization;

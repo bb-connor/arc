@@ -239,7 +239,7 @@ fn nitro_backend_rejects_tdx_and_sev_snp_fixtures() {
 
 #[test]
 fn corpus_filename_prefix_convention_is_present_for_forward_kinds() {
-    // The SEV-SNP and Nitro corpora landing in P4 follow the
+    // The SEV-SNP and Nitro corpora follow the
     // `<kind>_*.bin` convention. Pin that here so the gate-side
     // grep for /(tdx_|sev_snp_|nitro_)/ keeps passing.
     let sev_snp_root = fixtures_root_for("sev_snp");

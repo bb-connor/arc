@@ -19,8 +19,8 @@
 #   libfuzzer_crash            crash file promoted via promote_fuzz_seed.sh --mode libfuzzer
 #   adversarial_curated        hand-written adversarial vector
 #   adversarial_promoted       crash promoted via promote_fuzz_seed.sh --mode adversarial
-#   m03_counterexample         minimised counterexample from chio-policy proptests
-#   m02_verdict_divergence     promoted from cross-SDK verdict divergence
+#   policy_counterexample         minimised counterexample from chio-policy proptests
+#   sdk_verdict_divergence     promoted from cross-SDK verdict divergence
 #
 # The script enforces, fail-closed:
 #   1. Every file under fuzz/corpus/ has exactly one [[seed]] entry.
@@ -80,8 +80,8 @@ VALID_SOURCES = {
     "libfuzzer_crash",
     "adversarial_curated",
     "adversarial_promoted",
-    "m03_counterexample",
-    "m02_verdict_divergence",
+    "policy_counterexample",
+    "sdk_verdict_divergence",
 }
 
 VALID_CLASSES = {

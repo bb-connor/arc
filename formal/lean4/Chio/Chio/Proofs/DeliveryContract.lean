@@ -15,8 +15,8 @@
   `SettlementGate.admit` means only that the bounded kernel decision permits
   the existing settlement machinery to continue.
 
-  M3 implements the digest comparison and `deniedAfterDelivery` terminal.
-  The finding-purchase input records the composition boundary supplied by M4;
+  Delivery verification implements the digest comparison and `deniedAfterDelivery` terminal.
+  The finding-purchase input records the composition boundary supplied by finding-purchase verification;
   this module is a bounded decision model, not a refinement proof for either
   Rust implementation.
 -/
@@ -149,7 +149,7 @@ theorem missing_required_purchase_rejects_before_delivery :
       { decision := Decision.denyBeforeDelivery, settlement := SettlementGate.block } := by
   rfl
 
-/-- Negative M3 case: a generic required digest mismatch denies after delivery. -/
+/-- Negative delivery case: a generic required digest mismatch denies after delivery. -/
 theorem generic_required_digest_mismatch_denies_after_delivery :
     finalize
       { requiresFindingPurchase := false, requiresOutputDigest := true }

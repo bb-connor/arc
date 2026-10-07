@@ -988,7 +988,7 @@ fn insert_blob_bytes_tx(
     }
 }
 
-fn load_resolved_blob_connection(
+pub(crate) fn load_resolved_blob_connection(
     connection: &Connection,
     outcome: &ToolOutcomeRecordV1,
 ) -> Result<Option<CanonicalResolvedOutputBlobV1>, ToolOutcomeStoreError> {
@@ -1198,7 +1198,7 @@ fn load_outcome_tx(
     load_outcome_connection(transaction, operation_id.as_str())
 }
 
-fn load_outcome_connection(
+pub(crate) fn load_outcome_connection(
     connection: &Connection,
     operation_id: &str,
 ) -> Result<Option<ToolOutcomeRecordV1>, ToolOutcomeStoreError> {
@@ -1525,6 +1525,10 @@ fn admission_error(error: AdmissionOperationStoreError) -> ToolOutcomeStoreError
             ToolOutcomeStoreError::Unavailable(detail)
         }
         AdmissionOperationStoreError::Invariant(detail) => ToolOutcomeStoreError::Invariant(detail),
+        AdmissionOperationStoreError::RecoveryAuthorityDenied
+        | AdmissionOperationStoreError::RecoveryMediationRequired => {
+            invariant("recovery preview refusal is outside this store")
+        }
         AdmissionOperationStoreError::Operation(error) => invariant(error.to_string()),
     }
 }

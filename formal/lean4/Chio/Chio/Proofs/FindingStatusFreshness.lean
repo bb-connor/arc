@@ -1,10 +1,10 @@
 /-
   Finding-status freshness and rollback model.
 
-  This bounded model captures the pure decision rules used by the M6
-  finding-status verifier. Cryptographic signature, canonical JSON, sparse
+  This bounded model captures the pure decision rules used by the finding-status
+  verifier. Cryptographic signature, canonical JSON, sparse
   path, and durable-storage correctness remain implementation checks and
-  audited assumptions. The model proves the two roadmap properties:
+  audited assumptions. The model proves the two security properties:
 
   * a root that advances a durable feed floor has a strictly greater map
     epoch; and
@@ -85,7 +85,7 @@ structure NonInclusionInput where
   validUntil : Nat
 deriving DecidableEq, Repr
 
-/-- Bounded M6 non-inclusion decision. Pending and retracted observations are
+/-- Bounded finding-status non-inclusion decision. Pending and retracted observations are
     sticky and therefore cannot be cleared by another absence proof. -/
 def admitsNonInclusion
     (sticky : StickyStatus)

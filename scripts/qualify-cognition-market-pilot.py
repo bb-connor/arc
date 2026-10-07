@@ -571,7 +571,7 @@ def qualify(binary: Path, output: Path, candidate_sha: str) -> dict[str, Any]:
     if not binary.is_file():
         raise RuntimeError(f"chio binary does not exist: {binary}")
     output.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="chio-m10-pilot-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="chio-cognition-pilot-") as temporary:
         temporary_root = Path(temporary)
         repository = temporary_root / "task-repository"
         revisions = create_corpus(repository)

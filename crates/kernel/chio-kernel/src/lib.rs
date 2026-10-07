@@ -131,6 +131,8 @@ pub mod receipt_store;
 #[cfg(not(loom))]
 mod receipt_support;
 #[cfg(not(loom))]
+pub mod recovery;
+#[cfg(not(loom))]
 mod replay_retention;
 #[cfg(not(loom))]
 mod request_matching;
@@ -608,9 +610,9 @@ pub use revocation_store::{RevocationRecord, RevocationStoreError};
 #[cfg(not(loom))]
 pub use runtime::{
     BlockingToolServerAdapter, BlockingToolServerConnection, NestedFlowBridge, NestedFlowClient,
-    ToolCallChunk, ToolCallOutput, ToolCallRequest, ToolCallResponse, ToolCallStream,
-    ToolDispatchContext, ToolInvocationContext, ToolInvocationCost, ToolServerConnection,
-    ToolServerEvent, ToolServerOutput, ToolServerStreamResult, Verdict,
+    RecoveryRequestCustody, ToolCallChunk, ToolCallOutput, ToolCallRequest, ToolCallResponse,
+    ToolCallStream, ToolDispatchContext, ToolInvocationContext, ToolInvocationCost,
+    ToolServerConnection, ToolServerEvent, ToolServerOutput, ToolServerStreamResult, Verdict,
 };
 #[cfg(not(loom))]
 pub use runtime_trace::{RuntimeTraceEvent, RuntimeTraceObserver};
@@ -686,8 +688,9 @@ pub use kernel::{
     MemoryBudgetConfig, NativeSecurityAdmissionContext, NativeSecurityFlowJoinAuthority,
     NativeSecurityNoncePreflightJoinAuthority, NestedToolCallProofs, OverloadResource,
     PreDispatchActiveResponseReconstruction, PreparedActiveResponseAdmission,
-    PreparedNativeSecurityEgress, PromptProvider, ProtocolRefusalReason, ProtocolRefusalSummary,
-    ProtocolRequestDigest, ProtocolRequestDigestSource, ReceiptDeliveryStep, ReceiptLog,
+    PreparedNativeSecurityEgress, PreparedNativeSecurityEgressCommit, PromptProvider,
+    ProtocolRefusalReason, ProtocolRefusalSummary, ProtocolRequestDigest,
+    ProtocolRequestDigestSource, ReceiptDeliveryStep, ReceiptLog,
     ReplayClockDirection, ResourceProvider, ResponseDispatchPreparationRequest,
     RuntimeAdmissionContext, RuntimeAdmissionDecision, RuntimeAdmissionHook,
     RuntimeAdmissionReadinessToken, RuntimeAdmissionRevalidationContext,
@@ -712,10 +715,6 @@ pub use kernel::DurableFinalizationCutpoint;
 #[cfg(all(not(loom), feature = "admission-test-support"))]
 pub use kernel::DurableFinalizationCutpointHook;
 #[cfg(all(not(loom), feature = "admission-test-support"))]
-pub use kernel::NativeSecurityCaptureCheckpointHook;
-#[cfg(not(loom))]
-pub use kernel::NativeSecurityDispatchCaptureAuthority;
-#[cfg(all(not(loom), feature = "admission-test-support"))]
 pub use kernel::NativeSecurityEgressCheckpointHook;
 #[cfg(not(loom))]
 pub use kernel::NativeSecurityOutputJoinAuthority;
@@ -725,6 +724,12 @@ pub use kernel::VerifiedNativeDispatchCredentials;
 pub use kernel::{CallerExecutionCheckpoint, CallerExecutionCheckpointHook};
 #[cfg(not(loom))]
 pub use kernel::{CallerExecutionReport, CallerStartCredentials, CallerStartResponse};
+#[cfg(not(loom))]
+pub use kernel::{
+    NativeFlowPolicyRefusal, NativeFlowPolicyRefusalOwner, NativeSecurityDispatchCaptureAuthority,
+};
+#[cfg(all(not(loom), feature = "admission-test-support"))]
+pub use kernel::{NativeSecurityCaptureCheckpointHook, NativeSecurityCaptureObserver};
 
 #[cfg(not(loom))]
 /// Settlement observer surface. Re-exported so integration tests and
@@ -751,3 +756,6 @@ pub use kernel::signing_task::METRIC_CHIO_SIGNING_QUEUE_BLOCK_TOTAL;
 
 #[cfg(all(not(loom), feature = "admission-test-support"))]
 pub use kernel::active_response_test_support;
+
+#[cfg(not(loom))]
+pub mod knowledge;
