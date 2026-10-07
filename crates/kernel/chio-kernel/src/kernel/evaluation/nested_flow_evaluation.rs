@@ -1215,22 +1215,10 @@ impl ChioKernel {
                     verified_payee_binding: verified_governed_payee_binding.as_ref(),
                     budget_lease_acquired,
                 };
-                let credential_disposition = if payment_authorization.is_some() {
-                    PaymentCredentialDisposition::RetainedAfterAuthorization
-                } else {
-                    PaymentCredentialDisposition::NonePresent
-                };
-                if refusal.cancellation.is_some() {
-                    self.build_pre_dispatch_cleanup_cancelled_response_with_credentials(
-                        cleanup,
-                        credential_disposition,
-                    )
-                } else {
-                    self.build_pre_dispatch_cleanup_deny_response_with_credentials(
-                        cleanup,
-                        credential_disposition,
-                    )
-                }
+                self.build_session_dispatch_refusal_response(
+                    cleanup,
+                    refusal.cancellation.is_some(),
+                )
             });
         }
 

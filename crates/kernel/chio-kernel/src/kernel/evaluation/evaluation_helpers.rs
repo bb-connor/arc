@@ -497,17 +497,25 @@ impl ChioKernel {
         )
     }
 
-    /// Runs the same pre-dispatch cleanup as a denial, then signs the host
-    /// cancellation that won the dispatch-start boundary as a cancelled outcome.
-    pub(super) fn build_pre_dispatch_cleanup_cancelled_response_with_credentials(
+    /// Preserve the host cancellation decision through the shared cleanup owner.
+    pub(super) fn build_session_dispatch_refusal_response(
         &self,
-        cancellation: PreDispatchCleanupDeny<'_>,
-        credential_disposition: PaymentCredentialDisposition,
+        cleanup: PreDispatchCleanupDeny<'_>,
+        cancelled: bool,
     ) -> Result<ToolCallResponse, KernelError> {
+        let credential_disposition = if cleanup.payment_authorization.is_some() {
+            PaymentCredentialDisposition::RetainedAfterAuthorization
+        } else {
+            PaymentCredentialDisposition::NonePresent
+        };
         self.build_pre_dispatch_cleanup_response(
-            cancellation,
+            cleanup,
             credential_disposition,
-            PreDispatchCleanupOutcome::Cancelled,
+            if cancelled {
+                PreDispatchCleanupOutcome::Cancelled
+            } else {
+                PreDispatchCleanupOutcome::Denied
+            },
         )
     }
 
