@@ -12,6 +12,10 @@ gate_fixture="$work/check-cage-enforcement.sh"
 candidate_artifacts="$work/candidate-artifacts"
 verifier_artifacts="$work/verifier-artifacts"
 mkdir -p "$trusted_root" "$candidate_artifacts" "$verifier_artifacts"
+ld_cache="$work/etc/ld.so.cache"
+musl_loader="$work/musl/ld-musl-x86_64.so.1"
+mkdir -p "$(dirname "$ld_cache")" "$(dirname "$musl_loader")"
+: >"$musl_loader"
 cp "$repo_root/scripts/check-linux-enforcement-stack.py" \
   "$trusted_root/check-linux-enforcement-stack.py"
 cp "$repo_root/scripts/check-cage-all-target-inventory.py" \
@@ -23,7 +27,8 @@ python3 - \
   "$trusted_root" \
   "$gate_fixture" \
   "$candidate_artifacts" \
-  "$verifier_artifacts" <<'PY'
+  "$verifier_artifacts" \
+  "$ld_cache" <<'PY'
 import sys
 from pathlib import Path
 
@@ -33,6 +38,7 @@ trusted_root = Path(sys.argv[2])
 fixture = Path(sys.argv[3])
 candidate_artifacts = Path(sys.argv[4])
 verifier_artifacts = Path(sys.argv[5])
+ld_cache = Path(sys.argv[6])
 source = (repo_root / "scripts/check-cage-enforcement.sh").read_text(encoding="utf-8")
 replacements = {
     "/private/candidate": str(repo_root),
@@ -64,6 +70,7 @@ runner_replacements = {
     '[[ ! "$verifier_artifacts" =~ ^/baseline/candidate-state/[a-f0-9]{64}/verifier/artifacts$ ]]': (
         f'[[ "$verifier_artifacts" != "{verifier_artifacts}" ]]'
     ),
+    "/etc/ld.so.cache": str(ld_cache),
 }
 for old, new in runner_replacements.items():
     if old not in runner_source:
@@ -110,9 +117,24 @@ EOF
 
 cat >"$fake_bin/ldd" <<'EOF'
 #!/usr/bin/env bash
-printf 'libc.so.6 => /bin/sh (0x1)\n'
-printf 'libm.so.6 => /bin/ls (0x2)\n'
-printf '\t/bin/cat (0x3)\n'
+case "${FAKE_LDD_MODE:-glibc}" in
+  glibc)
+    printf 'libc.so.6 => /bin/sh (0x1)\n'
+    printf 'libm.so.6 => /bin/ls (0x2)\n'
+    printf '\t/bin/cat (0x3)\n'
+    ;;
+  musl)
+    printf '\t/lib/ld-musl-x86_64.so.1 (0x72361b094000)\n'
+    printf '\tlibc.musl-x86_64.so.1 => /lib/ld-musl-x86_64.so.1 (0x72361b094000)\n'
+    ;;
+  musl_without_libc)
+    printf '\t/lib/ld-musl-x86_64.so.1 (0x72361b094000)\n'
+    ;;
+  musl_without_interpreter)
+    printf '\tlibc.musl-x86_64.so.1 => /lib/ld-musl-x86_64.so.1 (0x72361b094000)\n'
+    ;;
+  *) exit 64 ;;
+esac
 EOF
 
 cat >"$fake_bin/readlink" <<'EOF'
@@ -122,6 +144,10 @@ set -euo pipefail
 shift
 if [[ "${1:-}" == "--" ]]; then
   shift
+fi
+if [[ "$1" == "/lib/ld-musl-x86_64.so.1" ]]; then
+  /bin/realpath "${FAKE_MUSL_LOADER:?}"
+  exit
 fi
 /bin/realpath "$1"
 EOF
@@ -369,7 +395,15 @@ chmod 700 "$fake_bin"/*
 run_gate() {
   local runner="$1"
   local cargo_mode="$2"
+  local ldd_mode="${3:-glibc}"
   local output="$work/$runner-$cargo_mode.out"
+  if [[ "$ldd_mode" != "glibc" ]]; then
+    output="$work/$runner-$cargo_mode-$ldd_mode.out"
+  fi
+  rm -f "$ld_cache"
+  if [[ "$ldd_mode" == "glibc" ]]; then
+    : >"$ld_cache"
+  fi
   set +e
   (
     cd "$repo_root"
@@ -384,6 +418,8 @@ run_gate() {
         CHIO_SECURITY_CANDIDATE_ARTIFACTS="$candidate_artifacts" \
         CHIO_SECURITY_VERIFIER_ARTIFACTS="$verifier_artifacts" \
         FAKE_CARGO_MODE="$cargo_mode" \
+        FAKE_LDD_MODE="$ldd_mode" \
+        FAKE_MUSL_LOADER="$musl_loader" \
         "$gate_fixture" --release
     else
       PATH="$fake_bin:$PATH" \
@@ -422,6 +458,24 @@ if [[ "$status" -ne 0 ]]; then
 fi
 grep -Eq '^CHIO_CAGE_REAL_LINUX_EVIDENCE challenge=[a-f0-9]{64} all_targets=102 probes=38 mutations=10$' \
   "$work/1-success.out"
+
+status="$(run_gate 1 success musl)"
+if [[ "$status" -ne 0 ]]; then
+  cat "$work/1-success-musl.out" >&2
+  exit "$status"
+fi
+grep -Eq '^CHIO_CAGE_REAL_LINUX_EVIDENCE challenge=[a-f0-9]{64} all_targets=102 probes=38 mutations=10$' \
+  "$work/1-success-musl.out"
+
+for ldd_mode in musl_without_libc musl_without_interpreter; do
+  status="$(run_gate 1 success "$ldd_mode")"
+  if [[ "$status" -eq 0 ]]; then
+    echo "release mode accepted dynamic runtime mode $ldd_mode" >&2
+    exit 1
+  fi
+  grep -Fq 'dynamic probe did not resolve an interpreter and shared library' \
+    "$work/1-success-$ldd_mode.out"
+done
 
 python3 scripts/tests/check-cage-all-target-inventory.test.py
 

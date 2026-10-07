@@ -110,7 +110,16 @@ for path in "${dynamic_paths[@]}"; do
     dynamic_runtime_paths+=("$resolved")
   fi
 done
-if [[ "${#dynamic_runtime_paths[@]}" -lt 2 ]]; then
+dynamic_interpreter="$(awk '/^[[:space:]]*\// { print $1; exit }' <<<"$dynamic_dependencies")"
+dynamic_libc="$(awk '$1 ~ /^libc\./ && $2 == "=>" && $3 ~ /^\// { print $3; exit }' <<<"$dynamic_dependencies")"
+combined_loader_libc=0
+# musl ships its dynamic loader and libc as one file, so ldd resolves both to it.
+if [[ "${#dynamic_runtime_paths[@]}" -eq 1 ]] &&
+  [[ -n "$dynamic_interpreter" ]] && [[ -n "$dynamic_libc" ]] &&
+  [[ "$(readlink -e -- "$dynamic_libc")" == "$(readlink -e -- "$dynamic_interpreter")" ]]; then
+  combined_loader_libc=1
+fi
+if [[ "${#dynamic_runtime_paths[@]}" -lt 2 ]] && [[ "$combined_loader_libc" -ne 1 ]]; then
   echo "dynamic probe did not resolve an interpreter and shared library" >&2
   exit 1
 fi
