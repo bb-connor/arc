@@ -319,9 +319,13 @@ impl ProductionRuntimeLeaseState {
         }
     }
 
-    fn ensure_worker_admission_ready(&self) -> Result<(), ResponseWorkerTickError> {
+    /// Reaches lifecycle-owner and worker port I/O, so callers never hold
+    /// the control mutex across it.
+    fn ensure_worker_admission_ready(
+        &self,
+        worker: &ProductionResponseWorker,
+    ) -> Result<(), ResponseWorkerTickError> {
         self.security_state_authority.ensure_owned()?;
-        let worker = self.bound_worker()?;
         worker
             .ensure_ready()
             .map_err(|_| ResponseWorkerTickError::RuntimeAdmissionClosed)?;
@@ -330,6 +334,29 @@ impl ProductionRuntimeLeaseState {
         } else {
             Err(ResponseWorkerTickError::RuntimeAdmissionClosed)
         }
+    }
+
+    fn ensure_published_worker(
+        &self,
+        control: &ProductionRuntimeLeaseControl,
+        worker: &Arc<ProductionResponseWorker>,
+    ) -> Result<(), ResponseWorkerTickError> {
+        if !matches!(control.phase, ProductionRuntimeAdmissionPhase::Published) {
+            return Err(ResponseWorkerTickError::RuntimeAdmissionClosed);
+        }
+        if Arc::ptr_eq(worker, &self.bound_worker()?) {
+            Ok(())
+        } else {
+            Err(ResponseWorkerTickError::RuntimeAdmissionClosed)
+        }
+    }
+
+    fn published_worker(&self) -> Result<Arc<ProductionResponseWorker>, ResponseWorkerTickError> {
+        let control = self.control.lock().map_err(|_| PortError::unavailable())?;
+        if !matches!(control.phase, ProductionRuntimeAdmissionPhase::Published) {
+            return Err(ResponseWorkerTickError::RuntimeAdmissionClosed);
+        }
+        self.bound_worker()
     }
 
     fn admission_published(&self) -> bool {
@@ -546,47 +573,54 @@ impl ProductionDeclassificationReceiptLifecycle {
     }
 
     pub(super) fn ensure_runtime_admission_open(&self) -> Result<(), ResponseWorkerTickError> {
-        let control = self
-            .runtime_leases
-            .control
-            .lock()
-            .map_err(|_| PortError::unavailable())?;
-        if !matches!(control.phase, ProductionRuntimeAdmissionPhase::Published) {
-            return Err(ResponseWorkerTickError::RuntimeAdmissionClosed);
+        let worker = self.runtime_leases.published_worker()?;
+        self.runtime_leases.ensure_worker_admission_ready(&worker)?;
+        if Arc::ptr_eq(&worker, &self.runtime_leases.published_worker()?) {
+            Ok(())
+        } else {
+            Err(ResponseWorkerTickError::RuntimeAdmissionClosed)
         }
-        self.runtime_leases.ensure_worker_admission_ready()
     }
 
+    /// The lease is counted before readiness is probed outside the control
+    /// mutex, so a concurrent close observes it. A failed probe or a phase or
+    /// worker change seen on the recheck drops the counted lease.
     pub(super) fn acquire_consumer_lease_for(
         &self,
         worker: &Arc<ProductionResponseWorker>,
     ) -> Result<ProductionConsumerLease, ResponseWorkerTickError> {
-        let mut control = self
-            .runtime_leases
-            .control
-            .lock()
-            .map_err(|_| PortError::unavailable())?;
-        if !matches!(control.phase, ProductionRuntimeAdmissionPhase::Published) {
-            return Err(ResponseWorkerTickError::RuntimeAdmissionClosed);
+        let lease = {
+            let mut control = self
+                .runtime_leases
+                .control
+                .lock()
+                .map_err(|_| PortError::unavailable())?;
+            self.runtime_leases
+                .ensure_published_worker(&control, worker)?;
+            control.consumer_leases = control
+                .consumer_leases
+                .checked_add(1)
+                .ok_or(ResponseWorkerTickError::InvalidConfig)?;
+            let _ = self
+                .runtime_leases
+                .lease_counts
+                .send_replace(control.lease_counts());
+            ProductionConsumerLease::new(ProductionLifecycleLease {
+                state: Arc::clone(&self.runtime_leases),
+                active: true,
+            })
+        };
+        self.runtime_leases.ensure_worker_admission_ready(worker)?;
+        {
+            let control = self
+                .runtime_leases
+                .control
+                .lock()
+                .map_err(|_| PortError::unavailable())?;
+            self.runtime_leases
+                .ensure_published_worker(&control, worker)?;
         }
-        let retained_worker = self.runtime_leases.bound_worker()?;
-        if !Arc::ptr_eq(worker, &retained_worker) {
-            return Err(ResponseWorkerTickError::RuntimeAdmissionClosed);
-        }
-        self.runtime_leases.ensure_worker_admission_ready()?;
-        control.consumer_leases = control
-            .consumer_leases
-            .checked_add(1)
-            .ok_or(ResponseWorkerTickError::InvalidConfig)?;
-        let _ = self
-            .runtime_leases
-            .lease_counts
-            .send_replace(control.lease_counts());
-        drop(control);
-        Ok(ProductionConsumerLease::new(ProductionLifecycleLease {
-            state: Arc::clone(&self.runtime_leases),
-            active: true,
-        }))
+        Ok(lease)
     }
 
     pub(super) fn bind_worker(
