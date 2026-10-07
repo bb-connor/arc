@@ -65,12 +65,20 @@ pub(super) fn read_legacy(
         }
         cursor = page.next_cursor;
         if remaining == 0 {
-            // One primary-key existence probe allocates/decodes no candidate.
+            // One indexed existence probe allocates/decodes no candidate.
             // Absence proves the stream ended; any raw tail remains unresolved.
             let has_tail: bool = transaction
                 .query_row(
                     "SELECT EXISTS(SELECT 1 FROM admission_operations o
-                 WHERE operation_id > ?1 AND created_at_unix_ms <= ?2
+                 WHERE operation_id IN (
+                         SELECT operation_id FROM admission_operations
+                             INDEXED BY admission_operations_recovery
+                         WHERE terminal=0 AND operation_id > ?1
+                         UNION ALL
+                         SELECT operation_id FROM admission_operation_recovery_deferrals
+                             INDEXED BY admission_operation_recovery_due
+                         WHERE quarantined=1 AND operation_id > ?1)
+                   AND created_at_unix_ms <= ?2
                    AND (terminal=0 OR EXISTS(
                        SELECT 1 FROM admission_operation_recovery_deferrals d
                        WHERE d.operation_id=o.operation_id AND d.quarantined=1))
@@ -118,6 +126,9 @@ fn read_snapshot(
     transaction: &Transaction<'_>,
     query: AdmissionRecoveryPageQuery<'_>,
 ) -> Result<AdmissionRecoveryPageV1, AdmissionOperationStoreError> {
+    // Candidate identities come only from the non-terminal and quarantined
+    // indexes, so a page never steps through retained terminal history. The
+    // outer predicates still decide eligibility exactly.
     let mut statement = transaction
         .prepare(
             "SELECT operation_id, request_namespace_digest, request_id,
@@ -127,7 +138,15 @@ fn read_snapshot(
          recovery_coordinator_lease_epoch, recovery_claimed_version,
          recovery_expires_at_unix_ms, recovery_store_uuid,
          recovery_store_lease_id, recovery_store_owner_epoch
-         FROM admission_operations o WHERE operation_id > ?1
+         FROM admission_operations o
+         WHERE operation_id IN (
+                 SELECT operation_id FROM admission_operations
+                     INDEXED BY admission_operations_recovery
+                 WHERE terminal=0 AND operation_id > ?1
+                 UNION ALL
+                 SELECT operation_id FROM admission_operation_recovery_deferrals
+                     INDEXED BY admission_operation_recovery_due
+                 WHERE quarantined=1 AND operation_id > ?1)
            AND created_at_unix_ms <= ?2
            AND (terminal=0 OR EXISTS(SELECT 1 FROM admission_operation_recovery_deferrals d
                                     WHERE d.operation_id=o.operation_id AND d.quarantined=1))
