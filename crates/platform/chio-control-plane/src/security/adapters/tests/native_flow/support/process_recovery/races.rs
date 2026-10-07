@@ -146,12 +146,13 @@ fn race(pause: Pause, revoke: bool) -> TestResult {
         assert_eq!(operation.dispatch_commit().is_some(), captured);
         assert_eq!(
             (usage.reserved_invocations, usage.captured_invocations),
-            if captured { (0, 1) } else { (1, 0) }
+            if captured { (0, 1) } else { (0, 0) }
         );
         if !captured {
-            // The failed callback retains uncertainty and its unexpired lease.
-            // A replacement serving owner must inspect and compensate the same
-            // physical operation, not infer a refund from the callback error.
+            assert_eq!(
+                operation.state(),
+                AdmissionOperationState::CompensatedBeforeDispatch
+            );
             let old_fence = fixture.authority.mutation_fence();
             drop(store);
             drop(kernel);
