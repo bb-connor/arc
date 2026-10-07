@@ -40,6 +40,8 @@ mod federation_context;
 mod ordinary_operation;
 #[path = "durable_admission_sqlite/payment_recovery.rs"]
 mod payment_recovery;
+#[path = "durable_admission_sqlite/recovery_sweep.rs"]
+mod recovery_sweep;
 #[path = "durable_admission_sqlite/review_boundaries.rs"]
 mod review_boundaries;
 #[path = "durable_admission_sqlite/security_release.rs"]
