@@ -176,10 +176,13 @@ impl ChioKernel {
         let Some(runtime) = self.durable_admission_runtime.as_ref() else {
             return Ok(0);
         };
-        let now = runtime.refresh_trusted_time(0)?;
+        let mut now = 0;
         let mut total = 0_usize;
         let mut cursor = None;
         loop {
+            // The authority validates each page time against its own clock
+            // when the page is read, so no page reuses an earlier sample.
+            now = runtime.refresh_trusted_time(now)?;
             let (changed, next) =
                 self.reconcile_admission_recovery_page(now, 256, cursor.as_ref())?;
             total = total.checked_add(changed).ok_or_else(|| {
