@@ -4,6 +4,8 @@ use super::*;
 
 #[path = "scope_binding.rs"]
 mod scope_binding;
+#[path = "session_boundary.rs"]
+mod session_boundary;
 #[path = "session_cancellation.rs"]
 mod session_cancellation;
 #[path = "session_claim_race.rs"]
