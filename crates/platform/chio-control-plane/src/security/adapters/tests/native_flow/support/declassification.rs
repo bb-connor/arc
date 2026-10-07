@@ -7,6 +7,8 @@ mod rejection;
 
 mod faults;
 
+mod capture_order;
+
 fn fixture() -> TestResult<Fixture> {
     Ok(profile(false, 300)?.0)
 }
