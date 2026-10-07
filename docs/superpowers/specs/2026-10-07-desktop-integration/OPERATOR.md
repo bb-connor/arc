@@ -82,6 +82,18 @@ atomic snapshot. Native `UnknownEffect`, successful execution with refused
 acceptance, withheld result, unpaid obligation and incomplete delivery must remain
 distinguishable. A reference is not proof, a permit, funding or release authority. `WorkAcceptanceV1` derives from the original configured evaluator and evidence contract, never a caller acceptance boolean. Human patch-application approval is separate from work acceptance.
 
+An evaluator that imports, builds or runs candidate-controlled code MUST use a
+separately qualified bounded execution boundary at the existing runner/work
+owner. Immutable oracle fixtures alone do not confine the code they evaluate.
+That execution receives only captured candidate input, pinned dependencies and
+declared fixtures, without ambient host data, credentials, egress, unrelated
+process control or acceptance/signing authority. Trusted result validation and
+W1 acceptance commit remain outside candidate execution; raw stdout/exit status
+cannot impersonate them. Pin and test this evaluator boundary independently of
+the agent/recipe boundary. Missing confinement, failed/unknown evaluation or
+unproven result separation leaves sealed acceptance unavailable. This is an
+execution-profile obligation, not a prerequisite for basic observation.
+
 ## 3. IPC, negotiation and correlation
 
 Linux MUST reuse `chio-secure-ipc` listener custody, peer authentication and

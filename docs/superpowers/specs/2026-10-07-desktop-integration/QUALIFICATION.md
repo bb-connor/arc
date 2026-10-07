@@ -71,6 +71,15 @@ unavailable until its owner implements and qualifies it. The desktop may not
 substitute a weaker path merely because the whole pure-machine/crossing/census
 redesign is not a blanket milestone gate.
 
+Sealed qualification includes the configured evaluator whenever it executes
+candidate imports/builds/tests. Apply Q12/Q19 confinement, resource and closure
+probes to that execution separately from the agent/recipe. A known-good artifact
+must produce a bound valid result; hostile candidate hooks must fail outside
+file/credential access, direct egress, inherited-descriptor and unrelated-process
+effects under independent observers, and must not forge the trusted acceptance
+channel. Failed/unknown evaluation cannot become accepted W1 work. Existing
+unconfined workbench checks and immutable oracle files are insufficient evidence.
+
 ## Native approval defect handoff
 
 The Pi wrapper refuses `approval-decide` before native invocation. The audited
