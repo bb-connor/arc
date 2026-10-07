@@ -130,6 +130,7 @@ jobs:
       - name: Run live C++ conformance areas
         env:
           CHIO_CPP_LIVE_CONFORMANCE: "1"
+          TMPDIR: ${{ runner.temp }}
         run: |
           cargo build --locked -p chio-cli --bin chio --features real-linux-enforcement
           cargo test -p chio-conformance --test mcp_core_cpp_live -- --nocapture
@@ -137,6 +138,15 @@ jobs:
           cargo test -p chio-conformance --test auth_cpp_live -- --nocapture
           cargo test -p chio-conformance --test notifications_cpp_live -- --nocapture
           cargo test -p chio-conformance --test nested_callbacks_cpp_live -- --nocapture
+      - name: Retain public C++ MCP core diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: chio-cpp-conformance-public-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/chio-conformance-mcp-core-cpp-*/results/cpp-failed-scenarios-public.json
+          if-no-files-found: warn
+          include-hidden-files: false
+          retention-days: 7
 
   hardening:
     name: Sanitizers and leaks
