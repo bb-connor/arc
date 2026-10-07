@@ -898,3 +898,51 @@ async fn duplicate_backend_records_never_confirm_a_row() {
         assert_eq!(error.kind(), PortErrorKind::IntegrityFailure, "{label}");
     }
 }
+
+#[tokio::test]
+async fn reopening_accepts_the_exact_backend_outcome_table_with_its_records() {
+    let pagerduty = ScriptedBackend::new(PAGERDUTY, accept_every_dispatch);
+    let opsgenie = ScriptedBackend::new(OPSGENIE, reject_only_the_first_dispatch);
+    let fixture = Fixture::open(&[&pagerduty, &opsgenie]);
+    let alerts = fixture.page_due(1);
+    assert_eq!(
+        report(
+            fixture.deliver(DUE_AT_UNIX_MS, 10).await,
+            "partial delivery"
+        ),
+        dispatch_report([1, 0, 1, 0, 2, 1])
+    );
+    let database = fixture.database();
+    assert_eq!(
+        backend_table_shape(&database),
+        (
+            backend_columns(),
+            vec!["idempotency_key".to_owned(), "backend_name".to_owned()],
+            1
+        ),
+        "precondition: the declared table must hold its composite key and foreign key"
+    );
+    let before = schema_snapshot(&database);
+
+    let reopened = open_outbox(&fixture.path, &[&pagerduty, &opsgenie]);
+    assert_eq!(
+        schema_snapshot(&database),
+        before,
+        "reopening must keep the declared schema unchanged"
+    );
+    assert_eq!(
+        report(
+            reopened.deliver_due(FIRST_RETRY_AT_UNIX_MS, 10).await,
+            "retry after reopen"
+        ),
+        dispatch_report([1, 1, 0, 0, 1, 0])
+    );
+    assert_eq!(
+        (pagerduty.dispatches().len(), opsgenie.dispatches().len()),
+        (1, 2)
+    );
+    assert_eq!(
+        fixture.status(&alerts[0]),
+        Some(delivered(2, FIRST_RETRY_AT_UNIX_MS))
+    );
+}
