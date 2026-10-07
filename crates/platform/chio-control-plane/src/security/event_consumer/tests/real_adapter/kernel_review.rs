@@ -431,3 +431,6 @@ fn deactivation_blocks_signed_simulation() {
     assert_eq!(executor.calls(), 0);
     assert_eq!(effects.executions(), 0);
 }
+
+#[path = "kernel_review/operator_cancel.rs"]
+mod operator_cancel;
