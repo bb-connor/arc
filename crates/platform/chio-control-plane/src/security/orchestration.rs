@@ -692,6 +692,10 @@ impl ResponseWorkerPort for PlanningRecoveryResponseWorkerPort {
         Ok(())
     }
 
+    fn ensure_recovery_ready(&self) -> Result<(), ResponseWorkerTickError> {
+        self.inner.ensure_recovery_ready()
+    }
+
     fn tick(
         &self,
         tick_sequence: u64,

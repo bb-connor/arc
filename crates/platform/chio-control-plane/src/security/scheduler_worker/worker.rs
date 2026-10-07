@@ -44,7 +44,7 @@ impl ProductionResponseWorkerLoopConfig {
 
 impl ProductionResponseWorker {
     pub fn new(port: Arc<dyn ResponseWorkerPort>) -> Result<Self, ResponseWorkerTickError> {
-        port.ensure_ready()?;
+        port.ensure_recovery_ready()?;
         Ok(Self {
             port,
             next_tick_sequence: AtomicU64::new(0),
@@ -91,6 +91,11 @@ impl ProductionResponseWorker {
     ) -> Result<(), ResponseWorkerTickError> {
         self.live_lifecycle()?;
         self.port.ensure_ready()
+    }
+
+    fn ensure_recovery_start_ready(&self) -> Result<(), ResponseWorkerTickError> {
+        self.live_lifecycle()?;
+        self.port.ensure_recovery_ready()
     }
 
     pub fn ensure_ready(&self) -> Result<(), ResponseWorkerTickError> {
@@ -234,7 +239,7 @@ impl ProductionResponseWorker {
         config: ProductionResponseWorkerLoopConfig,
     ) -> Result<ProductionResponseWorkerHandle, ResponseWorkerTickError> {
         let config = config.validate()?;
-        self.ensure_bootstrap_ready()?;
+        self.ensure_recovery_start_ready()?;
         let join_permit = acquire_response_worker_join_permit()?;
         self.loop_started
             .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)

@@ -44,6 +44,13 @@ pub struct ResponseWorkerTick {
 
 pub trait ResponseWorkerPort: Send + Sync {
     fn ensure_ready(&self) -> Result<(), ResponseWorkerTickError>;
+
+    /// Readiness to construct and start a worker that services expiry,
+    /// rollback and receipt recovery. Runtime admission keeps `ensure_ready`.
+    fn ensure_recovery_ready(&self) -> Result<(), ResponseWorkerTickError> {
+        self.ensure_ready()
+    }
+
     fn tick(
         &self,
         tick_sequence: u64,
