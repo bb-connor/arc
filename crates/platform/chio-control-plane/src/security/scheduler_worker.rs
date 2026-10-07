@@ -19,7 +19,6 @@ use chio_security_types::ports::{
 };
 use chio_store_sqlite::security_state::SqliteSecurityStateStore;
 pub use error::ResponseWorkerTickError;
-use rand_core::{OsRng, RngCore};
 use serde::Serialize;
 use std::collections::{BTreeMap, VecDeque};
 use std::panic::{catch_unwind, AssertUnwindSafe};
