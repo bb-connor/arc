@@ -155,18 +155,32 @@ fn certificate_time_and_sequence_fail_closed() {
     ));
     let overflow = [
         ComplianceReceiptEntry {
-            receipt: receipt.clone(),
+            receipt,
             seq: u64::MAX,
             entry_seq: None,
         },
         ComplianceReceiptEntry {
-            receipt,
+            receipt: make_receipt_for_session(
+                &key,
+                "session",
+                "receipt-after-max",
+                3,
+                "fs/read_text_file",
+                Decision::Allow,
+                vec![],
+            ),
             seq: 0,
             entry_seq: None,
         },
     ];
+    // The shared clock above now holds a regressed reading, which would refuse
+    // before any sequence is examined, and distinct receipts keep the duplicate
+    // check from refusing first.
+    let valid = AcpClock::new(Arc::new(AuditTestClock(Arc::new(Mutex::new(Ok(
+        audit_reading(3, 2),
+    ))))));
     assert!(matches!(
-        generate_compliance_certificate("session", &overflow, &config, &key, &clock),
+        generate_compliance_certificate("session", &overflow, &config, &key, &valid),
         Err(ComplianceCertificateError::Audit(AcpAuditError::Clock(
             ClockError::Overflow
         )))
