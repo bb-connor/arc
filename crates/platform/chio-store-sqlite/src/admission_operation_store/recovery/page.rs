@@ -67,11 +67,27 @@ pub(super) fn read_legacy(
         if remaining == 0 {
             // One primary-key existence probe allocates/decodes no candidate.
             // Absence proves the stream ended; any raw tail remains unresolved.
-            let has_tail: bool = transaction.query_row(
-                "SELECT EXISTS(SELECT 1 FROM admission_operations WHERE operation_id > ?1 LIMIT 1)",
-                [cursor.as_ref().map_or("", AdmissionOperationId::as_str)],
-                |row| row.get(0),
-            ).map_err(sqlite_error)?;
+            let has_tail: bool = transaction
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM admission_operations o
+                 WHERE operation_id > ?1 AND created_at_unix_ms <= ?2
+                   AND (terminal=0 OR EXISTS(
+                       SELECT 1 FROM admission_operation_recovery_deferrals d
+                       WHERE d.operation_id=o.operation_id AND d.quarantined=1))
+                   AND (recovery_expires_at_unix_ms IS NULL OR recovery_expires_at_unix_ms <= ?2
+                        OR recovery_store_uuid <> ?3 OR recovery_store_lease_id <> ?4
+                        OR recovery_store_owner_epoch <> ?5 OR terminal=1)
+                 LIMIT 1)",
+                    params![
+                        cursor.as_ref().map_or("", AdmissionOperationId::as_str),
+                        sqlite_i64(not_after_unix_ms, "recovery page time")?,
+                        &fence.store_uuid,
+                        &fence.lease_id,
+                        sqlite_i64(fence.owner_epoch, "recovery owner epoch")?,
+                    ],
+                    |row| row.get(0),
+                )
+                .map_err(sqlite_error)?;
             if has_tail {
                 unresolved_tail = true;
             }

@@ -193,3 +193,68 @@ fn legacy_recovery_external_write_remains_fatal_and_mints_no_result() -> Anchore
     assert_eq!(admission_commit_rows(&external)?, committed);
     Ok(())
 }
+
+#[test]
+fn legacy_recovery_terminal_tail_does_not_exhaust_candidate_capacity() -> AnchoredTestResult {
+    let at = 1_800_001_400_000;
+    let _clock = chio_test_support::clock::scope_unix_secs(at / 1_000);
+    let fixture = fixture();
+    let mut operations = (0..257)
+        .map(|index| {
+            prepared_operation(
+                &fixture.fence,
+                AdmissionOperationKind::ToolDispatch,
+                &format!("legacy-terminal-tail-request-{index:03}"),
+                &format!("legacy-terminal-tail-capability-{index:03}"),
+            )
+        })
+        .collect::<Vec<_>>();
+    operations.sort_by(|left, right| {
+        left.binding()
+            .operation_id()
+            .cmp(right.binding().operation_id())
+    });
+    let (tail, dormant) = operations.split_last().ok_or("terminal tail fixture")?;
+    for operation in dormant {
+        fixture.store.begin(operation, &fixture.fence, at)?;
+        defer(&fixture, operation, at)?;
+    }
+    let terminal = finalizing_tool_operation(
+        &fixture,
+        tail.binding().request_id().as_str(),
+        tail.binding().capability_id().as_str(),
+        at,
+    );
+    assert_eq!(terminal.binding(), tail.binding());
+    fixture
+        .store
+        .commit_terminal_projection(&unknown_projection(
+            &fixture,
+            &terminal,
+            "legacy-excluded-terminal-tail-incident",
+            'd',
+            at + 20,
+        ))?;
+    let terminal = fixture
+        .store
+        .load_by_operation_id(tail.binding().operation_id())?
+        .ok_or("retained terminal tail")?;
+    assert_eq!(
+        terminal.state(),
+        AdmissionOperationState::OutcomeUnknownAfterDispatch
+    );
+    assert!(fixture
+        .store
+        .load_recovery_status(tail.binding().operation_id(), &fixture.fence, at + 2_000)?
+        .is_none());
+    let before = read_state(&fixture)?;
+    assert!(fixture.store.list_recoverable(at + 2_000, 1)?.is_empty());
+    assert_eq!(read_state(&fixture)?, before);
+    assert_eq!(
+        fixture
+            .store
+            .load_by_operation_id(tail.binding().operation_id())?,
+        Some(terminal)
+    );
+    Ok(())
+}
