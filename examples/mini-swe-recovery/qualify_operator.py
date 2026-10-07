@@ -21,6 +21,13 @@ from chio_mini_swe.repository_store import configuration_digest
 
 HERE = Path(__file__).resolve().parent
 DOCKER = ["/usr/bin/docker", "--host", "unix:///var/run/docker.sock"]
+ATTACHMENT_MARKER = re.compile(
+    r"chio container still running after attachment ended: "
+    r"reason (exit_(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|signal|worker_io_failed"
+    r"|runner_interrupted|container_attachment_error|unclassified), "
+    r"client (exit_zero|exit_error|exit_engine|exit_other|signal|killed_bootstrap"
+    r"|killed_interrupt|unobserved|unclassified)\n"
+)
 
 
 def failure_classes(text):
@@ -40,8 +47,16 @@ def failure_classes(text):
         "output_ceiling": "output_ceiling",
         "permission_denied": "permission denied",
         "connection_refused": "connection refused",
+        "docker_attach_stream_failed": "error from daemon in stream",
+        "docker_wait_failed": "error waiting for container",
+        "reconciliation_required": "requires reconciliation",
     }
-    return sorted(name for name, phrase in known.items() if phrase in text)
+    classes = {name for name, phrase in known.items() if phrase in text}
+    # The runner writes this line before any worker byte; only position 0 counts.
+    marker = ATTACHMENT_MARKER.match(text)
+    if marker:
+        classes.update(("attachment_reason_" + marker[1], "attachment_client_" + marker[2]))
+    return sorted(classes)
 
 
 def safe_run_report(text):

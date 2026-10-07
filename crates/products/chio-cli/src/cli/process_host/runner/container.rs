@@ -467,6 +467,17 @@ fn classify(record: &Record, outcome: &mut Outcome) {
             outcome.reason = "output_ceiling".to_owned();
             outcome.diagnostic = None;
         } else if !matches!(outcome.reason.as_str(), "timeout" | "output_ceiling") {
+            // First in the private log, so the log byte bound cannot drop it.
+            let (reason, client) = attachment_client(&outcome.reason)
+                .map_or(("unclassified", "unclassified"), |client| {
+                    (outcome.reason.as_str(), client)
+                });
+            let mut stderr = format!(
+                "chio container still running after attachment ended: reason {reason}, client {client}\n"
+            )
+            .into_bytes();
+            stderr.append(&mut outcome.stderr);
+            outcome.stderr = stderr;
             outcome.reason = "container_attachment_lost".to_owned();
         }
     } else if record.status == "created" && record.started_at.starts_with("0001-") {
@@ -497,6 +508,27 @@ fn classify(record: &Record, outcome: &mut Outcome) {
     // wait4 accounted the Docker client, not the worker cgroup. Do not publish
     // those host-side numbers as worker resource measurements.
     outcome.usage = Usage::default();
+}
+
+/// Fixed category of how the Docker attach client ended. Only exact fixed
+/// reasons are named; any other reason text is reported as unclassified.
+fn attachment_client(reason: &str) -> Option<&'static str> {
+    Some(match reason {
+        "exit_0" => "exit_zero",
+        "exit_1" => "exit_error",
+        "exit_125" => "exit_engine",
+        "signal" => "signal",
+        "worker_io_failed" => "killed_bootstrap",
+        "runner_interrupted" => "killed_interrupt",
+        "container_attachment_error" => "unobserved",
+        _ => {
+            let code: u8 = reason.strip_prefix("exit_")?.parse().ok()?;
+            if reason != format!("exit_{code}") {
+                return None;
+            }
+            "exit_other"
+        }
+    })
 }
 
 #[cfg(test)]
