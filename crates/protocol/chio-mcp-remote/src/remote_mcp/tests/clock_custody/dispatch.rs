@@ -138,9 +138,8 @@ async fn p0p1_http_request_waiting_for_stream_cannot_send_after_close() {
         Poll::Ready(())
     })
     .await;
-    // Subscription happens immediately before the stream lock. No sleeps or
-    // scheduler timing assumptions are needed to establish the interleaving.
-    assert_eq!(session.event_tx.receiver_count(), 1);
+    // A POST waiting for the stream lock holds no session event subscription.
+    assert_eq!(session.event_tx.receiver_count(), 0);
     sessions.mark_closed(&session).await.unwrap();
     drop(held_stream);
     let response = response.await;
