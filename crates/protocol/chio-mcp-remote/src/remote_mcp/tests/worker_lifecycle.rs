@@ -2,6 +2,7 @@
 use super::*;
 use axum::body::{Body, HttpBody};
 use std::future::Future;
+use std::io::Write as _;
 use std::pin::Pin;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Condvar;
@@ -445,12 +446,16 @@ async fn waiting_post_owner_observes_actual_worker_death_before_enqueue() {
     drop(pending);
 }
 
-#[tokio::test]
-async fn lagged_post_response_fails_closed_without_reinvocation() {
-    let fixture = fixture(0, None);
+/// A Ready session bound to the fixture bearer identity whose bounded inbox the
+/// test drains in place of a worker.
+async fn controlled_session(
+    fixture: &Fixture,
+    session_id: &str,
+    event_capacity: usize,
+) -> (Arc<RemoteSession>, McpInboxReceiver) {
     let clock = fixture.state.factory.config.clock.clone();
     let (input_tx, input_rx) = mcp_inbox();
-    let (event_tx, _) = broadcast::channel(8);
+    let (event_tx, _) = broadcast::channel(event_capacity);
     let mut headers = HeaderMap::new();
     headers.insert(
         AUTHORIZATION,
@@ -459,7 +464,7 @@ async fn lagged_post_response_fails_closed_without_reinvocation() {
     let session = Arc::new(
         RemoteSession::new(RemoteSessionInit {
             clock,
-            session_id: "lost-response-session".into(),
+            session_id: session_id.into(),
             agent_id: "agent".into(),
             capabilities: vec![],
             issued_capabilities: vec![],
@@ -494,6 +499,13 @@ async fn lagged_post_response_fails_closed_without_reinvocation() {
         )
         .unwrap();
     fixture.state.sessions.insert_active(session.clone()).await;
+    (session, input_rx)
+}
+
+#[tokio::test]
+async fn lagged_post_response_fails_closed_without_reinvocation() {
+    let fixture = fixture(0, None);
+    let (session, input_rx) = controlled_session(&fixture, "lost-response-session", 8).await;
     let response = post(
         &fixture,
         Some(&session.session_id),
@@ -564,4 +576,152 @@ async fn initialize_wait_closes_when_actual_worker_panics_before_reply() {
     assert!(!std::str::from_utf8(&bytes).unwrap().contains("\"result\""));
     assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
     assert!(fixture.state.sessions.snapshot().await.0.is_empty());
+}
+
+/// Writes one worker output line through the production session writer, which
+/// classifies it against the current request-stream owner.
+fn publish(output: &mut BroadcastJsonRpcWriter, message: &Value) {
+    let mut line = serde_json::to_vec(message).unwrap();
+    line.push(b'\n');
+    output.write_all(&line).unwrap();
+}
+
+fn sse_messages(wire: &[u8]) -> Vec<Value> {
+    std::str::from_utf8(wire)
+        .unwrap()
+        .lines()
+        .filter_map(|line| line.strip_prefix("data:"))
+        .map(str::trim)
+        .filter(|data| !data.is_empty())
+        .map(|data| serde_json::from_str(data).unwrap())
+        .collect()
+}
+
+struct OwnerHandOff {
+    new_stream: Vec<Value>,
+    new_terminal: Value,
+}
+
+/// Drives a request-owner hand-off through real `handle_post`. The actor has
+/// completed the OLD request while the OLD HTTP body still owns the request
+/// stream. A NEW POST waits for that owner while the OLD sample and terminal
+/// are published, then owns the stream and is answered.
+async fn owner_hand_off(old_id: u64, new_id: u64) -> OwnerHandOff {
+    let fixture = fixture(0, None);
+    let (session, inbox) = controlled_session(&fixture, "owner-hand-off-session", 16).await;
+    let mut output = BroadcastJsonRpcWriter::new(
+        session.event_tx.clone(),
+        session.retained_notification_events.clone(),
+        session.next_event_id.clone(),
+        session.session_id.clone(),
+        session.active_request_stream.clone(),
+    );
+
+    let old = post(&fixture, Some(&session.session_id), &read_call(old_id)).await;
+    assert_eq!(old.status(), StatusCode::OK);
+    assert!(
+        session.has_active_request_stream(),
+        "OLD POST body does not own the request stream"
+    );
+    // The actor takes the OLD request with its reservation and computes its
+    // complete outcome before the NEW POST arrives.
+    let old_request = inbox
+        .try_recv()
+        .unwrap()
+        .expect("OLD request was not enqueued");
+    assert_eq!(old_request.value()["id"], old_id);
+    let old_sample = json!({"jsonrpc":"2.0","id":"old-owner-sampling",
+        "method":"sampling/createMessage","params":{"maxTokens":1,
+        "messages":[{"role":"user","content":{"type":"text","text":"old-owner-sample"}}]}});
+    let old_terminal = json!({"jsonrpc":"2.0","id":old_id,"result":{
+        "content":[{"type":"text","text":"old-owner-result"}],"isError":false}});
+
+    let mut new_call = read_call(new_id);
+    new_call["params"]["arguments"]["path"] = json!("/workspace/new.txt");
+    let mut waiting = Box::pin(handle_post(
+        State(fixture.state.clone()),
+        post_request(Some(&session.session_id), &new_call),
+    ));
+    for _ in 0..8 {
+        let pending =
+            std::future::poll_fn(|cx| Poll::Ready(waiting.as_mut().poll(cx).is_pending())).await;
+        assert!(
+            pending,
+            "NEW POST completed while another body owned the request stream"
+        );
+        tokio::task::yield_now().await;
+    }
+    assert!(
+        inbox.try_recv().unwrap().is_none(),
+        "NEW request reached the actor before its POST owned the request stream"
+    );
+
+    // The OLD outcome is delivered while the NEW POST waits for the owner.
+    publish(&mut output, &old_sample);
+    publish(&mut output, &old_terminal);
+    drop(old_request);
+    let old_wire = tokio::time::timeout(WAIT, axum::body::to_bytes(old.into_body(), 64 * 1024))
+        .await
+        .expect("OLD POST body did not release the request stream")
+        .unwrap();
+    assert_eq!(
+        sse_messages(&old_wire),
+        [old_sample, old_terminal],
+        "OLD owner did not receive its own outcome"
+    );
+
+    let new = tokio::time::timeout(WAIT, waiting)
+        .await
+        .expect("NEW POST did not take the released request stream");
+    assert_eq!(new.status(), StatusCode::OK);
+    let new_request = inbox
+        .try_recv()
+        .unwrap()
+        .expect("NEW request was not enqueued once its POST owned the request stream");
+    assert_eq!(new_request.value()["id"], new_id);
+    assert_eq!(
+        new_request.value()["params"]["arguments"]["path"],
+        "/workspace/new.txt"
+    );
+    let new_terminal = json!({"jsonrpc":"2.0","id":new_id,"result":{
+        "content":[{"type":"text","text":"new-owner-result"}],"isError":false}});
+    publish(&mut output, &new_terminal);
+    drop(new_request);
+    let new_wire = tokio::time::timeout(WAIT, axum::body::to_bytes(new.into_body(), 64 * 1024))
+        .await
+        .expect("NEW POST stream did not end before its outer deadline")
+        .unwrap();
+    assert!(!session.has_active_request_stream());
+    fixture.state.sessions.shutdown_all_active().await.unwrap();
+    OwnerHandOff {
+        new_stream: sse_messages(&new_wire),
+        new_terminal,
+    }
+}
+
+fn assert_only_own_outcome(hand_off: &OwnerHandOff) {
+    let prior = hand_off
+        .new_stream
+        .iter()
+        .filter(|message| message.to_string().contains("old-owner"))
+        .collect::<Vec<_>>();
+    assert!(
+        prior.is_empty(),
+        "NEW POST stream delivered prior-owner events: {prior:?}"
+    );
+    assert_eq!(
+        hand_off.new_stream,
+        std::slice::from_ref(&hand_off.new_terminal),
+        "NEW POST stream did not deliver exactly its own outcome"
+    );
+}
+
+#[tokio::test]
+async fn new_post_after_completed_actor_id_reuse_excludes_old_owner_events() {
+    assert_only_own_outcome(&owner_hand_off(17, 17).await);
+}
+
+#[tokio::test]
+async fn new_post_with_distinct_id_excludes_prior_owner_nested_request() {
+    assert_only_own_outcome(&owner_hand_off(17, 18).await);
 }
