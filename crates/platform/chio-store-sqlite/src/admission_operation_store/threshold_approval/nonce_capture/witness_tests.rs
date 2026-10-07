@@ -17,6 +17,8 @@ use std::path::{Path, PathBuf};
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 const REQUEST_ID: &str = "witness-threshold-request";
+const WINDOW_INVARIANT: &str = "threshold reservation requires currently valid proposal and tokens";
+const RESERVED_INVARIANT: &str = "threshold replay lost its exact durable proposal reservation";
 const CAPABILITY_DIGEST: char = 'a';
 const POLICY_DIGEST: char = 'c';
 
@@ -188,6 +190,11 @@ fn verify_unit(
     verify_nonce_capture_approval(&transaction, operation, now, &store.serving_owner)
 }
 
+/// Whether `result` is exactly the named store invariant refusal.
+fn refused_by<T>(result: Result<T, AdmissionOperationStoreError>, invariant: &str) -> bool {
+    matches!(result, Err(AdmissionOperationStoreError::Invariant(detail)) if detail == invariant)
+}
+
 fn rows(store: &SqliteAdmissionOperationStore) -> TestResult<(i64, i64, i64)> {
     Ok(store.connection()?.query_row(
         "SELECT (SELECT COUNT(*) FROM threshold_approval_proposals),
@@ -243,11 +250,20 @@ fn reserved_threshold_witness_binds_its_original_and_checks_only_signed_time() -
 
     // Only the original signed proposal and token windows remain to compare.
     let created_ms = created_at * 1_000;
-    assert!(witness.validate_at(created_ms - 1).is_err());
+    assert!(refused_by(
+        witness.validate_at(created_ms - 1),
+        WINDOW_INVARIANT
+    ));
     assert!(witness.validate_at(created_ms).is_ok());
     assert!(witness.validate_at((created_at + 60) * 1_000 - 1).is_ok());
-    assert!(witness.validate_at((created_at + 60) * 1_000).is_err());
-    assert!(witness.validate_at((created_at + 300) * 1_000).is_err());
+    assert!(refused_by(
+        witness.validate_at((created_at + 60) * 1_000),
+        WINDOW_INVARIANT
+    ));
+    assert!(refused_by(
+        witness.validate_at((created_at + 300) * 1_000),
+        WINDOW_INVARIANT
+    ));
 
     // The committed lifecycle row never qualifies a fresh reservation, and a
     // witness never binds the committed successor or another serving fence.
@@ -270,8 +286,14 @@ fn reserved_threshold_witness_binds_its_original_and_checks_only_signed_time() -
         now + 4,
         None,
     )?;
-    assert!(qualify(&store, &fence, &committed, now + 5, None).is_err());
-    assert!(verify_unit(&store, &fence, &committed, now + 5).is_err());
+    assert!(refused_by(
+        qualify(&store, &fence, &committed, now + 5, None),
+        RESERVED_INVARIANT
+    ));
+    assert!(refused_by(
+        verify_unit(&store, &fence, &committed, now + 5),
+        RESERVED_INVARIANT
+    ));
     assert!(!witness.binds(&committed, &store.serving_owner));
     assert!(witness.validate_at(now + 5).is_ok());
     drop(store);
