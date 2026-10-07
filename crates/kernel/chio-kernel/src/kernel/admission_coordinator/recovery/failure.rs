@@ -27,6 +27,9 @@ pub(super) fn classify(error: &KernelError) -> Option<AdmissionRecoveryFailureKi
             _ => AdmissionRecoveryFailureKind::OutputDenied,
         }),
         KernelError::GuardDenied(_) => Some(AdmissionRecoveryFailureKind::OutputDenied),
+        KernelError::CapabilityRevoked(_) | KernelError::DelegationChainRevoked(_) => {
+            Some(AdmissionRecoveryFailureKind::OutputDenied)
+        }
         _ => None,
     }
 }
