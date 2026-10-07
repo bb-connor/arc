@@ -98,32 +98,55 @@ impl AlertBackend for ScriptedBackend {
 
 struct Fixture {
     _tempdir: TempDir,
+    path: std::path::PathBuf,
     outbox: SqliteSiemOutbox,
+}
+
+fn open_outbox(path: &std::path::Path, backends: &[&Arc<ScriptedBackend>]) -> SqliteSiemOutbox {
+    let outbox = SqliteSiemOutbox::open(
+        path,
+        backends
+            .iter()
+            .map(|backend| Arc::clone(backend) as Arc<dyn AlertBackend>)
+            .collect(),
+        AlertOutboxConfig {
+            base_retry_ms: 10,
+            max_retry_ms: 100,
+            max_attempts: 3,
+        },
+    )
+    .unwrap_or_else(|error| panic!("outbox: {error}"));
+    outbox
+        .ensure_alerts_ready()
+        .unwrap_or_else(|error| panic!("outbox readiness: {error}"));
+    outbox
 }
 
 impl Fixture {
     fn open(backends: &[&Arc<ScriptedBackend>]) -> Self {
         let tempdir = TempDir::new().unwrap_or_else(|error| panic!("tempdir: {error}"));
-        let outbox = SqliteSiemOutbox::open(
-            tempdir.path().join("alerts.sqlite"),
-            backends
-                .iter()
-                .map(|backend| Arc::clone(backend) as Arc<dyn AlertBackend>)
-                .collect(),
-            AlertOutboxConfig {
-                base_retry_ms: 10,
-                max_retry_ms: 100,
-                max_attempts: 3,
-            },
-        )
-        .unwrap_or_else(|error| panic!("outbox: {error}"));
-        outbox
-            .ensure_alerts_ready()
-            .unwrap_or_else(|error| panic!("outbox readiness: {error}"));
+        let path = tempdir.path().join("alerts.sqlite");
+        let outbox = open_outbox(&path, backends);
         Self {
             _tempdir: tempdir,
+            path,
             outbox,
         }
+    }
+
+    fn backend_outcomes(
+        &self,
+        alert: &SecurityAlert,
+    ) -> Option<BTreeMap<String, AlertDeliveryStatus>> {
+        self.outbox
+            .load_backend_deliveries(&AlertDeliveryQuery {
+                alert: alert.clone(),
+            })
+            .unwrap_or_else(|error| panic!("load backend deliveries: {error}"))
+    }
+
+    fn database(&self) -> Connection {
+        Connection::open(&self.path).unwrap_or_else(|error| panic!("open database: {error}"))
     }
 
     fn page_due(&self, count: u8) -> Vec<SecurityAlert> {
@@ -184,6 +207,44 @@ fn report(result: PortResult<AlertDispatchReport>, context: &str) -> AlertDispat
     result.unwrap_or_else(|error: PortError| panic!("{context}: {error:?}"))
 }
 
+fn dispatch_report(
+    [attempted, delivered, failed, parked, backend_dispatches, backend_failures]: [usize; 6],
+) -> AlertDispatchReport {
+    AlertDispatchReport {
+        attempted,
+        delivered,
+        failed,
+        parked,
+        backend_dispatches,
+        backend_failures,
+    }
+}
+
+fn delivered(attempts: u32, delivered_at_unix_ms: u64) -> AlertDeliveryStatus {
+    AlertDeliveryStatus::Delivered {
+        attempts,
+        delivered_at_unix_ms,
+    }
+}
+
+fn pending(attempts: u32, next_attempt_at_unix_ms: u64) -> AlertDeliveryStatus {
+    AlertDeliveryStatus::Pending {
+        attempts,
+        next_attempt_at_unix_ms,
+    }
+}
+
+fn outcomes(
+    entries: [(&str, AlertDeliveryStatus); 2],
+) -> Option<BTreeMap<String, AlertDeliveryStatus>> {
+    Some(
+        entries
+            .into_iter()
+            .map(|(backend, status)| (backend.to_owned(), status))
+            .collect(),
+    )
+}
+
 #[tokio::test]
 async fn healthy_backend_receives_every_due_row_in_one_call_while_another_backend_fails() {
     let pagerduty = ScriptedBackend::new(PAGERDUTY, accept_every_dispatch);
@@ -215,6 +276,24 @@ async fn healthy_backend_receives_every_due_row_in_one_call_while_another_backen
         opsgenie.dispatches(),
         fixture.statuses(&alerts)
     );
+    assert_eq!(
+        report(result, "partial delivery"),
+        dispatch_report([3, 0, 3, 0, 6, 3])
+    );
+    for alert in &alerts {
+        assert_eq!(
+            fixture.status(alert),
+            Some(pending(1, FIRST_RETRY_AT_UNIX_MS)),
+            "a row {OPSGENIE} has not confirmed must not be reported delivered"
+        );
+        assert_eq!(
+            fixture.backend_outcomes(alert),
+            outcomes([
+                (PAGERDUTY, delivered(1, DUE_AT_UNIX_MS)),
+                (OPSGENIE, pending(1, FIRST_RETRY_AT_UNIX_MS)),
+            ])
+        );
+    }
 }
 
 #[tokio::test]
@@ -244,7 +323,7 @@ async fn retry_pages_only_the_backend_that_has_not_confirmed_the_row() {
         fixture.deliver(FIRST_RETRY_AT_UNIX_MS, 1).await,
         "retry delivery",
     );
-    assert_eq!((second.attempted, second.delivered), (1, 1));
+    assert_eq!(second, dispatch_report([1, 1, 0, 0, 1, 0]));
     assert_eq!(
         opsgenie.dispatches(),
         vec![(key.to_owned(), false), (key.to_owned(), true)],
@@ -263,6 +342,17 @@ async fn retry_pages_only_the_backend_that_has_not_confirmed_the_row() {
         "{PAGERDUTY} confirmed {key} on the first attempt and must not be paged again when the \
          row is retried for {OPSGENIE}; it saw {:?}",
         pagerduty.dispatches()
+    );
+    assert_eq!(
+        report(first, "first delivery"),
+        dispatch_report([1, 0, 1, 0, 2, 1])
+    );
+    assert_eq!(
+        fixture.backend_outcomes(&alerts[0]),
+        outcomes([
+            (PAGERDUTY, delivered(1, DUE_AT_UNIX_MS)),
+            (OPSGENIE, delivered(2, FIRST_RETRY_AT_UNIX_MS)),
+        ])
     );
 }
 
@@ -300,6 +390,10 @@ async fn a_row_rejected_by_a_backend_does_not_stop_the_rest_of_the_batch() {
          deliver_due returned {result:?}, the backend saw {:?}",
         pagerduty.dispatches()
     );
+    assert_eq!(
+        report(result, "batch delivery"),
+        dispatch_report([3, 2, 1, 0, 3, 1])
+    );
 }
 
 #[tokio::test]
@@ -313,7 +407,7 @@ async fn every_healthy_backend_receives_each_row_once() {
         fixture.deliver(DUE_AT_UNIX_MS, 10).await,
         "healthy delivery",
     );
-    assert_eq!((first.attempted, first.delivered), (3, 3));
+    assert_eq!(first, dispatch_report([3, 3, 0, 0, 6, 0]));
     assert_eq!(pagerduty.accepted(), keys(&alerts));
     assert_eq!(opsgenie.accepted(), keys(&alerts));
     assert_eq!(
@@ -326,12 +420,21 @@ async fn every_healthy_backend_receives_each_row_once() {
             3
         ]
     );
+    for alert in &alerts {
+        assert_eq!(
+            fixture.backend_outcomes(alert),
+            outcomes([
+                (PAGERDUTY, delivered(1, DUE_AT_UNIX_MS)),
+                (OPSGENIE, delivered(1, DUE_AT_UNIX_MS)),
+            ])
+        );
+    }
 
     let later = report(
         fixture.deliver(DUE_AT_UNIX_MS + 60_000, 10).await,
         "nothing due",
     );
-    assert_eq!((later.attempted, later.delivered), (0, 0));
+    assert_eq!(later, AlertDispatchReport::default());
     assert_eq!(pagerduty.dispatches().len(), 3);
     assert_eq!(opsgenie.dispatches().len(), 3);
 }
@@ -352,7 +455,7 @@ async fn when_every_backend_fails_backoff_and_parking_are_unchanged() {
             fixture.deliver(now_unix_ms - 1, 10).await,
             "row not yet due",
         );
-        assert_eq!((early.attempted, early.delivered), (0, 0));
+        assert_eq!(early, AlertDispatchReport::default());
 
         assert_eq!(
             report(fixture.deliver(now_unix_ms, 10).await, "failed delivery"),
@@ -382,7 +485,170 @@ async fn when_every_backend_fails_backoff_and_parking_are_unchanged() {
         fixture.deliver(PARKED_AT_UNIX_MS, 10).await,
         "parked row is not due",
     );
-    assert_eq!((parked.attempted, parked.delivered), (0, 0));
+    assert_eq!(parked, AlertDispatchReport::default());
     assert_eq!(pagerduty.dispatches().len(), 3);
     assert_eq!(opsgenie.dispatches().len(), 3);
+    assert_eq!(
+        fixture.backend_outcomes(&alerts[0]),
+        outcomes([
+            (PAGERDUTY, pending(3, PARKED_AT_UNIX_MS)),
+            (OPSGENIE, pending(3, PARKED_AT_UNIX_MS)),
+        ])
+    );
+}
+
+#[tokio::test]
+async fn a_call_handles_at_most_limit_rows_and_one_dispatch_per_unconfirmed_backend() {
+    let pagerduty = ScriptedBackend::new(PAGERDUTY, accept_every_dispatch);
+    let opsgenie = ScriptedBackend::new(OPSGENIE, reject_every_dispatch);
+    let fixture = Fixture::open(&[&pagerduty, &opsgenie]);
+    let alerts = fixture.page_due(3);
+
+    assert_eq!(
+        report(fixture.deliver(DUE_AT_UNIX_MS, 2).await, "bounded delivery"),
+        dispatch_report([2, 0, 2, 0, 4, 2])
+    );
+    assert_eq!(pagerduty.accepted(), keys(&alerts[..2]));
+    assert_eq!(opsgenie.dispatches().len(), 2);
+    assert_eq!(
+        fixture.status(&alerts[2]),
+        Some(pending(0, DUE_AT_UNIX_MS)),
+        "a row beyond the limit must stay untouched and due"
+    );
+    assert_eq!(fixture.backend_outcomes(&alerts[2]), Some(BTreeMap::new()));
+
+    assert_eq!(
+        report(fixture.deliver(DUE_AT_UNIX_MS, 2).await, "remaining row"),
+        dispatch_report([1, 0, 1, 0, 2, 1])
+    );
+    assert_eq!(pagerduty.accepted(), keys(&alerts));
+
+    assert_eq!(
+        report(
+            fixture.deliver(FIRST_RETRY_AT_UNIX_MS, 10).await,
+            "retry delivery"
+        ),
+        dispatch_report([3, 0, 3, 0, 3, 3]),
+        "a retry must dispatch only to the backend that has not confirmed each row"
+    );
+    assert_eq!(pagerduty.dispatches().len(), 3);
+    assert_eq!(opsgenie.dispatches().len(), 6);
+}
+
+#[tokio::test]
+async fn exhaustion_parks_the_row_with_each_backend_outcome_visible() {
+    let pagerduty = ScriptedBackend::new(PAGERDUTY, accept_every_dispatch);
+    let opsgenie = ScriptedBackend::new(OPSGENIE, reject_every_dispatch);
+    let fixture = Fixture::open(&[&pagerduty, &opsgenie]);
+    let alerts = fixture.page_due(1);
+    let attempts = [
+        (DUE_AT_UNIX_MS, dispatch_report([1, 0, 1, 0, 2, 1])),
+        (FIRST_RETRY_AT_UNIX_MS, dispatch_report([1, 0, 1, 0, 1, 1])),
+        (SECOND_RETRY_AT_UNIX_MS, dispatch_report([1, 0, 1, 1, 1, 1])),
+    ];
+    for (now_unix_ms, expected) in attempts {
+        assert_eq!(
+            report(fixture.deliver(now_unix_ms, 10).await, "failing delivery"),
+            expected
+        );
+    }
+
+    assert_eq!(
+        fixture.status(&alerts[0]),
+        Some(pending(3, PARKED_AT_UNIX_MS))
+    );
+    assert_eq!(
+        fixture.backend_outcomes(&alerts[0]),
+        outcomes([
+            (PAGERDUTY, delivered(1, DUE_AT_UNIX_MS)),
+            (OPSGENIE, pending(3, PARKED_AT_UNIX_MS)),
+        ])
+    );
+    assert_eq!(
+        report(
+            fixture.deliver(PARKED_AT_UNIX_MS, 10).await,
+            "parked row is not due"
+        ),
+        AlertDispatchReport::default()
+    );
+    assert_eq!(pagerduty.dispatches().len(), 1);
+    assert_eq!(opsgenie.dispatches().len(), 3);
+}
+
+#[tokio::test]
+async fn readiness_requires_the_backend_outcome_table_and_reopening_restores_it() {
+    let pagerduty = ScriptedBackend::new(PAGERDUTY, accept_every_dispatch);
+    let fixture = Fixture::open(&[&pagerduty]);
+    let alerts = fixture.page_due(1);
+    fixture
+        .database()
+        .execute_batch("DROP TABLE chio_security_alert_outbox_backend")
+        .unwrap_or_else(|error| panic!("drop backend outcome table: {error}"));
+
+    let error = rejection(
+        fixture.outbox.ensure_alerts_ready(),
+        "readiness must fail closed without the backend outcome table",
+    );
+    assert_eq!(error.kind(), PortErrorKind::Unavailable);
+    let error = rejection(
+        fixture.deliver(DUE_AT_UNIX_MS, 10).await,
+        "delivery must fail closed without the backend outcome table",
+    );
+    assert_eq!(error.kind(), PortErrorKind::Unavailable);
+    assert_eq!(pagerduty.dispatches().len(), 0);
+
+    let reopened = open_outbox(&fixture.path, &[&pagerduty]);
+    assert_eq!(
+        report(reopened.deliver_due(DUE_AT_UNIX_MS, 10).await, "reopened"),
+        dispatch_report([1, 1, 0, 0, 1, 0])
+    );
+    assert_eq!(
+        fixture.status(&alerts[0]),
+        Some(delivered(1, DUE_AT_UNIX_MS))
+    );
+}
+
+#[tokio::test]
+async fn a_backend_outcome_bound_to_another_command_fails_closed() {
+    let pagerduty = ScriptedBackend::new(PAGERDUTY, accept_every_dispatch);
+    let opsgenie = ScriptedBackend::new(OPSGENIE, reject_every_dispatch);
+    let fixture = Fixture::open(&[&pagerduty, &opsgenie]);
+    let alerts = fixture.page_due(1);
+    assert_eq!(
+        report(
+            fixture.deliver(DUE_AT_UNIX_MS, 10).await,
+            "partial delivery"
+        ),
+        dispatch_report([1, 0, 1, 0, 2, 1])
+    );
+    let changed = fixture
+        .database()
+        .execute(
+            "UPDATE chio_security_alert_outbox_backend SET command_hash = ?1
+             WHERE backend_name = ?2",
+            rusqlite::params![[7_u8; 32].as_slice(), PAGERDUTY],
+        )
+        .unwrap_or_else(|error| panic!("rebind backend outcome: {error}"));
+    assert_eq!(changed, 1);
+
+    let error = rejection(
+        fixture.deliver(FIRST_RETRY_AT_UNIX_MS, 10).await,
+        "a rebound backend outcome must not count as a confirmation",
+    );
+    assert_eq!(error.kind(), PortErrorKind::IntegrityFailure);
+    let error = rejection(
+        fixture.outbox.load_backend_deliveries(&AlertDeliveryQuery {
+            alert: alerts[0].clone(),
+        }),
+        "a rebound backend outcome must not be reported",
+    );
+    assert_eq!(error.kind(), PortErrorKind::IntegrityFailure);
+    assert_eq!(
+        (pagerduty.dispatches().len(), opsgenie.dispatches().len()),
+        (1, 1)
+    );
+    assert_eq!(
+        fixture.status(&alerts[0]),
+        Some(pending(1, FIRST_RETRY_AT_UNIX_MS))
+    );
 }
