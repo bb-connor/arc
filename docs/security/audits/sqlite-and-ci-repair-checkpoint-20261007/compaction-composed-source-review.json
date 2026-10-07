@@ -1,0 +1,196 @@
+{
+  "schema": "chio.security.compaction-composed-source-review.v1",
+  "reviewer": "published_repair_review",
+  "SourceAccepted": true,
+  "verdict": "SourceAccepted for the exact composed compaction production repair and exact read-boundary controls; no supported P0/P1/P2 finding in this bounded composition.",
+  "findings": [],
+  "qualified_candidate": false,
+  "base_head": "3f398f4d363eb1287e376d1207b8d4c2a58b0c35",
+  "source_checkout": "/home/connor/lanes/integration",
+  "scope": "Six installed producer/reader files, two test files and six directly necessary existing strict-decoder/history/terminal contexts. Separate structural/script/documentation changes in this dirty tree are not qualified by this review.",
+  "accepted_patch_hashes": {
+    "boundary-tests-amendment.patch": "f203bb72a4148e0e6268f278c5674d6046f556d07deba3775acb9648bebe1714",
+    "production.patch": "4f26939bceff93b25890dce020ecc456a040387d75ce11fbd91da2a717626a4d",
+    "receipt-reuse/production-named-context.patch": "fdc3a174c25ff692efcc1be99d07576ed490781b9f501710bc8fafcf8333ccc1"
+  },
+  "excluded_superseded_patch": "Receipt tuple draft dfa1586f31aca88f6f64876130254b83fe60da23caa446291d1c0ef33dab0397 remains retained and was not the installed named-context patch.",
+  "source_guard": {
+    "start": {
+      "all_installed_reviewed_files_match_guarded_stage": false,
+      "context_hashes": {
+        "crates/kernel/chio-kernel/src/tool_outcome.rs": "594f8bf96e970edb744593da2772486c1988e76efaac2dcbff2c7ae6cf7e5004",
+        "crates/kernel/chio-kernel/src/tool_outcome/record_binding.rs": "257ef43efb5f5dcb2ed9be886c3879f985d72db82fe54577589b1fd114f7907a",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/history_scope.rs": "95c7051439f4b6e521c2c8f06acfa37147fad43208c697cba6bdd54e6e3a50bf",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/projection/terminal_record_read.rs": "aa697101191c49bd9f68a0ce3fadad6733ffc3efc26e0a92a69836f20518d0a3",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/projection/terminal_time.rs": "cd4f019945f4b8778f0fd04990ac6857dcd56bb9bb49a2908ce9a22a7fe79f8d",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs": "c80cfaabd125163120ac00c1a0ae761d41b2636ffe21aba1e9daf5d15fae9e0e"
+      },
+      "head": "3f398f4d363eb1287e376d1207b8d4c2a58b0c35",
+      "installed_hashes": {
+        "crates/platform/chio-store-sqlite/src/admission_operation_store.rs": "03d5cbe565aa0425e969cfd05fca858d2d3cf8aabd00d6bca3deb78966441da1",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs": "04cd6be720e73558c286ea4a3f3c1d2428cae7a6f7206bc7b8061e3822b2fe19",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/tool_outcome_replay.rs": "3cd72e6036e1e4eadb68be208c1e2924a3245b511db204ec3abcb162e79243f5",
+        "crates/platform/chio-store-sqlite/src/tool_outcome_projection.rs": "21cc58956ff8aca485dbd559559bae33a8a78b64e4d58f82bcba309e5515fec5",
+        "crates/platform/chio-store-sqlite/src/tool_outcome_store/payload_compaction.rs": "24057ea35f5eb21abef80836b027cba8690ccc508af8cdbb64c9f85fe4a44e6e",
+        "crates/platform/chio-store-sqlite/src/tool_outcome_store/payload_compaction/eligibility.rs": "46b1b6b95b3f83a2269c738b558c27afe6821056c196b00a0c479ee41b4d5def",
+        "crates/platform/chio-store-sqlite/src/tool_outcome_store_tests.rs": "227df073a740d46278b4abc57302dfa6ad20a83bb2fa6b4e3f01b741e47490cb",
+        "crates/platform/chio-store-sqlite/src/tool_outcome_store_tests/compaction_read_bounds.rs": "56663d1651965af844cd15a56cdccc010cfc68c9faf8a44fe4224bf5cd964ac6"
+      },
+      "patch_hashes": {
+        "boundary-tests-amendment.patch": "f203bb72a4148e0e6268f278c5674d6046f556d07deba3775acb9648bebe1714",
+        "production.patch": "4f26939bceff93b25890dce020ecc456a040387d75ce11fbd91da2a717626a4d",
+        "receipt-reuse/production-named-context.patch": "fdc3a174c25ff692efcc1be99d07576ed490781b9f501710bc8fafcf8333ccc1"
+      },
+      "recorded_utc": "2026-10-07T15:43:11.419038+00:00",
+      "worktree_status": " M .github/workflows/audit-log-schema-lint.yml\n M .github/workflows/chio-tee-fips.yml\n M crates/kernel/chio-kernel/src/kernel/tests/durable_admission/review_boundaries.rs\n M crates/platform/chio-store-sqlite/src/admission_operation_store.rs\n M crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs\n M crates/platform/chio-store-sqlite/src/admission_operation_store/threshold_approval/nonce_capture/witness_tests.rs\n M crates/platform/chio-store-sqlite/src/security_state.rs\n M crates/platform/chio-store-sqlite/src/tool_outcome_projection.rs\n M crates/platform/chio-store-sqlite/src/tool_outcome_store/payload_compaction.rs\n M crates/platform/chio-store-sqlite/src/tool_outcome_store/payload_compaction/eligibility.rs\n M crates/platform/chio-store-sqlite/src/tool_outcome_store_tests.rs\n M crates/products/chio-api-protect/src/proxy/state/admission_maintenance_tests.rs\n M crates/protocol/chio-openapi/ARCHITECTURE.md\n M crates/security/chio-secret-broker/src/process_boundary_tests/native.rs\n M docs/security/foundation-acceptance-scope.md\n M docs/superpowers/plans/2026-10-05-evidence-product-closeout.md\n M docs/superpowers/plans/2026-10-05-production-readiness-closeout.md\n M scripts/check-keyring-transparency.sh\n M scripts/check-mcp-admin-credential-contract.py\n M scripts/check-secret-broker-boundary.sh\n M scripts/security-clock-inventory.json\n M scripts/security_clock_compositions.py\n M scripts/tests/check-mcp-admin-credential-contract.test.py\n?? crates/platform/chio-store-sqlite/src/admission_operation_store/tool_outcome_replay.rs\n?? crates/platform/chio-store-sqlite/src/tool_outcome_store_tests/compaction_read_bounds.rs\n"
+    },
+    "end": {
+      "context_hashes": {
+        "crates/kernel/chio-kernel/src/tool_outcome.rs": "594f8bf96e970edb744593da2772486c1988e76efaac2dcbff2c7ae6cf7e5004",
+        "crates/kernel/chio-kernel/src/tool_outcome/record_binding.rs": "257ef43efb5f5dcb2ed9be886c3879f985d72db82fe54577589b1fd114f7907a",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/history_scope.rs": "95c7051439f4b6e521c2c8f06acfa37147fad43208c697cba6bdd54e6e3a50bf",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/projection/terminal_record_read.rs": "aa697101191c49bd9f68a0ce3fadad6733ffc3efc26e0a92a69836f20518d0a3",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/projection/terminal_time.rs": "cd4f019945f4b8778f0fd04990ac6857dcd56bb9bb49a2908ce9a22a7fe79f8d",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs": "c80cfaabd125163120ac00c1a0ae761d41b2636ffe21aba1e9daf5d15fae9e0e"
+      },
+      "head": "3f398f4d363eb1287e376d1207b8d4c2a58b0c35",
+      "installed_hashes": {
+        "crates/platform/chio-store-sqlite/src/admission_operation_store.rs": "03d5cbe565aa0425e969cfd05fca858d2d3cf8aabd00d6bca3deb78966441da1",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs": "04cd6be720e73558c286ea4a3f3c1d2428cae7a6f7206bc7b8061e3822b2fe19",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/tool_outcome_replay.rs": "3cd72e6036e1e4eadb68be208c1e2924a3245b511db204ec3abcb162e79243f5",
+        "crates/platform/chio-store-sqlite/src/tool_outcome_projection.rs": "21cc58956ff8aca485dbd559559bae33a8a78b64e4d58f82bcba309e5515fec5",
+        "crates/platform/chio-store-sqlite/src/tool_outcome_store/payload_compaction.rs": "24057ea35f5eb21abef80836b027cba8690ccc508af8cdbb64c9f85fe4a44e6e",
+        "crates/platform/chio-store-sqlite/src/tool_outcome_store/payload_compaction/eligibility.rs": "46b1b6b95b3f83a2269c738b558c27afe6821056c196b00a0c479ee41b4d5def",
+        "crates/platform/chio-store-sqlite/src/tool_outcome_store_tests.rs": "227df073a740d46278b4abc57302dfa6ad20a83bb2fa6b4e3f01b741e47490cb",
+        "crates/platform/chio-store-sqlite/src/tool_outcome_store_tests/compaction_read_bounds.rs": "56663d1651965af844cd15a56cdccc010cfc68c9faf8a44fe4224bf5cd964ac6"
+      },
+      "logs": [
+        {
+          "path": "/tmp/chio-pr1160-qualification-20261007/compaction-boundary-original2.log",
+          "sha256": "ccef21f163a087477d338ce0a170551673cf88780ea87c53c5f69cb7252311a8",
+          "test_results": [
+            "test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 2068 filtered out; finished in 4.79s"
+          ]
+        },
+        {
+          "path": "/tmp/chio-pr1160-qualification-20261007/compaction-focused-green4.log",
+          "sha256": "8ec400e8df9e52165ff7be8289620a03d31b788120f73640426fcd267dcd0409",
+          "test_results": [
+            "test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 2066 filtered out; finished in 32.74s"
+          ]
+        },
+        {
+          "path": "/tmp/chio-pr1160-qualification-20261007/compaction-receipt-reuse-green4.log",
+          "sha256": "5ec74e85879cd168e684effcd077823767480d5e7a588d7cfc80acc52c2609f4",
+          "test_results": [
+            "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 2066 filtered out; finished in 34.35s"
+          ]
+        }
+      ],
+      "patch_hashes": {
+        "boundary-tests-amendment.patch": "f203bb72a4148e0e6268f278c5674d6046f556d07deba3775acb9648bebe1714",
+        "production.patch": "4f26939bceff93b25890dce020ecc456a040387d75ce11fbd91da2a717626a4d",
+        "receipt-reuse/production-named-context.patch": "fdc3a174c25ff692efcc1be99d07576ed490781b9f501710bc8fafcf8333ccc1"
+      },
+      "recorded_utc": "2026-10-07T15:46:22.943390+00:00",
+      "six_producer_and_exact_child_match_stage": true,
+      "test_parent_stage_difference": "removed two diagnostic eprintln calls and reformatted unchanged bounded-progress assertion; independently diff-reviewed",
+      "worktree_status": " M .github/workflows/audit-log-schema-lint.yml\n M .github/workflows/chio-tee-fips.yml\n M crates/kernel/chio-kernel/src/kernel/tests/durable_admission/review_boundaries.rs\n M crates/platform/chio-store-sqlite/src/admission_operation_store.rs\n M crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs\n M crates/platform/chio-store-sqlite/src/admission_operation_store/threshold_approval/nonce_capture/witness_tests.rs\n M crates/platform/chio-store-sqlite/src/security_state.rs\n M crates/platform/chio-store-sqlite/src/tool_outcome_projection.rs\n M crates/platform/chio-store-sqlite/src/tool_outcome_store/payload_compaction.rs\n M crates/platform/chio-store-sqlite/src/tool_outcome_store/payload_compaction/eligibility.rs\n M crates/platform/chio-store-sqlite/src/tool_outcome_store_tests.rs\n M crates/products/chio-api-protect/src/proxy/state/admission_maintenance_tests.rs\n M crates/protocol/chio-openapi/ARCHITECTURE.md\n M crates/security/chio-secret-broker/src/process_boundary_tests/native.rs\n M docs/security/foundation-acceptance-scope.md\n M docs/superpowers/plans/2026-10-05-evidence-product-closeout.md\n M docs/superpowers/plans/2026-10-05-production-readiness-closeout.md\n M scripts/check-keyring-transparency.sh\n M scripts/check-mcp-admin-credential-contract.py\n M scripts/check-secret-broker-boundary.sh\n M scripts/security-clock-inventory.json\n M scripts/security_clock_compositions.py\n M scripts/tests/check-mcp-admin-credential-contract.test.py\n?? crates/platform/chio-store-sqlite/src/admission_operation_store/tool_outcome_replay.rs\n?? crates/platform/chio-store-sqlite/src/tool_outcome_store_tests/compaction_read_bounds.rs\n"
+    },
+    "result": {
+      "same_head": true,
+      "start_clean": false,
+      "end_clean": false,
+      "installed_file_drift": [],
+      "context_file_drift": [],
+      "patch_drift": [],
+      "current_six_producers_and_exact_child_match_stage": true
+    },
+    "explanation": "The tree was already dirty at both guards. All eight installed reviewed hashes, six context hashes and three accepted patch hashes remained unchanged. Six producer files and the exact boundary child match staged after hashes. The parent test file differs from its stage only by removal of two diagnostic prints and formatting of the same bounded-progress assertion; those differences were explicitly inspected."
+  },
+  "assessment": [
+    {
+      "paths": [
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/tool_outcome_replay.rs:9",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/history_scope.rs:45",
+        "crates/platform/chio-store-sqlite/src/tool_outcome_store/payload_compaction.rs:233"
+      ],
+      "finding": "None",
+      "reason": "One narrow reader borrows the exact maintenance transaction and existing CheckedHistoryScope. Complete chronology/chain qualification remains, with connection and unchanged-head checks; reuse lasts only this transaction and the reader drops before commit. No cross-transaction or global verified-state cache is introduced."
+    },
+    {
+      "paths": [
+        "crates/platform/chio-store-sqlite/src/tool_outcome_projection.rs:43",
+        "crates/kernel/chio-kernel/src/tool_outcome/record_binding.rs:19"
+      ],
+      "finding": "None",
+      "reason": "Only the already selected raw bytes and completely qualified owner are reused inside the same transaction. Strict signed/canonical raw decoding still verifies size, digest, original operation/request/dispatch/fence/provider/cost binding. Outcome/evaluation/native return/security-release/current recovery/commit-chain/resolved-output checks remain in the shared projection body. Ordinary point/projection wrappers still perform the complete checks."
+    },
+    {
+      "paths": [
+        "crates/platform/chio-store-sqlite/src/admission_operation_store.rs:1364",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs:900",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs:1051"
+      ],
+      "finding": "None",
+      "reason": "The named private/crate-private result carries historical data only. Selected receipt bytes move from the already loaded physical record vector only after all original manifest/record/participant/native/credit/recovery/terminal-CAS/chronology checks succeed. Selection requires Receipt kind and the operation's sealed receipt ID; missing bytes retain payload rather than grant erasure. No verification predicate or public API is widened."
+    },
+    {
+      "paths": [
+        "crates/platform/chio-store-sqlite/src/tool_outcome_store/payload_compaction/eligibility.rs:191",
+        "crates/platform/chio-store-sqlite/src/tool_outcome_store/payload_compaction/eligibility.rs:272"
+      ],
+      "finding": "None",
+      "reason": "The byte accounting removes one actual operation/raw reread and one actual receipt SQL reread, while charging both current-recovery status reads. The nonce-preflight table receives a metadata absence probe before any payload-column access. Row/byte/SQL caps, owner fencing, same cursor, corruption errors, rollback behavior and independent all-owner terminal erasure trigger remain unchanged.",
+      "measured_cap_example": "Selected fixture total drops from 29299 to 24511 only after the 4788-byte physical receipt fetch is removed; original cap 26184 remains unchanged."
+    },
+    {
+      "paths": [
+        "crates/platform/chio-store-sqlite/src/tool_outcome_store_tests/compaction_read_bounds.rs:7",
+        "crates/platform/chio-store-sqlite/src/tool_outcome_store_tests/compaction_read_bounds.rs:110"
+      ],
+      "finding": "None",
+      "reason": "Both new boundary controls now assert exact error values, actual column-access counts, identical retained raw bytes/digest/size and original fence. Removing only the isolated fixture fault permits resume from the original cursor under the same byte cap. Existing partial-byte and legacy65 tests retain their original caps and assertions."
+    }
+  ],
+  "retained_evidence": {
+    "captures": [
+      {
+        "path": "/tmp/chio-pr1160-qualification-20261007/compaction-boundary-original2.log",
+        "sha256": "ccef21f163a087477d338ce0a170551673cf88780ea87c53c5f69cb7252311a8",
+        "test_results": [
+          "test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 2068 filtered out; finished in 4.79s"
+        ]
+      },
+      {
+        "path": "/tmp/chio-pr1160-qualification-20261007/compaction-focused-green4.log",
+        "sha256": "8ec400e8df9e52165ff7be8289620a03d31b788120f73640426fcd267dcd0409",
+        "test_results": [
+          "test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 2066 filtered out; finished in 32.74s"
+        ]
+      },
+      {
+        "path": "/tmp/chio-pr1160-qualification-20261007/compaction-receipt-reuse-green4.log",
+        "sha256": "5ec74e85879cd168e684effcd077823767480d5e7a588d7cfc80acc52c2609f4",
+        "test_results": [
+          "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 2066 filtered out; finished in 34.35s"
+        ]
+      }
+    ],
+    "owning_terminal_controls": {
+      "path": "/tmp/chio-pr1160-qualification-20261007/compaction-owning-and-terminal-controls.log",
+      "sha256": "27c68be8e29650c531c2b4cc7cca1868cc2079366470dc96d95279cbc4294615",
+      "test_results": [
+        "test result: ok. 57 passed; 0 failed; 0 ignored; 0 measured; 2013 filtered out; finished in 161.07s"
+      ]
+    },
+    "classification": "Boundary original is terminal RED 0/2; the first composed campaign is terminal FAILED 3/1; the named receipt-reuse campaign is terminal GREEN 4/0. The owning/terminal-control capture is GREEN 57/0. These separate campaigns are preserved and not relabeled as one green run.",
+    "reviewer_Cargo_executions": []
+  },
+  "pending": [
+    "Root's inclusive strict capture is active at report handoff.",
+    "A pending parent-test assertion line wrap is formatting-only and not claimed part of the already guarded hash.",
+    "Full SQLite/full remaining matrix, complete main-to-foundation source review, benchmarks, native/cold/trusted/controller authorization, hosted exact-source CI and protected landing remain outside this verdict."
+  ]
+}
+

@@ -1,0 +1,270 @@
+{
+  "schema": "chio.security.session-producer-source-review.v1",
+  "reviewer": "published_repair_review",
+  "SourceAccepted": true,
+  "verdict": "No supported P0/P1/P2 finding in the integrated session E2/E3 producer delta and its directly affected complete bridge/claim/cleanup/receipt paths.",
+  "findings": [],
+  "qualified_candidate": false,
+  "reviewed_tail_base": "e47f4de5c7",
+  "reviewed_tip": "280133b31209d1d15661a83e4e7e273b13c39884",
+  "current_observed_head": "7cf5ce39ee4f46d411257e1ab40e18b94eea3758",
+  "scope": "Eight changed producer files, four original regression files, and direct session request-map/claim-drop/threshold-restoration/terminal-response contexts. This is a finite producer review, not an exhaustive review of every unrelated body in these large files or the full foundation.",
+  "source_guard": {
+    "start": {
+      "changed_file_hashes": {
+        "crates/kernel/chio-kernel/src/kernel/dispatch.rs": "0f8c72b6a1a2ba1582c2ff7f7dcb61bdd4320cfd1b6e75ca9c9d170e44f53c65",
+        "crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_core.rs": "3eb6d8de2ef7a3ad4c501b425e46f0900cb98567542eeafe8cc51649b61785a3",
+        "crates/kernel/chio-kernel/src/kernel/evaluation/evaluation_helpers.rs": "8cb250246dc05983df765d91d915697f8caa97a81fd6afa5c60829d1f9ea3fa0",
+        "crates/kernel/chio-kernel/src/kernel/evaluation/nested_flow_evaluation.rs": "f6cc26e589862aa469aa3543b6f5b811a8863ade0ee3e5f23d6593c02ad090ac",
+        "crates/kernel/chio-kernel/src/kernel/mod.rs": "4d1cee30b87b81a2e1b3144f4fda67442d9af08e65ff1ffac65f814e4f1743a3",
+        "crates/kernel/chio-kernel/src/kernel/responses/deny_responses.rs": "d59d13be017c3f7754069d60d8a550280b2b6d0726ccc84d0c6fec67c58f7e14",
+        "crates/kernel/chio-kernel/src/kernel/session_ops.rs": "63ac5064179d5d6fb48fcc49604bbb56e8cb45d30061053e93731c93b0bd11b3",
+        "crates/kernel/chio-kernel/src/kernel/session_ops/nested_tool_call.rs": "9cfb3bee26ea0133e359090328a15a2db807f32b26ea2df7d20fba0a05979b7f",
+        "crates/kernel/chio-kernel/src/kernel/tests/threshold_issuance/session_boundary.rs": "0304557866a4547428b4fd3cec7c1fb3652a5b0ecd84ebef7dbf3921c46f6c6b",
+        "crates/kernel/chio-kernel/src/kernel/tests/threshold_issuance/session_boundary/current_thread_bridge.rs": "20d5e8fb3f6fbb6cc467a215c93725dc7f7ce20e9d4dd8e3ad91378bab248178",
+        "crates/kernel/chio-kernel/src/kernel/tests/threshold_issuance/session_boundary/pre_dispatch_cancellation.rs": "14812507976b963f9926076e4f1178f729d371b4d286ba01f30ff91691353814",
+        "crates/kernel/chio-kernel/src/kernel/tests/threshold_issuance/session_continuation.rs": "7dcae1a2f0d850f4f42dfcee3202bfc0e4a3f4d3e8099da6f616f7d6a2fcf4cd"
+      },
+      "context_hashes": {
+        "crates/kernel/chio-kernel/src/kernel/responses/terminal_responses.rs": "474dc1571c83b61ca961ff0232cb6d4f92ac43ac123de2c9e553c274804272f4",
+        "crates/kernel/chio-kernel/src/kernel/session_ops/request_claim.rs": "715550feba2f41796c6c9b7666a440199d883ac082455cc4b4cd4199e7c56271",
+        "crates/kernel/chio-kernel/src/session.rs": "45d1f1c7c78c72016f4f9ce76b06ef729015f2f37993b781a0ed2b02633ea9f3"
+      },
+      "head": "280133b31209d1d15661a83e4e7e273b13c39884",
+      "recorded_utc": "2026-10-07T15:56:50.642201+00:00",
+      "reviewed_tail_base": "e47f4de5c7",
+      "reviewed_tip": "280133b312",
+      "worktree_status": " M .github/workflows/audit-log-schema-lint.yml\n M .github/workflows/chio-cpp.yml\n M .github/workflows/chio-tee-fips.yml\n M .github/workflows/sdk-parity.yml\n M crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/resolved_snapshot.rs\n M crates/kernel/chio-kernel/src/kernel/tests/durable_admission/review_boundaries.rs\n M crates/kernel/chio-kernel/src/tool_outcome_tests/original_security_dispatch.rs\n M crates/platform/chio-control-plane/src/policy/tests.rs\n M crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/ledger.rs\n M crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/record.rs\n M crates/platform/chio-store-sqlite/src/admission_operation_store/threshold_approval/nonce_capture/witness_tests.rs\n M crates/platform/chio-store-sqlite/src/security_state.rs\n M crates/products/chio-api-protect/src/proxy/input.rs\n M crates/products/chio-api-protect/src/proxy/mediated/tests/reconcile_numbers.rs\n M crates/products/chio-api-protect/src/proxy/state/admission_maintenance_tests.rs\n M crates/protocol/chio-openapi/ARCHITECTURE.md\n M crates/security/chio-secret-broker/src/process_boundary_tests/native.rs\n M crates/tooling/chio-conformance/tests/mcp_core_cpp_live.rs\n M docs/security/foundation-acceptance-scope.md\n M docs/security/trust-boundary-inventory.json\n M docs/superpowers/plans/2026-10-05-evidence-product-closeout.md\n M docs/superpowers/plans/2026-10-05-production-readiness-closeout.md\n M scripts/check-keyring-transparency.sh\n M scripts/check-mcp-admin-credential-contract.py\n M scripts/check-secret-broker-boundary.sh\n M scripts/security-clock-inventory.json\n M scripts/security_clock_compositions.py\n M scripts/tests/check-mcp-admin-credential-contract.test.py\n M scripts/tests/check-trust-boundaries.test.py\n M scripts/trust_boundary_reader_rules.py\n?? crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/resolved_snapshot_wire_tests.rs\n?? crates/kernel/chio-kernel/src/tool_outcome_tests/original_security_dispatch/\n?? crates/platform/chio-control-plane/src/policy/tests/runtime_policy_wire.rs\n?? crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/ledger/wire_shape.rs\n?? crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/fixtures/\n?? crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/record_wire_tests.rs\n?? crates/products/chio-api-protect/src/proxy/mediated/tests/reconcile_cost.rs\n?? crates/tooling/chio-conformance/tests/mcp_core_cpp_live/\n"
+    },
+    "end": {
+      "additional_restoration_context": {
+        "path": "crates/kernel/chio-kernel/src/session/threshold_continuation.rs",
+        "sha256": "f2d3526f78cc18453cdfac8265134be1be02ee1d52cc3848e92644019c59255c"
+      },
+      "changed_after_reviewed_tip": [
+        "crates/security/chio-cage/scripts/check-linux-enforcement.sh",
+        "crates/security/chio-cage/src/launch/linux.rs",
+        "docs/security/trust-boundary-inventory.json",
+        "scripts/tests/check-cage-enforcement.test.sh",
+        "scripts/tests/check-trust-boundaries.test.py",
+        "scripts/trust_boundary_reader_rules.py"
+      ],
+      "changed_file_hashes": {
+        "crates/kernel/chio-kernel/src/kernel/dispatch.rs": "0f8c72b6a1a2ba1582c2ff7f7dcb61bdd4320cfd1b6e75ca9c9d170e44f53c65",
+        "crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_core.rs": "3eb6d8de2ef7a3ad4c501b425e46f0900cb98567542eeafe8cc51649b61785a3",
+        "crates/kernel/chio-kernel/src/kernel/evaluation/evaluation_helpers.rs": "8cb250246dc05983df765d91d915697f8caa97a81fd6afa5c60829d1f9ea3fa0",
+        "crates/kernel/chio-kernel/src/kernel/evaluation/nested_flow_evaluation.rs": "f6cc26e589862aa469aa3543b6f5b811a8863ade0ee3e5f23d6593c02ad090ac",
+        "crates/kernel/chio-kernel/src/kernel/mod.rs": "4d1cee30b87b81a2e1b3144f4fda67442d9af08e65ff1ffac65f814e4f1743a3",
+        "crates/kernel/chio-kernel/src/kernel/responses/deny_responses.rs": "d59d13be017c3f7754069d60d8a550280b2b6d0726ccc84d0c6fec67c58f7e14",
+        "crates/kernel/chio-kernel/src/kernel/session_ops.rs": "63ac5064179d5d6fb48fcc49604bbb56e8cb45d30061053e93731c93b0bd11b3",
+        "crates/kernel/chio-kernel/src/kernel/session_ops/nested_tool_call.rs": "9cfb3bee26ea0133e359090328a15a2db807f32b26ea2df7d20fba0a05979b7f",
+        "crates/kernel/chio-kernel/src/kernel/tests/threshold_issuance/session_boundary.rs": "0304557866a4547428b4fd3cec7c1fb3652a5b0ecd84ebef7dbf3921c46f6c6b",
+        "crates/kernel/chio-kernel/src/kernel/tests/threshold_issuance/session_boundary/current_thread_bridge.rs": "20d5e8fb3f6fbb6cc467a215c93725dc7f7ce20e9d4dd8e3ad91378bab248178",
+        "crates/kernel/chio-kernel/src/kernel/tests/threshold_issuance/session_boundary/pre_dispatch_cancellation.rs": "14812507976b963f9926076e4f1178f729d371b4d286ba01f30ff91691353814",
+        "crates/kernel/chio-kernel/src/kernel/tests/threshold_issuance/session_continuation.rs": "7dcae1a2f0d850f4f42dfcee3202bfc0e4a3f4d3e8099da6f616f7d6a2fcf4cd"
+      },
+      "context_hashes": {
+        "crates/kernel/chio-kernel/src/kernel/responses/terminal_responses.rs": "474dc1571c83b61ca961ff0232cb6d4f92ac43ac123de2c9e553c274804272f4",
+        "crates/kernel/chio-kernel/src/kernel/session_ops/request_claim.rs": "715550feba2f41796c6c9b7666a440199d883ac082455cc4b4cd4199e7c56271",
+        "crates/kernel/chio-kernel/src/session.rs": "45d1f1c7c78c72016f4f9ce76b06ef729015f2f37993b781a0ed2b02633ea9f3"
+      },
+      "head": "7cf5ce39ee4f46d411257e1ab40e18b94eea3758",
+      "recorded_utc": "2026-10-07T16:06:34.961823+00:00",
+      "reviewed_tail_base": "e47f4de5c7",
+      "reviewed_tip": "280133b312",
+      "worktree_status": " M .github/workflows/audit-log-schema-lint.yml\n M .github/workflows/chio-cpp.yml\n M .github/workflows/chio-tee-fips.yml\n M .github/workflows/sdk-parity.yml\n M crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/resolved_snapshot.rs\n M crates/kernel/chio-kernel/src/kernel/tests/durable_admission/review_boundaries.rs\n M crates/kernel/chio-kernel/src/tool_outcome_tests/original_security_dispatch.rs\n M crates/platform/chio-control-plane/src/policy/tests.rs\n M crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/ledger.rs\n M crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/record.rs\n M crates/platform/chio-store-sqlite/src/admission_operation_store/threshold_approval/nonce_capture/witness_tests.rs\n M crates/platform/chio-store-sqlite/src/security_state.rs\n M crates/products/chio-api-protect/src/proxy/input.rs\n M crates/products/chio-api-protect/src/proxy/mediated/tests/reconcile_numbers.rs\n M crates/products/chio-api-protect/src/proxy/state/admission_maintenance_tests.rs\n M crates/protocol/chio-openapi/ARCHITECTURE.md\n M crates/security/chio-secret-broker/src/process_boundary_tests/native.rs\n M crates/tooling/chio-conformance/tests/mcp_core_cpp_live.rs\n M docs/security/foundation-acceptance-scope.md\n M docs/security/landing-ledger.md\n M docs/superpowers/plans/2026-10-05-evidence-product-closeout.md\n M docs/superpowers/plans/2026-10-05-production-readiness-closeout.md\n M scripts/check-chio-proof-room-release-truth.sh\n M scripts/check-keyring-transparency.sh\n M scripts/check-mcp-admin-credential-contract.py\n M scripts/check-secret-broker-boundary.sh\n M scripts/security-clock-inventory.json\n M scripts/security_clock_compositions.py\n M scripts/tests/check-chio-proof-room-release-truth.test.sh\n M scripts/tests/check-mcp-admin-credential-contract.test.py\n?? crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/resolved_snapshot_wire_tests.rs\n?? crates/kernel/chio-kernel/src/tool_outcome_tests/original_security_dispatch/\n?? crates/platform/chio-control-plane/src/policy/tests/runtime_policy_wire.rs\n?? crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/ledger/wire_shape.rs\n?? crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/fixtures/\n?? crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/record_wire_tests.rs\n?? crates/products/chio-api-protect/src/proxy/mediated/tests/reconcile_cost.rs\n?? crates/tooling/chio-conformance/tests/mcp_core_cpp_live/\n?? scripts/proof_room_historical_protocols.py\n?? scripts/tests/check-proof-room-historical-protocols.test.py\n"
+    },
+    "result": {
+      "start_head": "280133b31209d1d15661a83e4e7e273b13c39884",
+      "end_head": "7cf5ce39ee4f46d411257e1ab40e18b94eea3758",
+      "start_clean": false,
+      "end_clean": false,
+      "head_advanced": true,
+      "reviewed_file_drift": [],
+      "context_drift": [],
+      "committed_changes_after_tip_overlap_reviewed_scope": []
+    },
+    "assessment": "Head advanced through unrelated commits while source review ran; none overlap reviewed paths. All twelve reviewed file hashes and three start/end context hashes remain unchanged. Dirty worktree state is recorded, not hidden. The additional threshold-restoration context is separately pinned."
+  },
+  "production_assessment": [
+    {
+      "paths": [
+        "crates/kernel/chio-kernel/src/kernel/dispatch.rs:1570",
+        "crates/kernel/chio-kernel/src/session.rs:315",
+        "crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_core.rs:1492",
+        "crates/kernel/chio-kernel/src/kernel/evaluation/nested_flow_evaluation.rs:1193"
+      ],
+      "assessment": "The cancellation reason marker is set only for the real CancellationRequested dispatch-start refusal while that request decision is locked. Missing/completed requests, changed anchors and unavailable sessions remain ordinary errors/denials. Both ordinary and nested producers choose Cancelled only from this marker, before pool claim/dispatch, and retain the same capability, request, durable operation and credential disposition."
+    },
+    {
+      "paths": [
+        "crates/kernel/chio-kernel/src/kernel/evaluation/evaluation_helpers.rs:514",
+        "crates/kernel/chio-kernel/src/kernel/responses/deny_responses.rs:150",
+        "crates/kernel/chio-kernel/src/kernel/responses/terminal_responses.rs:8"
+      ],
+      "assessment": "All affected cleanup branches were traced: runtime reservation release, budget lease release, rail/budget unwind, confirmed durable compensation, unconfirmed cleanup metadata, reversed monetary metadata and final no-money outcome. The outcome selection changes the signed terminal label; it does not skip cleanup. Unconfirmed cleanup keeps may-be-retained flags and references. The extracted pre-execution financial calculation preserves zero charged/attempted amount and original cap/grant/payee attribution.",
+      "runtime_limit": "Dedicated new real monetary confirmed/unconfirmed cancellation controls remain pending; static tracing and older broad runs are not that new branch-specific execution evidence."
+    },
+    {
+      "paths": [
+        "crates/kernel/chio-kernel/src/kernel/mod.rs:749",
+        "crates/kernel/chio-kernel/src/kernel/mod.rs:780",
+        "crates/kernel/chio-kernel/src/kernel/session_ops.rs:894",
+        "crates/kernel/chio-kernel/src/kernel/session_ops/nested_tool_call.rs:85",
+        "crates/kernel/chio-kernel/src/kernel/session_ops/request_claim.rs:55",
+        "crates/kernel/chio-kernel/src/session/threshold_continuation.rs:55"
+      ],
+      "assessment": "The bridge refuses on the current-thread runtime before polling the fresh evaluation future. The retry escape applies only to a retained original threshold claim and the typed refusal on that incompatible calling thread. Armed Drop then restores the same opaque wait under the real request-map lock, or cancels when cancellation won; retries still revalidate current authority. Fresh claims and errors raised by an evaluation that actually ran retain ordinary completion handling."
+    }
+  ],
+  "retained_evidence": {
+    "original": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/session-e2e3/31-tip-red-run1.log",
+      "sha256": "91d549cddaeefe86b3ddbdf2d67ada7d960190b97aac6889ced2f0bd80e0bb3d",
+      "results": [
+        "test result: FAILED. 2 passed; 5 failed; 0 ignored; 0 measured; 1578 filtered out; finished in 0.21s"
+      ]
+    },
+    "repair_runs": [
+      {
+        "finishes": [
+          "Finished `test` profile [unoptimized] target(s) in 2m 59s"
+        ],
+        "head_mentions": [
+          "head: cab1e02e5166a394a86d9a97b2c16dddb45fe8dc"
+        ],
+        "path": "/home/connor/lanes/claude-pr1160-evidence/session-repair/11-e3wip-session-boundary.log",
+        "results": [
+          "test result: FAILED. 5 passed; 2 failed; 0 ignored; 0 measured; 1578 filtered out; finished in 0.24s"
+        ],
+        "sha256": "b5fe22e4aede07801db634a353b93291d78b07750ff577971a7171bdc67566ce"
+      },
+      {
+        "finishes": [
+          "Finished `test` profile [unoptimized] target(s) in 2m 50s"
+        ],
+        "head_mentions": [
+          "commit-session-boundary",
+          "head: fc6f36518e1257125c85b6e05119d70fff054d6a"
+        ],
+        "path": "/home/connor/lanes/claude-pr1160-evidence/session-repair/21-e3commit-session-boundary.log",
+        "results": [
+          "test result: FAILED. 5 passed; 2 failed; 0 ignored; 0 measured; 1578 filtered out; finished in 0.24s"
+        ],
+        "sha256": "ca202d35036433e2099b09230f6921213140568c2ede6e791a6eda40a02c5ddc"
+      },
+      {
+        "finishes": [
+          "Finished `test` profile [unoptimized] target(s) in 2.31s"
+        ],
+        "head_mentions": [
+          "head: cc6af838bf0eb984163c1f5a436d45be91812fa7"
+        ],
+        "path": "/home/connor/lanes/claude-pr1160-evidence/session-repair/41-tip-session-boundary-run1.log",
+        "results": [
+          "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 1578 filtered out; finished in 0.27s"
+        ],
+        "sha256": "3e7eebbf0cda2b2c3d8e74d7ba95878a4d5a04ebb8167bc27fec71ca849e3626"
+      },
+      {
+        "finishes": [
+          "Finished `test` profile [unoptimized] target(s) in 0.85s"
+        ],
+        "head_mentions": [
+          "head: cc6af838bf0eb984163c1f5a436d45be91812fa7",
+          "commit_and_clock ... ok",
+          "commits_with_dispatch_and_cannot_be_replaced ... ok"
+        ],
+        "path": "/home/connor/lanes/claude-pr1160-evidence/session-repair/47-tip-kernel-lib-full.log",
+        "results": [
+          "test result: ok. 1585 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 29.06s"
+        ],
+        "sha256": "3d8e81438110ed3d60a748dfe6ecd20cf00015431bac827c11310aa70ddb7ef0"
+      },
+      {
+        "finishes": [
+          "Finished `test` profile [unoptimized] target(s) in 14.92s"
+        ],
+        "head_mentions": [
+          "head: cc6af838bf0eb984163c1f5a436d45be91812fa7",
+          "commitments ... ok",
+          "committed_capture_without_request_replay ... ok"
+        ],
+        "path": "/home/connor/lanes/claude-pr1160-evidence/session-repair/48-tip-durable-admission-sqlite.log",
+        "results": [
+          "test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 61.46s"
+        ],
+        "sha256": "f0224e30b29b91370d07761a5df6790f8a59ad2f7c6d2fb1785b01b01180d784"
+      },
+      {
+        "finishes": [
+          "Finished `dev` profile [unoptimized] target(s) in 2m 18s"
+        ],
+        "head_mentions": [
+          "head: cc6af838bf0eb984163c1f5a436d45be91812fa7"
+        ],
+        "path": "/home/connor/lanes/claude-pr1160-evidence/session-repair/49-tip-clippy-all-targets.log",
+        "results": [],
+        "sha256": "0dab155f51f5e0d17691e22c8003e438f30e7176e97172c12ebbcc0956c5b0fa"
+      }
+    ],
+    "producer_pin_matches": [
+      {
+        "current_sha256": "0f8c72b6a1a2ba1582c2ff7f7dcb61bdd4320cfd1b6e75ca9c9d170e44f53c65",
+        "path": "crates/kernel/chio-kernel/src/kernel/dispatch.rs",
+        "retained_after_sha256": "0f8c72b6a1a2ba1582c2ff7f7dcb61bdd4320cfd1b6e75ca9c9d170e44f53c65",
+        "same": true
+      },
+      {
+        "current_sha256": "8cb250246dc05983df765d91d915697f8caa97a81fd6afa5c60829d1f9ea3fa0",
+        "path": "crates/kernel/chio-kernel/src/kernel/evaluation/evaluation_helpers.rs",
+        "retained_after_sha256": "8cb250246dc05983df765d91d915697f8caa97a81fd6afa5c60829d1f9ea3fa0",
+        "same": true
+      },
+      {
+        "current_sha256": "d59d13be017c3f7754069d60d8a550280b2b6d0726ccc84d0c6fec67c58f7e14",
+        "path": "crates/kernel/chio-kernel/src/kernel/responses/deny_responses.rs",
+        "retained_after_sha256": "d59d13be017c3f7754069d60d8a550280b2b6d0726ccc84d0c6fec67c58f7e14",
+        "same": true
+      },
+      {
+        "current_sha256": "3eb6d8de2ef7a3ad4c501b425e46f0900cb98567542eeafe8cc51649b61785a3",
+        "path": "crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_core.rs",
+        "retained_after_sha256": "3eb6d8de2ef7a3ad4c501b425e46f0900cb98567542eeafe8cc51649b61785a3",
+        "same": true
+      },
+      {
+        "current_sha256": "f6cc26e589862aa469aa3543b6f5b811a8863ade0ee3e5f23d6593c02ad090ac",
+        "path": "crates/kernel/chio-kernel/src/kernel/evaluation/nested_flow_evaluation.rs",
+        "retained_after_sha256": "f6cc26e589862aa469aa3543b6f5b811a8863ade0ee3e5f23d6593c02ad090ac",
+        "same": true
+      },
+      {
+        "current_sha256": "4d1cee30b87b81a2e1b3144f4fda67442d9af08e65ff1ffac65f814e4f1743a3",
+        "path": "crates/kernel/chio-kernel/src/kernel/mod.rs",
+        "retained_after_sha256": "4d1cee30b87b81a2e1b3144f4fda67442d9af08e65ff1ffac65f814e4f1743a3",
+        "same": true
+      },
+      {
+        "current_sha256": "63ac5064179d5d6fb48fcc49604bbb56e8cb45d30061053e93731c93b0bd11b3",
+        "path": "crates/kernel/chio-kernel/src/kernel/session_ops.rs",
+        "retained_after_sha256": "63ac5064179d5d6fb48fcc49604bbb56e8cb45d30061053e93731c93b0bd11b3",
+        "same": true
+      },
+      {
+        "current_sha256": "9cfb3bee26ea0133e359090328a15a2db807f32b26ea2df7d20fba0a05979b7f",
+        "path": "crates/kernel/chio-kernel/src/kernel/session_ops/nested_tool_call.rs",
+        "retained_after_sha256": "9cfb3bee26ea0133e359090328a15a2db807f32b26ea2df7d20fba0a05979b7f",
+        "same": true
+      }
+    ],
+    "assessment": "All eight current producer hashes exactly match the retained Claude repair tip. Original 2 passed/5 failed, intermediate 5 passed/2 failed, seam 7 passed, full library1585 passed and durable28 passed are distinct retained campaigns. The library/durable/strict captures belong to the retained lane tip; matching producer bytes does not qualify every containing integrated candidate.",
+    "reviewer_Cargo_executions": []
+  },
+  "pending": [
+    "Dedicated real monetary cleanup/cancellation controls requested by root.",
+    "Fresh exact integrated-candidate full/default/optional/platform qualification and complete-foundation independent source review.",
+    "Native/cold/trusted/controller authorization, full benchmarks, hosted exact-source CI and protected landing."
+  ]
+}
+

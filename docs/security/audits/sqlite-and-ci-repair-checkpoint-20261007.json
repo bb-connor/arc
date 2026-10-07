@@ -1,0 +1,663 @@
+{
+  "observed_utc": "2026-10-07T16:39:56.650692+00:00",
+  "source_base": "3f398f4d363eb1287e376d1207b8d4c2a58b0c35",
+  "published_source": "fffbab1ef24babd0cee5096dbcf8f3cab4c3e08b",
+  "current_changes": "All tested Rust, workflow and checker repairs committed through29a2cc050c; only this evidence/ledger checkpoint remains to commit.",
+  "campaigns": [
+    {
+      "path": "sqlite-full-owning.log",
+      "sha256": "9a4d82e4c4f25e4a9897801f3437acc016fa8326693e5b8d8739a6eab3e71552",
+      "bytes": 263015,
+      "exit_code": 101,
+      "passed": 2049,
+      "failed": 10,
+      "ignored": 3
+    },
+    {
+      "path": "tool-outcome-schema-green2.log",
+      "sha256": "d25fcf94eda3f6b7588ba80b3f805c02ad4f7f55657a8f1e046f687bd1e496b8",
+      "bytes": 614,
+      "exit_code": 0,
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "path": "tool-outcome-schema-owning.log",
+      "sha256": "399db73abb4043561dfb7b2927a8881ad5dd9f0d9eaff9b14bb8562164a4c26a",
+      "bytes": 1354,
+      "exit_code": 0,
+      "passed": 9,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "path": "payment-originals-and-controls-green12.log",
+      "sha256": "196c49ebf71525724ee2412de9651c277b8b41a756ba5907c0f1d196f4234358",
+      "bytes": 3404,
+      "exit_code": 0,
+      "passed": 12,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "path": "payment-owning.log",
+      "sha256": "358196f55e0b2942ae04e252fbb84caf22df7bbb4f13dded868d32567d4ff4f3",
+      "bytes": 3939,
+      "exit_code": 0,
+      "passed": 30,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "path": "payment-owning-strict.log",
+      "sha256": "40d5c3f95401ae272df9c7022d95d70abdda43392069d1da90a1400c95951d0b",
+      "bytes": 166,
+      "exit_code": 0,
+      "passed": null,
+      "failed": null,
+      "ignored": null
+    },
+    {
+      "path": "compaction-boundary-original2.log",
+      "sha256": "ccef21f163a087477d338ce0a170551673cf88780ea87c53c5f69cb7252311a8",
+      "bytes": 1714,
+      "exit_code": 101,
+      "passed": 0,
+      "failed": 2,
+      "ignored": 0
+    },
+    {
+      "path": "compaction-focused-green4.log",
+      "sha256": "8ec400e8df9e52165ff7be8289620a03d31b788120f73640426fcd267dcd0409",
+      "bytes": 1454,
+      "exit_code": 101,
+      "passed": 3,
+      "failed": 1,
+      "ignored": 0
+    },
+    {
+      "path": "compaction-receipt-reuse-green4.log",
+      "sha256": "5ec74e85879cd168e684effcd077823767480d5e7a588d7cfc80acc52c2609f4",
+      "bytes": 841,
+      "exit_code": 0,
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "path": "compaction-owning-and-terminal-controls.log",
+      "sha256": "27c68be8e29650c531c2b4cc7cca1868cc2079366470dc96d95279cbc4294615",
+      "bytes": 8468,
+      "exit_code": 0,
+      "passed": 57,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "path": "compaction-final-strict.log",
+      "sha256": "7504950aa4fdd6388910d36a715d2246b9460956cb0914b2d2796f04e7d119c6",
+      "bytes": 166,
+      "exit_code": 0,
+      "passed": null,
+      "failed": null,
+      "ignored": null
+    },
+    {
+      "path": "reconcile-cost-original1.log",
+      "sha256": "20ad19e6c19c0b38a9671a3db8b89f473c08ecf189d366f35a5f1a2233ebd74e",
+      "bytes": 4034,
+      "exit_code": 101,
+      "passed": 0,
+      "failed": 1,
+      "ignored": 0
+    },
+    {
+      "path": "reconcile-cost-green2.log",
+      "sha256": "bc7dd1e1e41c08a7f4f5e7f33648ac8d7baccbc1e12810bcb218f6109e5550fe",
+      "bytes": 645,
+      "exit_code": 0,
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "path": "reconcile-cost-api-owning.log",
+      "sha256": "8b6b746f83f548ed7e2f2a63d86502297baf4636a01cd7736eff782c32af63de",
+      "exit_code": 0,
+      "passed": 278,
+      "semantic_scope": "scoped terminal success"
+    },
+    {
+      "path": "kernel-wire-session-focused.log",
+      "sha256": "c11fee2745e7c899d4349e3dca69c0b679b5e7882dc15c0d0badd153adb45845",
+      "exit_code": 0,
+      "passed": 11,
+      "semantic_scope": "scoped terminal success"
+    },
+    {
+      "path": "wire-session-compile.log",
+      "sha256": "9b47e48c074ee896b13c4a5eb0c12277ade1669638b82e8eb32757b0f6486430",
+      "exit_code": 101,
+      "passed": null,
+      "semantic_scope": "compile module-path setup failure"
+    },
+    {
+      "path": "cage-musl-installed-selftest.log",
+      "sha256": "3279c61c6da9453f2870e4c2b2864be4e48585ff92e7198a7383a48d8c03e012",
+      "exit_code": 0,
+      "passed": null,
+      "semantic_scope": "scoped terminal success"
+    },
+    {
+      "path": "provenance-installed-selftest.log",
+      "sha256": "219e1e2695f996a6bbdb0387df70326fdd96c7a4eea3f06c22b67a119c4e8e4e",
+      "exit_code": 0,
+      "passed": 6,
+      "semantic_scope": "scoped terminal success"
+    },
+    {
+      "path": "provenance-installed-gate.log",
+      "sha256": "5152d1b007007c97a9da835487c73f692d17eb52895bef3472e89e8c26582be7",
+      "exit_code": 1,
+      "passed": null,
+      "semantic_scope": "setup-only failure, readonly Cargo lock"
+    },
+    {
+      "path": "kernel-current-full-owning.log",
+      "sha256": "17e4745b392e18e2919463520ad41a73a9eb9bdc3e6451387dc6d0fd24e5ac6c",
+      "bytes": 196165,
+      "exit_code": 0,
+      "passed": 1587,
+      "failed": 0
+    },
+    {
+      "path": "cef-privacy-owning.log",
+      "sha256": "ad828e333244b543a30136090b0cf30c567c980af4a41b5041255011f02bfe49",
+      "bytes": 2164,
+      "exit_code": 0,
+      "passed": 19,
+      "failed": 0
+    },
+    {
+      "path": "cpp-public-diagnostics-green2.log",
+      "sha256": "b08db8a6dd9b098f5a384e34b55d6fbdc487de9b18b48b21482706cfdff482bc",
+      "bytes": 11136,
+      "exit_code": 0,
+      "passed": 2,
+      "failed": 0
+    },
+    {
+      "path": "control-plane-wire-green3.log",
+      "sha256": "3f7a9366fd26f008e5b17926245cd7cd9111a0cce64ba2ccea8d51b800e40b02",
+      "bytes": 750,
+      "exit_code": 0,
+      "passed": 3,
+      "failed": 0
+    },
+    {
+      "path": "sqlite-checkpoint-wire-focused.log",
+      "sha256": "786bef86ea4a7316be5836c785c5ae548fcac2e7a710d5f9976e954841ea41cf",
+      "bytes": 1370,
+      "exit_code": 0,
+      "passed": 2,
+      "failed": 0
+    },
+    {
+      "path": "trust-installed-selftest.log",
+      "sha256": "b2888edba0804b1dc1a1772c13454023431bfe2166c6d67ededf6723bc4fd3cc",
+      "bytes": 143,
+      "exit_code": 0,
+      "passed": 42,
+      "failed": 0
+    },
+    {
+      "path": "wire-lock-installed-gate.log",
+      "sha256": "04a78c85dfab28742b2612a5eac938cf93fa01e06a074f09ffc6f8fcc98d1519",
+      "bytes": 189,
+      "exit_code": 0,
+      "passed": null,
+      "failed": null
+    },
+    {
+      "path": "wire-lock-installed-selftest.log",
+      "sha256": "9fdea84ee33fd6c77ceec6bdf05dae698d29135314a65b907645aea962e702b8",
+      "bytes": 952,
+      "exit_code": 0,
+      "passed": null,
+      "failed": null
+    }
+  ],
+  "source_repairs": {
+    "schema_expected_version": "085b8d7f0e3b5d87e1d58da1684df57c458d6812",
+    "payment_catalog_and_fixtures": "3f398f4d363eb1287e376d1207b8d4c2a58b0c35",
+    "compaction": "e47f4de5c7",
+    "cost_breakdown": "5f49170141",
+    "session_cleanup": "123f6f04d1",
+    "clock_fixtures": "801f0a5282",
+    "wire_shapes": "c935c80a3c",
+    "cpp_public_diagnostics": "2b75e71206",
+    "ci_contracts": "29a2cc050c",
+    "trust_reader_contracts": "7cf5ce39ee"
+  },
+  "remaining_local_failures": [],
+  "qualified_candidate": false,
+  "foundation_merged": false,
+  "new_pr_feedback": {
+    "comment": 4207782346,
+    "source": "fffbab1ef24babd0cee5096dbcf8f3cab4c3e08b",
+    "status": "genuine HTTP RED0/1 then GREEN2; complete API278/0 and eight-owner strict0",
+    "source_fix": "5f49170141",
+    "same_caps": true
+  },
+  "current_kernel_source": "shared session cleanup helper; same outcome decision and authorization values, full1587PASS; modulehygiene nowPASS",
+  "updated_utc": "2026-10-07T16:40:33.906876+00:00",
+  "source_checkpoint": "29a2cc050c3995a390667f9171ede3401e1da419",
+  "final_structural": [
+    {
+      "path": "release-truth-final.log",
+      "argv": [
+        "bash",
+        "scripts/check-chio-proof-room-release-truth.sh"
+      ],
+      "exit_code": 0
+    },
+    {
+      "path": "release-truth-full-selftest.log",
+      "argv": [
+        "bash",
+        "scripts/tests/check-chio-proof-room-release-truth.test.sh"
+      ],
+      "exit_code": 0
+    },
+    {
+      "path": "hardening-final.log",
+      "argv": [
+        "python3",
+        "scripts/check-rust-hardening.py"
+      ],
+      "exit_code": 0
+    },
+    {
+      "path": "hardening-final-selftest.log",
+      "argv": [
+        "python3",
+        "scripts/tests/check-rust-hardening.test.py"
+      ],
+      "exit_code": 0
+    },
+    {
+      "path": "owning-union-final-strict.log",
+      "argv": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-api-protect",
+        "-p",
+        "chio-conformance",
+        "-p",
+        "chio-siem",
+        "-p",
+        "chio-secret-broker",
+        "-p",
+        "chio-cage",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0
+    }
+  ],
+  "new_review_obligations": {
+    "reviewed_source": "7cf5ce39ee4f46d411257e1ab40e18b94eea3758",
+    "source": "coord/pr1160 to-codex2026-10-07T16:28:04Z",
+    "findings": [
+      {
+        "id": "fragment:F092",
+        "priority": "P2",
+        "requirement": "Gate unsupported security admission SQLite store before production publish",
+        "existing_requirement": "incoming-pr1160-review-20261006:F092",
+        "status": "isolated composed repair qualification in progress",
+        "landing_pr": 1160
+      },
+      {
+        "id": "fragment:terminal-immutability",
+        "priority": "P2",
+        "requirement": "Refuse terminal self-transition and cleanup CAS mutations in both security admission stores",
+        "status": "assigned Original-first to claude",
+        "landing_pr": 1160
+      },
+      {
+        "id": "fragment:cleanup-pagination",
+        "priority": "P2",
+        "requirement": "Bound pending cleanup pages with stable cursor and progress beyond failing head outboxes",
+        "status": "assigned Original-first to claude",
+        "landing_pr": 1160
+      },
+      {
+        "id": "fragment:request-owner-oracle",
+        "priority": "P2",
+        "requirement": "Exercise genuine request ID ownership conflict with distinct operation binding and exact error",
+        "status": "assigned Original-first to claude",
+        "landing_pr": 1160
+      }
+    ],
+    "all_required_before_final_acceptance": true,
+    "source_only_review": true,
+    "runtime_reproduction_pending": true,
+    "historical1739_preserved": true,
+    "additional_pipeline_findings": [
+      {
+        "id": "pipeline:issuance-fence-recovery",
+        "priority": "P1",
+        "requirement": "Recover lapsed or independently advanced lineage fences without wedging rollback and expiry",
+        "source": "to-codex2026-10-07T16:32:12Z",
+        "status": "assigned Original-first to claude",
+        "landing_pr": 1160
+      },
+      {
+        "id": "pipeline:terminal-rejection-ack",
+        "priority": "P1",
+        "requirement": "Acknowledge durable terminal rejection and keep outbox recovery progressing after ingress failures",
+        "source": "to-codex2026-10-07T16:32:46Z",
+        "status": "assigned Original-first to claude",
+        "landing_pr": 1160
+      },
+      {
+        "id": "effects:trusted-clock",
+        "priority": "P2",
+        "requirement": "Thread owner clock through alert and issuance production backends",
+        "status": "assigned",
+        "landing_pr": 1160
+      },
+      {
+        "id": "effects:durable-plan-binding",
+        "priority": "P2",
+        "requirement": "Verify exact durable plan binding for every effect execute/readback",
+        "status": "assigned",
+        "landing_pr": 1160
+      },
+      {
+        "id": "effects:shared-freeze-fence",
+        "priority": "P2",
+        "requirement": "Prevent repeated FreezeIssuance effects from releasing another active effect fence",
+        "status": "assigned current trigger verification",
+        "landing_pr": 1160
+      },
+      {
+        "id": "pipeline:recovery-readiness",
+        "priority": "P2",
+        "requirement": "Permit rollback recovery when planning/ingress dependencies are unavailable",
+        "status": "assigned",
+        "landing_pr": 1160
+      },
+      {
+        "id": "pipeline:teardown-fairness",
+        "priority": "P2",
+        "requirement": "Progress independent held cleanup jobs despite one indefinite teardown",
+        "status": "assigned bounded design",
+        "landing_pr": 1160
+      }
+    ]
+  },
+  "foundation_review_gaps": {
+    "review_scope": "partial known missing foundation coverage after recovery",
+    "basis": "docs/reviews/2026-10-06-pr1160/README.md Coverage limits and slices.md",
+    "reviewed_recent_reports": [
+      "payment-repair-source-review.json",
+      "compaction-composed-source-review.json",
+      "session-producer-source-review.json",
+      "reconcile-cost-review-stage/source-accepted-report.json"
+    ],
+    "remaining_source_areas": [
+      "remaining largest include fragments with declared unread ranges",
+      "full bodies of largest CI/checker mutation suites",
+      "control-plane security effect backend and teardown full paths",
+      "selected exact new dependency/type/constructor cuts after d049 intake"
+    ],
+    "partner_review": "Claude read kernel/security/store fragments with four P2 now assigned; partial test fragments and dead recovery include remain unread",
+    "whole_foundation_positive_review": false
+  },
+  "retained_logs": [
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/cage-musl-installed-selftest.log.gz",
+      "raw_sha256": "3279c61c6da9453f2870e4c2b2864be4e48585ff92e7198a7383a48d8c03e012",
+      "compressed_sha256": "ad61a2cfd1c4bb154c5a2fe044305d3755091b9ceab57cfc0a35f28a58eaac24"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/cef-privacy-owning.log.gz",
+      "raw_sha256": "ad828e333244b543a30136090b0cf30c567c980af4a41b5041255011f02bfe49",
+      "compressed_sha256": "0da52bae81461c30429cf096d20321acedcf83b279d6dc520ea7a28ba37daa07"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/clock-followup-installed-selftest.log.gz",
+      "raw_sha256": "3ead97fe6cf576495f0c84261ee15f4e8fcccb21d7a2d0523bc6ef59aea3df65",
+      "compressed_sha256": "7da975c6945d7264142637ab0c5386847c7818eb421b349609f322b1e8edb799"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/clock-followup-installed.log.gz",
+      "raw_sha256": "d54d53b2e8928a4e856a3bb217dc2a3826e66f4c2fd610ef616d293459887184",
+      "compressed_sha256": "3d6231d1278d9e4fc9a778f84793f76805e1f4debb1cd91f883c290476c17e1d"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/compaction-boundary-original2.log.gz",
+      "raw_sha256": "ccef21f163a087477d338ce0a170551673cf88780ea87c53c5f69cb7252311a8",
+      "compressed_sha256": "499a3de820dfa6ea0b347211cfac9ed44dd73abdc6e77f3da3dc1469a8b876c2"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/compaction-final-strict.log.gz",
+      "raw_sha256": "7504950aa4fdd6388910d36a715d2246b9460956cb0914b2d2796f04e7d119c6",
+      "compressed_sha256": "86037cca5567964ea4be290637f6e50ae150ae08460f4a5c9fcf140be8737591"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/compaction-focused-green4.log.gz",
+      "raw_sha256": "8ec400e8df9e52165ff7be8289620a03d31b788120f73640426fcd267dcd0409",
+      "compressed_sha256": "b78b390c69b777e245e1c6c0c53b3f637aa2d8cb9e2060a27ec0aef9198e4bbd"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/compaction-owning-and-terminal-controls.log.gz",
+      "raw_sha256": "27c68be8e29650c531c2b4cc7cca1868cc2079366470dc96d95279cbc4294615",
+      "compressed_sha256": "f0f81a2d5cb813602075edf4f30918fb07fbafb0be11b9be1b0a2767dbc133ec"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/compaction-receipt-reuse-green4.log.gz",
+      "raw_sha256": "5ec74e85879cd168e684effcd077823767480d5e7a588d7cfc80acc52c2609f4",
+      "compressed_sha256": "6809143306ca687cbd3ca8af60ba33237fc63ce6ce2c6a95be3162de4bcdc3a0"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/control-plane-wire-green3.log.gz",
+      "raw_sha256": "3f7a9366fd26f008e5b17926245cd7cd9111a0cce64ba2ccea8d51b800e40b02",
+      "compressed_sha256": "d42bd997a2c141bb590d257cd174b61e0a58ff371a52a60f13da14b603fd1382"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/cpp-public-diagnostics-green2.log.gz",
+      "raw_sha256": "b08db8a6dd9b098f5a384e34b55d6fbdc487de9b18b48b21482706cfdff482bc",
+      "compressed_sha256": "844acfb3412cdf2ef6e4a04087b5b61862c0d61a98331773959a388c69debb4b"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/final-current-format.log.gz",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "compressed_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/final-current-negative.log.gz",
+      "raw_sha256": "897161cd4db645803bc8f94e7409695a5e18d5200539a8ad39682ab644f47997",
+      "compressed_sha256": "fcb5755e7b61fd4214906c02841e700527973bf3989df4f7cc6defbc1265eeb6"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/hardening-final-selftest.log.gz",
+      "raw_sha256": "3a23405a755a7d6d9ad22267d1635b62fbc421d698b4ebf041393d18ba32585f",
+      "compressed_sha256": "77d84ab60e7bd396f42ad5d38a48ddac562e2f68f8f6ec9a88d569597d9d1206"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/hardening-final.log.gz",
+      "raw_sha256": "3a9a4ad59aef182de12528fb4185656162b3448b731756cd45f5f98e49221454",
+      "compressed_sha256": "6eb7a1f4eb4c89213a95578915a740cb8607d7784a0aee48ff12082dd786606b"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/kernel-current-full-owning.log.gz",
+      "raw_sha256": "17e4745b392e18e2919463520ad41a73a9eb9bdc3e6451387dc6d0fd24e5ac6c",
+      "compressed_sha256": "e59a180bdad184c3f9a103324e237e999af3399415c8161748c13198a5bb7ac5"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/kernel-wire-session-focused.log.gz",
+      "raw_sha256": "c11fee2745e7c899d4349e3dca69c0b679b5e7882dc15c0d0badd153adb45845",
+      "compressed_sha256": "52cfc267e2895d3206833dc9bb17c4fe8fc327e66c12e7fd5430a467dc36d9e9"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/mcp-contract-installed-selftest.log.gz",
+      "raw_sha256": "fb326c4ad52a319be73a7531ed0b02ca6096f48f11147d998505055ffc87d413",
+      "compressed_sha256": "e1870b85e2be62946e2922708086d3179085b56092ed6fc06c2247130fdf9a9d"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/mcp-contract-installed.log.gz",
+      "raw_sha256": "54605b249edfbcf030036884ded1fa091595096f699757a712d7b5bf9bfd122f",
+      "compressed_sha256": "950175cd60430400594fe64a84029cb274ff037f2fe5caa54521a026d5cdc3a4"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/owning-union-final-strict.log.gz",
+      "raw_sha256": "0492721446673d599077958a23faff46dc2573615dbd34a0882efd1b7b294e56",
+      "compressed_sha256": "9e8694308f0573c9baad468835abe905e419be5facf141cc7d5f431273ce0f13"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/payment-originals-and-controls-green12.log.gz",
+      "raw_sha256": "196c49ebf71525724ee2412de9651c277b8b41a756ba5907c0f1d196f4234358",
+      "compressed_sha256": "0c8660ee3dd75663634dcb884c36f873932ea0b7a2d3273eb7edbf81ba8bc139"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/payment-owning-strict.log.gz",
+      "raw_sha256": "40d5c3f95401ae272df9c7022d95d70abdda43392069d1da90a1400c95951d0b",
+      "compressed_sha256": "9c21a4a4020fdace16eae66f6023967d9a12bfa202fe8ade7b0f421cade71273"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/payment-owning.log.gz",
+      "raw_sha256": "358196f55e0b2942ae04e252fbb84caf22df7bbb4f13dded868d32567d4ff4f3",
+      "compressed_sha256": "b18ea6d868d87cb6247a18fcc4263706595af2270cb3f0a446d7592d0f856c2e"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/provenance-installed-gate.log.gz",
+      "raw_sha256": "5152d1b007007c97a9da835487c73f692d17eb52895bef3472e89e8c26582be7",
+      "compressed_sha256": "931d66e943856525a2fe691968e7c29b277a8aa554dd764460ea45b9146e15e5"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/provenance-installed-selftest.log.gz",
+      "raw_sha256": "219e1e2695f996a6bbdb0387df70326fdd96c7a4eea3f06c22b67a119c4e8e4e",
+      "compressed_sha256": "b8f5a794f8e523ff3ead246f8d280bda4d52af828cb819ff5efb46c19b35b0ef"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/reconcile-cost-api-owning.log.gz",
+      "raw_sha256": "8b6b746f83f548ed7e2f2a63d86502297baf4636a01cd7736eff782c32af63de",
+      "compressed_sha256": "91acce16b009e83a9c645534b69c4d51c82f7fb74814ccdafe078f8da5f6768b"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/reconcile-cost-green2.log.gz",
+      "raw_sha256": "bc7dd1e1e41c08a7f4f5e7f33648ac8d7baccbc1e12810bcb218f6109e5550fe",
+      "compressed_sha256": "80059c4e207c7bffdacc08cbb63957a054c3962c48f6cc083c3b085ed4d02a5d"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/reconcile-cost-original1.log.gz",
+      "raw_sha256": "20ad19e6c19c0b38a9671a3db8b89f473c08ecf189d366f35a5f1a2233ebd74e",
+      "compressed_sha256": "14bf55418c1d830f328e1b05b91ee7eff0618019d070770047448cfa9f31a2ad"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/release-truth-final.log.gz",
+      "raw_sha256": "a1d0a08a627700e626e18fc189d7b89281565fc5c76b13b6ecf530eace65af25",
+      "compressed_sha256": "17855693943a71b0b214f066c5a0ac947dadc947016a45c9406c46a82cb6fa02"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/release-truth-full-selftest.log.gz",
+      "raw_sha256": "60236922560b1748b3c5333be8bb88d4acd3b7fd3b1be60003d11f5ea2a78261",
+      "compressed_sha256": "efcd1ccfb27d546fdc6bdb6c27746f353f4f3f57481e8befa4f596c9503db299"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/session-final-hygiene.log.gz",
+      "raw_sha256": "5906be7ba0284a69166548952783fa003ed5a5b614392f9cf12345252149f184",
+      "compressed_sha256": "10e56d42e58e278b342ab7360c1babb22238092705276d94a0784a7802addd61"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/sqlite-checkpoint-wire-focused.log.gz",
+      "raw_sha256": "786bef86ea4a7316be5836c785c5ae548fcac2e7a710d5f9976e954841ea41cf",
+      "compressed_sha256": "680e8a4928031433f165f7c8dbd69a1884dca31703b6c2eff1b6eb430a03a43c"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/sqlite-full-owning.log.gz",
+      "raw_sha256": "9a4d82e4c4f25e4a9897801f3437acc016fa8326693e5b8d8739a6eab3e71552",
+      "compressed_sha256": "34b0ab741a6a5182d44ff6c13df87a5311ed7c0d3f53eb56b148c4575518264f"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/tool-outcome-schema-green2.log.gz",
+      "raw_sha256": "d25fcf94eda3f6b7588ba80b3f805c02ad4f7f55657a8f1e046f687bd1e496b8",
+      "compressed_sha256": "05d7cdfa497656e882980c205f059b6bd06a62fc8b3fad2932e80da94da2ff5e"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/tool-outcome-schema-owning.log.gz",
+      "raw_sha256": "399db73abb4043561dfb7b2927a8881ad5dd9f0d9eaff9b14bb8562164a4c26a",
+      "compressed_sha256": "94059078a20ab21585520ebe168c3110a0c8e62d923a74dee8a095f0568d1ec9"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/trust-installed-selftest.log.gz",
+      "raw_sha256": "b2888edba0804b1dc1a1772c13454023431bfe2166c6d67ededf6723bc4fd3cc",
+      "compressed_sha256": "fb0550dd6713a0d76cd12b89533b9a6e27c0c75ff53c9967a15fddc741755345"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/trust-installed.log.gz",
+      "raw_sha256": "e95f179803ffd3c1b7aa88a7b884e6bb39ca3ed47f8615da70c939b7357fcbda",
+      "compressed_sha256": "9cb5cd1c42048dcfb5c49b9b499a26f47e73f86611668e0caa91620ebf8caeaf"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/wire-lock-installed-gate.log.gz",
+      "raw_sha256": "04a78c85dfab28742b2612a5eac938cf93fa01e06a074f09ffc6f8fcc98d1519",
+      "compressed_sha256": "4c79d419bb68e3d21cde47a76fac1bf3960526f5488630f714ad8c1925a0742d"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/wire-lock-installed-selftest.log.gz",
+      "raw_sha256": "9fdea84ee33fd6c77ceec6bdf05dae698d29135314a65b907645aea962e702b8",
+      "compressed_sha256": "0de69027effb76cd12e540f902492a49df19cda6b7dab42066c23b143546adc1"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/wire-session-compile.log.gz",
+      "raw_sha256": "9b47e48c074ee896b13c4a5eb0c12277ade1669638b82e8eb32757b0f6486430",
+      "compressed_sha256": "738e4f5618341a94629fa840d7e30ee201c4adf8d046e80761ea08bc40c4d70e"
+    }
+  ],
+  "review_reports": [
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/payment-repair-source-review.json",
+      "sha256": "0c54ee0e4343941168aefec7c294ee51cf217f4ee0112c9af16e98c4f845aad4"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/compaction-composed-source-review.json",
+      "sha256": "e6145d508373ca1b4eac7c425a97da322311866e4da2f58951d21850684216d8"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/session-producer-source-review.json",
+      "sha256": "518a8aebbc4e93159c828e67a343513f7870c047b681525f964cb5216cc8ef8c"
+    },
+    {
+      "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007/source-accepted-report.json",
+      "sha256": "30f0dea7948039f8aaabdb8f54088d2be2dcee4ffb18d95edafb32657c6dd6c3"
+    }
+  ],
+  "prior_draft_observations": {
+    "source_base": "3f398f4d363eb1287e376d1207b8d4c2a58b0c35",
+    "current_changes": "kernel E2/E3 integrated280133b312; structural/wire/diagnostic/cost source uncommitted, active capture held",
+    "new_pr_feedback": {
+      "comment": 4207782346,
+      "source": "fffbab1ef24babd0cee5096dbcf8f3cab4c3e08b",
+      "status": "genuine HTTP RED0/1 then GREEN2; complete API278/0 and eight-owner strict0",
+      "source_fix": "5f49170141",
+      "same_caps": true
+    },
+    "updated_utc": "2026-10-07T16:32:44.435136+00:00"
+  },
+  "remaining_local_failures_semantics": "No failures in this completed repair batch; this is not a claim that the remaining source/default/PQ/native/hosted qualification matrix has passed."
+}

@@ -129204,5 +129204,18 @@
       }
     ],
     "qualified_candidate": false
+  },
+  "sqlite_and_ci_repair_checkpoint_20261007": {
+    "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007.json",
+    "sha256": "5225033f2e20b4ad2dab6c1263622801bf4a3532c4e2a8305c1df3480db06041",
+    "source_commit": "29a2cc050c3995a390667f9171ede3401e1da419",
+    "all_original_ten_sqlite_failures_have_scoped_passing_repairs": true,
+    "kernel_full_passed": 1587,
+    "api_owning_passed": 278,
+    "compaction_and_terminal_controls_passed": 57,
+    "owning_union_alltargets_strict_exit": 0,
+    "new_pipeline_and_fragment_review_obligations": "retained in referenced checkpoint; reproduce/repair/qualify before landing",
+    "candidate_qualified": false,
+    "foundation_merged": false
   }
 }

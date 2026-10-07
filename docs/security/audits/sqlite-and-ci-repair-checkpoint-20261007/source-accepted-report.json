@@ -1,0 +1,150 @@
+{
+  "verdict": "SourceAccepted: genuine P2 unsigned cost-report decoder defect repaired at its owning mixed-input boundary.",
+  "review_comment_id": 4207782346,
+  "review_comment_url": "https://github.com/bb-connor/arc/pull/1160#discussion_r4207782346",
+  "source_checkout": "/home/connor/lanes/integration",
+  "parent_reported_local_commit_prefix": "3f398",
+  "candidate_state": "root-applied uncommitted decoder classification repair and private cost regression child; exact source pins below",
+  "authority_contract": {
+    "unsigned_report": "ToolInvocationCost declares units:u64, currency:String, breakdown:Option<serde_json::Value>; breakdown is audit data. Sidecar documentation identifies realized_cost as tool-server report, not an attested oracle credential.",
+    "signed_authority": "Signed execution nonce covers operation identity, canonical argument hash and reserved hold. Kernel checks nonce signature/replay, exact arguments, reserved currency and min(realized,reserved) before canonical receipt signing.",
+    "classification": "realized_cost now uses whole-document duplicate-aware numeric semantics and typed ToolInvocationCost projection; original signed nonce RawValue slices stay strict before projection.",
+    "other_signed_payloads": "top-level classification does not relax nested signed payloads or authenticated delivery reports; their owning strict decoder remains unchanged",
+    "compatibility_scope": "direct legacy reconcile HTTP route; current Python SDK rejects its obsolete unsigned-report method and directs callers to authenticated delivery",
+    "prior_assumption_refined": "prior source review correctly observed strict cost parsing but treated that as intended authority. Current documented DTO and route ownership show the optional cost breakdown is unsigned audit JSON."
+  },
+  "production_diff": "one classification arm adds realized_cost beside arguments/parameters, plus comment clarifying unsigned cost reports; no kernel, nonce, canonical signing or budget API changes",
+  "read_guard_audit": {
+    "original_nodes": 19,
+    "unchanged_original_nodes": 17,
+    "authorized_changes": [
+      "crates/products/chio-api-protect/src/proxy/input.rs",
+      "crates/products/chio-api-protect/src/proxy/mediated/tests/reconcile_numbers.rs"
+    ],
+    "private_child_matches_frozen_stage": true,
+    "old_test_bodies_unchanged": true
+  },
+  "new_tests": {
+    "positive": "actual Router held-nonce evaluation then original breakdown1e-05/0.50 reconciliation. units30 commits30 from signed100 exposure; u64MAX remains valid typed integer input and commits only100. Both return verified authoritative receipts with normalized audit breakdown and exact hold/event lineage; replays create zero additional budget mutations or receipts.",
+    "negative": "nine actual HTTP controls cover fractional units, nonstring currency, mismatched reserved currency, duplicate breakdown key, duplicate units, duplicate realized_cost, original signed nonce number alias, tampered nonce signature and changed argument hash. Each pins parser/shape/kernel phase and complete cause, preserves exact hold/usage/event vector/log count, then valid retry commits one settlement."
+  },
+  "root_runtime_evidence_read": {
+    "original": {
+      "path": "/tmp/chio-pr1160-qualification-20261007/reconcile-cost-original1.log",
+      "sha256": "20ad19e6c19c0b38a9671a3db8b89f473c08ecf189d366f35a5f1a2233ebd74e",
+      "status": "failed",
+      "passed": 0,
+      "failed": 1,
+      "ignored": 0,
+      "filtered": 274,
+      "runtime_seconds": 0.25,
+      "failure": "actual reconcile400 versus expected200, valid units30/USD report with original breakdown1e-05/0.50"
+    },
+    "fixed": {
+      "path": "/tmp/chio-pr1160-qualification-20261007/reconcile-cost-green2.log",
+      "sha256": "bc7dd1e1e41c08a7f4f5e7f33648ac8d7baccbc1e12810bcb218f6109e5550fe",
+      "status": "passed",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "filtered": 273,
+      "runtime_seconds": 0.43,
+      "compile_seconds": 36.35
+    },
+    "cargo_owner": "root; reviewer independently read complete terminal logs and ran no Cargo"
+  },
+  "broader_verification": {
+    "full_api_package": "root running separate owning package campaign; no claim from this report",
+    "log": "/tmp/chio-pr1160-qualification-20261007/reconcile-cost-api-owning.log"
+  },
+  "scope_limit": "local targeted regressions and bounded source verdict only; no full owning-package, hosted CI, publication, merge, release or activation claim",
+  "artifacts": {
+    "frozen_original_test_patch_sha256": "7b71c62c79038a4f14063f8ae6fabb8bb3454cee6610a27a923622386d8b5334",
+    "frozen_original_manifest_sha256": "24b0fd89cea26aaf509891f6ddb95a2f024984a750cdd36d23332fba343a0ad6",
+    "producer_patch_sha256": "12e4546f9f035cbc00b032f9691085e9cc4cff1c94f10afb6d951f33f27bc036",
+    "formatting_amendment": "separate uninstalled formatting amendment; original frozen capture artifact unchanged"
+  },
+  "source_pins": {
+    "AGENTS.md": {
+      "sha256": "98979837f4c51e084a88b2afa7b3b679740d132ec878bdea06016832421a1d15",
+      "bytes": 6061
+    },
+    "rust-toolchain.toml": {
+      "sha256": "24ef3b9d3edbd850aa386cb0a98e10450b0030991a4537cb359f54d49dbbb33a",
+      "bytes": 86
+    },
+    "crates/products/chio-api-protect/Cargo.toml": {
+      "sha256": "9e3db90d69b87a028d8e7f832b756eee5004e80daddfdf5b73a09f01e9e11d7e",
+      "bytes": 1540
+    },
+    "crates/products/chio-api-protect/src/proxy/input.rs": {
+      "sha256": "f1b73de833b8d62f1129b383de2bebd78fc7756df0f5b4667fefbcf67b5690f7",
+      "bytes": 7417
+    },
+    "crates/products/chio-api-protect/src/proxy/mediated.rs": {
+      "sha256": "b426d7cc6c2ca8065fb0ba90334060d4228a31f89dc0723751f742308f1afa14",
+      "bytes": 39428
+    },
+    "crates/products/chio-api-protect/src/proxy/mediated/tests.rs": {
+      "sha256": "65298bb56b735206904a9478ed98fef6d48a244adc1b122c6328578c84f3d088",
+      "bytes": 65020
+    },
+    "crates/products/chio-api-protect/src/proxy/mediated/tests/reconcile_numbers.rs": {
+      "sha256": "b39930a5d7586d19cf61da6ba32ec80c9cf793f4d76e9a4492887a6fbcae436c",
+      "bytes": 14522
+    },
+    "crates/products/chio-api-protect/src/proxy/router.rs": {
+      "sha256": "3b61937a69042e6a4498729be3a6df393c2a469733bb8684623aba526f3a1953",
+      "bytes": 24055
+    },
+    "crates/products/chio-api-protect/src/proxy/control.rs": {
+      "sha256": "4bf28df2a438f78e695b99c4a6e25b033471e1d310263bd6cb586f994396513c",
+      "bytes": 6926
+    },
+    "crates/kernel/chio-kernel/src/runtime.rs": {
+      "sha256": "d38349544c2283fafadb5ab213c22e4cc52547bbe9f53326af781a347a5783c5",
+      "bytes": 18313
+    },
+    "crates/kernel/chio-kernel/src/kernel/reconciliation.rs": {
+      "sha256": "4d925d51c565da12f22709d9405683155bd3852480288ec242a648594afe25f3",
+      "bytes": 24312
+    },
+    "crates/kernel/chio-kernel/src/kernel/evaluation/caller_execution.rs": {
+      "sha256": "4a8c90f89910498d5d1a9f7bf3f8956aab8663787b800a0bce7bfbb9cede51dd",
+      "bytes": 20968
+    },
+    "crates/core/chio-core-types/src/canonical/untrusted.rs": {
+      "sha256": "7cc5c0c0d3b5229cdc7ca65211102e3428de4ac9efb4a3efa50795e4f84eec2d",
+      "bytes": 8896
+    },
+    "crates/core/chio-core-types/src/canonical/signed_json.rs": {
+      "sha256": "7302106e21e4977208865613c2ad17fddd85d2599a699940d5c4a8a0bdf79bfe",
+      "bytes": 5631
+    },
+    "crates/core/chio-core-types/src/message.rs": {
+      "sha256": "9ef31b87902be5865aee371ad66a7cf9eafb15507dc3042252a1d2cb6b3fda23",
+      "bytes": 24336
+    },
+    "crates/core/chio-core-types/src/receipt/decision.rs": {
+      "sha256": "b011299b4b441f9e6eb0578eb9f70b0a5c0010f4ce8c0cc238fbc5d241bfc013",
+      "bytes": 1939
+    },
+    "crates/core/chio-core-types/src/receipt/economics.rs": {
+      "sha256": "1a3290837b0410c56a4817aace836f8528d6c968c6cf0beea27b45d3894877d0",
+      "bytes": 13641
+    },
+    "crates/core/chio-core-types/src/receipt/authoritative_spend.rs": {
+      "sha256": "c2e5c0f39e81536dd0ed2651a11900cd6d6860f5a6cf7662aef3cc93f5d59a5a",
+      "bytes": 35171
+    },
+    "sdks/python/chio-sdk-python/src/chio_sdk/client.py": {
+      "sha256": "890a6633c161024953744a934aa85ac7fe0cc7455804416328ac0b0609821286",
+      "bytes": 40717
+    },
+    "crates/products/chio-api-protect/src/proxy/mediated/tests/reconcile_cost.rs": {
+      "sha256": "b0dcc99b6fe6c80887b113aa4ff152dc6ce013f91735f1f86c02670e164391f5",
+      "bytes": 13869
+    }
+  },
+  "reviewer_actions": "read-only source and log inspection, staged artifacts under this tmp directory; no source writes, Git operations, Cargo, network messages or spawned agents"
+}
