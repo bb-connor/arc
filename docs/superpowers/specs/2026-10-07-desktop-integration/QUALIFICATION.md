@@ -43,7 +43,7 @@ The delivery plan covers the handoff and desktop tests after those contracts lan
 | ID | Owner and stimulus | Required result |
 | --- | --- | --- |
 | Q01 | Work owner: finish process, reject acceptance, withhold settlement or delivery independently | WorkViewV1 preserves all six observations; desktop invents no composite success |
-| Q02 | Recovery/work owner: lose a response after durable admission; restart controller | Lookup original command/preparation/work identity; no fresh dispatch or idempotency key |
+| Q02 | Each exposed effecting mutation owner: lose a response after admission; restart; barrier-synchronize exact duplicate and same-ID changed-intent submissions at native lookup/admission/commit | Original command/preparation/operation lookup; atomic full-intent arbitration yields one original operation/outcome or retained uncertainty, no new identity or duplicate protected dispatch/downstream effects; changed intent conflicts before retention/effect |
 | Q03 | S9 M20: retry reusable, retained and terminal failures | Owner classification and original identity control retry; UI never promotes unknown to safe replay |
 | Q04 | Projection: substitute response method, parameters, pagination, session, work, scope revision or request intent | Reject substituted response including error/retry replies; never render another request's evidence |
 | Q05 | Native approval: request deny but receive an approved token; substitute approval ID or bound scope | Reject before retention/use; no credential persisted, no resume or external effect |
@@ -51,17 +51,17 @@ The delivery plan covers the handoff and desktop tests after those contracts lan
 | Q07 | S4/process owner: stop while children/grandchildren run, then restart services | Closure evidence includes the real process/resource boundary; pending/failed/unknown distinct from stopped |
 | Q08 | S8: stop before restart and exercise operator route authorization | Durable kernel stop survives; tenant/recovery scopes remain unavailable before their owner phases |
 | Q09 | S5 Part B: disconnect, duplicate/reorder hints, overflow retention, stale cursor, unauthorized stream | Bounded resync against the non-persisting owner read; no invented authoritative event or paid inspect polling |
-| Q10 | IPC owner: wrong UID/PID/session, reused PID, stale socket, spoofed server, duplicate controller | Native peer/session policy rejects; one controller per scoped session, no TCP fallback |
+| Q10 | IPC/browser session owners: wrong UID/PID/session, reused PID, stale socket, spoofed server, duplicate controller; malicious-origin HTTP and cross-site WebSocket requests to the genuine controller with a live ambient-cookie session | Native peer/session policy rejects; one controller per scoped session and no TCP fallback; exact browser origin plus non-ambient owner proof precede protected reads/subscriptions/mutations, with zero unauthorized bytes/effects; genuine authenticated requests succeed, no weaker fallback |
 | Q11 | Host owner/doc 19: crash/omit/timeout hooks, enable alternate native tool/shell, change host version | Hook mode stays detect_only; protected mode fails closed and requires I01-I08 for that host tuple |
 | Q12 | S7/backend: unknown kind, stale policy/hash, launcher bypass, inherited FD, direct IP/DNS/IPv6 egress, child escape | No confinement claim without native evidence; fail launch or restrict; no unconfined fallback |
 | Q13 | Secret broker/relay: malicious host tries environment/file/process-list/log access or alternate provider route | Raw credentials absent from agent/client; every permitted model route bound to enrolled scope |
 | Q14 | Applicable artifact/evidence export owner: symlink/hardlink replacement or alias, path traversal, descriptor race, oversized/archive/device artifact, changed base, unauthorized staging reads, repository-controlled capture execution/fetch/object indirection | Bounded audience-private staging and descriptor-based export reject unsafe input; result hash/base/review identity bind applicable acceptance and publication, and unrelated alias contents/identity/access policy remain unchanged |
 | Q15 | Budget owner: zero, max, overflow, fraction, missing/unknown units, duplicate dimensions, unavailable observations | Exact typed bounds and unique dimensions; unavailable never interpreted as unlimited; native enforcement independently proven |
 | Q16 | Controller health: no evaluated profiles, stale session, expired evidence, missing backend | Feature unavailable with a reason; no empty healthy/ready response |
-| Q17 | UI/workbench: forged artifact text, injected commands/links, notification click, out-of-order response | Treat content as untrusted; no automatic execution or authority transition; keyboard/screen-reader state remains accurate |
+| Q17 | UI/workbench and each exposed helper owner: forged artifact text, injected commands/links, notification click, out-of-order response; leading-dash operands, option aliases and Git pathspec magic/globs | Inert presentation and qualified literal operand semantics; no unintended file reads, execution, egress or authority transition; useful ordinary operands and keyboard/screen-reader state remain correct |
 | Q18 | Release: swap one artifact/tuple field, remove required evidence or submit authenticated ambiguous/noncanonical/over-limit manifest bytes | Positive baseline passes; each mutation fails its intended gate before evidence admission or profile state changes; signature and semantic consumption use one strict bounded owner decode |
 | Q19 | Process backend: timeout and descendants, spawn/exec/reparent during closure, unrelated exited child, unkillable/pending child | Bounded cleanup and complete custody evidence; do not reap another task's status or report false completion |
-| Q20 | Install/update: unsigned/tampered/wrong-arch artifact, downgrade across installation users, competing update/removal, unauthorized/replayed privileged lifecycle caller, mid-update crash, reboot/uninstall | Reject invalid package or unauthorized caller; native single-writer custody and installation-scoped floor guard shared mutations, preserve recoverable state and revalidate before enablement; explicit cleanup |
+| Q20 | Install/update: unsigned/tampered/wrong-arch artifact, downgrade across installation users, competing update/removal, concurrent exact and changed-intent duplicate lifecycle submissions, unauthorized/replayed privileged caller, mid-update crash, reboot/uninstall | Reject invalid package/caller; native atomic original-identity arbitration, single-writer custody and installation-scoped floor guard shared mutations; no duplicate downstream effects or lost uncertainty, preserve recoverable state and revalidate before enablement; explicit cleanup |
 | Q21 | Observation/S5 owners, plus recovery when exposed: subscriber idle for long periods and sustained event traffic | No observation path spends recovery-command quota or drains settlement reserve; configured buffer and resource limits enforced; exposed recovery additionally passes native saturation/finality controls |
 | Q22 | Isolation profile: attempt an in-workspace write through the host's native shell, outside an explicitly granted runner operation | Boundary interactive labels a permitted write cannot_see with no per-write receipt; protected/sealed profiles reject the alternate native-shell route. An expressly granted sealed recipe's internal shell is a separate bounded execution and cannot qualify this negative. |
 
@@ -124,14 +124,14 @@ a complete inventory of every predecessor obligation.
 
 | Profile | Mandatory acceptance | Runtime gate |
 | --- | --- | --- |
-| Observe | Q04, Q09-Q11, Q16-Q17, Q21; Q15 projection cases when a budget view is exposed; add Q01-Q03 only if the build exposes W1 views or recovery capability | S5 A/B, authenticated bounded non-persisting reads, selected trust-control GETs and truthful hook source attribution; W1/M20 are not basic receipt/hook observation gates |
+| Observe | Q04, Q09-Q11, Q16-Q17, Q21; Q15 projection cases for an exposed budget view; Q02 for every exposed effecting mutation, including support export/lifecycle; applicable Q01/Q03 for exposed W1 views or recovery capability | S5 A/B, authenticated bounded non-persisting reads, selected trust-control GETs and truthful hook source attribution; W1/M20 are not basic receipt/hook observation gates |
 | Approve | Q02-Q06, Q09-Q10, Q16-Q17 | Qualified native approval owner, S28 identity, production verifier and installed utility binding; no stop capability implied |
 | Per-task stop | Q02-Q04, Q07, Q09-Q10, Q16-Q17, Q19 | Qualified S4/process closure and its native route authorization; Q05/Q06 are not prerequisites when approval is absent |
 | Kernel stop | Q02-Q04, Q08-Q10, Q16-Q17; Q19 additionally for any claimed process cleanup | Qualified S8 phase-1 scope, durability and native route authorization; no S28 approval or per-task closure prerequisite and no implied process termination |
 | Sealed work | Q01-Q22 applicable to its concrete backend, with exclusions justified by owner; Q22's alternate native-shell negative is mandatory | W1, recovery, restricted host, runner, S7 and installed release tuple |
 | Protected interactive | Q02-Q13, Q15-Q22 plus doc 19 I01-I08 | Each of six hosts individually qualified; native-shell removal and Q22 alternate-access rejection enforced |
 | Boundary interactive | Q02-Q13, Q15-Q22 as applicable; no mediated-local-effect claim | Deferred; independent backend evidence required |
-| Managed endpoint | Platform annex's ES/NE matrix plus Q16-Q20 | Deferred; consent/entitlements and restrictive-only authority model |
+| Managed endpoint | Platform annex's ES/NE matrix plus Q16-Q20 and Q02 for every exposed effecting mutation | Deferred; consent/entitlements and restrictive-only authority model |
 
 Every row expands to an explicit executable case manifest at implementation
 time. "Applicable" must not let a release omit a gate silently: the manifest
@@ -149,13 +149,56 @@ Release qualification removes each required case individually from a passing
 manifest and proves the affected surface cannot be promoted; omitted, skipped
 or unclassified cases cannot disappear behind a broader passing Q label.
 
+For every browser-delivered profile, Q10 covers the genuine controller as well
+as endpoint impersonation. Enroll a legitimate browser session, retain its live
+ambient cookies, then issue malicious-origin form/fetch requests and cross-site
+WebSocket handshakes/subscriptions against the real controller. Exercise missing,
+null and substituted origins and absent/invalid/replayed request/session proof.
+Independent owner dispatch/effect counters and read/stream canaries must show no
+protected bytes or native effects. Pair these with legitimate protected reads,
+subscriptions and each exposed mutation using the owner-approved non-ambient
+proof and exact origin, including reconnect. Browser read/subscription authority
+is mandatory for Observe; mutation probes apply only to mutations it exposes.
+Cookie flags, a CORS rejection or a permitted Origin alone cannot satisfy Q10.
+
+Q17 inventories each native helper invocation reachable by the selected profile,
+including open/navigation, capture/import, export/publication and lifecycle
+helpers where exposed. Record its actual executable/API, trusted options and
+operand parser. Test leading-dash input, option aliases and Git pathspec magic/
+globs with outside-file, process and network canaries; rejection or literal-data
+handling must cause no unintended reads, execution or egress. A verified `--` is
+valid only where that tool supports it; Git additionally requires literal
+pathspec semantics. Descriptor/stdin/typed APIs must prove the same data boundary.
+Pair every negative with a useful ordinary operand through that exact helper;
+blanket helper refusal or an argv-construction assertion is not acceptance.
+
+Q02 applies per entry in an explicit selected-profile mutation inventory, not
+just to work creation and approval. Include every exposed effecting owner/action,
+its full intent binding and retained identity: offer selection, resume/cancel,
+support export, publication/artifact release, task closure, emergency restrict/resume and
+installation/update/removal or other lifecycle actions as applicable. In each
+owner's actual tests, synchronize competing requests at native lookup, admission
+and commit for exact duplicates and for each changed semantic field under the
+same ID. Count native operations and downstream effects independently: one
+original operation/outcome or retained uncertainty, with no duplicate downstream
+effects. Competitors join that original or conflict before changed intent is
+retained or dispatched. Repeat with lost replies, restart, stale expected revision
+and full new-admission capacity to prove original lookup remains available
+without a new identity or repeated effects. Q20 consumes these cases for exposed
+lifecycle mutations. An observation profile that exposes support export or
+lifecycle actions must qualify their own Q02 cases without acquiring unrelated
+W1/M20 dependencies. Pure read-only Observe has no mutation-owner dependency;
+mark absent capabilities unavailable.
+
 For basic Observe, Q04 binds the actual receipt/hook/read request parameters;
 it does not require a nonexistent work handle. Q09/Q21 prove bounded idle/active
 observation and no recovery-command polling or settlement-reserve consumption;
 the recovery-specific saturation case becomes mandatory when that source is
 exposed. Q11 checks truthful hook omission/crash/timeout behavior; the protected
 host cases remain gates for protected profiles. A build with W1 views or recovery
-capability adds Q01-Q03 with owner-justified applicability recorded per case.
+capability adds applicable Q01/Q03 cases; Q02 independently gates every exposed
+effecting mutation through its own owner, including support export/lifecycle
+without W1/M20. Record owner-justified applicability per case.
 Absent optional work/recovery/approval/stop capabilities remain explicitly
 unavailable and cannot be exercised through Observe. Packet 2's operator lane
 continues to gate selected mutations independently of a read-only candidate.
