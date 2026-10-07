@@ -598,6 +598,12 @@ impl AdmissionOperation {
         coordinator_lease_epoch: u64,
         last_error: Option<String>,
     ) -> Result<Self, AdmissionOperationError> {
+        if self.state.is_terminal() {
+            return Err(AdmissionOperationError::Invalid(format!(
+                "terminal admission operation in `{}` is immutable",
+                self.state.as_str()
+            )));
+        }
         if coordinator_lease_epoch < self.coordinator_lease_epoch {
             return Err(AdmissionOperationError::Invalid(
                 "coordinator lease epoch regressed".to_string(),
@@ -630,10 +636,7 @@ impl AdmissionOperation {
     /// Fence every coordinator that observed the prior lease epoch while
     /// preserving the durable saga state for recovery inspection.
     pub fn claim_recovery_checked(&self) -> Result<Self, AdmissionOperationError> {
-        if matches!(
-            self.state,
-            AdmissionOperationState::Completed | AdmissionOperationState::CompensatedBeforeDispatch
-        ) {
+        if self.state.is_terminal() {
             return Err(AdmissionOperationError::Invalid(
                 "terminal admission operation cannot be claimed for recovery".to_string(),
             ));
