@@ -1128,3 +1128,6 @@ fn outbox_rejects_idempotency_rebinding_and_scheduler_wrapper_mismatch() {
     );
     assert_eq!(error.kind(), PortErrorKind::IntegrityFailure);
 }
+
+#[path = "native_security_evidence/siem_per_backend_delivery.rs"]
+mod siem_per_backend_delivery;
