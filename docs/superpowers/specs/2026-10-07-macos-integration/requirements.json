@@ -743,7 +743,7 @@
         {
           "plan": "01-native-operator.md",
           "heading": "Task 6: Localize and make complete review flows accessible",
-          "action": "public enum IdentityDisplay {\n    public static func escaped(_ input: String) -> String {\n        input.unicodeScalars.map { scalar in\n            let n = scalar.value\n            let bidi = (0x202A...0x202E).contains(n) || (0x2066...0x2069).contains(n)\n            return n < 0x20 || n == 0x7F || bidi\n              ? \"\\\\u{\\(String(n, radix: 16, uppercase: true))}\" : String(scalar)\n        }.joined()\n    }\n}\n```"
+          "action": "Use the same escaped string for visible identity text and its accessibility label/value; never attach the raw identity as hidden accessibility metadata. Bind after Task 5 privacy substitution, so hidden identities remain hidden."
         },
         {
           "plan": "01-native-operator.md",
@@ -754,6 +754,11 @@
           "plan": "01-native-operator.md",
           "heading": "Task 4: Add exact-review invalidation and original-operation recovery",
           "action": "The generated client must match the response `operation_ref` to the request, retain its `review_ref`, verify the complete inline UTF-8 byte count and SHA-256, and accept native bindings only through the delivered M0/M2 native adapter. That adapter, not the app, verifies all projected fields against the frozen native record and sealed resource."
+        },
+        {
+          "plan": "01-native-operator.md",
+          "heading": "Task 6: Localize and make complete review flows accessible",
+          "action": "Add signed `ReviewAccessibilityTests` cases for each of the same 12 scalars in destination, filename and diff identities. Assert the accessibility label/value contains the exact escape and no raw control; inspect the visible text and accessible reading order in LTR and RTL layouts."
         }
       ]
     },
@@ -843,7 +848,7 @@
     {
       "id": "MAC-KER-001",
       "spec": "03-kernel-contracts.md",
-      "line": 56,
+      "line": 60,
       "requirement": "Every execution profile MUST pin source, installed native ABI/store compatibility, policy, host adapter and platform identity; missing native prerequisites MUST close affected mutations.",
       "acceptance": "AT-MAC-KER-001",
       "acceptance_status": "specified_not_executed",
@@ -864,7 +869,7 @@
     {
       "id": "MAC-KER-002",
       "spec": "03-kernel-contracts.md",
-      "line": 57,
+      "line": 61,
       "requirement": "Every desktop command and native entry point MUST have one closed classification, declared L0 descent and stop disposition; unknown variants MUST refuse.",
       "acceptance": "AT-MAC-KER-002",
       "acceptance_status": "specified_not_executed",
@@ -880,7 +885,7 @@
     {
       "id": "MAC-KER-003",
       "spec": "03-kernel-contracts.md",
-      "line": 58,
+      "line": 62,
       "requirement": "Admission, startup, stop drain and recovery MUST use one pure native machine, with deterministic transitions over authenticated facts and IO only in drivers.",
       "acceptance": "AT-MAC-KER-003",
       "acceptance_status": "specified_not_executed",
@@ -896,7 +901,7 @@
     {
       "id": "MAC-KER-004",
       "spec": "03-kernel-contracts.md",
-      "line": 59,
+      "line": 63,
       "requirement": "Every release of governed effects or bytes MUST appear in the crossing census with writer, checks, ordering point and retained evidence.",
       "acceptance": "AT-MAC-KER-004",
       "acceptance_status": "specified_not_executed",
@@ -912,7 +917,7 @@
     {
       "id": "MAC-KER-005",
       "spec": "03-kernel-contracts.md",
-      "line": 60,
+      "line": 64,
       "requirement": "Authoritative mutable checks MUST occur in the serving writer before crossing mutation; external snapshots MUST be marked early-only and cannot satisfy an atomic profile gate.",
       "acceptance": "AT-MAC-KER-005",
       "acceptance_status": "specified_not_executed",
@@ -928,7 +933,7 @@
     {
       "id": "MAC-KER-006",
       "spec": "03-kernel-contracts.md",
-      "line": 61,
+      "line": 65,
       "requirement": "A crossing MUST preserve participant-local gates, expected-version checks, reservation semantics and required durability before acknowledging authority.",
       "acceptance": "AT-MAC-KER-006",
       "acceptance_status": "specified_not_executed",
@@ -944,7 +949,7 @@
     {
       "id": "MAC-KER-007",
       "spec": "03-kernel-contracts.md",
-      "line": 62,
+      "line": 66,
       "requirement": "Drivers MUST distinguish refused, retry, known unavailable and unknown commit results; uncertain commit MUST poison serving mutation and reconcile the original operation.",
       "acceptance": "AT-MAC-KER-007",
       "acceptance_status": "specified_not_executed",
@@ -960,7 +965,7 @@
     {
       "id": "MAC-KER-008",
       "spec": "03-kernel-contracts.md",
-      "line": 63,
+      "line": 67,
       "requirement": "Native operations MUST bind stable intent to one canonical request and policy; transport retry MUST recover the same operation or return conflict.",
       "acceptance": "AT-MAC-KER-008",
       "acceptance_status": "specified_not_executed",
@@ -981,7 +986,7 @@
     {
       "id": "MAC-KER-009",
       "spec": "03-kernel-contracts.md",
-      "line": 64,
+      "line": 68,
       "requirement": "Stop and release MUST use native crossing order; intent committed before stop MAY execute, while a later release MUST apply its own stop disposition.",
       "acceptance": "AT-MAC-KER-009",
       "acceptance_status": "specified_not_executed",
@@ -997,7 +1002,7 @@
     {
       "id": "MAC-KER-010",
       "spec": "03-kernel-contracts.md",
-      "line": 65,
+      "line": 69,
       "requirement": "The Mac invocation profile MUST require durable coverage and MUST refuse unsupported read optimizations or silently weaker store modes.",
       "acceptance": "AT-MAC-KER-010",
       "acceptance_status": "specified_not_executed",
@@ -1013,7 +1018,7 @@
     {
       "id": "MAC-KER-011",
       "spec": "03-kernel-contracts.md",
-      "line": 66,
+      "line": 70,
       "requirement": "ES, NE, host supervisors and controller caches MUST be restrictive or observational seams and MUST NOT mint positive authority, approval or budget.",
       "acceptance": "AT-MAC-KER-011",
       "acceptance_status": "specified_not_executed",
@@ -1034,7 +1039,7 @@
     {
       "id": "MAC-KER-012",
       "spec": "03-kernel-contracts.md",
-      "line": 67,
+      "line": 71,
       "requirement": "Every reservation MUST identify native owner, parent accounting and release authority; post-effect uncertainty MUST retain irreversible commitments.",
       "acceptance": "AT-MAC-KER-012",
       "acceptance_status": "specified_not_executed",
@@ -1050,7 +1055,7 @@
     {
       "id": "MAC-KER-013",
       "spec": "03-kernel-contracts.md",
-      "line": 68,
+      "line": 72,
       "requirement": "Native authority MUST own capability lineage, child attenuation, key custody and subtree closure; incomplete descendant enumeration MUST refuse a complete-closure claim.",
       "acceptance": "AT-MAC-KER-013",
       "acceptance_status": "specified_not_executed",
@@ -1076,7 +1081,7 @@
     {
       "id": "MAC-KER-014",
       "spec": "03-kernel-contracts.md",
-      "line": 69,
+      "line": 73,
       "requirement": "Event hints MUST trigger authoritative reads and MUST NOT authorize; sensor IDs, subscription IDs and crossing positions MUST remain separately typed.",
       "acceptance": "AT-MAC-KER-014",
       "acceptance_status": "specified_not_executed",
@@ -1092,7 +1097,7 @@
     {
       "id": "MAC-KER-015",
       "spec": "03-kernel-contracts.md",
-      "line": 70,
+      "line": 74,
       "requirement": "Historical export and exact original-operation reconciliation MUST remain available under stop according to native read/control authority, without creating new effects.",
       "acceptance": "AT-MAC-KER-015",
       "acceptance_status": "specified_not_executed",
@@ -1108,7 +1113,7 @@
     {
       "id": "MAC-KER-016",
       "spec": "03-kernel-contracts.md",
-      "line": 71,
+      "line": 75,
       "requirement": "Kernel qualification MUST distinguish source, component, installed-runtime and qualified evidence, with independent negative and positive controls on the exact selected profile.",
       "acceptance": "AT-MAC-KER-016",
       "acceptance_status": "specified_not_executed",
@@ -4740,7 +4745,7 @@
         {
           "plan": "08-distribution-qualification.md",
           "heading": "Task 10: Performance and energy measurement with fixed thresholds",
-          "action": "Define nearest-rank percentile for the fixed 30-run latency suite; raw samples remain in evidence and report the estimator. Reject empty or nonfinite values. Energy inference uses a declared paired statistical method and interval, not battery-percentage subtraction."
+          "action": "Define nearest-rank percentile for the fixed 30-run latency suite; raw samples remain in evidence and report the estimator. Reject empty samples, Boolean values, nonintegers, negative measurements, and integers above `2^53 - 1`; measurements use the fixed integer units from Task 2. Express the percentile as integer basis points in `1..10000`, so p95 is `9500`, with no floating-point conversion."
         }
       ]
     },
@@ -6370,6 +6375,11 @@
           "plan": "08-distribution-qualification.md",
           "heading": "Task 2: Safe content-addressed artifact loading and fraud fixtures",
           "action": "Enforce 1 MiB of UTF-8 bytes, 32 container levels, 4,096 total containers, 65,536 lexical tokens including punctuation, 32,768 scalars including keys, 65,536 source characters per quoted string token including escapes/delimiters, and 256 decoded characters per key."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 11: Native-backed semantic verification and scoped result issuance",
+          "action": "Native transport derives the actual calling child incarnation and challenge independently, verifies curator/run/closure/root/resource-generation/manifest/policy/boot/session bindings and native monotonic expiry/revocation, then atomically consumes its one-use ledger entry before exposing bounded evidence reads."
         }
       ]
     },
@@ -6401,6 +6411,11 @@
           "plan": "08-distribution-qualification.md",
           "heading": "Task 2: Safe content-addressed artifact loading and fraud fixtures",
           "action": "Reuse M6 `read_verified_file(root_fd, root_identity, relative, expected_digest, max_bytes)` and parse exactly its returned bytes; no pathname reopen is permitted. The authenticated artifact owner supplies a held immutable-root descriptor and separately pinned `(st_dev, st_ino)`, never a candidate-selected root identity."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 11: Native-backed semantic verification and scoped result issuance",
+          "action": "The enrolled native resource/generation and descriptor remain in service custody; clients cannot supply a root FD, root identity, policy key, executable, import path, or expected verifier identity to enroll an existing directory."
         }
       ]
     },
@@ -6506,6 +6521,11 @@
           "plan": "08-distribution-qualification.md",
           "heading": "Task 2: Safe content-addressed artifact loading and fraud fixtures",
           "action": "Patch `json.loads` with a failing sentinel for over-depth, over-container, token/scalar fanout, escape-heavy string/key, duplicate decoded key, invalid Unicode, unsafe number, and oversize inputs; assert it was never called."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 11: Native-backed semantic verification and scoped result issuance",
+          "action": "A failing import, missing/extra/duplicate test, skip, or timeout is a failed gate. An `expectedFailure` also fails this required gate; an expected failing test is not a passing acceptance case."
         }
       ]
     },

@@ -29,7 +29,7 @@ python3 -m venv /tmp/chio-macos-doc-validation
 /tmp/chio-macos-doc-validation/bin/python docs/superpowers/specs/2026-10-07-macos-integration/verify.py --self-test
 ```
 
-Do not overwrite an existing unrelated environment; choose a fresh temporary path if that one exists. An already installed matching dependency is also sufficient. The program exits nonzero for missing local references, missing or duplicate acceptance definitions, requirement traceability drift, schema/example mismatch, response substitution, catalog drift, or strict decoder regressions. It always reports `runtime_qualification: false`.
+Do not overwrite an existing unrelated environment; choose a fresh temporary path if that one exists. An already installed matching dependency is also sufficient. The program exits nonzero for missing local references, missing, duplicate, orphaned or wrong-owner acceptance definitions across the package, requirement traceability drift, schema/example mismatch, response substitution, catalog drift, or strict decoder regressions. It always reports `runtime_qualification: false`.
 
 After intentionally editing normative tables, update their derived manifest and review its diff:
 

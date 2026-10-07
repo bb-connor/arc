@@ -386,7 +386,7 @@
         {
           "plan": "08-distribution-qualification.md",
           "heading": "Task 10: Performance and energy measurement with fixed thresholds",
-          "action": "Define nearest-rank percentile for the fixed 30-run latency suite; raw samples remain in evidence and report the estimator. Reject empty or nonfinite values. Energy inference uses a declared paired statistical method and interval, not battery-percentage subtraction."
+          "action": "Define nearest-rank percentile for the fixed 30-run latency suite; raw samples remain in evidence and report the estimator. Reject empty samples, Boolean values, nonintegers, negative measurements, and integers above `2^53 - 1`; measurements use the fixed integer units from Task 2. Express the percentile as integer basis points in `1..10000`, so p95 is `9500`, with no floating-point conversion."
         }
       ]
     },
@@ -1012,6 +1012,11 @@
           "plan": "08-distribution-qualification.md",
           "heading": "Task 2: Safe content-addressed artifact loading and fraud fixtures",
           "action": "Enforce 1 MiB of UTF-8 bytes, 32 container levels, 4,096 total containers, 65,536 lexical tokens including punctuation, 32,768 scalars including keys, 65,536 source characters per quoted string token including escapes/delimiters, and 256 decoded characters per key."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 11: Native-backed semantic verification and scoped result issuance",
+          "action": "Native transport derives the actual calling child incarnation and challenge independently, verifies curator/run/closure/root/resource-generation/manifest/policy/boot/session bindings and native monotonic expiry/revocation, then atomically consumes its one-use ledger entry before exposing bounded evidence reads."
         }
       ]
     },
@@ -1037,6 +1042,11 @@
           "plan": "08-distribution-qualification.md",
           "heading": "Task 2: Safe content-addressed artifact loading and fraud fixtures",
           "action": "Reuse M6 `read_verified_file(root_fd, root_identity, relative, expected_digest, max_bytes)` and parse exactly its returned bytes; no pathname reopen is permitted. The authenticated artifact owner supplies a held immutable-root descriptor and separately pinned `(st_dev, st_ino)`, never a candidate-selected root identity."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 11: Native-backed semantic verification and scoped result issuance",
+          "action": "The enrolled native resource/generation and descriptor remain in service custody; clients cannot supply a root FD, root identity, policy key, executable, import path, or expected verifier identity to enroll an existing directory."
         }
       ]
     },
@@ -1112,6 +1122,11 @@
           "plan": "08-distribution-qualification.md",
           "heading": "Task 2: Safe content-addressed artifact loading and fraud fixtures",
           "action": "Patch `json.loads` with a failing sentinel for over-depth, over-container, token/scalar fanout, escape-heavy string/key, duplicate decoded key, invalid Unicode, unsafe number, and oversize inputs; assert it was never called."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 11: Native-backed semantic verification and scoped result issuance",
+          "action": "A failing import, missing/extra/duplicate test, skip, or timeout is a failed gate. An `expectedFailure` also fails this required gate; an expected failing test is not a passing acceptance case."
         }
       ]
     }

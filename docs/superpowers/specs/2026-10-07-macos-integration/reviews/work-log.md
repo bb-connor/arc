@@ -18,3 +18,7 @@ Addressed nine distinct findings reported in ten comments across both hosted bot
 ## Second hosted review repair
 
 Addressed five additional Codex findings: mandatory per-method negative vectors, intent-compatible retry hints, exact stop scope, descriptor-safe evidence indexing and bounded qualification-object parsing. Both evidence consumers now use the same held-root reader. Local wire review also caught and closed a missing correlation-oracle binding in the validator. The assembled checks and exact extracted helper regressions pass; approval remains tied to the next live hosted review of the pushed commit.
+
+## Third hosted review repair
+
+Addressed four further findings: authenticated lab-to-verifier artifact custody, integer-only performance samples, complete Unicode bidirectional-control escaping, and a package-wide acceptance-definition census. The custody plan names its missing native prerequisite and real descriptor handoff; component fixture success cannot establish native or installed qualification. Independent census review also closed Markdown whitespace and fence parsing gaps. Platform review tightened native-registration deadlines and result-reference retrieval, and both required component runners now reject expected-failure results as well as skipped or empty suites. A hosted release-copy lint finding was corrected by naming the publication fields precisely, and the repository release-truth check passed locally.

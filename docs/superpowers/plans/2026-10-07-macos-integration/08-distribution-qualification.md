@@ -32,6 +32,7 @@ Current design inputs are the four linked specifications and `docs/superpowers/s
 | `integrations/macos/distribution/release-inputs.json` | Exact approved build/signing identifiers, inputs, component closure, security floor, and matrix candidate |
 | `integrations/macos/distribution/scripts/` | Build, inventory, packaging, notarization, and installed identity capture |
 | `integrations/macos/qualification/manifests/` | Pre-run immutable per-profile applicability, exact tuple, required subcases, controls, oracles, thresholds |
+| `integrations/macos/qualification/curator/` | Proposed signed LabCurator service and authenticated request client; enrolled immutable-root custody and pinned verifier child launch |
 | `integrations/macos/qualification/verifier/` | Safe artifact loading, trusted-manifest verification, independent case predicates, native-proof adapter, scoped report |
 | `integrations/macos/qualification/observers/` | Outside filesystem/process/receiver/permission/energy collectors with explicit identity and run nonce |
 | `integrations/macos/qualification/cases/` | Executable distribution, lifecycle, privacy, performance, and selected-profile attack scenarios |
@@ -87,7 +88,7 @@ def check_case_set(manifest, cases):
 
 ## Task 2: Safe content-addressed artifact loading and fraud fixtures
 
-**Files:** Create `integrations/macos/qualification/verifier/artifacts.py`, `integrations/macos/qualification/tests/test_artifacts.py`, and `integrations/macos/qualification/tests/fixtures/fraud/`. Reuse M6's `integrations/macos/qualification/evidence_index.py` reader; do not add a second pathname-based artifact loader.
+**Files:** Create `integrations/macos/qualification/verifier/artifacts.py`, `integrations/macos/qualification/tests/test_artifacts.py`, `integrations/macos/qualification/tests/run_required_suite.py`, and `integrations/macos/qualification/tests/fixtures/fraud/`. Reuse M6's `integrations/macos/qualification/evidence_index.py` reader; do not add a second pathname-based artifact loader.
 
 - [ ] **Step 1: Add failures for random digest-shaped references, traversal, symlinks, duplicate JSON keys, and overlarge inputs.** Use temporary directories and `hashlib.sha256` over actual bytes. Tests must verify the artifact root's outside sentinel is unchanged.
 
@@ -499,7 +500,7 @@ def parse_object(data):
 - [ ] **Step 3c: Prove refusal occurs before the full decoder.** Patch `json.loads` with a failing sentinel for over-depth, over-container, token/scalar fanout, escape-heavy string/key, duplicate decoded key, invalid Unicode, unsafe number, and oversize inputs; assert it was never called. Retain positive escaped/nested controls and the actual synthetic `release-candidate.json` fixture, proving one materialization of digest-verified bytes. Run the test process with a 20-second outer deadline, retain the one-second actual FIFO regression, and fail the implementation gate on timeout or unexpected decoder entry. These are parser/custody component tests and issue no installed qualification.
 
 - [ ] **Step 4: Add schema-valid fraud candidates.** Create separate complete fixtures for absent artifacts, wrong source/installed correspondence, duplicated cases, untrusted manifest, synthetic release attempt, wrong observer, and stale restore reference. Preserve `status=candidate`; never create a fixture falsely presented as an installed qualification report. Tests assert shape acceptance where expected and semantic rejection independently.
-- [ ] **Step 5: Run the artifact tests and all applicability tests.** Expected: each negative names a specific failure; no fixture ever causes a qualification artifact to be emitted.
+- [ ] **Step 5: Run the required artifact inventory and all applicability tests.** Run `python3 integrations/macos/qualification/tests/run_required_suite.py artifacts` using the fixed-inventory runner defined in Task 11. Expected: exactly the 16 named artifact tests pass with zero skips and a 20-second process deadline; missing, duplicate, renamed, skipped, or empty discovered tests return nonzero. Each negative names a specific failure; no fixture ever causes a qualification artifact to be emitted. Before Task 11 supplies the runner, this gate remains unavailable, not passed by bare empty discovery.
 - [ ] **Step 6: Commit** with `feat(macos): verify qualification artifact custody`.
 
 ## Task 3: Build and inspect the signed application closure
@@ -602,7 +603,7 @@ def effect_predicate(positive, enforced, bypass):
 
 - [ ] **Step 2: Run** `PYTHONPATH=integrations/macos/qualification python3 -m unittest discover -s integrations/macos/qualification/tests -p test_observer_health.py -v`. Expected: negative disconnected-receiver fixtures are inconclusive, not passing.
 - [ ] **Step 3: Implement the external receiver and sentinels.** The receiver runs on a separately controlled lab endpoint, accepts only synthetic run-scoped tokens, records request identity/body digest/connection bytes and time, and exposes read-only results to the verifier. The process observer samples actual process incarnations and audit identities from outside the tested worker/controller; the filesystem observer hashes known synthetic sentinels before/after and records deliberate bypass writes. No observer takes expected outcomes from the tested application's health report.
-- [ ] **Step 4: Implement runner arguments `--mode component|installed`, `--manifest`, `--case`, `--output`, and `--record-unavailable`.** Load only a statically registered case implementation for an exact acceptance/subcase ID; arguments are data and never shell source. Generate a unique run nonce, prepare synthetic fixtures, establish observer readiness, invoke the case, record controls/raw artifacts, clean test-owned resources, and write candidate results. Installed candidate cases requiring execution use the dedicated signed probe, not production user-profile admission. Component mode is always `synthetic=true`; genuinely observed installed behavior may use synthetic resource contents without becoming fabricated evidence. Exit nonzero for failed required cases; emit `unavailable` on absent entitlement, native API, host, permission, observer, or fixture authority.
+- [ ] **Step 4: Implement runner arguments `--mode component|installed`, `--manifest`, `--case`, `--output`, and `--record-unavailable`.** Load only a statically registered case implementation for an exact acceptance/subcase ID; arguments are data and never shell source. Generate a unique run nonce, prepare synthetic fixtures, establish observer readiness, invoke the case, record controls/raw artifacts, clean test-owned resources, and write candidate results. Installed candidate cases requiring execution use the dedicated signed probe, not production user-profile admission. In installed mode the runner is a client of Task 11's authenticated LabCurator begin/ingest/seal flow: the service enrolls its private root before any input, owns capture storage, and returns a non-authorizing `capture.ref` locator for later verification. The runner's output directory never becomes a trusted root by supplying its path. Component mode is always `synthetic=true`; genuinely observed installed behavior may use synthetic resource contents without becoming fabricated evidence. Exit nonzero for failed required cases; emit `unavailable` on absent entitlement, native API, host, permission, observer, or fixture authority.
 - [ ] **Step 4a: Build the dedicated probe and its native fixture-authority binding.** Give the probe a distinct code identity; bind its native fixture authority to the exact installed driver/runtime digests, run nonce, isolated test-user or VM host, enumerated synthetic resources/test accounts/receivers, budgets, and expiry. Native integrity, approval, crossing, stop, and recovery checks still run. Test missing/wrong probe identity, absent fixture authority, scope expansion, expired fixture authority, and attempts to invoke the probe from production user-profile admission. Expected: all negatives deny before an outside effect. If the native fixture-authority contract is missing, assign it to the M0 owner and keep installed cases unavailable; do not construct an app-local grant shim.
 - [ ] **Step 4b: Prove production has no bootstrap bypass.** Inspect built production options/configuration and attempt `--skip-qualification`, unsafe feature/environment overrides, and forged probe principals. Expected: ordinary production admission rejects missing verified qualification regardless of these inputs. Deliberately weakened negative-control code is a separately signed/digested disposable fixture, never a production flag or substituted passing driver.
 - [ ] **Step 5: Run** `python3 integrations/macos/qualification/run.py --mode component --manifest integrations/macos/qualification/manifests/observe-v1.json --case AT-MAC-VER-004 --output output/macos-qualification/oracle-controls`. Expected: component observer tests prove efficacy but emit no installed qualification.
@@ -742,36 +743,62 @@ def test_support_export_has_no_secret_canary():
 
 **Files:** Create `integrations/macos/qualification/cases/performance.py`, `integrations/macos/qualification/observers/energy.py`, `integrations/macos/qualification/verifier/statistics.py`, `integrations/macos/qualification/tests/test_statistics.py`, and immutable workload fixtures under `integrations/macos/qualification/fixtures/workloads/`.
 
-- [ ] **Step 1: Test percentile computation, paired energy comparisons, missing samples, and low-resolution rejection.** Define nearest-rank percentile for the fixed 30-run latency suite; raw samples remain in evidence and report the estimator. Reject empty or nonfinite values. Energy inference uses a declared paired statistical method and interval, not battery-percentage subtraction.
+- [ ] **Step 1: Test percentile computation, paired energy comparisons, missing samples, and low-resolution rejection.** Define nearest-rank percentile for the fixed 30-run latency suite; raw samples remain in evidence and report the estimator. Reject empty samples, Boolean values, nonintegers, negative measurements, and integers above `2^53 - 1`; measurements use the fixed integer units from Task 2. Express the percentile as integer basis points in `1..10000`, so p95 is `9500`, with no floating-point conversion. Energy inference uses a declared paired statistical method and interval, not battery-percentage subtraction.
 
 ```python
-import math
 import unittest
 
-def nearest_rank(samples, percentile):
-    if not samples or not 0 < percentile <= 1:
-        raise ValueError("invalid_samples_or_percentile")
-    if any(not math.isfinite(value) or value < 0 for value in samples):
-        raise ValueError("invalid_sample")
+MAX_MEASUREMENT_INTEGER = (1 << 53) - 1
+
+def nearest_rank(samples, percentile_basis_points):
+    if (not samples or type(percentile_basis_points) is not int
+            or not 1 <= percentile_basis_points <= 10000):
+        raise ValueError('invalid_samples_or_percentile')
+    if any(type(value) is not int or not 0 <= value <= MAX_MEASUREMENT_INTEGER
+           for value in samples):
+        raise ValueError('invalid_integer_measurement')
     ordered = sorted(samples)
-    return ordered[math.ceil(percentile * len(ordered)) - 1]
+    rank = (percentile_basis_points * len(ordered) + 9999) // 10000
+    return ordered[rank - 1]
 
 class StatisticsTests(unittest.TestCase):
     def test_p95_uses_raw_distribution(self):
-        self.assertEqual(nearest_rank(list(range(1, 31)), 0.95), 29)
+        self.assertEqual(nearest_rank(list(range(1, 31)), 9500), 29)
+
+    def test_bool_samples_are_not_measurements(self):
+        for value in (False, True):
+            with self.assertRaisesRegex(ValueError, 'invalid_integer_measurement'):
+                nearest_rank([0, value, 2], 9500)
+
+    def test_noninteger_negative_and_unsafe_samples_are_rejected(self):
+        for value in (1.0, float('nan'), float('inf'), -1,
+                      MAX_MEASUREMENT_INTEGER + 1, '1', None):
+            with self.assertRaisesRegex(ValueError, 'invalid_integer_measurement'):
+                nearest_rank([value], 9500)
+
+    def test_empty_samples_and_invalid_percentile_are_rejected(self):
+        for samples, percentile in (([], 9500), ([1], True), ([1], False),
+                                    ([1], 0.95), ([1], 0), ([1], 10001)):
+            with self.assertRaisesRegex(ValueError, 'invalid_samples_or_percentile'):
+                nearest_rank(samples, percentile)
+
+    def test_integer_boundaries_and_extreme_percentiles(self):
+        values = [0, MAX_MEASUREMENT_INTEGER]
+        self.assertEqual(nearest_rank(values, 1), 0)
+        self.assertEqual(nearest_rank(values, 10000), MAX_MEASUREMENT_INTEGER)
 ```
 
 - [ ] **Step 2: Instrument distinct boundaries.** Add non-sensitive signposts for view usability, IPC response, native durable acknowledgment, broker overhead, VM start, first result, stop fence, worker death, and flow closure. OS/native/remote clock domains retain their mapping and uncertainty. The outside observer supplies actual process/resource state, not UI labels.
 - [ ] **Step 2a: Implement coalesced observation and power-aware work.** Add a shared observer coordinator under `ChioMacOperations` keyed by authenticated native scope, so 20 UI subscribers share one bounded upstream subscription. Stop nonessential polling when no view/task needs it and adapt only optional sampling/rendering to low-power and thermal-pressure notifications. Safety-critical fence propagation and required native/provider callbacks retain their deadlines and dedicated bounded path. Test hidden/visible app, 20 subscribers, lost subscriber cleanup, low-power mode, thermal pressure, and revocation during throttling; outside wakeup/IPC counts must fall while native fence/callback oracles still pass. Missing required deadline or coverage closes the affected profile, never a performance waiver.
 - [ ] **Step 3: Implement immutable workload and environment capture.** Record hardware, OS, display, power mode, thermal range, battery health/charge band, SDK/toolchain, source/installed tuple, observer version, baseline digest, model/provider route, and fixture digests. Run five warm-ups plus 30 samples, idle settling and ten-minute idle measurements, contention at 1/8/32 tasks, and hostile event ramp. Apply the pre-run budgets from the privacy/performance specification without post hoc adjustment.
 - [ ] **Step 4: Execute paired energy trials.** At least five randomized baseline/candidate 60-minute idle pairs and equivalent useful-work pairs use a declared supported instrument or external meter, calibrated units, tool overhead, raw traces, and paired uncertainty. A high-wakeup regression must fail; inadequate resolution yields inconclusive. Instrument privileges belong to the lab, not the consumer app.
-- [ ] **Step 5: Run** `PYTHONPATH=integrations/macos/qualification python3 -m unittest discover -s integrations/macos/qualification/tests -p test_statistics.py -v`, then `python3 integrations/macos/qualification/run.py --mode installed --manifest integrations/macos/qualification/manifests/observe-v1.json --case AT-MAC-PRV-011 --output output/macos-qualification/energy --record-unavailable`. Expected: valid scoped results or explicit inconclusive/unavailable gates, never fabricated measurements. Commit with `perf(macos): measure scoped latency and energy budgets`.
+- [ ] **Step 5: Run** `python3 integrations/macos/qualification/tests/run_required_suite.py statistics` (exactly five named helper tests, zero skips, 20-second deadline), then `python3 integrations/macos/qualification/run.py --mode installed --manifest integrations/macos/qualification/manifests/observe-v1.json --case AT-MAC-PRV-011 --output output/macos-qualification/energy --record-unavailable`. Expected: valid scoped results or explicit inconclusive/unavailable gates, never fabricated measurements. Commit with `perf(macos): measure scoped latency and energy budgets`.
 
 ## Task 11: Native-backed semantic verification and scoped result issuance
 
-**Files:** Create `integrations/macos/qualification/verifier/native_proofs.py`, `integrations/macos/qualification/verifier/predicates.py`, `integrations/macos/qualification/verifier/main.py`, `integrations/macos/qualification/tests/test_semantic_verifier.py`, and `integrations/macos/qualification/verifier/verified-qualification.schema.json`.
+**Files:** Create `integrations/macos/qualification/verifier/native_proofs.py`, `integrations/macos/qualification/verifier/predicates.py`, `integrations/macos/qualification/verifier/main.py`, `integrations/macos/qualification/tests/test_semantic_verifier.py`, and `integrations/macos/qualification/verifier/verified-qualification.schema.json`. Also create `integrations/macos/qualification/curator/service.py`, `curator/launch.py`, `verifier/custody.py`, `verifier/native_capture.py`, and `tests/test_custody_handoff.py` beneath `integrations/macos/qualification/`; implement the fixed-inventory `tests/run_required_suite.py` declared in Task 2. The M0 NK03/NK05 owner supplies native capture enrollment, sealing, child registration, and one-use consumption; this plan does not claim those contracts exist today.
 
-- [ ] **Step 1: Introduce explicit proof adapter outcomes.** `verify_native_evidence(reference_bytes, trusted_context)` returns verified native semantics or one of invalid/unavailable. The implementation calls the real M0/M6 native verifier contract; the function must not infer validity from JSON fields, shell exit code alone, an unverified child-provided trust root, or a local signature checked against a candidate-provided key. Test adapters are confined to `--mode component` and cannot issue a release artifact.
+- [ ] **Step 1: Introduce explicit proof adapter outcomes.** `verify_native_evidence(reference_bytes, trusted_context)` returns verified native semantics or one of invalid/unavailable. The implementation calls the real M0/M6 native verifier contract; the function must not infer validity from JSON fields, shell exit code alone, an unverified child-provided trust root, or a local signature checked against a candidate-provided key. Test adapters are confined to `--mode component` and cannot issue a release artifact. That mode belongs only to the separately packaged component harness; the production child has no fixture/mode/import override and the qualified closure excludes fixture modules.
 - [ ] **Step 2: Write fraud tests before the orchestrator.** Cover false `pass`, absent artifact, bad signature, untrusted root, forged observer, mismatched run nonce/tuple, stale anchor, duplicate case, missing required subcase, broken positive/negative control, wrong evidence class, absent/expanded native fixture authority, and omitted payload falsely claimed inspected. Null restore freshness is accepted only for an approved authority-restore exclusion with its required refusal observation. The unchanged fabricated verifier fixture may pass component predicates but is still rejected for release; real signed lab-probe observations are independently checked against their scope and installed bytes.
 - [ ] **Step 3: Implement the verifier pipeline in the nine ordered stages defined in the qualification specification.** The following small predicate demonstrates why a candidate result is insufficient. Native proofs and observer transcripts must already be authenticated through the preceding stages.
 
@@ -790,9 +817,535 @@ def derive_case_result(case, trusted_expected, authenticated_observed):
     )
 ```
 
-- [ ] **Step 4: Define CLI arguments `--candidate`, `--artifact-root`, `--trusted-release-policy`, `--mode component|release`, and `--output`.** External trusted policy pins accepted verifier/native proof contract, approved manifest, trust roots, observer contracts, and freshness. The candidate's `verifier` entry is compared with that policy; it cannot select policy. Safe loading and schema validation precede semantics; release mode refuses fabricated/synthetic-envelope evidence and missing native API. The authenticated lab wrapper supplies M6 root custody separately from `--artifact-root`; require that locator to match the held root and use Task 2's shared descriptor reader and preflight for candidate, manifest, policy, and observer JSON. The trusted policy itself is provisioned by the external authority, not selected by the candidate; every input acquisition has a byte bound before materialization. Output the separate verified qualification report only after every required candidate-evidence gate passes; the manifest's distinct final production-confirmation gate remains necessary for release approval.
+- [ ] **Step 3a: Enroll capture custody before accepting candidate inputs.** Create signed `LabCurator` service code in `curator/service.py` and its thin authenticated request client in `curator/launch.py`; packaging installs the proposed client at `/Library/Application Support/ChioQualification/bin/chio-lab`. The M8 distribution owner pins the curator, verifier, embedded interpreter, standard library, native adapter, and every imported dependency as one private read-only code closure. Under an isolated lab service principal, the curator creates an empty private root beneath its protected parent, opens it, and enrolls the held object with the M0 NK03/NK05 `MacQualificationCaptureV1` owner before receiving untrusted inputs. The enrolled native resource/generation and descriptor remain in service custody; clients cannot supply a root FD, root identity, policy key, executable, import path, or expected verifier identity to enroll an existing directory. Native capture is bounded evidence read/provenance authority only; it grants no task execution, fixture execution, or qualification.
+- [ ] **Step 3b: Freeze a capture through the existing native read/capture owner.** Copy bounded input byte streams into fresh service-owned files, never hard-link or reuse client files. Authenticate observer/run bindings, compute the complete inventory and candidate digests, close writer handles, quiesce producers, and obtain the native sealed capture generation. Enforce no writable aliases, untrusted same-principal processes, writable mount substitution, or subsequent in-place writes; an independently checked immutable snapshot/read-only store plus controlled curator state must establish the M6 custody precondition. Permission-bit changes or a caller's `frozen=true` alone are insufficient. Failure to establish immutability returns unavailable. New evidence creates a new capture/generation; an existing frozen capture is never reopened for mutation. The native capture record binds root resource/generation and `(st_dev, st_ino)`, UID/audit session, host boot identity, curator code closure, run nonce, candidate digest, `appliedProfileManifestDigest`, trusted policy digest, and current read scope.
+- [ ] **Step 3c: Register the actual child before delivering its one-use attestation.** The curator selects only its pinned verifier/interpreter closure and launches in a private fixed working directory with a sanitized fixed environment and isolated interpreter mode; candidate paths, cwd, `PYTHONPATH`, user site packages, CLI module names, and startup files cannot select code. Production uses the closure's embedded interpreter with fixed `-I -m verifier.main` arguments. Pass the held root descriptor and a dedicated socket descriptor using `pass_fds`; descriptor numbers are transport routing only. After spawning, the native owner resolves the child's actual audit/process incarnation, verifies the entire code/import closure against the approved manifest, allocates its fresh native challenge, and registers that specific process under the capture. PID, a signer on the interpreter alone, or caller-provided code/nonce fields cannot satisfy this check. The bounded native registration must finish within the handoff deadline; otherwise terminate the child and retain an unavailable result. Enforce this independently with the helper's one-second absolute native-call deadline and a single daemon RPC worker slot shared by registration and result lookup. A stalled call keeps that slot occupied until it settles; additional calls refuse instead of accumulating workers. Bound the curator request queue to one active launch and reject queued excess. On registration timeout kill/reap the child, retain the original capture as unresolved/unavailable, and reconcile the late native registration by its original operation identity. A late reply is discarded and cannot be delivered to another child; the native owner invalidates the dead child incarnation/challenge and prevents any orphan read authority or implicit retry capture. Process teardown is not proof that the native operation never committed.
+- [ ] **Step 3d: Verify and consume the capture at the native owner.** Implement the proposed installed adapter in `verifier/native_capture.py` against the M0 `MacQualificationCaptureV1` prerequisite, with `consume_capture_attestation(opaque_proof, observed_root_identity) -> VerifiedCapture`. The adapter is selected by pinned code, never a command-line mode, environment variable, candidate object, or caller-selected module. Native transport derives the actual calling child incarnation and challenge independently, verifies curator/run/closure/root/resource-generation/manifest/policy/boot/session bindings and native monotonic expiry/revocation, then atomically consumes its one-use ledger entry before exposing bounded evidence reads. Replays, stale generations, swapped processes, expired or revoked reads, and unavailable native registration/verification return closed errors. A lost consumption response remains consumed; it cannot trigger an implicit new capture or retry grant. Missing native support returns `native_capture_contract_unavailable`, never the fixture adapter. The native owner also rechecks current capture/read scope before final report import; expiry or revocation during verification cannot issue a qualified report.
+- [ ] **Step 3e: Implement and test the descriptor handoff boundary.** Put this shared transport helper in `verifier/custody.py`; `curator/service.py` alone calls `launch_enrolled_verifier` with package-owned code/environment and its already enrolled root. Its `register_actual_child` callback calls the bounded native registration from Step 3c and resolves PID to native process incarnation rather than signing local metadata. The release child accepts only internal `--root-fd` and `--attestation-fd` arguments, creates the fixed native adapter, then calls `consume_root_handoff` before parsing any candidate. The returned native context pins candidate/manifest/policy digests; subsequent reads use M6's shared checked reader on the same held root. Neither descriptor possession nor the socket's bytes authenticate a capture by themselves. Child stdout/stderr are discarded here. The child submits its report through the existing authenticated M6 native evidence import/store path, binding the capture ID and actual registered child incarnation. The registration callback retains the native child-registration reference in service-owned state. After process completion, the curator calls `collect_registered_result` with those service-owned capture/registration IDs; its fixed native adapter's bounded `lookup_capture_result(capture_id, child_registration_id, deadline)` authenticates the M6 record, exact child/closure/run/manifest binding, and current capture generation/read scope before returning `VerifiedCaptureResult`. This is a proposed adapter over the existing native evidence owner, not a local result signer or extra qualification authority. No extra result FD is required. Zero exit without that native record, mismatched capture/child, missing or lost result, stale or revoked capture, or missing native import/lookup support remains unavailable and emits no qualification reference.
+
+```python
+import os
+import queue
+import socket
+import stat
+import struct
+import subprocess
+import time
+import threading
+from dataclasses import dataclass
+from verifier.artifacts import load_artifact
+
+MAX_ATTESTATION_BYTES = 16384
+HANDOFF_TIMEOUT_SECONDS = 2
+REGISTRATION_TIMEOUT_SECONDS = 1
+_REGISTRATION_SLOT = threading.BoundedSemaphore(1)
+
+class CustodyUnavailable(RuntimeError):
+    pass
+
+@dataclass(frozen=True)
+class VerifiedCapture:
+    root_identity: tuple
+    capture_id: str
+    run_nonce: str
+    candidate_digest: str
+    manifest_digest: str
+    policy_digest: str
+    # The native owner authenticates the remaining run/process bindings.
+
+class UnavailableNativeCapture:
+    def consume_capture_attestation(self, opaque_proof, observed_root_identity):
+        raise CustodyUnavailable('native_capture_contract_unavailable')
+
+@dataclass(frozen=True)
+class VerifiedCaptureResult:
+    capture_id: str
+    child_registration_id: str
+    evidence_reference: bytes
+
+
+def bounded_native_call(operation):
+    if not _REGISTRATION_SLOT.acquire(blocking=False):
+        raise CustodyUnavailable('native_capture_busy')
+    replies = queue.Queue(maxsize=1)
+    deadline = time.monotonic() + REGISTRATION_TIMEOUT_SECONDS
+    def invoke():
+        try:
+            replies.put((True, operation(deadline)))
+        except BaseException as error:
+            replies.put((False, error))
+        finally:
+            _REGISTRATION_SLOT.release()
+    worker = threading.Thread(target=invoke, daemon=True)
+    try:
+        worker.start()
+    except BaseException:
+        _REGISTRATION_SLOT.release()
+        raise
+    try:
+        succeeded, result = replies.get(timeout=max(0, deadline - time.monotonic()))
+    except queue.Empty as error:
+        # A hung RPC retains the sole slot until it settles; no worker pileup.
+        raise CustodyUnavailable('native_capture_deadline') from error
+    if time.monotonic() >= deadline:
+        raise CustodyUnavailable('native_capture_deadline')
+    if not succeeded:
+        raise result
+    return result
+
+
+def collect_registered_result(exit_status, capture_id, child_registration_id, native_owner):
+    if exit_status != 0:
+        raise CustodyUnavailable('verifier_child_failed')
+    # Service-owned identifiers come from enrollment/registration, not argv.
+    # Fixed native adapter authenticates current M6 evidence semantics and the
+    # actual registered child before returning this typed result.
+    result = bounded_native_call(lambda deadline: native_owner.lookup_capture_result(
+        capture_id, child_registration_id, deadline))
+    if (not isinstance(result, VerifiedCaptureResult)
+            or result.capture_id != capture_id
+            or result.child_registration_id != child_registration_id
+            or type(result.evidence_reference) is not bytes
+            or not 1 <= len(result.evidence_reference) <= 4096):
+        raise CustodyUnavailable('native_result_unavailable')
+    return result.evidence_reference
+
+
+def _receive_exact(channel, size, deadline):
+    result = bytearray()
+    while len(result) < size:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise ValueError('attestation_deadline')
+        channel.settimeout(remaining)
+        part = channel.recv(size - len(result))
+        if not part:
+            raise ValueError('truncated_attestation')
+        result.extend(part)
+    return bytes(result)
+
+
+def receive_attestation(attestation_fd):
+    if type(attestation_fd) is not int or attestation_fd < 0:
+        raise ValueError('missing_attestation_fd')
+    # This socket conveys opaque proof bytes; possession is not authentication.
+    with socket.socket(fileno=os.dup(attestation_fd)) as channel:
+        deadline = time.monotonic() + HANDOFF_TIMEOUT_SECONDS
+        size = struct.unpack('!I', _receive_exact(channel, 4, deadline))[0]
+        if not 1 <= size <= MAX_ATTESTATION_BYTES:
+            raise ValueError('attestation_size')
+        proof = _receive_exact(channel, size, deadline)
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise ValueError('attestation_deadline')
+        channel.settimeout(remaining)
+        if channel.recv(1):
+            raise ValueError('trailing_attestation')
+        return proof
+
+
+def consume_root_handoff(root_fd, attestation_fd, native_owner):
+    if type(root_fd) is not int or root_fd < 0:
+        raise ValueError('missing_root_fd')
+    info = os.fstat(root_fd)
+    if not stat.S_ISDIR(info.st_mode):
+        raise ValueError('root_not_directory')
+    observed = (info.st_dev, info.st_ino)
+    proof = receive_attestation(attestation_fd)
+    # Installed adapter derives this process's audit incarnation/challenge itself;
+    # no caller-supplied expected identity, clock, nonce, trust key, or mode.
+    capture = native_owner.consume_capture_attestation(proof, observed)
+    if not isinstance(capture, VerifiedCapture) or capture.root_identity != observed:
+        raise ValueError('root_context_mismatch')
+    for value in (capture.capture_id, capture.run_nonce, capture.candidate_digest,
+                  capture.manifest_digest, capture.policy_digest):
+        if type(value) is not str or len(value) != 64 or any(c not in '0123456789abcdef' for c in value):
+            raise ValueError('invalid_capture_digest')
+    candidate = load_artifact(root_fd, capture.root_identity,
+                              capture.candidate_digest, json_object=True)
+    return capture, candidate
+
+
+def launch_enrolled_verifier(root_fd, register_actual_child, executable, prefix, environment, workdir):
+    # executable/prefix/environment come only from the signed curator's pinned
+    # package manifest, not request fields. prefix is a tuple of fixed arguments.
+    parent = child = None
+    process = None
+    try:
+        parent, child = socket.socketpair()
+        parent.settimeout(HANDOFF_TIMEOUT_SECONDS)
+        process = subprocess.Popen(
+            [executable, *prefix, '--root-fd', str(root_fd),
+             '--attestation-fd', str(child.fileno())],
+            pass_fds=(root_fd, child.fileno()), close_fds=True,
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL, env=environment, cwd=workdir,
+        )
+        child.close()
+        # Callback resolves the actual child audit identity from the native owner,
+        # enrolls its fresh native challenge, and returns a one-use native proof.
+        # PID alone and self-reported child identity are never sufficient.
+        proof = bounded_native_call(lambda deadline:
+            register_actual_child(process.pid, deadline))
+        if type(proof) is not bytes or not 1 <= len(proof) <= MAX_ATTESTATION_BYTES:
+            raise ValueError('invalid_attestation')
+        parent.sendall(struct.pack('!I', len(proof)) + proof)
+        parent.shutdown(socket.SHUT_WR)
+        return process.wait(timeout=5)
+    finally:
+        if parent is not None:
+            parent.close()
+        if child is not None:
+            child.close()
+        if process is not None and process.poll() is None:
+            process.kill()
+            process.wait(timeout=1)
+```
+
+- [ ] **Step 3f: Exercise real descriptor inheritance with an explicitly synthetic authority seam.** Save the following as `tests/test_custody_handoff.py`. Its generated child script and local fixture ledger model an authenticated native result only for component testing; they are excluded from the installed code closure, cannot satisfy the native prerequisite, and issue no qualification. Native acceptance separately proves actual audit incarnation, enrolled capture generation, signer/closure, challenge, monotonic lifetime, revocation, and atomic replay behavior under `mac_qualification_capture_`. The missing-native fixture must fail even when the component positive succeeds.
+
+```python
+import hashlib
+import json
+import os
+import secrets
+import socket
+import struct
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+import verifier.custody as custody
+from verifier.custody import (CustodyUnavailable, VerifiedCaptureResult,
+    collect_registered_result, launch_enrolled_verifier)
+
+# COMPONENT ONLY: this fixture stands in for the absent native capture owner.
+# It cannot be imported by the installed verifier or emit release qualification.
+FIXTURE_CHILD = r'''
+import argparse, json, os, sys, time
+from pathlib import Path
+from verifier.custody import consume_root_handoff, VerifiedCapture, UnavailableNativeCapture
+
+class FixtureOwner:
+    def consume_capture_attestation(self, proof, observed_root_identity):
+        state = json.loads(Path(RECORD).read_text())
+        claims = state['claims']
+        if proof != bytes.fromhex(state['proof']):
+            raise ValueError('fixture_untrusted_attestation')
+        if (claims['subject_pid'] != os.getpid()
+                or claims['challenge'] != state['active_challenge']
+                or claims['run_nonce'] != '1' * 64
+                or claims['closure_digest'] != '2' * 64
+                or claims['host_boot'] != 'component-boot'
+                or claims['expires_ns'] <= time.monotonic_ns()
+                or tuple(claims['root_identity']) != observed_root_identity):
+            raise ValueError('fixture_context_mismatch')
+        # Fixture-only atomic consumption; the real ledger belongs to native NK05.
+        fd = os.open(LEDGER, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        os.close(fd)
+        return VerifiedCapture(tuple(claims['root_identity']), '3' * 64,
+            claims['run_nonce'], claims['candidate_digest'], '4' * 64, '5' * 64)
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--root-fd', type=int, required=True)
+parser.add_argument('--attestation-fd', type=int, required=True)
+args = parser.parse_args()
+try:
+    owner = UnavailableNativeCapture() if NATIVE_UNAVAILABLE else FixtureOwner()
+    capture, candidate = consume_root_handoff(args.root_fd, args.attestation_fd, owner)
+    if candidate != {'synthetic': True, 'status': 'candidate'}:
+        raise ValueError('unexpected_candidate')
+except Exception:
+    sys.exit(42)
+sys.exit(0)
+'''
+
+class CustodyHandoffTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.base = Path(self.temporary.name)
+        self.root = self.base / 'enrolled'
+        self.root.mkdir(mode=0o700)
+        self.root_fd = os.open(self.root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        self.addCleanup(os.close, self.root_fd)
+        info = os.fstat(self.root_fd)
+        self.identity = (info.st_dev, info.st_ino)
+        self.payload = b'{"synthetic":true,"status":"candidate"}'
+        self.digest = hashlib.sha256(self.payload).hexdigest()
+        (self.root / self.digest).write_bytes(self.payload)
+        self.record = self.base / 'fixture-owner.json'
+        self.ledger = self.base / 'fixture-consumed'
+        self.child = self.base / 'component_child.py'
+        self.write_child()
+        self.environment = dict(os.environ)  # Controlled fixture imports only.
+
+    def write_child(self, unavailable=False):
+        prelude = (f'RECORD = {str(self.record)!r}\nLEDGER = {str(self.ledger)!r}\n'
+                   f'NATIVE_UNAVAILABLE = {unavailable!r}\n')
+        self.child.write_text(prelude + FIXTURE_CHILD)
+
+    def register_fixture_child(self, pid, overrides=None, forged=False):
+        challenge = secrets.token_hex(32)
+        proof = secrets.token_bytes(32)
+        claims = dict(subject_pid=pid, challenge=challenge, run_nonce='1' * 64,
+            closure_digest='2' * 64, host_boot='component-boot',
+            expires_ns=time.monotonic_ns() + 2_000_000_000,
+            root_identity=self.identity, candidate_digest=self.digest)
+        claims.update(overrides or {})
+        self.record.write_text(json.dumps(dict(claims=claims,
+            active_challenge=challenge, proof=proof.hex())))
+        return b'caller-forged' if forged else proof
+
+    def launch(self, root_fd=None, overrides=None, forged=False):
+        return launch_enrolled_verifier(
+            self.root_fd if root_fd is None else root_fd,
+            lambda pid, deadline: self.register_fixture_child(pid, overrides, forged),
+            sys.executable, (str(self.child),), self.environment, self.base)
+
+    def direct_child(self, root_fd, proof_fd, inherited=(), extra=()):
+        return subprocess.run([sys.executable, str(self.child), '--root-fd', str(root_fd),
+            '--attestation-fd', str(proof_fd), *extra], pass_fds=inherited,
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL, env=self.environment, timeout=3).returncode
+
+    def test_enrolled_wrapper_transfers_real_descriptor(self):
+        self.assertEqual(self.launch(), 0)
+        self.assertTrue(self.ledger.exists())
+
+    def test_held_root_survives_pathname_replacement(self):
+        self.root.rename(self.base / 'original')
+        self.root.mkdir()
+        (self.root / self.digest).write_bytes(b'candidate replacement')
+        self.assertEqual(self.launch(), 0)
+
+    def test_missing_root_descriptor_is_rejected(self):
+        self.assertNotEqual(self.direct_child(self.root_fd, -1), 0)
+
+    def test_missing_attestation_descriptor_is_rejected(self):
+        self.assertNotEqual(self.direct_child(self.root_fd, -1, (self.root_fd,)), 0)
+
+    def test_swapped_descriptors_are_rejected(self):
+        channel, peer = socket.socketpair()
+        try:
+            self.assertNotEqual(self.direct_child(channel.fileno(), self.root_fd,
+                (channel.fileno(), self.root_fd)), 0)
+        finally:
+            channel.close()
+            peer.close()
+
+    def test_caller_forged_attestation_is_rejected(self):
+        self.assertNotEqual(self.launch(forged=True), 0)
+        self.assertFalse(self.ledger.exists())
+
+    def test_unenrolled_root_with_identical_bytes_is_rejected(self):
+        other = self.base / 'caller-root'
+        other.mkdir()
+        (other / self.digest).write_bytes(self.payload)
+        fd = os.open(other, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            self.assertNotEqual(self.launch(root_fd=fd), 0)
+        finally:
+            os.close(fd)
+
+    def test_wrong_nonce_challenge_child_closure_and_boot_are_rejected(self):
+        for changes in ({'run_nonce': '9' * 64}, {'challenge': '9' * 64},
+                        {'subject_pid': -1}, {'closure_digest': '9' * 64},
+                        {'host_boot': 'other-boot'}):
+            with self.subTest(changes=changes):
+                self.assertNotEqual(self.launch(overrides=changes), 0)
+                self.assertFalse(self.ledger.exists())
+
+    def test_expired_context_is_rejected(self):
+        self.assertNotEqual(self.launch(overrides={'expires_ns': 0}), 0)
+
+    def test_capture_consumption_cannot_replay(self):
+        self.assertEqual(self.launch(), 0)
+        self.assertNotEqual(self.launch(), 0)
+
+    def test_absent_native_contract_cannot_use_fixture_positive(self):
+        self.write_child(unavailable=True)
+        self.assertNotEqual(self.launch(), 0)
+        self.assertFalse(self.ledger.exists())
+
+    def test_direct_path_arguments_cannot_enable_admission(self):
+        self.assertNotEqual(self.direct_child(-1, -1, extra=(
+            '--artifact-root', str(self.root), '--candidate', str(self.root / self.digest))), 0)
+
+    def test_already_queued_reply_after_absolute_deadline_is_rejected(self):
+        # Complete synchronously, then resume the parent after its deadline.
+        with patch('verifier.custody.threading.Thread.start', lambda worker: worker.run()):
+            with patch('verifier.custody.time.monotonic', side_effect=[100.0, 102.0, 102.0]):
+                with self.assertRaisesRegex(CustodyUnavailable, 'native_capture_deadline'):
+                    custody.bounded_native_call(lambda deadline: 'already-completed')
+
+    def test_stalled_registration_is_bounded_without_worker_accumulation(self):
+        release, settled = threading.Event(), threading.Event()
+        child_pids = []
+        def stalled(pid, deadline):
+            child_pids.append(pid)
+            try:
+                release.wait(5)
+                return self.register_fixture_child(pid)
+            finally:
+                settled.set()
+        started = time.monotonic()
+        try:
+            with self.assertRaisesRegex(CustodyUnavailable, 'native_capture_deadline'):
+                launch_enrolled_verifier(self.root_fd, stalled, sys.executable,
+                    (str(self.child),), self.environment, self.base)
+            self.assertLess(time.monotonic() - started, 2)
+            with self.assertRaises(ProcessLookupError):
+                os.kill(child_pids[0], 0)
+            with self.assertRaisesRegex(CustodyUnavailable, 'native_capture_busy'):
+                self.launch()
+            self.assertFalse(self.ledger.exists())
+        finally:
+            release.set()
+            self.assertTrue(settled.wait(2))
+            until = time.monotonic() + 2
+            while not custody._REGISTRATION_SLOT.acquire(blocking=False):
+                if time.monotonic() >= until:
+                    self.fail('registration_slot_not_released')
+                time.sleep(0.001)
+            custody._REGISTRATION_SLOT.release()
+
+    def test_zero_exit_without_native_result_is_unavailable(self):
+        class FixtureResultOwner:
+            def lookup_capture_result(self, capture_id, child_registration_id, deadline):
+                return None
+        with self.assertRaisesRegex(CustodyUnavailable, 'native_result_unavailable'):
+            collect_registered_result(0, 'capture', 'registered-child', FixtureResultOwner())
+
+    def test_native_result_matches_capture_and_registered_child(self):
+        class FixtureResultOwner:
+            def lookup_capture_result(self, capture_id, child_registration_id, deadline):
+                return self.result
+        owner = FixtureResultOwner()
+        owner.result = VerifiedCaptureResult('capture', 'registered-child', b'component-only')
+        self.assertEqual(collect_registered_result(0, 'capture', 'registered-child', owner),
+                         b'component-only')
+        for record in (VerifiedCaptureResult('other', 'registered-child', b'component-only'),
+                       VerifiedCaptureResult('capture', 'other-child', b'component-only'),
+                       VerifiedCaptureResult('capture', 'registered-child', b'')):
+            owner.result = record
+            with self.assertRaisesRegex(CustodyUnavailable, 'native_result_unavailable'):
+                collect_registered_result(0, 'capture', 'registered-child', owner)
+
+    def test_attestation_size_truncation_and_deadline_are_bounded(self):
+        for body in (struct.pack('!I', 16385), struct.pack('!I', 10) + b'x'):
+            with self.subTest(body=body):
+                parent, child = socket.socketpair()
+                try:
+                    parent.sendall(body)
+                    parent.shutdown(socket.SHUT_WR)
+                    self.assertNotEqual(self.direct_child(self.root_fd, child.fileno(),
+                        (self.root_fd, child.fileno())), 0)
+                finally:
+                    parent.close()
+                    child.close()
+        parent, child = socket.socketpair()
+        try:
+            started = time.monotonic()
+            self.assertNotEqual(self.direct_child(self.root_fd, child.fileno(),
+                (self.root_fd, child.fileno())), 0)
+            self.assertLess(time.monotonic() - started, 3)
+        finally:
+            parent.close()
+            child.close()
+```
+
+- [ ] **Step 3g: Require the complete component inventory under a process deadline.** Create `tests/run_required_suite.py` with these fixed reviewed test IDs, independent of discovery. A failing import, missing/extra/duplicate test, skip, or timeout is a failed gate. An `expectedFailure` also fails this required gate; an expected failing test is not a passing acceptance case. Execute the artifact, custody, and statistics suites through this runner; mutate one suite to empty, one test to skipped, and one failing test to expected-failure to prove none can produce a passing command. Restore the intended fixture files after each mutation. The broader semantic suite must receive its own reviewed exact inventory and the same no-skip/deadline gate as its cases are implemented; bare `unittest discover` is never sufficient release evidence.
+
+```python
+import os
+import subprocess
+import sys
+import unittest
+from pathlib import Path
+
+# Reviewed inventories, never generated from whatever happens to be discovered.
+EXPECTED = {'artifacts': ('test_artifacts.ArtifactTests.test_bytes_not_digest_shape_establish_integrity',
+               'test_artifacts.ArtifactTests.test_root_replacement_cannot_select_new_artifacts',
+               'test_artifacts.ArtifactTests.test_reference_shape_empty_artifact_and_absent_file',
+               'test_artifacts.ArtifactTests.test_duplicate_decoded_keys_fail_before_decoder',
+               'test_artifacts.ArtifactTests.test_depth_is_bounded_before_decoder',
+               'test_artifacts.ArtifactTests.test_container_fanout_is_bounded_before_decoder',
+               'test_artifacts.ArtifactTests.test_token_and_scalar_budgets_precede_decoder',
+               'test_artifacts.ArtifactTests.test_escaped_string_and_key_budgets_precede_decoder',
+               'test_artifacts.ArtifactTests.test_invalid_unicode_escapes_and_utf8_precede_decoder',
+               'test_artifacts.ArtifactTests.test_unsafe_numbers_precede_decoder',
+               'test_artifacts.ArtifactTests.test_byte_budget_and_invalid_grammar_precede_decoder',
+               'test_artifacts.ArtifactTests.test_valid_escaped_control_materializes_once',
+               'test_artifacts.ArtifactTests.test_artifact_json_budget_is_distinct_from_wire_limit',
+               'test_artifacts.ArtifactTests.test_real_candidate_fixture_is_bounded_and_decoded_once',
+               'test_artifacts.ArtifactTests.test_json_artifact_byte_limit_applies_before_read_or_decode',
+               'test_artifacts.ArtifactTests.test_fifo_is_rejected_without_waiting_for_a_writer'),
+ 'custody': ('test_custody_handoff.CustodyHandoffTests.test_enrolled_wrapper_transfers_real_descriptor',
+             'test_custody_handoff.CustodyHandoffTests.test_held_root_survives_pathname_replacement',
+             'test_custody_handoff.CustodyHandoffTests.test_missing_root_descriptor_is_rejected',
+             'test_custody_handoff.CustodyHandoffTests.test_missing_attestation_descriptor_is_rejected',
+             'test_custody_handoff.CustodyHandoffTests.test_swapped_descriptors_are_rejected',
+             'test_custody_handoff.CustodyHandoffTests.test_caller_forged_attestation_is_rejected',
+             'test_custody_handoff.CustodyHandoffTests.test_unenrolled_root_with_identical_bytes_is_rejected',
+             'test_custody_handoff.CustodyHandoffTests.test_wrong_nonce_challenge_child_closure_and_boot_are_rejected',
+             'test_custody_handoff.CustodyHandoffTests.test_expired_context_is_rejected',
+             'test_custody_handoff.CustodyHandoffTests.test_capture_consumption_cannot_replay',
+             'test_custody_handoff.CustodyHandoffTests.test_absent_native_contract_cannot_use_fixture_positive',
+             'test_custody_handoff.CustodyHandoffTests.test_direct_path_arguments_cannot_enable_admission',
+             'test_custody_handoff.CustodyHandoffTests.test_already_queued_reply_after_absolute_deadline_is_rejected',
+             'test_custody_handoff.CustodyHandoffTests.test_stalled_registration_is_bounded_without_worker_accumulation',
+             'test_custody_handoff.CustodyHandoffTests.test_zero_exit_without_native_result_is_unavailable',
+             'test_custody_handoff.CustodyHandoffTests.test_native_result_matches_capture_and_registered_child',
+             'test_custody_handoff.CustodyHandoffTests.test_attestation_size_truncation_and_deadline_are_bounded'),
+ 'statistics': ('test_statistics.StatisticsTests.test_p95_uses_raw_distribution',
+                'test_statistics.StatisticsTests.test_bool_samples_are_not_measurements',
+                'test_statistics.StatisticsTests.test_noninteger_negative_and_unsafe_samples_are_rejected',
+                'test_statistics.StatisticsTests.test_empty_samples_and_invalid_percentile_are_rejected',
+                'test_statistics.StatisticsTests.test_integer_boundaries_and_extreme_percentiles')}
+
+TESTS = Path(__file__).resolve().parent
+QUALIFICATION = TESTS.parent
+
+def case_ids(suite):
+    result = []
+    for case in suite:
+        result.extend(case_ids(case) if isinstance(case, unittest.TestSuite) else [case.id()])
+    return result
+
+def run_child(name):
+    module = EXPECTED[name][0].split('.')[0]
+    suite = unittest.defaultTestLoader.discover(str(TESTS), pattern=module + '.py')
+    actual = case_ids(suite)
+    if len(actual) != len(EXPECTED[name]) or set(actual) != set(EXPECTED[name]):
+        print('required_test_inventory_mismatch', file=sys.stderr)
+        return 1
+    result = unittest.TextTestRunner(verbosity=2).run(suite)
+    return 0 if result.wasSuccessful() and not result.skipped and not result.expectedFailures else 1
+
+if __name__ == '__main__':
+    args = sys.argv[1:]
+    if len(args) not in (1, 2) or args[0] not in EXPECTED or (len(args) == 2 and args[1] != '--child'):
+        raise SystemExit('usage: run_required_suite.py artifacts|custody|statistics [--child]')
+    if len(args) == 2:
+        raise SystemExit(run_child(args[0]))
+    # Component-test launch only. Production verifier uses the enrolled curator.
+    environment = dict(os.environ, PYTHONPATH=str(QUALIFICATION))
+    try:
+        result = subprocess.run([sys.executable, str(Path(__file__).resolve()), args[0], '--child'],
+            env=environment, timeout=20, check=False)
+    except subprocess.TimeoutExpired:
+        raise SystemExit('required_test_timeout')
+    raise SystemExit(result.returncode)
+```
+
+- [ ] **Step 4: Route release verification through the enrolled curator service.** The public lab client accepts only `verify --capture-ref <locator> --output-locator <locator>`; a capture reference selects an existing native enrolled capture through authenticated IPC and carries no root/code/trust authority. External trusted policy pins accepted verifier/native proof contract, approved manifest, trust roots, observer contracts, and freshness. The candidate's `verifier` entry is compared with that policy; it cannot select policy. Safe loading and schema validation precede semantics; release mode refuses fabricated/synthetic-envelope evidence and missing native API. Candidate, manifest, policy, and observer bytes are selected by their native-bound capture digests and read through Task 2's shared reader/preflight. `--candidate`, `--artifact-root`, `--trusted-release-policy`, caller-supplied root identities, and arbitrary inherited FDs cannot enable release admission. Old path-only `python3 -m verifier.main` invocations must fail closed. Output the separate verified qualification report only after every required candidate-evidence gate passes; the manifest's distinct final production-confirmation gate remains necessary for release approval.
 - [ ] **Step 5: Bind native compatibility to a verified report reference.** Use the M2/M6 native evidence import/verification path to derive `qualified_for_tuple`; do not let the app set it from a local report Boolean. The report binds candidate/manifest digests, exact tuple, verifier/trust identities, case verdicts, claim exclusions, and invalidation rules. Missing required native import contract remains a prerequisite, not a new app signer. Initial probe execution never sets this state. Retain the immutable report for the ordinary production-admission confirmation in Task 12.
-- [ ] **Step 6: Run** `PYTHONPATH=integrations/macos/qualification python3 -m unittest discover -s integrations/macos/qualification/tests -p test_semantic_verifier.py -v`. Then run `python3 -m verifier.main --candidate output/macos-qualification/candidate.json --artifact-root output/macos-qualification/artifacts --trusted-release-policy integrations/macos/qualification/manifests/trusted-release-policy.json --mode release --output output/macos-qualification/verified.json` with `PYTHONPATH=integrations/macos/qualification` set by the lab command wrapper. Expected: release rejection until authentic installed evidence and externally provisioned trust policy exist. Commit with `feat(macos): independently verify profile qualification`.
+- [ ] **Step 6: Run bounded component gates, then request the enrolled release verification.** Run `python3 integrations/macos/qualification/tests/run_required_suite.py custody`, `python3 integrations/macos/qualification/tests/run_required_suite.py artifacts`, and `python3 integrations/macos/qualification/tests/run_required_suite.py statistics`. Expected: exactly 17, 16, and 5 passing cases respectively, zero skips or expected failures, and each subprocess finishes within 20 seconds; these counts cover helper/component behavior only. Run the completed semantic fraud inventory with the same fixed-inventory gate before installed qualification. After the signed curator and actual native capture contract are installed, run `"/Library/Application Support/ChioQualification/bin/chio-lab" verify --capture-ref output/macos-qualification/capture.ref --output-locator output/macos-qualification/verified.ref`. The installed runner obtains `capture.ref` from the curator's authenticated begin/ingest/seal capture flow; the file is only a locator into service-owned enrolled state. The service supplies its held root, registers the actual verifier child, transfers native proof, then retrieves and verifies the capture/child-bound native result reference. Child exit success alone is insufficient. Direct child/path-only launch, missing service enrollment, absent native support, unavailable signed closure, or expired capture rejects verification. No `PYTHONPATH`-based release launch or local synthetic fixture can replace that flow. Commit with `feat(macos): independently verify profile qualification`.
 
 ## Task 12: Profile expansion, adversarial closure, and public release review
 

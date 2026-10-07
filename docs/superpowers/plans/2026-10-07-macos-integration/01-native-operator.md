@@ -289,30 +289,81 @@ Register resource-bearing intents with `.requiresLocalDeviceAuthentication`. Pin
 
 **Interfaces:** Introduce `IdentityDisplay.escaped(_ input: String) -> String`, a display-only escaped view of control/bidi code points. Raw native identity remains unchanged and the Copy Exact action copies verified original bytes where the wire representation permits it. UI test identifiers are `review.destination`, `review.release`, `review.effect`, `review.submit`, `review.decline`, `stop.progress`, `privacy.presenter`.
 
-- [ ] **Step 1: Add the ambiguous-destination test.**
+- [ ] **Step 1: Add exhaustive bidi-control and ordinary-text tests.**
 
 ```swift
-func testBidiControlCannotHideDestinationSuffix() {
-    XCTAssertEqual(IdentityDisplay.escaped("safe\u{202E}txt"), "safe\\u{202E}txt")
-    XCTAssertEqual(IdentityDisplay.escaped("café"), "café")
+import XCTest
+@testable import ChioMacUI
+
+final class IdentityDisplayTests: XCTestCase {
+    func testEveryBidiControlIsEscaped() throws {
+        let vectors: [(UInt32, String)] = [
+            (0x061C, "\\u{61C}"), (0x200E, "\\u{200E}"),
+            (0x200F, "\\u{200F}"), (0x202A, "\\u{202A}"),
+            (0x202B, "\\u{202B}"), (0x202C, "\\u{202C}"),
+            (0x202D, "\\u{202D}"), (0x202E, "\\u{202E}"),
+            (0x2066, "\\u{2066}"), (0x2067, "\\u{2067}"),
+            (0x2068, "\\u{2068}"), (0x2069, "\\u{2069}")
+        ]
+        for (value, escaped) in vectors {
+            let scalar = try XCTUnwrap(Unicode.Scalar(value))
+            let source = "report" + String(scalar) + ".txt"
+            let originalBytes = Array(source.utf8)
+            XCTAssertEqual(IdentityDisplay.escaped(source), "report" + escaped + ".txt")
+            XCTAssertEqual(Array(source.utf8), originalBytes)
+        }
+    }
+
+    func testOrdinaryTextRetainsExactUTF8Bytes() {
+        for source in ["", "report.txt", "café", "cafe\u{301}",
+                       "العربية", "עברית", "文書", "👩\u{200D}💻", "123.txt"] {
+            XCTAssertEqual(Array(IdentityDisplay.escaped(source).utf8), Array(source.utf8))
+        }
+    }
+
+    func testExistingControlEscapingRemains() {
+        XCTAssertEqual(IdentityDisplay.escaped("a\u{0}\t\n\u{7F}z"),
+                       "a\\u{0}\\u{9}\\u{A}\\u{7F}z")
+    }
 }
 ```
 
 - [ ] **Step 2: Run `swift test --package-path integrations/macos/native --filter IdentityDisplayTests`; expect missing function failure.**
 - [ ] **Step 3: Implement escaping and semantic accessibility.**
 
+Pin this predicate and the test vectors to the 12 `Bidi_Control` scalars in [Unicode 17.0.0 PropList](https://www.unicode.org/Public/17.0.0/ucd/PropList.txt): U+061C, U+200E–U+200F, U+202A–U+202E and U+2066–U+2069. [Unicode UAX #9 §2.6](https://www.unicode.org/reports/tr9/#Implicit_Directional_Marks) explains why the invisible LRM, RLM and ALM marks also affect ordering. Keep ordinary Arabic/Hebrew characters and join controls intact; escaping must not normalize source bytes. A Unicode-version change requires rechecking the property set and vectors.
+
 ```swift
 public enum IdentityDisplay {
     public static func escaped(_ input: String) -> String {
         input.unicodeScalars.map { scalar in
             let n = scalar.value
-            let bidi = (0x202A...0x202E).contains(n) || (0x2066...0x2069).contains(n)
+            let bidi = n == 0x061C || (0x200E...0x200F).contains(n)
+              || (0x202A...0x202E).contains(n) || (0x2066...0x2069).contains(n)
             return n < 0x20 || n == 0x7F || bidi
               ? "\\u{\(String(n, radix: 16, uppercase: true))}" : String(scalar)
         }.joined()
     }
 }
 ```
+
+Use the same escaped string for visible identity text and its accessibility label/value; never attach the raw identity as hidden accessibility metadata. Bind after Task 5 privacy substitution, so hidden identities remain hidden. Apple's [accessible descriptions](https://developer.apple.com/documentation/swiftui/accessible-descriptions) documents the explicit accessibility label/value channel. Use this view for untrusted technical identities, while Copy Exact remains a separate explicit action over verified original bytes:
+
+```swift
+import SwiftUI
+
+struct IdentityText: View {
+    let input: String // Already subject to the current privacy presentation.
+
+    var body: some View {
+        let escaped = IdentityDisplay.escaped(input)
+        Text(verbatim: escaped)
+            .accessibilityLabel(Text(verbatim: escaped))
+    }
+}
+```
+
+Add signed `ReviewAccessibilityTests` cases for each of the same 12 scalars in destination, filename and diff identities. Assert the accessibility label/value contains the exact escape and no raw control; inspect the visible text and accessible reading order in LTR and RTL layouts. Include normal Arabic/Hebrew, composed/decomposed accents and emoji join sequences as unchanged-byte controls. The pure helper tests and view type-check are component evidence; installed rendering/VoiceOver evidence remains required.
 
 Create `ServicesMenu.strings` with `"Run with Chio" = "Run with Chio";` and localized variants for the Services label. Create catalog entries for all messages from Tasks 1-5, pluralized counts, and error recovery actions. Keep authority identifiers out of translated format strings; display long values with wrapping and selectable full text. Use labels/values/hints, heading grouping and deliberate focus after Review changed. Provide keyboard shortcuts for navigation/stop, not approval; honor reduced-motion and contrast settings. Logs strip ANSI effects in the viewer and keep raw bounded evidence behind explicit export. No HTML/script/network preview engine is introduced.
 

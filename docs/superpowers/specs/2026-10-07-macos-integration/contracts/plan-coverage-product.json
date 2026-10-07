@@ -556,7 +556,7 @@
         {
           "plan": "01-native-operator.md",
           "heading": "Task 6: Localize and make complete review flows accessible",
-          "action": "public enum IdentityDisplay {\n    public static func escaped(_ input: String) -> String {\n        input.unicodeScalars.map { scalar in\n            let n = scalar.value\n            let bidi = (0x202A...0x202E).contains(n) || (0x2066...0x2069).contains(n)\n            return n < 0x20 || n == 0x7F || bidi\n              ? \"\\\\u{\\(String(n, radix: 16, uppercase: true))}\" : String(scalar)\n        }.joined()\n    }\n}\n```"
+          "action": "Use the same escaped string for visible identity text and its accessibility label/value; never attach the raw identity as hidden accessibility metadata. Bind after Task 5 privacy substitution, so hidden identities remain hidden."
         },
         {
           "plan": "01-native-operator.md",
@@ -567,6 +567,11 @@
           "plan": "01-native-operator.md",
           "heading": "Task 4: Add exact-review invalidation and original-operation recovery",
           "action": "The generated client must match the response `operation_ref` to the request, retain its `review_ref`, verify the complete inline UTF-8 byte count and SHA-256, and accept native bindings only through the delivered M0/M2 native adapter. That adapter, not the app, verifies all projected fields against the frozen native record and sealed resource."
+        },
+        {
+          "plan": "01-native-operator.md",
+          "heading": "Task 6: Localize and make complete review flows accessible",
+          "action": "Add signed `ReviewAccessibilityTests` cases for each of the same 12 scalars in destination, filename and diff identities. Assert the accessibility label/value contains the exact escape and no raw control; inspect the visible text and accessible reading order in LTR and RTL layouts."
         }
       ]
     },

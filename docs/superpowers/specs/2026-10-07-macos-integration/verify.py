@@ -121,16 +121,26 @@ def validators() -> dict[str, Draft202012Validator]:
             for name, value in schemas.items()}
 
 
-def plan_task_body(text: str, heading: str) -> str:
-    # Code examples can contain Markdown-looking comments. Preserve offsets while
-    # excluding fenced bodies from the heading census.
-    visible, fenced = [], False
+def markdown_definitions(text: str) -> str:
+    # Code examples can contain Markdown-looking definitions. Preserve offsets
+    # while excluding fenced bodies from requirement/heading censuses.
+    visible, fence = [], None
     for line in text.splitlines(keepends=True):
-        boundary = bool(re.match(r"^\s*```", line))
-        visible.append(re.sub(r"[^\n]", " ", line) if fenced or boundary else line)
-        if boundary:
-            fenced = not fenced
-    headings = list(re.finditer(r"^(#{1,6}) (.+)$", "".join(visible), re.M))
+        marker = re.match(r"^ {0,3}(`{3,}|~{3,})([^\r\n]*)[\r\n]*$", line)
+        if fence is not None:
+            visible.append(re.sub(r"[^\n]", " ", line))
+            if marker and marker[1][0] == fence[0] and len(marker[1]) >= fence[1] and not marker[2].strip():
+                fence = None
+        elif marker and (marker[1][0] == "~" or "`" not in marker[2]):
+            fence = (marker[1][0], len(marker[1]))
+            visible.append(re.sub(r"[^\n]", " ", line))
+        else:
+            visible.append(line)
+    return "".join(visible)
+
+
+def plan_task_body(text: str, heading: str) -> str:
+    headings = list(re.finditer(r"^(#{1,6}) (.+)$", markdown_definitions(text), re.M))
     matches = [i for i, match in enumerate(headings) if match[2] == heading]
     if len(matches) != 1 or not re.fullmatch(r"Task [0-9]+: .+", heading):
         raise ValueError(f"Missing or duplicate implementation task: {heading}")
@@ -167,11 +177,26 @@ def validate_plan_coverage(entries: list[dict], identifiers: set[str], plans: di
     return coverage
 
 
+def validate_acceptance_definitions(records: list[dict], documents: dict[str, str]) -> None:
+    expected = {record["acceptance"]: record["spec"] for record in records}
+    definitions: dict[str, list[str]] = {}
+    pattern = re.compile(r"^ {0,3}(?:\|[ \t]*(AT-MAC-[A-Z]+-\d{3})[ \t]*\||#{1,6}[ \t]+(AT-MAC-[A-Z]+-\d{3})(?=:|[ \t]|$))", re.M)
+    for name, text in documents.items():
+        for match in pattern.finditer(markdown_definitions(text)):
+            identifier = match[1] or match[2]
+            definitions.setdefault(identifier, []).append(name)
+    if set(definitions) != set(expected):
+        raise ValueError(f"Missing/orphan acceptance definitions: {sorted(set(definitions) ^ set(expected))}")
+    for identifier, owner in expected.items():
+        if definitions[identifier] != [owner]:
+            raise ValueError(f"Acceptance must be defined once in {owner}: {identifier}: {definitions[identifier]}")
+
+
 def requirement_records() -> list[dict]:
     records, identifiers = [], set()
     for path in sorted(ROOT.glob("[0-9][0-9]-*.md")):
         text = path.read_text()
-        for line_no, line in enumerate(text.splitlines(), 1):
+        for line_no, line in enumerate(markdown_definitions(text).splitlines(), 1):
             match = re.fullmatch(r"\| (MAC-([A-Z]+)-\d{3}) \| (.+) \| (AT-MAC-[A-Z]+-\d{3}) \|", line)
             if not match:
                 if re.match(r"\| MAC-[A-Z]+-\d{3} \|", line):
@@ -182,15 +207,15 @@ def requirement_records() -> list[dict]:
                 raise ValueError(f"Duplicate or mismatched requirement: {identifier}")
             if prefix not in REQUIREMENT_PREFIXES:
                 raise ValueError(f"Unmapped requirement prefix: {prefix}")
-            definition = re.compile(r"^(?:\| " + re.escape(acceptance) + r" \||#{2,4} " + re.escape(acceptance) + r"(?::|\s))", re.M)
-            if len(definition.findall(text)) != 1:
-                raise ValueError(f"Acceptance procedure must be defined once: {acceptance}")
             identifiers.add(identifier)
             records.append({"id": identifier, "spec": path.name, "line": line_no,
                             "requirement": statement, "acceptance": acceptance,
                             "acceptance_status": "specified_not_executed"})
     if not records:
         raise ValueError("No requirements found")
+    documents = {path.relative_to(ROOT).as_posix(): path.read_text() for path in ROOT.rglob("*.md")}
+    documents.update({"plans/" + path.relative_to(PLANS).as_posix(): path.read_text() for path in PLANS.rglob("*.md")})
+    validate_acceptance_definitions(records, documents)
     entries = []
     for path in sorted((ROOT / "contracts").glob("plan-coverage-*.json")):
         document = read_json(path)
@@ -381,6 +406,34 @@ def self_test(loaded: dict) -> int:
         except ValueError:
             continue
         raise ValueError("Plan coverage accepted removed, unbound or duplicate implementation work")
+    acceptance = "AT-" + identifier
+    acceptance_records = [{"acceptance": acceptance, "spec": "06-protocol.md"}]
+    table = f"| {acceptance} | Exercise refusal. | No effect. |\n"
+    heading_definition = f"### {acceptance}: Exercise refusal\n\nNo effect.\n"
+    definition_docs = {"06-protocol.md": table, "research/example.md": f"```markdown\n{table}```\n"}
+    validate_acceptance_definitions(acceptance_records, definition_docs)
+    validate_acceptance_definitions(acceptance_records, {"06-protocol.md": heading_definition})
+    fence_cases = [f"~~~markdown\n{table}~~~\n", f"````markdown\n```\n{table}```\n````\n"]
+    for example in fence_cases:
+        validate_acceptance_definitions(acceptance_records, {"06-protocol.md": table, "research/example.md": example})
+    bad_definitions = [
+        {},
+        {"06-protocol.md": table + table},
+        {"06-protocol.md": table, "07-vm.md": table},
+        {"06-protocol.md": table, "plans/02-protocol.md": heading_definition},
+        {"06-protocol.md": table + table.replace(acceptance, "AT-MAC-IPC-999")},
+        {"07-vm.md": table},
+        {"06-protocol.md": f"```markdown\n{table}```\n"},
+        {"06-protocol.md": table, "07-vm.md": "  " + heading_definition},
+        {"06-protocol.md": table, "07-vm.md": heading_definition.replace("### ", "###  ")},
+        {"06-protocol.md": table, "07-vm.md": table.replace("| ", "|").replace(" |", "|")},
+    ]
+    for documents in bad_definitions:
+        try:
+            validate_acceptance_definitions(acceptance_records, documents)
+        except ValueError:
+            continue
+        raise ValueError("Acceptance census accepted a missing, duplicate, orphan or wrong-owner definition")
     request = wire_decode((ROOT / "examples/request-task-stop.json").read_bytes())
     response = wire_decode((ROOT / "examples/response-task-stop.json").read_bytes())
     response["result"]["scope"] = "task"
@@ -434,7 +487,7 @@ def self_test(loaded: dict) -> int:
         if list(loaded["operator-response.schema.json"].iter_errors(response)):
             raise ValueError(f"Retry fixture has an unrelated shape defect: {name}")
         retry_checks += 1
-    return len(malformed) + 7 + 4 + 2 + len(bad_cases) + 1 + coverage_checks + retry_checks
+    return len(malformed) + 7 + 4 + 2 + len(bad_cases) + 2 + len(fence_cases) + len(bad_definitions) + 1 + coverage_checks + retry_checks
 
 
 def main() -> int:

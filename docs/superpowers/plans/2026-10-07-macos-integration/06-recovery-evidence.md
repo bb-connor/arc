@@ -582,7 +582,7 @@ suite = unittest.defaultTestLoader.discover(
 if suite.countTestCases() != 9:
     raise SystemExit("expected exactly nine evidence-index regressions")
 result = unittest.TextTestRunner(verbosity=2).run(suite)
-raise SystemExit(0 if result.wasSuccessful() and not result.skipped else 1)
+raise SystemExit(0 if result.wasSuccessful() and not result.skipped and not result.expectedFailures else 1)
 """
 result = subprocess.run([sys.executable, "-c", runner], timeout=10, check=False)
 raise SystemExit(result.returncode)
