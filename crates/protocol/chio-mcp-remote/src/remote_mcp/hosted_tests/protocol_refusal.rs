@@ -36,7 +36,7 @@ struct HttpFixture {
     trusted_key: PublicKey,
 }
 fn fixture() -> TestResult<HttpFixture> {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let mut config = support::base_remote_config(directory.path(), "127.0.0.1:0".parse()?);
     config.auth_token = Some("operator-fixture".into());
     config.admin_token = Some("admin-fixture".into());

@@ -13,7 +13,7 @@ fn request() -> Value {
 #[cfg(target_os = "linux")]
 #[test]
 fn delivery_writer_refuses_event_sized_outcome_before_replacing_pending_rows() {
-    let directory = tempfile::tempdir().unwrap();
+    let directory = chio_test_support::private_tempdir().unwrap();
     let path = directory.path().join("sessions.sqlite3");
     let _lease = crate::tests::acquire_test_session_store(&path);
     let keypair = Keypair::generate();
@@ -63,7 +63,7 @@ fn delivery_writer_refuses_event_sized_outcome_before_replacing_pending_rows() {
 #[cfg(target_os = "linux")]
 #[test]
 fn delivery_writer_preserves_decoded_decimal_native_replay_and_acknowledgement() {
-    let directory = tempfile::tempdir().unwrap();
+    let directory = chio_test_support::private_tempdir().unwrap();
     let path = directory.path().join("sessions.sqlite3");
     let _lease = crate::tests::acquire_test_session_store(&path);
     let keypair = Keypair::generate();
