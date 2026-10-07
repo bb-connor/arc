@@ -794,6 +794,20 @@ impl ProductionActiveDefenseOrchestrator {
         {
             return Err(PortError::invalid_data().into());
         }
+        // The response worker claims and expires scheduled work only for the
+        // scheduler tenant, so every trusted producer must belong to it.
+        let scheduler_tenant_id = &config.scheduler.tenant_id;
+        if config
+            .trusted_event_producers
+            .iter()
+            .any(|producer| &producer.tenant_id != scheduler_tenant_id)
+            || config
+                .trusted_event_receipt_producers
+                .iter()
+                .any(|producer| &producer.tenant_id != scheduler_tenant_id)
+        {
+            return Err(PortError::invalid_data().into());
+        }
         let response_recovery_limits = config.response_recovery_limits;
         lifecycle.ensure_authority(
             &security_state_authority,
