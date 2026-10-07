@@ -1300,3 +1300,7 @@ fn exact_cleanup_action(
                 | AdmissionCleanupActionState::Completed
         )
 }
+
+#[cfg(test)]
+#[path = "admission_terminal_receipt/pending_outbox_cursor_tests.rs"]
+mod pending_outbox_cursor_tests;
