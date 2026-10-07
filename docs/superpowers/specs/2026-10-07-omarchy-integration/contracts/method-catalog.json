@@ -1,0 +1,70 @@
+{
+  "protocol": "chio.omarchy.operator.v1",
+  "methods": [
+    {
+      "method": "hello",
+      "result_kind": "hello",
+      "mutation": false
+    },
+    {
+      "method": "health.get",
+      "result_kind": "health",
+      "mutation": false
+    },
+    {
+      "method": "tasks.list",
+      "result_kind": "task_page",
+      "mutation": false
+    },
+    {
+      "method": "task.get",
+      "result_kind": "task",
+      "mutation": false
+    },
+    {
+      "method": "events.subscribe",
+      "result_kind": "subscription",
+      "mutation": false
+    },
+    {
+      "method": "operation.get",
+      "result_kind": "operation",
+      "mutation": false
+    },
+    {
+      "method": "task.create",
+      "result_kind": "task_reserved",
+      "mutation": true
+    },
+    {
+      "method": "task.cancel",
+      "result_kind": "control_retained",
+      "mutation": true
+    },
+    {
+      "method": "task.resume",
+      "result_kind": "control_retained",
+      "mutation": true
+    },
+    {
+      "method": "review.open",
+      "result_kind": "review",
+      "mutation": false
+    },
+    {
+      "method": "approval.submit",
+      "result_kind": "decision",
+      "mutation": true
+    },
+    {
+      "method": "receipts.export",
+      "result_kind": "export",
+      "mutation": true
+    },
+    {
+      "method": "scope.get",
+      "result_kind": "scope",
+      "mutation": false
+    }
+  ]
+}

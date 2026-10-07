@@ -1,0 +1,240 @@
+{
+  "status": "synthetic schema cases only",
+  "fixtures": [
+    {
+      "file": "examples/request-hello.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/request-health-get.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/request-tasks-list.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/request-task-get.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/request-events-subscribe.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/request-operation-get.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/request-task-create.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/request-task-cancel.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/request-task-resume.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/request-review-open.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/request-approval-submit.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/request-receipts-export.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/response-hello.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/response-health-get.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/response-tasks-list.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/response-task-get.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/response-events-subscribe.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/response-operation-get.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/response-task-create.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/response-task-cancel.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/response-task-resume.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/response-review-open.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/response-approval-submit.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/response-receipts-export.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/response-error.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/event-heartbeat.json",
+      "schema": "contracts/operator-event.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/event-task_changed.json",
+      "schema": "contracts/operator-event.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/event-approval_invalidated.json",
+      "schema": "contracts/operator-event.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/event-prerequisite_changed.json",
+      "schema": "contracts/operator-event.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/compatibility-proposed.json",
+      "schema": "contracts/compatibility.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/release-candidate.json",
+      "schema": "contracts/release-evidence.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/invalid-command.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-ui-approval.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-unsafe-integer.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-method.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-project-path.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-result-substitution.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-open-prerequisite.json",
+      "schema": "contracts/compatibility.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-unknown-release.json",
+      "schema": "contracts/release-evidence.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-task-connectivity.json",
+      "schema": "contracts/operator-event.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/request-scope-get.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/response-scope-get.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/request-native-sha256.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/invalid-native-reference.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-unreviewed-scope.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/task-lost-cancel-result.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/request-native-v7.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": true
+    }
+  ]
+}

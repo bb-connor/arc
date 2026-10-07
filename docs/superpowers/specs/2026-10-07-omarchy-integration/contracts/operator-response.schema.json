@@ -1,0 +1,1165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Proposed typed operator responses",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "protocol": {
+          "const": "chio.omarchy.operator.v1"
+        },
+        "request_id": {
+          "$ref": "common.schema.json#/$defs/uuid"
+        },
+        "method": {
+          "const": "hello"
+        },
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "hello"
+            },
+            "value": {
+              "type": "object",
+              "properties": {
+                "journal_epoch": {
+                  "$ref": "common.schema.json#/$defs/uuid"
+                },
+                "enrollment_epoch": {
+                  "$ref": "common.schema.json#/$defs/uuid"
+                },
+                "profiles": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "common.schema.json#/$defs/profile"
+                  },
+                  "maxItems": 6
+                },
+                "features": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "status",
+                      "project",
+                      "approvals",
+                      "publication",
+                      "desktop",
+                      "repair",
+                      "delegation",
+                      "export"
+                    ]
+                  },
+                  "maxItems": 8
+                },
+                "max_frame_bytes": {
+                  "const": 65536
+                },
+                "heartbeat_seconds": {
+                  "const": 5
+                },
+                "builds": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "component": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 96
+                      },
+                      "version": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 96
+                      },
+                      "sha256": {
+                        "$ref": "common.schema.json#/$defs/sha256"
+                      }
+                    },
+                    "required": [
+                      "component",
+                      "version",
+                      "sha256"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "minItems": 1,
+                  "maxItems": 32
+                }
+              },
+              "required": [
+                "journal_epoch",
+                "enrollment_epoch",
+                "profiles",
+                "features",
+                "max_frame_bytes",
+                "heartbeat_seconds",
+                "builds"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "protocol",
+        "request_id",
+        "method",
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "protocol": {
+          "const": "chio.omarchy.operator.v1"
+        },
+        "request_id": {
+          "$ref": "common.schema.json#/$defs/uuid"
+        },
+        "method": {
+          "const": "health.get"
+        },
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "health"
+            },
+            "value": {
+              "type": "object",
+              "properties": {
+                "available": {
+                  "type": "boolean"
+                },
+                "blocked_prerequisites": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 96
+                  },
+                  "maxItems": 64
+                },
+                "compatibility_digest": {
+                  "anyOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/sha256"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "observations": {
+                  "type": "object",
+                  "properties": {
+                    "observed_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "boot_id": {
+                      "anyOf": [
+                        {
+                          "$ref": "common.schema.json#/$defs/uuid"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "session_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "freshness": {
+                      "enum": [
+                        "fresh",
+                        "stale",
+                        "unknown"
+                      ]
+                    },
+                    "protocol": {
+                      "enum": [
+                        "compatible",
+                        "incompatible",
+                        "unknown"
+                      ]
+                    },
+                    "packages": {
+                      "enum": [
+                        "compatible",
+                        "incompatible",
+                        "unknown"
+                      ]
+                    },
+                    "enforcement": {
+                      "enum": [
+                        "configured",
+                        "observed",
+                        "qualified",
+                        "unavailable",
+                        "unknown"
+                      ]
+                    },
+                    "storage_headroom_bytes": {
+                      "anyOf": [
+                        {
+                          "$ref": "common.schema.json#/$defs/safe_integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "credentials": {
+                      "enum": [
+                        "healthy",
+                        "expired",
+                        "revoked",
+                        "unavailable",
+                        "unknown"
+                      ]
+                    },
+                    "desktop_session": {
+                      "enum": [
+                        "unlocked",
+                        "locked",
+                        "unowned",
+                        "unknown"
+                      ]
+                    },
+                    "native_recovery": {
+                      "enum": [
+                        "healthy",
+                        "blocked_unknown",
+                        "unavailable",
+                        "unknown"
+                      ]
+                    },
+                    "state_store": {
+                      "enum": [
+                        "healthy",
+                        "full",
+                        "read_only",
+                        "incompatible",
+                        "unavailable",
+                        "unknown"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "observed_at",
+                    "boot_id",
+                    "session_id",
+                    "freshness",
+                    "protocol",
+                    "packages",
+                    "enforcement",
+                    "storage_headroom_bytes",
+                    "credentials",
+                    "desktop_session",
+                    "native_recovery",
+                    "state_store"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "available",
+                "blocked_prerequisites",
+                "compatibility_digest",
+                "observations"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "protocol",
+        "request_id",
+        "method",
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "protocol": {
+          "const": "chio.omarchy.operator.v1"
+        },
+        "request_id": {
+          "$ref": "common.schema.json#/$defs/uuid"
+        },
+        "method": {
+          "const": "tasks.list"
+        },
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "task_page"
+            },
+            "value": {
+              "type": "object",
+              "properties": {
+                "tasks": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "common.schema.json#/$defs/task"
+                  },
+                  "maxItems": 200
+                },
+                "watermark": {
+                  "$ref": "common.schema.json#/$defs/cursor"
+                },
+                "next_cursor": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 1024
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "tasks",
+                "watermark",
+                "next_cursor"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "protocol",
+        "request_id",
+        "method",
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "protocol": {
+          "const": "chio.omarchy.operator.v1"
+        },
+        "request_id": {
+          "$ref": "common.schema.json#/$defs/uuid"
+        },
+        "method": {
+          "const": "task.get"
+        },
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "task"
+            },
+            "value": {
+              "$ref": "common.schema.json#/$defs/task"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "protocol",
+        "request_id",
+        "method",
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "protocol": {
+          "const": "chio.omarchy.operator.v1"
+        },
+        "request_id": {
+          "$ref": "common.schema.json#/$defs/uuid"
+        },
+        "method": {
+          "const": "events.subscribe"
+        },
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "subscription"
+            },
+            "value": {
+              "type": "object",
+              "properties": {
+                "from_cursor": {
+                  "$ref": "common.schema.json#/$defs/cursor"
+                }
+              },
+              "required": [
+                "from_cursor"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "protocol",
+        "request_id",
+        "method",
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "protocol": {
+          "const": "chio.omarchy.operator.v1"
+        },
+        "request_id": {
+          "$ref": "common.schema.json#/$defs/uuid"
+        },
+        "method": {
+          "const": "operation.get"
+        },
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "operation"
+            },
+            "value": {
+              "type": "object",
+              "properties": {
+                "task_id": {
+                  "$ref": "common.schema.json#/$defs/uuid"
+                },
+                "operation_ref": {
+                  "$ref": "common.schema.json#/$defs/native_operation_ref"
+                },
+                "outcome": {
+                  "enum": [
+                    "not_dispatched",
+                    "in_flight",
+                    "succeeded",
+                    "failed",
+                    "cancelled_before_dispatch",
+                    "unknown"
+                  ]
+                },
+                "evidence": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "common.schema.json#/$defs/evidence_ref"
+                  },
+                  "maxItems": 32
+                }
+              },
+              "required": [
+                "task_id",
+                "operation_ref",
+                "outcome",
+                "evidence"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "protocol",
+        "request_id",
+        "method",
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "protocol": {
+          "const": "chio.omarchy.operator.v1"
+        },
+        "request_id": {
+          "$ref": "common.schema.json#/$defs/uuid"
+        },
+        "method": {
+          "const": "task.create"
+        },
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "task_reserved"
+            },
+            "value": {
+              "type": "object",
+              "properties": {
+                "task_id": {
+                  "$ref": "common.schema.json#/$defs/uuid"
+                },
+                "revision": {
+                  "$ref": "common.schema.json#/$defs/safe_integer"
+                },
+                "state": {
+                  "const": "preparing"
+                }
+              },
+              "required": [
+                "task_id",
+                "revision",
+                "state"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "protocol",
+        "request_id",
+        "method",
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "protocol": {
+          "const": "chio.omarchy.operator.v1"
+        },
+        "request_id": {
+          "$ref": "common.schema.json#/$defs/uuid"
+        },
+        "method": {
+          "const": "task.cancel"
+        },
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "control_retained"
+            },
+            "value": {
+              "type": "object",
+              "properties": {
+                "task_id": {
+                  "$ref": "common.schema.json#/$defs/uuid"
+                },
+                "revision": {
+                  "$ref": "common.schema.json#/$defs/safe_integer"
+                },
+                "control_id": {
+                  "$ref": "common.schema.json#/$defs/uuid"
+                },
+                "action": {
+                  "const": "cancel"
+                }
+              },
+              "required": [
+                "task_id",
+                "revision",
+                "control_id",
+                "action"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "protocol",
+        "request_id",
+        "method",
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "protocol": {
+          "const": "chio.omarchy.operator.v1"
+        },
+        "request_id": {
+          "$ref": "common.schema.json#/$defs/uuid"
+        },
+        "method": {
+          "const": "task.resume"
+        },
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "control_retained"
+            },
+            "value": {
+              "type": "object",
+              "properties": {
+                "task_id": {
+                  "$ref": "common.schema.json#/$defs/uuid"
+                },
+                "revision": {
+                  "$ref": "common.schema.json#/$defs/safe_integer"
+                },
+                "control_id": {
+                  "$ref": "common.schema.json#/$defs/uuid"
+                },
+                "action": {
+                  "const": "resume"
+                }
+              },
+              "required": [
+                "task_id",
+                "revision",
+                "control_id",
+                "action"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "protocol",
+        "request_id",
+        "method",
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "protocol": {
+          "const": "chio.omarchy.operator.v1"
+        },
+        "request_id": {
+          "$ref": "common.schema.json#/$defs/uuid"
+        },
+        "method": {
+          "const": "review.open"
+        },
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "review"
+            },
+            "value": {
+              "type": "object",
+              "properties": {
+                "task_id": {
+                  "$ref": "common.schema.json#/$defs/uuid"
+                },
+                "operation_ref": {
+                  "$ref": "common.schema.json#/$defs/native_operation_ref"
+                },
+                "review_id": {
+                  "$ref": "common.schema.json#/$defs/native_id"
+                },
+                "expires_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "task_id",
+                "operation_ref",
+                "review_id",
+                "expires_at"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "protocol",
+        "request_id",
+        "method",
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "protocol": {
+          "const": "chio.omarchy.operator.v1"
+        },
+        "request_id": {
+          "$ref": "common.schema.json#/$defs/uuid"
+        },
+        "method": {
+          "const": "approval.submit"
+        },
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "decision"
+            },
+            "value": {
+              "type": "object",
+              "properties": {
+                "task_id": {
+                  "$ref": "common.schema.json#/$defs/uuid"
+                },
+                "operation_ref": {
+                  "$ref": "common.schema.json#/$defs/native_operation_ref"
+                },
+                "proposal_id": {
+                  "$ref": "common.schema.json#/$defs/native_id"
+                },
+                "revision": {
+                  "$ref": "common.schema.json#/$defs/safe_integer"
+                },
+                "native_decision_id": {
+                  "$ref": "common.schema.json#/$defs/native_id"
+                },
+                "decision": {
+                  "enum": [
+                    "approved",
+                    "denied"
+                  ]
+                }
+              },
+              "required": [
+                "task_id",
+                "operation_ref",
+                "proposal_id",
+                "revision",
+                "native_decision_id",
+                "decision"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "protocol",
+        "request_id",
+        "method",
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "protocol": {
+          "const": "chio.omarchy.operator.v1"
+        },
+        "request_id": {
+          "$ref": "common.schema.json#/$defs/uuid"
+        },
+        "method": {
+          "const": "receipts.export"
+        },
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "export"
+            },
+            "value": {
+              "type": "object",
+              "properties": {
+                "task_id": {
+                  "$ref": "common.schema.json#/$defs/uuid"
+                },
+                "operation_ref": {
+                  "$ref": "common.schema.json#/$defs/native_operation_ref"
+                },
+                "artifact_id": {
+                  "$ref": "common.schema.json#/$defs/uuid"
+                },
+                "sha256": {
+                  "$ref": "common.schema.json#/$defs/sha256"
+                },
+                "bytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 16777216
+                },
+                "export_profile_id": {
+                  "$ref": "common.schema.json#/$defs/uuid"
+                }
+              },
+              "required": [
+                "task_id",
+                "operation_ref",
+                "artifact_id",
+                "sha256",
+                "bytes",
+                "export_profile_id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "protocol",
+        "request_id",
+        "method",
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "protocol": {
+          "const": "chio.omarchy.operator.v1"
+        },
+        "request_id": {
+          "$ref": "common.schema.json#/$defs/uuid"
+        },
+        "method": {
+          "enum": [
+            "hello",
+            "health.get",
+            "tasks.list",
+            "task.get",
+            "events.subscribe",
+            "operation.get",
+            "task.create",
+            "task.cancel",
+            "task.resume",
+            "review.open",
+            "approval.submit",
+            "receipts.export",
+            "scope.get"
+          ]
+        },
+        "ok": {
+          "const": false
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "$ref": "common.schema.json#/$defs/error_code"
+            },
+            "message": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "retry": {
+              "enum": [
+                "never",
+                "refresh",
+                "reconcile_original",
+                "after_operator_repair"
+              ]
+            },
+            "operation_ref": {
+              "anyOf": [
+                {
+                  "$ref": "common.schema.json#/$defs/native_operation_ref"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "code",
+            "message",
+            "retry",
+            "operation_ref"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "protocol",
+        "request_id",
+        "method",
+        "ok",
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "protocol": {
+          "const": "chio.omarchy.operator.v1"
+        },
+        "request_id": {
+          "$ref": "common.schema.json#/$defs/uuid"
+        },
+        "method": {
+          "const": "scope.get"
+        },
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "scope"
+            },
+            "value": {
+              "type": "object",
+              "properties": {
+                "project_id": {
+                  "$ref": "common.schema.json#/$defs/uuid"
+                },
+                "profile_id": {
+                  "$ref": "common.schema.json#/$defs/profile"
+                },
+                "enrollment_epoch": {
+                  "$ref": "common.schema.json#/$defs/uuid"
+                },
+                "scope_revision": {
+                  "$ref": "common.schema.json#/$defs/safe_integer"
+                },
+                "reviewed_scope_digest": {
+                  "$ref": "common.schema.json#/$defs/sha256"
+                },
+                "project_label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "selection_summary": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "maxItems": 64
+                },
+                "provider_label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "governance_mode": {
+                  "enum": [
+                    "execution_only",
+                    "required"
+                  ]
+                },
+                "limits": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "dimension": {
+                        "enum": [
+                          "wall_ms",
+                          "calls",
+                          "input_bytes",
+                          "output_bytes",
+                          "tokens",
+                          "cost_microunits",
+                          "memory_bytes"
+                        ]
+                      },
+                      "enforcement": {
+                        "enum": [
+                          "enforced",
+                          "measured_only",
+                          "unavailable"
+                        ]
+                      },
+                      "value": {
+                        "anyOf": [
+                          {
+                            "$ref": "common.schema.json#/$defs/safe_integer"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "dimension",
+                      "enforcement",
+                      "value"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "maxItems": 16
+                },
+                "recipe_ids": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "common.schema.json#/$defs/uuid"
+                  },
+                  "maxItems": 32
+                }
+              },
+              "required": [
+                "project_id",
+                "profile_id",
+                "enrollment_epoch",
+                "scope_revision",
+                "reviewed_scope_digest",
+                "project_label",
+                "selection_summary",
+                "provider_label",
+                "governance_mode",
+                "limits",
+                "recipe_ids"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "protocol",
+        "request_id",
+        "method",
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}

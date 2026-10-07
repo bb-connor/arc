@@ -1,0 +1,15 @@
+{
+  "scope": "documents and synthetic schemas only",
+  "passed": true,
+  "counts": {
+    "schemas": 6,
+    "fixtures": 47,
+    "response_substitutions": 156,
+    "specs": 17,
+    "requirements": 209,
+    "acceptance_cases": 209,
+    "markdown_files": 35,
+    "validator_mutants": 4
+  },
+  "errors": []
+}

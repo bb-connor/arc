@@ -32,6 +32,8 @@ separate live contracts from reference material and historical roadmaps.
 
 ## Install and distribution
 
+- [Omarchy integration research and specifications](superpowers/specs/2026-10-07-omarchy-integration/README.md) - proposed native desktop integration, contracts, prerequisite gates and P0-P7 implementation plans; no runtime qualification claim
+
 - [Install guide](install/README.md) - how to obtain and run Chio
 - [Binary Distribution](install/BINARY_DISTRIBUTION.md) - prebuilt binary channels
 - [Homebrew](install/homebrew.md) - Homebrew tap and formula

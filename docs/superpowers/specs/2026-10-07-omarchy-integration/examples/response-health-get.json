@@ -1,0 +1,30 @@
+{
+  "protocol": "chio.omarchy.operator.v1",
+  "request_id": "11111111-1111-4111-8111-111111111111",
+  "method": "health.get",
+  "ok": true,
+  "result": {
+    "kind": "health",
+    "value": {
+      "available": false,
+      "blocked_prerequisites": [
+        "P0-NATIVE-BUNDLE"
+      ],
+      "compatibility_digest": null,
+      "observations": {
+        "observed_at": "2026-10-07T12:00:00Z",
+        "boot_id": null,
+        "session_id": null,
+        "freshness": "unknown",
+        "protocol": "compatible",
+        "packages": "unknown",
+        "enforcement": "unavailable",
+        "storage_headroom_bytes": null,
+        "credentials": "unavailable",
+        "desktop_session": "unknown",
+        "native_recovery": "unavailable",
+        "state_store": "healthy"
+      }
+    }
+  }
+}

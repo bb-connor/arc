@@ -1,0 +1,1680 @@
+{
+  "schema_version": 1,
+  "status": "proposed specifications, no runtime acceptance performed",
+  "profile_applicability_gate": "P0-PROFILE-MATRIX",
+  "planning_phase_is_not_release_applicability": true,
+  "requirements": [
+    {
+      "requirement_id": "OM-PRD-001",
+      "requirement": "Every advertised profile MUST name its exact feature set and qualification tuple.",
+      "spec": "01-product-scope.md",
+      "planning_phase": "P0",
+      "proposed_acceptance_test": "AT-PRD-001",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-PRD-002",
+      "requirement": "Missing native prerequisites MUST leave dependent actions unavailable without ordinary-agent fallback.",
+      "spec": "01-product-scope.md",
+      "planning_phase": "P0",
+      "proposed_acceptance_test": "AT-PRD-002",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-PRD-003",
+      "requirement": "P2 MUST produce a useful local project artifact through mediated operations.",
+      "spec": "01-product-scope.md",
+      "planning_phase": "P0",
+      "proposed_acceptance_test": "AT-PRD-003",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-PRD-004",
+      "requirement": "Installation and enrollment MUST preserve existing agent profiles and unrelated desktop configuration.",
+      "spec": "01-product-scope.md",
+      "planning_phase": "P0",
+      "proposed_acceptance_test": "AT-PRD-004",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-PRD-005",
+      "requirement": "Completion claims MUST distinguish verified effects, observed tests, model explanations and uncertainty.",
+      "spec": "01-product-scope.md",
+      "planning_phase": "P0",
+      "proposed_acceptance_test": "AT-PRD-005",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-PRD-006",
+      "requirement": "Recovery MUST retain original task, authority and native operation bindings.",
+      "spec": "01-product-scope.md",
+      "planning_phase": "P0",
+      "proposed_acceptance_test": "AT-PRD-006",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-PRD-007",
+      "requirement": "Expansion decisions MUST record measured adoption results and explicit stopping-rule outcomes.",
+      "spec": "01-product-scope.md",
+      "planning_phase": "P0",
+      "proposed_acceptance_test": "AT-PRD-007",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-PRD-008",
+      "requirement": "The product MUST disclose the default desktop-trust boundary and unsupported profiles during enrollment.",
+      "spec": "01-product-scope.md",
+      "planning_phase": "P0",
+      "proposed_acceptance_test": "AT-PRD-008",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UX-001",
+      "requirement": "First launch exposes only qualified profiles and distinguishes read-only readiness from execution readiness.",
+      "spec": "02-desktop-experience.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UX-001",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UX-002",
+      "requirement": "Project import binds resolved identity and preserves unrelated source-tree work.",
+      "spec": "02-desktop-experience.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UX-002",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UX-003",
+      "requirement": "Task start is deliberate, canonically bound and idempotent under lost responses.",
+      "spec": "02-desktop-experience.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UX-003",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UX-004",
+      "requirement": "Task state and connectivity remain distinct and mutations require fresh state.",
+      "spec": "02-desktop-experience.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UX-004",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UX-005",
+      "requirement": "Overview/detail remain responsive with bounded activity and no focus stealing.",
+      "spec": "02-desktop-experience.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UX-005",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UX-006",
+      "requirement": "Review distinguishes native outcome, artifact checks, publication and verified receipts.",
+      "spec": "02-desktop-experience.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UX-006",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UX-007",
+      "requirement": "Exact native approval is unavailable until qualified and rejects changed, expired or stale bindings.",
+      "spec": "02-desktop-experience.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UX-007",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UX-008",
+      "requirement": "Cancellation reports in-flight uncertainty and never implies rollback.",
+      "spec": "02-desktop-experience.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UX-008",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UX-009",
+      "requirement": "Unknown outcomes reconcile the same operation without blind retries.",
+      "spec": "02-desktop-experience.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UX-009",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UX-010",
+      "requirement": "Every journey is operable by keyboard with correct editor and multi-monitor focus behavior.",
+      "spec": "02-desktop-experience.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UX-010",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UX-011",
+      "requirement": "Controls, states, scaling, contrast and motion meet the stated accessibility contract.",
+      "spec": "02-desktop-experience.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UX-011",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UX-012",
+      "requirement": "Lock/unknown-lock states conceal sensitive content and refuse mutations until freshly reconciled.",
+      "spec": "02-desktop-experience.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UX-012",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UX-013",
+      "requirement": "Notifications are private, rate-limited navigation with no authority effects.",
+      "spec": "02-desktop-experience.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UX-013",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UX-014",
+      "requirement": "Credentials and provider budget claims reflect qualified native behavior.",
+      "spec": "02-desktop-experience.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UX-014",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UX-015",
+      "requirement": "Upgrade and reconnect invalidate stale decisions without duplicating work.",
+      "spec": "02-desktop-experience.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UX-015",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UX-016",
+      "requirement": "Disable/uninstall distinguish client removal, task handling and explicit data deletion.",
+      "spec": "02-desktop-experience.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UX-016",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UX-017",
+      "requirement": "Chio preserves upstream Agents/default-agent and existing menu/shortcut settings.",
+      "spec": "02-desktop-experience.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UX-017",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UX-018",
+      "requirement": "Untrusted content cannot alter navigation, commands or exact review presentation.",
+      "spec": "02-desktop-experience.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UX-018",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UI-001",
+      "requirement": "The manifest and package conform to the supported schema without invented security or activation guarantees.",
+      "spec": "03-omarchy-plugin.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UI-001",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UI-002",
+      "requirement": "Late injection, multiple monitors and repeated readiness produce exactly one shared service connection.",
+      "spec": "03-omarchy-plugin.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UI-002",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UI-003",
+      "requirement": "Open/close/summon payloads perform only bounded validated navigation.",
+      "spec": "03-omarchy-plugin.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UI-003",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UI-004",
+      "requirement": "QML communicates through the pinned literal-argv shim with stdin JSON and no credential inheritance.",
+      "spec": "03-omarchy-plugin.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UI-004",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UI-005",
+      "requirement": "Streams, queues, models and rendering obey the stated resource bounds.",
+      "spec": "03-omarchy-plugin.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UI-005",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UI-006",
+      "requirement": "Epoch/sequence snapshot resynchronization prevents stale or missing transitions being presented as current.",
+      "spec": "03-omarchy-plugin.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UI-006",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UI-007",
+      "requirement": "Mutations bind exact native identity, canonical arguments, idempotency and current revision.",
+      "spec": "03-omarchy-plugin.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UI-007",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UI-008",
+      "requirement": "Client destruction/reload never cancels, duplicates or supervises native tasks.",
+      "spec": "03-omarchy-plugin.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UI-008",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UI-009",
+      "requirement": "Protocol/profile incompatibility fails closed with useful read-only diagnostics.",
+      "spec": "03-omarchy-plugin.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UI-009",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UI-010",
+      "requirement": "The supported bar contract is explicit and replacement-bar degradation never bypasses facade boundaries.",
+      "spec": "03-omarchy-plugin.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UI-010",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UI-011",
+      "requirement": "Cache and lock handling prevent sensitive persistent UI state and stale decision replay.",
+      "spec": "03-omarchy-plugin.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UI-011",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UI-012",
+      "requirement": "Theme, scaling, accessibility and keyboard input work on both named baselines without HEAD-only dependencies.",
+      "spec": "03-omarchy-plugin.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UI-012",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UI-013",
+      "requirement": "Notifications preserve privacy/DND and contain navigation-only actions.",
+      "spec": "03-omarchy-plugin.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UI-013",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UI-014",
+      "requirement": "Menu/desktop/shortcut installation preserves user customization and never silently changes default agent.",
+      "spec": "03-omarchy-plugin.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UI-014",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UI-015",
+      "requirement": "Native package activation is independently installed/qualified and cannot be bootstrapped by plugin code.",
+      "spec": "03-omarchy-plugin.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UI-015",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UI-016",
+      "requirement": "Paired-version upgrades and rollback preserve native operation/evidence state.",
+      "spec": "03-omarchy-plugin.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UI-016",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UI-017",
+      "requirement": "Removal respects exact file ownership and distinguishes client removal from native task termination.",
+      "spec": "03-omarchy-plugin.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UI-017",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-UI-018",
+      "requirement": "Guest exclusion of operator/desktop sockets and truthful receipt provenance are independently demonstrated.",
+      "spec": "03-omarchy-plugin.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-UI-018",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-ARC-001",
+      "requirement": "The controller MUST delegate authority, dispatch and recovery decisions to selected native owners.",
+      "spec": "04-controller-architecture.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-ARC-001",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-ARC-002",
+      "requirement": "Task creation MUST be durably reserved and reconciled by original identity across every preparation cutpoint.",
+      "spec": "04-controller-architecture.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-ARC-002",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-ARC-003",
+      "requirement": "A guest MUST start only after actual resource, authority and confinement readiness.",
+      "spec": "04-controller-architecture.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-ARC-003",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-ARC-004",
+      "requirement": "Client or QML failure MUST NOT change task authority or clear uncertainty.",
+      "spec": "04-controller-architecture.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-ARC-004",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-ARC-005",
+      "requirement": "One state-root owner and per-task serialization MUST prevent duplicate launches and conflicting control.",
+      "spec": "04-controller-architecture.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-ARC-005",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-ARC-006",
+      "requirement": "Backend incompatibility MUST refuse mutations and label any diagnostic projection.",
+      "spec": "04-controller-architecture.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-ARC-006",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-ARC-007",
+      "requirement": "Terminal task classification MUST join the actual native and resource outcome contracts.",
+      "spec": "04-controller-architecture.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-ARC-007",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-ARC-008",
+      "requirement": "New adapters MUST provide independent qualification of every consequential host surface.",
+      "spec": "04-controller-architecture.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-ARC-008",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-API-001",
+      "requirement": "Peers and socket paths MUST be validated, and operator transport MUST be absent from the guest.",
+      "spec": "05-operator-protocol.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-API-001",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-API-002",
+      "requirement": "Wire limits and closed schemas MUST be enforced before dispatch.",
+      "spec": "05-operator-protocol.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-API-002",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-API-003",
+      "requirement": "ABI negotiation MUST precede every connection's requests.",
+      "spec": "05-operator-protocol.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-API-003",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-API-004",
+      "requirement": "Idempotency lookup MUST preserve original mutations, including above capacity and after revision changes.",
+      "spec": "05-operator-protocol.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-API-004",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-API-005",
+      "requirement": "Mutations MUST bind exact semantic params and enforce revision comparison on new requests.",
+      "spec": "05-operator-protocol.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-API-005",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-API-006",
+      "requirement": "Snapshot and event cursors MUST prevent missing or duplicating projection changes across reconnect.",
+      "spec": "05-operator-protocol.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-API-006",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-API-007",
+      "requirement": "Slow consumers MUST cause bounded disconnect and resnapshot rather than unbounded buffering or silent loss.",
+      "spec": "05-operator-protocol.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-API-007",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-API-008",
+      "requirement": "Error responses MUST distinguish pre-dispatch failure from uncertain original outcomes.",
+      "spec": "05-operator-protocol.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-API-008",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-API-009",
+      "requirement": "Client bridge invocation MUST use literal argv/stdin and keep secrets out of process metadata.",
+      "spec": "05-operator-protocol.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-API-009",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-API-010",
+      "requirement": "Export MUST use an enrolled disclosure profile and retained effect identity.",
+      "spec": "05-operator-protocol.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-API-010",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-API-011",
+      "requirement": "Task creation MUST atomically bind the exact scope revision and digest reviewed by the operator.",
+      "spec": "05-operator-protocol.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-API-011",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-API-012",
+      "requirement": "Reconnected projections MUST expose independent admission, guest, provider-abort and reconciliation stop dimensions.",
+      "spec": "05-operator-protocol.md",
+      "planning_phase": "P1",
+      "proposed_acceptance_test": "AT-API-012",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-AUT-001",
+      "requirement": "The declared trust profile MUST match actual principal and same-UID boundaries.",
+      "spec": "06-authority-approvals.md",
+      "planning_phase": "P3",
+      "proposed_acceptance_test": "AT-AUT-001",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-AUT-002",
+      "requirement": "Authority MUST be provisioned by the selected native owner and bound to the exact task/resource/profile.",
+      "spec": "06-authority-approvals.md",
+      "planning_phase": "P3",
+      "proposed_acceptance_test": "AT-AUT-002",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-AUT-003",
+      "requirement": "All consequential guest paths MUST be mediated or independently confined.",
+      "spec": "06-authority-approvals.md",
+      "planning_phase": "P3",
+      "proposed_acceptance_test": "AT-AUT-003",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-AUT-004",
+      "requirement": "A proposal MUST bind the exact original operation, arguments, resource generation, policy, limits and validity.",
+      "spec": "06-authority-approvals.md",
+      "planning_phase": "P3",
+      "proposed_acceptance_test": "AT-AUT-004",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-AUT-005",
+      "requirement": "Native decision validation MUST precede retention, rejecting a decision different from the operator's choice.",
+      "spec": "06-authority-approvals.md",
+      "planning_phase": "P3",
+      "proposed_acceptance_test": "AT-AUT-005",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-AUT-006",
+      "requirement": "Approval consumption MUST be one-time and recover by original operation under concurrent/replayed requests.",
+      "spec": "06-authority-approvals.md",
+      "planning_phase": "P3",
+      "proposed_acceptance_test": "AT-AUT-006",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-AUT-007",
+      "requirement": "Stale, expired, revoked or cancelled proposals MUST refuse without authority widening.",
+      "spec": "06-authority-approvals.md",
+      "planning_phase": "P3",
+      "proposed_acceptance_test": "AT-AUT-007",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-AUT-008",
+      "requirement": "Reviewer presentation MUST separate verified bindings from untrusted content and disclose truncation.",
+      "spec": "06-authority-approvals.md",
+      "planning_phase": "P3",
+      "proposed_acceptance_test": "AT-AUT-008",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-AUT-009",
+      "requirement": "Stop controls MUST report admission, process and effect outcomes independently.",
+      "spec": "06-authority-approvals.md",
+      "planning_phase": "P3",
+      "proposed_acceptance_test": "AT-AUT-009",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-AUT-010",
+      "requirement": "Execution-only and required disclosure governance MUST remain explicitly distinguishable.",
+      "spec": "06-authority-approvals.md",
+      "planning_phase": "P3",
+      "proposed_acceptance_test": "AT-AUT-010",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-HST-001",
+      "requirement": "The first adapter MUST use the exact qualified Pi SDK/print entry mode and negotiate a closed installation descriptor before creating a task host; interactive or unsupported hosts MUST refuse.",
+      "spec": "07-host-provider-adapters.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-HST-001",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-HST-002",
+      "requirement": "The adapter MUST disable implicit discovery and freeze one exact tool registry, including aliases, schemas and canonical argument binding; reload and replacement sessions MUST retain these restrictions.",
+      "spec": "07-host-provider-adapters.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-HST-002",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-HST-003",
+      "requirement": "Preparation MUST pin all host/native/runtime/account/registry identities and validate required prerequisites before credential access or provider traffic; mismatch MUST refuse without fallback.",
+      "spec": "07-host-provider-adapters.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-HST-003",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-HST-004",
+      "requirement": "Protected effects MUST dispatch through their native owner and admission path; the guest MUST lack direct access to operator control, protected resources and alternative tool transports.",
+      "spec": "07-host-provider-adapters.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-HST-004",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-HST-005",
+      "requirement": "Provider and native credentials MUST remain in the trusted owner; guests receive only scoped transport access, and task input/credentials MUST use private non-argv transport.",
+      "spec": "07-host-provider-adapters.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-HST-005",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-HST-006",
+      "requirement": "Governance mode MUST be immutable and explicitly visible as `execution-only` or `required`; unavailable native committed model release MUST refuse `required` before credentials or egress.",
+      "spec": "07-host-provider-adapters.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-HST-006",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-HST-007",
+      "requirement": "Every model release MUST bind the exact selected provider route/model/account, permitted prompt/context, tool schemas and history; remote references, hosted tools and undeclared disclosure paths MUST refuse.",
+      "spec": "07-host-provider-adapters.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-HST-007",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-HST-008",
+      "requirement": "Limits MUST report enforceable, observed and unavailable dimensions separately; durable reservations/deadlines MUST survive failure/resume and no unsupported hard token or spending ceiling may be claimed.",
+      "spec": "07-host-provider-adapters.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-HST-008",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-HST-009",
+      "requirement": "Tool calls MUST execute sequentially, and a new effect MUST remain fenced while an earlier original lacks native delivery acknowledgement or retains uncertainty.",
+      "spec": "07-host-provider-adapters.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-HST-009",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-HST-010",
+      "requirement": "Completed-result ACK MUST require verified exact native history delivery and original receipt/result/authority binding; UI display, export, a denial or a tool callback alone MUST NOT ACK.",
+      "spec": "07-host-provider-adapters.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-HST-010",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-HST-011",
+      "requirement": "Native approval submission, decision and resume MUST remain separate operations; the known unavailable decision utility MUST refuse, and no desktop control may manufacture approval authority.",
+      "spec": "07-host-provider-adapters.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-HST-011",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-HST-012",
+      "requirement": "Lifecycle replacement, import, compaction, model changes and shutdown MUST preserve the frozen security binding and durable owner custody; unsupported transformations MUST refuse.",
+      "spec": "07-host-provider-adapters.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-HST-012",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-HST-013",
+      "requirement": "Cancellation and termination MUST report native admission/effect state independently from guest exit, preserve unresolved originals and observe actual process-group exit before releasing launch custody.",
+      "spec": "07-host-provider-adapters.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-HST-013",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-HST-014",
+      "requirement": "Errors MUST carry an exact safe binding and dispatch/evidence classification; unknown or mismatched outcomes MUST never become successful task completion or automatic retries.",
+      "spec": "07-host-provider-adapters.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-HST-014",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-HST-015",
+      "requirement": "Recovery MUST act on original native identities, current valid authority and independently verified retained results, with explicit refusal for missing/corrupt/foreign state and stale ownership.",
+      "spec": "07-host-provider-adapters.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-HST-015",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-HST-016",
+      "requirement": "Additional provider/host support MUST be gated by exact profile-specific acceptance, including negative boundaries, package provenance and current native compatibility.",
+      "spec": "07-host-provider-adapters.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-HST-016",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-LNX-001",
+      "requirement": "Execution SHALL require a named x86_64 Omarchy support tuple and positive effective-feature probes; unsupported hosts retain read-only diagnostics and refuse mutation without a privileged or unconfined fallback.",
+      "spec": "08-linux-confinement.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-LNX-001",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-LNX-002",
+      "requirement": "Guest, recipe and native-resource enforcement SHALL have distinct manifest/profile identities and independent qualification; controller and trusted shell are outside the guest security boundary.",
+      "spec": "08-linux-confinement.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-LNX-002",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-LNX-003",
+      "requirement": "Admission SHALL bind the entire immutable runtime/mount closure and retain its identity through launch; additions, replacements, aliases, unresolved dependencies or executable mismatch refuse launch.",
+      "spec": "08-linux-confinement.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-LNX-003",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-LNX-004",
+      "requirement": "Guest admission SHALL prove unprivileged user, mount, PID, IPC, network and UTS namespaces, private process/device views, no new privileges and dropped capabilities under the actual service.",
+      "spec": "08-linux-confinement.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-LNX-004",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-LNX-005",
+      "requirement": "Each executable profile SHALL use its independently qualified architecture-specific seccomp policy and required Landlock rights; missing or partial mandatory enforcement refuses launch.",
+      "spec": "08-linux-confinement.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-LNX-005",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-LNX-006",
+      "requirement": "Guest communication SHALL be restricted to exact authenticated Chio/model routes, with operator, compositor, session, SSH, container, portal and other ambient sockets absent and unreachable.",
+      "spec": "08-linux-confinement.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-LNX-006",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-LNX-007",
+      "requirement": "Environment, argument vectors and inherited descriptors SHALL be constructed from explicit public allowlists; provider/operator credentials remain outside guest-visible files and process attributes.",
+      "spec": "08-linux-confinement.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-LNX-007",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-LNX-008",
+      "requirement": "Parent publication into or from guest-controlled storage SHALL use race-resistant retained-directory operations, exclusive temporary files and durable atomic commit, with no symlink/hardlink traversal or unverified destination replacement.",
+      "spec": "08-linux-confinement.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-LNX-008",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-LNX-009",
+      "requirement": "Every guest and recipe SHALL have effective task-scoped memory, process/thread, CPU, time, output and writable-storage bounds; admission refuses unavailable mandatory controls.",
+      "spec": "08-linux-confinement.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-LNX-009",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-LNX-010",
+      "requirement": "Stop, timeout, parent crash and service failure SHALL terminate the whole owned process tree and verify absence without relying on a signalled PID or wrapper exit alone.",
+      "spec": "08-linux-confinement.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-LNX-010",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-LNX-011",
+      "requirement": "Local lifetime accounting SHALL include suspend, bind to boot identity and preserve original cumulative reservations; restart, wall-clock rollback or checkpoint restore cannot renew authority or budget.",
+      "spec": "08-linux-confinement.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-LNX-011",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-LNX-012",
+      "requirement": "Suspend/resume SHALL stop new admission, bound local shutdown and require authority/operation reconciliation before any resumed work; uncertainty remains visible and fenced.",
+      "spec": "08-linux-confinement.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-LNX-012",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-LNX-013",
+      "requirement": "Lock, unlock, logout and shutdown SHALL follow the explicit session policy below, including missed events, lingering user managers and multiple graphical sessions.",
+      "spec": "08-linux-confinement.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-LNX-013",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-LNX-014",
+      "requirement": "Credential or route renewal SHALL occur only in the trusted native/relay path, bind the original task authority and invalidate stale transports without widening the guest profile.",
+      "spec": "08-linux-confinement.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-LNX-014",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-LNX-015",
+      "requirement": "ENOSPC, inode exhaustion, EIO, read-only filesystems, torn persistence and unexpected unmount SHALL fail closed while retaining operation identity and recovery evidence.",
+      "spec": "08-linux-confinement.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-LNX-015",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-LNX-016",
+      "requirement": "Project material and recipe effects SHALL cross through protected source-generation/test/publication adapters; a confined test success alone cannot authorize publication.",
+      "spec": "08-linux-confinement.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-LNX-016",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-LNX-017",
+      "requirement": "Health/status SHALL distinguish configured intent, observed enforcement, native evidence and qualification; host diagnostics and UI events are never substituted for execution receipts.",
+      "spec": "08-linux-confinement.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-LNX-017",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-LNX-018",
+      "requirement": "A release SHALL include independent positive and negative actual-Omarchy evidence for the complete selected tuple, including externally observed effects and lifecycle cleanup.",
+      "spec": "08-linux-confinement.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-LNX-018",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-RES-001",
+      "requirement": "Only an operator-selected registered project and explicit import selection may enter a task; task text cannot choose host paths or discover repositories.",
+      "spec": "09-project-resource.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-RES-001",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-RES-002",
+      "requirement": "Intake MUST preserve dirty originals and retain reviewed provenance for tracked, staged, unstaged and selected untracked inputs.",
+      "spec": "09-project-resource.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-RES-002",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-RES-003",
+      "requirement": "Intake MUST inventory links, gitlinks, ignored and sensitive paths without following or silently admitting them; unsupported selections refuse.",
+      "spec": "09-project-resource.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-RES-003",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-RES-004",
+      "requirement": "The importer MUST publish one race-checked immutable selected generation or refuse; mixed-time copies are not an accepted snapshot.",
+      "spec": "09-project-resource.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-RES-004",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-RES-005",
+      "requirement": "The resource owner MUST be reachable only through the kernel-owned participant connection; guest host filesystem, operator state and original checkout access are absent.",
+      "spec": "09-project-resource.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-RES-005",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-RES-006",
+      "requirement": "The tool inventory MUST stay closed and bounded to the nine candidate tools; no shell, Git, network, arbitrary path or arbitrary recipe tool is added.",
+      "spec": "09-project-resource.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-RES-006",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-RES-007",
+      "requirement": "Patches MUST bind the current source digest and every full-file precondition and commit all changed resource files together.",
+      "spec": "09-project-resource.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-RES-007",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-RES-008",
+      "requirement": "Native original-operation binding, durable intent, generation publication and retained result MUST preserve uncertainty and exact replay across crashes.",
+      "spec": "09-project-resource.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-RES-008",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-RES-009",
+      "requirement": "Tests MUST execute only operator-pinned recipes against the exact immutable generation under qualified OS confinement and bounded lifetime/output.",
+      "spec": "09-project-resource.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-RES-009",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-RES-010",
+      "requirement": "Test success MUST retain exact source, recipe, runtime, result and operation lineage; command exit alone is insufficient to authorize a review artifact.",
+      "spec": "09-project-resource.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-RES-010",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-RES-011",
+      "requirement": "Publication MUST bind exact retained successful test lineage and destination; the only supported destination is the private local `review` artifact store.",
+      "spec": "09-project-resource.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-RES-011",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-RES-012",
+      "requirement": "Every returned context/output MUST carry source and sensitivity provenance, enforce serialized byte bounds and preserve explicit partial or truncated results.",
+      "spec": "09-project-resource.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-RES-012",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-RES-013",
+      "requirement": "Review MUST distinguish resource changes from original dirty changes and require an exact native approval wherever the task's publication policy requires one.",
+      "spec": "09-project-resource.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-RES-013",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-RES-014",
+      "requirement": "Cancellation, expiry and revocation MUST stop future admission and reconcile in-flight effects using their original identities before reporting completion.",
+      "spec": "09-project-resource.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-RES-014",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-RES-015",
+      "requirement": "Export, retention and recovery MUST preserve authoritative native evidence separately from unsigned resource bundles and never invent supported destinations.",
+      "spec": "09-project-resource.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-RES-015",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DSK-001",
+      "requirement": "P4 MUST advertise exactly the enabled closed desktop inventory and refuse every unqualified action before dispatch.",
+      "spec": "10-desktop-tools.md",
+      "planning_phase": "P4",
+      "proposed_acceptance_test": "AT-DSK-001",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DSK-002",
+      "requirement": "The protected desktop resource MUST own all compositor access and keep raw session/operator transports unreachable from the guest.",
+      "spec": "10-desktop-tools.md",
+      "planning_phase": "P4",
+      "proposed_acceptance_test": "AT-DSK-002",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DSK-003",
+      "requirement": "Each request MUST bind one enrolled user/session/compositor epoch and refuse stale, locked or ambiguous session targets.",
+      "spec": "10-desktop-tools.md",
+      "planning_phase": "P4",
+      "proposed_acceptance_test": "AT-DSK-003",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DSK-004",
+      "requirement": "Input schemas MUST reject extra properties, raw selectors, commands, arbitrary paths and unknown enum values before native admission.",
+      "spec": "10-desktop-tools.md",
+      "planning_phase": "P4",
+      "proposed_acceptance_test": "AT-DSK-004",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DSK-005",
+      "requirement": "Desktop reads MUST expose only the selected metadata with explicit freshness, bounded pages and privacy labels.",
+      "spec": "10-desktop-tools.md",
+      "planning_phase": "P4",
+      "proposed_acceptance_test": "AT-DSK-005",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DSK-006",
+      "requirement": "Workspace selection MUST target an explicit enrolled numeric slot, bind exact native approval and preserve its original operation identity.",
+      "spec": "10-desktop-tools.md",
+      "planning_phase": "P4",
+      "proposed_acceptance_test": "AT-DSK-006",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DSK-007",
+      "requirement": "Address-targeted window mutations MUST remain disabled until compositor-side stable-target validation closes address-reuse races.",
+      "spec": "10-desktop-tools.md",
+      "planning_phase": "P4",
+      "proposed_acceptance_test": "AT-DSK-007",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DSK-008",
+      "requirement": "A mutation result MUST distinguish dispatch, observed post-state and independently verified native execution evidence.",
+      "spec": "10-desktop-tools.md",
+      "planning_phase": "P4",
+      "proposed_acceptance_test": "AT-DSK-008",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DSK-009",
+      "requirement": "Bounded socket lifecycle, serialization and event resynchronization MUST protect compositor responsiveness and stale-state handling.",
+      "spec": "10-desktop-tools.md",
+      "planning_phase": "P4",
+      "proposed_acceptance_test": "AT-DSK-009",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DSK-010",
+      "requirement": "Cancellation, expiry, revocation and stop MUST be enforced by native admission and the resource, with honest in-flight outcomes.",
+      "spec": "10-desktop-tools.md",
+      "planning_phase": "P4",
+      "proposed_acceptance_test": "AT-DSK-010",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DSK-011",
+      "requirement": "Lost responses and resource/controller restarts MUST reconcile the original operation without redispatching or treating current desktop state as original completion.",
+      "spec": "10-desktop-tools.md",
+      "planning_phase": "P4",
+      "proposed_acceptance_test": "AT-DSK-011",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DSK-012",
+      "requirement": "Screenshots, screen recording, clipboard and OCR MUST remain unavailable in the default profile pending explicit disclosure and target/capture gates.",
+      "spec": "10-desktop-tools.md",
+      "planning_phase": "P4",
+      "proposed_acceptance_test": "AT-DSK-012",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DSK-013",
+      "requirement": "Launch, URL opening, keystrokes, notifications with actions, audio/network/power and package operations MUST remain outside this first desktop profile.",
+      "spec": "10-desktop-tools.md",
+      "planning_phase": "P4",
+      "proposed_acceptance_test": "AT-DSK-013",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DSK-014",
+      "requirement": "Desktop observations and untrusted strings MUST not become instructions, executable markup, approval authority or unbounded logs.",
+      "spec": "10-desktop-tools.md",
+      "planning_phase": "P4",
+      "proposed_acceptance_test": "AT-DSK-014",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DSK-015",
+      "requirement": "Each enabled profile MUST retain source provenance, exact tool/schema/policy hashes and actual-machine independent acceptance evidence.",
+      "spec": "10-desktop-tools.md",
+      "planning_phase": "P4",
+      "proposed_acceptance_test": "AT-DSK-015",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-FIX-001",
+      "requirement": "The first repair profile MUST restrict changes to the declared single-file scalar domain and reject broad or privileged repair requests.",
+      "spec": "11-configuration-repair.md",
+      "planning_phase": "P5",
+      "proposed_acceptance_test": "AT-FIX-001",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-FIX-002",
+      "requirement": "Diagnosis MUST retain bounded selected evidence with source/version/time provenance and distinguish observations from causal hypotheses.",
+      "spec": "11-configuration-repair.md",
+      "planning_phase": "P5",
+      "proposed_acceptance_test": "AT-FIX-002",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-FIX-003",
+      "requirement": "Proposed bytes MUST be generated and reviewed from one immutable config snapshot with exact before/after hashes and a closed semantic diff.",
+      "spec": "11-configuration-repair.md",
+      "planning_phase": "P5",
+      "proposed_acceptance_test": "AT-FIX-003",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-FIX-004",
+      "requirement": "Preflight MUST parse and validate only private copied inputs under confinement; proposed or existing Lua must never execute on the host merely to validate.",
+      "spec": "11-configuration-repair.md",
+      "planning_phase": "P5",
+      "proposed_acceptance_test": "AT-FIX-004",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-FIX-005",
+      "requirement": "Apply MUST require native approval binding the exact file set, patch, validation, backup, reload effect plan, session/version and expiry.",
+      "spec": "11-configuration-repair.md",
+      "planning_phase": "P5",
+      "proposed_acceptance_test": "AT-FIX-005",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-FIX-006",
+      "requirement": "Independent home-configuration backups MUST be durably verified before mutation; system snapshots are not accepted as those backups.",
+      "spec": "11-configuration-repair.md",
+      "planning_phase": "P5",
+      "proposed_acceptance_test": "AT-FIX-006",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-FIX-007",
+      "requirement": "File mutation MUST use a qualified writer-exclusion and compare-and-swap protocol with no-follow identity checks; ordinary hash-then-rename is insufficient.",
+      "spec": "11-configuration-repair.md",
+      "planning_phase": "P5",
+      "proposed_acceptance_test": "AT-FIX-007",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-FIX-008",
+      "requirement": "Original intent, individual file stages, reload boundary and terminal outcome MUST be durable; multi-file requests are refused in the first profile and never described as atomic without proof.",
+      "spec": "11-configuration-repair.md",
+      "planning_phase": "P5",
+      "proposed_acceptance_test": "AT-FIX-008",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-FIX-009",
+      "requirement": "Reload MUST be explicitly included in the effect plan, bounded to the enrolled session and refused when dependent Lua/hooks have unbounded or changed effects.",
+      "spec": "11-configuration-repair.md",
+      "planning_phase": "P5",
+      "proposed_acceptance_test": "AT-FIX-009",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-FIX-010",
+      "requirement": "Success MUST require exact installed bytes, empty relevant config errors and independently observed live scalar values; a successful command alone is insufficient.",
+      "spec": "11-configuration-repair.md",
+      "planning_phase": "P5",
+      "proposed_acceptance_test": "AT-FIX-010",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-FIX-011",
+      "requirement": "Rollback MUST compare the current state, preserve newer user changes and retain the original failure; failed or uncertain rollback cannot be called restored.",
+      "spec": "11-configuration-repair.md",
+      "planning_phase": "P5",
+      "proposed_acceptance_test": "AT-FIX-011",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-FIX-012",
+      "requirement": "Crash, lost reply, cancellation and timeout MUST reconcile the original operation and preserve unknown effects instead of automatically retrying apply or reload.",
+      "spec": "11-configuration-repair.md",
+      "planning_phase": "P5",
+      "proposed_acceptance_test": "AT-FIX-012",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-FIX-013",
+      "requirement": "Config, logs, backups and diagnostic outputs MUST remain private, bounded and excluded from provider/export channels unless explicitly selected.",
+      "spec": "11-configuration-repair.md",
+      "planning_phase": "P5",
+      "proposed_acceptance_test": "AT-FIX-013",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-FIX-014",
+      "requirement": "The default repair profile MUST have no sudo/polkit, package/update, bootloader, system snapshot, service-management or arbitrary command authority.",
+      "spec": "11-configuration-repair.md",
+      "planning_phase": "P5",
+      "proposed_acceptance_test": "AT-FIX-014",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-FIX-015",
+      "requirement": "P5 enablement MUST require an actual-machine fault matrix, independent restoration evidence and a version-bound profile gate.",
+      "spec": "11-configuration-repair.md",
+      "planning_phase": "P5",
+      "proposed_acceptance_test": "AT-FIX-015",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-OPS-001",
+      "requirement": "QML distribution SHALL remain separate from backend/runtime package installation, with explicit missing-dependency UX and no privileged or remote-code installation side effect.",
+      "spec": "12-distribution-operations.md",
+      "planning_phase": "P7",
+      "proposed_acceptance_test": "AT-OPS-001",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-OPS-002",
+      "requirement": "Every supported release SHALL publish an exact support tuple and named qualified profiles, separating source support, installation, Linux enforcement, native recovery, provider and desktop acceptance.",
+      "spec": "12-distribution-operations.md",
+      "planning_phase": "P7",
+      "proposed_acceptance_test": "AT-OPS-002",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-OPS-003",
+      "requirement": "Backend/runtime artifacts SHALL be reproducibly built from public immutable inputs in recorded clean build environments, with dependency inventories, licenses and machine-readable SBOM/provenance.",
+      "spec": "12-distribution-operations.md",
+      "planning_phase": "P7",
+      "proposed_acceptance_test": "AT-OPS-003",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-OPS-004",
+      "requirement": "Installation and activation SHALL require authenticated package/artifact integrity and declared publisher trust, rejecting invalid, untrusted, revoked or manifest-mismatched inputs.",
+      "spec": "12-distribution-operations.md",
+      "planning_phase": "P7",
+      "proposed_acceptance_test": "AT-OPS-004",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-OPS-005",
+      "requirement": "Runtime selection SHALL use package-owned absolute paths and exact manifests; host, mise or dependency drift invalidates affected execution qualification without silently changing runtime or weakening controls.",
+      "spec": "12-distribution-operations.md",
+      "planning_phase": "P7",
+      "proposed_acceptance_test": "AT-OPS-005",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-OPS-006",
+      "requirement": "Services SHALL run as the desktop user with explicit opt-in activation, bounded restart/stop policy, session ownership and no automatic lingering or global system mutation.",
+      "spec": "12-distribution-operations.md",
+      "planning_phase": "P7",
+      "proposed_acceptance_test": "AT-OPS-006",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-OPS-007",
+      "requirement": "Each controller/launcher/relay/guest unit SHALL have a tested role-specific hardening matrix, effective-limit observations and explicit refusal for unavailable required protections.",
+      "spec": "12-distribution-operations.md",
+      "planning_phase": "P7",
+      "proposed_acceptance_test": "AT-OPS-007",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-OPS-008",
+      "requirement": "Updates SHALL use a durable staged activation transaction that quiesces effects, validates exact runtime/state compatibility and atomically commits one generation without concurrent mixed-generation task execution.",
+      "spec": "12-distribution-operations.md",
+      "planning_phase": "P7",
+      "proposed_acceptance_test": "AT-OPS-008",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-OPS-009",
+      "requirement": "Rollback SHALL preserve monotonic authority/effect custody and enforce read/write state ABI compatibility; incompatible rollback is diagnostic-only and cannot restore an old state snapshot over uncertain effects.",
+      "spec": "12-distribution-operations.md",
+      "planning_phase": "P7",
+      "proposed_acceptance_test": "AT-OPS-009",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-OPS-010",
+      "requirement": "Plugin/controller protocol mismatch SHALL produce a bounded compatibility result; independent plugin reload/update never launches a second controller, repeats a mutation or claims task completion.",
+      "spec": "12-distribution-operations.md",
+      "planning_phase": "P7",
+      "proposed_acceptance_test": "AT-OPS-010",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-OPS-011",
+      "requirement": "Local health and monitoring SHALL expose actionable bounded diagnostics with separate connectivity, compatibility, enforcement, storage and native-authority dimensions.",
+      "spec": "12-distribution-operations.md",
+      "planning_phase": "P7",
+      "proposed_acceptance_test": "AT-OPS-011",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-OPS-012",
+      "requirement": "Logs, telemetry and diagnostic exports SHALL follow explicit data minimization, size/rate/retention bounds and local review; none is authoritative execution evidence.",
+      "spec": "12-distribution-operations.md",
+      "planning_phase": "P7",
+      "proposed_acceptance_test": "AT-OPS-012",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-OPS-013",
+      "requirement": "Backups SHALL capture a consistent declared state set with manifests, required trust material and recovery dependencies, while excluding transient sockets and unnecessary credentials.",
+      "spec": "12-distribution-operations.md",
+      "planning_phase": "P7",
+      "proposed_acceptance_test": "AT-OPS-013",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-OPS-014",
+      "requirement": "Restore SHALL quarantine incompatible/corrupt state and reconcile original native operations and rollback anchors before effects, without creating replacement task/operation identities to bypass uncertainty.",
+      "spec": "12-distribution-operations.md",
+      "planning_phase": "P7",
+      "proposed_acceptance_test": "AT-OPS-014",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-OPS-015",
+      "requirement": "Disable/uninstall SHALL stop admission and owned processes, preserve unresolved operations and user data by default, and require a separate explicit destructive purge action.",
+      "spec": "12-distribution-operations.md",
+      "planning_phase": "P7",
+      "proposed_acceptance_test": "AT-OPS-015",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-OPS-016",
+      "requirement": "Package, activation and runtime storage failures SHALL leave an independently diagnosable fail-closed state with retained previous-generation and recovery metadata.",
+      "spec": "12-distribution-operations.md",
+      "planning_phase": "P7",
+      "proposed_acceptance_test": "AT-OPS-016",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-OPS-017",
+      "requirement": "Security and compatibility updates SHALL have a documented signed channel, bounded qualification ownership and revocation response without unattended authority expansion or implicit task replay.",
+      "spec": "12-distribution-operations.md",
+      "planning_phase": "P7",
+      "proposed_acceptance_test": "AT-OPS-017",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-OPS-018",
+      "requirement": "Release approval SHALL require an independent clean consumer install/upgrade/rollback/backup/restore/uninstall run on the exact x86_64 Omarchy tuple, including negative cases and named scope.",
+      "spec": "12-distribution-operations.md",
+      "planning_phase": "P7",
+      "proposed_acceptance_test": "AT-OPS-018",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DLG-001",
+      "requirement": "Delegation MUST remain unavailable until P3 and exact native process/child/confinement prerequisites pass; Pi callback or package availability alone MUST NOT enable it.",
+      "spec": "13-delegation-multihost.md",
+      "planning_phase": "P6",
+      "proposed_acceptance_test": "AT-DLG-001",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DLG-002",
+      "requirement": "Every child MUST descend from one retained parent under the selected authority through verified signed attenuation; issuer, scope, validity, budget family and target bindings MUST remain constrained.",
+      "spec": "13-delegation-multihost.md",
+      "planning_phase": "P6",
+      "proposed_acceptance_test": "AT-DLG-002",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DLG-003",
+      "requirement": "Child admission MUST atomically retain original request identity, exact template/input binding, capability and signer custody before launch; duplicate requests MUST replay original admission or conflict.",
+      "spec": "13-delegation-multihost.md",
+      "planning_phase": "P6",
+      "proposed_acceptance_test": "AT-DLG-003",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DLG-004",
+      "requirement": "Workers MUST use operator-installed immutable templates and independently qualified guest confinement; child input MUST NOT choose executable, argv, environment, packages, sockets or authority.",
+      "spec": "13-delegation-multihost.md",
+      "planning_phase": "P6",
+      "proposed_acceptance_test": "AT-DLG-004",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DLG-005",
+      "requirement": "Root and subtree limits MUST cover admitted processes, depth, concurrency, logical calls, provider usage and wall/expiry bounds; sibling reservations MUST fit their parent without implicit reclamation.",
+      "spec": "13-delegation-multihost.md",
+      "planning_phase": "P6",
+      "proposed_acceptance_test": "AT-DLG-005",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DLG-006",
+      "requirement": "Expiry, revocation and cancellation MUST fence new admission at the native linearization point; previously admitted effects and surviving processes MUST retain truthful independent status.",
+      "spec": "13-delegation-multihost.md",
+      "planning_phase": "P6",
+      "proposed_acceptance_test": "AT-DLG-006",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DLG-007",
+      "requirement": "Every logical effect MUST retain its original native identity, exact request/authority binding and admission history across worker crash, host change and result delivery.",
+      "spec": "13-delegation-multihost.md",
+      "planning_phase": "P6",
+      "proposed_acceptance_test": "AT-DLG-007",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DLG-008",
+      "requirement": "Each active worker and authoritative state writer MUST have one verifiable owner with fenced generation/lease; timeout or stale PID alone MUST NOT authorize takeover or effect repetition.",
+      "spec": "13-delegation-multihost.md",
+      "planning_phase": "P6",
+      "proposed_acceptance_test": "AT-DLG-008",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DLG-009",
+      "requirement": "Cross-host communication MUST authenticate host/worker/authority and restrict routes, disclose only admitted context and retain exact dependency/artifact identities; raw host-control sockets MUST remain inaccessible.",
+      "spec": "13-delegation-multihost.md",
+      "planning_phase": "P6",
+      "proposed_acceptance_test": "AT-DLG-009",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DLG-010",
+      "requirement": "Handoff or relocation MUST transfer complete required custody and original records through a native-supported protocol; the source MUST be retired/fenced before destination authority can serve.",
+      "spec": "13-delegation-multihost.md",
+      "planning_phase": "P6",
+      "proposed_acceptance_test": "AT-DLG-010",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DLG-011",
+      "requirement": "Unknown remote effects MUST remain unresolved until native/provider-owned original evidence permits reconciliation; no arbitrary exactly-once external-effect guarantee or blind retry is permitted.",
+      "spec": "13-delegation-multihost.md",
+      "planning_phase": "P6",
+      "proposed_acceptance_test": "AT-DLG-011",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DLG-012",
+      "requirement": "Child results MUST pass native receipt/result and disclosure verification before parent ingestion or ACK; a child success claim, message or checkpoint MUST NOT authorize another effect.",
+      "spec": "13-delegation-multihost.md",
+      "planning_phase": "P6",
+      "proposed_acceptance_test": "AT-DLG-012",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DLG-013",
+      "requirement": "Parent wait/settle behavior MUST be bounded, acyclic and truthful about failures/cancelled/unknown descendants; required unresolved work MUST prevent root success.",
+      "spec": "13-delegation-multihost.md",
+      "planning_phase": "P6",
+      "proposed_acceptance_test": "AT-DLG-013",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DLG-014",
+      "requirement": "P6 release qualification MUST separately identify local workers, remote workers and relocation, with exact artifacts and independent race/failure evidence for every advertised profile.",
+      "spec": "13-delegation-multihost.md",
+      "planning_phase": "P6",
+      "proposed_acceptance_test": "AT-DLG-014",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DAT-001",
+      "requirement": "Task projections MUST keep immutable native bindings and never manufacture receipt authority.",
+      "spec": "14-state-evidence-data.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-DAT-001",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DAT-002",
+      "requirement": "State transitions and profile completion predicates MUST distinguish process exit, test failure and unknown effect outcomes.",
+      "spec": "14-state-evidence-data.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-DAT-002",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DAT-003",
+      "requirement": "Restart MUST reconcile original IDs without automatically restarting guest work or widening limits.",
+      "spec": "14-state-evidence-data.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-DAT-003",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DAT-004",
+      "requirement": "Durable intent MUST precede dispatch, and native outbox replay MUST be idempotent.",
+      "spec": "14-state-evidence-data.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-DAT-004",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DAT-005",
+      "requirement": "Task, mutation and event updates MUST commit consistently under concurrent controls.",
+      "spec": "14-state-evidence-data.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-DAT-005",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DAT-006",
+      "requirement": "Retention MUST pin uncertainty and preserve replay tombstones or retire the whole enrollment epoch.",
+      "spec": "14-state-evidence-data.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-DAT-006",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DAT-007",
+      "requirement": "Storage exhaustion MUST stop new work while preserving bounded stop/recovery routes.",
+      "spec": "14-state-evidence-data.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-DAT-007",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-DAT-008",
+      "requirement": "Restore, migration and rollback MUST reconcile forward and refuse incompatible schemas.",
+      "spec": "14-state-evidence-data.md",
+      "planning_phase": "P2",
+      "proposed_acceptance_test": "AT-DAT-008",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-VER-001",
+      "requirement": "Evidence MUST preserve source/component/runtime/release distinctions and report skipped cases.",
+      "spec": "15-verification-release.md",
+      "planning_phase": "P7",
+      "proposed_acceptance_test": "AT-VER-001",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-VER-002",
+      "requirement": "Runtime denial claims MUST have independent outside-effect oracles and positive controls.",
+      "spec": "15-verification-release.md",
+      "planning_phase": "P7",
+      "proposed_acceptance_test": "AT-VER-002",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-VER-003",
+      "requirement": "Qualification MUST exercise deterministic dispatch/delivery/recovery crash cutpoints.",
+      "spec": "15-verification-release.md",
+      "planning_phase": "P7",
+      "proposed_acceptance_test": "AT-VER-003",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-VER-004",
+      "requirement": "Every release profile MUST map to complete current-tuple requirement evidence.",
+      "spec": "15-verification-release.md",
+      "planning_phase": "P7",
+      "proposed_acceptance_test": "AT-VER-004",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-VER-005",
+      "requirement": "Clean-install lifecycle and independent operator acceptance MUST precede profile publication claims.",
+      "spec": "15-verification-release.md",
+      "planning_phase": "P7",
+      "proposed_acceptance_test": "AT-VER-005",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-VER-006",
+      "requirement": "The document validator MUST fail broken traceability, malformed examples and incompatible response shapes.",
+      "spec": "15-verification-release.md",
+      "planning_phase": "P7",
+      "proposed_acceptance_test": "AT-VER-006",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-PLN-001",
+      "requirement": "Phase execution MUST respect native prerequisites and selected-profile dependency edges.",
+      "spec": "16-roadmap-decisions.md",
+      "planning_phase": "P0",
+      "proposed_acceptance_test": "AT-PLN-001",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-PLN-002",
+      "requirement": "Open prerequisite closure MUST include exact identity and independently observed acceptance.",
+      "spec": "16-roadmap-decisions.md",
+      "planning_phase": "P0",
+      "proposed_acceptance_test": "AT-PLN-002",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-PLN-003",
+      "requirement": "Architecture changes MUST update contracts, applicability and plans together.",
+      "spec": "16-roadmap-decisions.md",
+      "planning_phase": "P0",
+      "proposed_acceptance_test": "AT-PLN-003",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-PLN-004",
+      "requirement": "Failed experiments MUST preserve explicit unavailable profiles instead of weakening authority.",
+      "spec": "16-roadmap-decisions.md",
+      "planning_phase": "P0",
+      "proposed_acceptance_test": "AT-PLN-004",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-OBS-001",
+      "requirement": "Disclosures MUST follow the inventory and distinguish source read from provider release.",
+      "spec": "17-privacy-observability-performance.md",
+      "planning_phase": "P7",
+      "proposed_acceptance_test": "AT-OBS-001",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-OBS-002",
+      "requirement": "Sensitive data MUST be excluded from notifications, process metadata and default diagnostics.",
+      "spec": "17-privacy-observability-performance.md",
+      "planning_phase": "P7",
+      "proposed_acceptance_test": "AT-OBS-002",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-OBS-003",
+      "requirement": "Lock or unknown session ownership MUST redact views and invalidate review handles.",
+      "spec": "17-privacy-observability-performance.md",
+      "planning_phase": "P7",
+      "proposed_acceptance_test": "AT-OBS-003",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-OBS-004",
+      "requirement": "Support export MUST preview and enforce an enrolled bounded disclosure profile.",
+      "spec": "17-privacy-observability-performance.md",
+      "planning_phase": "P7",
+      "proposed_acceptance_test": "AT-OBS-004",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-OBS-005",
+      "requirement": "Performance claims MUST include reproducible machine, workload and percentile evidence.",
+      "spec": "17-privacy-observability-performance.md",
+      "planning_phase": "P7",
+      "proposed_acceptance_test": "AT-OBS-005",
+      "evidence_status": "proposed"
+    },
+    {
+      "requirement_id": "OM-OBS-006",
+      "requirement": "Unknown outcomes and surviving descendants MUST remain actionable until native reconciliation.",
+      "spec": "17-privacy-observability-performance.md",
+      "planning_phase": "P7",
+      "proposed_acceptance_test": "AT-OBS-006",
+      "evidence_status": "proposed"
+    }
+  ]
+}

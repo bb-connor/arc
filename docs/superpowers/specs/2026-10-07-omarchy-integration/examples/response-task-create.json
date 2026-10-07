@@ -1,0 +1,14 @@
+{
+  "protocol": "chio.omarchy.operator.v1",
+  "request_id": "11111111-1111-4111-8111-111111111111",
+  "method": "task.create",
+  "ok": true,
+  "result": {
+    "kind": "task_reserved",
+    "value": {
+      "task_id": "11111111-1111-4111-8111-111111111111",
+      "revision": 0,
+      "state": "preparing"
+    }
+  }
+}
