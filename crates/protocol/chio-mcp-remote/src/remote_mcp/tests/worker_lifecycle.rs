@@ -9,6 +9,12 @@ use std::task::Poll;
 
 const TOKEN: &str = "worker-lifecycle-token";
 const WAIT: Duration = Duration::from_secs(4);
+// The default output sanitizer truncates each string above 1,000,000 bytes, so
+// fixture output is split into text items that each stay below that limit.
+const TEXT_ITEM_BYTES: usize = 512 * 1024;
+// Below the 4 MiB upstream result bound, yet the edge projects it twice (result
+// and evidence) with two receipts, which exceeds the 8 MiB session line bound.
+const WORKER_KILLING_OUTPUT_BYTES: usize = 4 * 1024 * 1024 - 512;
 type DispatchGate = Arc<(StdMutex<bool>, Condvar)>;
 
 struct ReadTransport {
@@ -48,8 +54,18 @@ impl McpTransport for ReadTransport {
                 ));
             }
         }
+        let mut content = Vec::new();
+        let mut remaining = self.output_bytes;
+        loop {
+            let item_bytes = remaining.min(TEXT_ITEM_BYTES);
+            content.push(json!({"type":"text","text":"x".repeat(item_bytes)}));
+            remaining -= item_bytes;
+            if remaining == 0 {
+                break;
+            }
+        }
         let result = chio_mcp_adapter::edge::McpToolResult {
-            content: vec![json!({"type":"text","text":"x".repeat(self.output_bytes)})],
+            content,
             structured_content: None,
             is_error: Some(false),
         };
@@ -139,6 +155,13 @@ capabilities:
         },
         calls,
     }
+}
+
+/// A `read` call the default runtime guard profile admits. That profile
+/// classifies `read` as filesystem access and denies it without a path.
+fn read_call(id: u64) -> Value {
+    json!({"jsonrpc":"2.0","id":id,"method":"tools/call",
+        "params":{"name":"read","arguments":{"path":"/workspace/notes.txt"}}})
 }
 
 fn post_request(session: Option<&str>, message: &Value) -> Request {
@@ -313,7 +336,7 @@ async fn first_get_after_initialized_delivers_already_retained_roots_request() {
 
 #[tokio::test]
 async fn pending_post_and_get_close_when_projection_kills_actual_worker() {
-    let fixture = fixture(4 * 1024 * 1024 - 128, None);
+    let fixture = fixture(WORKER_KILLING_OUTPUT_BYTES, None);
     let session = initialize(&fixture, false).await;
     initialized(&fixture, &session).await;
     let get = handle_get(
@@ -322,8 +345,7 @@ async fn pending_post_and_get_close_when_projection_kills_actual_worker() {
     )
     .await;
     assert_eq!(get.status(), StatusCode::OK);
-    let call = post(&fixture, Some(&session.session_id),
-        &json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"read","arguments":{}}})).await;
+    let call = post(&fixture, Some(&session.session_id), &read_call(2)).await;
     assert_eq!(call.status(), StatusCode::OK);
     let (post_body, get_body) = tokio::join!(
         tokio::time::timeout(WAIT, axum::body::to_bytes(call.into_body(), 64 * 1024)),
@@ -364,8 +386,7 @@ async fn pending_post_and_get_close_when_projection_kills_actual_worker() {
         session.lifecycle_snapshot().state,
         RemoteSessionState::Closed
     );
-    let retry = post(&fixture, Some(&session.session_id),
-        &json!({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"read","arguments":{}}})).await;
+    let retry = post(&fixture, Some(&session.session_id), &read_call(3)).await;
     assert_ne!(retry.status(), StatusCode::OK);
     assert_eq!(fixture.calls.load(Ordering::SeqCst), 1);
 }
@@ -373,11 +394,10 @@ async fn pending_post_and_get_close_when_projection_kills_actual_worker() {
 #[tokio::test]
 async fn waiting_post_owner_observes_actual_worker_death_before_enqueue() {
     let gate = Arc::new((StdMutex::new(false), Condvar::new()));
-    let fixture = fixture(4 * 1024 * 1024 - 128, Some(gate.clone()));
+    let fixture = fixture(WORKER_KILLING_OUTPUT_BYTES, Some(gate.clone()));
     let session = initialize(&fixture, false).await;
     initialized(&fixture, &session).await;
-    let pending = post(&fixture, Some(&session.session_id),
-        &json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"read","arguments":{}}})).await;
+    let pending = post(&fixture, Some(&session.session_id), &read_call(2)).await;
     assert_eq!(pending.status(), StatusCode::OK);
     let entered = tokio::time::timeout(WAIT, async {
         while fixture.calls.load(Ordering::SeqCst) == 0 {
@@ -403,10 +423,7 @@ async fn waiting_post_owner_observes_actual_worker_death_before_enqueue() {
     }
     // The first SSE body still owns the mutex. A dead actor cannot require a
     // client to drop that body before refusing the next request.
-    let request = post_request(
-        Some(&session.session_id),
-        &json!({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"read","arguments":{}}}),
-    );
+    let request = post_request(Some(&session.session_id), &read_call(3));
     let mut waiting = Box::pin(handle_post(State(fixture.state.clone()), request));
     std::future::poll_fn(|cx| {
         assert!(waiting.as_mut().poll(cx).is_pending());
