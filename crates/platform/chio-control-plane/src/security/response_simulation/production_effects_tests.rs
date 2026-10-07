@@ -1358,3 +1358,129 @@ fn capability_set_suspensions_planned_on_one_base_both_hold() {
         "a capability-set suspension planned on the same base must compose with the first and outlive its lift"
     );
 }
+
+#[test]
+fn production_plan_binding_admits_exact_rollback_and_refuses_rebound_commitments() {
+    let fixture = ProductionEffectsFixture::new();
+    let planned_session = session("production-effects-binding-session");
+    let other_session = session("production-effects-binding-other-session");
+    let (plan, work) = fixture.dispatch(
+        "production-effects-binding-action",
+        vec![record(planned_session.as_str())],
+        vec![fixture.egress_spec(&planned_session, &["server-a"])],
+    );
+    let effects = fixture.effects();
+    let planned = plan
+        .effects
+        .as_slice()
+        .first()
+        .unwrap_or_else(|| panic!("planned egress effect missing"));
+    let apply = effect_request(&plan, planned, &work, "binding-apply");
+    let applied = effects
+        .execute(&apply)
+        .unwrap_or_else(|error| panic!("apply planned egress: {error}"));
+    assert!(applied.applied);
+
+    let other_contribution = fixture.egress_spec(&planned_session, &["server-b"]);
+    let rebound: Vec<(&str, EffectRequest)> = vec![
+        ("plan hash", {
+            let mut request = effect_request(&plan, planned, &work, "binding-plan-hash");
+            request.plan_hash = digest(b"another-plan");
+            request
+        }),
+        ("plan expiry", {
+            let mut request = effect_request(&plan, planned, &work, "binding-plan-expiry");
+            request.plan_expires_at_unix_ms = plan.expires_at_unix_ms.saturating_add(1);
+            request
+        }),
+        ("contribution", {
+            let mut request = effect_request(&plan, planned, &work, "binding-contribution");
+            request.canonical_contribution = other_contribution.canonical_contribution.clone();
+            request.contribution_hash = other_contribution.contribution_hash;
+            request
+        }),
+        ("target", {
+            let mut request = effect_request(&plan, planned, &work, "binding-target");
+            request.target = ResponseTarget::Session {
+                session_id: other_session.clone(),
+            };
+            request
+        }),
+        ("apply base", {
+            let mut request = effect_request(&plan, planned, &work, "binding-apply-base");
+            request.expected_version_hash = applied.resulting_version_hash;
+            request
+        }),
+    ];
+    for (label, request) in &rebound {
+        let refused = effects
+            .execute(request)
+            .err()
+            .unwrap_or_else(|| panic!("rebound {label} was accepted"));
+        assert_eq!(refused.kind(), PortErrorKind::IntegrityFailure, "{label}");
+        let unreadable = effects
+            .load_result(&query(request))
+            .err()
+            .unwrap_or_else(|| panic!("rebound {label} result was readable"));
+        assert_eq!(
+            unreadable.kind(),
+            PortErrorKind::IntegrityFailure,
+            "{label}"
+        );
+    }
+
+    let mut remove = effect_request(&plan, planned, &work, "binding-remove");
+    remove.operation = EffectOperation::Remove;
+    remove.expected_version_hash = applied.resulting_version_hash;
+    let removed = effects
+        .execute(&remove)
+        .unwrap_or_else(|error| panic!("remove planned egress: {error}"));
+    assert!(!removed.applied);
+    assert_eq!(
+        effects
+            .load_result(&query(&remove))
+            .unwrap_or_else(|error| panic!("load planned removal: {error}")),
+        chio_security_types::ports::EffectExecutionStatus::Completed { result: removed }
+    );
+}
+
+#[test]
+fn unbound_effect_router_never_reports_ready() {
+    use crate::security::adapters::effect_port::{
+        ActiveResponseEffectPort, CapabilitySetSuspensionBackend, EscalateAlertBackend,
+        EscalateAlertStore, IssuanceFreezeBackend, ResponseEffectBackend,
+        RestrictEgressOverlayBackend, SessionSuspensionOverlayBackend, SessionThrottleBackend,
+    };
+    let fixture = ProductionEffectsFixture::new();
+    let alerts: Arc<dyn EscalateAlertStore> = fixture.outbox.clone();
+    let blast: Arc<dyn BlastRadiusPort> = fixture.resolver.clone();
+    let backends: Vec<Arc<dyn ResponseEffectBackend>> = vec![
+        Arc::new(EscalateAlertBackend::with_clock(
+            alerts,
+            Arc::clone(&fixture.trusted_clock),
+        )),
+        Arc::new(SessionThrottleBackend::new(fixture.store.clone())),
+        Arc::new(RestrictEgressOverlayBackend::new(fixture.store.clone())),
+        Arc::new(SessionSuspensionOverlayBackend::new(fixture.store.clone())),
+        Arc::new(CapabilitySetSuspensionBackend::new(fixture.store.clone())),
+        Arc::new(
+            IssuanceFreezeBackend::new_with_scheduler(
+                fixture.store.clone(),
+                blast,
+                fixture.store.clone(),
+            )
+            .with_clock(Arc::clone(&fixture.trusted_clock)),
+        ),
+    ];
+    let unbound = ActiveResponseEffectPort::from_backends(backends)
+        .unwrap_or_else(|error| panic!("unbound router: {error}"));
+    let unready = unbound
+        .ensure_effects_ready()
+        .err()
+        .unwrap_or_else(|| panic!("an unbound router reported ready"));
+    assert_eq!(unready.kind(), PortErrorKind::Unavailable);
+    let bound = unbound.with_plan_authority(fixture.store.clone());
+    bound
+        .ensure_effects_ready()
+        .unwrap_or_else(|error| panic!("bound router readiness: {error}"));
+}
