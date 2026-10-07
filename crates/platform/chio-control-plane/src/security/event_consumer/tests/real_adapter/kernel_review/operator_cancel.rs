@@ -112,7 +112,12 @@ fn committed_approval_window(
         .kernel
         .commit_prepared_active_response_admission(request, &prepared);
     assert!(
-        matches!(commit, Err(chio_kernel::KernelError::Internal(_))),
+        matches!(
+            &commit,
+            Err(chio_kernel::KernelError::Internal(reason))
+                if reason.contains("transition acknowledgement is uncertain")
+                    && reason.contains("injected dispatch commitment CAS failure")
+        ),
         "{commit:?}"
     );
     assert!(
@@ -791,7 +796,14 @@ fn uncommitted_reserved_approval_retry_after_expiry_still_compensates() {
         .runtime
         .kernel
         .commit_prepared_active_response_admission(fixture.native_request(), &prepared);
-    assert!(retry.is_err(), "{retry:?}");
+    assert!(
+        matches!(
+            &retry,
+            Err(chio_kernel::KernelError::GovernedTransactionDenied(reason))
+                if reason == "active-response authorization denied: compact response plan is not currently valid"
+        ),
+        "{retry:?}"
+    );
     assert_eq!(
         fixture
             .runtime
