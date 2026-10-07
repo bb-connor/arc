@@ -652,3 +652,249 @@ async fn a_backend_outcome_bound_to_another_command_fails_closed() {
         Some(pending(1, FIRST_RETRY_AT_UNIX_MS))
     );
 }
+
+const FOREIGN_BACKEND_COLUMNS: &str = "idempotency_key TEXT NOT NULL,
+    backend_name TEXT NOT NULL,
+    command_hash BLOB NOT NULL,
+    status TEXT NOT NULL,
+    attempts INTEGER NOT NULL,
+    delivered_at_unix_ms INTEGER";
+
+type SchemaEntry = (String, String, String, Option<String>);
+
+fn schema_snapshot(connection: &Connection) -> Vec<SchemaEntry> {
+    let mut statement = connection
+        .prepare("SELECT type, name, tbl_name, sql FROM sqlite_master ORDER BY type, name")
+        .unwrap_or_else(|error| panic!("prepare schema snapshot: {error}"));
+    statement
+        .query_map([], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        })
+        .unwrap_or_else(|error| panic!("query schema snapshot: {error}"))
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .unwrap_or_else(|error| panic!("read schema snapshot: {error}"))
+}
+
+fn backend_table_shape(connection: &Connection) -> (Vec<String>, Vec<String>, i64) {
+    let names = |sql: &str| -> Vec<String> {
+        let mut statement = connection
+            .prepare(sql)
+            .unwrap_or_else(|error| panic!("prepare table info: {error}"));
+        statement
+            .query_map([], |row| row.get(0))
+            .unwrap_or_else(|error| panic!("query table info: {error}"))
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .unwrap_or_else(|error| panic!("read table info: {error}"))
+    };
+    let columns = names(
+        "SELECT name FROM pragma_table_info('chio_security_alert_outbox_backend') ORDER BY cid",
+    );
+    let primary_key = names(
+        "SELECT name FROM pragma_table_info('chio_security_alert_outbox_backend')
+         WHERE pk > 0 ORDER BY pk",
+    );
+    let foreign_keys = connection
+        .query_row(
+            "SELECT COUNT(*) FROM pragma_foreign_key_list('chio_security_alert_outbox_backend')",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or_else(|error| panic!("read foreign keys: {error}"));
+    (columns, primary_key, foreign_keys)
+}
+
+fn backend_columns() -> Vec<String> {
+    [
+        "idempotency_key",
+        "backend_name",
+        "command_hash",
+        "status",
+        "attempts",
+        "delivered_at_unix_ms",
+    ]
+    .map(str::to_owned)
+    .to_vec()
+}
+
+#[test]
+fn open_refuses_a_foreign_backend_outcome_table_before_any_schema_change() {
+    let key = vec!["idempotency_key".to_owned(), "backend_name".to_owned()];
+    let foreign_tables = [
+        (
+            "no composite key and no foreign key",
+            format!("CREATE TABLE chio_security_alert_outbox_backend ({FOREIGN_BACKEND_COLUMNS})"),
+            Vec::new(),
+            0,
+        ),
+        (
+            "composite key without the foreign key",
+            format!(
+                "CREATE TABLE chio_security_alert_outbox_backend ({FOREIGN_BACKEND_COLUMNS},
+                 PRIMARY KEY (idempotency_key, backend_name))"
+            ),
+            key.clone(),
+            0,
+        ),
+        (
+            "composite key and foreign key without the value checks",
+            format!(
+                "CREATE TABLE chio_security_alert_outbox_backend ({FOREIGN_BACKEND_COLUMNS},
+                 PRIMARY KEY (idempotency_key, backend_name),
+                 FOREIGN KEY (idempotency_key)
+                    REFERENCES chio_security_alert_outbox(idempotency_key))"
+            ),
+            key,
+            1,
+        ),
+        (
+            "upper-case name with no composite key",
+            format!("CREATE TABLE CHIO_SECURITY_ALERT_OUTBOX_BACKEND ({FOREIGN_BACKEND_COLUMNS})"),
+            Vec::new(),
+            0,
+        ),
+    ];
+    for (label, create_sql, primary_key, foreign_keys) in foreign_tables {
+        let tempdir = TempDir::new().unwrap_or_else(|error| panic!("tempdir: {error}"));
+        let path = tempdir.path().join("alerts.sqlite");
+        let database =
+            Connection::open(&path).unwrap_or_else(|error| panic!("open database: {error}"));
+        database
+            .execute_batch(&create_sql)
+            .unwrap_or_else(|error| panic!("create {label} table: {error}"));
+        assert_eq!(
+            backend_table_shape(&database),
+            (backend_columns(), primary_key, foreign_keys),
+            "precondition: the {label} table must exist with the declared columns"
+        );
+        let before = schema_snapshot(&database);
+        drop(database);
+
+        let pagerduty = ScriptedBackend::new(PAGERDUTY, accept_every_dispatch);
+        let opened = SqliteSiemOutbox::open(
+            &path,
+            vec![pagerduty as Arc<dyn AlertBackend>],
+            AlertOutboxConfig {
+                base_retry_ms: 10,
+                max_retry_ms: 100,
+                max_attempts: 3,
+            },
+        );
+        let error = match opened {
+            Ok(outbox) => panic!(
+                "open accepted a foreign backend outcome table with {label}; readiness then \
+                 returned {:?}",
+                outbox.ensure_alerts_ready()
+            ),
+            Err(error) => error,
+        };
+        assert_eq!(error.kind(), PortErrorKind::IntegrityFailure, "{label}");
+
+        let database =
+            Connection::open(&path).unwrap_or_else(|error| panic!("reopen database: {error}"));
+        assert_eq!(
+            schema_snapshot(&database),
+            before,
+            "a refused open must not change the schema ({label})"
+        );
+        let journal_mode: String = database
+            .query_row("PRAGMA journal_mode", [], |row| row.get(0))
+            .unwrap_or_else(|error| panic!("journal mode: {error}"));
+        assert_eq!(journal_mode, "delete", "{label}");
+    }
+}
+
+#[tokio::test]
+async fn duplicate_backend_records_never_confirm_a_row() {
+    let duplicates = [
+        (
+            "pending then delivered",
+            [("pending", None), ("delivered", Some(1_000_i64))],
+        ),
+        (
+            "delivered twice",
+            [
+                ("delivered", Some(1_000_i64)),
+                ("delivered", Some(1_000_i64)),
+            ],
+        ),
+        (
+            "delivered then pending",
+            [("delivered", Some(1_000_i64)), ("pending", None)],
+        ),
+    ];
+    for (label, records) in duplicates {
+        let pagerduty = ScriptedBackend::new(PAGERDUTY, accept_every_dispatch);
+        let fixture = Fixture::open(&[&pagerduty]);
+        let alerts = fixture.page_due(1);
+        let key = alerts[0].idempotency_key.as_str();
+        let database = fixture.database();
+        database
+            .execute_batch(&format!(
+                "DROP TABLE chio_security_alert_outbox_backend;
+                 CREATE TABLE chio_security_alert_outbox_backend ({FOREIGN_BACKEND_COLUMNS});"
+            ))
+            .unwrap_or_else(|error| panic!("replace backend outcome table: {error}"));
+        for (status, delivered_at) in records {
+            database
+                .execute(
+                    "INSERT INTO chio_security_alert_outbox_backend
+                     SELECT idempotency_key, ?1, command_hash, ?2, 1, ?3
+                     FROM chio_security_alert_outbox WHERE idempotency_key = ?4",
+                    rusqlite::params![PAGERDUTY, status, delivered_at, key],
+                )
+                .unwrap_or_else(|error| panic!("insert {status} record: {error}"));
+        }
+        let stored: Vec<String> = {
+            let mut statement = database
+                .prepare(
+                    "SELECT backend.status
+                     FROM chio_security_alert_outbox_backend AS backend
+                     JOIN chio_security_alert_outbox AS alert
+                       ON alert.idempotency_key = backend.idempotency_key
+                      AND alert.command_hash = backend.command_hash
+                     WHERE backend.idempotency_key = ?1 AND backend.backend_name = ?2
+                     ORDER BY backend.rowid",
+                )
+                .unwrap_or_else(|error| panic!("prepare duplicate scan: {error}"));
+            statement
+                .query_map(rusqlite::params![key, PAGERDUTY], |row| row.get(0))
+                .unwrap_or_else(|error| panic!("scan duplicates: {error}"))
+                .collect::<rusqlite::Result<Vec<_>>>()
+                .unwrap_or_else(|error| panic!("read duplicates: {error}"))
+        };
+        assert_eq!(
+            stored,
+            records.map(|(status, _)| status.to_owned()).to_vec(),
+            "precondition: both {PAGERDUTY} records ({label}) must bind the exact paged command"
+        );
+        assert_eq!(
+            fixture.status(&alerts[0]),
+            Some(pending(0, DUE_AT_UNIX_MS)),
+            "precondition: the row must be pending and due ({label})"
+        );
+
+        let result = fixture.deliver(DUE_AT_UNIX_MS, 10).await;
+        assert_eq!(
+            fixture.status(&alerts[0]),
+            Some(pending(0, DUE_AT_UNIX_MS)),
+            "duplicate {PAGERDUTY} records ({label}) must never confirm the row; deliver_due \
+             returned {result:?} after {} dispatches",
+            pagerduty.dispatches().len()
+        );
+        assert_eq!(pagerduty.dispatches().len(), 0, "{label}");
+        let error = rejection(result, "duplicate backend records must fail closed");
+        assert_eq!(error.kind(), PortErrorKind::IntegrityFailure, "{label}");
+        let error = rejection(
+            fixture.outbox.load_backend_deliveries(&AlertDeliveryQuery {
+                alert: alerts[0].clone(),
+            }),
+            "duplicate backend records must not be reported as one outcome",
+        );
+        assert_eq!(error.kind(), PortErrorKind::IntegrityFailure, "{label}");
+        let error = rejection(
+            fixture.outbox.ensure_alerts_ready(),
+            "readiness must refuse the replaced backend outcome table",
+        );
+        assert_eq!(error.kind(), PortErrorKind::IntegrityFailure, "{label}");
+    }
+}
