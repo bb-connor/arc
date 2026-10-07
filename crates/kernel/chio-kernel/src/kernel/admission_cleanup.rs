@@ -298,9 +298,17 @@ impl ChioKernel {
         operation_store: &dyn AdmissionOperationStore,
         approval_store: Option<&dyn ApprovalStore>,
     ) -> Result<usize, KernelError> {
+        self.drain_compensated_active_response_operations_progress(operation_store, approval_store)?
+            .into_ready_count()
+    }
+
+    pub(super) fn drain_compensated_active_response_operations_progress(
+        &self,
+        operation_store: &dyn AdmissionOperationStore,
+        approval_store: Option<&dyn ApprovalStore>,
+    ) -> Result<ActiveResponseRecoveryProgress, KernelError> {
         let mut cursor: Option<String> = None;
-        let mut recovered = 0_usize;
-        let mut pending = None;
+        let mut progress = ActiveResponseRecoveryProgress::default();
         loop {
             let mut ids = operation_store.list_compensated_with_pending_cleanup_page(
                 Some(AdmissionOperationKind::GovernedActiveResponse),
@@ -317,21 +325,20 @@ impl ChioKernel {
                     approval_store,
                     &id,
                 )? {
-                    recovered = increment_recovery_count(recovered)?;
-                } else if pending.is_none() {
-                    pending = Some(KernelError::Internal(format!(
-                        "active-response cleanup remains pending for {id}"
-                    )));
+                    progress.record_completed()?;
+                } else {
+                    progress.record_pending(|| {
+                        KernelError::Internal(format!(
+                            "active-response cleanup remains pending for {id}"
+                        ))
+                    })?;
                 }
             }
             if !more_remaining {
                 break;
             }
         }
-        if let Some(error) = pending {
-            return Err(error);
-        }
-        Ok(recovered)
+        Ok(progress)
     }
 
     fn recover_compensated_active_response_operation_with_store(
@@ -646,13 +653,29 @@ impl ChioKernel {
         approval_store: Option<&dyn ApprovalStore>,
         expected_coordinator_authority_id: &str,
     ) -> Result<usize, KernelError> {
-        let mut recovered = self.recover_terminal_receipt_outboxes_with_store(
+        self.recover_nonterminal_active_response_operations_progress(
             operation_store,
-            AdmissionOperationKind::GovernedActiveResponse,
-            Some(expected_coordinator_authority_id),
-        )?;
+            approval_store,
+            expected_coordinator_authority_id,
+        )?
+        .into_ready_count()
+    }
+
+    pub(super) fn recover_nonterminal_active_response_operations_progress(
+        &self,
+        operation_store: &dyn AdmissionOperationStore,
+        approval_store: Option<&dyn ApprovalStore>,
+        expected_coordinator_authority_id: &str,
+    ) -> Result<ActiveResponseRecoveryProgress, KernelError> {
+        let mut progress = ActiveResponseRecoveryProgress {
+            completed: self.recover_terminal_receipt_outboxes_with_store(
+                operation_store,
+                AdmissionOperationKind::GovernedActiveResponse,
+                Some(expected_coordinator_authority_id),
+            )?,
+            ..ActiveResponseRecoveryProgress::default()
+        };
         let mut cursor: Option<String> = None;
-        let mut deferred = None;
         loop {
             let mut page = operation_store.list_admission_recovery_candidates_page(
                 AdmissionOperationKind::GovernedActiveResponse,
@@ -675,12 +698,10 @@ impl ChioKernel {
                     expected_coordinator_authority_id,
                     operation,
                 ) {
-                    Ok(true) => recovered = increment_recovery_count(recovered)?,
+                    Ok(true) => progress.record_completed()?,
                     Ok(false) => {}
                     Err(ActiveResponseRecoveryFailure::ItemRefusal(error)) => {
-                        if deferred.is_none() {
-                            deferred = Some(error);
-                        }
+                        progress.record_pending(|| error)?;
                     }
                     Err(ActiveResponseRecoveryFailure::Fatal(error)) => return Err(error),
                 }
@@ -689,14 +710,7 @@ impl ChioKernel {
                 break;
             }
         }
-        if let Some(error) = deferred {
-            tracing::warn!(
-                recovered,
-                "active-response recovery made progress before an item refusal"
-            );
-            return Err(error);
-        }
-        Ok(recovered)
+        Ok(progress)
     }
 
     fn recover_active_response_item(
@@ -786,8 +800,61 @@ impl From<KernelError> for ActiveResponseRecoveryFailure {
     }
 }
 
+/// Item-local outcome of one complete active-response recovery pass. Fatal
+/// failures never become progress: they return before the pass finishes.
+/// `pending` is nonzero exactly when `first_refusal` is retained.
+#[derive(Default)]
+pub(super) struct ActiveResponseRecoveryProgress {
+    pub(super) completed: usize,
+    pub(super) pending: usize,
+    pub(super) first_refusal: Option<KernelError>,
+}
+
+impl ActiveResponseRecoveryProgress {
+    fn record_completed(&mut self) -> Result<(), KernelError> {
+        self.completed = increment_recovery_count(self.completed)?;
+        Ok(())
+    }
+
+    fn record_pending(&mut self, refusal: impl FnOnce() -> KernelError) -> Result<(), KernelError> {
+        self.pending = increment_recovery_count(self.pending)?;
+        if self.first_refusal.is_none() {
+            self.first_refusal = Some(refusal());
+        }
+        Ok(())
+    }
+
+    /// Combine passes in execution order. The earlier pass keeps its refusal.
+    pub(super) fn merge(self, later: Self) -> Result<Self, KernelError> {
+        Ok(Self {
+            completed: add_recovery_counts(self.completed, later.completed)?,
+            pending: add_recovery_counts(self.pending, later.pending)?,
+            first_refusal: self.first_refusal.or(later.first_refusal),
+        })
+    }
+
+    /// Readiness is refused while any item-local work remains pending.
+    pub(super) fn into_ready_count(self) -> Result<usize, KernelError> {
+        match self.first_refusal {
+            None => Ok(self.completed),
+            Some(refusal) => {
+                tracing::warn!(
+                    recovered = self.completed,
+                    pending = self.pending,
+                    "active-response recovery made progress before an item refusal"
+                );
+                Err(refusal)
+            }
+        }
+    }
+}
+
 fn increment_recovery_count(count: usize) -> Result<usize, KernelError> {
-    count.checked_add(1).ok_or_else(|| {
+    add_recovery_counts(count, 1)
+}
+
+fn add_recovery_counts(left: usize, right: usize) -> Result<usize, KernelError> {
+    left.checked_add(right).ok_or_else(|| {
         KernelError::Internal("active-response recovery count overflowed usize".into())
     })
 }

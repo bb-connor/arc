@@ -188,16 +188,18 @@ impl ChioKernel {
         // installed ancillary participant authorities before any publication
         // field changes. Cleanup is operation-bound and idempotent, so durable
         // progress is safe if publication later aborts while the kernel remains
-        // on the old generation.
-        self.drain_compensated_active_response_operations(
+        // on the old generation. Item-local pending work from either pass
+        // refuses publication only after both passes have run.
+        let compensated = self.drain_compensated_active_response_operations_progress(
             publication.admission_operation_store.as_ref(),
             Some(publication.approval_store.as_ref()),
         )?;
-        self.recover_nonterminal_active_response_operations_with_authorities(
+        let nonterminal = self.recover_nonterminal_active_response_operations_progress(
             publication.admission_operation_store.as_ref(),
             Some(publication.approval_store.as_ref()),
             executor_identity.authority_id(),
         )?;
+        compensated.merge(nonterminal)?.into_ready_count()?;
 
         self.guards = Arc::new(publication.guards.into_iter().map(Arc::from).collect());
         self.post_invocation_pipeline = publication.post_invocation_pipeline;
