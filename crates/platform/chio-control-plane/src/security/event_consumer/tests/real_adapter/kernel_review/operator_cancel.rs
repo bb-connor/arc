@@ -1,5 +1,6 @@
-//! Operator cancellation of a governed preparation whose threshold approval
-//! already committed, using real signed artifacts and SQLite stores.
+//! Operator cancellation and commit retry of a governed preparation whose
+//! threshold approval already committed, using real signed artifacts and SQLite
+//! stores.
 use super::*;
 use chio_kernel::security_admission_operation::{
     AdmissionCleanupActionKind, AdmissionDispatchState,
@@ -256,6 +257,127 @@ fn operator_cancel_cannot_compensate_already_committed_threshold_approval() {
         assert_eq!(approval_rows(&fixture.paths), approvals_before);
     }
     assert_eq!(total_effects, 1);
+}
+
+/// Moves the kernel's injected fixture clock to the response plan expiry
+/// boundary and proves the kernel authority reading observes it.
+fn at_plan_expiry(fixture: &RealAdapterFixture) -> chio_test_support::clock::ClockScope {
+    let expires_at_unix_ms = fixture.native_request().response_plan().expires_at_unix_ms;
+    let scope = chio_test_support::clock::scope_unix_secs(expires_at_unix_ms.div_ceil(1_000));
+    let observed = fixture
+        .runtime
+        .kernel
+        .authority_clock_reading()
+        .test_unwrap()
+        .unix_millis()
+        .get();
+    assert!(
+        (expires_at_unix_ms..expires_at_unix_ms + 1_000).contains(&observed),
+        "kernel authority clock observed {observed}, plan expires at {expires_at_unix_ms}"
+    );
+    scope
+}
+
+#[test]
+fn committed_threshold_approval_retry_after_expiry_cannot_be_compensated() {
+    let fail_next = Arc::new(AtomicBool::new(false));
+    let fixture = dispatch_commit_fault_fixture(&fail_next);
+    let request = fixture.native_request().clone();
+    let plan = request.response_plan().clone();
+    let prepared = committed_approval_window(&fixture, &fail_next);
+    let id = operation_id(&prepared).to_owned();
+    let committed = fixture
+        .runtime
+        .admission_operations
+        .load(&id)
+        .test_unwrap()
+        .test_unwrap();
+    assert_eq!(committed.request_id(), plan.action_id.as_str());
+    assert_eq!(
+        committed.coordinator_authority_id(),
+        fixture.runtime.executor.identity().authority_id()
+    );
+    let committed_approval = fixture
+        .runtime
+        .approvals
+        .get_approval_reservation(&id)
+        .test_unwrap();
+    let approvals_before = approval_rows(&fixture.paths);
+    assert_eq!(
+        terminal_receipt_actions(&fixture.runtime.admission_operations, &id),
+        0
+    );
+    let _expired = at_plan_expiry(&fixture);
+    assert!(!fail_next.load(Ordering::Acquire));
+
+    let retry = fixture
+        .runtime
+        .kernel
+        .commit_prepared_active_response_admission(&request, &prepared);
+    let operation = fixture
+        .runtime
+        .admission_operations
+        .load(&id)
+        .test_unwrap()
+        .test_unwrap();
+    assert_eq!(
+        operation.state(),
+        AdmissionOperationState::DispatchCommitted,
+        "a commit retry after expiry compensated an already committed approval: {retry:?}"
+    );
+    assert_eq!(
+        operation.dispatch_state(),
+        AdmissionDispatchState::Committed
+    );
+    assert!(operation.has_same_prepared_binding(&committed));
+    assert_eq!(
+        terminal_receipt_actions(&fixture.runtime.admission_operations, &id),
+        0
+    );
+    assert_eq!(
+        fixture
+            .runtime
+            .approvals
+            .get_approval_reservation(&id)
+            .test_unwrap(),
+        committed_approval
+    );
+    assert_eq!(approval_rows(&fixture.paths), approvals_before);
+    assert_eq!(fixture.runtime.executor.calls(), 0);
+    assert_eq!(fixture.runtime.effects.executions(), 0);
+    assert!(retry.is_ok(), "{retry:?}");
+
+    drop(fixture.runtime);
+    let reopened = build_real_adapter_runtime(
+        &fixture.paths,
+        &fixture.operator_authority,
+        &fixture.executor_signer,
+        &fixture.submission_authority,
+        &fixture.threshold_policy_authority,
+        &fixture.threshold_requirement,
+        &fixture.finding,
+        &plan,
+        Arc::clone(&fixture.clock),
+        false,
+    );
+    assert_eq!(
+        reopened.admission_operations.load(&id).test_unwrap(),
+        Some(operation)
+    );
+    assert_eq!(
+        terminal_receipt_actions(&reopened.admission_operations, &id),
+        0
+    );
+    assert_eq!(
+        reopened
+            .approvals
+            .get_approval_reservation(&id)
+            .test_unwrap(),
+        committed_approval
+    );
+    assert_eq!(approval_rows(&fixture.paths), approvals_before);
+    assert_eq!(reopened.executor.calls(), 0);
+    assert_eq!(reopened.effects.executions(), 0);
 }
 
 /// Reports the exact approval reservation under a different approval set while
