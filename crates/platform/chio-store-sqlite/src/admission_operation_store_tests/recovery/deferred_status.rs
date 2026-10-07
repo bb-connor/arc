@@ -209,8 +209,8 @@ fn recovery_backoff_due_and_global_integrity_are_checked_before_skipping() -> An
     assert!(matches!(
         fixture.store.recovery_page(query(at + 2_000)),
         Err(AdmissionRecoveryPortError::Local(
-            AdmissionOperationStoreError::Invariant(_)
-        ))
+            AdmissionOperationStoreError::OutcomeUnknown(reason)
+        )) if reason == "authority database changed outside its serving-owner connection"
     ));
     assert!(matches!(
         fixture.store.load_recovery_status(
@@ -219,8 +219,49 @@ fn recovery_backoff_due_and_global_integrity_are_checked_before_skipping() -> An
             at + 2_000
         ),
         Err(AdmissionRecoveryPortError::Local(
-            AdmissionOperationStoreError::Invariant(_)
-        ))
+            AdmissionOperationStoreError::OutcomeUnknown(reason)
+        )) if reason == "sqlite authority owner is poisoned after an outcome-unknown anchor sync"
+    ));
+
+    // A fresh owned-connection scenario reaches the anchored status check.
+    // It is separate from the earlier external-write custody refusal above.
+    let owned = crate::admission_operation_store::tests::fixture();
+    let owned_operation = prepared_operation(
+        &owned.fence,
+        AdmissionOperationKind::ToolDispatch,
+        "deferred-owned-integrity-request",
+        "deferred-owned-integrity-capability",
+    );
+    owned.store.begin(&owned_operation, &owned.fence, at)?;
+    defer(&owned, &owned_operation, at)?;
+    let owned_query = AdmissionRecoveryPageQuery {
+        not_after_unix_ms: at + 2_000,
+        candidate_limit: 1,
+        after_operation_id: None,
+        fence: &owned.fence,
+    };
+    owned.store.connection()?.execute(
+        "UPDATE admission_operation_recovery_deferrals SET status_digest=?1 WHERE operation_id=?2",
+        params![
+            "b".repeat(64),
+            owned_operation.binding().operation_id().as_str()
+        ],
+    )?;
+    assert!(matches!(
+        owned.store.recovery_page(owned_query),
+        Err(AdmissionRecoveryPortError::Local(
+            AdmissionOperationStoreError::Invariant(reason)
+        )) if reason == "recovery status does not match its anchored canonical record"
+    ));
+    assert!(matches!(
+        owned.store.load_recovery_status(
+            owned_operation.binding().operation_id(),
+            &owned.fence,
+            at + 2_000
+        ),
+        Err(AdmissionRecoveryPortError::Local(
+            AdmissionOperationStoreError::Invariant(reason)
+        )) if reason == "recovery status does not match its anchored canonical record"
     ));
     Ok(())
 }
