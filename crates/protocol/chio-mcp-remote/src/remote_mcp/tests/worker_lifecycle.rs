@@ -772,5 +772,7 @@ async fn new_post_with_distinct_id_excludes_prior_owner_nested_request() {
     assert_only_own_outcome(&owner_hand_off(17, 18).await);
 }
 
+#[path = "worker_lifecycle/initialize_session_header.rs"]
+mod initialize_session_header;
 #[path = "worker_lifecycle/roots_next_request.rs"]
 mod roots_next_request;
