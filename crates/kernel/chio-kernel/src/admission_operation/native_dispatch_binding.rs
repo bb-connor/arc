@@ -57,8 +57,13 @@ impl NativeSecurityDispatchRequestBindingV1 {
             chio_core::canonical::UntrustedJsonText::from_wire(bytes, MAX_LEDGER_BYTES)
                 .and_then(|input| input.decode_signed())?;
         let operation = AdmissionOperationV1::from_persisted(
-            serde_json::from_value(value["operation"].clone())
-                .map_err(UntrustedJsonError::Decode)?,
+            serde_json::from_value(
+                value
+                    .get("operation")
+                    .cloned()
+                    .unwrap_or(serde_json::Value::Null),
+            )
+            .map_err(UntrustedJsonError::Decode)?,
         )?;
         if canonical_json_bytes(&value).map_err(UntrustedJsonError::Canonicalization)? != *bytes
             || sha256_hex(bytes) != record.record_digest.as_str()
@@ -78,16 +83,23 @@ impl NativeSecurityDispatchRequestBindingV1 {
                 Ok(None)
             }
             Some(NATIVE_DISPATCH_LEDGER_SCHEMA) => {
-                let dispatch_commitment_id: RecordId =
-                    serde_json::from_value(value["original_dispatch_commitment_id"].clone())
-                        .map_err(UntrustedJsonError::Decode)?;
+                let dispatch_commitment_id: RecordId = serde_json::from_value(
+                    value
+                        .get("original_dispatch_commitment_id")
+                        .cloned()
+                        .unwrap_or(serde_json::Value::Null),
+                )
+                .map_err(UntrustedJsonError::Decode)?;
                 if !valid_dispatch_commitment_id(&dispatch_commitment_id) {
                     return Err(invalid("original native dispatch commitment is invalid"));
                 }
                 Ok(Some(Self {
                     dispatch_commitment_id,
                     live_request_digest: serde_json::from_value(
-                        value["live_request_digest"].clone(),
+                        value
+                            .get("live_request_digest")
+                            .cloned()
+                            .unwrap_or(serde_json::Value::Null),
                     )
                     .map_err(UntrustedJsonError::Decode)?,
                 }))
