@@ -1,10 +1,10 @@
 //! Semantic signatures authenticate distinct roles and never replace admission.
-use super::RecoveryDigestDomain;
 use super::authority::{invalid, signed_authority};
+use super::RecoveryDigestDomain;
 use crate::crypto::Ed25519Backend;
 use crate::{
-    CanonicalBytes, Keypair, PublicKey, Result, Signature, SigningAlgorithm, SigningBackend,
-    canonical_json_bytes,
+    canonical_json_bytes, CanonicalBytes, Keypair, PublicKey, Result, Signature, SigningAlgorithm,
+    SigningBackend,
 };
 use alloc::vec::Vec;
 use chio_security_types::{recovery::*, semantic::*};

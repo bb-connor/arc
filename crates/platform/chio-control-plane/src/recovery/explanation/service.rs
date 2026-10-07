@@ -1,9 +1,9 @@
 //! This service needs an advisory signer and explicit facts, not a kernel,
 //! process runtime, disclosure issuer, provider or mutation port.
 use crate::recovery::RecoveryRuntimeError;
-use chio_core_types::{Ed25519Backend, SigningBackend, recovery::*};
-use chio_recovery::{ExplanationAudience, prepare_explanation_report};
-use chio_security_types::{InformationLabel, recovery::*};
+use chio_core_types::{recovery::*, Ed25519Backend, SigningBackend};
+use chio_recovery::{prepare_explanation_report, ExplanationAudience};
+use chio_security_types::{recovery::*, InformationLabel};
 use rand_core::{OsRng, RngCore};
 use std::{
     collections::BTreeMap,
@@ -301,11 +301,9 @@ mod tests {
         )?;
         assert!(service.admit(&active, EXPLANATION_WINDOW_MS).is_err());
         assert!(service.admit(&active, EXPLANATION_WINDOW_MS - 2).is_err());
-        assert!(
-            service
-                .admit(&active, EXPLANATION_WINDOW_MS * 2 - 1)
-                .is_ok()
-        );
+        assert!(service
+            .admit(&active, EXPLANATION_WINDOW_MS * 2 - 1)
+            .is_ok());
         Ok(())
     }
 }

@@ -1,7 +1,7 @@
 use chio_security_types::recovery::{
     BoundedList, ContractError, NonEmptyBoundedList, SafeInteger, StepId, TemplateId,
 };
-use chio_semantic_contracts::{DependencyNodeV1, VerificationBudget, validate_dependency_graph};
+use chio_semantic_contracts::{validate_dependency_graph, DependencyNodeV1, VerificationBudget};
 type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 fn node(id: &str, dependencies: &[&str], cost: u64) -> Result<DependencyNodeV1> {

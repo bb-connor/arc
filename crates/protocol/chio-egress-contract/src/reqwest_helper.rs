@@ -1,6 +1,6 @@
 use crate::{HttpEgressContract, HttpEgressError, PreparedHttpEgressContract};
 use reqwest::header::{
-    AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, COOKIE, HOST, HeaderMap, HeaderName, LOCATION,
+    HeaderMap, HeaderName, AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, COOKIE, HOST, LOCATION,
     PROXY_AUTHORIZATION,
 };
 use reqwest::{Method, StatusCode, Url};

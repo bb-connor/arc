@@ -6,10 +6,10 @@ use std::path::Path;
 use std::process::{Command, Output};
 
 use chio_core::{
-    crypto::{Keypair, canonical_json_bytes, sha256_hex},
+    crypto::{canonical_json_bytes, sha256_hex, Keypair},
     receipt::{body::ChioReceipt, decision::ToolCallAction},
 };
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -148,10 +148,10 @@ fn modeled_outcomes() -> Result<(ChioReceipt, Keypair)> {
     use chio_core_types::{
         capability::{
             aggregate_invocation::{
-                AggregateBudgetDelegationMarker, verify_aggregate_invocation_budget,
+                verify_aggregate_invocation_budget, AggregateBudgetDelegationMarker,
             },
             attenuation::{
-                DelegationLink, DelegationLinkBody, compute_attenuation_witness, scope_hash,
+                compute_attenuation_witness, scope_hash, DelegationLink, DelegationLinkBody,
             },
             scope::{ChioScope, Operation, ToolGrant},
             token::{CapabilityToken, CapabilityTokenBody},
@@ -536,12 +536,10 @@ fn supervised_outcomes_exports_preserve_incomplete_qualification_aliases() -> Re
     assert_eq!(report["captured_invocations"], 2);
     assert_eq!(report["artifact_schema"], "chio.process.worker-outcomes.v3");
     for check in ["execution_nonces", "receipt_log_inclusion"] {
-        assert!(
-            report["checks"]
-                .as_array()
-                .ok_or("checks")?
-                .contains(&json!(check))
-        );
+        assert!(report["checks"]
+            .as_array()
+            .ok_or("checks")?
+            .contains(&json!(check)));
     }
     let mut states = report["observed_operations"]
         .as_object()

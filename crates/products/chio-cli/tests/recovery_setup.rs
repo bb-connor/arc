@@ -1,11 +1,12 @@
 //! Actual CLI transport preserves opaque setup proofs and pins trusted operator evidence.
 use chio_core_types::{
-    Keypair, canonical_json_bytes,
+    canonical_json_bytes,
     capability::{
         scope::{ChioScope, Operation, ToolGrant},
         token::{CapabilityToken, CapabilityTokenBody},
     },
     recovery::*,
+    Keypair,
 };
 use std::{
     io::{Read, Write},
@@ -490,11 +491,9 @@ fn setup_cli_rejects_a_valid_envelope_signed_by_a_different_operator() -> Result
             assert_eq!(invocation.output.stdout, response);
         } else {
             assert!(invocation.output.stdout.is_empty());
-            assert!(
-                !String::from_utf8_lossy(&invocation.output.stderr)
-                    .to_ascii_lowercase()
-                    .contains("readiness")
-            );
+            assert!(!String::from_utf8_lossy(&invocation.output.stderr)
+                .to_ascii_lowercase()
+                .contains("readiness"));
         }
     }
     Ok(())
@@ -578,11 +577,9 @@ fn setup_cli_refuses_a_signed_report_for_a_different_probe() -> Result {
             "accepted an unrelated signed setup report: {case}"
         );
         assert!(invocation.output.stdout.is_empty());
-        assert!(
-            !String::from_utf8_lossy(&invocation.output.stderr)
-                .to_ascii_lowercase()
-                .contains("readiness")
-        );
+        assert!(!String::from_utf8_lossy(&invocation.output.stderr)
+            .to_ascii_lowercase()
+            .contains("readiness"));
     }
     Ok(())
 }

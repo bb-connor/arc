@@ -71,8 +71,8 @@ mod tests {
     use chio_security_types::recovery::RecoveryTrajectoryV1;
 
     #[test]
-    fn trajectory_effect_assertions_reject_each_independent_mutation()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn trajectory_effect_assertions_reject_each_independent_mutation(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let wire = include_str!("../../../../spec/vectors/recovery/v1/trajectory.json").trim_end();
         let trajectory: RecoveryTrajectoryV1 = decode_contract(wire.as_bytes())?;
         let expected = &trajectory.frames.as_slice()[0].expected;

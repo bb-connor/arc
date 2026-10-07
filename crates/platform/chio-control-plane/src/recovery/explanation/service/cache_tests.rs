@@ -170,37 +170,25 @@ fn retained_graph_keeps_original_identity_until_the_signed_view_expires() -> Tes
     assert!(Arc::ptr_eq(&first, &second));
     assert_eq!(first.report, expected_report);
     assert_eq!(first.view, expected_view);
-    assert!(
-        service
-            .retained_native_graph(&workflow, &reference, protected_deadline)
-            .is_ok()
-    );
-    assert!(
-        service
-            .retained_native_graph(&WorkflowId::new("other-workflow")?, &reference, 1000)
-            .is_err()
-    );
-    assert!(
-        service
-            .retained_native_graph(&workflow, &ExplanationRef::new("advice:missing")?, 1000)
-            .is_err()
-    );
-    assert!(
-        service
-            .retained_native_graph(&workflow, &reference, deadline - 1)
-            .is_ok()
-    );
-    assert!(
-        service
-            .retained_native_graph(&workflow, &reference, deadline)
-            .is_err()
-    );
+    assert!(service
+        .retained_native_graph(&workflow, &reference, protected_deadline)
+        .is_ok());
+    assert!(service
+        .retained_native_graph(&WorkflowId::new("other-workflow")?, &reference, 1000)
+        .is_err());
+    assert!(service
+        .retained_native_graph(&workflow, &ExplanationRef::new("advice:missing")?, 1000)
+        .is_err());
+    assert!(service
+        .retained_native_graph(&workflow, &reference, deadline - 1)
+        .is_ok());
+    assert!(service
+        .retained_native_graph(&workflow, &reference, deadline)
+        .is_err());
     let restarted = self::service(service.scope.clone())?;
-    assert!(
-        restarted
-            .retained_native_graph(&workflow, &reference, 1000)
-            .is_err()
-    );
+    assert!(restarted
+        .retained_native_graph(&workflow, &reference, 1000)
+        .is_err());
     Ok(())
 }
 
@@ -247,11 +235,9 @@ fn cache_capacity_preserves_every_live_reference_and_reclaims_only_expired_entri
         Err(RecoveryRuntimeError::Unavailable)
     ));
     for reference in &references {
-        assert!(
-            service
-                .retained_native_graph(&workflow, reference, 1000)
-                .is_ok()
-        );
+        assert!(service
+            .retained_native_graph(&workflow, reference, 1000)
+            .is_ok());
     }
     let expiry = expiry.ok_or("missing expiry")?;
     let (mut snapshot, mut registry) = native_inputs(InformationLabel::bottom())?;
@@ -277,11 +263,9 @@ fn cache_capacity_preserves_every_live_reference_and_reclaims_only_expired_entri
     )?;
     service.retain_native_graph(&workflow, next_artifact, expiry)?;
     for reference in &references {
-        assert!(
-            service
-                .retained_native_graph(&workflow, reference, expiry)
-                .is_err()
-        );
+        assert!(service
+            .retained_native_graph(&workflow, reference, expiry)
+            .is_err());
     }
     Ok(())
 }
@@ -299,11 +283,9 @@ fn a_reference_collision_or_clock_rollback_cannot_replace_the_original_graph() -
         service.retain_native_graph(&WorkflowId::new("other-workflow")?, original, 1000),
         Err(RecoveryRuntimeError::Unavailable)
     ));
-    assert!(
-        service
-            .retained_native_graph(&workflow, &reference, 999)
-            .is_err()
-    );
+    assert!(service
+        .retained_native_graph(&workflow, &reference, 999)
+        .is_err());
     assert_eq!(
         service
             .retained_native_graph(&workflow, &reference, 1000)?

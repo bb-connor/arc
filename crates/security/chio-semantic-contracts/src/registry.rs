@@ -4,7 +4,7 @@ use alloc::{
     vec,
     vec::Vec,
 };
-use chio_core_types::{PublicKey, recovery::*};
+use chio_core_types::{recovery::*, PublicKey};
 use chio_security_types::{recovery::*, semantic::*};
 use serde::{Deserialize, Serialize};
 

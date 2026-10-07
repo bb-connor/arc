@@ -7,12 +7,12 @@ use std::process::{Command, Output};
 
 #[cfg(target_os = "linux")]
 use chio_core::{
-    crypto::{Keypair, canonical_json_bytes, sha256_hex},
+    crypto::{canonical_json_bytes, sha256_hex, Keypair},
     receipt::{body::ChioReceipt, decision::ToolCallAction},
 };
-use serde_json::Value;
 #[cfg(target_os = "linux")]
 use serde_json::json;
+use serde_json::Value;
 
 type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -89,12 +89,10 @@ fn retained_calls_bind_real_outcomes_and_reject_resigned_substitutions() -> Resu
         assert_eq!(report["qualification_complete"], false);
         assert_eq!(report["m5_acceptance_complete"], false);
         for check in ["execution_nonces", "receipt_log_inclusion"] {
-            assert!(
-                report["checks"]
-                    .as_array()
-                    .ok_or("checks")?
-                    .contains(&json!(check))
-            );
+            assert!(report["checks"]
+                .as_array()
+                .ok_or("checks")?
+                .contains(&json!(check)));
         }
         let original: ChioReceipt = serde_json::from_slice(&std::fs::read(&artifact)?)?;
         let state = original.action.parameters["operation"]["state"]
@@ -105,16 +103,12 @@ fn retained_calls_bind_real_outcomes_and_reject_resigned_substitutions() -> Resu
             "compensated_before_dispatch" => counts[1] += 1,
             _ => return Err(format!("unexpected operation state: {state}").into()),
         }
-        assert!(
-            !verify(&artifact, "another-runtime", &folder, &key)?
-                .status
-                .success()
-        );
-        assert!(
-            !verify(&artifact, runtime, &folder, &wrong_key)?
-                .status
-                .success()
-        );
+        assert!(!verify(&artifact, "another-runtime", &folder, &key)?
+            .status
+            .success());
+        assert!(!verify(&artifact, runtime, &folder, &wrong_key)?
+            .status
+            .success());
         let other = if name == "alice" {
             root.join("bob")
         } else {
@@ -317,12 +311,10 @@ fn retained_call_exports_preserve_incomplete_qualification_aliases() -> Result {
     );
     assert_eq!(report["observed_operation_state"], "completed");
     for check in ["execution_nonces", "receipt_log_inclusion"] {
-        assert!(
-            report["checks"]
-                .as_array()
-                .ok_or("checks")?
-                .contains(&json!(check))
-        );
+        assert!(report["checks"]
+            .as_array()
+            .ok_or("checks")?
+            .contains(&json!(check)));
     }
     let signed: ChioReceipt = serde_json::from_slice(&std::fs::read(&artifact)?)?;
     assert!(signed.verify_signature()?);

@@ -13,8 +13,8 @@ mod work;
 pub use constraints::*;
 pub use effect::*;
 pub use graph::{
-    DependencyGraphSchema, DependencyGraphV1, DependencyNodeV1, ValidatedDependencyGraph,
-    validate_dependency_graph,
+    validate_dependency_graph, DependencyGraphSchema, DependencyGraphV1, DependencyNodeV1,
+    ValidatedDependencyGraph,
 };
 pub use plans::*;
 pub use registry::*;
