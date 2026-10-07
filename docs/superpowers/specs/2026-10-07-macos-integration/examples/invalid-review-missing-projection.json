@@ -1,0 +1,24 @@
+{
+  "version": "chio.desktop.operator.v1",
+  "request_id": "synthetic-request-review-open",
+  "method": "review.open",
+  "ok": true,
+  "result": {
+    "review_ref": {
+      "kind": "review",
+      "issuer": "synthetic-authority",
+      "native_id": "synthetic-review-1",
+      "generation": "1",
+      "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "presentation": "trusted_native_review",
+    "expires_in_seconds": 120,
+    "operation_ref": {
+      "kind": "operation",
+      "issuer": "synthetic-authority",
+      "native_id": "synthetic-operation-1",
+      "generation": "1",
+      "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  }
+}

@@ -1,5 +1,7 @@
 # Independent protocol, authority and recovery review
 
+This report records the initial local review before the first hosted review round. Later corrections and validation are recorded in [validation](validation.md) and [work log](work-log.md); hosted verdicts must be checked on the live current commit.
+
 Reviewed 2026-10-07 against base `6573b8980a1e5331028b7e688169f033a39d0384` and the uncommitted specification package. Scope: specifications 03/04/05/06/11/19, shared schemas, fixtures, document validator, and implementation plans M0/M2/M6. The native stop/event designs were checked in the pinned north-star review checkout. This is a specification-readiness review, not runtime qualification. Confidence in the findings below: high.
 
 Final rereview disposition: all four P2 findings below are resolved in the current uncommitted package. No unresolved P1/P2 finding remains in this reviewed scope. Confidence: high for the specification fixes and document checks. This permits proceeding with implementation planning under the stated native prerequisites; it does not establish runtime qualification.

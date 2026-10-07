@@ -16,7 +16,7 @@
     "operation_ref": {
       "kind": "operation",
       "issuer": "synthetic-authority",
-      "native_id": "synthetic-operation-1",
+      "native_id": "synthetic-other-operation",
       "generation": "1",
       "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     },

@@ -4,10 +4,13 @@ Validated on 2026-10-07. This record concerns the specification package, its syn
 
 ## Checks executed
 
-- `python3 docs/superpowers/specs/2026-10-07-macos-integration/verify.py --write-traceability --self-test`: passed. The package contains 41 Markdown documents, 323 normative requirements with acceptance/plan mappings, six schemas, 66 synthetic fixtures, 22 correlated request/response pairs and 15 validator self-checks. The output explicitly reports `runtime_qualification: false`.
-- Embedded fenced examples: all 34 Python blocks parse with `ast.parse`, all 13 JSON blocks decode, and all eight Bash blocks pass `bash -n`. Parsing checks syntax only; future commands and product examples were not thereby executed.
+Updated after the first hosted review repair. Traceability now binds all 323 requirements to 695 retained task/action excerpts. Fresh isolated virtualenv setup, regeneration and revalidation passed with the pinned dependency. The coverage self-checks reject removed/missing/duplicate requirements, plans, tasks and actions, while correctly ignoring headings inside fenced code.
+
+- `python3 docs/superpowers/specs/2026-10-07-macos-integration/verify.py --write-traceability --self-test`: passed. The package contains 42 Markdown documents, 323 normative requirements with acceptance/plan mappings, six schemas, 79 synthetic fixtures, 26 correlated request/response pairs and 27 validator self-checks. The output explicitly reports `runtime_qualification: false`.
+- Embedded fenced examples: all 35 Python blocks parse with `ast.parse`, all 13 JSON blocks decode, and all nine Bash blocks pass `bash -n`. Parsing checks syntax only; future commands and product examples were not thereby executed.
 - `cargo fmt --all -- --check`: passed against the assembled worktree. This documentation change introduces no Rust product source.
 - Focused pure example checks were exercised during plan authoring: M0/M6 Python and Rust helpers, M4 host-side Rust oracle controls, and M3 guest descriptor C syntax/source-lock refusal helpers. These checks establish only the illustrated local logic, not integration, guest provenance, installed isolation or a qualified profile.
+- Additional executed examples: the packed-only Git positive fixture retains seven reachable objects in one valid pack with zero loose objects and compares three committed files against its independent byte/mode oracle. The artifact-reader regression rejects a FIFO without a writer within its one-second subprocess bound, and all 12 lifecycle matrix rows pass the local data/completeness checks. These do not execute the future importer or installed lifecycle harness.
 - Independent [contract review](contracts-review.md) and [platform review](platform-review.md): all six initial findings corrected and reinspected; no remaining P1/P2 findings in either reviewed scope.
 
 The package command for subsequent checks is:

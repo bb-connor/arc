@@ -97,7 +97,99 @@
             }
           }
         ]
-      }
+      },
+      "allOf": [
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "profile": {
+                "const": "observe-v1"
+              }
+            },
+            "required": [
+              "profile"
+            ]
+          },
+          "minContains": 0,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "profile": {
+                "const": "brokered-v1"
+              }
+            },
+            "required": [
+              "profile"
+            ]
+          },
+          "minContains": 0,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "profile": {
+                "const": "vm-project-v1"
+              }
+            },
+            "required": [
+              "profile"
+            ]
+          },
+          "minContains": 0,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "profile": {
+                "const": "remote-project-v1"
+              }
+            },
+            "required": [
+              "profile"
+            ]
+          },
+          "minContains": 0,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "profile": {
+                "const": "native-descendant-v1"
+              }
+            },
+            "required": [
+              "profile"
+            ]
+          },
+          "minContains": 0,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "profile": {
+                "const": "managed-endpoint-v1"
+              }
+            },
+            "required": [
+              "profile"
+            ]
+          },
+          "minContains": 0,
+          "maxContains": 1
+        }
+      ]
     }
   },
   "required": [

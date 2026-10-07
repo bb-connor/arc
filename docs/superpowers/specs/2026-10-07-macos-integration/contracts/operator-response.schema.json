@@ -874,7 +874,134 @@
           "const": true
         },
         "result": {
-          "$ref": "common.schema.json#/$defs/stop_state"
+          "type": "object",
+          "properties": {
+            "admission": {
+              "enum": [
+                "requested",
+                "fenced",
+                "unavailable",
+                "restricted"
+              ]
+            },
+            "worker": {
+              "enum": [
+                "running",
+                "terminated",
+                "unknown",
+                "not_applicable"
+              ]
+            },
+            "network": {
+              "enum": [
+                "open",
+                "closed",
+                "unknown",
+                "not_applicable"
+              ]
+            },
+            "cleanup": {
+              "enum": [
+                "pending",
+                "complete",
+                "unknown"
+              ]
+            },
+            "external_outcome": {
+              "enum": [
+                "known",
+                "unresolved"
+              ]
+            },
+            "stop_ref": {
+              "oneOf": [
+                {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/native_ref"
+                    },
+                    {
+                      "properties": {
+                        "kind": {
+                          "const": "stop"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "durability": {
+              "enum": [
+                "unknown",
+                "process_only",
+                "latch_only",
+                "durable"
+              ]
+            },
+            "task_id": {
+              "$ref": "common.schema.json#/$defs/id"
+            }
+          },
+          "required": [
+            "admission",
+            "worker",
+            "network",
+            "cleanup",
+            "external_outcome",
+            "stop_ref",
+            "durability",
+            "task_id"
+          ],
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "durability": {
+                    "const": "durable"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "stop_ref": {
+                    "allOf": [
+                      {
+                        "$ref": "common.schema.json#/$defs/native_ref"
+                      },
+                      {
+                        "properties": {
+                          "kind": {
+                            "const": "stop"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "admission": {
+                    "const": "fenced"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "durability": {
+                    "const": "durable"
+                  }
+                }
+              }
+            }
+          ]
         }
       },
       "required": [
@@ -1009,12 +1136,31 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 300
+            },
+            "operation_ref": {
+              "allOf": [
+                {
+                  "$ref": "common.schema.json#/$defs/native_ref"
+                },
+                {
+                  "properties": {
+                    "kind": {
+                      "const": "operation"
+                    }
+                  }
+                }
+              ]
+            },
+            "projection": {
+              "$ref": "common.schema.json#/$defs/local_publication_review"
             }
           },
           "required": [
             "review_ref",
             "presentation",
-            "expires_in_seconds"
+            "expires_in_seconds",
+            "operation_ref",
+            "projection"
           ],
           "additionalProperties": false
         }

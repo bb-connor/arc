@@ -1,0 +1,1104 @@
+{
+  "requirements": [
+    {
+      "id": "MAC-DST-001",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 3: Build and inspect the signed application closure",
+          "action": "Bind every shipped executable/library/guest asset to immutable public source revision or archive digest, dependency lock entry, vendored patch digest, exact toolchain/build environment, unsigned content digest, final signed digest, and license/source-obligation record. Emit `source-provenance.json` and `sbom.spdx.json`; inventory packaging scripts as executable build inputs. Run two isolated offline rebuilds and compare unsigned content before claiming reproducibility."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 6: Notarization and clean consumer installation",
+          "action": "Explain actual optional approvals, selected unavailable profiles, and how to inspect the release evidence. Verify any instructed Git revision exists in the public repository before publishing. Commit with `build(macos): add notarized consumer distribution path`."
+        }
+      ]
+    },
+    {
+      "id": "MAC-DST-002",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 3: Build and inspect the signed application closure",
+          "action": "Extend bundle inspection to require Hardened Runtime flags and a secure signing timestamp on every applicable executable, reject `get-task-allow`, and validate actual provisioning capability grants rather than entitlement text alone. Implement `PinnedExecutableResolver` in the M2 Mac controller adapter using package-owned absolute paths, manifest identity/digest verification, a sanitized fixed environment, and no interactive-shell initialization."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 3: Build and inspect the signed application closure",
+          "action": "Embed reviewed helpers and selected providers from their owning tracks with inside-out signing; exact entitlement allowlists and actual provisioned Team ID are release inputs. Do not use `codesign --deep` as an implicit signing policy, disable library validation broadly, or add debug entitlements to make a production build run. Read-only and VM configurations omit unused providers."
+        }
+      ]
+    },
+    {
+      "id": "MAC-DST-003",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 6: Notarization and clean consumer installation",
+          "action": "Parse `notary-submit.json`, require successful final status, retain submission ID and full log, and reject errors even if a command returned output. Notarize/staple the intended container or app under Apple's documented supported workflow and capture the final post-staple digest. `spctl` app assessment remains a separate installed observation."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 6: Notarization and clean consumer installation",
+          "action": "The runner records host build/security settings, download quarantine, online/offline launch, signature and ticket checks. Expected: passing controls on a real qualified tuple or precise closed unavailability, never a local developer exception counted as consumer success."
+        }
+      ]
+    },
+    {
+      "id": "MAC-DST-004",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 3: Build and inspect the signed application closure",
+          "action": "Use `subprocess.run` with argument arrays and `check=True`; enumerate all executable Mach-O files and nested bundles without following links outside the bundle; compare exact identifiers, Team ID, architectures, entitlements, provisioning capabilities, and content digests against `release-inputs.json`. Return nonzero for missing inputs or any mismatch. The script records raw platform outputs as supporting evidence, never `qualified=true`."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 4: Platform service, extension, and keychain observations",
+          "action": "The caller supplies identifiers read from the validated bundle manifest; this code does not supply signing or grant authority."
+        }
+      ]
+    },
+    {
+      "id": "MAC-DST-005",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 4: Platform service, extension, and keychain observations",
+          "action": "Define local enum `ProviderAvailability` with `absent`, `approvalPending`, `restartPending`, `activeUnqualified`, and `unavailable`; test activation success remains `activeUnqualified`, not execution-ready. Test service denial and missing keychain access stay distinct. Native qualification comes only from the verified reference provided by M2/M6."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 4: Platform service, extension, and keychain observations",
+          "action": "Register only after explicit background-service selection; reopening the app must not repeat a denied request. Keep read-only diagnosis usable and open relevant settings only on explicit action. Add fresh-install, opt-out, five-reopen denial, approval withdrawal, and later opt-in cases with outside launch counts; no denied path starts a controller or requests broader permissions."
+        }
+      ]
+    },
+    {
+      "id": "MAC-DST-006",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 1: Freeze applicability and a release candidate tuple",
+          "action": "Require profile/features, exact host/component tuple, prerequisite proof digests, explicit acceptance IDs/subcases, required evidence class, control and observer digests, predicate ID/version, thresholds, invalidation map, and an externally authenticated pre-run binding. Enumerate the complete candidate-evidence set separately from final production-admission confirmation; this separation cannot remove a candidate case to make the first artifact pass."
+        },
+        {
+          "plan": "07-adapters-delegation.md",
+          "heading": "Task 8: Execute the complete matrix and publish truthful capability state",
+          "action": "Update the matrix with independent verified evidence references only after exact positive and negative cases pass. Re-run changed-boundary cases after any adapter, native ABI, model contract, policy, image, OS or provider binary change. A new framework's version must be exact and independently installed; dependency ranges and source receipts remain insufficient."
+        }
+      ]
+    },
+    {
+      "id": "MAC-DST-007",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 3: Build and inspect the signed application closure",
+          "action": "Implement `PinnedExecutableResolver` in the M2 Mac controller adapter using package-owned absolute paths, manifest identity/digest verification, a sanitized fixed environment, and no interactive-shell initialization. Add substituted PATH helper, startup-file command, injected-library environment, altered nested helper, missing timestamp, and invalid runtime-flag tests; the external fake-tool sentinel must remain untouched and incompatible code must refuse before launch."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 3: Build and inspect the signed application closure",
+          "action": "Add substituted PATH helper, startup-file command, injected-library environment, altered nested helper, missing timestamp, and invalid runtime-flag tests; the external fake-tool sentinel must remain untouched and incompatible code must refuse before launch."
+        }
+      ]
+    },
+    {
+      "id": "MAC-DST-008",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 7: Update, downgrade, removal, and incident state machines",
+          "action": "Verify metadata against installer-owned trust roots and expiry/security floor, stage safe files, call the native fence, persist exact proof references, reconcile originals, execute an explicitly supported state migration, replace app/provider, independently remeasure active code, then request native compatibility recheck. Any unknown step enters `recovery-required` with original custody retained."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 7: Update, downgrade, removal, and incident state machines",
+          "action": "Installer-owned authenticated policy binds current and successor signing/update-key identities, accepted metadata generation, expiry no later than seven days, security floor, and revocation records; downloaded metadata cannot replace its own trust root. A valid authenticated rotation permits only its named successor; same bundle name, unrelated key, or TLS alone does not."
+        }
+      ]
+    },
+    {
+      "id": "MAC-DST-009",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 7: Update, downgrade, removal, and incident state machines",
+          "action": "Introduce the stages exactly as in the distribution spec; journal old/new code digests, state ABI, pending native fence reference, and actual active provider observation. A reducer may choose only the next operational action, never declare native authority. Add tests for new app/old provider, denied replacement, interrupted migration, stale release floor, incompatible schema, and unresolved operation."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 7: Update, downgrade, removal, and incident state machines",
+          "action": "Verify metadata against installer-owned trust roots and expiry/security floor, stage safe files, call the native fence, persist exact proof references, reconcile originals, execute an explicitly supported state migration, replace app/provider, independently remeasure active code, then request native compatibility recheck. Any unknown step enters `recovery-required` with original custody retained."
+        }
+      ]
+    },
+    {
+      "id": "MAC-DST-010",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 4: Platform service, extension, and keychain observations",
+          "action": "`requestNeedsUserApproval` sets approval pending; `.willCompleteAfterReboot` sets restart pending; immediate completion triggers independent active-code remeasurement; failure records bounded OS error. Replacement returns `.replace` only for the previously validated compatibility decision, otherwise `.cancel`. Keep the delegate alive until terminal callback. Deactivation uses the containing app and retains pending restart until actual provider inspection confirms removal."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 7: Update, downgrade, removal, and incident state machines",
+          "action": "Add tests for new app/old provider, denied replacement, interrupted migration, stale release floor, incompatible schema, and unresolved operation."
+        }
+      ]
+    },
+    {
+      "id": "MAC-DST-011",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 7: Update, downgrade, removal, and incident state machines",
+          "action": "Compatible code rollback never overwrites native authority from the migration backup."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 7: Update, downgrade, removal, and incident state machines",
+          "action": "Test unsigned successor, replayed old metadata, expired offline metadata, revoked current build, interrupted rotation, and an allowed nonrevoked code rollback. Expiry prevents new update activation; observed revocation fences affected admission while retaining original custody and minimal signed incident evidence. Resume requires a newly verified exact-profile record and independent production confirmation, not clearing the warning."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 8: Shared-Mac lifecycle and rollback-resistant recovery cases",
+          "action": "Snapshot state before a grant is spent, spend/revoke/fence it, then restore database/keychain/home/guest snapshot and clone to a second machine. Remove connectivity to the independent freshness owner. Expected: no restored authority becomes current from a local database, keychain key, or internally consistent hash chain. A missing native freshness API is an owned M0/M6 prerequisite and yields `unavailable`; do not add an application-local counter as a substitute."
+        }
+      ]
+    },
+    {
+      "id": "MAC-DST-012",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 7: Update, downgrade, removal, and incident state machines",
+          "action": "Installer-owned authenticated policy binds current and successor signing/update-key identities, accepted metadata generation, expiry no later than seven days, security floor, and revocation records; downloaded metadata cannot replace its own trust root. A valid authenticated rotation permits only its named successor; same bundle name, unrelated key, or TLS alone does not."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 7: Update, downgrade, removal, and incident state machines",
+          "action": "A valid authenticated rotation permits only its named successor; same bundle name, unrelated key, or TLS alone does not. Test unsigned successor, replayed old metadata, expired offline metadata, revoked current build, interrupted rotation, and an allowed nonrevoked code rollback. Expiry prevents new update activation; observed revocation fences affected admission while retaining original custody and minimal signed incident evidence."
+        }
+      ]
+    },
+    {
+      "id": "MAC-DST-013",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 7: Update, downgrade, removal, and incident state machines",
+          "action": "Fence and stop owned work, preserve unknown outcomes, deactivate providers, unregister services, inventory actual residuals, and distinguish restart-pending. Default removal preserves projects/evidence/custody; purge is a separate explicit inventory-bound operation. An incident revokes affected trust through its owner and uses the same fence/recovery path."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 4: Platform service, extension, and keychain observations",
+          "action": "Deactivation uses the containing app and retains pending restart until actual provider inspection confirms removal."
+        }
+      ]
+    },
+    {
+      "id": "MAC-DST-014",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 7: Update, downgrade, removal, and incident state machines",
+          "action": "Default removal preserves projects/evidence/custody; purge is a separate explicit inventory-bound operation. An incident revokes affected trust through its owner and uses the same fence/recovery path."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 8: Shared-Mac lifecycle and rollback-resistant recovery cases",
+          "action": "Corrupt store, missing key, truncated provider mapping, or EIO preserves original bytes and unresolved custody, closes affected admission, and exposes bounded diagnosis instead of resetting state."
+        }
+      ]
+    },
+    {
+      "id": "MAC-DST-015",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 6: Notarization and clean consumer installation",
+          "action": "Render extension, supported PPPC, background-service, and removability payloads from the actual approved Team ID, bundle identities, designated code requirements, and selected OS payload schema; never infer MDM entitlement from a consumer approval. Install and withdraw those exact payloads on an enrolled test Mac, separately testing a standard user, admin, wrong-team identity, denied user override, and managed uninstall."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 6: Notarization and clean consumer installation",
+          "action": "Compare OS/MDM observations with native history: external restrictions are attributed to their administrator, removal cannot create a native grant, no MDM event creates approval/publication authority, and changed management invalidates affected profile evidence."
+        }
+      ]
+    },
+    {
+      "id": "MAC-DST-016",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 7: Update, downgrade, removal, and incident state machines",
+          "action": "Add tests for new app/old provider, denied replacement, interrupted migration, stale release floor, incompatible schema, and unresolved operation."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 8: Shared-Mac lifecycle and rollback-resistant recovery cases",
+          "action": "Corrupt store, missing key, truncated provider mapping, or EIO preserves original bytes and unresolved custody, closes affected admission, and exposes bounded diagnosis instead of resetting state."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 7: Update, downgrade, removal, and incident state machines",
+          "action": "Expected: outside effect count remains at most one for an original operation; unknowns survive; a mixed generation never becomes active for governed work."
+        }
+      ]
+    },
+    {
+      "id": "MAC-DST-017",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 6: Notarization and clean consumer installation",
+          "action": "Explain actual optional approvals, selected unavailable profiles, and how to inspect the release evidence. Verify any instructed Git revision exists in the public repository before publishing. Commit with `build(macos): add notarized consumer distribution path`."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 12: Profile expansion, adversarial closure, and public release review",
+          "action": "A reviewer other than the implementer uses the exact final signed artifact on a clean supported Mac and reconciles passing production confirmation, user-visible capability availability, semantic verifier result, public installation instructions, same-profile privacy/performance evidence, update/removal behavior, and known exclusions. Required failure/unavailable/gap/skip/inconclusive results close the gate."
+        }
+      ]
+    },
+    {
+      "id": "MAC-DST-018",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 12: Profile expansion, adversarial closure, and public release review",
+          "action": "Save rendered documentation and DocC metadata, inspect final SDK headers, record actual final OS build and granted entitlement, and run every descendant-specific case. Documentation metadata disagreement is evidence to resolve, not a reason to assume beta or final behavior. If any mechanism is unavailable or a required guarantee fails, retain `native-descendant-v1` as unavailable and release other qualified profiles only."
+        }
+      ]
+    },
+    {
+      "id": "MAC-PRV-001",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 9: Privacy, retention, and evidence export verification",
+          "action": "Add `privacy-inventory.json` and enforce it in M6's diagnostic/export adapter: default clipboard, screen, whole-home, host-network-payload, analytics, and crash-upload collectors stay off; task read, model release, app effect, and support export have separate native authority."
+        },
+        {
+          "plan": "04-resources-publication.md",
+          "heading": "Task 5: Bind model export and resource grant state to native authority",
+          "action": "Run model broker tests under a native test principal against a controlled recording endpoint with secret canaries. Inspect the worker-facing return buffer and logs without requiring a VM. Expect only approved payload bytes, one original operation, bounded spend and no reusable secret in returned data/logs. Use network-disabled failure to prove no fallback route. Task 8 repeats credential inventory against the actual M3 worker.**"
+        }
+      ]
+    },
+    {
+      "id": "MAC-PRV-002",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 9: Privacy, retention, and evidence export verification",
+          "action": "Include numeric ID, prompt, raw path, provider secret, URL query, untrusted stderr, approval handle, task title, and model response. Scan persisted app diagnostics, available OS logs, argv/env, notifications, crash output, archive names and members, metric labels, and caches after success, denial, failure, restart, and overload."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 9: Privacy, retention, and evidence export verification",
+          "action": "Add `metrics_inventory.json` and a bounded collector using only reviewed enum labels, queue/deadline/drop counters, durations, and scoped opaque IDs where permitted; reject user task names, paths, URLs, prompts, and arbitrary error strings as labels. Bound buffers and storage before callbacks enqueue; callback/authority paths never wait for metric export or log flush."
+        }
+      ]
+    },
+    {
+      "id": "MAC-PRV-003",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 9: Privacy, retention, and evidence export verification",
+          "action": "Preserve signed receipt bytes or clearly identify a redacted derivative; never relabel an edited body as signature-valid."
+        },
+        {
+          "plan": "06-recovery-evidence.md",
+          "heading": "Task 6: Compose export without fabricating evidence",
+          "action": "Implement `evidence/manifest.rs` as a composition of immutable native artifact files and separate host observations. Reuse the existing native `EvidenceExportBundle` and shared M8 evidence schema; do not redefine their signed body or wire fields. Required composition entries are:"
+        }
+      ]
+    },
+    {
+      "id": "MAC-PRV-004",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 9: Privacy, retention, and evidence export verification",
+          "action": "Separate native custody from disposable logs; expire payload/caches/indexes consistently, record explicit retained obligations, and shed diagnostics with counters before authority durability is threatened. Preserve signed receipt bytes or clearly identify a redacted derivative; never relabel an edited body as signature-valid."
+        }
+      ]
+    },
+    {
+      "id": "MAC-PRV-005",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 9: Privacy, retention, and evidence export verification",
+          "action": "Generate an exact archive-member/field/time-window/size preview, validate the user's explicit local destination through the existing export contract, and enforce archive bounds and traversal/symlink rejection before materialization. Test project-read-only against model/support release, unrequested collectors, secret-bearing signed payload, oversized archive, preview/body mismatch, and external upload attempt with outside receiver and canaries."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 9: Privacy, retention, and evidence export verification",
+          "action": "Test project-read-only against model/support release, unrequested collectors, secret-bearing signed payload, oversized archive, preview/body mismatch, and external upload attempt with outside receiver and canaries. Preserve original signed bytes or declare omitted payload/unverified derivative honestly."
+        }
+      ]
+    },
+    {
+      "id": "MAC-PRV-006",
+      "tasks": [
+        {
+          "plan": "01-native-operator.md",
+          "heading": "Task 5: Add lifecycle redaction, presenter mode and bounded App Intents",
+          "action": "Add tests for inactive app, unknown session, user switch, presenter mode, stale notification and malicious intent parameters. Run privacy tests and generated App Intent metadata inspection in signed app qualification. Expect no sensitive accessible/copy/restored text and no approval route.**"
+        },
+        {
+          "plan": "06-recovery-evidence.md",
+          "heading": "Task 4: Integrate durable stop and lifecycle revalidation",
+          "action": "Inject macOS lifecycle events through the existing M1/M2 platform adapter: sleep beyond capability expiry, wake with provider disconnected, logout/fast user switch, helper restart and host reboot. Each event blocks affected mutation until native binding/time/restriction readiness is refreshed. The lifecycle callback carries an observation and invokes reconciliation; it has no resume/approval authority."
+        }
+      ]
+    },
+    {
+      "id": "MAC-PRV-007",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 9: Privacy, retention, and evidence export verification",
+          "action": "Add `metrics_inventory.json` and a bounded collector using only reviewed enum labels, queue/deadline/drop counters, durations, and scoped opaque IDs where permitted; reject user task names, paths, URLs, prompts, and arbitrary error strings as labels. Bound buffers and storage before callbacks enqueue; callback/authority paths never wait for metric export or log flush."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 9: Privacy, retention, and evidence export verification",
+          "action": "Bound buffers and storage before callbacks enqueue; callback/authority paths never wait for metric export or log flush. Send one million unique hostile labels, stall the reader, fill disk, and inject a failed native durable commit. Independent producer counts must reconcile gaps; memory/cardinality caps hold, and no failed authoritative commit dispatches an effect."
+        }
+      ]
+    },
+    {
+      "id": "MAC-PRV-008",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 10: Performance and energy measurement with fixed thresholds",
+          "action": "Record hardware, OS, display, power mode, thermal range, battery health/charge band, SDK/toolchain, source/installed tuple, observer version, baseline digest, model/provider route, and fixture digests. Run five warm-ups plus 30 samples, idle settling and ten-minute idle measurements, contention at 1/8/32 tasks, and hostile event ramp. Apply the pre-run budgets from the privacy/performance specification without post hoc adjustment."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 10: Performance and energy measurement with fixed thresholds",
+          "action": "Define nearest-rank percentile for the fixed 30-run latency suite; raw samples remain in evidence and report the estimator. Reject empty or nonfinite values. Energy inference uses a declared paired statistical method and interval, not battery-percentage subtraction."
+        }
+      ]
+    },
+    {
+      "id": "MAC-PRV-009",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 10: Performance and energy measurement with fixed thresholds",
+          "action": "Add non-sensitive signposts for view usability, IPC response, native durable acknowledgment, broker overhead, VM start, first result, stop fence, worker death, and flow closure. OS/native/remote clock domains retain their mapping and uncertainty. The outside observer supplies actual process/resource state, not UI labels."
+        }
+      ]
+    },
+    {
+      "id": "MAC-PRV-010",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 10: Performance and energy measurement with fixed thresholds",
+          "action": "Apply the pre-run budgets from the privacy/performance specification without post hoc adjustment."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 10: Performance and energy measurement with fixed thresholds",
+          "action": "Missing required deadline or coverage closes the affected profile, never a performance waiver."
+        }
+      ]
+    },
+    {
+      "id": "MAC-PRV-011",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 10: Performance and energy measurement with fixed thresholds",
+          "action": "At least five randomized baseline/candidate 60-minute idle pairs and equivalent useful-work pairs use a declared supported instrument or external meter, calibrated units, tool overhead, raw traces, and paired uncertainty. A high-wakeup regression must fail; inadequate resolution yields inconclusive. Instrument privileges belong to the lab, not the consumer app."
+        }
+      ]
+    },
+    {
+      "id": "MAC-PRV-012",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 10: Performance and energy measurement with fixed thresholds",
+          "action": "Add a shared observer coordinator under `ChioMacOperations` keyed by authenticated native scope, so 20 UI subscribers share one bounded upstream subscription. Stop nonessential polling when no view/task needs it and adapt only optional sampling/rendering to low-power and thermal-pressure notifications. Safety-critical fence propagation and required native/provider callbacks retain their deadlines and dedicated bounded path."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 10: Performance and energy measurement with fixed thresholds",
+          "action": "Safety-critical fence propagation and required native/provider callbacks retain their deadlines and dedicated bounded path. Test hidden/visible app, 20 subscribers, lost subscriber cleanup, low-power mode, thermal pressure, and revocation during throttling; outside wakeup/IPC counts must fall while native fence/callback oracles still pass. Missing required deadline or coverage closes the affected profile, never a performance waiver."
+        }
+      ]
+    },
+    {
+      "id": "MAC-PRV-013",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 9: Privacy, retention, and evidence export verification",
+          "action": "Bound buffers and storage before callbacks enqueue; callback/authority paths never wait for metric export or log flush. Send one million unique hostile labels, stall the reader, fill disk, and inject a failed native durable commit. Independent producer counts must reconcile gaps; memory/cardinality caps hold, and no failed authoritative commit dispatches an effect."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 9: Privacy, retention, and evidence export verification",
+          "action": "Send one million unique hostile labels, stall the reader, fill disk, and inject a failed native durable commit. Independent producer counts must reconcile gaps; memory/cardinality caps hold, and no failed authoritative commit dispatches an effect."
+        }
+      ]
+    },
+    {
+      "id": "MAC-PRV-014",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 9: Privacy, retention, and evidence export verification",
+          "action": "Separate native custody from disposable logs; expire payload/caches/indexes consistently, record explicit retained obligations, and shed diagnostics with counters before authority durability is threatened. Preserve signed receipt bytes or clearly identify a redacted derivative; never relabel an edited body as signature-valid."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 7: Update, downgrade, removal, and incident state machines",
+          "action": "Default removal preserves projects/evidence/custody; purge is a separate explicit inventory-bound operation. An incident revokes affected trust through its owner and uses the same fence/recovery path."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 9: Privacy, retention, and evidence export verification",
+          "action": "Expected: permitted export only, no undeclared network upload, precise statement of OS-managed surfaces the app cannot erase."
+        }
+      ]
+    },
+    {
+      "id": "MAC-PRV-015",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 9: Privacy, retention, and evidence export verification",
+          "action": "Public screenshots, recordings, evidence, and bug reports use synthetic task data and per-export host pseudonyms; scan names, metadata, paths, numeric IDs, and low-entropy hashes before export. Public witnessing stays disabled until its separate metadata-disclosure contract is approved. Inventory every dependency/updater/provider/crash destination and payload class, then capture launch, idle, error, update, provider call, and crash traffic independently."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 9: Privacy, retention, and evidence export verification",
+          "action": "Public witnessing stays disabled until its separate metadata-disclosure contract is approved. Inventory every dependency/updater/provider/crash destination and payload class, then capture launch, idle, error, update, provider call, and crash traffic independently. Seed a real-looking home/account canary, an unlisted analytics endpoint, and unexpected SDK crash upload; reject undisclosed traffic/artifacts and verify opt-out paths send nothing beyond declared necessary traffic."
+        }
+      ]
+    },
+    {
+      "id": "MAC-PRV-016",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 9: Privacy, retention, and evidence export verification",
+          "action": "Inventory every dependency/updater/provider/crash destination and payload class, then capture launch, idle, error, update, provider call, and crash traffic independently. Seed a real-looking home/account canary, an unlisted analytics endpoint, and unexpected SDK crash upload; reject undisclosed traffic/artifacts and verify opt-out paths send nothing beyond declared necessary traffic."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 9: Privacy, retention, and evidence export verification",
+          "action": "Seed a real-looking home/account canary, an unlisted analytics endpoint, and unexpected SDK crash upload; reject undisclosed traffic/artifacts and verify opt-out paths send nothing beyond declared necessary traffic."
+        }
+      ]
+    },
+    {
+      "id": "MAC-OPS-001",
+      "tasks": [
+        {
+          "plan": "02-protocol-controller.md",
+          "heading": "Task 3: Bind XPC peers, native principals and bounded sessions",
+          "action": "Create a `PeerBinding` value containing observed UID, audit-session identity, designated code-requirement digest and verified service identity. It is constructed only by the platform authenticator. Add a session state machine `Unauthenticated -> HelloComplete -> Closed`, with native principal binding supplied separately by the installed authority adapter."
+        },
+        {
+          "plan": "05-native-enforcement.md",
+          "heading": "Task 7: Integrate authority, stop, health and recovery",
+          "action": "Map actual native restrictive views to provider snapshots through authenticated, versioned controller-provider IPC. Reuse the M2 peer/canonical envelope rules but keep provider methods separate from public operator methods. Define only internal commands `replaceRestrictions`, `inspectAppliedGeneration`, `closeManagedFlows` and `exportSensorCoverage`; none submits an approval or issues a native operation."
+        }
+      ]
+    },
+    {
+      "id": "MAC-OPS-002",
+      "tasks": [
+        {
+          "plan": "02-protocol-controller.md",
+          "heading": "Task 3: Bind XPC peers, native principals and bounded sessions",
+          "action": "Create a `PeerBinding` value containing observed UID, audit-session identity, designated code-requirement digest and verified service identity. It is constructed only by the platform authenticator. Add a session state machine `Unauthenticated -> HelloComplete -> Closed`, with native principal binding supplied separately by the installed authority adapter."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 8: Shared-Mac lifecycle and rollback-resistant recovery cases",
+          "action": "Use two synthetic standard-user lab accounts, distinct secret/path canaries, identical task labels, simultaneous service instances, forged request identities, and reused numeric UID fixture. Compare OS connection/audit identity, native scope, outside effects, and export contents. Global provider records cannot expose another user's raw task data."
+        }
+      ]
+    },
+    {
+      "id": "MAC-OPS-003",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 4: Platform service, extension, and keychain observations",
+          "action": "Extend `ServiceRegistration.swift` with `notRequested`, `pendingApproval`, `enabled`, `denied`, and `unregistered` projections derived from actual OS observations and retained user choice. Register only after explicit background-service selection; reopening the app must not repeat a denied request. Keep read-only diagnosis usable and open relevant settings only on explicit action."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 4: Platform service, extension, and keychain observations",
+          "action": "Register only after explicit background-service selection; reopening the app must not repeat a denied request. Keep read-only diagnosis usable and open relevant settings only on explicit action. Add fresh-install, opt-out, five-reopen denial, approval withdrawal, and later opt-in cases with outside launch counts; no denied path starts a controller or requests broader permissions."
+        }
+      ]
+    },
+    {
+      "id": "MAC-OPS-004",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 8: Shared-Mac lifecycle and rollback-resistant recovery cases",
+          "action": "Persist operational attempt timing separately from native authority, enforce at most three automatic starts in 60 seconds with at least five seconds between attempts, then require explicit recovery. Multiple app instances authenticate and attach to the same native serving-writer scope; an application-local lock cannot elect a second native writer. Add five simultaneous app launches, repeated crashes, launchd restarts, lost post-commit reply, and stale owner-generation tests."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 8: Shared-Mac lifecycle and rollback-resistant recovery cases",
+          "action": "Multiple app instances authenticate and attach to the same native serving-writer scope; an application-local lock cannot elect a second native writer. Add five simultaneous app launches, repeated crashes, launchd restarts, lost post-commit reply, and stale owner-generation tests. Independent process census, native writer records, and destination counters must show bounded restarts, one serving owner, one original operation/effect, and no automatic task replay."
+        }
+      ]
+    },
+    {
+      "id": "MAC-OPS-005",
+      "tasks": [
+        {
+          "plan": "06-recovery-evidence.md",
+          "heading": "Task 4: Integrate durable stop and lifecycle revalidation",
+          "action": "Inject macOS lifecycle events through the existing M1/M2 platform adapter: sleep beyond capability expiry, wake with provider disconnected, logout/fast user switch, helper restart and host reboot. Each event blocks affected mutation until native binding/time/restriction readiness is refreshed. The lifecycle callback carries an observation and invokes reconciliation; it has no resume/approval authority."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 8: Shared-Mac lifecycle and rollback-resistant recovery cases",
+          "action": "Exercise sleep before/after native fence durability, reboot with an unresolved original effect, no-user global-provider lifetime, and forward/backward wall-clock shifts. Expected: unconfirmed sleep fencing stays unconfirmed, no logged-out user task obtains authority, a new boot does not reuse process identity, and the native deadline owner determines expiry without treating wall-clock adjustment as renewed grant lifetime."
+        }
+      ]
+    },
+    {
+      "id": "MAC-OPS-006",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 8: Shared-Mac lifecycle and rollback-resistant recovery cases",
+          "action": "Exercise sleep before/after native fence durability, reboot with an unresolved original effect, no-user global-provider lifetime, and forward/backward wall-clock shifts. Expected: unconfirmed sleep fencing stays unconfirmed, no logged-out user task obtains authority, a new boot does not reuse process identity, and the native deadline owner determines expiry without treating wall-clock adjustment as renewed grant lifetime."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 8: Shared-Mac lifecycle and rollback-resistant recovery cases",
+          "action": "Global provider records cannot expose another user's raw task data."
+        }
+      ]
+    },
+    {
+      "id": "MAC-OPS-007",
+      "tasks": [
+        {
+          "plan": "06-recovery-evidence.md",
+          "heading": "Task 4: Integrate durable stop and lifecycle revalidation",
+          "action": "Inject macOS lifecycle events through the existing M1/M2 platform adapter: sleep beyond capability expiry, wake with provider disconnected, logout/fast user switch, helper restart and host reboot. Each event blocks affected mutation until native binding/time/restriction readiness is refreshed. The lifecycle callback carries an observation and invokes reconciliation; it has no resume/approval authority."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 8: Shared-Mac lifecycle and rollback-resistant recovery cases",
+          "action": "Expected: unconfirmed sleep fencing stays unconfirmed, no logged-out user task obtains authority, a new boot does not reuse process identity, and the native deadline owner determines expiry without treating wall-clock adjustment as renewed grant lifetime."
+        }
+      ]
+    },
+    {
+      "id": "MAC-OPS-008",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 4: Platform service, extension, and keychain observations",
+          "action": "Use the real signed per-user access group and selected accessibility candidate; test denied/missing/migrated/logged-out behavior on the exact Mac build. Never add file-based keychain fallback. Cache lifetime follows native session fencing and token rotation; zeroize/drop broker-owned copies after use where the implementation can guarantee it."
+        }
+      ]
+    },
+    {
+      "id": "MAC-OPS-009",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 4: Platform service, extension, and keychain observations",
+          "action": "Bind every broker cache entry to its current native credential generation and invalidate new use on rotation, explicit removal, or session fence. Dispatch one held synthetic request, rotate/delete the token while its reply is withheld, and submit a second request. The independent receiver records token-generation use: no new request uses the old cache, while the first remains attached to its original native operation and known/unknown outcome."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 4: Platform service, extension, and keychain observations",
+          "action": "The independent receiver records token-generation use: no new request uses the old cache, while the first remains attached to its original native operation and known/unknown outcome. Test lost rotation notification by requiring a current-generation check before use; no unconditional retry or new operation identity is permitted."
+        }
+      ]
+    },
+    {
+      "id": "MAC-OPS-010",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 8: Shared-Mac lifecycle and rollback-resistant recovery cases",
+          "action": "Classify configuration, presentation, protected payload, native snapshot/custody, and required secret-key metadata separately; bind exact schema/component identities, payload digests, original unresolved operations, and the native consistent-snapshot reference when supported. Exclude sockets, transient launch identities, and raw provider secrets."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 8: Shared-Mac lifecycle and rollback-resistant recovery cases",
+          "action": "Test missing snapshot/key metadata, concurrent snapshot interruption, tampered digest, unsafe archive path, and unavailable native snapshot API; incomplete backups cannot be labeled complete. Extraction is quarantined and grants nothing. Corrupt store, missing key, truncated provider mapping, or EIO preserves original bytes and unresolved custody, closes affected admission, and exposes bounded diagnosis instead of resetting state."
+        }
+      ]
+    },
+    {
+      "id": "MAC-OPS-011",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 8: Shared-Mac lifecycle and rollback-resistant recovery cases",
+          "action": "Snapshot state before a grant is spent, spend/revoke/fence it, then restore database/keychain/home/guest snapshot and clone to a second machine. Remove connectivity to the independent freshness owner. Expected: no restored authority becomes current from a local database, keychain key, or internally consistent hash chain. A missing native freshness API is an owned M0/M6 prerequisite and yields `unavailable`; do not add an application-local counter as a substitute."
+        },
+        {
+          "plan": "06-recovery-evidence.md",
+          "heading": "Task 5: Keep restore closed until independent freshness is proven",
+          "action": "Add controller restore tests that allow rebuilding labels/receipt views but refuse launch, approval consume and publication until the native restore contract succeeds. Restored guest disks enter only as data under a fresh launch; stale worker descriptors, credentials and operation namespaces must fail native generation checks. No controller-generated epoch satisfies this test."
+        }
+      ]
+    },
+    {
+      "id": "MAC-OPS-012",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 4: Platform service, extension, and keychain observations",
+          "action": "Add `OperationalHealth.swift` and matching tests with separate connectivity, authentication, compatibility, permission, activation, convergence, observation coverage, storage, authority, and closure dimensions. Every observation carries source and observation time; unknown or expired facts remain unknown and cannot become a combined protected Boolean. Map actual native/provider/OS observations through M2's shared health envelope."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 4: Platform service, extension, and keychain observations",
+          "action": "Every observation carries source and observation time; unknown or expired facts remain unknown and cannot become a combined protected Boolean. Map actual native/provider/OS observations through M2's shared health envelope. Independently break each dimension, replay a stale provider heartbeat, lose a reply, and remove storage access; assert exact reason, age, affected-scope refusal, and continued read-only diagnosis."
+        }
+      ]
+    },
+    {
+      "id": "MAC-OPS-013",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 8: Shared-Mac lifecycle and rollback-resistant recovery cases",
+          "action": "Each stable reason code maps to a specific operator action, retained evidence, and outside verification. Remove any instruction that deletes an authority database, reuses an old approval, resets a generation, or widens permissions to clear a warning. Commit with `test(macos): qualify shared session and restore boundaries`."
+        }
+      ]
+    },
+    {
+      "id": "MAC-OPS-014",
+      "tasks": [
+        {
+          "plan": "01-native-operator.md",
+          "heading": "Task 3: Connect validated read-only snapshots and durable stop presentation",
+          "action": "Introduce display-only `StopPresentation` with `admissionFenced`, `workerClosed`, `networkClosed`, `resourcesClosed: Bool?`, and `unresolvedEffects: Int`; `closureText: String` is derived. Native stop/result references remain in the generated client and are never synthesized from these booleans. Read-only methods use `hello`, `health.get`, `tasks.list`, `task.get`, `operation.get`, `events.subscribe`, `events.ack` exactly as specified."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 7: Update, downgrade, removal, and incident state machines",
+          "action": "Fence and stop owned work, preserve unknown outcomes, deactivate providers, unregister services, inventory actual residuals, and distinguish restart-pending. Default removal preserves projects/evidence/custody; purge is a separate explicit inventory-bound operation. An incident revokes affected trust through its owner and uses the same fence/recovery path."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 10: Performance and energy measurement with fixed thresholds",
+          "action": "Add non-sensitive signposts for view usability, IPC response, native durable acknowledgment, broker overhead, VM start, first result, stop fence, worker death, and flow closure. OS/native/remote clock domains retain their mapping and uncertainty. The outside observer supplies actual process/resource state, not UI labels."
+        }
+      ]
+    },
+    {
+      "id": "MAC-OPS-015",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 8: Shared-Mac lifecycle and rollback-resistant recovery cases",
+          "action": "Corrupt store, missing key, truncated provider mapping, or EIO preserves original bytes and unresolved custody, closes affected admission, and exposes bounded diagnosis instead of resetting state."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 4: Platform service, extension, and keychain observations",
+          "action": "Independently break each dimension, replay a stale provider heartbeat, lose a reply, and remove storage access; assert exact reason, age, affected-scope refusal, and continued read-only diagnosis."
+        }
+      ]
+    },
+    {
+      "id": "MAC-OPS-016",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 6: Notarization and clean consumer installation",
+          "action": "Compare OS/MDM observations with native history: external restrictions are attributed to their administrator, removal cannot create a native grant, no MDM event creates approval/publication authority, and changed management invalidates affected profile evidence."
+        },
+        {
+          "plan": "05-native-enforcement.md",
+          "heading": "Task 7: Integrate authority, stop, health and recovery",
+          "action": "Exercise controller/provider disconnect, permission withdrawal, failed activation, logout, user switch, lock, reboot and interrupted upgrade. Missing state closes selected task execution; managed global default follows its declared administrator policy. No profile is silently downgraded to observation or converted to host-wide blocking."
+        }
+      ]
+    },
+    {
+      "id": "MAC-OPS-017",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 8: Shared-Mac lifecycle and rollback-resistant recovery cases",
+          "action": "Use two synthetic standard-user lab accounts, distinct secret/path canaries, identical task labels, simultaneous service instances, forged request identities, and reused numeric UID fixture. Compare OS connection/audit identity, native scope, outside effects, and export contents. Global provider records cannot expose another user's raw task data."
+        },
+        {
+          "plan": "06-recovery-evidence.md",
+          "heading": "Task 6: Compose export without fabricating evidence",
+          "action": "Add `tests/evidence_export.rs` cases for another user's read boundary, omitted tenant, tampered native receipt, missing checkpoint coverage, wrong runtime tuple, gap ranges, retained unknown operation, and redaction of a signed original. Use native `EvidenceExportQuery::tenant_scoped` only when the authenticated owner supplies that tenant; never call `admin_all` because a field was absent."
+        }
+      ]
+    },
+    {
+      "id": "MAC-OPS-018",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 7: Update, downgrade, removal, and incident state machines",
+          "action": "Expiry prevents new update activation; observed revocation fences affected admission while retaining original custody and minimal signed incident evidence. Resume requires a newly verified exact-profile record and independent production confirmation, not clearing the warning."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 7: Update, downgrade, removal, and incident state machines",
+          "action": "Resume requires a newly verified exact-profile record and independent production confirmation, not clearing the warning."
+        }
+      ]
+    },
+    {
+      "id": "MAC-VER-001",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 2: Safe content-addressed artifact loading and fraud fixtures",
+          "action": "Create separate complete fixtures for absent artifacts, wrong source/installed correspondence, duplicated cases, untrusted manifest, synthetic release attempt, wrong observer, and stale restore reference. Preserve `status=candidate`; never create a fixture falsely presented as an installed qualification report. Tests assert shape acceptance where expected and semantic rejection independently."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 11: Native-backed semantic verification and scoped result issuance",
+          "action": "External trusted policy pins accepted verifier/native proof contract, approved manifest, trust roots, observer contracts, and freshness. The candidate's `verifier` entry is compared with that policy; it cannot select policy. Safe loading and schema validation precede semantics; release mode refuses fabricated/synthetic-envelope evidence and missing native API."
+        }
+      ]
+    },
+    {
+      "id": "MAC-VER-002",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 1: Freeze applicability and a release candidate tuple",
+          "action": "Require profile/features, exact host/component tuple, prerequisite proof digests, explicit acceptance IDs/subcases, required evidence class, control and observer digests, predicate ID/version, thresholds, invalidation map, and an externally authenticated pre-run binding. Enumerate the complete candidate-evidence set separately from final production-admission confirmation; this separation cannot remove a candidate case to make the first artifact pass."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 1: Freeze applicability and a release candidate tuple",
+          "action": "Enumerate the complete candidate-evidence set separately from final production-admission confirmation; this separation cannot remove a candidate case to make the first artifact pass. Derive `observe-v1` from the specs, including refusal of mutation and authority restoration when excluded. Permit null restore freshness only under that explicit exclusion and required refusal case."
+        }
+      ]
+    },
+    {
+      "id": "MAC-VER-003",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 3: Build and inspect the signed application closure",
+          "action": "Bind every shipped executable/library/guest asset to immutable public source revision or archive digest, dependency lock entry, vendored patch digest, exact toolchain/build environment, unsigned content digest, final signed digest, and license/source-obligation record. Emit `source-provenance.json` and `sbom.spdx.json`; inventory packaging scripts as executable build inputs. Run two isolated offline rebuilds and compare unsigned content before claiming reproducibility."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 1: Freeze applicability and a release candidate tuple",
+          "action": "Require profile/features, exact host/component tuple, prerequisite proof digests, explicit acceptance IDs/subcases, required evidence class, control and observer digests, predicate ID/version, thresholds, invalidation map, and an externally authenticated pre-run binding. Enumerate the complete candidate-evidence set separately from final production-admission confirmation; this separation cannot remove a candidate case to make the first artifact pass."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 10: Performance and energy measurement with fixed thresholds",
+          "action": "Record hardware, OS, display, power mode, thermal range, battery health/charge band, SDK/toolchain, source/installed tuple, observer version, baseline digest, model/provider route, and fixture digests. Run five warm-ups plus 30 samples, idle settling and ten-minute idle measurements, contention at 1/8/32 tasks, and hostile event ramp. Apply the pre-run budgets from the privacy/performance specification without post hoc adjustment."
+        }
+      ]
+    },
+    {
+      "id": "MAC-VER-004",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 5: Outside observers and a bounded qualification runner",
+          "action": "Introduce observer transcript fields `run_nonce`, `observer_digest`, `started_at`, `ready_control`, `events`, and `completed_at`; source code and tool version are pinned by the profile manifest. A ready control must produce an externally observed synthetic event before a zero-effect assertion is meaningful."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 5: Outside observers and a bounded qualification runner",
+          "action": "The receiver runs on a separately controlled lab endpoint, accepts only synthetic run-scoped tokens, records request identity/body digest/connection bytes and time, and exposes read-only results to the verifier. The process observer samples actual process incarnations and audit identities from outside the tested worker/controller; the filesystem observer hashes known synthetic sentinels before/after and records deliberate bypass writes."
+        }
+      ]
+    },
+    {
+      "id": "MAC-VER-005",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 12: Profile expansion, adversarial closure, and public release review",
+          "action": "`brokered-v1` adds route mediation and credentials; `vm-project-v1` adds exact guest architecture/image and compromised-guest probes; `remote-project-v1` binds both hosts and remote observer; native and managed profiles add their own installed ES/NE/multi-user failure suites. `publication-v1` adds exact effect review/binding/reconciliation to the selected profile. No profile copies another row's pass status."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 12: Profile expansion, adversarial closure, and public release review",
+          "action": "No profile copies another row's pass status."
+        }
+      ]
+    },
+    {
+      "id": "MAC-VER-006",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 5: Outside observers and a bounded qualification runner",
+          "action": "Give the probe a distinct code identity; bind its native fixture authority to the exact installed driver/runtime digests, run nonce, isolated test-user or VM host, enumerated synthetic resources/test accounts/receivers, budgets, and expiry. Native integrity, approval, crossing, stop, and recovery checks still run."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 5: Outside observers and a bounded qualification runner",
+          "action": "Inspect built production options/configuration and attempt `--skip-qualification`, unsafe feature/environment overrides, and forged probe principals. Expected: ordinary production admission rejects missing verified qualification regardless of these inputs. Deliberately weakened negative-control code is a separately signed/digested disposable fixture, never a production flag or substituted passing driver."
+        }
+      ]
+    },
+    {
+      "id": "MAC-VER-007",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 12: Profile expansion, adversarial closure, and public release review",
+          "action": "Register pre-existing/inherited handles, direct network and host-socket bypass, symlink/rename/dirty-writer races, PID reuse, exec/reparenting/delegated services, sensor gaps, queue pressure, callback deadline miss, client death, stale provider cache/policy, and HTTP keep-alive/HTTP2/UDP/QUIC flow cases. Each case names its independent destination/sentinel oracle and successful bypass control before it can enter an approved manifest."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 12: Profile expansion, adversarial closure, and public release review",
+          "action": "`brokered-v1` adds route mediation and credentials; `vm-project-v1` adds exact guest architecture/image and compromised-guest probes; `remote-project-v1` binds both hosts and remote observer; native and managed profiles add their own installed ES/NE/multi-user failure suites. `publication-v1` adds exact effect review/binding/reconciliation to the selected profile. No profile copies another row's pass status."
+        }
+      ]
+    },
+    {
+      "id": "MAC-VER-008",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 12: Profile expansion, adversarial closure, and public release review",
+          "action": "Register pre-existing/inherited handles, direct network and host-socket bypass, symlink/rename/dirty-writer races, PID reuse, exec/reparenting/delegated services, sensor gaps, queue pressure, callback deadline miss, client death, stale provider cache/policy, and HTTP keep-alive/HTTP2/UDP/QUIC flow cases. Each case names its independent destination/sentinel oracle and successful bypass control before it can enter an approved manifest."
+        },
+        {
+          "plan": "05-native-enforcement.md",
+          "heading": "Task 9: Qualify actual installed denial, closure and restoration",
+          "action": "Enumerate every ES and NE acceptance ID with required outside observer, OS/architecture/profile and cutpoint. Run ordinary callbacks, missed deadlines, queue-full AUTH, client kill/disconnect/delete, subscription/permission loss, cache/mute changes and setuid/setgid behavior as separate cases. Do not merge client death into deadline-miss testing."
+        }
+      ]
+    },
+    {
+      "id": "MAC-VER-009",
+      "tasks": [
+        {
+          "plan": "01-native-operator.md",
+          "heading": "Task 4: Add exact-review invalidation and original-operation recovery",
+          "action": "Add native integration cases for cross-user review lookup; substituted native review/materialization; changed destination, artifact, cost, policy/deployment, deciding principal or influence after materialization; expired or consumed review; and lost approval response.** Run review tests plus the native binding tests from plan 00."
+        },
+        {
+          "plan": "04-resources-publication.md",
+          "heading": "Task 8: Qualify race, crash and useful-work acceptance on one matrix",
+          "action": "Run committed-tree concurrency, symlink/alias/hardlink, Unicode/APFS, object corruption, mmap/open-FD dirty-import refusal, output traversal, candidate unittest monkeypatch, os._exit(0), forged PASS/verdict text, empty/missing output, native invocation-attribution forgery, model export/budget, stop-before-release, duplicate publication, lost reply and all crash sites. Verify original host checkout and outside canaries independently before/after."
+        },
+        {
+          "plan": "07-adapters-delegation.md",
+          "heading": "Task 5: Child admission, attenuation and conserved ledger",
+          "action": "Verify every signed attenuation hop preserves issuer, tenant, budget family, resource constraints, parent validity and ancestor revocation. Equal replay returns the original; changed bindings conflict. Add namespace/issuer/budget-family substitution, missing-hop, sibling-parent, broader-scope and later-expiry cases plus crash-before/after-commit barriers; no invalid child obtains a key, allocation or launch."
+        }
+      ]
+    },
+    {
+      "id": "MAC-VER-010",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 8: Shared-Mac lifecycle and rollback-resistant recovery cases",
+          "action": "Snapshot state before a grant is spent, spend/revoke/fence it, then restore database/keychain/home/guest snapshot and clone to a second machine. Remove connectivity to the independent freshness owner. Expected: no restored authority becomes current from a local database, keychain key, or internally consistent hash chain. A missing native freshness API is an owned M0/M6 prerequisite and yields `unavailable`; do not add an application-local counter as a substitute."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 8: Shared-Mac lifecycle and rollback-resistant recovery cases",
+          "action": "Exercise sleep before/after native fence durability, reboot with an unresolved original effect, no-user global-provider lifetime, and forward/backward wall-clock shifts. Expected: unconfirmed sleep fencing stays unconfirmed, no logged-out user task obtains authority, a new boot does not reuse process identity, and the native deadline owner determines expiry without treating wall-clock adjustment as renewed grant lifetime."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 7: Update, downgrade, removal, and incident state machines",
+          "action": "Test unsigned successor, replayed old metadata, expired offline metadata, revoked current build, interrupted rotation, and an allowed nonrevoked code rollback. Expiry prevents new update activation; observed revocation fences affected admission while retaining original custody and minimal signed incident evidence. Resume requires a newly verified exact-profile record and independent production confirmation, not clearing the warning."
+        }
+      ]
+    },
+    {
+      "id": "MAC-VER-011",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 8: Shared-Mac lifecycle and rollback-resistant recovery cases",
+          "action": "Use two synthetic standard-user lab accounts, distinct secret/path canaries, identical task labels, simultaneous service instances, forged request identities, and reused numeric UID fixture. Compare OS connection/audit identity, native scope, outside effects, and export contents. Global provider records cannot expose another user's raw task data."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 6: Notarization and clean consumer installation",
+          "action": "Install and withdraw those exact payloads on an enrolled test Mac, separately testing a standard user, admin, wrong-team identity, denied user override, and managed uninstall. Compare OS/MDM observations with native history: external restrictions are attributed to their administrator, removal cannot create a native grant, no MDM event creates approval/publication authority, and changed management invalidates affected profile evidence."
+        }
+      ]
+    },
+    {
+      "id": "MAC-VER-012",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 6: Notarization and clean consumer installation",
+          "action": "The runner records host build/security settings, download quarantine, online/offline launch, signature and ticket checks. Expected: passing controls on a real qualified tuple or precise closed unavailability, never a local developer exception counted as consumer success."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 7: Update, downgrade, removal, and incident state machines",
+          "action": "Add tests for new app/old provider, denied replacement, interrupted migration, stale release floor, incompatible schema, and unresolved operation."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 7: Update, downgrade, removal, and incident state machines",
+          "action": "Fence and stop owned work, preserve unknown outcomes, deactivate providers, unregister services, inventory actual residuals, and distinguish restart-pending. Default removal preserves projects/evidence/custody; purge is a separate explicit inventory-bound operation. An incident revokes affected trust through its owner and uses the same fence/recovery path."
+        }
+      ]
+    },
+    {
+      "id": "MAC-VER-013",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 9: Privacy, retention, and evidence export verification",
+          "action": "Include numeric ID, prompt, raw path, provider secret, URL query, untrusted stderr, approval handle, task title, and model response. Scan persisted app diagnostics, available OS logs, argv/env, notifications, crash output, archive names and members, metric labels, and caches after success, denial, failure, restart, and overload."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 10: Performance and energy measurement with fixed thresholds",
+          "action": "Record hardware, OS, display, power mode, thermal range, battery health/charge band, SDK/toolchain, source/installed tuple, observer version, baseline digest, model/provider route, and fixture digests. Run five warm-ups plus 30 samples, idle settling and ten-minute idle measurements, contention at 1/8/32 tasks, and hostile event ramp. Apply the pre-run budgets from the privacy/performance specification without post hoc adjustment."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 10: Performance and energy measurement with fixed thresholds",
+          "action": "At least five randomized baseline/candidate 60-minute idle pairs and equivalent useful-work pairs use a declared supported instrument or external meter, calibrated units, tool overhead, raw traces, and paired uncertainty. A high-wakeup regression must fail; inadequate resolution yields inconclusive. Instrument privileges belong to the lab, not the consumer app."
+        }
+      ]
+    },
+    {
+      "id": "MAC-VER-014",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 11: Native-backed semantic verification and scoped result issuance",
+          "action": "The implementation calls the real M0/M6 native verifier contract; the function must not infer validity from JSON fields, shell exit code alone, an unverified child-provided trust root, or a local signature checked against a candidate-provided key. Test adapters are confined to `--mode component` and cannot issue a release artifact."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 11: Native-backed semantic verification and scoped result issuance",
+          "action": "Cover false `pass`, absent artifact, bad signature, untrusted root, forged observer, mismatched run nonce/tuple, stale anchor, duplicate case, missing required subcase, broken positive/negative control, wrong evidence class, absent/expanded native fixture authority, and omitted payload falsely claimed inspected. Null restore freshness is accepted only for an approved authority-restore exclusion with its required refusal observation."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 11: Native-backed semantic verification and scoped result issuance",
+          "action": "External trusted policy pins accepted verifier/native proof contract, approved manifest, trust roots, observer contracts, and freshness. The candidate's `verifier` entry is compared with that policy; it cannot select policy. Safe loading and schema validation precede semantics; release mode refuses fabricated/synthetic-envelope evidence and missing native API."
+        }
+      ]
+    },
+    {
+      "id": "MAC-VER-015",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 2: Safe content-addressed artifact loading and fraud fixtures",
+          "action": "Open with `O_NONBLOCK` before inspecting type so a FIFO cannot block the verifier before `fstat`. Reject every nonregular node before reading. Add bounded actual FIFO-without-writer, directory, Unix-socket, symlink, and disposable character-device fixtures; each must refuse within one second with no read attempted. Keep the artifact directory immutable during verification; later signed observer transport writes to staging before atomically publishing objects."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 2: Safe content-addressed artifact loading and fraud fixtures",
+          "action": "Artifact names are SHA-256 hex, not relative paths supplied by test data. Open with `O_NONBLOCK` before inspecting type so a FIFO cannot block the verifier before `fstat`. Reject every nonregular node before reading. Add bounded actual FIFO-without-writer, directory, Unix-socket, symlink, and disposable character-device fixtures; each must refuse within one second with no read attempted."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 9: Privacy, retention, and evidence export verification",
+          "action": "Public screenshots, recordings, evidence, and bug reports use synthetic task data and per-export host pseudonyms; scan names, metadata, paths, numeric IDs, and low-entropy hashes before export. Public witnessing stays disabled until its separate metadata-disclosure contract is approved. Inventory every dependency/updater/provider/crash destination and payload class, then capture launch, idle, error, update, provider call, and crash traffic independently."
+        }
+      ]
+    },
+    {
+      "id": "MAC-VER-016",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 12: Profile expansion, adversarial closure, and public release review",
+          "action": "It does not discover only passing tests or silently move failed candidate cases into the later gate. Retain every attempt, prior failure, invalidation reason, control artifact, and raw observation."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 12: Profile expansion, adversarial closure, and public release review",
+          "action": "Required failure/unavailable/gap/skip/inconclusive results close the gate. No warning waiver promotes source evidence to installed qualification."
+        }
+      ]
+    },
+    {
+      "id": "MAC-VER-017",
+      "tasks": [
+        {
+          "plan": "07-adapters-delegation.md",
+          "heading": "Task 8: Execute the complete matrix and publish truthful capability state",
+          "action": "Update the matrix with independent verified evidence references only after exact positive and negative cases pass. Re-run changed-boundary cases after any adapter, native ABI, model contract, policy, image, OS or provider binary change. A new framework's version must be exact and independently installed; dependency ranges and source receipts remain insufficient."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 11: Native-backed semantic verification and scoped result issuance",
+          "action": "The report binds candidate/manifest digests, exact tuple, verifier/trust identities, case verdicts, claim exclusions, and invalidation rules. Missing required native import contract remains a prerequisite, not a new app signer. Initial probe execution never sets this state. Retain the immutable report for the ordinary production-admission confirmation in Task 12."
+        }
+      ]
+    },
+    {
+      "id": "MAC-VER-018",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 12: Profile expansion, adversarial closure, and public release review",
+          "action": "Use the normal user-profile path with bounded ordinary native test authority, not the probe. Record one useful allowed effect and one denied-effect control; repeat with missing, forged, wrong-tuple, and revoked qualification references. Expected: both real verified qualification and native task authority are necessary, all negative references refuse admission, and the confirmation binds the immutable artifact digest."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 12: Profile expansion, adversarial closure, and public release review",
+          "action": "A reviewer other than the implementer uses the exact final signed artifact on a clean supported Mac and reconciles passing production confirmation, user-visible capability availability, semantic verifier result, public installation instructions, same-profile privacy/performance evidence, update/removal behavior, and known exclusions. Required failure/unavailable/gap/skip/inconclusive results close the gate."
+        }
+      ]
+    },
+    {
+      "id": "MAC-VER-019",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 12: Profile expansion, adversarial closure, and public release review",
+          "action": "Save rendered documentation and DocC metadata, inspect final SDK headers, record actual final OS build and granted entitlement, and run every descendant-specific case. Documentation metadata disagreement is evidence to resolve, not a reason to assume beta or final behavior. If any mechanism is unavailable or a required guarantee fails, retain `native-descendant-v1` as unavailable and release other qualified profiles only."
+        }
+      ]
+    },
+    {
+      "id": "MAC-VER-020",
+      "tasks": [
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 2: Safe content-addressed artifact loading and fraud fixtures",
+          "action": "Create separate complete fixtures for absent artifacts, wrong source/installed correspondence, duplicated cases, untrusted manifest, synthetic release attempt, wrong observer, and stale restore reference. Preserve `status=candidate`; never create a fixture falsely presented as an installed qualification report. Tests assert shape acceptance where expected and semantic rejection independently."
+        },
+        {
+          "plan": "08-distribution-qualification.md",
+          "heading": "Task 11: Native-backed semantic verification and scoped result issuance",
+          "action": "Cover false `pass`, absent artifact, bad signature, untrusted root, forged observer, mismatched run nonce/tuple, stale anchor, duplicate case, missing required subcase, broken positive/negative control, wrong evidence class, absent/expanded native fixture authority, and omitted payload falsely claimed inspected. Null restore freshness is accepted only for an approved authority-restore exclusion with its required refusal observation."
+        }
+      ]
+    }
+  ]
+}

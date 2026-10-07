@@ -48,6 +48,7 @@ Confidence is high in the cited source findings and authority ownership requirem
 - [Mac workflow](research/macos-workflow.md): native affordances and UX constraints.
 - [Distribution research](research/distribution.md): platform packaging, signing, approvals and operations.
 - [Clawdstrike](research/clawdstrike.md): immutable public source audit and selective reuse.
+- [Source retrieval](research/source-retrieval.md): authenticated branch locators and exact-object reproduction for separately fetched design inputs.
 - [Source identity registry](research/source-pins.json): source roles and inspected identities, not public checkout instructions.
 - [Requirements](requirements.json): every normative requirement, same-file acceptance procedure and primary plan; all acceptance is initially specified, not executed.
 - [Contracts](contracts/README.md): six schemas, a closed method catalog, synthetic positive/negative examples and response-binding checks.

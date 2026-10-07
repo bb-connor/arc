@@ -256,6 +256,170 @@
           }
         }
       ]
+    },
+    "local_publication_review": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "local_artifact_publication_v1"
+        },
+        "operation_state": {
+          "const": "prepared"
+        },
+        "binding": {
+          "type": "object",
+          "properties": {
+            "native_action_digest": {
+              "$ref": "common.schema.json#/$defs/digest"
+            },
+            "policy_digest": {
+              "$ref": "common.schema.json#/$defs/digest"
+            },
+            "policy_generation": {
+              "$ref": "common.schema.json#/$defs/uint"
+            },
+            "deployment_digest": {
+              "$ref": "common.schema.json#/$defs/digest"
+            },
+            "influence_commitment": {
+              "$ref": "common.schema.json#/$defs/digest"
+            },
+            "deciding_principal": {
+              "$ref": "common.schema.json#/$defs/id"
+            },
+            "valid_from": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "expires_at": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          "required": [
+            "native_action_digest",
+            "policy_digest",
+            "policy_generation",
+            "deployment_digest",
+            "influence_commitment",
+            "deciding_principal",
+            "valid_from",
+            "expires_at"
+          ],
+          "additionalProperties": false
+        },
+        "artifact": {
+          "type": "object",
+          "properties": {
+            "resource_ref": {
+              "allOf": [
+                {
+                  "$ref": "common.schema.json#/$defs/native_ref"
+                },
+                {
+                  "properties": {
+                    "kind": {
+                      "const": "resource"
+                    }
+                  }
+                }
+              ]
+            },
+            "manifest_digest": {
+              "$ref": "common.schema.json#/$defs/digest"
+            },
+            "content_sha256": {
+              "$ref": "common.schema.json#/$defs/digest"
+            },
+            "byte_length": {
+              "$ref": "common.schema.json#/$defs/uint"
+            },
+            "content_encoding": {
+              "const": "utf8"
+            },
+            "content_utf8": {
+              "type": "string",
+              "maxLength": 8192
+            }
+          },
+          "required": [
+            "resource_ref",
+            "manifest_digest",
+            "content_sha256",
+            "byte_length",
+            "content_encoding",
+            "content_utf8"
+          ],
+          "additionalProperties": false
+        },
+        "destination": {
+          "type": "object",
+          "properties": {
+            "resource_ref": {
+              "allOf": [
+                {
+                  "$ref": "common.schema.json#/$defs/native_ref"
+                },
+                {
+                  "properties": {
+                    "kind": {
+                      "const": "resource"
+                    }
+                  }
+                }
+              ]
+            },
+            "directory_display": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "filename_hex": {
+              "type": "string",
+              "pattern": "^(?:[0-9a-f]{2}){1,255}$"
+            }
+          },
+          "required": [
+            "resource_ref",
+            "directory_display",
+            "filename_hex"
+          ],
+          "additionalProperties": false
+        },
+        "effect": {
+          "const": "create_file_no_replace"
+        },
+        "expected_target": {
+          "const": "absent"
+        },
+        "cost": {
+          "type": "object",
+          "properties": {
+            "max_cost_minor": {
+              "$ref": "common.schema.json#/$defs/uint"
+            },
+            "currency": {
+              "const": "USD"
+            }
+          },
+          "required": [
+            "max_cost_minor",
+            "currency"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "kind",
+        "operation_state",
+        "binding",
+        "artifact",
+        "destination",
+        "effect",
+        "expected_target",
+        "cost"
+      ],
+      "additionalProperties": false
     }
   }
 }

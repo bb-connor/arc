@@ -15,7 +15,7 @@ These schemas describe proposed message and evidence shapes. They do not impleme
 
 The protocol name `chio.desktop.operator.v1` requires explicit negotiation and a versioned Omarchy compatibility map. Native references are opaque locators verified by their registered owner. A digest-shaped field, matching issuer string or successful schema check proves neither possession nor authority. Destination/resource types, generations, current policy, grants, influence, signatures and stop state are checked by native owners.
 
-The custom JSON Schema format `uint64-decimal` is mandatory for every unsigned decimal field. Validators must check canonical spelling and the inclusive range 0 through 18446744073709551615. Merely applying the regex without format validation is insufficient. JSON numbers are safe integers only; money and native generations use these decimal strings. Unknown fields are rejected.
+The custom JSON Schema format `uint64-decimal` is mandatory for every unsigned decimal field. Validators must check canonical spelling and the inclusive range 0 through 18446744073709551615. Merely applying the regex without format validation is insufficient. JSON numbers are safe integers only; money and native generations use these decimal strings. Unknown fields are rejected. Compatibility records also require at most one row per profile identity, including identical duplicates; six per-profile `contains`/`maxContains` constraints enforce this before any status is exposed.
 
 Example files use pretty-printed JSON for review. They represent payload values, not signed or canonical wire bytes. Runtime commitments and hashes use RFC 8785 through the registered codec. The document checker does not certify an RFC 8785 implementation; it checks strict parsing, shapes and response correlation. Native signed objects keep their own registered encoding and verifier.
 
@@ -34,11 +34,11 @@ Do not overwrite an existing unrelated environment; choose a fresh temporary pat
 After intentionally editing normative tables, update their derived manifest and review its diff:
 
 ```bash
-python3 docs/superpowers/specs/2026-10-07-macos-integration/verify.py --write-traceability --self-test
+/tmp/chio-macos-doc-validation/bin/python docs/superpowers/specs/2026-10-07-macos-integration/verify.py --write-traceability --self-test
 git diff -- docs/superpowers/specs/2026-10-07-macos-integration/requirements.json
 ```
 
-Requirement traceability assigns each requirement to a primary implementation plan. It does not select release applicability. The immutable, pre-run profile manifest in [qualification](../17-qualification.md) must expand the actual applicable cases, controls, evidence classes, prerequisites and thresholds before a runtime qualification run. Candidate data cannot choose its own easier case set afterward.
+The reviewed `plan-coverage-*.json` files assign every requirement to concrete named implementation tasks and exact retained action excerpts. The validator rejects missing/duplicate/unknown requirements, empty or absent tasks, removed actions and stale mappings; mutation self-checks exercise those failures. `requirements.json` derives its primary plan and task bindings from that inventory. This protects structural coverage from drift; reviewers must still judge whether each action adequately implements the requirement. It does not select release applicability. The immutable, pre-run profile manifest in [qualification](../17-qualification.md) must expand the actual applicable cases, controls, evidence classes, prerequisites and thresholds before a runtime qualification run. Candidate data cannot choose its own easier case set afterward.
 
 ## Candidate versus verified qualification
 

@@ -58,7 +58,7 @@
         "directory_display": "/Users/synthetic/Exports",
         "filename_hex": "6772656574696e672e7061746368"
       },
-      "effect": "create_file_no_replace",
+      "effect": "overwrite_file",
       "expected_target": "absent",
       "cost": {
         "max_cost_minor": "0",

@@ -10,3 +10,7 @@ Local specification and planning work completed on 2026-10-07. Publication and c
 - Independently reviewed authority/protocol/recovery and Apple platform/execution boundaries. Corrected stop durability, read-only stop recovery, terminal event projection, retry method identity, the external test oracle and explicit guest image/supervisor ownership. Both reviewers reinspected their findings.
 
 The user explicitly authorized specification, planning, commit, push, PR publication and a hosted bot-review repair loop. Product implementation and runtime qualification remain separate work. The loop's completion requires current-head bot approval and closure of every actionable review finding; local review or a successful review check alone is insufficient.
+
+## First hosted review repair
+
+Addressed nine distinct findings reported in ten comments across both hosted bots: stop/review reply binding, exact review-content delivery, retained-action plan coverage, a packed-only Git success control, nonblocking special-file evidence handling, reproducible internal-source locators, consistent virtualenv regeneration, a complete lifecycle matrix and profile-identity uniqueness. The coverage audit closed additional concrete implementation omissions in the owning plans. Each hosted comment receives its own disposition after the repair is pushed; final bot approval remains a live current-head PR fact.

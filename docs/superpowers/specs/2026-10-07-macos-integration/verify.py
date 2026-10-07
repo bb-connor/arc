@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import json
 import re
 import sys
@@ -18,17 +19,9 @@ REPO = ROOT.parents[3]
 MAX_BYTES = 65536
 MAX_DEPTH = 16
 SAFE_INTEGER = 9007199254740991
-PREFIX_PLAN = {
-    "PRD": "01-native-operator.md", "UX": "01-native-operator.md",
-    "KER": "00-kernel-prerequisites.md", "AUT": "00-kernel-prerequisites.md",
-    "ARC": "02-protocol-controller.md", "IPC": "02-protocol-controller.md",
-    "VM": "03-vm-project.md", "ES": "05-native-enforcement.md",
-    "NE": "05-native-enforcement.md", "RES": "04-resources-publication.md",
-    "REC": "06-recovery-evidence.md", "DST": "08-distribution-qualification.md",
-    "PRV": "08-distribution-qualification.md", "OPS": "08-distribution-qualification.md",
-    "HST": "07-adapters-delegation.md", "DEL": "07-adapters-delegation.md",
-    "VER": "08-distribution-qualification.md", "CLW": "07-adapters-delegation.md",
-    "RDM": "00-kernel-prerequisites.md",
+REQUIREMENT_PREFIXES = {
+    "PRD", "UX", "KER", "AUT", "ARC", "IPC", "VM", "ES", "NE", "RES",
+    "REC", "DST", "PRV", "OPS", "HST", "DEL", "VER", "CLW", "RDM",
 }
 CHECKER = FormatChecker()
 
@@ -96,8 +89,22 @@ def pair_matches(request: dict, response: dict) -> bool:
         echoed = response["error"].get("operation_ref")
         return original is None or echoed is None or original == echoed
     params, result = request["params"], response["result"]
-    for key in ("operation_ref", "task_id", "subscription_id", "decision"):
-        if key in params and key in result and params[key] != result[key]:
+    required_bindings = {
+        "task.get": ("task_id",), "task.stop": ("task_id",),
+        "operation.get": ("operation_ref",), "review.open": ("operation_ref",),
+        "approval.submit": ("operation_ref", "decision"),
+        "events.ack": ("subscription_id",),
+    }
+    for key in required_bindings.get(request["method"], ()):
+        if key not in params or key not in result or params[key] != result[key]:
+            return False
+    if request["method"] == "review.open":
+        try:
+            artifact = result["projection"]["artifact"]
+            content = artifact["content_utf8"].encode("utf-8", errors="strict")
+            if len(content) != int(artifact["byte_length"]) or hashlib.sha256(content).hexdigest() != artifact["content_sha256"]:
+                return False
+        except (KeyError, TypeError, ValueError, UnicodeError):
             return False
     return True
 
@@ -110,6 +117,52 @@ def validators() -> dict[str, Draft202012Validator]:
         registry = registry.with_resource(name, Resource.from_contents(value))
     return {name: Draft202012Validator(value, registry=registry, format_checker=CHECKER)
             for name, value in schemas.items()}
+
+
+def plan_task_body(text: str, heading: str) -> str:
+    # Code examples can contain Markdown-looking comments. Preserve offsets while
+    # excluding fenced bodies from the heading census.
+    visible, fenced = [], False
+    for line in text.splitlines(keepends=True):
+        boundary = bool(re.match(r"^\s*```", line))
+        visible.append(re.sub(r"[^\n]", " ", line) if fenced or boundary else line)
+        if boundary:
+            fenced = not fenced
+    headings = list(re.finditer(r"^(#{1,6}) (.+)$", "".join(visible), re.M))
+    matches = [i for i, match in enumerate(headings) if match[2] == heading]
+    if len(matches) != 1 or not re.fullmatch(r"Task [0-9]+: .+", heading):
+        raise ValueError(f"Missing or duplicate implementation task: {heading}")
+    index = matches[0]
+    start, level = headings[index].end(), len(headings[index][1])
+    end = next((match.start() for match in headings[index + 1:] if len(match[1]) <= level), len(text))
+    return text[start:end]
+
+
+def validate_plan_coverage(entries: list[dict], identifiers: set[str], plans: dict[str, str]) -> dict[str, list[dict]]:
+    coverage = {}
+    for entry in entries:
+        if set(entry) != {"id", "tasks"} or entry["id"] in coverage:
+            raise ValueError("Malformed or duplicate plan coverage entry")
+        tasks = entry["tasks"]
+        if not isinstance(tasks, list) or not tasks:
+            raise ValueError(f"No implementation actions: {entry['id']}")
+        seen = set()
+        for task in tasks:
+            if set(task) != {"plan", "heading", "action"}:
+                raise ValueError(f"Malformed implementation action: {entry['id']}")
+            name, heading, action = task["plan"], task["heading"], task["action"]
+            if name not in plans or Path(name).name != name:
+                raise ValueError(f"Missing implementation plan: {name}")
+            body = plan_task_body(plans[name], heading)
+            if not isinstance(action, str) or not 30 <= len(action) <= 500 or action not in body:
+                raise ValueError(f"Missing mapped implementation action: {entry['id']} in {name}: {heading}")
+            if "- [ ]" not in body or (name, heading, action) in seen:
+                raise ValueError(f"Missing task work or duplicate mapping: {entry['id']}")
+            seen.add((name, heading, action))
+        coverage[entry["id"]] = tasks
+    if set(coverage) != identifiers:
+        raise ValueError(f"Plan requirement coverage drift: {sorted(set(coverage) ^ identifiers)}")
+    return coverage
 
 
 def requirement_records() -> list[dict]:
@@ -125,19 +178,28 @@ def requirement_records() -> list[dict]:
             identifier, prefix, statement, acceptance = match.groups()
             if identifier in identifiers or acceptance != "AT-" + identifier:
                 raise ValueError(f"Duplicate or mismatched requirement: {identifier}")
-            if prefix not in PREFIX_PLAN:
+            if prefix not in REQUIREMENT_PREFIXES:
                 raise ValueError(f"Unmapped requirement prefix: {prefix}")
             definition = re.compile(r"^(?:\| " + re.escape(acceptance) + r" \||#{2,4} " + re.escape(acceptance) + r"(?::|\s))", re.M)
             if len(definition.findall(text)) != 1:
                 raise ValueError(f"Acceptance procedure must be defined once: {acceptance}")
-            if not (PLANS / PREFIX_PLAN[prefix]).is_file():
-                raise ValueError(f"Missing implementation plan: {PREFIX_PLAN[prefix]}")
             identifiers.add(identifier)
             records.append({"id": identifier, "spec": path.name, "line": line_no,
                             "requirement": statement, "acceptance": acceptance,
-                            "plan": PREFIX_PLAN[prefix], "acceptance_status": "specified_not_executed"})
+                            "acceptance_status": "specified_not_executed"})
     if not records:
         raise ValueError("No requirements found")
+    entries = []
+    for path in sorted((ROOT / "contracts").glob("plan-coverage-*.json")):
+        document = read_json(path)
+        if set(document) != {"requirements"}:
+            raise ValueError(f"Malformed plan coverage file: {path.name}")
+        entries.extend(document["requirements"])
+    plans = {path.name: path.read_text() for path in PLANS.glob("[0-9][0-9]-*.md")}
+    coverage = validate_plan_coverage(entries, identifiers, plans)
+    for record in records:
+        record["plan"] = coverage[record["id"]][0]["plan"]
+        record["plan_tasks"] = coverage[record["id"]]
     return records
 
 
@@ -243,7 +305,38 @@ def self_test(loaded: dict) -> int:
     mutant["params"]["endorsement_ref"]["generation"] = "18446744073709551616"
     if not list(loaded["operator-request.schema.json"].iter_errors(mutant)):
         raise ValueError("Schema accepted overflowing native generation")
-    return len(malformed) + 7
+    for method in ("task.stop", "review.open"):
+        request = wire_decode((ROOT / f"examples/request-{method.replace('.', '-')}.json").read_bytes())
+        response = wire_decode((ROOT / f"examples/response-{method.replace('.', '-')}.json").read_bytes())
+        key = "task_id" if method == "task.stop" else "operation_ref"
+        for remove in (False, True):
+            mutant = copy.deepcopy(response)
+            if remove:
+                del mutant["result"][key]
+            else:
+                mutant["result"][key] = "substituted"
+            if pair_matches(request, mutant):
+                raise ValueError(f"Correlation accepted missing/substituted {method} binding")
+    identifier = "MAC-IPC-001"
+    heading = "Task 1: Authenticate native peers"
+    action = "Reject a peer whose audit identity differs from the selected native session."
+    plan = f"# Plan\n\n## {heading}\n\n- [ ] {action}\n"
+    entry = {"id": identifier, "tasks": [{"plan": "02-protocol-controller.md", "heading": heading, "action": action}]}
+    plans = {"02-protocol-controller.md": plan}
+    validate_plan_coverage([entry], {identifier}, plans)
+    fenced_plan = plan.replace("- [ ]", "```python\n# Not a plan heading\n```\n\n- [ ]")
+    validate_plan_coverage([entry], {identifier}, {"02-protocol-controller.md": fenced_plan})
+    bad_cases = [([], plans), ([entry, entry], plans), ([entry], {}),
+                 ([entry], {"02-protocol-controller.md": plan.replace(action, "Removed action.")}),
+                 ([entry], {"02-protocol-controller.md": plan.replace(heading, "Task 2: Different task")}),
+                 ([entry], {"02-protocol-controller.md": plan.replace("- [ ]", "Narrative only:")})]
+    for entries, mutated_plans in bad_cases:
+        try:
+            validate_plan_coverage(entries, {identifier}, mutated_plans)
+        except ValueError:
+            continue
+        raise ValueError("Plan coverage accepted removed, unbound or duplicate implementation work")
+    return len(malformed) + 7 + 4 + 2 + len(bad_cases)
 
 
 def main() -> int:

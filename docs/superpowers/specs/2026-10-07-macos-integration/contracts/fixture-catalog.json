@@ -374,6 +374,79 @@
       "file": "invalid-transport-terminal-reason.json",
       "schema": "operator-event.schema.json",
       "schema_valid": false
+    },
+    {
+      "file": "invalid-review-missing-projection.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false
+    },
+    {
+      "file": "invalid-review-effect.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false
+    },
+    {
+      "file": "invalid-review-oversized-content.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false
+    },
+    {
+      "file": "invalid-review-content-url.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false
+    },
+    {
+      "file": "invalid-review-filename.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false
+    },
+    {
+      "file": "invalid-review-operation-substitution.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-review-open.json",
+      "pair_valid": false
+    },
+    {
+      "file": "invalid-review-content-digest.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-review-open.json",
+      "pair_valid": false
+    },
+    {
+      "file": "invalid-review-content-length.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-review-open.json",
+      "pair_valid": false
+    },
+    {
+      "file": "invalid-stop-task-substitution.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-task-stop.json",
+      "pair_valid": false
+    },
+    {
+      "file": "invalid-stop-task-binding-missing.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false
+    },
+    {
+      "file": "invalid-compatibility-duplicate-profile.json",
+      "schema": "compatibility.schema.json",
+      "schema_valid": false
+    },
+    {
+      "file": "invalid-compatibility-conflicting-profile.json",
+      "schema": "compatibility.schema.json",
+      "schema_valid": false
+    },
+    {
+      "file": "compatibility-distinct-profiles.json",
+      "schema": "compatibility.schema.json",
+      "schema_valid": true
     }
   ]
 }

@@ -43,9 +43,9 @@
         },
         "manifest_digest": "1111111111111111111111111111111111111111111111111111111111111111",
         "content_sha256": "e78ad3af1b7d8591792e2fe6c784798fbf95f5daf57640aeb078784af8844c06",
-        "byte_length": "86",
+        "byte_length": "85",
         "content_encoding": "utf8",
-        "content_utf8": "--- a/greeting.py\n+++ b/greeting.py\n@@ -1 +1 @@\n-print(\"Hello\")\n+print(\"Hello, Chio\")\n"
+        "content_utf8": "--- a/greeting.py\n+++ b/greeting.py\n@@ -1 +1 @@\n-print(\"Hello\")\n+print(\"Hello, Chio\")"
       },
       "destination": {
         "resource_ref": {

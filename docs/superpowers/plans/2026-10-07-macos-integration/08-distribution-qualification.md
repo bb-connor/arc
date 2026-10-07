@@ -94,6 +94,9 @@ def check_case_set(manifest, cases):
 ```python
 import hashlib
 import json
+import os
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -111,10 +114,26 @@ class ArtifactTests(unittest.TestCase):
     def test_duplicate_keys_fail(self):
         with self.assertRaisesRegex(ValueError, "duplicate_key"):
             parse_object(b'{"result":"fail","result":"pass"}')
+
+    def test_fifo_is_rejected_without_waiting_for_a_writer(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            digest = hashlib.sha256(b"fifo-fixture").hexdigest()
+            os.mkfifo(root / digest)
+            result = subprocess.run(
+                [sys.executable, "-c",
+                 "import sys; from pathlib import Path; "
+                 "from verifier.artifacts import load_artifact; "
+                 "load_artifact(Path(sys.argv[1]), sys.argv[2])",
+                 str(root), digest],
+                capture_output=True, text=True, timeout=1,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("invalid_artifact_size_or_type", result.stderr)
 ```
 
 - [ ] **Step 2: Run** `PYTHONPATH=integrations/macos/qualification python3 -m unittest discover -s integrations/macos/qualification/tests -p test_artifacts.py -v`. Expected: missing-module failure.
-- [ ] **Step 3: Implement bounded loading with no symbolic-link following.** Artifact names are SHA-256 hex, not relative paths supplied by test data. Keep the artifact directory immutable during verification; later signed observer transport writes to staging before atomically publishing objects.
+- [ ] **Step 3: Implement bounded loading with no symbolic-link following.** Artifact names are SHA-256 hex, not relative paths supplied by test data. Open with `O_NONBLOCK` before inspecting type so a FIFO cannot block the verifier before `fstat`. Reject every nonregular node before reading. Add bounded actual FIFO-without-writer, directory, Unix-socket, symlink, and disposable character-device fixtures; each must refuse within one second with no read attempted. Keep the artifact directory immutable during verification; later signed observer transport writes to staging before atomically publishing objects.
 
 ```python
 import hashlib
@@ -128,7 +147,7 @@ LIMIT = 16 * 1024 * 1024
 def load_artifact(root, digest):
     if re.fullmatch(r"[0-9a-f]{64}", digest) is None:
         raise ValueError("invalid_digest")
-    fd = os.open(root / digest, os.O_RDONLY | os.O_NOFOLLOW)
+    fd = os.open(root / digest, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     try:
         info = os.fstat(fd)
         if not stat.S_ISREG(info.st_mode) or info.st_size > LIMIT:
@@ -169,6 +188,10 @@ def parse_object(data):
 
 - [ ] **Step 1: Add fixture bundles with a modified nested helper, wrong-team provider, undeclared entitlement, duplicate component ID, wrong architecture, and `get-task-allow=true`.** The inventory test consumes captured `codesign`, `security cms`, `file`, and `lipo` output from fixtures first, then runs the same assertions on final installed bytes. Expected: each unacceptable closure is rejected for its own cause.
 - [ ] **Step 2: Implement `inspect-bundle.py` with required CLI arguments `--app`, `--release-inputs`, and `--output`.** Use `subprocess.run` with argument arrays and `check=True`; enumerate all executable Mach-O files and nested bundles without following links outside the bundle; compare exact identifiers, Team ID, architectures, entitlements, provisioning capabilities, and content digests against `release-inputs.json`. Return nonzero for missing inputs or any mismatch. The script records raw platform outputs as supporting evidence, never `qualified=true`.
+
+- [ ] **Step 2a: Materialize source, license, and build provenance.** Create `integrations/macos/distribution/scripts/build-provenance.py` and `integrations/macos/qualification/tests/test_build_provenance.py`. Bind every shipped executable/library/guest asset to immutable public source revision or archive digest, dependency lock entry, vendored patch digest, exact toolchain/build environment, unsigned content digest, final signed digest, and license/source-obligation record. Emit `source-provenance.json` and `sbom.spdx.json`; inventory packaging scripts as executable build inputs. Run two isolated offline rebuilds and compare unsigned content before claiming reproducibility. Reject a missing license, unresolved dependency, unrecorded patch, floating source, unpublished instructed revision, or generated executable absent from the closure.
+
+- [ ] **Step 2b: Enforce production signature and executable-selection policy.** Extend bundle inspection to require Hardened Runtime flags and a secure signing timestamp on every applicable executable, reject `get-task-allow`, and validate actual provisioning capability grants rather than entitlement text alone. Implement `PinnedExecutableResolver` in the M2 Mac controller adapter using package-owned absolute paths, manifest identity/digest verification, a sanitized fixed environment, and no interactive-shell initialization. Add substituted PATH helper, startup-file command, injected-library environment, altered nested helper, missing timestamp, and invalid runtime-flag tests; the external fake-tool sentinel must remain untouched and incompatible code must refuse before launch.
 
 ```python
 import subprocess
@@ -234,6 +257,9 @@ func credentialQuery(service: String, account: String) -> [String: Any] {
 
 - [ ] **Step 4: Complete the delegate with exact observation transitions.** `requestNeedsUserApproval` sets approval pending; `.willCompleteAfterReboot` sets restart pending; immediate completion triggers independent active-code remeasurement; failure records bounded OS error. Replacement returns `.replace` only for the previously validated compatibility decision, otherwise `.cancel`. Keep the delegate alive until terminal callback. Deactivation uses the containing app and retains pending restart until actual provider inspection confirms removal.
 - [ ] **Step 5: Add credential creation policy and locked-session tests.** Use the real signed per-user access group and selected accessibility candidate; test denied/missing/migrated/logged-out behavior on the exact Mac build. Never add file-based keychain fallback. Cache lifetime follows native session fencing and token rotation; zeroize/drop broker-owned copies after use where the implementation can guarantee it.
+- [ ] **Step 5a: Verify credential rotation against an in-flight external effect.** Bind every broker cache entry to its current native credential generation and invalidate new use on rotation, explicit removal, or session fence. Dispatch one held synthetic request, rotate/delete the token while its reply is withheld, and submit a second request. The independent receiver records token-generation use: no new request uses the old cache, while the first remains attached to its original native operation and known/unknown outcome. Test lost rotation notification by requiring a current-generation check before use; no unconditional retry or new operation identity is permitted.
+- [ ] **Step 5b: Implement explicit service opt-in and bounded permission recovery.** Extend `ServiceRegistration.swift` with `notRequested`, `pendingApproval`, `enabled`, `denied`, and `unregistered` projections derived from actual OS observations and retained user choice. Register only after explicit background-service selection; reopening the app must not repeat a denied request. Keep read-only diagnosis usable and open relevant settings only on explicit action. Add fresh-install, opt-out, five-reopen denial, approval withdrawal, and later opt-in cases with outside launch counts; no denied path starts a controller or requests broader permissions.
+- [ ] **Step 5c: Implement full aged operational health.** Add `OperationalHealth.swift` and matching tests with separate connectivity, authentication, compatibility, permission, activation, convergence, observation coverage, storage, authority, and closure dimensions. Every observation carries source and observation time; unknown or expired facts remain unknown and cannot become a combined protected Boolean. Map actual native/provider/OS observations through M2's shared health envelope. Independently break each dimension, replay a stale provider heartbeat, lose a reply, and remove storage access; assert exact reason, age, affected-scope refusal, and continued read-only diagnosis.
 - [ ] **Step 6: Run Swift tests, then record installed cases through the lab runner introduced next.** Expected: unit tests pass and signed installed tests remain unavailable until actual team/profile access exists. Commit with `feat(macos): observe service provider and credential lifecycle`.
 
 ## Task 5: Outside observers and a bounded qualification runner
@@ -285,6 +311,7 @@ shasum -a 256 "$artifact_path" > "$record_dir/final-artifact.sha256"
 - [ ] **Step 3: Make acceptance of the submission status explicit.** Parse `notary-submit.json`, require successful final status, retain submission ID and full log, and reject errors even if a command returned output. Notarize/staple the intended container or app under Apple's documented supported workflow and capture the final post-staple digest. `spctl` app assessment remains a separate installed observation.
 - [ ] **Step 4: Execute the clean-Mac consumer case.** Run `python3 integrations/macos/qualification/run.py --mode installed --manifest integrations/macos/qualification/manifests/observe-v1.json --case AT-MAC-DST-003 --output output/macos-qualification/consumer-launch --record-unavailable`. The runner records host build/security settings, download quarantine, online/offline launch, signature and ticket checks. Expected: passing controls on a real qualified tuple or precise closed unavailability, never a local developer exception counted as consumer success.
 - [ ] **Step 5: Write install instructions using public artifacts and revisions only.** Explain actual optional approvals, selected unavailable profiles, and how to inspect the release evidence. Verify any instructed Git revision exists in the public repository before publishing. Commit with `build(macos): add notarized consumer distribution path`.
+- [ ] **Step 5a: Implement a separately qualified managed installation path.** Create `integrations/macos/distribution/managed/render_payloads.py` and `integrations/macos/qualification/cases/managed_deployment.py`. Render extension, supported PPPC, background-service, and removability payloads from the actual approved Team ID, bundle identities, designated code requirements, and selected OS payload schema; never infer MDM entitlement from a consumer approval. Install and withdraw those exact payloads on an enrolled test Mac, separately testing a standard user, admin, wrong-team identity, denied user override, and managed uninstall. Compare OS/MDM observations with native history: external restrictions are attributed to their administrator, removal cannot create a native grant, no MDM event creates approval/publication authority, and changed management invalidates affected profile evidence.
 
 ## Task 7: Update, downgrade, removal, and incident state machines
 
@@ -314,6 +341,7 @@ func updateReadiness(
 
 - [ ] **Step 2: Run** `swift test --package-path integrations/macos/native --filter UpdateTests`. Expected: reducers demonstrate safe intermediate states; Boolean unit fixtures cannot substitute for real native proof verification in the coordinator.
 - [ ] **Step 3: Implement the coordinator transaction.** Verify metadata against installer-owned trust roots and expiry/security floor, stage safe files, call the native fence, persist exact proof references, reconcile originals, execute an explicitly supported state migration, replace app/provider, independently remeasure active code, then request native compatibility recheck. Any unknown step enters `recovery-required` with original custody retained. Compatible code rollback never overwrites native authority from the migration backup.
+- [ ] **Step 3a: Implement authenticated publisher rotation and revocation.** Create `PublisherTrustPolicy.swift` and `PublisherTrustTests.swift`. Installer-owned authenticated policy binds current and successor signing/update-key identities, accepted metadata generation, expiry no later than seven days, security floor, and revocation records; downloaded metadata cannot replace its own trust root. A valid authenticated rotation permits only its named successor; same bundle name, unrelated key, or TLS alone does not. Test unsigned successor, replayed old metadata, expired offline metadata, revoked current build, interrupted rotation, and an allowed nonrevoked code rollback. Expiry prevents new update activation; observed revocation fences affected admission while retaining original custody and minimal signed incident evidence. Resume requires a newly verified exact-profile record and independent production confirmation, not clearing the warning.
 - [ ] **Step 4: Implement removal through the containing app.** Fence and stop owned work, preserve unknown outcomes, deactivate providers, unregister services, inventory actual residuals, and distinguish restart-pending. Default removal preserves projects/evidence/custody; purge is a separate explicit inventory-bound operation. An incident revokes affected trust through its owner and uses the same fence/recovery path.
 - [ ] **Step 5: Fault every transition.** Run `python3 integrations/macos/qualification/run.py --mode installed --manifest integrations/macos/qualification/manifests/observe-v1.json --case AT-MAC-DST-009 --output output/macos-qualification/update-crashes --record-unavailable`, then the registered downgrade, removal, storage-fault, and incident cases. Expected: outside effect count remains at most one for an original operation; unknowns survive; a mixed generation never becomes active for governed work.
 - [ ] **Step 6: Commit** with `feat(macos): preserve authority across update and removal`.
@@ -326,17 +354,40 @@ func updateReadiness(
 
 ```python
 SESSION_CASES = (
-    ("window_close", "custody_continues", "native_expiry", "unchanged"),
-    ("screen_lock", "new_crossings_fenced", "invalidated", "blocked"),
-    ("owner_unknown", "new_crossings_fenced", "invalidated", "blocked"),
-    ("fast_user_switch", "new_crossings_fenced", "invalidated", "blocked"),
-    ("logout", "new_crossings_fenced", "invalidated", "blocked"),
-    ("wake", "reconcile_before_admission", "invalidated", "revalidate"),
+    # transition, admission, review, credential, worker closure, external outcome
+    ("window_close", "custody_continues", "native_expiry", "unchanged",
+     "not_implied_by_ui", "unchanged"),
+    ("screen_lock", "new_crossings_fenced", "invalidated", "blocked",
+     "independently_confirm", "precommitted_effect_may_finish"),
+    ("owner_unknown", "new_crossings_fenced", "invalidated", "blocked",
+     "independently_confirm", "retain_unknown"),
+    ("fast_user_switch", "new_crossings_fenced", "invalidated", "blocked",
+     "independently_confirm", "retain_original_outcome"),
+    ("logout", "new_crossings_fenced", "invalidated", "blocked",
+     "independently_confirm", "retain_original_outcome"),
+    ("no_user_logged_in", "no_user_task_authority", "invalidated", "unavailable",
+     "global_restriction_is_separate", "retain_original_outcome"),
+    ("sleep", "fence_or_record_unconfirmed", "invalidated", "blocked",
+     "unconfirmed_until_observed", "retain_unknown"),
+    ("wake", "reconcile_before_admission", "invalidated", "revalidate",
+     "fresh_identity_and_closure_check", "reconcile_original"),
+    ("login", "reauthenticate_then_reconcile", "invalidated", "revalidate",
+     "no_automatic_worker_replay", "reconcile_original"),
+    ("reboot", "freshness_then_reconcile", "invalidated", "revalidate",
+     "new_boot_and_process_identities", "reconcile_original"),
+    ("provider_restart", "affected_profile_fenced", "invalidated", "blocked",
+     "restriction_coverage_remeasure", "retain_original_outcome"),
+    ("clock_shift", "native_deadline_revalidation", "invalidated", "revalidate",
+     "no_cross_boot_clock_comparison", "retain_original_outcome"),
 )
 ```
 
+- [ ] **Step 1a: Verify complete lifecycle rows and non-fabricated closure.** Add `test_session_matrix.py` asserting the exact transition set above, six nonempty fields per row, and separate outside worker/flow/external observations. Exercise sleep before/after native fence durability, reboot with an unresolved original effect, no-user global-provider lifetime, and forward/backward wall-clock shifts. Expected: unconfirmed sleep fencing stays unconfirmed, no logged-out user task obtains authority, a new boot does not reuse process identity, and the native deadline owner determines expiry without treating wall-clock adjustment as renewed grant lifetime.
+
 - [ ] **Step 2: Add independent two-user tests.** Use two synthetic standard-user lab accounts, distinct secret/path canaries, identical task labels, simultaneous service instances, forged request identities, and reused numeric UID fixture. Compare OS connection/audit identity, native scope, outside effects, and export contents. Global provider records cannot expose another user's raw task data.
+- [ ] **Step 2a: Implement bounded controller restart and single-writer custody.** Create `crates/products/chio-desktop/src/platform/macos/service_lifecycle.rs` and `tests/macos_service_lifecycle.rs`. Persist operational attempt timing separately from native authority, enforce at most three automatic starts in 60 seconds with at least five seconds between attempts, then require explicit recovery. Multiple app instances authenticate and attach to the same native serving-writer scope; an application-local lock cannot elect a second native writer. Add five simultaneous app launches, repeated crashes, launchd restarts, lost post-commit reply, and stale owner-generation tests. Independent process census, native writer records, and destination counters must show bounded restarts, one serving owner, one original operation/effect, and no automatic task replay.
 - [ ] **Step 3: Bind restore to M6's real freshness proof.** Snapshot state before a grant is spent, spend/revoke/fence it, then restore database/keychain/home/guest snapshot and clone to a second machine. Remove connectivity to the independent freshness owner. Expected: no restored authority becomes current from a local database, keychain key, or internally consistent hash chain. A missing native freshness API is an owned M0/M6 prerequisite and yields `unavailable`; do not add an application-local counter as a substitute.
+- [ ] **Step 3a: Implement a consistent, non-authorizing backup manifest.** Create `integrations/macos/native/Sources/ChioMacOperations/BackupManifest.swift` and `integrations/macos/qualification/cases/backup_inventory.py`. Classify configuration, presentation, protected payload, native snapshot/custody, and required secret-key metadata separately; bind exact schema/component identities, payload digests, original unresolved operations, and the native consistent-snapshot reference when supported. Exclude sockets, transient launch identities, and raw provider secrets. Test missing snapshot/key metadata, concurrent snapshot interruption, tampered digest, unsafe archive path, and unavailable native snapshot API; incomplete backups cannot be labeled complete. Extraction is quarantined and grants nothing. Corrupt store, missing key, truncated provider mapping, or EIO preserves original bytes and unresolved custody, closes affected admission, and exposes bounded diagnosis instead of resetting state.
 - [ ] **Step 4: Run** `python3 integrations/macos/qualification/run.py --mode installed --manifest integrations/macos/qualification/manifests/observe-v1.json --case AT-MAC-OPS-011 --output output/macos-qualification/restore-freshness --record-unavailable`. Also register/run every applicable OPS case through the immutable manifest. Expected: external effect counter stays unchanged for stale grants; read-only historical inspection remains possible.
 - [ ] **Step 5: Reproduce the runbooks independently.** Each stable reason code maps to a specific operator action, retained evidence, and outside verification. Remove any instruction that deletes an authority database, reuses an old approval, resets a generation, or widens permissions to clear a warning. Commit with `test(macos): qualify shared session and restore boundaries`.
 
@@ -361,6 +412,9 @@ def test_support_export_has_no_secret_canary():
 ```
 
 - [ ] **Step 3: Implement retention and bounded diagnostics against the spec inventory.** Separate native custody from disposable logs; expire payload/caches/indexes consistently, record explicit retained obligations, and shed diagnostics with counters before authority durability is threatened. Preserve signed receipt bytes or clearly identify a redacted derivative; never relabel an edited body as signature-valid.
+- [ ] **Step 3a: Implement the versioned collection/disclosure inventory and export preview.** Add `privacy-inventory.json` and enforce it in M6's diagnostic/export adapter: default clipboard, screen, whole-home, host-network-payload, analytics, and crash-upload collectors stay off; task read, model release, app effect, and support export have separate native authority. Generate an exact archive-member/field/time-window/size preview, validate the user's explicit local destination through the existing export contract, and enforce archive bounds and traversal/symlink rejection before materialization. Test project-read-only against model/support release, unrequested collectors, secret-bearing signed payload, oversized archive, preview/body mismatch, and external upload attempt with outside receiver and canaries. Preserve original signed bytes or declare omitted payload/unverified derivative honestly.
+- [ ] **Step 3b: Implement fixed-cardinality metrics and diagnostic shedding.** Add `metrics_inventory.json` and a bounded collector using only reviewed enum labels, queue/deadline/drop counters, durations, and scoped opaque IDs where permitted; reject user task names, paths, URLs, prompts, and arbitrary error strings as labels. Bound buffers and storage before callbacks enqueue; callback/authority paths never wait for metric export or log flush. Send one million unique hostile labels, stall the reader, fill disk, and inject a failed native durable commit. Independent producer counts must reconcile gaps; memory/cardinality caps hold, and no failed authoritative commit dispatches an effect.
+- [ ] **Step 3c: Gate public artifacts and external telemetry disclosure.** Create `public-artifact-policy.json`, `cases/public_artifacts.py`, and `cases/dependency_telemetry.py`. Public screenshots, recordings, evidence, and bug reports use synthetic task data and per-export host pseudonyms; scan names, metadata, paths, numeric IDs, and low-entropy hashes before export. Public witnessing stays disabled until its separate metadata-disclosure contract is approved. Inventory every dependency/updater/provider/crash destination and payload class, then capture launch, idle, error, update, provider call, and crash traffic independently. Seed a real-looking home/account canary, an unlisted analytics endpoint, and unexpected SDK crash upload; reject undisclosed traffic/artifacts and verify opt-out paths send nothing beyond declared necessary traffic.
 - [ ] **Step 4: Execute** `python3 integrations/macos/qualification/run.py --mode installed --manifest integrations/macos/qualification/manifests/observe-v1.json --case AT-MAC-PRV-002 --output output/macos-qualification/privacy-canaries --record-unavailable`, followed by each applicable retention/archive/deletion/telemetry case. Expected: permitted export only, no undeclared network upload, precise statement of OS-managed surfaces the app cannot erase.
 - [ ] **Step 5: Commit** with `feat(macos): bound diagnostics and verify evidence privacy`.
 
@@ -388,6 +442,7 @@ class StatisticsTests(unittest.TestCase):
 ```
 
 - [ ] **Step 2: Instrument distinct boundaries.** Add non-sensitive signposts for view usability, IPC response, native durable acknowledgment, broker overhead, VM start, first result, stop fence, worker death, and flow closure. OS/native/remote clock domains retain their mapping and uncertainty. The outside observer supplies actual process/resource state, not UI labels.
+- [ ] **Step 2a: Implement coalesced observation and power-aware work.** Add a shared observer coordinator under `ChioMacOperations` keyed by authenticated native scope, so 20 UI subscribers share one bounded upstream subscription. Stop nonessential polling when no view/task needs it and adapt only optional sampling/rendering to low-power and thermal-pressure notifications. Safety-critical fence propagation and required native/provider callbacks retain their deadlines and dedicated bounded path. Test hidden/visible app, 20 subscribers, lost subscriber cleanup, low-power mode, thermal pressure, and revocation during throttling; outside wakeup/IPC counts must fall while native fence/callback oracles still pass. Missing required deadline or coverage closes the affected profile, never a performance waiver.
 - [ ] **Step 3: Implement immutable workload and environment capture.** Record hardware, OS, display, power mode, thermal range, battery health/charge band, SDK/toolchain, source/installed tuple, observer version, baseline digest, model/provider route, and fixture digests. Run five warm-ups plus 30 samples, idle settling and ten-minute idle measurements, contention at 1/8/32 tasks, and hostile event ramp. Apply the pre-run budgets from the privacy/performance specification without post hoc adjustment.
 - [ ] **Step 4: Execute paired energy trials.** At least five randomized baseline/candidate 60-minute idle pairs and equivalent useful-work pairs use a declared supported instrument or external meter, calibrated units, tool overhead, raw traces, and paired uncertainty. A high-wakeup regression must fail; inadequate resolution yields inconclusive. Instrument privileges belong to the lab, not the consumer app.
 - [ ] **Step 5: Run** `PYTHONPATH=integrations/macos/qualification python3 -m unittest discover -s integrations/macos/qualification/tests -p test_statistics.py -v`, then `python3 integrations/macos/qualification/run.py --mode installed --manifest integrations/macos/qualification/manifests/observe-v1.json --case AT-MAC-PRV-011 --output output/macos-qualification/energy --record-unavailable`. Expected: valid scoped results or explicit inconclusive/unavailable gates, never fabricated measurements. Commit with `perf(macos): measure scoped latency and energy budgets`.

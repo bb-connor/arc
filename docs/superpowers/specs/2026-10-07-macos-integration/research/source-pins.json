@@ -16,7 +16,64 @@
       "visibility": "internal-design-source",
       "role": "open documentation-only target, separately fetched source tree",
       "path": "docs/superpowers/specs/2026-10-04-*-design.md",
-      "runtime_qualified": false
+      "runtime_qualified": false,
+      "locator": {
+        "repository": "same authenticated working repository as this specification set",
+        "remote": "origin",
+        "fetch_ref": "refs/heads/docs/ftl-lessons-specs-20261004",
+        "pinned_object": "8dffff3da53dfb56da8e60019af5e3ae896f7f5b",
+        "instructions": "source-retrieval.md"
+      },
+      "files": [
+        {
+          "path": "docs/superpowers/specs/2026-10-04-authority-faults-design.md",
+          "sha256": "1c2790d8d3b4fe76af2d12a161cfff6679f9c361c629f0a7ec5909a6f0b20339"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-04-authority-space-teardown-design.md",
+          "sha256": "467d05c0986e7360d91b0e652c5f5e708a7d9dd6ba16df2b7f02139a46bcf275"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-04-closed-kernel-abi-design.md",
+          "sha256": "0970cc2ace6a4f70d30022c342821e4d3bafdde1c569a7e2b5482d79e18ccb5a"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-04-crossing-primitive-design.md",
+          "sha256": "c0e25fd71300cafdffc28950bb09ed56ce44b60271b6d03c7b13aa829a7bf407"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-04-durable-stop-epoch-design.md",
+          "sha256": "9533d40fb7d30ea633f2ae205477795464907647018b9ba9228644cd54c4f9fe"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-04-ftl-lessons-program-design.md",
+          "sha256": "7408c56619eb3eca86317965a32cd153d03deb4bf196dc4466d8013f53224626"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-04-integrity-gated-admission-design.md",
+          "sha256": "5de04bb2a109276448eab8046183d6cde6b544ede34bd98c733fcdfc8c161300"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-04-microkernel-isolation-backend-design.md",
+          "sha256": "8dcb3a545c11f09de20f038a17f570d0b0f39f7c9304ea74d890b3fd7cdbfedd"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-04-opaque-adapter-context-design.md",
+          "sha256": "c7d3269c19f9bd0d0bbcb7a9eb57f21d79054fce4cb0850fccd11fac3073739c"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-04-pure-admission-machine-design.md",
+          "sha256": "da027f4b5473bd755011127e66f82b8c9e71dbb37e27d2101328b4f0c2032f51"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-04-typed-reservations-design.md",
+          "sha256": "e0192adae1a669b6a0023ead3c9f1621570ea22efc350b5bb8cf6d7245dad604"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-04-unified-event-queue-design.md",
+          "sha256": "3f29d0d5a8efbd1ec5cf1b9277a5e195354b386ba5ba7d233893bbe1dd97bd3b"
+        }
+      ]
     },
     {
       "id": "OMARCHY-SPEC",
@@ -24,7 +81,14 @@
       "visibility": "internal-design-source",
       "path": "docs/superpowers/specs/2026-10-07-omarchy-integration",
       "role": "independent unmerged specification precedent",
-      "runtime_qualified": false
+      "runtime_qualified": false,
+      "locator": {
+        "repository": "same authenticated working repository as this specification set",
+        "remote": "origin",
+        "fetch_ref": "refs/heads/docs/omarchy-integration-specs-20261007",
+        "pinned_object": "d092128a18efdf666f4430bf41efd7aff6c16148",
+        "instructions": "source-retrieval.md"
+      }
     },
     {
       "id": "CLAWDSTRIKE",

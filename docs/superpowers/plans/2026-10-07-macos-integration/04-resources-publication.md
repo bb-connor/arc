@@ -143,6 +143,113 @@ print(root, commit)
 
 The fixture generator is test-only, not the product importer. Add separate malicious config/hooks, replace ref, external alternates, missing-object, corrupt packed-object, gitlink, symlink and LFS pointer fixtures. Record expected committed bytes independent of importer output.
 
+- [ ] **Step 1b: Add an ordinary valid packed-only positive fixture and an external committed-tree oracle.** Add this self-contained example to `make_git_fixtures.py` as the `packed-only` case. It uses Git only in the trusted fixture harness, never in the product importer. It independently inventories the committed tree and reads its blobs before packing, packs every reachable object, proves there is no loose-object fallback, and rechecks the same tree afterward. The fixture includes nested binary content and an executable bit, then dirties the checkout so success must use the frozen commit.
+
+```python
+import hashlib
+import json
+import os
+import pathlib
+import subprocess
+import tempfile
+
+fixture_dir = pathlib.Path(tempfile.mkdtemp(prefix="chio-packed-positive-"))
+repo = fixture_dir / "packed-only"
+repo.mkdir()
+env = {
+    "PATH": "/usr/bin:/bin",
+    "GIT_CONFIG_GLOBAL": os.devnull,
+    "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_NO_REPLACE_OBJECTS": "1",
+    "GIT_AUTHOR_DATE": "2000-01-01T00:00:00+0000",
+    "GIT_COMMITTER_DATE": "2000-01-01T00:00:00+0000",
+}
+
+def fixture_git(*args):
+    return subprocess.run(
+        ["/usr/bin/git", "-C", str(repo), *args], env=env,
+        check=True, capture_output=True,
+    ).stdout
+
+fixture_git("init", "--object-format=sha1", "--template=")
+fixture_git("config", "user.name", "Chio Fixture")
+fixture_git("config", "user.email", "fixture@example.test")
+fixture_git("config", "core.autocrlf", "false")
+fixture_git("config", "core.filemode", "true")
+known_files = {
+    "greeting.txt": (b"hello\n", "100644"),
+    "nested/data.bin": (b"\x00packed\xff\n", "100644"),
+    "bin/check": (b"#!/bin/sh\nexit 0\n", "100755"),
+}
+for relative, (data, mode) in known_files.items():
+    path = repo / relative
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data)
+    path.chmod(0o755 if mode == "100755" else 0o644)
+fixture_git("add", "--", *known_files)
+fixture_git("commit", "-m", "packed-only positive fixture")
+commit = fixture_git("rev-parse", "HEAD").strip().decode("ascii")
+tree = fixture_git("rev-parse", commit + "^{tree}").strip().decode("ascii")
+
+def committed_tree_oracle():
+    entries = []
+    for record in fixture_git("ls-tree", "-r", "-z", "--full-tree", commit).split(b"\0"):
+        if not record:
+            continue
+        metadata, raw_path = record.split(b"\t", 1)
+        mode, kind, oid = metadata.split(b" ")
+        assert kind == b"blob"
+        relative = raw_path.decode("utf-8")
+        data = fixture_git("cat-file", "blob", oid.decode("ascii"))
+        assert (data, mode.decode("ascii")) == known_files[relative]
+        entries.append({
+            "path_utf8": relative, "mode": mode.decode("ascii"),
+            "git_oid": oid.decode("ascii"), "byte_length": len(data),
+            "sha256": hashlib.sha256(data).hexdigest(), "bytes_hex": data.hex(),
+        })
+    assert {entry["path_utf8"] for entry in entries} == set(known_files)
+    return sorted(entries, key=lambda entry: entry["path_utf8"])
+
+expected = committed_tree_oracle()
+fixture_git("repack", "-a", "-d")
+fixture_git("prune-packed")
+objects = repo / ".git" / "objects"
+indices = sorted((objects / "pack").glob("*.idx"))
+assert indices and all(index.with_suffix(".pack").is_file() for index in indices)
+packed_oids = set()
+for index in indices:
+    for line in fixture_git("verify-pack", "-v", str(index)).splitlines():
+        first = line.split()[0]
+        if len(first) == 40 and all(byte in b"0123456789abcdef" for byte in first):
+            packed_oids.add(first.decode("ascii"))
+reachable = {
+    line.split(b" ", 1)[0].decode("ascii")
+    for line in fixture_git("rev-list", "--objects", commit).splitlines()
+}
+assert reachable and reachable <= packed_oids
+assert all(not (objects / oid[:2] / oid[2:]).exists() for oid in reachable)
+counts = dict(line.split(": ", 1) for line in fixture_git("count-objects", "-v").decode().splitlines())
+assert counts["count"] == "0"
+assert not (objects / "info" / "alternates").exists()
+fixture_git("fsck", "--full", "--strict", "--no-reflogs")
+assert committed_tree_oracle() == expected
+(repo / "greeting.txt").write_bytes(b"dirty checkout must not be imported\n")
+assert committed_tree_oracle() == expected
+oracle_path = fixture_dir / "expected-tree.json"
+oracle_path.write_text(json.dumps({
+    "fixture": "packed-only", "commit_oid": commit, "tree_oid": tree,
+    "entries": expected, "reachable_object_count": len(reachable),
+    "loose_object_count": 0, "pack_count": len(indices),
+}, indent=2) + "\n")
+print(json.dumps({"repo": str(repo), "oracle": str(oracle_path), "commit": commit,
+                  "reachable_objects": len(reachable), "loose_objects": 0,
+                  "packs": len(indices)}))
+```
+
+Add `packed_only_committed_tree_matches_external_oracle` to `tests/resources_git.rs`. Import this exact `commit_oid` through the actual product object reader and generation-sealing path, then independently read the sealed manifest and every referenced content-store blob. Compare the complete path set, admitted Git modes, byte lengths, SHA-256 digests and exact bytes against `expected-tree.json` and fresh fixture-only `git cat-file` reads of its frozen tree. Require the sealed source commit/tree identities to match and `greeting.txt` to contain `hello\n`, not dirty checkout bytes. No file may be missing or added. Recheck zero loose objects and complete reachable pack membership immediately before import; a fixture accidentally recreated as loose objects fails the test. This ordinary valid packed repository must seal successfully: refusal is not an acceptable positive-control outcome.
+
+Future importer command: `cargo test -p chio-desktop --test resources_git packed_only_committed_tree_matches_external_oracle -- --exact`. Expected after implementation: successful seal with exact external-oracle equality. Running the Python fixture alone verifies repository construction, pack-only storage and the independent Git oracle; it does not verify the proposed importer, native capture or runtime qualification.
+
 - [ ] **Step 2: Run `cargo test -p chio-desktop --test resources_git`; expect missing importer, then explicit regression failures until all fixtures are enforced.**
 - [ ] **Step 3: Implement descriptor-rooted staging and a bounded object reader.** Copy only allowed regular files from the selected `.git/objects` store into broker-owned staging using descriptor-relative no-follow reads. Reject `objects/info/alternates`, promisor files, linked worktree indirection and unsupported repository object format before use; do not parse user/global Git configuration as executable behavior. Bound packed/loose file sizes and cumulative decompression. A pinned audited libgit2 object-database reader can use `git2::Odb::open(&owned_objects_path)` and `Odb::read` on this owned store without opening a Repository; dependency version and parser fuzz evidence are release inputs. It does not execute hooks, filters or lazy fetch. Verify every object's raw type/length/hash and the selected commit/tree graph independently; SHA-1 collision-handling behavior is part of the dependency gate, not assumed from the name.
 
@@ -157,7 +264,7 @@ pub fn content_digest(bytes: &[u8]) -> [u8; 32] {
 
 Implement streaming digest and bounded reads for production blobs rather than allocating arbitrary object sizes through the illustrative small-object interface. Default candidate limits: 30,000 total graph objects, 20,000 files, 256 MiB aggregate bytes, 16 MiB per blob, depth 32. These are versioned template limits and UI-visible constraints, not performance claims. Native admitted limits may only reduce them.
 
-- [ ] **Step 4: Run Git fixtures while moving HEAD/editing checkout/repacking in another process. Expect exact original committed bytes or closed failure; inspect process/network canaries for zero hooks/filter/helper execution and zero network.**
+- [ ] **Step 4: First require successful seals for the ordinary loose-object and packed-only positive fixtures with exact external committed-tree oracle equality. Then run separate adversarial fixtures while moving HEAD/editing checkout/repacking in another process. Concurrent invalidation may yield exact original committed bytes or closed failure; that exception does not permit refusing the stable valid packed-only positive control. Inspect process/network canaries for zero hooks/filter/helper execution and zero network.**
 - [ ] **Step 5: Commit with `git commit -m "feat: import sealed committed project generations"`.**
 
 ### Task 3: Validate path identity and target filesystem materialization
@@ -392,6 +499,8 @@ impl PublicationStage {
 }
 ```
 
+For the first `publication-v1` review, select or derive a separately sealed single UTF-8 text/patch file with retained source-output provenance and joined influence. The complete file must satisfy the [inline review projection](../../specs/2026-10-07-macos-integration/06-operator-protocol.md#exact-review-content-delivery) bounds and fit the operator envelope. Native release verification must bind its byte count/SHA-256 and every action/destination/policy field to that frozen review before delivery. Directory, binary, oversized or incomplete-content proposals return unavailable before approval; a hash or truncated preview is insufficient. Add positive complete-text and negative binary/directory/oversize/content-substitution cases to publication tests. Multi-file output custody remains separate from this deliberately narrow release format.
+
 The prerequisite native publication-preparation interface accepts the sealed artifact and enrolled destination through the trusted resource bridge and returns the original native operation for `review.open`/`approval.submit`. Plan 00 owns this native contract; until delivered, publication stays unavailable. Do not add a public operator method or route arbitrary artifacts through `evidence.export`. Native preparation binds exact artifact, destination parent identity/generation, filename, absent-target requirement and relevant policy/influence. Review shows these values; the UI forwards only kernel-owned endorsement references. After current native admission, create staging with `openat` plus `O_CREAT | O_EXCL | O_NOFOLLOW`, restrictive mode and bounded content. Verify digest, flush bytes with the qualified Darwin durability sequence, then use `renameatx_np` with `RENAME_EXCL` for no-replace installation within the retained selected directory. Verify file type, link count, ownership and parent identity before effects; concurrent rename/substitution invalidates the proposal where identity can no longer be established. Refuse unqualified network/File Provider destinations. Do not use check-then-ordinary-rename.
 
 Persist the operation-to-staging/effect association in the native durable record before dispatch, record install evidence and directory durability according to the qualified APFS protocol, then commit native outcome. Exact `fsync`/`F_FULLFSYNC` ordering and crash persistence must be established by the platform experiment; POSIX function names alone do not qualify power-loss behavior. An unavailable durability primitive closes the feature.
@@ -407,7 +516,7 @@ Recovery queries the original native operation, retained effect identity and par
 
 **Files:** Create `crates/products/chio-desktop/src/resources/capture_kind.rs`, `tests/resources_gates.rs`, `integrations/macos/tests/fixtures/resources/influence_cases.json`; extend the fixed feature/profile registry from plan 02 and native UI capability presentation.
 
-**Interfaces:** Introduce `ResourceFeature { DirtyImport, BrowserCapture, ClipboardCapture, AppCapture, AppDraft, AppPublish, GuiEffect, GitPublish }` as local feature-registry entries. Their availability comes from the verified qualification manifest and native contract registry; no enum variant grants capability. Define `CapturedBytes { bytes: Vec<u8>, representation: String }` only as untrusted staging data; native capture joins source influence and issues a separate resource reference.
+**Interfaces:** Introduce `ResourceFeature { DirtyImport, BrowserCapture, ClipboardCapture, AppCapture, AppDraft, AppModify, AppPublish, GuiEffect, GitPublish }` as local feature-registry entries. Their availability comes from the verified qualification manifest and native contract registry; no enum variant grants capability. Define `CapturedBytes { bytes: Vec<u8>, representation: String }` only as untrusted staging data; native capture joins source influence and issues a separate resource reference.
 
 - [ ] **Step 1: Add the default-closed regression to the registry tests.**
 
@@ -415,13 +524,14 @@ Recovery queries the original native operation, retained effect identity and par
 #[test]
 fn draft_and_capture_do_not_imply_publication() {
     let enabled = [ResourceFeature::AppCapture, ResourceFeature::AppDraft];
+    assert!(!enabled.contains(&ResourceFeature::AppModify));
     assert!(!enabled.contains(&ResourceFeature::AppPublish));
     assert!(!enabled.contains(&ResourceFeature::GuiEffect));
     assert!(!enabled.contains(&ResourceFeature::GitPublish));
 }
 ```
 
-The real registry integration test loads a candidate manifest with only first-profile gates and asserts all eight future features unavailable. Test mutation must reject a manifest trying to enable an unqualified contract by setting a Boolean.
+The real registry integration test loads a candidate manifest with only first-profile gates and asserts all nine future features unavailable. Test mutation must reject a manifest trying to enable an unqualified contract by setting a Boolean.
 
 - [ ] **Step 2: Run `cargo test -p chio-desktop --test resources_gates`; expect missing feature registry integration initially.**
 - [ ] **Step 3: Implement closed entries and influence conformance fixtures.** Every unavailable entry supplies a reason and named acceptance gate. Browser/clipboard/app fixture capture preserves origin/representation digest and joins influence before model consumption. Summaries and OCR do not remove source influence; OS app signature and Universal Clipboard origin cannot create trusted user authority. App draft tests distinguish local draft from cloud-sync effects; resource/review/endorsement references are independently typed and native-verified. Generic Apple Events/Accessibility consent has no execution path here. Git publication requires exact remote/account/ref/commit, native expected-old-ref comparison and original-effect reconciliation; no generic `git push` fallback is added.
@@ -436,6 +546,8 @@ The real registry integration test loads a candidate manifest with only first-pr
   "expected": "deny-with-influence-preserved"
 }
 ```
+
+- [ ] Keep app capture, draft, modification and publication as four independent gates. Add negative cases proving draft permission cannot edit an existing app resource or publish it. Git release additionally requires broker-held credentials bound to the exact account/remote/ref and forbids passing them to workers. A future GUI effect needs a native typed semantic action, exact target/resource/content binding, current endorsement, separately qualified observation and original-effect reconciliation; generic clicks or Accessibility consent cannot satisfy it. Until every prerequisite exists, refuse before modifying an app, releasing credentials or dispatching a GUI effect.
 
 This JSON is a local test fixture, not operator wire or signed authority. The test harness feeds its cases through the real native integrity owner when available; mock-only passes cannot qualify the feature.
 
@@ -471,4 +583,4 @@ Extend the actual validator test to remove each required case, replace arm64 evi
 
 ## Coverage and execution boundary
 
-Complete the foundation in dependency order 1, 3, 2, 5 after M0/M2/M6, then M3 backend Tasks 1-7, then this plan Task 4, VM qualification Task 8 and this plan Tasks 6-8. Tasks 1-3 cover input authority, committed generation, paths and storage; Task 4 output/test sealing and release; Task 5 provider exports and budgets; Task 6 local publication/recovery; Task 7 closed future captures/drafts/GUI/Git publication; Task 8 adversarial and same-profile useful-work evidence, retention and failure recovery. Dirty capture, Git publish and native app effect implementation remain separate explicitly gated work, as required by the spec; their absence cannot be hidden by UI affordances. This plan is future implementation work and grants no OS permissions, sends no messages and publishes no user artifact during the specification turn.
+Complete the foundation in dependency order 1, 3, 2, 5 after M0/M2/M6, then M3 Task 0 preparation and backend Tasks 1-7 (integrated Task 0 probes after Tasks 2-4), then this plan Task 4, VM qualification Task 8 and this plan Tasks 6-8. Tasks 1-3 cover input authority, committed generation, paths and storage; Task 4 output/test sealing and release; Task 5 provider exports and budgets; Task 6 local publication/recovery; Task 7 closed future captures/drafts/GUI/Git publication; Task 8 adversarial and same-profile useful-work evidence, retention and failure recovery. Dirty capture, Git publish and native app effect implementation remain separate explicitly gated work, as required by the spec; their absence cannot be hidden by UI affordances. This plan is future implementation work and grants no OS permissions, sends no messages and publishes no user artifact during the specification turn.

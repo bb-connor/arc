@@ -1,5 +1,7 @@
 # macOS platform and execution review
 
+This report records the initial local review before the first hosted review round. Later corrections and validation are recorded in [validation](validation.md) and [work log](work-log.md); hosted verdicts must be checked on the live current commit.
+
 Review date: 2026-10-07. Scope: proposed specifications and implementation plans only. No product implementation, installation, entitlement, or runtime qualification was attempted. Confidence: high in the two concrete findings below; high in the directly checked Apple documentation findings; unknown in eventual installed platform behavior.
 
 Final platform-review verdict: ready within the reviewed documentation scope, with no remaining P1/P2 findings. The two initial findings were corrected and reinspected below. The design consistently separates native kernel authority from OS restrictions and treats missing installed evidence as unavailable. This verdict covers the proposed contracts and executable handoff, not runtime implementation, installed qualification, or the coordinating reviewer's final whole-package decision.

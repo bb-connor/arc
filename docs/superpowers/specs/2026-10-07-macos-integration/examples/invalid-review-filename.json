@@ -56,7 +56,7 @@
           "digest": "2222222222222222222222222222222222222222222222222222222222222222"
         },
         "directory_display": "/Users/synthetic/Exports",
-        "filename_hex": "6772656574696e672e7061746368"
+        "filename_hex": "not-hex"
       },
       "effect": "create_file_no_replace",
       "expected_target": "absent",
