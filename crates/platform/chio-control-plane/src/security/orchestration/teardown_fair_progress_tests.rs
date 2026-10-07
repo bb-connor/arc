@@ -208,14 +208,7 @@ async fn never_ending_reserved_cleanup_does_not_block_an_independent_queued_clea
 
     let independent_completed = released(&independent_registry, INDEPENDENT_PROGRESS_TIMEOUT).await;
     let attempts_while_independent_ran = stuck_port.shutdown_attempts();
-    let stuck_reservation_held = matches!(
-        tokio::time::timeout(
-            Duration::from_millis(200),
-            stuck_registry.wait_until_vacant()
-        )
-        .await,
-        Err(_)
-    );
+    let stuck_reservation_held = !released(&stuck_registry, Duration::from_millis(200)).await;
     let retained_while_stuck = supervisor.lock_state().retained_owners;
     let stuck_kept_retrying = tokio::time::timeout(INDEPENDENT_PROGRESS_TIMEOUT, async {
         while stuck_port.shutdown_attempts() <= attempts_while_independent_ran {
@@ -263,10 +256,7 @@ async fn parked_cleanup_keeps_its_reservation_and_retries_at_the_parked_interval
     })
     .await;
     let gaps = port.attempt_gaps();
-    let reservation_held = matches!(
-        tokio::time::timeout(Duration::from_millis(200), registry.wait_until_vacant()).await,
-        Err(_)
-    );
+    let reservation_held = !released(&registry, Duration::from_millis(200)).await;
     let retained_while_parked = supervisor.lock_state().retained_owners;
     port.release();
     let completed = released(&registry, PROGRESS_TIMEOUT).await;
