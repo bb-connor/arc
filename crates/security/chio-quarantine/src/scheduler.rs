@@ -22,6 +22,33 @@ const SCHEDULER_TRANSITION_ID_DOMAIN: &[u8] = b"chio.response-scheduler-transiti
 const SCHEDULER_HEALTH_EVENT_ID_DOMAIN: &[u8] = b"chio.response-scheduler-health-event.v1\0";
 const SCHEDULER_HEALTH_ALERT_HASH_DOMAIN: &[u8] = b"chio.response-scheduler-health-alert.v1\0";
 
+/// Error code a lineage-fence maintenance port returns when the external
+/// fence of an installed issuance freeze is no longer live.
+///
+/// Maintenance cannot restore such a fence, so the scheduler still runs the
+/// executor for that work item: expiry and rollback do not depend on the
+/// external fence, while the stale local projection keeps issuance admission
+/// for the lineage failing closed until the freeze is removed.
+pub const LINEAGE_FENCE_LAPSED_ERROR_CODE: &str = "response.lineage_fence_lapsed";
+
+#[derive(Debug, Error)]
+#[error("external lineage fence is absent or expired")]
+pub struct LineageFenceLapsed;
+
+#[must_use]
+pub fn lineage_fence_lapsed_error() -> PortError {
+    PortError::with_source(
+        PortErrorKind::Unavailable,
+        LINEAGE_FENCE_LAPSED_ERROR_CODE,
+        LineageFenceLapsed,
+    )
+}
+
+fn is_lineage_fence_lapsed(error: &PortError) -> bool {
+    error.kind() == PortErrorKind::Unavailable
+        && error.code().as_str() == LINEAGE_FENCE_LAPSED_ERROR_CODE
+}
+
 pub trait ScheduledResponseExecutor: Send + Sync {
     fn execute_scheduled(
         &self,
@@ -230,6 +257,7 @@ impl<
         let current_snapshot =
             decode_response_record(&current).map_err(SchedulerError::InvalidExecutionRecord)?;
         let installed_lineage_fences = installed_lineage_fence_effect_ids(&current_snapshot);
+        let mut lapsed_fence = None;
         if !installed_lineage_fences.is_empty() {
             match self.maintain_lineage_fences(
                 &current_snapshot,
@@ -238,6 +266,9 @@ impl<
                 now_unix_ms,
             ) {
                 Ok(()) => {}
+                Err(error) if is_lineage_fence_lapsed(&error) => {
+                    lapsed_fence = Some(error.code().clone());
+                }
                 Err(error) if error.kind() == PortErrorKind::Conflict => {
                     return Ok(SchedulerWorkOutcome::LeaseLost {
                         action_id: work.action_id.clone(),
@@ -263,6 +294,9 @@ impl<
                 }
                 if self.store.load_plan(&key)?.as_ref() != Some(&record) {
                     return Err(SchedulerError::ExecutionRecordNotDurable);
+                }
+                if let (ResponseState::Active, Some(lapsed_code)) = (snapshot.state, lapsed_fence) {
+                    return self.schedule_retry(work, now_unix_ms, lapsed_code);
                 }
                 match snapshot.state {
                     ResponseState::Active

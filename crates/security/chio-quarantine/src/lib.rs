@@ -38,8 +38,9 @@ pub use executor::{
 };
 pub use rules::{GroupingKey, RuleError, RuleLimits, TemporalRule, TemporalStage};
 pub use scheduler::{
-    ResponseScheduler, ScheduledResponseExecutor, SchedulerError, SchedulerPolicy,
-    SchedulerTickRequest, SchedulerWorkOutcome,
+    lineage_fence_lapsed_error, LineageFenceLapsed, ResponseScheduler, ScheduledResponseExecutor,
+    SchedulerError, SchedulerPolicy, SchedulerTickRequest, SchedulerWorkOutcome,
+    LINEAGE_FENCE_LAPSED_ERROR_CODE,
 };
 pub use state_machine::{
     build_response_plan, decode_response_record, CanonicalFailure, EffectMutation,

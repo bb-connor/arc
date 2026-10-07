@@ -15,6 +15,8 @@ use super::{
     ResponseSchedulerStore, ResponseSnapshot, ResponseState, ResponseTarget, ScheduledWork,
     SystemClock, TenantId, LINEAGE_FENCE_MAX_LEASE_MS,
 };
+use chio_quarantine::lineage_fence_lapsed_error;
+use std::cmp::Ordering;
 
 /// Exact `FreezeIssuance` backend over a commit-indexed causal fence.
 ///
@@ -725,21 +727,172 @@ impl IssuanceFreezeBackend {
             && maintained.expires_at_unix_ms == renewed_expires_at_unix_ms
     }
 
-    fn query_maintained_fence(
+    /// Read the live fence held under one scheduler identity for the lineage
+    /// binding of `before`, with no expiry floor.
+    fn query_live_fence(
         &self,
         before: &LineageFence,
-        work: &ScheduledWork,
-        renewed_expires_at_unix_ms: u64,
+        scheduler_lease_owner_id: &chio_security_types::ports::LeaseOwnerId,
+        scheduler_fencing_token: u64,
     ) -> PortResult<Option<LineageFence>> {
         self.query_exact_fence(&LineageFenceRequest {
             tenant_id: before.tenant_id.clone(),
             action_id: before.action_id.clone(),
             expected_commit_index: before.commit_index,
             expected_affected_set_hash: before.affected_set_hash,
+            scheduler_lease_owner_id: scheduler_lease_owner_id.clone(),
+            scheduler_fencing_token,
+            expires_at_unix_ms: 0,
+        })
+    }
+
+    fn renew_live_fence(
+        &self,
+        live: &LineageFence,
+        renewed_expires_at_unix_ms: u64,
+        cas_error: PortError,
+    ) -> PortResult<LineageFence> {
+        match live.expires_at_unix_ms.cmp(&renewed_expires_at_unix_ms) {
+            Ordering::Equal => Ok(live.clone()),
+            Ordering::Greater => Err(cas_error),
+            Ordering::Less => self.blast_radius.renew_fence(&LineageFenceRenewal {
+                tenant_id: live.tenant_id.clone(),
+                action_id: live.action_id.clone(),
+                fencing_token: live.fencing_token,
+                scheduler_lease_owner_id: live.scheduler_lease_owner_id.clone(),
+                scheduler_fencing_token: live.scheduler_fencing_token,
+                expected_expires_at_unix_ms: live.expires_at_unix_ms,
+                renewed_expires_at_unix_ms,
+            }),
+        }
+    }
+
+    /// Reconcile a same-epoch renewal whose compare-and-swap on the projected
+    /// expiry failed. Only the projected fence epoch is adopted, renewed from
+    /// its live expiry. `None` means no fence is live.
+    fn reconcile_failed_renewal(
+        &self,
+        before: &LineageFence,
+        work: &ScheduledWork,
+        renewed_expires_at_unix_ms: u64,
+        renew_error: PortError,
+    ) -> PortResult<Option<LineageFence>> {
+        let Some(live) = self.query_live_fence(before, &work.lease_owner_id, work.fencing_token)?
+        else {
+            return Ok(None);
+        };
+        if live.fencing_token != before.fencing_token {
+            return Err(PortError::integrity_failure());
+        }
+        if live.expires_at_unix_ms == before.expires_at_unix_ms {
+            return Err(renew_error);
+        }
+        self.renew_live_fence(&live, renewed_expires_at_unix_ms, renew_error)
+            .map(Some)
+    }
+
+    /// Reconcile a takeover whose compare-and-swap failed. This work's own
+    /// committed takeover is adopted, and a fence still in the projected
+    /// epoch is taken over from its live expiry. Any other live fence is
+    /// refused. `None` means no fence is live.
+    fn reconcile_failed_takeover(
+        &self,
+        before: &LineageFence,
+        work: &ScheduledWork,
+        renewed_expires_at_unix_ms: u64,
+        takeover_error: PortError,
+    ) -> PortResult<Option<LineageFence>> {
+        let successor_error =
+            match self.query_live_fence(before, &work.lease_owner_id, work.fencing_token) {
+                Ok(Some(live)) => {
+                    if live.fencing_token <= before.fencing_token {
+                        return Err(PortError::integrity_failure());
+                    }
+                    return self
+                        .renew_live_fence(&live, renewed_expires_at_unix_ms, takeover_error)
+                        .map(Some);
+                }
+                Ok(None) => return Ok(None),
+                Err(successor_error) => successor_error,
+            };
+        let live = match self.query_live_fence(
+            before,
+            &before.scheduler_lease_owner_id,
+            before.scheduler_fencing_token,
+        ) {
+            Ok(Some(live)) => live,
+            Ok(None) => return Ok(None),
+            Err(_) => return Err(successor_error),
+        };
+        if live.fencing_token != before.fencing_token {
+            return Err(PortError::integrity_failure());
+        }
+        if live.expires_at_unix_ms == before.expires_at_unix_ms
+            || live.expires_at_unix_ms > renewed_expires_at_unix_ms
+        {
+            return Err(takeover_error);
+        }
+        self.blast_radius
+            .takeover_fence(&LineageFenceTakeover {
+                tenant_id: live.tenant_id.clone(),
+                action_id: live.action_id.clone(),
+                expected_fencing_token: live.fencing_token,
+                expected_scheduler_lease_owner_id: live.scheduler_lease_owner_id.clone(),
+                expected_scheduler_fencing_token: live.scheduler_fencing_token,
+                expected_expires_at_unix_ms: live.expires_at_unix_ms,
+                successor_scheduler_lease_owner_id: work.lease_owner_id.clone(),
+                successor_scheduler_fencing_token: work.fencing_token,
+                successor_expires_at_unix_ms: renewed_expires_at_unix_ms,
+            })
+            .map(Some)
+    }
+
+    /// Bind the local projection of a lapsed fence to the current scheduler
+    /// epoch, keeping the external fencing token and expiry, so that epoch can
+    /// expire or roll back the contribution. Returns the error to report.
+    fn rebind_lapsed_projection(
+        &self,
+        key: &IssuanceFreezeKey,
+        request: &EffectRequest,
+        before: &LineageFence,
+        work: &ScheduledWork,
+    ) -> PortError {
+        let rebound = LineageFence {
             scheduler_lease_owner_id: work.lease_owner_id.clone(),
             scheduler_fencing_token: work.fencing_token,
-            expires_at_unix_ms: renewed_expires_at_unix_ms,
-        })
+            ..before.clone()
+        };
+        let rebind = IssuanceFreezeFenceMaintenanceRequest {
+            key: key.clone(),
+            action_id: request.action_id.clone(),
+            effect_id: request.effect_id.clone(),
+            expected_external_fence: before.clone(),
+            maintained_external_fence: rebound.clone(),
+            scheduler_work: work.clone(),
+        };
+        let holds_rebound = |snapshot: &IssuanceFreezeSnapshot| {
+            snapshot.contributions.as_slice().iter().any(|entry| {
+                entry.action_id == request.action_id
+                    && entry.effect_id == request.effect_id
+                    && entry.external_fence == rebound
+            })
+        };
+        let persisted = match self.freezes.maintain_issuance_freeze_fence(&rebind) {
+            Ok(snapshot) => snapshot,
+            Err(persistence_error) => match self.freezes.load_issuance_freezes(key) {
+                Ok(Some(snapshot)) if holds_rebound(&snapshot) => snapshot,
+                Ok(Some(_)) => return persistence_error,
+                Ok(None) => return PortError::integrity_failure(),
+                Err(readback_error) => return readback_error,
+            },
+        };
+        if let Err(error) = validate_issuance_freeze_snapshot(&persisted, key) {
+            return error;
+        }
+        if !holds_rebound(&persisted) {
+            return PortError::integrity_failure();
+        }
+        lineage_fence_lapsed_error()
     }
 
     fn validate_pending_release_order(
@@ -994,15 +1147,14 @@ impl IssuanceFreezeBackend {
             };
             match self.blast_radius.renew_fence(&renewal) {
                 Ok(renewed) => renewed,
-                Err(renew_error) => match self.query_maintained_fence(
-                    &before,
-                    &maintenance.scheduler_work,
-                    maintenance.renewed_expires_at_unix_ms,
-                ) {
-                    Ok(Some(renewed)) => renewed,
-                    Ok(None) => return Err(renew_error),
-                    Err(readback_error) => return Err(readback_error),
-                },
+                Err(renew_error) => self
+                    .reconcile_failed_renewal(
+                        &before,
+                        &maintenance.scheduler_work,
+                        maintenance.renewed_expires_at_unix_ms,
+                        renew_error,
+                    )?
+                    .ok_or_else(lineage_fence_lapsed_error)?,
             }
         } else {
             if maintenance.scheduler_work.fencing_token <= before.scheduler_fencing_token {
@@ -1024,14 +1176,21 @@ impl IssuanceFreezeBackend {
             };
             match self.blast_radius.takeover_fence(&takeover) {
                 Ok(taken_over) => taken_over,
-                Err(takeover_error) => match self.query_maintained_fence(
+                Err(takeover_error) => match self.reconcile_failed_takeover(
                     &before,
                     &maintenance.scheduler_work,
                     maintenance.renewed_expires_at_unix_ms,
-                ) {
-                    Ok(Some(taken_over)) => taken_over,
-                    Ok(None) => return Err(takeover_error),
-                    Err(readback_error) => return Err(readback_error),
+                    takeover_error,
+                )? {
+                    Some(taken_over) => taken_over,
+                    None => {
+                        return Err(self.rebind_lapsed_projection(
+                            &key,
+                            &request,
+                            &before,
+                            &maintenance.scheduler_work,
+                        ));
+                    }
                 },
             }
         };

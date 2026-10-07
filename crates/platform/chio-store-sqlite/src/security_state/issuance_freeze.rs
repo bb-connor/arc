@@ -1405,7 +1405,12 @@ impl IssuanceFreezeStore for SqliteSecurityStateStore {
             > expected.scheduler_fencing_token
             && maintained.fencing_token > expected.fencing_token
             && maintained.expires_at_unix_ms >= expected.expires_at_unix_ms;
-        if !same_scheduler_epoch && !scheduler_takeover {
+        // A projection whose fence has lapsed is rebound to a later scheduler
+        // epoch without changing the external fencing token or expiry.
+        let lapsed_rebind = maintained.scheduler_fencing_token > expected.scheduler_fencing_token
+            && maintained.fencing_token == expected.fencing_token
+            && maintained.expires_at_unix_ms == expected.expires_at_unix_ms;
+        if !same_scheduler_epoch && !scheduler_takeover && !lapsed_rebind {
             return Err(PortError::invalid_data());
         }
 
@@ -1414,6 +1419,9 @@ impl IssuanceFreezeStore for SqliteSecurityStateStore {
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(sqlite_error)?;
         let trusted_now = self.trusted_now_in_transaction(&transaction)?;
+        if lapsed_rebind && expected.expires_at_unix_ms > trusted_now {
+            return Err(PortError::invalid_data());
+        }
         validate_scheduler_lease_binding(
             &transaction,
             request.key.tenant_id.as_str(),
