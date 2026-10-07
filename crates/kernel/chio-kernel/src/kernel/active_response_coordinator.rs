@@ -356,6 +356,20 @@ impl ChioKernel {
                 "persisted active-response operation changed identity",
             ));
         }
+        // A committed approval is the dispatch commit point. Reconcile it
+        // before live validation can classify this attempt as uncommitted.
+        if operation.state() == AdmissionOperationState::ApprovalReserved {
+            let operation_store = self.admission_operation_store.as_ref().ok_or_else(|| {
+                active_response_internal("durable active-response operation store is not installed")
+            })?;
+            if let Some(committed) = self.reconcile_governed_active_response_commit(
+                operation_store.as_ref(),
+                self.approval_store.as_deref(),
+                &operation,
+            )? {
+                operation = committed;
+            }
+        }
         let committed_recovery = matches!(
             operation.state(),
             AdmissionOperationState::DispatchCommitted | AdmissionOperationState::Completed
