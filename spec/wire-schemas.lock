@@ -2860,6 +2860,11 @@ files = ["crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_cont
 first_seen = "3cd73631a1"
 
 [[schema]]
+value = "chio.kernel-terminal-snapshot.v1"
+files = ["crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/resolved_snapshot.rs"]
+first_seen = "de519d7776"
+
+[[schema]]
 value = "chio.key-binding-certificate.v1"
 files = ["crates/economy/chio-web3/src/identity.rs"]
 first_seen = "11e573d2d7"
@@ -3426,8 +3431,13 @@ first_seen = "51e46336b1"
 
 [[schema]]
 value = "chio.native-dispatch-preparation-ledger.v1"
-files = ["crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger.rs"]
+files = ["crates/kernel/chio-kernel/src/admission_operation/native_dispatch_binding.rs"]
 first_seen = "7e54c14a60"
+
+[[schema]]
+value = "chio.native-dispatch-preparation-ledger.v2"
+files = ["crates/kernel/chio-kernel/src/admission_operation/native_dispatch_binding.rs"]
+first_seen = "de519d7776"
 
 [[schema]]
 value = "chio.native-flow-dispatch-policy.v1"
@@ -3448,6 +3458,11 @@ first_seen = "6a12a69155"
 value = "chio.native-security-authority-binding.v1"
 files = ["crates/kernel/chio-kernel/src/admission_operation/native_security_binding.rs"]
 first_seen = "7e54c14a60"
+
+[[schema]]
+value = "chio.native-security-checkpoint.v1"
+files = ["crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/record.rs"]
+first_seen = "de519d7776"
 
 [[schema]]
 value = "chio.native-security-egress.v1"
@@ -3558,6 +3573,11 @@ first_seen = "11e573d2d7"
 value = "chio.oracle-conversion-evidence.v1"
 files = ["crates/core/chio-core-types/src/oracle.rs", "crates/economy/chio-web3/src/anchors.rs"]
 first_seen = "11e573d2d7"
+
+[[schema]]
+value = "chio.original-security-dispatch-binding.v1"
+files = ["crates/kernel/chio-kernel/src/tool_outcome/original_security_dispatch.rs"]
+first_seen = "de519d7776"
 
 [[schema]]
 value = "chio.outcome.contractual-zero.v1"
@@ -4475,6 +4495,11 @@ files = ["crates/kernel/chio-kernel/src/tool_outcome.rs"]
 first_seen = "7e54c14a60"
 
 [[schema]]
+value = "chio.raw-invocation-outcome-with-original-security-dispatch.v1"
+files = ["crates/kernel/chio-kernel/src/tool_outcome/original_security_dispatch.rs"]
+first_seen = "de519d7776"
+
+[[schema]]
 value = "chio.raw-invocation-outcome-with-request.v1"
 files = ["crates/kernel/chio-kernel/src/tool_outcome.rs"]
 first_seen = "51e46336b1"
@@ -4725,9 +4750,9 @@ files = ["crates/economy/chio-appraisal/src/types.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
-value = "chio.runtime-policy.v2"
+value = "chio.runtime-policy.v3"
 files = ["crates/platform/chio-control-plane/src/policy/util.rs"]
-first_seen = "5546fdc325"
+first_seen = "de519d7776"
 
 [[schema]]
 value = "chio.runtime-replay-source-seal.v1"

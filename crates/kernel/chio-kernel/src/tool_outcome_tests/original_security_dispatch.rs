@@ -35,7 +35,7 @@ fn legacy_raw_security_formats_decode_without_fresh_release_authority(
     let mut persisted = raw_for(&operation, json!({"retained": true})).to_persisted();
     persisted.schema = RAW_INVOCATION_OUTCOME_WITH_SECURITY_CONTEXT_SCHEMA.into();
     persisted.request_canonical_json = Some(String::from_utf8(canonical_json_bytes(&request)?)?);
-    persisted.security_invocation_context = Some(context);
+    persisted.security_invocation_context = Some(context.clone());
     let contextual = RawInvocationOutcomeV1::from_persisted(persisted)?;
     let required = contextual.clone().with_security_release_requirement(true)?;
     let signing =
@@ -45,6 +45,7 @@ fn legacy_raw_security_formats_decode_without_fresh_release_authority(
                 signer.public_key(),
                 chio_core::receipt::crypto_floor::ReceiptCryptoFloor::AllowClassical,
             )?)?;
+    wire_shape::verify(&signing, &operation, &request, &context)?;
     for legacy in [contextual, required, signing] {
         let bytes = legacy.canonical_blob()?.bytes().to_vec();
         let decoded = RawInvocationOutcomeV1::from_canonical_bytes(&bytes)?;
@@ -60,3 +61,6 @@ fn legacy_raw_security_formats_decode_without_fresh_release_authority(
     }
     Ok(())
 }
+
+#[path = "original_security_dispatch/wire_shape.rs"]
+mod wire_shape;

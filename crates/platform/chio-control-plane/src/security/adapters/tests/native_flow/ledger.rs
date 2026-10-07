@@ -218,7 +218,7 @@ fn native_dispatch_ledger_retains_exact_policy_and_custody_after_compensation() 
         let record: serde_json::Value = serde_json::from_slice(&ledger.canonical_record)?;
         assert_eq!(
             record["schema"],
-            "chio.native-dispatch-preparation-ledger.v1"
+            "chio.native-dispatch-preparation-ledger.v2"
         );
         assert_eq!(
             record["policy"],
@@ -227,6 +227,7 @@ fn native_dispatch_ledger_retains_exact_policy_and_custody_after_compensation() 
             )?
         );
         assert_eq!(record["grant_index"], 0);
+        wire_shape::verify(ledger, &record, &fixture.request)?;
         assert_eq!(
             ledger.record_digest.as_str(),
             chio_core::sha256_hex(&ledger.canonical_record)
@@ -300,3 +301,6 @@ fn native_dispatch_ledger_corruption_or_missing_global_coverage_denies_reopen() 
     }
     Ok(())
 }
+
+#[path = "ledger/wire_shape.rs"]
+mod wire_shape;

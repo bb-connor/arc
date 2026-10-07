@@ -90,3 +90,7 @@ impl DurableTerminalSnapshot {
         serde_json::to_value(self).map_err(|error| KernelError::DurableAdmission(error.to_string()))
     }
 }
+
+#[cfg(test)]
+#[path = "resolved_snapshot_wire_tests.rs"]
+mod wire_tests;

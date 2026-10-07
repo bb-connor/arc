@@ -1985,3 +1985,6 @@ extensions:
         Some("sgx")
     );
 }
+
+#[path = "tests/runtime_policy_wire.rs"]
+mod runtime_policy_wire;

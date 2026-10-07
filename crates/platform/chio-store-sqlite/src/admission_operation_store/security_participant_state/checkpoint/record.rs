@@ -224,3 +224,7 @@ pub(super) fn latest(
     verify_reference(connection, &record)?;
     Ok(Some(record))
 }
+
+#[cfg(test)]
+#[path = "record_wire_tests.rs"]
+mod wire_tests;
