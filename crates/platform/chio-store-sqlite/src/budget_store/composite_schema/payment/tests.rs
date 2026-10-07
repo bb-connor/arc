@@ -272,3 +272,42 @@ fn budget12_rejects_changed_predecessor_constraints_and_quoted_literals() -> Tes
     }
     Ok(())
 }
+
+#[test]
+fn budget12_downgraded_current_catalog_is_not_a_supported_predecessor() -> TestResult {
+    for declared_version in [0, 1, 3, 6, 9, 10, 11] {
+        let mut connection = Connection::open_in_memory()?;
+        parent(&connection)?;
+        connection.execute_batch(SCHEMA)?;
+        let transaction = connection.transaction()?;
+        assert!(matches!(
+            ensure(&transaction, declared_version),
+            Err(BudgetStoreError::Invariant(reason))
+                if reason == "pre-schema12 payment journal catalog is not a supported predecessor"
+        ));
+        transaction.rollback()?;
+    }
+    Ok(())
+}
+
+#[test]
+fn budget12_pre_cancel_catalog_is_rejected_from_version11_onward() -> TestResult {
+    for (declared_version, expected_reason) in [
+        (
+            11,
+            "pre-schema12 payment journal catalog is not a supported predecessor",
+        ),
+        (12, "schema12 payment journal catalog differs"),
+    ] {
+        let mut connection = Connection::open_in_memory()?;
+        parent(&connection)?;
+        connection.execute_batch(&LEGACY.replace(CANCELLED_BRANCH, ""))?;
+        let transaction = connection.transaction()?;
+        assert!(matches!(
+            ensure(&transaction, declared_version),
+            Err(BudgetStoreError::Invariant(reason)) if reason == expected_reason
+        ));
+        transaction.rollback()?;
+    }
+    Ok(())
+}

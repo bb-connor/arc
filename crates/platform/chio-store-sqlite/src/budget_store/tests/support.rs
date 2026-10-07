@@ -90,3 +90,26 @@ pub(super) fn authority(
         lease_epoch,
     }
 }
+
+/// Older budget fixtures must not retain the schema12 payment catalog created
+/// by today's factory. Reinstall the exact supported predecessor only when no
+/// payment journal or release-evidence facts can be lost.
+pub(super) fn install_empty_legacy_payment_journal(
+    connection: &Connection,
+) -> rusqlite::Result<()> {
+    let transaction = connection.unchecked_transaction()?;
+    let counts: (i64, i64) = transaction.query_row(
+        "SELECT (SELECT COUNT(*) FROM payment_journal),
+                (SELECT COUNT(*) FROM payment_release_evidence)",
+        [],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )?;
+    assert_eq!(
+        counts,
+        (0, 0),
+        "older fixtures must retain all payment facts"
+    );
+    transaction.execute_batch("DROP TABLE payment_journal;")?;
+    transaction.execute_batch(include_str!("../composite_schema/payment/legacy_v11.sql"))?;
+    transaction.commit()
+}

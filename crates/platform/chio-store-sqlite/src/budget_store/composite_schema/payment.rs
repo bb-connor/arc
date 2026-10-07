@@ -1,6 +1,9 @@
 //! Preserve original journal facts while adding exact debit and attempt custody.
 use super::*;
 
+#[path = "payment/sql_normalizer.rs"]
+mod sql_normalizer;
+
 #[cfg(test)]
 #[path = "payment/tests.rs"]
 mod tests;
@@ -94,7 +97,13 @@ fn catalog(connection: &Connection) -> Result<Vec<CatalogEntry>, BudgetStoreErro
     )?;
     let entries = statement
         .query_map([], |row| {
-            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+            let sql: Option<String> = row.get(3)?;
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                sql.as_deref().map(sql_normalizer::normalize_sql),
+            ))
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
     Ok(entries)

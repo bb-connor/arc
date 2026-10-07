@@ -1528,6 +1528,33 @@ fn offline_provision_upgrade_is_fenced_and_idempotent() {
     assert_eq!(admission_projection(&database), before);
 
     let connection = Connection::open(&database).expect("schema connection");
+    {
+        let transaction = connection
+            .unchecked_transaction()
+            .expect("legacy payment fixture transaction");
+        let payment_counts: (i64, i64) = transaction
+            .query_row(
+                "SELECT (SELECT COUNT(*) FROM payment_journal),
+                        (SELECT COUNT(*) FROM payment_release_evidence)",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .expect("inspect empty payment fixture");
+        assert_eq!(
+            payment_counts,
+            (0, 0),
+            "offline upgrade fixture must retain all payment facts"
+        );
+        transaction
+            .execute_batch("DROP TABLE payment_journal;")
+            .expect("drop empty current payment catalog");
+        transaction
+            .execute_batch(include_str!(
+                "../budget_store/composite_schema/payment/legacy_v11.sql"
+            ))
+            .expect("install supported predecessor payment catalog");
+        transaction.commit().expect("commit legacy payment fixture");
+    }
     crate::stamp_schema_version(&connection, "budget", 3).expect("old budget stamp");
     crate::stamp_schema_version(&connection, "revocation", 1).expect("old revocation stamp");
     drop(connection);
