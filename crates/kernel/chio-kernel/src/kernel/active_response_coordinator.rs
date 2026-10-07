@@ -338,7 +338,7 @@ impl ChioKernel {
                 let _dispatch_gate = installed.dispatch_gate.lock().map_err(|_| {
                     active_response_internal("active-response executor dispatch gate is poisoned")
                 })?;
-                self.compensate_active_response_before_dispatch(reservation, reason)
+                self.cancel_active_response_before_dispatch(reservation, reason)
             }
         }
     }
@@ -633,6 +633,30 @@ impl ChioKernel {
         let _dispatch_gate = installed.dispatch_gate.lock().map_err(|_| {
             active_response_internal("active-response executor dispatch gate is poisoned")
         })?;
+        self.cancel_active_response_before_dispatch(reservation, reason)
+    }
+
+    /// The approval commit is the dispatch commit point. Operator cancellation
+    /// reconciles it first, so a committed approval leaves a recoverable
+    /// DispatchCommitted operation that pre-dispatch compensation refuses.
+    fn cancel_active_response_before_dispatch(
+        &self,
+        reservation: &GovernedActiveResponseReservation,
+        reason: &str,
+    ) -> Result<(), KernelError> {
+        let operation = self.load_active_response_operation(reservation.operation_id())?;
+        if operation.state() == AdmissionOperationState::ApprovalReserved
+            && operation.has_same_prepared_binding(&reservation.operation)
+        {
+            let operation_store = self.admission_operation_store.as_ref().ok_or_else(|| {
+                active_response_internal("durable active-response operation store is not installed")
+            })?;
+            self.reconcile_governed_active_response_commit(
+                operation_store.as_ref(),
+                self.approval_store.as_deref(),
+                &operation,
+            )?;
+        }
         self.compensate_active_response_before_dispatch(reservation, reason)
     }
 
