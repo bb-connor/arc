@@ -1820,7 +1820,7 @@ mod tests {
                 SyscallArgumentConstraint {
                     argument_index: 4,
                     comparison: SeccompArgumentComparison::Equal,
-                    value: AT_EMPTY_PATH as u64,
+                    value: AT_EMPTY_PATH,
                 },
             ]],
         );
