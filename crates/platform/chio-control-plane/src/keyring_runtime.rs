@@ -22,6 +22,7 @@ use chio_security_types::{
     EnterpriseMigrationStateStore,
 };
 use chio_store_sqlite::{SqliteEnterpriseMigrationOpenPolicy, SqliteEnterpriseMigrationStateStore};
+use zeroize::Zeroizing;
 
 use crate::CliError;
 
@@ -1325,14 +1326,54 @@ struct PrivateFileIdentity {
     length: u64,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
 struct AuthoritySeedHandoff {
     schema: String,
     key_id: String,
     base_epoch: u64,
     target_epoch: u64,
-    seed_hex: String,
+    seed_hex: AuthoritySeedHex,
+}
+
+/// Authority seed text whose owned storage wipes on drop and never renders.
+#[derive(Eq, PartialEq)]
+struct AuthoritySeedHex(Zeroizing<String>);
+
+impl AuthoritySeedHex {
+    fn expose_secret(&self) -> &str {
+        self.0.as_str()
+    }
+
+    /// Only the lowercase 64-digit encoding of the seed behind `public_key` binds.
+    fn binds(&self, public_key: &chio_core::PublicKey) -> bool {
+        let encoded = self.expose_secret();
+        encoded.len() == 64
+            && encoded
+                .bytes()
+                .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+            && Keypair::from_seed_hex(encoded)
+                .is_ok_and(|stored| stored.public_key() == *public_key)
+    }
+}
+
+impl std::fmt::Debug for AuthoritySeedHex {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("AuthoritySeedHex([REDACTED])")
+    }
+}
+
+impl serde::Serialize for AuthoritySeedHex {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.expose_secret())
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for AuthoritySeedHex {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        <String as serde::Deserialize>::deserialize(deserializer)
+            .map(|value| Self(Zeroizing::new(value)))
+    }
 }
 
 impl AuthoritySeedHandoff {
@@ -1354,7 +1395,7 @@ impl AuthoritySeedHandoff {
             key_id: key_id.to_string(),
             base_epoch,
             target_epoch,
-            seed_hex: keypair.seed_hex(),
+            seed_hex: AuthoritySeedHex(Zeroizing::new(keypair.seed_hex())),
         })
     }
 
@@ -1368,7 +1409,7 @@ impl AuthoritySeedHandoff {
         if self.schema != AUTHORITY_SEED_HANDOFF_SCHEMA
             || self.target_epoch != expected_target
             || self.key_id != key_id.to_string()
-            || self.seed_hex != keypair.seed_hex()
+            || !self.seed_hex.binds(&public_key)
         {
             return Err(CliError::cli_other_error(
                 "authority seed handoff identity or epoch binding is invalid".to_string(),
@@ -1407,7 +1448,7 @@ fn persist_authority_seed_handoff(
     path: &Path,
     handoff: &AuthoritySeedHandoff,
 ) -> Result<PrivateFileIdentity, CliError> {
-    let bytes = chio_core::canonical::canonical_json_bytes(handoff)?;
+    let bytes = chio_core::canonical::canonical_json_bytes_zeroizing(handoff)?;
     atomic_write_private_file(path, &bytes, None).map_err(CliError::Io)
 }
 
@@ -1418,7 +1459,7 @@ fn load_authority_seed_handoff(
     let handoff: AuthoritySeedHandoff =
         chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 64 * 1024 * 1024)
             .and_then(|input| input.decode_signed())?;
-    let keypair = Keypair::from_seed_hex(&handoff.seed_hex)?;
+    let keypair = Keypair::from_seed_hex(handoff.seed_hex.expose_secret())?;
     handoff.validate_keypair(&keypair)?;
     Ok((handoff, keypair, identity))
 }
@@ -1513,18 +1554,18 @@ fn write_authority_seed_file_bound(
     keypair: &Keypair,
     expected_identity: Option<&PrivateFileIdentity>,
 ) -> Result<PrivateFileIdentity, CliError> {
-    atomic_write_private_file(
-        path,
-        format!("{}\n", keypair.seed_hex()).as_bytes(),
-        expected_identity,
-    )
-    .map_err(CliError::Io)
+    let seed_hex = Zeroizing::new(keypair.seed_hex());
+    // Sized up front so appending the newline never reallocates seed text.
+    let mut contents = Zeroizing::new(String::with_capacity(seed_hex.len() + 1));
+    contents.push_str(&seed_hex);
+    contents.push('\n');
+    atomic_write_private_file(path, contents.as_bytes(), expected_identity).map_err(CliError::Io)
 }
 
 fn read_private_file(
     path: &Path,
     maximum_bytes: usize,
-) -> Result<(Vec<u8>, PrivateFileIdentity), std::io::Error> {
+) -> Result<(Zeroizing<Vec<u8>>, PrivateFileIdentity), std::io::Error> {
     let path_metadata = fs::symlink_metadata(path)?;
     validate_private_file_metadata(&path_metadata)?;
     #[cfg(unix)]
@@ -1550,11 +1591,13 @@ fn read_private_file(
             "private file changed while it was opened",
         ));
     }
-    let limit = u64::try_from(maximum_bytes)
-        .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "file limit"))?
+    let capacity = maximum_bytes
         .checked_add(1)
         .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "file limit"))?;
-    let mut bytes = Vec::with_capacity(maximum_bytes);
+    let limit = u64::try_from(capacity)
+        .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "file limit"))?;
+    // Capacity covers the overflow byte, so reading never reallocates secret bytes.
+    let mut bytes = Zeroizing::new(Vec::with_capacity(capacity));
     Read::by_ref(&mut file)
         .take(limit)
         .read_to_end(&mut bytes)?;
@@ -1578,16 +1621,14 @@ fn read_private_file(
 }
 
 fn load_private_seed_backend(path: &Path) -> Result<chio_core::crypto::Ed25519Backend, CliError> {
-    let (mut bytes, _) = read_private_file(path, 32)?;
+    let (bytes, _) = read_private_file(path, 32)?;
     if bytes.len() != 32 {
-        bytes.fill(0);
         return Err(CliError::cli_other_error(
             "signing seed must contain exactly 32 bytes".to_string(),
         ));
     }
     let mut seed = [0_u8; 32];
     seed.copy_from_slice(&bytes);
-    bytes.fill(0);
     let keypair = Keypair::from_seed(&seed);
     seed.fill(0);
     Ok(chio_core::crypto::Ed25519Backend::new(keypair))
