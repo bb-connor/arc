@@ -254,7 +254,7 @@ pub struct SignedActiveResponseAuthorityResponse {
 }
 
 #[derive(Serialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 struct ActiveResponseAuthoritySigningInput<'a, T> {
     domain: &'static str,
     body: &'a T,
