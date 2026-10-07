@@ -910,6 +910,15 @@ assert_rejected(
     "exposes a repository secret to candidate work",
 )
 assert_rejected(
+    "required enterprise unspaced secret injection",
+    "enterprise-hardening.yml",
+    replace_once(
+        'env:\n  CARGO_INCREMENTAL: "0"\n',
+        'env:\n  CANARY: ${{secrets.CHIO_ENTERPRISE_CANARY_SIGNING_SEED_HEX}}\n  CARGO_INCREMENTAL: "0"\n',
+    ),
+    "exposes a repository secret to candidate work",
+)
+assert_rejected(
     "enterprise bind-source gains checkout",
     "enterprise-hardening.yml",
     replace_in_named_step(
@@ -2961,6 +2970,15 @@ assert_rejected(
     "validation receives a signing secret",
 )
 assert_rejected(
+    "validation receives bracket-indexed signing seed",
+    "enterprise-evidence-finalizer.yml",
+    replace_once(
+        "      GH_TOKEN: ${{ github.token }}\n",
+        "      CANARY: ${{ secrets['CHIO_ENTERPRISE_CANARY_SIGNING_SEED_HEX'] }}\n      GH_TOKEN: ${{ github.token }}\n",
+    ),
+    "validation receives a signing secret",
+)
+assert_rejected(
     "finalizer seed secret drift",
     "enterprise-evidence-finalizer.yml",
     replace_once(
@@ -3476,6 +3494,110 @@ jobs:
 """,
     "publisher private key reference escapes",
 )
+for spelling_label, key_reference in (
+    ("bracket index", "${{ secrets['CHIO_SECURITY_APP_PRIVATE_KEY_PEM'] }}"),
+    ("unspaced expression", "${{secrets.CHIO_SECURITY_APP_PRIVATE_KEY_PEM}}"),
+    ("irregular spacing", "${{  secrets . CHIO_SECURITY_APP_PRIVATE_KEY_PEM }}"),
+    ("mixed case", "${{ Secrets.chio_security_app_private_key_pem }}"),
+    (
+        "quoted expression terminator",
+        "${{ format('}}{0}', secrets.CHIO_SECURITY_APP_PRIVATE_KEY_PEM) }}",
+    ),
+):
+    assert_added_workflow_rejected(
+        f"added workflow references the publisher key through {spelling_label}",
+        f"""name: unreviewed key reference
+on: workflow_dispatch
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - env:
+          KEY: {key_reference}
+        run: true
+""",
+        "publisher private key reference escapes",
+    )
+assert_added_workflow_rejected(
+    "added workflow tests the publisher key in an implicit step condition",
+    """name: unreviewed key condition
+on: workflow_dispatch
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - if: startsWith(secrets.CHIO_SECURITY_APP_PRIVATE_KEY_PEM, '-----BEGIN')
+        run: true
+""",
+    "publisher private key reference escapes",
+)
+for exposure_label, exposing_job in (
+    (
+        "serializes the entire secrets context",
+        "    runs-on: ubuntu-24.04\n"
+        "    steps:\n"
+        "      - run: echo '${{ toJSON(secrets) }}'\n",
+    ),
+    (
+        "selects a secret through a computed index",
+        "    runs-on: ubuntu-24.04\n"
+        "    steps:\n"
+        "      - env:\n"
+        "          KEY: ${{ secrets[format('CHIO_SECURITY_APP_{0}', 'PRIVATE_KEY_PEM')] }}\n"
+        "        run: true\n",
+    ),
+    (
+        "passes every secret to a reusable workflow",
+        "    uses: example/collector/.github/workflows/collect.yml@0123456789abcdef0123456789abcdef01234567\n"
+        "    secrets: inherit\n",
+    ),
+):
+    assert_added_workflow_rejected(
+        f"added workflow {exposure_label}",
+        "name: unreviewed secret exposure\n"
+        "on: workflow_dispatch\n"
+        "jobs:\n"
+        "  expose:\n" + exposing_job,
+        "workflow exposes the entire secrets context",
+    )
+for expression_label, expression_value, implicit_expression, expected_names in (
+    (
+        "canonical reference",
+        "${{ secrets.CHIO_SECURITY_APP_PRIVATE_KEY_PEM }}",
+        False,
+        {"CHIO_SECURITY_APP_PRIVATE_KEY_PEM"},
+    ),
+    ("unspaced reference", "${{secrets.GITHUB_TOKEN}}", False, {"GITHUB_TOKEN"}),
+    ("spaced bracket reference", "${{ secrets [ 'github_token' ] }}", False, {"GITHUB_TOKEN"}),
+    (
+        "several expressions",
+        "a ${{ secrets.ONE }} b ${{ format('{0}', secrets['TWO']) }}",
+        False,
+        {"ONE", "TWO"},
+    ),
+    ("serialized context", "${{ toJSON(secrets) }}", False, {CHECKER.ENTIRE_SECRETS_CONTEXT}),
+    ("object filter", "${{ join(secrets.*, ',') }}", False, {CHECKER.ENTIRE_SECRETS_CONTEXT}),
+    ("computed index", "${{ secrets[matrix.name] }}", False, {CHECKER.ENTIRE_SECRETS_CONTEXT}),
+    ("quoted terminator", "${{ format('}}', secrets.HIDDEN) }}", False, {"HIDDEN"}),
+    ("implicit condition", "startsWith(secrets.HIDDEN, 'x')", True, {"HIDDEN"}),
+    ("text outside an expression", "echo secrets.HIDDEN", False, set()),
+    (
+        "quoted context name",
+        "${{ contains(github.event.head_commit.message, 'secrets.HIDDEN') }}",
+        False,
+        set(),
+    ),
+    ("step output property", "${{ steps.secrets.outputs.ready }}", False, set()),
+    ("longer identifier", "${{ needs.build.outputs.has_secrets }}", False, set()),
+):
+    observed_names = CHECKER.referenced_secret_names(
+        expression_value, implicit_expression
+    )
+    if observed_names != expected_names:
+        raise AssertionError(
+            f"{expression_label}: expected secret names {sorted(expected_names)}, "
+            f"got {sorted(observed_names)}"
+        )
 assert_added_workflow_rejected(
     "added workflow grants write-all token permissions",
     """name: unreviewed workflow writer

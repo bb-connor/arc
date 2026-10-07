@@ -196,6 +196,7 @@ ALLOWED_WORKFLOW_ENVIRONMENTS: dict[tuple[str, str], object] = {
         "url": "https://pypi.org/p/${{ steps.meta.outputs.name }}",
     },
 }
+PUBLISHER_PRIVATE_KEY_SECRET = "CHIO_SECURITY_APP_PRIVATE_KEY_PEM"
 PUBLISHER_PRIVATE_KEY_REFERENCE = "${{ secrets.CHIO_SECURITY_APP_PRIVATE_KEY_PEM }}"
 PUBLISHER_PRIVATE_KEY_LOCATIONS = (
     (
@@ -222,6 +223,16 @@ PUBLISHER_PRIVATE_KEY_LOCATIONS = (
         ),
         PUBLISHER_PRIVATE_KEY_REFERENCE,
     ),
+)
+# A secrets-context reference that does not resolve to one static name stands for
+# the entire context. The first alternative consumes single-quoted expression
+# literals so that text inside a literal is never a reference.
+ENTIRE_SECRETS_CONTEXT = "*"
+SECRET_CONTEXT_TOKEN = re.compile(
+    r"'(?:[^']|'')*'"
+    r"|(?<![\w.-])secrets(?![\w-])"
+    r"(?:\s*\.\s*([A-Za-z_][\w-]*)|\s*\[\s*'([^']*)'\s*\])?",
+    re.IGNORECASE,
 )
 FORBIDDEN_INHERITED_ENV = {
     "BASH_ENV",
@@ -1655,20 +1666,72 @@ def require_run_markers(
     return run
 
 
+# An expression ends at the first `}}` outside a single-quoted literal, and an
+# unterminated expression runs to the end of the string.
+def expression_bodies(value: str) -> list[str]:
+    bodies: list[str] = []
+    start = value.find("${{")
+    while start >= 0:
+        cursor = start + 3
+        quoted = False
+        while cursor < len(value) and (quoted or not value.startswith("}}", cursor)):
+            if value[cursor] == "'":
+                quoted = not quoted
+            cursor += 1
+        bodies.append(value[start + 3 : cursor])
+        start = value.find("${{", cursor + 2)
+    return bodies
+
+
+# Secret names are case-insensitive and returned upper-cased. An `if` condition
+# is an implicit expression evaluated without `${{ }}`.
+def referenced_secret_names(
+    value: str, implicit_expression: bool = False
+) -> frozenset[str]:
+    bodies = [value] if implicit_expression else expression_bodies(value)
+    names: set[str] = set()
+    for body in bodies:
+        for match in SECRET_CONTEXT_TOKEN.finditer(body):
+            if match.group(0).startswith("'"):
+                continue
+            name = match.group(1) or match.group(2)
+            names.add(name.upper() if name else ENTIRE_SECRETS_CONTEXT)
+    return frozenset(names)
+
+
+# `secrets: inherit` on a reusable workflow call passes the entire context.
+def secret_references(
+    value: object, path: tuple[object, ...] = ()
+) -> list[tuple[tuple[object, ...], str, frozenset[str]]]:
+    references: list[tuple[tuple[object, ...], str, frozenset[str]]] = []
+    if isinstance(value, str):
+        names = referenced_secret_names(value, path[-1:] == ("if",))
+        if names:
+            references.append((path, value, names))
+    elif isinstance(value, dict):
+        for key, child in value.items():
+            key_names = referenced_secret_names(key) if isinstance(key, str) else None
+            if key_names:
+                references.append(((*path, key), key, key_names))
+            if key == "secrets" and "uses" in value and isinstance(child, str):
+                references.append(
+                    ((*path, key), child, frozenset({ENTIRE_SECRETS_CONTEXT}))
+                )
+            else:
+                references.extend(secret_references(child, (*path, key)))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            references.extend(secret_references(child, (*path, index)))
+    return references
+
+
 def secret_reference_locations(
     value: object, path: tuple[object, ...] = ()
 ) -> list[tuple[tuple[object, ...], str]]:
-    locations: list[tuple[tuple[object, ...], str]] = []
-    if isinstance(value, str):
-        if "${{ secrets." in value:
-            locations.append((path, value))
-    elif isinstance(value, dict):
-        for key, child in value.items():
-            locations.extend(secret_reference_locations(child, (*path, key)))
-    elif isinstance(value, list):
-        for index, child in enumerate(value):
-            locations.extend(secret_reference_locations(child, (*path, index)))
-    return locations
+    return [
+        (location, reference)
+        for location, reference, _ in secret_references(value, path)
+    ]
 
 
 def grants_actions_write(permissions: object) -> bool:
@@ -1726,8 +1789,12 @@ def validate_global_workflow_boundaries(root: Path) -> None:
                     f"unreviewed workflow environment: {path.name}:{identifier}"
                 )
 
-        for location, reference in secret_reference_locations(workflow):
-            if "CHIO_SECURITY_APP_PRIVATE_KEY_PEM" in reference:
+        for location, reference, names in secret_references(workflow):
+            if ENTIRE_SECRETS_CONTEXT in names:
+                raise ContractError(
+                    f"workflow exposes the entire secrets context: {path.name}"
+                )
+            if PUBLISHER_PRIVATE_KEY_SECRET in names:
                 publisher_key_locations.append((path.name, location, reference))
 
     if actions_write_declarations != EXPECTED_ACTIONS_WRITE_DECLARATIONS:
@@ -5074,7 +5141,7 @@ def validate(root: Path) -> None:
             raise ContractError(
                 f"{workflow_name} exposes required or candidate work to a persistent runner"
             )
-        if contains_text(workflow, "${{ secrets."):
+        if secret_references(workflow):
             raise ContractError(
                 f"{workflow_name} exposes a repository secret to candidate work"
             )
@@ -6287,7 +6354,7 @@ def validate(root: Path) -> None:
         evidence_finalizer, "authorize-security-check-publication"
     )
     publish_security_contract = job(evidence_finalizer, "publish-security-contract")
-    if contains_text(validate_capture, "${{ secrets."):
+    if secret_references(validate_capture):
         raise ContractError("capture validation receives a signing secret")
     if (
         "if" in validate_capture
