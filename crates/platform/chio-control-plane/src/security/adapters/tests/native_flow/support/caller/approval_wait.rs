@@ -290,13 +290,61 @@ impl ParkedApproval {
         })
     }
 
+    /// Close every original owner and reopen the same SQLite authority with
+    /// the original pins, selecting the original at the owned authority time.
     fn reopen(mut self) -> TestResult<Self> {
-        self.fixture = super::restart::reopen(self.fixture, &self.executor, None)?;
-        self.fixture
-            .kernel
-            .set_threshold_approval_requirement_resolver(Arc::new(Requirement(
-                self.requirement.clone(),
-            )));
+        let witness = super::super::process_recovery::caller_restart_witness(&self.fixture, None);
+        let previous_fence = self.fixture.authority.mutation_fence();
+        let Fixture {
+            kernel,
+            clock,
+            authority,
+            binding,
+            request,
+            context,
+            invocations: _,
+            hook,
+            agent,
+            signer,
+            _directory,
+        } = self.fixture;
+        drop(kernel);
+        drop(authority);
+        let authority = SqliteAuthorityStore::open_serving_with_clock(
+            _directory.path().join("admission.db"),
+            _directory.path().join("locks"),
+            clock.clone(),
+        )?;
+        assert_ne!(authority.mutation_fence(), previous_fence);
+        let (mut kernel, invocations) =
+            open_kernel(_directory.path(), &authority, &signer, clock.clone())?;
+        let (_, original) = authority
+            .admission_operation_store()
+            .load_retained_tool_request(
+                &self.operation_id,
+                &authority.mutation_fence(),
+                clock.snapshot(),
+            )?
+            .ok_or("original native caller request")?;
+        super::super::process_recovery::configure_caller_restart(&mut kernel, &original, &witness)?;
+        kernel.set_caller_executor(self.executor.clone())?;
+        kernel.set_threshold_approval_requirement_resolver(Arc::new(Requirement(
+            self.requirement.clone(),
+        )));
+        kernel.reconcile_durable_admission_startup()?;
+        self.fixture = Fixture {
+            kernel,
+            clock,
+            authority,
+            binding,
+            request,
+            context,
+            invocations,
+            hook,
+            agent,
+            signer,
+            _directory,
+        };
         Ok(self)
     }
 }
