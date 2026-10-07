@@ -61,14 +61,20 @@ impl ChioKernel {
         identity: &crate::tool_outcome::FrozenReceiptSigningIdentityV1,
     ) -> Result<(), KernelError> {
         let current = self.freeze_receipt_signing_identity()?;
-        if identity.public_key() != current.public_key() {
-            return Err(KernelError::ReceiptSigningFailed(
-                "original receipt signing authority is unavailable".into(),
-            ));
-        }
         identity
             .validate()
-            .map_err(|error| KernelError::ReceiptSigningFailed(error.to_string()))
+            .map_err(|error| KernelError::ReceiptSigningFailed(error.to_string()))?;
+        // Only a valid retained identity naming another signer is an item
+        // refusal. Restoring that signer makes the operation recoverable.
+        if identity.public_key() != current.public_key() {
+            return Err(KernelError::AdmissionRecovery(Box::new(
+                crate::admission_operation::AdmissionRecoveryError::Item {
+                    kind: crate::admission_operation::AdmissionRecoveryFailureKind::ContractChanged,
+                    detail: "original receipt signing authority is unavailable".into(),
+                },
+            )));
+        }
+        Ok(())
     }
 
     /// Install the proposal and ordinary receipt signing backend under
