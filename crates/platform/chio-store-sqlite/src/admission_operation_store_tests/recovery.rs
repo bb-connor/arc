@@ -6,6 +6,8 @@ mod deferred_pages;
 mod deferred_status;
 #[path = "recovery/fused_security.rs"]
 mod fused_security;
+#[path = "recovery/history_pages.rs"]
+mod history_pages;
 #[path = "recovery/legacy_continuation.rs"]
 mod legacy_continuation;
 #[path = "recovery/legacy_selection.rs"]
