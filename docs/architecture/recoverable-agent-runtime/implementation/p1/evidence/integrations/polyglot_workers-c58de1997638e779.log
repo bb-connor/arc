@@ -1,0 +1,16 @@
+
+running 2 tests
+test polyglot_host_phase ... ok
+test python_and_javascript_recover_after_host_process_death ... FAILED
+
+failures:
+
+---- python_and_javascript_recover_after_host_process_death stdout ----
+Error: "host first failed: \nrunning 1 test\ntest polyglot_host_phase ... FAILED\n\nfailures:\n\nfailures:\n    polyglot_host_phase\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.91s\n\n\nError: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }\n"
+
+
+failures:
+    python_and_javascript_recover_after_host_process_death
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.94s
+

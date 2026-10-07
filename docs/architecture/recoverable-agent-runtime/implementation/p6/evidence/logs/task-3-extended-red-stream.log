@@ -1,0 +1,24 @@
+   Compiling chio-control-plane v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-control-plane)
+    Finished `test` profile [unoptimized] target(s) in 57.41s
+     Running unittests src/lib.rs (target/recovery-p5-linux/host/debug/deps/chio_control_plane-6f8003448d0ced3f)
+
+running 4 tests
+test recovery::tests::knowledge::setup::p6_setup_every_foreign_binding_and_old_profile_refuses ... ok
+test recovery::tests::knowledge::setup::p6_setup_lost_live_broker_refuses_the_protected_review_route ... 
+thread 'recovery::tests::knowledge::setup::p6_setup_lost_live_broker_refuses_the_protected_review_route' (66490) panicked at crates/platform/chio-control-plane/src/recovery/tests/knowledge/setup.rs:132:5:
+assertion failed: f.f.runtime.review_document(&f.f.control, &workflow).is_err()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+test recovery::tests::knowledge::setup::p6_setup_missing_broker_and_failed_benign_cannot_unlock_work ... ok
+test recovery::tests::knowledge::setup::p6_setup_real_restart_recovers_the_identical_operation_once ... Error: AuthorityDenied
+FAILED
+
+failures:
+
+failures:
+    recovery::tests::knowledge::setup::p6_setup_lost_live_broker_refuses_the_protected_review_route
+    recovery::tests::knowledge::setup::p6_setup_real_restart_recovers_the_identical_operation_once
+
+test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 1264 filtered out; finished in 65.69s
+
+error: test failed, to rerun pass `-p chio-control-plane --lib`

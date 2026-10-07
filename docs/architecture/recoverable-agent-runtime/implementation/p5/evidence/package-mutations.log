@@ -1,0 +1,144 @@
+initial positive audit
+PASS P5 evidence: 46 local gates, ten obligations, P4 archive and seals intact; phase accomplished=True
+
+false phase completion
+P5 verification differs from recomputation
+
+restored positive audit: false phase completion
+PASS P5 evidence: 46 local gates, ten obligations, P4 archive and seals intact; phase accomplished=True
+
+missing required gate
+Traceback (most recent call last):
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/verify-package.py", line 11, in <module>
+    recomputed=module.build_record()
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/seal-package.py", line 47, in build_record
+    row=json.loads((PHASE/"evidence"/(name+".result.json")).read_text())
+                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.4/Frameworks/Python.framework/Versions/3.14/lib/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.4/Frameworks/Python.framework/Versions/3.14/lib/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/contracts.result.json'
+
+restored positive audit: missing required gate
+PASS P5 evidence: 46 local gates, ten obligations, P4 archive and seals intact; phase accomplished=True
+
+stale source gate
+Traceback (most recent call last):
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/verify-package.py", line 11, in <module>
+    recomputed=module.build_record()
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/seal-package.py", line 50, in build_record
+    raise ValueError("local gate absent, failed or stale: "+name)
+ValueError: local gate absent, failed or stale: native
+
+restored positive audit: stale source gate
+PASS P5 evidence: 46 local gates, ten obligations, P4 archive and seals intact; phase accomplished=True
+
+changed native log
+Traceback (most recent call last):
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/verify-package.py", line 11, in <module>
+    recomputed=module.build_record()
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/seal-package.py", line 50, in build_record
+    raise ValueError("local gate absent, failed or stale: "+name)
+ValueError: local gate absent, failed or stale: native
+
+restored positive audit: changed native log
+PASS P5 evidence: 46 local gates, ten obligations, P4 archive and seals intact; phase accomplished=True
+
+stale Rust review
+Traceback (most recent call last):
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/verify-package.py", line 11, in <module>
+    recomputed=module.build_record()
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/seal-package.py", line 80, in build_record
+    raise ValueError("source review incomplete or stale")
+ValueError: source review incomplete or stale
+
+restored positive audit: stale Rust review
+PASS P5 evidence: 46 local gates, ten obligations, P4 archive and seals intact; phase accomplished=True
+
+stale other-source review
+Traceback (most recent call last):
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/verify-package.py", line 11, in <module>
+    recomputed=module.build_record()
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/seal-package.py", line 80, in build_record
+    raise ValueError("source review incomplete or stale")
+ValueError: source review incomplete or stale
+
+restored positive audit: stale other-source review
+PASS P5 evidence: 46 local gates, ten obligations, P4 archive and seals intact; phase accomplished=True
+
+stale review binding
+Traceback (most recent call last):
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/verify-package.py", line 11, in <module>
+    recomputed=module.build_record()
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/seal-package.py", line 80, in build_record
+    raise ValueError("source review incomplete or stale")
+ValueError: source review incomplete or stale
+
+restored positive audit: stale review binding
+PASS P5 evidence: 46 local gates, ten obligations, P4 archive and seals intact; phase accomplished=True
+
+open P1 review issue
+Traceback (most recent call last):
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/verify-package.py", line 11, in <module>
+    recomputed=module.build_record()
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/seal-package.py", line 80, in build_record
+    raise ValueError("source review incomplete or stale")
+ValueError: source review incomplete or stale
+
+restored positive audit: open P1 review issue
+PASS P5 evidence: 46 local gates, ten obligations, P4 archive and seals intact; phase accomplished=True
+
+missing obligation anchor
+Traceback (most recent call last):
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/verify-package.py", line 11, in <module>
+    recomputed=module.build_record()
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/seal-package.py", line 88, in build_record
+    if anchor["anchor"] not in (ROOT/anchor["path"]).read_text(): raise ValueError("crosswalk anchor drifted")
+                                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: crosswalk anchor drifted
+
+restored positive audit: missing obligation anchor
+PASS P5 evidence: 46 local gates, ten obligations, P4 archive and seals intact; phase accomplished=True
+
+fake Linux success
+Traceback (most recent call last):
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/verify-package.py", line 11, in <module>
+    recomputed=module.build_record()
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/seal-package.py", line 67, in build_record
+    raise ValueError("Linux acceptance inventory incomplete")
+ValueError: Linux acceptance inventory incomplete
+
+restored positive audit: fake Linux success
+PASS P5 evidence: 46 local gates, ten obligations, P4 archive and seals intact; phase accomplished=True
+
+changed baseline archive digest
+Traceback (most recent call last):
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/verify-package.py", line 11, in <module>
+    recomputed=module.build_record()
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/seal-package.py", line 45, in build_record
+    baseline=baseline_check();runner=load_runner();binding=source_binding();checks=[]
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/seal-package.py", line 31, in baseline_check
+    if sha(archive)!=baseline["archive_sha256"]: raise ValueError("P4 archive hash changed")
+                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: P4 archive hash changed
+
+restored positive audit: changed baseline archive digest
+PASS P5 evidence: 46 local gates, ten obligations, P4 archive and seals intact; phase accomplished=True
+
+changed phase documentation
+P5 artifact changed: OPERATIONS.md
+
+restored positive audit: changed phase documentation
+PASS P5 evidence: 46 local gates, ten obligations, P4 archive and seals intact; phase accomplished=True
+
+unregistered phase artifact
+P5 artifact inventory differs
+
+restored positive audit: unregistered phase artifact
+PASS P5 evidence: 46 local gates, ten obligations, P4 archive and seals intact; phase accomplished=True
+
+final positive audit
+PASS P5 evidence: 46 local gates, ten obligations, P4 archive and seals intact; phase accomplished=True

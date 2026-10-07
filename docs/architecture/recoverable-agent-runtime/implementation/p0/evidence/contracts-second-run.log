@@ -1,0 +1,29 @@
+   Compiling chio-security-types v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-security-types)
+   Compiling chio-semantic-contracts v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-semantic-contracts)
+   Compiling chio-core-types v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-core-types)
+   Compiling chio-recovery v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-recovery)
+error: no rules expected `.`
+  --> crates/security/chio-recovery/tests/workflow.rs:15:80
+   |
+15 |     json!({"operation_id":"operation-original","native_admission_digest":[3;32].to_vec(),"operation_version":1})
+   |                                                                                ^ no rules expected this token in macro call
+   |
+   = note: while trying to match end of macro
+
+error: could not compile `chio-recovery` (test "workflow") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error[E0597]: `schema` does not live long enough
+  --> crates/core/chio-core-types/tests/recovery_contracts.rs:46:37
+   |
+44 |         let schema: Value = serde_json::from_slice(&std::fs::read(root.join(format!("{name}.schema.json")))?)?;
+   |             ------ binding `schema` declared here
+45 |         let id = schema["$id"].as_str().ok_or("missing schema id")?;
+46 |         registry = registry.add(id, &schema)?;
+   |                                     ^^^^^^^ borrowed value does not live long enough
+47 |     }
+   |     - `schema` dropped here while still borrowed
+48 |     let registry = registry.prepare()?;
+   |                    -------- borrow later used here
+
+For more information about this error, try `rustc --explain E0597`.
+error: could not compile `chio-core-types` (test "recovery_contracts") due to 1 previous error

@@ -1,0 +1,68 @@
+{
+  "arm": "baseline",
+  "case": "conflicting_basis",
+  "host": "langgraph",
+  "id": "langgraph-support-baseline-conflicting_basis-r1",
+  "repetition": 1,
+  "workflow": "support",
+  "requested_model": "gpt-5.4-2026-03-05",
+  "authority_policy": "6cbea0e86b177e31ed3863462505826b686b5e6c133f1b0dc62b1bef0777ff41",
+  "source_binding": "599483edaa9ba14165c0f2b73126f1ad8e24f2f26b1fb730f8460a1d0b0dc985",
+  "model_attempts": [
+    {
+      "model": "gpt-5.4-2026-03-05",
+      "error": null,
+      "input_tokens": 145,
+      "output_tokens": 29,
+      "seconds": 1.02738,
+      "prompt_bytes": 793,
+      "prompt_sha256": "1011e0a0138a88c2f36ed478736bac6f763390263b34a6ef52a0a3ca6bfa1788",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You have one tool: recovery(choice). To call it, end with exactly:\nAction: recovery\nAction Input: {\"choice\":\"resume\"}\nDo not invent a result."
+        },
+        {
+          "role": "user",
+          "content": "Complete the reviewed synthetic support-to-public-issue workflow using its existing owned native command. Preserve private source restrictions. If already completed before restart, recover its original outcome without a new effect. The selected stable command conflicts with retained content or the artifact basis is stale. Check through the native owner and respect the refusal; do not repair identity or weaken policy. Call the recovery tool once with choice resume. Accept its bounded category. Do not guess success, create new operations, include credentials, or bypass a refusal."
+        }
+      ],
+      "request_id": "chatcmpl-EVb5cNQmZcukoTNe6jQ3fV08wTLSp",
+      "completion": "Action: recovery\nAction Input: {\"choice\":\"resume\"}"
+    }
+  ],
+  "tool_actions": 1,
+  "hidden_retries": 0,
+  "outcome": "refused",
+  "native": {
+    "approval_records": 2,
+    "artifact_deliveries": 0,
+    "artifact_releases": 0,
+    "artifacts": 0,
+    "charges": 1,
+    "duplicate_effects": 0,
+    "effects": 1,
+    "extra_approvals": 0,
+    "fence": {
+      "lease_id": "01a10bcd-e927-7e42-9df4-12060ae89f1c",
+      "owner_epoch": 2,
+      "store_uuid": "01a10bcd-9dbb-7e63-b900-fffeb3bc4158"
+    },
+    "native_actions": 1,
+    "preexisting_effects": 1,
+    "provider_effects_total": 2,
+    "recovery_success": false,
+    "setup_effects": 1,
+    "source_label_retained": true,
+    "unauthorized_effects": 0,
+    "unresolved": 0,
+    "unresolved_age_ms": 0,
+    "useful_completion": false
+  },
+  "elapsed_seconds": 65.054657,
+  "native_preparation_seconds": 62.513798,
+  "host_model_native_seconds": 1.206861,
+  "host_output": {
+    "category": "refused"
+  }
+}

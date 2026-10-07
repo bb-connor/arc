@@ -1,0 +1,14 @@
+.E
+======================================================================
+ERROR: test_public_native_preflight_requires_eight_current_independent_cases (test_review.PrimaryReviewAcceptanceTest.test_public_native_preflight_requires_eight_current_independent_cases)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p6/evidence/test_review.py", line 50, in test_public_native_preflight_requires_eight_current_independent_cases
+    self.assertEqual(module.audit_public_preflight(root,"a"*64,policy)["cases"],8)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'review_acceptance' has no attribute 'audit_public_preflight'
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.012s
+
+FAILED (errors=1)

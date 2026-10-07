@@ -1,0 +1,202 @@
+[
+  {
+    "path": ".superpowers/sdd/PLAN/progress.md",
+    "line": 7,
+    "text": "Ruling: preserve the predecessor dirty checkout and sealed source package instead of synthesizing task commits across P0-P4; cost if wrong: changes remain local and are reviewed against the retained source archive."
+  },
+  {
+    "path": ".superpowers/sdd/PLAN/progress.md",
+    "line": 23,
+    "text": "Final: Ruling: the reviewer declined hosted, deployment, provider reuse, non-Boolean channels, nested launches, recipient exactly-once effects, covert channels, and unrelated predecessor audits. Keep those exclusions in the published supported profile, as the selected profile disables those features and sink effects remain separately owned. Cost if wrong: broader consumers must refuse or obtain separate qualification, and local proof cannot support broader claims."
+  },
+  {
+    "path": ".superpowers/sdd/PLAN/progress.md",
+    "line": 25,
+    "text": "Final: Ruling: retain the final review package and ledger until phase evidence is sealed, since this worktree has uncommitted predecessor work and no authorized shared Git mutation. Cost if wrong: retained review evidence consumes a small ignored directory; deletion now would lose the only fresh reviewer report."
+  },
+  {
+    "path": ".superpowers/sdd/PLAN/progress.md",
+    "line": 41,
+    "text": "Ruling: temporarily add only this client IP /32 to the existing bastion allowlist to use the user-authorized private qualification VM. Preserve all original entries and restore them after the task. Cost if wrong: another network client sharing this public IP can reach the authenticated bastion during this task; only the task public key is allowed for its three-hour session. No broad CIDR, VCN rules or shared host keys changed. API readback verifies the bounded allowlist update."
+  },
+  {
+    "path": ".superpowers/sdd/PLAN/progress.md",
+    "line": 47,
+    "text": "Ruling: use a tagged temporary x86_64 VM in the existing qualification subnet because the stopped existing host rejects its listed account SSH key and its agent command remains undelivered. The user explicitly authorized OCI use and whatever works. Create an 8-OCPU, 64-GiB Ubuntu host with a task-only key and existing private network; retain artifacts, then terminate only this tagged task instance and boot volume. Restore the predecessor VM agent configuration and stopped state. Cost if wrong: temporary compute and boot-volume charges until cleanup; no shared host source or service changes."
+  },
+  {
+    "path": ".superpowers/sdd/PLAN/progress.md",
+    "line": 55,
+    "text": "Ruling: pin the cage compiler's exact parent-independent LANG=C, LC_ALL=C and TZ=UTC values instead of the plan's impossible empty environment. The binding specification permits proven host-fixed templates; every extra or mutated environment value refuses. Cost if wrong: the selected locale template needs separate qualification before any expansion. Native RED reproduced profile refusal after valid compilation."
+  },
+  {
+    "path": ".superpowers/sdd/PLAN/progress.md",
+    "line": 57,
+    "text": "Ruling: update the strict native preparation fixture for its two intentionally added public base digest fields and assert their exact pre-stdio values. Cost if wrong: incorrect receipt lineage could be overlooked; both base and prepared digests are now independently compared while paths/secrets remain forbidden. The actual Linux campaign first failed 26/27, then passed all 72 original tests, 27 required runtime probes and 10 real helper mutants."
+  },
+  {
+    "path": ".superpowers/sdd/PLAN/progress.md",
+    "line": 59,
+    "text": "Ruling: remove the earlier sandbox-only payment listener skips because current full access permits real listeners. Cost if wrong: the full kernel gate fails visibly and blocks sealing; failed historical attempts remain retained."
+  },
+  {
+    "path": ".superpowers/sdd/PLAN/progress.md",
+    "line": 67,
+    "text": "Ruling: correct the P5 positive fixture to publish from an actually imported restricted native parent context; adopted legacy artifacts intentionally retain unknown influence and cannot demonstrate known-provenance return utility. Add a paired real-Linux correct-projection/unknown-provenance refusal and retain the original staging failure. Cost if wrong: a broken native provenance path still fails the independent label, actual worker-exit and withheld-admission checks; no production provenance check is weakened. The required Linux inventory grows to ten cases."
+  },
+  {
+    "path": ".superpowers/sdd/PLAN/progress.md",
+    "line": 73,
+    "text": "Ruling: replace the cached cross-checkout Node aliases with isolated frozen npm installs and record the actual lifecycle-hook limitation in the sealer. Source hashes remain authoritative; rerun every gate and native Linux on the new evidence-helper binding. Cost if wrong: another complete verification cycle; no SDK result may come from another checkout."
+  },
+  {
+    "path": ".superpowers/sdd/P6-PRODUCT-PLAN/progress.md",
+    "line": 9,
+    "text": "Ruling: Continue inline under repeated user execution authorization without another plan approval request. Cost if wrong: plan choices are reviewable in retained plan/rulings; no production deployment is authorized or claimed."
+  },
+  {
+    "path": ".superpowers/sdd/P6-PRODUCT-PLAN/progress.md",
+    "line": 10,
+    "text": "Ruling: Preserve original P5 source review verdict and final fix evidence separately. P6 changes make current-tree P5 recomputation naturally stale; verify historic P5 via immutable archive and hashes. Cost if wrong: historical and current evidence must not be confused."
+  },
+  {
+    "path": ".superpowers/sdd/P6-PRODUCT-PLAN/progress.md",
+    "line": 11,
+    "text": "Ruling: Retain exact source deltas and task ledgers instead of committing the entire inherited dirty tree. Cost if wrong: final reviewer must assess source-baseline delta rather than only HEAD commits; no unrelated change is swept into a commit."
+  },
+  {
+    "path": ".superpowers/sdd/P6-PRODUCT-PLAN/progress.md",
+    "line": 21,
+    "text": "Task 2: Ruling: affected_contracts initially used P5 ReturnContractDigest, while the actual deployment endpoint changes P3 semantic policies. Use SemanticPackageDigest for the affected signed contract packages, and validate coverage of changed routes. The typed consumer mismatch failed first; serialized shape and retained vectors remain unchanged. Cost if wrong: proposals would otherwise conflate independent contract authorities; final contracts and native suites are reverified."
+  },
+  {
+    "path": ".superpowers/sdd/P6-PRODUCT-PLAN/progress.md",
+    "line": 23,
+    "text": "Task 2: Ruling: changed semantic routes require an actual host restart/reload because PinnedSemanticConnector deliberately checks the complete selected route/contract. Restart fixtures now read and compile the retained signed generation instead of reinstalling generation one, and frame the action with that selected generation. Cost if wrong: stale fixture requests could be mistaken for policy regressions; no production route equality, root, source or generation check is weakened."
+  },
+  {
+    "path": ".superpowers/sdd/P6-PRODUCT-PLAN/progress.md",
+    "line": 25,
+    "text": "Task 2: Ruling: public report/proposal projections include native labels and conservative untrusted influence through two additional generated closed DTOs. The apply endpoint remains the trusted native operator API, separate from agent-facing report/propose HTTP. Cost if wrong: a host must explicitly wire operator review/restart; no maintenance capability alone can install policy."
+  },
+  {
+    "path": ".superpowers/sdd/P6-PRODUCT-PLAN/progress.md",
+    "line": 27,
+    "text": "Task 2: Ruling: classify and freshly authorize a retained report/proposal before revealing a semantic-body conflict. A lowered-clearance changed-report replay failed first (Conflict instead of AuthorityDenied), then both product ledgers adopted audience-before-conflict order. Cost if wrong: an error category could reveal retained classified identity; no protected result or quota is returned/refunded."
+  },
+  {
+    "path": ".superpowers/sdd/P6-PRODUCT-PLAN/progress.md",
+    "line": 33,
+    "text": "Task 2: Ruling: Refresh the trusted egress commit timestamp after bounded reconciliation and lease acquisition. Preserve the original acquisition fence deadline and lease and recheck that deadline against the new observation; neither authority lifetime nor credential is renewed. Cost if wrong: a delayed internal request could retain an invalid clock binding; native temporal checks, physical capture and the current whole-suite campaign remain mandatory. This is a production owner correction demonstrated by the retained real native RED, not a relaxed fixture deadline."
+  },
+  {
+    "path": ".superpowers/sdd/P6-PRODUCT-PLAN/progress.md",
+    "line": 40,
+    "text": "Task 3: Ruling: Readiness is a protected tenant/domain marker, compared inside command, semantic plan, knowledge mutation and physical native capture owners. Legacy unmarked profiles retain their P0-P5 behavior; mounting the P6 protected service requires the actual knowledge broker, selected semantic operator and exact unfinished self-test. Cost if wrong: an unsupported legacy deployment must not be presented as P6 protected setup; final qualification names only the mounted supported profile."
+  },
+  {
+    "path": ".superpowers/sdd/P6-PRODUCT-PLAN/progress.md",
+    "line": 41,
+    "text": "Task 3: Ruling: Live broker validation runs outside SQL transactions on protected execution, review and explanation routes, with native installed-profile/fence checks repeated inside owning mutations. A cancelled-broker review and a new pre-ready semantic plan both failed their refusal assertions before the corrections. Cost if wrong: a stale host preflight could miss a race; the real reload-before-capture interleaving is mandatory."
+  },
+  {
+    "path": ".superpowers/sdd/P6-PRODUCT-PLAN/progress.md",
+    "line": 42,
+    "text": "Task 3: Ruling: A new writer may replace its predecessor readiness report using the identical retained probe/operation/receipt within the probe lifetime. Same-writer altered reports conflict; the original effect and tree charge cannot repeat. Cost if wrong: historical report evidence must not be mistaken for current readiness; each report binds the full live serving fence."
+  },
+  {
+    "path": ".superpowers/sdd/P6-PRODUCT-PLAN/progress.md",
+    "line": 45,
+    "text": "Task 3: Ruling: Heap-pin the public setup futures and split writer-restart test phases. GDB proved fixed-size native poll frames exhausted the default Linux test stack, and the operator creation extension reproduced it. Cost if wrong: bounded per-call allocation adds overhead; acceptance retains the default Linux stack and real capture rather than increasing stack limits."
+  },
+  {
+    "path": ".superpowers/sdd/P6-PRODUCT-PLAN/progress.md",
+    "line": 46,
+    "text": "Task 3: Ruling: Setup CLI requests have an explicit 120-second deadline, while ordinary commands retain 20 seconds. Native setup includes a real journal/receipt effect and reconciliation. Cost if wrong: a timeout leaves the original stable self-test owned; the CLI never retries or grants readiness. Only fixed known restart/uncovered categories are printed; arbitrary error bodies remain private."
+  },
+  {
+    "path": ".superpowers/sdd/P6-PRODUCT-PLAN/progress.md",
+    "line": 48,
+    "text": "Task 3 actual CLI RED: native probe succeeded, but the CLI printed pretty JSON which its own strict canonical qualify decoder refused before HTTP. The owning stdout-reuse regression failed NonCanonical. Ruling: setup stdout emits the exact verified native canonical envelope without a trailing newline. Cost if wrong: machine-readable proof output has no presentation whitespace; signed native bytes and strict parser behavior remain unchanged."
+  },
+  {
+    "path": ".superpowers/sdd/P6-PRODUCT-PLAN/progress.md",
+    "line": 51,
+    "text": "Task 3 acceptance: Linux six native tests passed, zero failed, normal default stack, 77.35 seconds; the one private CLI host helper was then explicitly executed and passed (29.08 seconds, zero ignored). Actual Mac CLI across a private SSH tunnel to OCI Linux passed probe, typed same-writer refusal, real writer reopen and qualify: effects=1, identical native operation/report, unchanged replay charge. CLI three tests passed, Python two and TypeScript two setup tests passed; owning control-plane/store all-target clippy passed. Ruling: trusted local operator bootstrap atomically pins only a fresh exact self-test after profile reload/expiry; it uses the existing normal Create owner and grants no other work. Cost if wrong: host operators must explicitly pin, review and run the replacement self-test rather than recycling an expired or old-profile report."
+  },
+  {
+    "path": ".superpowers/sdd/P6-PRODUCT-PLAN/progress.md",
+    "line": 59,
+    "text": "Task 4: Ruling: Router construction is fallible because both dedicated settlement workers must exist before serving. Propagate startup failure through recovery_router and protected_recovery_router; do not mount a partly protected listener. Cost if wrong: Rust host composition must handle a Result at startup; no HTTP schema or capability is changed. Two total permits include queued, active and disconnected work, and shutdown refuses new work while accepted jobs finish."
+  },
+  {
+    "path": ".superpowers/sdd/P6-PRODUCT-PLAN/progress.md",
+    "line": 63,
+    "text": "Task 4: Ruling: add a non-cloneable kernel-prepared egress commit that finishes original acquisition reconciliation and lease checks before exposing the trusted event clock. Build the new unsigned use evidence from that clock outside all locks; atomic native commit still checks original signed grant, original deadline, current flow, lease and five-second skew. Existing timestamped evidence is never rewritten or renewed. Cost if wrong: an interleaving between preparation and commit must be refused by the physical owner; current freshness/cutpoint regressions and actual positive host integration are required."
+  },
+  {
+    "path": ".superpowers/sdd/P6-PRODUCT-PLAN/progress.md",
+    "line": 66,
+    "text": "Task 4: Ruling: permit an explicit integer host/client wait budget of 1-120 seconds, default 20. Both qualification hosts select 120 seconds for the same debug native fixture; CLI ordinary calls remain 20 and native deadlines/grants remain unchanged. Cost if wrong: operator-selected waits may retain a caller longer, but never increase outstanding native work, silently retry, renew authority or release permits on disconnect. API-absence RED and bounds/no-retry test precede the change."
+  },
+  {
+    "path": ".superpowers/sdd/P6-PRODUCT-PLAN/progress.md",
+    "line": 74,
+    "text": "Task 5: Ruling: the competent comparison baseline is explicit application supervision over the identical existing P1/P4 native effect and knowledge owners, provider idempotency, original-outcome lookup and current ACL. This matches authority and avoids an intentionally weak alternate runtime. Cost if wrong: the comparison measures integration and utility, not a security advantage over an independent runtime or OpenAPPA. No savings from a production migration are claimed."
+  },
+  {
+    "path": ".superpowers/sdd/P6-PRODUCT-PLAN/progress.md",
+    "line": 75,
+    "text": "Task 5: Ruling: qualify protected artifact reuse through a private trusted Rust fixture bridge around actual NativeKnowledgeRuntime read/release and the existing Inspect command. The second workflow has real immutable custody, writer reopen, label checks and an authorized sink; its bytes never reach model state. Cost if wrong: this demonstrates native host composition only, not a general production artifact HTTP protocol. That unsupported surface is named explicitly."
+  },
+  {
+    "path": ".superpowers/sdd/P6-PRODUCT-PLAN/progress.md",
+    "line": 84,
+    "text": "Task 5: Ruling: distinguish host completion from independently completed native work. A framework error after an actual effect remains an unsuccessful host trial in its original denominator, while native completion is counted separately. Cost if wrong: neither transport failures nor committed effects may be censored or called successful host integration; post-effect framework-error regression failed first and the current ten-test harness suite passed."
+  },
+  {
+    "path": ".superpowers/sdd/P6-PRODUCT-PLAN/progress.md",
+    "line": 91,
+    "text": "Task 5: Ruling: retain the entire original 96-trial account-quota failure cohort and declare one independent identical 96-trial qualification cohort after a different authorized credential serves the exact pinned model. Execute cohorts sequentially under the original two-trial concurrency, without replacing any failed row or changing tasks, model, authority, sources, host versions or per-trial budgets. Report both separately plus all 192 combined denominators; the original cohort remains failed qualification. Cost if wrong: doubled finite fixture/compute work and account-dependent availability must remain visible; no data censoring, tuned task set, hidden retry or general superiority claim is allowed. Three separate public transport diagnostics are retained outside native denominators, with the one successful diagnostic consuming 15 input and 14 output tokens."
+  },
+  {
+    "path": ".superpowers/sdd/P6-PRODUCT-PLAN/progress.md",
+    "line": 96,
+    "text": "Task 5: Ruling: preserve the original partial cohort and all 45 unrecorded planned slots explicitly, with unavailable effects/labels/model usage marked unknown rather than fabricated zero or passing evidence. Only the complete second 96-trial cohort can satisfy qualification. Cost if wrong: the combined planned denominator is 192 with interrupted measurements separated; no all-192 safety or availability claim may be inferred. Restore exact frozen Python distributions under a persistent task-owned home directory and use one read-back-verified three-hour task timer. No earlier timer or key can silently govern collection again."
+  },
+  {
+    "path": ".superpowers/sdd/P6-PRODUCT-PLAN/progress.md",
+    "line": 103,
+    "text": "Task 5: Ruling: retain both earlier cohorts and declare a complete additional 96-trial matched qualification using exact gpt-5.4-2026-03-05 after public transport verification. The user delegated model choice; only the model changes, while sources, tasks, authority, host versions, per-trial budgets and acceptance thresholds remain identical. Cost if wrong: another full finite campaign and provider/compute cost, all 288 planned slots and failed mini-model utility remain visible; no selected-row retry, success censoring or general superiority claim."
+  },
+  {
+    "path": ".superpowers/sdd/P6-PRODUCT-PLAN/progress.md",
+    "line": 108,
+    "text": "Task 5: Ruling: retain earlier failed-cohort prompt snapshot gaps as unavailable request-content recomputation, with exact mismatch IDs and original hashes/bytes; independently retained native facts, response IDs/token usage and all denominators remain. New qualification requires exact prompt recomputation and all current source-bound gates. Cost if wrong: the earlier model transcripts cannot support complete prompt-content provenance, and another full source-bound gate cycle is required; no transcript is fabricated or repaired after collection."
+  },
+  {
+    "path": ".superpowers/sdd/P6-PRODUCT-PLAN/progress.md",
+    "line": 111,
+    "text": "Task 5: Ruling: retain the successful precollection quiet performance measurement for its byte-identical Rust native/pure subject, with an exact original-to-current source proof excluding only the Python prompt-custody implementation and regression. Neither benchmark imports those files. All later noisy measurements and their failures remain explicit. Cost if wrong: acceptance applies only to the declared quiet hardware/profile, not a shared-workstation latency SLA; the fresh reviewer must judge this source-isolation argument and no ceiling is raised."
+  },
+  {
+    "path": ".superpowers/sdd/P6-PRODUCT-PLAN/progress.md",
+    "line": 112,
+    "text": "Task 5: Ruling: bind the freshly executed complete Linux suites to their actual 3c2dc49 source inventory and prove their production/test subject is unchanged in 599483ed, rather than relabeling results or repeating unchanged Rust suites solely for two unused Python fixture file hashes. All 710 other sources are exact; no Rust native suite executes those Python modules. The corrected complete model cohort independently runs the changed wrapper and native helper. Cost if wrong: the reviewer must verify dependency isolation; a native dependency on either changed Python file invalidates this reuse and requires the full suite again."
+  },
+  {
+    "path": ".superpowers/sdd/P6-PRODUCT-PLAN/progress.md",
+    "line": 128,
+    "text": "Task 5: Ruling: retain the complete failed full-model cohort and declare one complete additional 96-trial corrected-framework qualification after the stop-contract regression. Use the same exact model, tasks, authority, hosts, per-trial budgets and thresholds; only the two existing standalone Python fixture files and explicit declared framework stop protocol change. The pinned BaseLLM method applies its own protocol before Crew parsing; raw provider completion, stop sequences and visible frame are retained. A skipped or malformed action is never synthesized. Cost if wrong: another full campaign and all 384 planned slots must remain visible; this is a reviewed integration correction, not retrospective repair, tuned utility thresholds or evidence of superiority."
+  },
+  {
+    "path": ".superpowers/sdd/P6-PRODUCT-PLAN/progress.md",
+    "line": 136,
+    "text": "Final: Ruling: preserve the existing branch, dirty worktree, exact phase archives and task ledger without committing inherited mixed file contents, pushing, merging or deleting the evidence workspace. The user authorized phase execution; the reviewable current-source delta and immutable predecessor package provide its provenance while Git HEAD remains de84fc3. Cost if wrong: integration and durable Git publication remain a separate release step, and this local reviewed result must not be represented as a merged or deployed release."
+  },
+  {
+    "path": ".superpowers/sdd/P6-PRODUCT-PLAN/progress.md",
+    "line": 137,
+    "text": "Final: Ruling: close the explicitly planned phase with its complete 33 local ownership/portable/SDK gates, four complete Linux suites, actual native overload/host/model evidence and fresh whole-phase review, while leaving repository-wide and hosted release qualification explicit. The 108-crate repository and inherited unrelated changes are outside this finite phase acceptance campaign. Cost if wrong: a downstream integration or optional workspace feature may still fail its release gates; no workspace-wide production release claim is permitted."
+  }
+]

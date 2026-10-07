@@ -1,0 +1,6 @@
+
+running 1 test
+test recovery::tests::recovery_p1_native_disclosure_once_and_exact_receipt_replay ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1178 filtered out; finished in 26.74s
+

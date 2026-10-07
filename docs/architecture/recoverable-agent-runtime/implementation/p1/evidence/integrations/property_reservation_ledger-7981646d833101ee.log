@@ -1,0 +1,8 @@
+
+running 3 tests
+test omitted_release_is_detected_by_terminal_history_replay - should panic ... ok
+test admitted_child_shares_remain_bounded_and_release_exactly_once ... ok
+test mixed_store_reservation_sequences_preserve_the_journal_law ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.56s
+

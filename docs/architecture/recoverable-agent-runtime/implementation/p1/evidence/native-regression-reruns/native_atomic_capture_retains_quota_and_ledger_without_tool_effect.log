@@ -1,0 +1,6 @@
+
+running 1 test
+test security::adapters::tests::native_flow::support::capture::native_atomic_capture_retains_quota_and_ledger_without_tool_effect ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1169 filtered out; finished in 7.75s
+

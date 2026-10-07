@@ -1,0 +1,19 @@
+
+running 6 tests
+
+running 1 test
+
+running 1 test
+test subprocess_child_worker ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.55s
+
+test child_committed_before_host_death_is_not_redispatched_when_kernel_outcome_is_unknown ... ok
+test subprocess_child_worker ... ok
+test independent_registries_serialize_duplicate_submission_and_cancellation ... ok
+test child_key_work_and_call_binding_commit_together_and_cannot_be_rebound ... ok
+test settled_joins_preserve_ownership_and_atomically_replace_the_persistent_wait_mode ... ok
+test the_same_capability_attached_to_two_processes_is_not_a_parent_selector ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.32s
+

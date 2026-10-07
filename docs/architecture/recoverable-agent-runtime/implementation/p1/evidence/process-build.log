@@ -1,0 +1,265 @@
+    Checking subtle v2.6.1
+    Checking libc v0.2.189
+    Checking smallvec v1.15.1
+    Checking zeroize v1.9.0
+    Checking serde v1.0.228
+    Checking serde_json v1.0.149
+    Checking once_cell v1.21.4
+    Checking either v1.15.0
+    Checking slab v0.4.12
+    Checking byteorder v1.5.0
+    Checking futures-io v0.3.32
+    Checking ruint v1.20.0
+    Checking hash32 v0.2.1
+    Checking tracing-core v0.1.36
+    Checking icu_normalizer v2.1.1
+    Checking generic-array v0.14.7
+    Checking der v0.7.10
+    Checking rustls-pki-types v1.14.0
+    Checking aws-lc-rs v1.18.1 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/third_party/aws-lc-rs-chio)
+    Checking getrandom v0.2.17
+    Checking cpufeatures v0.2.17
+    Checking bytes v1.11.1
+    Checking parking_lot_core v0.9.12
+    Checking rand_core v0.6.4
+    Checking errno v0.3.14
+    Checking ring v0.17.14
+    Checking signal-hook-registry v1.4.8
+    Checking idna_adapter v1.2.1
+    Checking parking_lot v0.12.5
+    Checking crypto-common v0.1.7
+    Checking block-buffer v0.10.4
+    Checking block-padding v0.3.3
+    Checking mio v1.1.1
+    Checking socket2 v0.6.3
+    Checking inout v0.1.4
+    Checking idna v1.1.0
+    Checking digest v0.10.7
+    Checking futures-util v0.3.32
+    Checking cipher v0.4.4
+    Checking http v1.4.0
+    Checking sha2 v0.10.9
+    Checking hmac v0.12.1
+    Checking spki v0.7.3
+    Checking signature v2.2.0
+    Checking url v2.5.8
+    Checking salsa20 v0.10.2
+    Checking pbkdf2 v0.12.2
+    Checking cbc v0.1.2
+    Checking aes v0.8.4
+    Checking curve25519-dalek v4.1.3
+    Checking tokio v1.50.0
+    Checking scrypt v0.11.0
+    Checking chio-security-types v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-security-types)
+    Checking rs_merkle v1.5.0
+    Checking pkcs5 v0.7.1
+    Checking keccak v0.1.6
+    Checking heapless v0.7.17
+    Checking sha3 v0.10.8
+    Checking pkcs8 v0.10.2
+    Checking serdect v0.2.0
+    Checking http-body v1.0.1
+    Checking itertools v0.14.0
+    Checking derive_more v2.1.1
+    Checking ed25519 v2.2.3
+    Checking const-hex v1.18.1
+    Checking rustls-webpki v0.103.15
+    Checking rustc-hash v2.1.1
+    Checking tracing v0.1.44
+    Checking ff v0.13.1
+    Checking ed25519-dalek v2.2.0
+    Checking alloy-primitives v1.5.7
+    Checking security-framework-sys v2.17.0
+    Checking postcard v1.1.3
+    Checking core-foundation v0.10.1
+    Checking chio-metrics-spec v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/observability/chio-metrics-spec)
+    Checking rustls v0.23.45
+    Checking ipnet v2.12.0
+    Checking group v0.13.0
+    Checking security-framework v3.7.0
+    Checking sec1 v0.7.3
+    Checking hkdf v0.12.4
+    Checking crypto-bigint v0.5.5
+    Checking rand_chacha v0.3.1
+    Checking chrono v0.4.44
+    Checking frost-core v3.0.0
+    Checking http-body-util v0.1.3
+    Checking serde_urlencoded v0.7.1
+    Checking rand v0.8.6
+    Checking rfc6979 v0.4.0
+    Checking serde-value v0.7.0
+    Checking prost v0.14.3
+    Checking objc2-core-foundation v0.3.2
+    Checking getrandom v0.4.2
+    Checking elliptic-curve v0.13.8
+    Checking alloy-sol-type-parser v1.5.7
+    Checking cpufeatures v0.3.0
+    Checking hashbrown v0.16.1
+    Checking hashbrown v0.17.0
+    Checking pem v3.0.6
+    Checking primeorder v0.13.6
+    Checking ecdsa v0.16.9
+    Checking frost-rerandomized v3.0.0
+    Checking frost-ed25519 v3.0.0
+    Checking alloy-json-abi v1.5.7
+    Checking sha2 v0.11.0
+    Checking prost-types v0.14.3
+    Checking num-bigint-dig v0.8.6
+    Checking futures-executor v0.3.32
+    Checking olpc-cjson v0.1.4
+    Checking rustix v1.1.4
+    Checking getrandom v0.3.4
+    Checking objc2-foundation v0.3.2
+    Checking pkcs1 v0.7.5
+    Checking universal-hash v0.5.1
+    Checking serde_plain v1.0.2
+    Checking serde_path_to_error v0.1.20
+    Checking strum v0.27.2
+    Checking bit-vec v0.8.0
+    Checking oci-spec v0.9.0
+    Checking oauth2 v5.0.0
+    Checking bit-set v0.8.0
+    Checking rsa v0.9.10
+    Checking prost-reflect v0.16.3
+    Checking fluent-uri v0.4.1
+    Checking tempfile v3.27.0
+    Checking hyper v1.8.1
+    Checking tower v0.5.3
+    Checking tokio-util v0.7.18
+    Checking tokio-rustls v0.26.4
+    Checking rustls-platform-verifier v0.6.2
+    Checking poly1305 v0.8.0
+    Checking tower-http v0.6.8
+    Checking tls_codec v0.4.2
+    Checking alloy-sol-types v1.5.7
+    Checking ahash v0.8.12
+    Checking futures v0.3.32
+    Checking hyper-util v0.1.20
+    Checking objc2-app-kit v0.3.2
+    Checking serde_with v3.18.0
+    Checking p256 v0.13.2
+    Checking p384 v0.13.1
+    Checking indexmap v2.14.1
+    Checking jsonwebtoken v10.4.0
+    Checking sha1 v0.10.6
+    Checking aead v0.5.2
+    Checking serde_spanned v0.6.9
+    Checking toml_datetime v0.6.11
+    Checking itertools v0.10.5
+    Checking ciborium-io v0.2.2
+    Checking tough v0.22.0
+    Checking toml_edit v0.22.27
+    Checking ciborium-ll v0.2.2
+    Checking serde_json_canonicalizer v0.3.2
+    Checking referencing v0.46.0
+    Checking sigstore_protobuf_specs v0.5.1
+    Checking hyper-rustls v0.27.7
+    Checking crypto_secretbox v0.1.1
+    Checking x509-cert v0.2.5
+    Checking reqwest v0.13.2
+    Checking alloy-core v1.5.7
+    Checking scrypt v0.12.0
+    Checking openidconnect v4.0.1
+    Checking webbrowser v1.2.2
+    Checking fancy-regex v0.17.0
+    Checking email_address v0.2.9
+    Checking signature v3.0.0
+    Checking alloy v1.8.3
+    Checking ciborium v0.2.2
+    Checking webpki-roots v1.0.6
+    Checking jsonschema v0.46.0
+    Checking tracing-log v0.2.0
+    Checking webpki-roots v0.26.11
+    Checking chio-egress-contract v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/protocol/chio-egress-contract)
+    Checking toml v0.8.23
+    Checking jsonwebtoken v9.3.1
+    Checking coset v0.4.2
+    Checking tracing-subscriber v0.3.23
+    Checking x509-parser v0.16.0
+    Checking oci-client v0.17.0
+    Checking chio-web3-bindings v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-web3-bindings)
+    Checking hashlink v0.11.0
+    Checking chio-data-guards-redactors-default v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/guards/chio-data-guards/redactors/default)
+    Checking rusqlite v0.39.0
+    Checking dashmap v6.1.0
+    Checking ureq v2.12.1
+    Checking chio-log-redact v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/observability/chio-log-redact)
+    Checking lru v0.18.2
+    Checking uuid v1.22.0
+    Checking chio-supervisor v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-supervisor)
+    Checking chio-bounded v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-bounded)
+    Checking sigstore v0.14.0
+    Checking chio-core-types v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-core-types)
+    Checking chio-listing v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-listing)
+    Checking chio-revocation-oracle v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-revocation-oracle)
+    Checking chio-pheromone v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-pheromone)
+    Checking chio-fincred v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-fincred)
+    Checking chio-did v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-did)
+    Checking chio-attest-verify v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-attest-verify)
+    Checking chio-lineage v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/observability/chio-lineage)
+    Checking chio-quarantine v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-quarantine)
+    Checking chio-kernel-core v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-kernel-core)
+    Checking chio-flow v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-flow)
+    Checking chio-finding v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-finding)
+    Checking chio-custody-hw v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-custody-hw)
+    Checking chio-weights v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-weights)
+    Checking chio-fiscal v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-fiscal)
+    Checking chio-governance v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-governance)
+    Checking chio-appraisal v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-appraisal)
+    Checking chio-open-market v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-open-market)
+    Checking chio-underwriting v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-underwriting)
+    Checking chio-federation v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-federation)
+    Checking chio-credit v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-credit)
+    Checking chio-web3 v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-web3)
+    Checking chio-market v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-market)
+    Checking chio-autonomy v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-autonomy)
+    Checking chio-core v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-core)
+    Checking chio-manifest v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-manifest)
+    Checking chio-settle v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-settle)
+    Checking chio-link v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-link)
+    Checking chio-tool-call-fabric v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/protocol/chio-tool-call-fabric)
+    Checking chio-kernel v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-kernel)
+error[E0599]: no method named `verify_signature` found for reference `&SignedDisclosureGrant` in the current scope
+   --> crates/kernel/chio-kernel/src/kernel/credential_reservation/preparation.rs:132:18
+    |
+131 |               if !grant
+    |  _________________-
+132 | |                 .verify_signature()
+    | |                 -^^^^^^^^^^^^^^^^ method not found in `&SignedDisclosureGrant`
+    | |_________________|
+    |
+
+error[E0282]: type annotations needed
+   --> crates/kernel/chio-kernel/src/kernel/credential_reservation/preparation.rs:133:27
+    |
+133 |                 .map_err(|error| invalid(&error.to_string()))?
+    |                           ^^^^^           ----- type must be known at this point
+    |
+help: consider giving this closure parameter an explicit type
+    |
+133 |                 .map_err(|error: /* Type */| invalid(&error.to_string()))?
+    |                                ++++++++++++
+
+error[E0308]: mismatched types
+   --> crates/kernel/chio-kernel/src/kernel/evaluation/caller_execution.rs:225:42
+    |
+225 |         request.declassification_grant = credentials.declassification_grant;
+    |         ------------------------------   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Option<SignedDisclosureGrant>`, found `Option<SignedDeclassificationGrant>`
+    |         |
+    |         expected due to the type of this binding
+    |
+    = note: expected enum `std::option::Option<SignedDisclosureGrant>`
+               found enum `std::option::Option<SignedDeclassificationGrant>`
+
+error[E0308]: mismatched types
+   --> crates/kernel/chio-kernel/src/kernel/session_ops/nested_tool_call.rs:206:33
+    |
+206 |         declassification_grant: proofs.declassification_grant,
+    |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Option<SignedDisclosureGrant>`, found `Option<SignedDeclassificationGrant>`
+    |
+    = note: expected enum `std::option::Option<SignedDisclosureGrant>`
+               found enum `std::option::Option<SignedDeclassificationGrant>`
+
+Some errors have detailed explanations: E0282, E0308, E0599.
+For more information about an error, try `rustc --explain E0282`.
+error: could not compile `chio-kernel` (lib) due to 4 previous errors

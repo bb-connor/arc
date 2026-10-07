@@ -1,0 +1,17 @@
+
+running 12 tests
+test actual_kernel_admission_binds_the_first_native_join_before_any_dispatch ... ok
+test denied_native_preparation_retains_monotone_history ... ok
+test capture::native_combined_capture_requires_supported_security_dispatch_custody ... ok
+test capture::native_generic_dispatch_commit_cannot_bypass_security_dispatch_custody ... ok
+test capture::native_split_capture_cannot_bypass_security_dispatch_custody ... ok
+test native_nonce_preflight_cannot_borrow_dispatch_join_authority ... ok
+test native_join_only_hook_cannot_activate_dispatch ... ok
+test egress_coordinator::actual_kernel_egress_custody_commits_sqlite_history_without_dispatch_activation ... ok
+test observation::fresh_observations_drive_first_and_later_admission_but_never_activate_dispatch ... ok
+test panicked_native_preparation_retains_monotone_history ... ok
+test silent_native_preparation_cannot_reach_budget_or_runtime ... ok
+test repeated_native_preparation_cannot_reach_budget_or_runtime ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 27.92s
+

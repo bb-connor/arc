@@ -1,0 +1,90 @@
+
+running 1 test
+test recovery::tests::knowledge::product::p6_policy_selected_operator_alone_applies_exact_proposal_and_native_target ... P6 temporary native state stack:    0: chio_store_sqlite::admission_operation_store::security_participant_state::invalid
+   1: core::ops::function::FnOnce::call_once
+   2: core::result::Result<T,E>::map_err
+   3: chio_store_sqlite::admission_operation_store::security_participant_state::egress::write::<impl chio_store_sqlite::admission_operation_store::SqliteAdmissionOperationStore>::mutate_security_participant_egress
+   4: chio_store_sqlite::admission_operation_store::security_participant_state::egress::write::<impl chio_store_sqlite::admission_operation_store::SqliteAdmissionOperationStore>::commit_security_participant_egress
+   5: chio_store_sqlite::admission_operation_store::store::native_security::<impl chio_store_sqlite::admission_operation_store::SqliteAdmissionOperationStore>::commit_native_egress_from_port
+   6: chio_store_sqlite::admission_operation_store::store::<impl chio_kernel::admission_operation::store::AdmissionOperationStore for chio_store_sqlite::admission_operation_store::SqliteAdmissionOperationStore>::commit_native_security_egress
+   7: chio_kernel::kernel::admission_coordinator::native_egress::AcquiredNativeSecurityEgress::commit_current_with_declassification::{{closure}}
+   8: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+   9: std::panicking::catch_unwind::do_call
+  10: __rust_try
+  11: std::panic::catch_unwind
+  12: chio_kernel::kernel::admission_coordinator::native_acquisition::store_call
+  13: chio_kernel::kernel::admission_coordinator::native_egress::AcquiredNativeSecurityEgress::commit_current_with_declassification
+  14: chio_kernel::kernel::admission_coordinator::native_egress::ledger::<impl chio_kernel::kernel::admission_coordinator::native_egress::PreparedNativeSecurityEgress>::retain_for_capture_inner
+  15: chio_kernel::kernel::admission_coordinator::native_egress::ledger::<impl chio_kernel::kernel::admission_coordinator::native_egress::PreparedNativeSecurityEgress>::retain_for_capture
+  16: chio_control_plane::security::adapters::native_flow::PreparedNativeFlowDispatch::capture_invocation
+  17: <chio_control_plane::security::adapters::native_flow::NativeFlowResolver as chio_kernel::kernel::SecurityPreDispatchHook>::commit_native_dispatch::{{closure}}
+  18: core::result::Result<T,E>::and_then
+  19: <chio_control_plane::security::adapters::native_flow::NativeFlowResolver as chio_kernel::kernel::SecurityPreDispatchHook>::commit_native_dispatch
+  20: chio_kernel::kernel::admission_coordinator::native_egress::capture::lifecycle::<impl chio_kernel::kernel::kernel_struct::ChioKernel>::freeze_and_commit_evaluation_dispatch::{{closure}}
+  21: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+  22: std::panicking::catch_unwind::do_call
+  23: __rust_try
+  24: std::panic::catch_unwind
+  25: chio_kernel::kernel::security_dispatch::callback
+  26: chio_kernel::kernel::admission_coordinator::native_egress::capture::lifecycle::<impl chio_kernel::kernel::kernel_struct::ChioKernel>::freeze_and_commit_evaluation_dispatch
+  27: chio_kernel::kernel::evaluation::async_evaluation_core::<impl chio_kernel::kernel::kernel_struct::ChioKernel>::evaluate_tool_call_async_with_session_context_scoped::{{closure}}
+  28: <core::pin::Pin<P> as core::future::future::Future>::poll
+  29: <tokio::task::task_local::TaskLocalFuture<T,F> as core::future::future::Future>::poll::{{closure}}
+  30: tokio::task::task_local::LocalKey<T>::scope_inner
+  31: <tokio::task::task_local::TaskLocalFuture<T,F> as core::future::future::Future>::poll
+  32: <tokio::task::task_local::TaskLocalFuture<T,F> as core::future::future::Future>::poll::{{closure}}
+  33: tokio::task::task_local::LocalKey<T>::scope_inner
+  34: <tokio::task::task_local::TaskLocalFuture<T,F> as core::future::future::Future>::poll
+  35: chio_kernel::kernel::evaluation::evaluation_entry::<impl chio_kernel::kernel::kernel_struct::ChioKernel>::evaluate_tool_call_async_with_session_context::{{closure}}
+  36: chio_kernel::kernel::evaluation::evaluation_entry::<impl chio_kernel::kernel::kernel_struct::ChioKernel>::evaluate_tool_call_with_metadata_and_security_context::{{closure}}
+  37: <core::pin::Pin<P> as core::future::future::Future>::poll
+  38: chio_process::ProcessRuntime::invoke_with_recovery::{{closure}}
+  39: chio_process::ProcessRuntime::invoke_known_only::{{closure}}
+  40: chio_control_plane::semantic::NativeSemanticRuntime::execute_step::{{closure}}
+  41: chio_control_plane::recovery::tests::knowledge::product::p6_policy_selected_operator_alone_applies_exact_proposal_and_native_target::{{closure}}
+  42: <core::pin::Pin<P> as core::future::future::Future>::poll
+  43: <core::pin::Pin<P> as core::future::future::Future>::poll
+  44: tokio::runtime::scheduler::current_thread::CoreGuard::block_on::{{closure}}::{{closure}}::{{closure}}
+  45: tokio::runtime::scheduler::current_thread::CoreGuard::block_on::{{closure}}::{{closure}}
+  46: tokio::runtime::scheduler::current_thread::Context::enter
+  47: tokio::runtime::scheduler::current_thread::CoreGuard::block_on::{{closure}}
+  48: tokio::runtime::scheduler::current_thread::CoreGuard::enter::{{closure}}
+  49: tokio::runtime::context::scoped::Scoped<T>::set
+  50: tokio::runtime::context::set_scheduler::{{closure}}
+  51: std::thread::local::LocalKey<T>::try_with
+  52: std::thread::local::LocalKey<T>::with
+  53: tokio::runtime::context::set_scheduler
+  54: tokio::runtime::scheduler::current_thread::CoreGuard::enter
+  55: tokio::runtime::scheduler::current_thread::CoreGuard::block_on
+  56: tokio::runtime::scheduler::current_thread::CurrentThread::block_on::{{closure}}
+  57: tokio::runtime::context::runtime::enter_runtime
+  58: tokio::runtime::scheduler::current_thread::CurrentThread::block_on
+  59: tokio::runtime::runtime::Runtime::block_on_inner
+  60: tokio::runtime::runtime::Runtime::block_on
+  61: chio_control_plane::recovery::tests::knowledge::product::p6_policy_selected_operator_alone_applies_exact_proposal_and_native_target
+  62: chio_control_plane::recovery::tests::knowledge::product::p6_policy_selected_operator_alone_applies_exact_proposal_and_native_target::{{closure}}
+  63: core::ops::function::FnOnce::call_once
+  64: test::__rust_begin_short_backtrace
+  65: test::run_test::{{closure}}
+  66: std::sys::backtrace::__rust_begin_short_backtrace
+  67: core::ops::function::FnOnce::call_once{{vtable.shim}}
+  68: std::sys::thread::unix::Thread::new::thread_start
+  69: <unknown>
+  70: <unknown>
+
+
+thread 'recovery::tests::knowledge::product::p6_policy_selected_operator_alone_applies_exact_proposal_and_native_target' (62425) panicked at crates/platform/chio-control-plane/src/recovery/tests/knowledge/product.rs:517:5:
+assertion `left == right` failed: Some("security dispatch outcome requires reconciliation: security native dispatch capture callback failed; authoritative recovery required")
+  left: Deny
+ right: Allow
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    recovery::tests::knowledge::product::p6_policy_selected_operator_alone_applies_exact_proposal_and_native_target
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1263 filtered out; finished in 88.38s
+
+error: test failed, to rerun pass `-p chio-control-plane --lib`

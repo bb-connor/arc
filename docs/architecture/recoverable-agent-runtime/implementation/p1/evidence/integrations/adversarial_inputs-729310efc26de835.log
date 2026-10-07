@@ -1,0 +1,10 @@
+
+running 5 tests
+test malformed_json_body_returns_deserialize_error ... ok
+test zero_length_body_returns_deserialize_error ... ok
+test truncated_frame_body_returns_connection_closed ... ok
+test wrong_type_fields_return_deserialize_error ... ok
+test missing_required_id_field_returns_deserialize_error ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

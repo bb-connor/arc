@@ -1,0 +1,277 @@
+
+running 38 tests
+test cloned_receipt_database_cannot_reuse_the_ledger_sink_binding ... FAILED
+test cognition_market_authenticated_pool_restart_never_exceeds_signed_amount ... FAILED
+test cognition_market_debit_rejects_non_ready_sessions_before_reservation ... FAILED
+test cognition_market_allocation_binds_one_concrete_store_across_deployments ... FAILED
+test cognition_market_ledger_rejects_an_in_place_rollback ... FAILED
+test cognition_market_kernel_refuses_pool_ledger_replacement ... FAILED
+test cognition_market_debit_resolves_tenant_from_authenticated_session_context ... FAILED
+test cognition_market_pool_binds_one_purchaser_allocation_per_pool ... FAILED
+test cognition_market_pool_bounds_expired_reclamation_per_debit ... FAILED
+test cognition_market_pool_ledger_persists_its_authority_selected_domain ... FAILED
+test cognition_market_pool_domain_excludes_a_second_live_store ... FAILED
+test cognition_market_pool_configuration_failure_is_atomic ... FAILED
+test cognition_market_pool_receipts_survive_ordinary_kernel_key_rotation ... FAILED
+test cognition_market_pool_receipt_authority_is_pinned_ledger_wide ... FAILED
+test cognition_market_pool_reclaims_unclaimed_reservations_at_the_claim_deadline ... FAILED
+test cognition_market_pool_reclamation_progress_survives_a_capacity_rejection ... FAILED
+test cognition_market_pool_rejects_authority_purchaser_digest_and_pool_substitution ... FAILED
+test cognition_market_pool_replay_skips_mutable_purchase_admission ... FAILED
+test cognition_market_pool_replays_after_allocation_authority_rotation ... FAILED
+test cognition_market_pool_replays_after_expiry_and_clock_rollback_but_rejects_new_spend ... FAILED
+test cognition_market_pool_replays_after_purchase_verifier_rotation ... FAILED
+test cognition_market_qualified_pool_refuses_in_memory_storage ... FAILED
+test cognition_market_receipt_sink_rejects_an_in_place_rollback_after_acknowledgment ... FAILED
+test cognition_market_sqlite_clone_cannot_reuse_the_store_binding ... FAILED
+test cognition_market_pool_requires_live_status_before_new_debit_but_replays ... FAILED
+test finding_pool_receipt_sink_rejects_a_writable_parent_directory ... FAILED
+test independent_receipt_anchors_produce_distinct_sink_identities ... FAILED
+test qualified_pool_creates_percent_decoded_uri_parent ... FAILED
+test in_memory_receipt_stores_never_advertise_a_durable_pool_sink ... FAILED
+test finding_pool_receipt_sink_rejects_unsafe_file_permissions_and_links ... FAILED
+test qualified_pool_rejects_a_symlink_database_path ... FAILED
+test qualified_pool_rejects_percent_decoded_nul_uris ... FAILED
+test qualified_pool_rejects_group_or_world_writable_database_files ... FAILED
+test qualified_pool_rejects_read_only_sqlite_uris ... FAILED
+test qualified_pool_rejects_sqlite_uris_that_disable_file_locking ... FAILED
+test sqlite_outbox_claim_serializes_independent_ledger_instances ... FAILED
+test sqlite_receipt_store_identity_survives_reopen ... FAILED
+test sqlite_outbox_restart_reclaims_a_prior_epoch_after_clock_rollback ... FAILED
+
+failures:
+
+---- cloned_receipt_database_cannot_reuse_the_ledger_sink_binding stdout ----
+
+thread 'cloned_receipt_database_cannot_reuse_the_ledger_sink_binding' (19585128) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- cognition_market_authenticated_pool_restart_never_exceeds_signed_amount stdout ----
+
+thread 'cognition_market_authenticated_pool_restart_never_exceeds_signed_amount' (19585130) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- cognition_market_debit_rejects_non_ready_sessions_before_reservation stdout ----
+
+thread 'cognition_market_debit_rejects_non_ready_sessions_before_reservation' (19585131) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- cognition_market_allocation_binds_one_concrete_store_across_deployments stdout ----
+
+thread 'cognition_market_allocation_binds_one_concrete_store_across_deployments' (19585129) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- cognition_market_ledger_rejects_an_in_place_rollback stdout ----
+
+thread 'cognition_market_ledger_rejects_an_in_place_rollback' (19585134) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- cognition_market_kernel_refuses_pool_ledger_replacement stdout ----
+
+thread 'cognition_market_kernel_refuses_pool_ledger_replacement' (19585133) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- cognition_market_debit_resolves_tenant_from_authenticated_session_context stdout ----
+
+thread 'cognition_market_debit_resolves_tenant_from_authenticated_session_context' (19585132) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- cognition_market_pool_binds_one_purchaser_allocation_per_pool stdout ----
+
+thread 'cognition_market_pool_binds_one_purchaser_allocation_per_pool' (19585135) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- cognition_market_pool_bounds_expired_reclamation_per_debit stdout ----
+
+thread 'cognition_market_pool_bounds_expired_reclamation_per_debit' (19585136) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- cognition_market_pool_ledger_persists_its_authority_selected_domain stdout ----
+
+thread 'cognition_market_pool_ledger_persists_its_authority_selected_domain' (19585139) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- cognition_market_pool_domain_excludes_a_second_live_store stdout ----
+
+thread 'cognition_market_pool_domain_excludes_a_second_live_store' (19585138) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- cognition_market_pool_configuration_failure_is_atomic stdout ----
+
+thread 'cognition_market_pool_configuration_failure_is_atomic' (19585137) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- cognition_market_pool_receipts_survive_ordinary_kernel_key_rotation stdout ----
+
+thread 'cognition_market_pool_receipts_survive_ordinary_kernel_key_rotation' (19585141) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- cognition_market_pool_receipt_authority_is_pinned_ledger_wide stdout ----
+
+thread 'cognition_market_pool_receipt_authority_is_pinned_ledger_wide' (19585140) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- cognition_market_pool_reclaims_unclaimed_reservations_at_the_claim_deadline stdout ----
+
+thread 'cognition_market_pool_reclaims_unclaimed_reservations_at_the_claim_deadline' (19585142) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- cognition_market_pool_reclamation_progress_survives_a_capacity_rejection stdout ----
+
+thread 'cognition_market_pool_reclamation_progress_survives_a_capacity_rejection' (19585143) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- cognition_market_pool_rejects_authority_purchaser_digest_and_pool_substitution stdout ----
+
+thread 'cognition_market_pool_rejects_authority_purchaser_digest_and_pool_substitution' (19585144) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- cognition_market_pool_replay_skips_mutable_purchase_admission stdout ----
+
+thread 'cognition_market_pool_replay_skips_mutable_purchase_admission' (19585145) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- cognition_market_pool_replays_after_allocation_authority_rotation stdout ----
+
+thread 'cognition_market_pool_replays_after_allocation_authority_rotation' (19585146) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- cognition_market_pool_replays_after_expiry_and_clock_rollback_but_rejects_new_spend stdout ----
+
+thread 'cognition_market_pool_replays_after_expiry_and_clock_rollback_but_rejects_new_spend' (19585147) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- cognition_market_pool_replays_after_purchase_verifier_rotation stdout ----
+
+thread 'cognition_market_pool_replays_after_purchase_verifier_rotation' (19585148) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- cognition_market_qualified_pool_refuses_in_memory_storage stdout ----
+
+thread 'cognition_market_qualified_pool_refuses_in_memory_storage' (19585150) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- cognition_market_receipt_sink_rejects_an_in_place_rollback_after_acknowledgment stdout ----
+
+thread 'cognition_market_receipt_sink_rejects_an_in_place_rollback_after_acknowledgment' (19585151) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- cognition_market_sqlite_clone_cannot_reuse_the_store_binding stdout ----
+
+thread 'cognition_market_sqlite_clone_cannot_reuse_the_store_binding' (19585152) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- cognition_market_pool_requires_live_status_before_new_debit_but_replays stdout ----
+
+thread 'cognition_market_pool_requires_live_status_before_new_debit_but_replays' (19585149) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- finding_pool_receipt_sink_rejects_a_writable_parent_directory stdout ----
+
+thread 'finding_pool_receipt_sink_rejects_a_writable_parent_directory' (19585153) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- independent_receipt_anchors_produce_distinct_sink_identities stdout ----
+
+thread 'independent_receipt_anchors_produce_distinct_sink_identities' (19585156) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:101:10:
+create rollback anchor directory: expected Ok(..), got Err(Custom { kind: NotFound, error: PathError { path: "/dev/shm/chio-first-receipt-anchoruLSfvW", err: Os { code: 2, kind: NotFound, message: "No such file or directory" } } })
+
+---- qualified_pool_creates_percent_decoded_uri_parent stdout ----
+
+thread 'qualified_pool_creates_percent_decoded_uri_parent' (19585157) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- in_memory_receipt_stores_never_advertise_a_durable_pool_sink stdout ----
+
+thread 'in_memory_receipt_stores_never_advertise_a_durable_pool_sink' (19585155) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- finding_pool_receipt_sink_rejects_unsafe_file_permissions_and_links stdout ----
+
+thread 'finding_pool_receipt_sink_rejects_unsafe_file_permissions_and_links' (19585154) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- qualified_pool_rejects_a_symlink_database_path stdout ----
+
+thread 'qualified_pool_rejects_a_symlink_database_path' (19585158) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- qualified_pool_rejects_percent_decoded_nul_uris stdout ----
+
+thread 'qualified_pool_rejects_percent_decoded_nul_uris' (19585160) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- qualified_pool_rejects_group_or_world_writable_database_files stdout ----
+
+thread 'qualified_pool_rejects_group_or_world_writable_database_files' (19585159) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- qualified_pool_rejects_read_only_sqlite_uris stdout ----
+
+thread 'qualified_pool_rejects_read_only_sqlite_uris' (19585161) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- qualified_pool_rejects_sqlite_uris_that_disable_file_locking stdout ----
+
+thread 'qualified_pool_rejects_sqlite_uris_that_disable_file_locking' (19585162) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- sqlite_outbox_claim_serializes_independent_ledger_instances stdout ----
+
+thread 'sqlite_outbox_claim_serializes_independent_ledger_instances' (19585163) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- sqlite_receipt_store_identity_survives_reopen stdout ----
+
+thread 'sqlite_receipt_store_identity_survives_reopen' (19585165) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+---- sqlite_outbox_restart_reclaims_a_prior_epoch_after_clock_rollback stdout ----
+
+thread 'sqlite_outbox_restart_reclaims_a_prior_epoch_after_clock_rollback' (19585164) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:84:17:
+create test rollback anchor root: No such file or directory (os error 2)
+
+
+failures:
+    cloned_receipt_database_cannot_reuse_the_ledger_sink_binding
+    cognition_market_allocation_binds_one_concrete_store_across_deployments
+    cognition_market_authenticated_pool_restart_never_exceeds_signed_amount
+    cognition_market_debit_rejects_non_ready_sessions_before_reservation
+    cognition_market_debit_resolves_tenant_from_authenticated_session_context
+    cognition_market_kernel_refuses_pool_ledger_replacement
+    cognition_market_ledger_rejects_an_in_place_rollback
+    cognition_market_pool_binds_one_purchaser_allocation_per_pool
+    cognition_market_pool_bounds_expired_reclamation_per_debit
+    cognition_market_pool_configuration_failure_is_atomic
+    cognition_market_pool_domain_excludes_a_second_live_store
+    cognition_market_pool_ledger_persists_its_authority_selected_domain
+    cognition_market_pool_receipt_authority_is_pinned_ledger_wide
+    cognition_market_pool_receipts_survive_ordinary_kernel_key_rotation
+    cognition_market_pool_reclaims_unclaimed_reservations_at_the_claim_deadline
+    cognition_market_pool_reclamation_progress_survives_a_capacity_rejection
+    cognition_market_pool_rejects_authority_purchaser_digest_and_pool_substitution
+    cognition_market_pool_replay_skips_mutable_purchase_admission
+    cognition_market_pool_replays_after_allocation_authority_rotation
+    cognition_market_pool_replays_after_expiry_and_clock_rollback_but_rejects_new_spend
+    cognition_market_pool_replays_after_purchase_verifier_rotation
+    cognition_market_pool_requires_live_status_before_new_debit_but_replays
+    cognition_market_qualified_pool_refuses_in_memory_storage
+    cognition_market_receipt_sink_rejects_an_in_place_rollback_after_acknowledgment
+    cognition_market_sqlite_clone_cannot_reuse_the_store_binding
+    finding_pool_receipt_sink_rejects_a_writable_parent_directory
+    finding_pool_receipt_sink_rejects_unsafe_file_permissions_and_links
+    in_memory_receipt_stores_never_advertise_a_durable_pool_sink
+    independent_receipt_anchors_produce_distinct_sink_identities
+    qualified_pool_creates_percent_decoded_uri_parent
+    qualified_pool_rejects_a_symlink_database_path
+    qualified_pool_rejects_group_or_world_writable_database_files
+    qualified_pool_rejects_percent_decoded_nul_uris
+    qualified_pool_rejects_read_only_sqlite_uris
+    qualified_pool_rejects_sqlite_uris_that_disable_file_locking
+    sqlite_outbox_claim_serializes_independent_ledger_instances
+    sqlite_outbox_restart_reclaims_a_prior_epoch_after_clock_rollback
+    sqlite_receipt_store_identity_survives_reopen
+
+test result: FAILED. 0 passed; 38 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+

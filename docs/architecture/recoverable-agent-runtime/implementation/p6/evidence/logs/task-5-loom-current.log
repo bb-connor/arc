@@ -1,0 +1,3480 @@
+   Compiling proc-macro2 v1.0.106
+   Compiling quote v1.0.45
+   Compiling unicode-ident v1.0.24
+   Compiling libc v0.2.189
+   Compiling stable_deref_trait v1.2.1
+   Compiling syn v2.0.117
+   Compiling cfg-if v1.0.4
+   Compiling version_check v0.9.5
+   Compiling generic-array v0.14.7
+   Compiling typenum v1.20.0
+   Compiling semver v1.0.27
+   Compiling rustc_version v0.4.1
+   Compiling synstructure v0.13.2
+   Compiling serde_core v1.0.228
+   Compiling zerofrom-derive v0.1.6
+   Compiling yoke-derive v0.8.1
+   Compiling zerovec-derive v0.11.2
+   Compiling zerofrom v0.1.6
+   Compiling yoke v0.8.1
+   Compiling zerovec v0.11.5
+   Compiling displaydoc v0.2.5
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling serde v1.0.228
+   Compiling digest v0.10.7
+   Compiling serde_derive v1.0.228
+   Compiling cpufeatures v0.2.17
+   Compiling tinystr v0.8.2
+   Compiling writeable v0.6.2
+   Compiling litemap v0.8.1
+   Compiling icu_locale_core v2.1.1
+   Compiling zerotrie v0.2.3
+   Compiling potential_utf v0.1.4
+   Compiling zeroize_derive v1.5.0
+   Compiling getrandom v0.2.17
+   Compiling smallvec v1.15.1
+   Compiling icu_properties_data v2.1.2
+   Compiling icu_normalizer_data v2.1.1
+   Compiling zeroize v1.9.0
+   Compiling rand_core v0.6.4
+   Compiling icu_collections v2.1.1
+   Compiling icu_provider v2.1.1
+   Compiling sha2 v0.10.9
+   Compiling curve25519-dalek v4.1.3
+   Compiling zmij v1.0.21
+   Compiling icu_properties v2.1.2
+   Compiling icu_normalizer v2.1.1
+   Compiling hex v0.4.3
+   Compiling subtle v2.6.1
+   Compiling itoa v1.0.17
+   Compiling serde_json v1.0.149
+   Compiling idna_adapter v1.2.1
+   Compiling utf8_iter v1.0.4
+   Compiling memchr v2.8.0
+   Compiling percent-encoding v2.3.2
+   Compiling thiserror v1.0.69
+   Compiling signature v2.2.0
+   Compiling ed25519 v2.2.3
+   Compiling form_urlencoded v1.2.2
+   Compiling idna v1.1.0
+   Compiling thiserror-impl v1.0.69
+   Compiling chio-security-types v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-security-types)
+   Compiling url v2.5.8
+   Compiling ed25519-dalek v2.2.0
+   Compiling ryu v1.0.23
+   Compiling thiserror v2.0.18
+   Compiling thiserror-impl v2.0.18
+   Compiling heapless v0.7.17
+   Compiling byteorder v1.5.0
+   Compiling hash32 v0.2.1
+   Compiling cobs v0.3.0
+   Compiling base16ct v0.2.0
+   Compiling either v1.15.0
+   Compiling litrs v1.0.0
+   Compiling document-features v0.2.12
+   Compiling itertools v0.14.0
+   Compiling serdect v0.2.0
+   Compiling postcard v1.1.3
+   Compiling rs_merkle v1.5.0
+   Compiling derive-getters v0.5.0
+   Compiling visibility v0.1.1
+   Compiling const-crc32-nostd v1.3.1
+   Compiling base64 v0.22.1
+   Compiling frost-core v3.0.0
+   Compiling chio-core-types v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-core-types)
+   Compiling frost-rerandomized v3.0.0
+   Compiling unicode-segmentation v1.13.2
+   Compiling convert_case v0.10.0
+   Compiling frost-ed25519 v3.0.0
+   Compiling chio-metrics-spec v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/observability/chio-metrics-spec)
+   Compiling bs58 v0.5.1
+   Compiling rustversion v1.0.22
+   Compiling paste v1.0.15
+   Compiling unicode-xid v0.2.6
+   Compiling derive_more-impl v2.1.1
+   Compiling chio-listing v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-listing)
+   Compiling chio-fiscal v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-fiscal)
+   Compiling chio-revocation-oracle v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-revocation-oracle)
+   Compiling chio-finding v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-finding)
+   Compiling chio-governance v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-governance)
+   Compiling chio-pheromone v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-pheromone)
+   Compiling chio-open-market v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-open-market)
+   Compiling chio-appraisal v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-appraisal)
+   Compiling chio-underwriting v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-underwriting)
+   Compiling chio-federation v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-federation)
+   Compiling chio-fincred v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-fincred)
+   Compiling chio-did v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-did)
+   Compiling keccak v0.1.6
+   Compiling ruint-macro v1.2.1
+   Compiling once_cell v1.21.4
+   Compiling find-msvc-tools v0.1.9
+   Compiling shlex v1.3.0
+   Compiling cc v1.2.57
+   Compiling ruint v1.20.0
+   Compiling tracing-core v0.1.36
+   Compiling sha3 v0.10.8
+   Compiling chio-credit v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-credit)
+   Compiling derive_more v2.1.1
+   Compiling const-hex v1.18.1
+   Compiling log v0.4.29
+   Compiling rustc-hash v2.1.1
+   Compiling bytes v1.11.1
+   Compiling regex-syntax v0.8.10
+   Compiling regex-automata v0.4.14
+   Compiling alloy-primitives v1.5.7
+   Compiling generator v0.8.8
+   Compiling lazy_static v1.5.0
+   Compiling pin-project-lite v0.2.17
+   Compiling tracing v0.1.44
+   Compiling sharded-slab v0.1.7
+   Compiling chio-web3 v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-web3)
+   Compiling chio-market v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-market)
+   Compiling matchers v0.2.0
+   Compiling tracing-log v0.2.0
+   Compiling thread_local v1.1.9
+   Compiling nu-ansi-term v0.50.3
+   Compiling tracing-subscriber v0.3.23
+   Compiling chio-autonomy v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-autonomy)
+   Compiling scoped-tls v1.0.1
+   Compiling loom v0.7.2
+   Compiling chio-core v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-core)
+   Compiling chio-kernel v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-kernel)
+error[E0432]: unresolved import `crate::capability_lineage`
+  --> crates/kernel/chio-kernel/src/receipt_store.rs:12:12
+   |
+12 | use crate::capability_lineage::CapabilitySnapshot;
+   |            ^^^^^^^^^^^^^^^^^^ could not find `capability_lineage` in the crate root
+   |
+note: found an item that was configured out
+  --> crates/kernel/chio-kernel/src/lib.rs:46:9
+   |
+45 | #[cfg(not(loom))]
+   |          ------ the item is gated here
+46 | pub mod capability_lineage;
+   |         ^^^^^^^^^^^^^^^^^^
+
+error[E0432]: unresolved import `crate::checkpoint`
+  --> crates/kernel/chio-kernel/src/receipt_store.rs:13:12
+   |
+13 | use crate::checkpoint::KernelCheckpoint;
+   |            ^^^^^^^^^^
+   |            |
+   |            unresolved import
+   |            help: a similar path exists: `chio_core::receipt::checkpoint`
+   |
+note: found an item that was configured out
+  --> crates/kernel/chio-kernel/src/lib.rs:48:9
+   |
+47 | #[cfg(not(loom))]
+   |          ------ the item is gated here
+48 | pub mod checkpoint;
+   |         ^^^^^^^^^^
+
+error[E0432]: unresolved import `crate::admission_operation`
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1378:16
+     |
+1378 |     use crate::admission_operation::AdmissionOperationStoreError as Store;
+     |                ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0432]: unresolved import `crate::admission_operation`
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1394:16
+     |
+1394 |     use crate::admission_operation::AdmissionCaptureError as Capture;
+     |                ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `chio_security_types`
+ --> crates/kernel/chio-kernel/src/recovery/observation.rs:4:5
+  |
+4 | use chio_security_types::recovery::WorkflowId;
+  |     ^^^^^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_security_types`
+  |
+  = help: if you wanted to use a crate named `chio_security_types`, use `cargo add chio_security_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `crate::admission_operation`
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1395:16
+     |
+1395 |     use crate::admission_operation::AdmissionOperationStoreError as Store;
+     |                ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0432]: unresolved import `crate::admission_operation`
+  --> crates/kernel/chio-kernel/src/recovery/ports.rs:2:12
+   |
+ 2 | use crate::admission_operation::{AdmissionOperationStoreError, StoreMutationFence};
+   |            ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+   |
+note: found an item that was configured out
+  --> crates/kernel/chio-kernel/src/lib.rs:32:9
+   |
+31 | #[cfg(not(loom))]
+   |          ------ the item is gated here
+32 | pub mod admission_operation;
+   |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0432]: unresolved import `crate::runtime`
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:3:12
+    |
+  3 | use crate::runtime::RecoveryRequestCustody;
+    |            ^^^^^^^ could not find `runtime` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:124:9
+    |
+123 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+124 | pub mod runtime;
+    |         ^^^^^^^
+
+error[E0432]: unresolved import `crate::admission_operation`
+  --> crates/kernel/chio-kernel/src/recovery/records.rs:1:12
+   |
+ 1 | use crate::admission_operation::{AdmissionOperationBindingV1, NativeSecurityAuthorityBindingV1};
+   |            ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+   |
+note: found an item that was configured out
+  --> crates/kernel/chio-kernel/src/lib.rs:32:9
+   |
+31 | #[cfg(not(loom))]
+   |          ------ the item is gated here
+32 | pub mod admission_operation;
+   |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0432]: unresolved imports `crate::SecurityInvocationContext`, `crate::ToolCallRequest`
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:2:13
+    |
+  2 | use crate::{SecurityInvocationContext, ToolCallRequest};
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^ no `ToolCallRequest` in the root
+    |             |
+    |             no `SecurityInvocationContext` in the root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:674:38
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+674 |     SecurityDispatchOutcomeRecorder, SecurityInvocationContext, SecurityInvocationContextAuthority,
+    |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: consider importing this variant instead:
+            chio_core::AgentMessage::ToolCallRequest
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:591:60
+    |
+588 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+591 |     RecoveryRequestCustody, ToolCallChunk, ToolCallOutput, ToolCallRequest, ToolCallResponse,
+    |                                                            ^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `chio_core_types`
+ --> crates/kernel/chio-kernel/src/recovery/semantic.rs:3:5
+  |
+3 | use chio_core_types::recovery::semantic_content_digest;
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_core_types`
+  |
+  = help: if you wanted to use a crate named `chio_core_types`, use `cargo add chio_core_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `chio_security_types`
+ --> crates/kernel/chio-kernel/src/recovery/semantic.rs:4:5
+  |
+4 | use chio_security_types::recovery::CanonicalPayloadDigest;
+  |     ^^^^^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_security_types`
+  |
+  = help: if you wanted to use a crate named `chio_security_types`, use `cargo add chio_security_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved imports `crate::KernelError`, `crate::ToolCallRequest`
+   --> crates/kernel/chio-kernel/src/recovery/semantic.rs:2:13
+    |
+  2 | use crate::{KernelError, ToolCallRequest};
+    |             ^^^^^^^^^^^  ^^^^^^^^^^^^^^^ no `ToolCallRequest` in the root
+    |             |
+    |             no `KernelError` in the root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:665:72
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+665 |     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    |                                                                        ^^^^^^^^^^^
+    = help: consider importing this variant instead:
+            chio_core::AgentMessage::ToolCallRequest
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:591:60
+    |
+588 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+591 |     RecoveryRequestCustody, ToolCallChunk, ToolCallOutput, ToolCallRequest, ToolCallResponse,
+    |                                                            ^^^^^^^^^^^^^^^
+
+error[E0432]: unresolved import `kernel`
+   --> crates/kernel/chio-kernel/src/lib.rs:689:9
+    |
+689 | pub use kernel::DurableFinalizationCutpoint;
+    |         ^^^^^^ use of unresolved module or unlinked crate `kernel`
+    |
+help: to make use of source file crates/kernel/chio-kernel/src/kernel/mod.rs, use `mod kernel` in this file to declare the module
+    |
+ 31 + mod kernel;
+    |
+
+error[E0432]: unresolved import `kernel`
+   --> crates/kernel/chio-kernel/src/lib.rs:692:9
+    |
+692 | pub use kernel::NativeSecurityDispatchCaptureAuthority;
+    |         ^^^^^^ use of unresolved module or unlinked crate `kernel`
+    |
+help: to make use of source file crates/kernel/chio-kernel/src/kernel/mod.rs, use `mod kernel` in this file to declare the module
+    |
+ 31 + mod kernel;
+    |
+
+error[E0432]: unresolved import `kernel`
+   --> crates/kernel/chio-kernel/src/lib.rs:697:9
+    |
+697 | pub use kernel::VerifiedNativeDispatchCredentials;
+    |         ^^^^^^ use of unresolved module or unlinked crate `kernel`
+    |
+help: to make use of source file crates/kernel/chio-kernel/src/kernel/mod.rs, use `mod kernel` in this file to declare the module
+    |
+ 31 + mod kernel;
+    |
+
+error[E0432]: unresolved import `kernel`
+   --> crates/kernel/chio-kernel/src/lib.rs:700:9
+    |
+700 | pub use kernel::{CallerExecutionReport, CallerStartCredentials, CallerStartResponse};
+    |         ^^^^^^ use of unresolved module or unlinked crate `kernel`
+    |
+help: to make use of source file crates/kernel/chio-kernel/src/kernel/mod.rs, use `mod kernel` in this file to declare the module
+    |
+ 31 + mod kernel;
+    |
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `chio_security_types`
+  --> crates/kernel/chio-kernel/src/receipt_store.rs:10:5
+   |
+10 | use chio_security_types::ports::OpaqueReceiptRef;
+   |     ^^^^^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_security_types`
+   |
+   = help: if you wanted to use a crate named `chio_security_types`, use `cargo add chio_security_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `chio_security_types`
+ --> crates/kernel/chio-kernel/src/recovery/ports.rs:6:5
+  |
+6 | use chio_security_types::recovery::*;
+  |     ^^^^^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_security_types`
+  |
+  = help: if you wanted to use a crate named `chio_security_types`, use `cargo add chio_security_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `chio_security_types`
+ --> crates/kernel/chio-kernel/src/recovery/records.rs:9:5
+  |
+9 | use chio_security_types::recovery::*;
+  |     ^^^^^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_security_types`
+  |
+  = help: if you wanted to use a crate named `chio_security_types`, use `cargo add chio_security_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `chio_core_types`
+ --> crates/kernel/chio-kernel/src/recovery/ports.rs:4:5
+  |
+4 | use chio_core_types::capability::token::CapabilityToken;
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_core_types`
+  |
+  = help: if you wanted to use a crate named `chio_core_types`, use `cargo add chio_core_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `chio_security_types`
+ --> crates/kernel/chio-kernel/src/recovery/ports.rs:5:5
+  |
+5 | use chio_security_types::flow::PrincipalId;
+  |     ^^^^^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_security_types`
+  |
+  = help: if you wanted to use a crate named `chio_security_types`, use `cargo add chio_security_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `chio_core_types`
+ --> crates/kernel/chio-kernel/src/recovery/records.rs:3:5
+  |
+3 | use chio_core_types::recovery::{
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_core_types`
+  |
+  = help: if you wanted to use a crate named `chio_core_types`, use `cargo add chio_core_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `chio_log_redact`
+ --> crates/kernel/chio-kernel/src/receipt_store.rs:9:5
+  |
+9 | use chio_log_redact::redacted;
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_log_redact`
+  |
+  = help: if you wanted to use a crate named `chio_log_redact`, use `cargo add chio_log_redact` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `chio_security_types`
+ --> crates/kernel/chio-kernel/src/recovery/records.rs:7:5
+  |
+7 | use chio_security_types::flow::{InformationLabel, PrincipalId};
+  |     ^^^^^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_security_types`
+  |
+  = help: if you wanted to use a crate named `chio_security_types`, use `cargo add chio_security_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `chio_security_types`
+ --> crates/kernel/chio-kernel/src/recovery/records.rs:8:5
+  |
+8 | use chio_security_types::ports::{FlowStateKey, FlowStateSnapshot};
+  |     ^^^^^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_security_types`
+  |
+  = help: if you wanted to use a crate named `chio_security_types`, use `cargo add chio_security_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `chio_security_types`
+ --> crates/kernel/chio-kernel/src/knowledge.rs:3:5
+  |
+3 | use chio_security_types::{knowledge::*, recovery::*};
+  |     ^^^^^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_security_types`
+  |
+  = help: if you wanted to use a crate named `chio_security_types`, use `cargo add chio_security_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `chio_core_types`
+ --> crates/kernel/chio-kernel/src/recovery/records.rs:6:5
+  |
+6 | use chio_core_types::PublicKey;
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_core_types`
+  |
+  = help: if you wanted to use a crate named `chio_core_types`, use `cargo add chio_core_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `tracing`
+   --> crates/kernel/chio-kernel/src/receipt_store.rs:125:25
+    |
+125 |                         tracing::warn!(
+    |                         ^^^^^^^ use of unresolved module or unlinked crate `tracing`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `tracing`
+   --> crates/kernel/chio-kernel/src/receipt_store.rs:133:25
+    |
+133 |                         tracing::warn!(
+    |                         ^^^^^^^ use of unresolved module or unlinked crate `tracing`
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+   --> crates/kernel/chio-kernel/src/receipt_store.rs:453:17
+    |
+453 |     ) -> crate::admission_operation::AdmissionProjectionCapabilities {
+    |                 ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:32:9
+    |
+ 31 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+ 32 | pub mod admission_operation;
+    |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+   --> crates/kernel/chio-kernel/src/receipt_store.rs:454:16
+    |
+454 |         crate::admission_operation::AdmissionProjectionCapabilities::default()
+    |                ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:32:9
+    |
+ 31 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+ 32 | pub mod admission_operation;
+    |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+   --> crates/kernel/chio-kernel/src/receipt_store.rs:458:30
+    |
+458 |         _projection: &crate::admission_operation::AdmissionTerminalProjection,
+    |                              ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:32:9
+    |
+ 31 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+ 32 | pub mod admission_operation;
+    |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+   --> crates/kernel/chio-kernel/src/receipt_store.rs:459:24
+    |
+459 |     ) -> Result<crate::admission_operation::AdmissionTerminal, ReceiptStoreError> {
+    |                        ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:32:9
+    |
+ 31 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+ 32 | pub mod admission_operation;
+    |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `budget_store` in the crate root
+   --> crates/kernel/chio-kernel/src/receipt_store.rs:961:26
+    |
+961 |     pub decision: crate::budget_store::BudgetAuthorizeHoldDecision,
+    |                          ^^^^^^^^^^^^ could not find `budget_store` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:42:9
+    |
+ 41 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+ 42 | pub mod budget_store;
+    |         ^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+   --> crates/kernel/chio-kernel/src/receipt_store.rs:962:27
+    |
+962 |     pub operation: crate::admission_operation::AdmissionOperationV1,
+    |                           ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:32:9
+    |
+ 31 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+ 32 | pub mod admission_operation;
+    |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `budget_store` in the crate root
+   --> crates/kernel/chio-kernel/src/receipt_store.rs:967:26
+    |
+967 |     pub decision: crate::budget_store::BudgetInvocationCaptureDecision,
+    |                          ^^^^^^^^^^^^ could not find `budget_store` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:42:9
+    |
+ 41 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+ 42 | pub mod budget_store;
+    |         ^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+   --> crates/kernel/chio-kernel/src/receipt_store.rs:968:27
+    |
+968 |     pub operation: crate::admission_operation::AdmissionOperationV1,
+    |                           ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:32:9
+    |
+ 31 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+ 32 | pub mod admission_operation;
+    |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+   --> crates/kernel/chio-kernel/src/receipt_store.rs:974:25
+    |
+974 |     pub custody: crate::admission_operation::NativeSecurityEgressContext<'a>,
+    |                         ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:32:9
+    |
+ 31 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+ 32 | pub mod admission_operation;
+    |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `budget_store` in the crate root
+   --> crates/kernel/chio-kernel/src/receipt_store.rs:975:25
+    |
+975 |     pub request: crate::budget_store::BudgetCaptureInvocationRequest,
+    |                         ^^^^^^^^^^^^ could not find `budget_store` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:42:9
+    |
+ 41 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+ 42 | pub mod budget_store;
+    |         ^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+   --> crates/kernel/chio-kernel/src/receipt_store.rs:977:28
+    |
+977 |     pub ledger: &'a crate::admission_operation::NativeSecurityDispatchLedgerRecordV1,
+    |                            ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:32:9
+    |
+ 31 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+ 32 | pub mod admission_operation;
+    |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+   --> crates/kernel/chio-kernel/src/receipt_store.rs:985:31
+    |
+985 |     pub operation: &'a crate::admission_operation::AdmissionOperationV1,
+    |                               ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:32:9
+    |
+ 31 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+ 32 | pub mod admission_operation;
+    |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+   --> crates/kernel/chio-kernel/src/receipt_store.rs:986:36
+    |
+986 |     pub recovery_lease: &'a crate::admission_operation::AdmissionRecoveryLease,
+    |                                    ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:32:9
+    |
+ 31 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+ 32 | pub mod admission_operation;
+    |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `budget_store` in the crate root
+   --> crates/kernel/chio-kernel/src/receipt_store.rs:987:25
+    |
+987 |     pub request: crate::budget_store::BudgetCaptureInvocationRequest,
+    |                         ^^^^^^^^^^^^ could not find `budget_store` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:42:9
+    |
+ 41 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+ 42 | pub mod budget_store;
+    |         ^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+   --> crates/kernel/chio-kernel/src/receipt_store.rs:988:29
+    |
+988 |     pub context: &'a crate::admission_operation::AdmissionCallerDispatchContextV1,
+    |                             ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:32:9
+    |
+ 31 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+ 32 | pub mod admission_operation;
+    |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+   --> crates/kernel/chio-kernel/src/receipt_store.rs:989:34
+    |
+989 |     pub active_fence: &'a crate::admission_operation::StoreMutationFence,
+    |                                  ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:32:9
+    |
+ 31 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+ 32 | pub mod admission_operation;
+    |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+   --> crates/kernel/chio-kernel/src/receipt_store.rs:995:31
+    |
+995 |     pub operation: &'a crate::admission_operation::AdmissionOperationV1,
+    |                               ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:32:9
+    |
+ 31 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+ 32 | pub mod admission_operation;
+    |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+   --> crates/kernel/chio-kernel/src/receipt_store.rs:996:36
+    |
+996 |     pub recovery_lease: &'a crate::admission_operation::AdmissionRecoveryLease,
+    |                                    ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:32:9
+    |
+ 31 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+ 32 | pub mod admission_operation;
+    |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `payment` in the crate root
+   --> crates/kernel/chio-kernel/src/receipt_store.rs:997:30
+    |
+997 |     pub expected: &'a crate::payment::PaymentJournalRecord,
+    |                              ^^^^^^^ could not find `payment` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:99:9
+    |
+ 98 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+ 99 | pub mod payment;
+    |         ^^^^^^^
+
+error[E0433]: failed to resolve: could not find `payment` in the crate root
+   --> crates/kernel/chio-kernel/src/receipt_store.rs:998:32
+    |
+998 |     pub transition: &'a crate::payment::PaymentJournalTransition,
+    |                                ^^^^^^^ could not find `payment` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:99:9
+    |
+ 98 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+ 99 | pub mod payment;
+    |         ^^^^^^^
+
+error[E0433]: failed to resolve: could not find `tool_outcome` in the crate root
+   --> crates/kernel/chio-kernel/src/receipt_store.rs:999:45
+    |
+999 |     pub release_evidence: Option<&'a crate::tool_outcome::MonetaryReleaseEvidenceV1>,
+    |                                             ^^^^^^^^^^^^ could not find `tool_outcome` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:137:9
+    |
+136 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+137 | pub mod tool_outcome;
+    |         ^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1000:34
+     |
+1000 |     pub active_fence: &'a crate::admission_operation::StoreMutationFence,
+     |                                  ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1006:31
+     |
+1006 |     pub operation: &'a crate::admission_operation::AdmissionOperationV1,
+     |                               ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1007:36
+     |
+1007 |     pub recovery_lease: &'a crate::admission_operation::AdmissionRecoveryLease,
+     |                                    ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `payment` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1008:30
+     |
+1008 |     pub expected: &'a crate::payment::PaymentJournalRecord,
+     |                              ^^^^^^^ could not find `payment` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:99:9
+     |
+  98 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  99 | pub mod payment;
+     |         ^^^^^^^
+
+error[E0433]: failed to resolve: could not find `payment` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1009:39
+     |
+1009 |     pub transition: Option<&'a crate::payment::PaymentJournalTransition>,
+     |                                       ^^^^^^^ could not find `payment` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:99:9
+     |
+  98 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  99 | pub mod payment;
+     |         ^^^^^^^
+
+error[E0433]: failed to resolve: could not find `tool_outcome` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1010:45
+     |
+1010 |     pub release_evidence: Option<&'a crate::tool_outcome::MonetaryReleaseEvidenceV1>,
+     |                                             ^^^^^^^^^^^^ could not find `tool_outcome` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:137:9
+     |
+ 136 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+ 137 | pub mod tool_outcome;
+     |         ^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `budget_store` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1011:34
+     |
+1011 |     pub budget_reconcile: crate::budget_store::BudgetReconcileHoldRequest,
+     |                                  ^^^^^^^^^^^^ could not find `budget_store` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:42:9
+     |
+  41 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  42 | pub mod budget_store;
+     |         ^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1012:34
+     |
+1012 |     pub active_fence: &'a crate::admission_operation::StoreMutationFence,
+     |                                  ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `payment` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1018:25
+     |
+1018 |     pub journal: crate::payment::PaymentJournalRecord,
+     |                         ^^^^^^^ could not find `payment` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:99:9
+     |
+  98 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  99 | pub mod payment;
+     |         ^^^^^^^
+
+error[E0433]: failed to resolve: could not find `budget_store` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1019:24
+     |
+1019 |     pub budget: crate::budget_store::BudgetReconcileHoldDecision,
+     |                        ^^^^^^^^^^^^ could not find `budget_store` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:42:9
+     |
+  41 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  42 | pub mod budget_store;
+     |         ^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1034:30
+     |
+1034 |     Operation(#[from] crate::admission_operation::AdmissionOperationError),
+     |                              ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1066:30
+     |
+1066 |     ) -> Result<Self, crate::admission_operation::AdmissionOperationStoreError> {
+     |                              ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1074:24
+     |
+1074 |                 crate::admission_operation::AdmissionOperationStoreError::Invariant(format!(
+     |                        ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1081:20
+     |
+1081 |             crate::admission_operation::AdmissionOperationStoreError::Invariant(error.to_string())
+     |                    ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1084:24
+     |
+1084 |                 crate::admission_operation::AdmissionOperationStoreError::Invariant(
+     |                        ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1090:20
+     |
+1090 |             crate::admission_operation::AdmissionOperationStoreError::Invariant(error.to_string())
+     |                    ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1111:28
+     |
+1111 |                     crate::admission_operation::AdmissionOperationStoreError::Invariant(
+     |                            ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1118:24
+     |
+1118 |                 crate::admission_operation::AdmissionOperationStoreError::Invariant(
+     |                        ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1123:28
+     |
+1123 |                     crate::admission_operation::AdmissionOperationStoreError::Invariant(
+     |                            ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1129:24
+     |
+1129 |                 crate::admission_operation::AdmissionOperationStoreError::Invariant(
+     |                        ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1145:24
+     |
+1145 |                 crate::admission_operation::AdmissionOperationStoreError::Invariant(
+     |                        ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1156:20
+     |
+1156 |             crate::admission_operation::AdmissionOperationStoreError::Invariant(error.to_string())
+     |                    ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1160:24
+     |
+1160 |                 crate::admission_operation::AdmissionOperationStoreError::Invariant(
+     |                        ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1194:27
+     |
+1194 |     ReceiptStore + crate::admission_operation::QualifiedAdmissionOperationStore
+     |                           ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1199:31
+     |
+1199 |         active_fence: &crate::admission_operation::StoreMutationFence,
+     |                               ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `payment` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1200:31
+     |
+1200 |     ) -> Result<Option<crate::payment::PaymentJournalRecord>, AdmissionPaymentJournalError>;
+     |                               ^^^^^^^ could not find `payment` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:99:9
+     |
+  98 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  99 | pub mod payment;
+     |         ^^^^^^^
+
+error[E0433]: failed to resolve: could not find `payment` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1205:24
+     |
+1205 |     ) -> Result<crate::payment::PaymentJournalRecord, AdmissionPaymentJournalError>;
+     |                        ^^^^^^^ could not find `payment` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:99:9
+     |
+  98 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  99 | pub mod payment;
+     |         ^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1215:28
+     |
+1215 |         operation: &crate::admission_operation::AdmissionOperationV1,
+     |                            ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1216:33
+     |
+1216 |         recovery_lease: &crate::admission_operation::AdmissionRecoveryLease,
+     |                                 ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `budget_store` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1217:25
+     |
+1217 |         request: crate::budget_store::BudgetAuthorizeHoldRequest,
+     |                         ^^^^^^^^^^^^ could not find `budget_store` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:42:9
+     |
+  41 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  42 | pub mod budget_store;
+     |         ^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `payment` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1218:40
+     |
+1218 |         payment_journal: Option<crate::payment::PaymentJournalRecord>,
+     |                                        ^^^^^^^ could not find `payment` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:99:9
+     |
+  98 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  99 | pub mod payment;
+     |         ^^^^^^^
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `chio_credit`
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1219:33
+     |
+1219 |         credit_exposure: Option<chio_credit::obligation::CreditExposureReservationRequest>,
+     |                                 ^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_credit`
+     |
+     = help: if you wanted to use a crate named `chio_credit`, use `cargo add chio_credit` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1220:31
+     |
+1220 |         active_fence: &crate::admission_operation::StoreMutationFence,
+     |                               ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1226:28
+     |
+1226 |         operation: &crate::admission_operation::AdmissionOperationV1,
+     |                            ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1227:33
+     |
+1227 |         recovery_lease: &crate::admission_operation::AdmissionRecoveryLease,
+     |                                 ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `budget_store` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1228:25
+     |
+1228 |         request: crate::budget_store::BudgetCaptureInvocationRequest,
+     |                         ^^^^^^^^^^^^ could not find `budget_store` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:42:9
+     |
+  41 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  42 | pub mod budget_store;
+     |         ^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1229:31
+     |
+1229 |         active_fence: &crate::admission_operation::StoreMutationFence,
+     |                               ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1231:48
+     |
+1231 |     ) -> Result<AdmissionBudgetCapture, crate::admission_operation::AdmissionCaptureError>;
+     |                                                ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1236:48
+     |
+1236 |     ) -> Result<AdmissionBudgetCapture, crate::admission_operation::AdmissionCaptureError> {
+     |                                                ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1238:20
+     |
+1238 |             crate::admission_operation::AdmissionCaptureError::Unavailable(
+     |                    ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1247:48
+     |
+1247 |     ) -> Result<AdmissionBudgetCapture, crate::admission_operation::AdmissionCaptureError> {
+     |                                                ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1249:20
+     |
+1249 |             crate::admission_operation::AdmissionCaptureError::Unavailable(
+     |                    ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1260:27
+     |
+1260 |         _context: &crate::admission_operation::AdmissionCallerDispatchContextV1,
+     |                           ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1261:48
+     |
+1261 |     ) -> Result<AdmissionBudgetCapture, crate::admission_operation::AdmissionCaptureError> {
+     |                                                ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1263:20
+     |
+1263 |             crate::admission_operation::AdmissionCaptureError::Unavailable(
+     |                    ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1275:32
+     |
+1275 |         _operation_id: &crate::admission_operation::AdmissionOperationId,
+     |                                ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1276:32
+     |
+1276 |         _active_fence: &crate::admission_operation::StoreMutationFence,
+     |                                ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1280:16
+     |
+1280 |         crate::admission_operation::AdmissionOperationStoreError,
+     |                ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1283:20
+     |
+1283 |             crate::admission_operation::AdmissionOperationStoreError::Unavailable(
+     |                    ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1297:23
+     |
+1297 |         claim: crate::admission_operation::RecoveryClaimRequest<'_>,
+     |                       ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1298:28
+     |
+1298 |         lease: &mut crate::admission_operation::ClaimedLease<'_>,
+     |                            ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1299:28
+     |
+1299 |         operation: &crate::admission_operation::AdmissionOperationV1,
+     |                            ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `budget_store` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1300:25
+     |
+1300 |         request: crate::budget_store::BudgetAuthorizeHoldRequest,
+     |                         ^^^^^^^^^^^^ could not find `budget_store` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:42:9
+     |
+  41 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  42 | pub mod budget_store;
+     |         ^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `payment` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1301:40
+     |
+1301 |         payment_journal: Option<crate::payment::PaymentJournalRecord>,
+     |                                        ^^^^^^^ could not find `payment` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:99:9
+     |
+  98 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  99 | pub mod payment;
+     |         ^^^^^^^
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `chio_credit`
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1302:33
+     |
+1302 |         credit_exposure: Option<chio_credit::obligation::CreditExposureReservationRequest>,
+     |                                 ^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_credit`
+     |
+     = help: if you wanted to use a crate named `chio_credit`, use `cargo add chio_credit` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1303:31
+     |
+1303 |         active_fence: &crate::admission_operation::StoreMutationFence,
+     |                               ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1306:28
+     |
+1306 |         let lease = crate::admission_operation::claim_qualified_lease(
+     |                            ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1329:23
+     |
+1329 |         claim: crate::admission_operation::RecoveryClaimRequest<'_>,
+     |                       ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1330:28
+     |
+1330 |         lease: &mut crate::admission_operation::ClaimedLease<'_>,
+     |                            ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1331:28
+     |
+1331 |         operation: &crate::admission_operation::AdmissionOperationV1,
+     |                            ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `budget_store` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1332:25
+     |
+1332 |         request: crate::budget_store::BudgetCaptureInvocationRequest,
+     |                         ^^^^^^^^^^^^ could not find `budget_store` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:42:9
+     |
+  41 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  42 | pub mod budget_store;
+     |         ^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1333:31
+     |
+1333 |         active_fence: &crate::admission_operation::StoreMutationFence,
+     |                               ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1335:48
+     |
+1335 |     ) -> Result<AdmissionBudgetCapture, crate::admission_operation::AdmissionCaptureError> {
+     |                                                ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1336:28
+     |
+1336 |         let lease = crate::admission_operation::claim_qualified_lease(
+     |                            ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1354:27
+     |
+1354 |         _command: &crate::admission_operation::AdmissionOperationCommand,
+     |                           ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1358:16
+     |
+1358 |         crate::admission_operation::AdmissionCommandResult,
+     |                ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1359:16
+     |
+1359 |         crate::admission_operation::AdmissionOperationStoreError,
+     |                ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1362:20
+     |
+1362 |             crate::admission_operation::AdmissionOperationStoreError::Unavailable(
+     |                    ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1376:19
+     |
+1376 |     error: crate::admission_operation::AdmissionOperationStoreError,
+     |                   ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1392:19
+     |
+1392 |     error: crate::admission_operation::AdmissionOperationStoreError,
+     |                   ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1393:13
+     |
+1393 | ) -> crate::admission_operation::AdmissionCaptureError {
+     |             ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1410:33
+     |
+1410 |         recovery_lease: &crate::admission_operation::AdmissionRecoveryLease,
+     |                                 ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1411:27
+     |
+1411 |         envelope: &crate::admission_operation::SignedAdmissionTerminalProjectionV1,
+     |                           ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1412:31
+     |
+1412 |         active_fence: &crate::admission_operation::StoreMutationFence,
+     |                               ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1419:31
+     |
+1419 |         active_fence: &crate::admission_operation::StoreMutationFence,
+     |                               ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1428:31
+     |
+1428 |         active_fence: &crate::admission_operation::StoreMutationFence,
+     |                               ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1435:31
+     |
+1435 |         active_fence: &crate::admission_operation::StoreMutationFence,
+     |                               ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+    --> crates/kernel/chio-kernel/src/receipt_store.rs:1437:24
+     |
+1437 |     ) -> Result<crate::admission_operation::AdmissionTerminal, ReceiptStoreError>;
+     |                        ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+     |
+note: found an item that was configured out
+    --> crates/kernel/chio-kernel/src/lib.rs:32:9
+     |
+  31 | #[cfg(not(loom))]
+     |          ------ the item is gated here
+  32 | pub mod admission_operation;
+     |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `KernelError` in the crate root
+   --> crates/kernel/chio-kernel/src/recovery/observation.rs:14:31
+    |
+ 14 |             return Err(crate::KernelError::DurableAdmission(
+    |                               ^^^^^^^^^^^ could not find `KernelError` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:665:72
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+665 |     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    |                                                                        ^^^^^^^^^^^
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `chio_core_types`
+  --> crates/kernel/chio-kernel/src/recovery/ports.rs:65:20
+   |
+65 |         finality: &chio_core_types::recovery::SignedRecoveryProviderFinalityV1,
+   |                    ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_core_types`
+   |
+   = help: if you wanted to use a crate named `chio_core_types`, use `cargo add chio_core_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:120:30
+    |
+120 |         observation: &crate::admission_operation::NativeSecurityFlowObservationV1,
+    |                              ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:32:9
+    |
+ 31 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+ 32 | pub mod admission_operation;
+    |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `chio_core_types`
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:128:16
+    |
+128 |         body: &chio_core_types::recovery::RecoveryGrantBodyV2,
+    |                ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_core_types`
+    |
+    = help: if you wanted to use a crate named `chio_core_types`, use `cargo add chio_core_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `chio_core_types`
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:131:17
+    |
+131 |     ) -> Result<chio_core_types::recovery::RecoveryGrantBodyV2, AdmissionOperationStoreError>;
+    |                 ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_core_types`
+    |
+    = help: if you wanted to use a crate named `chio_core_types`, use `cargo add chio_core_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `chio_core_types`
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:136:17
+    |
+136 |         grant: &chio_core_types::recovery::SignedRecoveryGrantV2,
+    |                 ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_core_types`
+    |
+    = help: if you wanted to use a crate named `chio_core_types`, use `cargo add chio_core_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:151:28
+    |
+151 |         operation: &crate::admission_operation::AdmissionOperationId,
+    |                            ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:32:9
+    |
+ 31 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+ 32 | pub mod admission_operation;
+    |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:160:28
+    |
+160 |         operation: &crate::admission_operation::AdmissionOperationId,
+    |                            ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:32:9
+    |
+ 31 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+ 32 | pub mod admission_operation;
+    |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `KernelError` in the crate root
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:184:31
+    |
+184 |             return Err(crate::KernelError::DurableAdmission(
+    |                               ^^^^^^^^^^^ could not find `KernelError` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:665:72
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+665 |     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    |                                                                        ^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `kernel` in the crate root
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:199:26
+    |
+199 |         let now = crate::kernel::current_unix_timestamp_ms();
+    |                          ^^^^^^ could not find `kernel` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:633:5
+    |
+630 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+633 | mod kernel;
+    |     ^^^^^^
+
+error[E0433]: failed to resolve: could not find `KernelError` in the crate root
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:202:24
+    |
+202 |                 crate::KernelError::DurableAdmission("recovery authority refused".into())
+    |                        ^^^^^^^^^^^ could not find `KernelError` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:665:72
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+665 |     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    |                                                                        ^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `KernelError` in the crate root
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:214:31
+    |
+214 |             return Err(crate::KernelError::DurableAdmission(
+    |                               ^^^^^^^^^^^ could not find `KernelError` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:665:72
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+665 |     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    |                                                                        ^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `KernelError` in the crate root
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:219:31
+    |
+219 |             return Err(crate::KernelError::DurableAdmission(
+    |                               ^^^^^^^^^^^ could not find `KernelError` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:665:72
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+665 |     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    |                                                                        ^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `KernelError` in the crate root
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:233:24
+    |
+233 |                 crate::KernelError::DurableAdmission("recovery audience refused".into())
+    |                        ^^^^^^^^^^^ could not find `KernelError` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:665:72
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+665 |     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    |                                                                        ^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `KernelError` in the crate root
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:258:31
+    |
+258 |             return Err(crate::KernelError::DurableAdmission(
+    |                               ^^^^^^^^^^^ could not find `KernelError` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:665:72
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+665 |     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    |                                                                        ^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `KernelError` in the crate root
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:280:20
+    |
+280 |             crate::KernelError::DurableAdmission("recovery custody is absent".into())
+    |                    ^^^^^^^^^^^ could not find `KernelError` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:665:72
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+665 |     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    |                                                                        ^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `KernelError` in the crate root
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:284:24
+    |
+284 |                 crate::KernelError::DurableAdmission("recovery custody is invalid".into())
+    |                        ^^^^^^^^^^^ could not find `KernelError` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:665:72
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+665 |     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    |                                                                        ^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+  --> crates/kernel/chio-kernel/src/recovery/records.rs:25:26
+   |
+25 |     Store(#[from] crate::admission_operation::AdmissionOperationStoreError),
+   |                          ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+   |
+note: found an item that was configured out
+  --> crates/kernel/chio-kernel/src/lib.rs:32:9
+   |
+31 | #[cfg(not(loom))]
+   |          ------ the item is gated here
+32 | pub mod admission_operation;
+   |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `chio_security_types`
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:112:20
+    |
+112 |     pub recipient: chio_security_types::ports::DestinationId,
+    |                    ^^^^^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_security_types`
+    |
+    = help: if you wanted to use a crate named `chio_security_types`, use `cargo add chio_security_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `chio_security_types`
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:113:18
+    |
+113 |     pub purpose: chio_security_types::flow::DeclassificationPurpose,
+    |                  ^^^^^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_security_types`
+    |
+    = help: if you wanted to use a crate named `chio_security_types`, use `cargo add chio_security_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `chio_security_types`
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:126:23
+    |
+126 | pub type RecordName = chio_security_types::ports::RecordId;
+    |                       ^^^^^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_security_types`
+    |
+    = help: if you wanted to use a crate named `chio_security_types`, use `cargo add chio_security_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:164:32
+    |
+164 |     pub native_binding: crate::admission_operation::PersistedAdmissionOperationBindingV1,
+    |                                ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:32:9
+    |
+ 31 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+ 32 | pub mod admission_operation;
+    |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `chio_core_types`
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:200:35
+    |
+200 |     pub provider_finality: Option<chio_core_types::recovery::SignedRecoveryProviderFinalityV1>,
+    |                                   ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_core_types`
+    |
+    = help: if you wanted to use a crate named `chio_core_types`, use `cargo add chio_core_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: could not find `KernelError` in the crate root
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:262:29
+    |
+262 |         .map_err(|_| crate::KernelError::DurableAdmission("recovery preview refused".into()))?;
+    |                             ^^^^^^^^^^^ could not find `KernelError` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:665:72
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+665 |     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    |                                                                        ^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `KernelError` in the crate root
+   --> crates/kernel/chio-kernel/src/recovery.rs:17:29
+    |
+ 17 |         .map_err(|_| crate::KernelError::DurableAdmission("recovery encoding refused".into()))?;
+    |                             ^^^^^^^^^^^ could not find `KernelError` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:665:72
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+665 |     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    |                                                                        ^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+  --> crates/kernel/chio-kernel/src/knowledge.rs:10:49
+   |
+10 |     pub(crate) store: std::sync::Arc<dyn crate::admission_operation::AdmissionOperationStore>,
+   |                                                 ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+   |
+note: found an item that was configured out
+  --> crates/kernel/chio-kernel/src/lib.rs:32:9
+   |
+31 | #[cfg(not(loom))]
+   |          ------ the item is gated here
+32 | pub mod admission_operation;
+   |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `admission_operation` in the crate root
+  --> crates/kernel/chio-kernel/src/knowledge.rs:11:30
+   |
+11 |     pub(crate) fence: crate::admission_operation::StoreMutationFence,
+   |                              ^^^^^^^^^^^^^^^^^^^ could not find `admission_operation` in the crate root
+   |
+note: found an item that was configured out
+  --> crates/kernel/chio-kernel/src/lib.rs:32:9
+   |
+31 | #[cfg(not(loom))]
+   |          ------ the item is gated here
+32 | pub mod admission_operation;
+   |         ^^^^^^^^^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `kernel` in the crate root
+   --> crates/kernel/chio-kernel/src/knowledge.rs:24:24
+    |
+ 24 |                 crate::kernel::current_unix_timestamp_ms(),
+    |                        ^^^^^^ could not find `kernel` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:633:5
+    |
+630 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+633 | mod kernel;
+    |     ^^^^^^
+
+error[E0433]: failed to resolve: could not find `KernelError` in the crate root
+   --> crates/kernel/chio-kernel/src/knowledge.rs:27:24
+    |
+ 27 |                 crate::KernelError::DurableAdmission("confined context unavailable".into())
+    |                        ^^^^^^^^^^^ could not find `KernelError` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:665:72
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+665 |     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    |                                                                        ^^^^^^^^^^^
+
+error[E0433]: failed to resolve: could not find `kernel` in the crate root
+   --> crates/kernel/chio-kernel/src/knowledge.rs:35:24
+    |
+ 35 |                 crate::kernel::current_unix_timestamp_ms(),
+    |                        ^^^^^^ could not find `kernel` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:633:5
+    |
+630 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+633 | mod kernel;
+    |     ^^^^^^
+
+error[E0433]: failed to resolve: could not find `KernelError` in the crate root
+   --> crates/kernel/chio-kernel/src/knowledge.rs:38:24
+    |
+ 38 |                 crate::KernelError::DurableAdmission("durable knowledge unavailable".into())
+    |                        ^^^^^^^^^^^ could not find `KernelError` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:665:72
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+665 |     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    |                                                                        ^^^^^^^^^^^
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `chio_security_types`
+  --> crates/kernel/chio-kernel/src/knowledge.rs:68:21
+   |
+68 |         _boundary: &chio_security_types::confinement::IsolationBoundaryV1,
+   |                     ^^^^^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_security_types`
+   |
+   = help: if you wanted to use a crate named `chio_security_types`, use `cargo add chio_security_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: could not find `KernelError` in the crate root
+   --> crates/kernel/chio-kernel/src/knowledge.rs:70:20
+    |
+ 70 |         Err(crate::KernelError::DurableAdmission(
+    |                    ^^^^^^^^^^^ could not find `KernelError` in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:665:72
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+665 |     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    |                                                                        ^^^^^^^^^^^
+
+error[E0425]: cannot find type `ChioKernel` in the crate root
+   --> crates/kernel/chio-kernel/src/recovery/observation.rs:6:13
+    |
+  6 | impl crate::ChioKernel {
+    |             ^^^^^^^^^^ not found in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:661:22
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+661 |     ChildReceiptLog, ChioKernel, DispatchCommittedActiveResponseResume,
+    |                      ^^^^^^^^^^
+
+error[E0425]: cannot find type `KernelError` in the crate root
+   --> crates/kernel/chio-kernel/src/recovery/observation.rs:11:30
+    |
+ 11 |     ) -> Result<bool, crate::KernelError> {
+    |                              ^^^^^^^^^^^ not found in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:665:72
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+665 |     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    |                                                                        ^^^^^^^^^^^
+
+error[E0425]: cannot find type `RecoveryScopeV1` in this scope
+  --> crates/kernel/chio-kernel/src/recovery/ports.rs:16:23
+   |
+16 |     pub(crate) scope: RecoveryScopeV1,
+   |                       ^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `RecoveryScopeV1` in this scope
+  --> crates/kernel/chio-kernel/src/recovery/ports.rs:22:29
+   |
+22 |     pub fn scope(&self) -> &RecoveryScopeV1 {
+   |                             ^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `WorkflowId` in this scope
+  --> crates/kernel/chio-kernel/src/recovery/ports.rs:57:20
+   |
+57 |         workflow: &WorkflowId,
+   |                    ^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `WorkflowId` in this scope
+  --> crates/kernel/chio-kernel/src/recovery/ports.rs:64:20
+   |
+64 |         workflow: &WorkflowId,
+   |                    ^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `WorkflowId` in this scope
+  --> crates/kernel/chio-kernel/src/recovery/ports.rs:73:20
+   |
+73 |         workflow: &WorkflowId,
+   |                    ^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `WorkflowId` in this scope
+  --> crates/kernel/chio-kernel/src/recovery/ports.rs:81:20
+   |
+81 |         workflow: &WorkflowId,
+   |                    ^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `WorkflowId` in this scope
+  --> crates/kernel/chio-kernel/src/recovery/ports.rs:90:20
+   |
+90 |         workflow: &WorkflowId,
+   |                    ^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `ApprovalIntentV1` in this scope
+  --> crates/kernel/chio-kernel/src/recovery/ports.rs:91:18
+   |
+91 |         review: &ApprovalIntentV1,
+   |                  ^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `ApprovalIntentV1` in this scope
+  --> crates/kernel/chio-kernel/src/recovery/ports.rs:94:17
+   |
+94 |     ) -> Result<ApprovalIntentV1, AdmissionOperationStoreError>;
+   |                 ^^^^^^^^^^^^^^^^ not found in this scope
+   |
+help: you might be missing a type parameter
+   |
+53 | pub trait RecoveryAuthorityPort<ApprovalIntentV1>: Send + Sync {
+   |                                ++++++++++++++++++
+
+error[E0425]: cannot find type `RecoveryScopeV1` in this scope
+  --> crates/kernel/chio-kernel/src/recovery/ports.rs:97:17
+   |
+97 |         scope: &RecoveryScopeV1,
+   |                 ^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `RecoveryCommandV1` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:104:19
+    |
+104 |         command: &RecoveryCommandV1,
+    |                   ^^^^^^^^^^^^^^^^^
+    |
+   ::: crates/kernel/chio-kernel/src/recovery/records.rs:31:1
+    |
+ 31 | pub enum RecoveryCommandError {
+    | ----------------------------- similarly named enum `RecoveryCommandError` defined here
+    |
+help: an enum with a similar name exists
+    |
+104 -         command: &RecoveryCommandV1,
+104 +         command: &RecoveryCommandError,
+    |
+
+error[E0425]: cannot find type `WorkflowId` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:111:20
+    |
+111 |         workflow: &WorkflowId,
+    |                    ^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `WorkflowId` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:118:20
+    |
+118 |         workflow: &WorkflowId,
+    |                    ^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `ActionIntentV1` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:119:18
+    |
+119 |         action: &ActionIntentV1,
+    |                  ^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `WorkflowId` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:127:20
+    |
+127 |         workflow: &WorkflowId,
+    |                    ^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `WorkflowId` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:135:20
+    |
+135 |         workflow: &WorkflowId,
+    |                    ^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `WorkflowId` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:143:20
+    |
+143 |         workflow: &WorkflowId,
+    |                    ^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `WorkflowId` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:167:20
+    |
+167 |         workflow: &WorkflowId,
+    |                    ^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `ChioKernel` in the crate root
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:173:13
+    |
+173 | impl crate::ChioKernel {
+    |             ^^^^^^^^^^ not found in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:661:22
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+661 |     ChildReceiptLog, ChioKernel, DispatchCommittedActiveResponseResume,
+    |                      ^^^^^^^^^^
+
+error[E0425]: cannot find type `KernelError` in the crate root
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:177:28
+    |
+177 |     ) -> Result<(), crate::KernelError> {
+    |                            ^^^^^^^^^^^ not found in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:665:72
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+665 |     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    |                                                                        ^^^^^^^^^^^
+
+error[E0425]: cannot find type `RecoveryScopeV1` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:195:17
+    |
+195 |         scope: &RecoveryScopeV1,
+    |                 ^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `KernelError` in the crate root
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:198:52
+    |
+198 |     ) -> Result<AuthenticatedRecoveryActor, crate::KernelError> {
+    |                                                    ^^^^^^^^^^^ not found in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:665:72
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+665 |     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    |                                                                        ^^^^^^^^^^^
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `chio_core_types`
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:255:36
+    |
+255 |                         .contains(&chio_core_types::capability::scope::Operation::Invoke)
+    |                                    ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_core_types`
+    |
+    = help: if you wanted to use a crate named `chio_core_types`, use `cargo add chio_core_types` to add it to your `Cargo.toml`
+help: consider importing this enum
+    |
+  1 + use chio_core::capability::scope::Operation;
+    |
+help: if you import `Operation`, refer to it directly
+    |
+255 -                         .contains(&chio_core_types::capability::scope::Operation::Invoke)
+255 +                         .contains(&Operation::Invoke)
+    |
+
+error[E0425]: cannot find type `WorkflowId` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:275:20
+    |
+275 |         workflow: &WorkflowId,
+    |                    ^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `KernelError` in the crate root
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:276:48
+    |
+276 |     ) -> Result<RecoveryRequestCustody, crate::KernelError> {
+    |                                                ^^^^^^^^^^^ not found in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:665:72
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+665 |     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    |                                                                        ^^^^^^^^^^^
+
+error[E0425]: cannot find type `ToolCallRequest` in the crate root
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:282:29
+    |
+282 |         let request: crate::ToolCallRequest = serde_json::from_str(envelope.request.as_str())
+    |                             ^^^^^^^^^^^^^^^ not found in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:591:60
+    |
+588 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+591 |     RecoveryRequestCustody, ToolCallChunk, ToolCallOutput, ToolCallRequest, ToolCallResponse,
+    |                                                            ^^^^^^^^^^^^^^^
+help: there is an enum variant `chio_core::AgentMessage::ToolCallRequest`; try using the variant's enum
+    |
+282 -         let request: crate::ToolCallRequest = serde_json::from_str(envelope.request.as_str())
+282 +         let request: chio_core::AgentMessage = serde_json::from_str(envelope.request.as_str())
+    |
+
+error[E0425]: cannot find type `BoundedList` in this scope
+  --> crates/kernel/chio-kernel/src/recovery/records.rs:46:22
+   |
+46 |     pub permissions: BoundedList<RecoveryPermission, 16>,
+   |                      ^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `IssuerId` in this scope
+  --> crates/kernel/chio-kernel/src/recovery/records.rs:96:20
+   |
+96 |     pub issuer_id: IssuerId,
+   |                    ^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `NonEmptyBoundedList` in this scope
+  --> crates/kernel/chio-kernel/src/recovery/records.rs:99:22
+   |
+99 |     pub obligations: NonEmptyBoundedList<AuthorityObligationV1, MAX_RECOVERY_OBLIGATIONS>,
+   |                      ^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `AuthorityObligationV1` in this scope
+  --> crates/kernel/chio-kernel/src/recovery/records.rs:99:42
+   |
+99 |     pub obligations: NonEmptyBoundedList<AuthorityObligationV1, MAX_RECOVERY_OBLIGATIONS>,
+   |                                          ^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+   |
+help: you might be missing a type parameter
+   |
+95 | pub struct RecoveryCoverageAssignment<AuthorityObligationV1> {
+   |                                      +++++++++++++++++++++++
+
+error[E0425]: cannot find type `MAX_RECOVERY_OBLIGATIONS` in this scope
+  --> crates/kernel/chio-kernel/src/recovery/records.rs:99:65
+   |
+99 |     pub obligations: NonEmptyBoundedList<AuthorityObligationV1, MAX_RECOVERY_OBLIGATIONS>,
+   |                                                                 ^^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+   |
+help: you might be missing a type parameter
+   |
+95 | pub struct RecoveryCoverageAssignment<MAX_RECOVERY_OBLIGATIONS> {
+   |                                      ++++++++++++++++++++++++++
+
+error[E0425]: cannot find type `AuthorityObligationV1` in this scope
+  --> crates/kernel/chio-kernel/src/recovery/records.rs:99:42
+   |
+99 |     pub obligations: NonEmptyBoundedList<AuthorityObligationV1, MAX_RECOVERY_OBLIGATIONS>,
+   |                                          ^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `MAX_RECOVERY_OBLIGATIONS` in this scope
+  --> crates/kernel/chio-kernel/src/recovery/records.rs:99:65
+   |
+99 |     pub obligations: NonEmptyBoundedList<AuthorityObligationV1, MAX_RECOVERY_OBLIGATIONS>,
+   |                                                                 ^^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `RecoveryScopeV1` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:107:16
+    |
+107 |     pub scope: RecoveryScopeV1,
+    |                ^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `PolicyDigest` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:115:24
+    |
+115 |     pub policy_digest: PolicyDigest,
+    |                        ^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `DeploymentDigest` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:116:26
+    |
+116 |     pub contract_digest: DeploymentDigest,
+    |                          ^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `AuthorityScopeDigest` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:117:26
+    |
+117 |     pub authority_scope: AuthorityScopeDigest,
+    |                          ^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `RecoveryAttachmentProfile` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:118:29
+    |
+118 |     pub attachment_profile: RecoveryAttachmentProfile,
+    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `NonEmptyBoundedList` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:121:17
+    |
+121 |     pub actors: NonEmptyBoundedList<RecoveryActorAssignment, 64>,
+    |                 ^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `NonEmptyBoundedList` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:122:19
+    |
+122 |     pub coverage: NonEmptyBoundedList<RecoveryCoverageAssignment, MAX_RECOVERY_OBLIGATIONS>,
+    |                   ^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `MAX_RECOVERY_OBLIGATIONS` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:122:67
+    |
+122 |     pub coverage: NonEmptyBoundedList<RecoveryCoverageAssignment, MAX_RECOVERY_OBLIGATIONS>,
+    |                                                                   ^^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+    |
+help: you might be missing a type parameter
+    |
+106 | pub struct RecoveryDeploymentV1<MAX_RECOVERY_OBLIGATIONS> {
+    |                                ++++++++++++++++++++++++++
+
+error[E0425]: cannot find type `SafeInteger` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:123:29
+    |
+123 |     pub effect_cardinality: SafeInteger,
+    |                             ^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `MAX_RECOVERY_OBLIGATIONS` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:122:67
+    |
+122 |     pub coverage: NonEmptyBoundedList<RecoveryCoverageAssignment, MAX_RECOVERY_OBLIGATIONS>,
+    |                                                                   ^^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `ApprovalIntentV1` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:143:17
+    |
+143 |     pub intent: ApprovalIntentV1,
+    |                 ^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `NonEmptyBoundedList` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:145:9
+    |
+145 |         NonEmptyBoundedList<SignedAuthorityCoverageAttestationV1, MAX_RECOVERY_OBLIGATIONS>,
+    |         ^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `MAX_RECOVERY_OBLIGATIONS` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:145:67
+    |
+145 |         NonEmptyBoundedList<SignedAuthorityCoverageAttestationV1, MAX_RECOVERY_OBLIGATIONS>,
+    |                                                                   ^^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+    |
+help: you might be missing a type parameter
+    |
+142 | pub struct RecoveryApprovalSubmissionV1<MAX_RECOVERY_OBLIGATIONS> {
+    |                                        ++++++++++++++++++++++++++
+
+error[E0425]: cannot find type `MAX_RECOVERY_OBLIGATIONS` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:145:67
+    |
+145 |         NonEmptyBoundedList<SignedAuthorityCoverageAttestationV1, MAX_RECOVERY_OBLIGATIONS>,
+    |                                                                   ^^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `IntentDigest` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:153:24
+    |
+153 |     pub action_intent: IntentDigest,
+    |                        ^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `AuthorizationRequirementsDigest` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:154:37
+    |
+154 |     pub authorization_requirements: AuthorizationRequirementsDigest,
+    |                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `ProtectedText` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:155:18
+    |
+155 |     pub request: ProtectedText<65536>,
+    |                  ^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `ProcessRequestDigest` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:156:33
+    |
+156 |     pub process_request_digest: ProcessRequestDigest,
+    |                                 ^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `ProcessCallBindingDigest` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:157:33
+    |
+157 |     pub process_binding_digest: ProcessCallBindingDigest,
+    |                                 ^^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `AdmissionIntentRef` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:163:17
+    |
+163 |     pub intent: AdmissionIntentRef,
+    |                 ^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `OperationId` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:165:30
+    |
+165 |     pub native_operation_id: OperationId,
+    |                              ^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `ProcessRequestDigest` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:166:33
+    |
+166 |     pub process_request_digest: ProcessRequestDigest,
+    |                                 ^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `ProcessCallBindingDigest` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:167:33
+    |
+167 |     pub process_binding_digest: ProcessCallBindingDigest,
+    |                                 ^^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `RecoveryScopeV1` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:173:16
+    |
+173 |     pub scope: RecoveryScopeV1,
+    |                ^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `WorkflowId` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:174:22
+    |
+174 |     pub workflow_id: WorkflowId,
+    |                      ^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `StepId` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:175:18
+    |
+175 |     pub step_id: StepId,
+    |                  ^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `ContinuationId` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:176:26
+    |
+176 |     pub continuation_id: ContinuationId,
+    |                          ^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `SafeInteger` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:177:19
+    |
+177 |     pub revision: SafeInteger,
+    |                   ^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `WorkflowControlV1` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:178:18
+    |
+178 |     pub control: WorkflowControlV1,
+    |                  ^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `ProtectedText` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:180:24
+    |
+180 |     pub creation_seed: ProtectedText<32768>,
+    |                        ^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `DeploymentDigest` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:181:28
+    |
+181 |     pub deployment_digest: DeploymentDigest,
+    |                            ^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `SafeInteger` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:183:29
+    |
+183 |     pub effect_cardinality: SafeInteger,
+    |                             ^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `ActionIntentV1` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:184:24
+    |
+184 |     pub action: Option<ActionIntentV1>,
+    |                        ^^^^^^^^^^^^^^ not found in this scope
+    |
+help: you might be missing a type parameter
+    |
+172 | pub struct RecoveryWorkflowRecordV1<ActionIntentV1> {
+    |                                    ++++++++++++++++
+
+error[E0425]: cannot find type `ProtectedText` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:185:37
+    |
+185 |     pub process_reservation: Option<ProtectedText<4096>>,
+    |                                     ^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `ApprovalIntentV1` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:187:24
+    |
+187 |     pub review: Option<ApprovalIntentV1>,
+    |                        ^^^^^^^^^^^^^^^^ not found in this scope
+    |
+help: you might be missing a type parameter
+    |
+172 | pub struct RecoveryWorkflowRecordV1<ApprovalIntentV1> {
+    |                                    ++++++++++++++++++
+
+error[E0425]: cannot find type `OperationId` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:194:29
+    |
+194 |     pub native_link: Option<OperationId>,
+    |                             ^^^^^^^^^^^ not found in this scope
+    |
+help: you might be missing a type parameter
+    |
+172 | pub struct RecoveryWorkflowRecordV1<OperationId> {
+    |                                    +++++++++++++
+
+error[E0425]: cannot find type `EffectObservationV1` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:196:17
+    |
+196 |     pub effect: EffectObservationV1,
+    |                 ^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `ReleaseDispositionV1` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:197:18
+    |
+197 |     pub release: ReleaseDispositionV1,
+    |                  ^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `RecoveryReportedDecision` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:199:35
+    |
+199 |     pub reported_decision: Option<RecoveryReportedDecision>,
+    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+    |
+help: you might be missing a type parameter
+    |
+172 | pub struct RecoveryWorkflowRecordV1<RecoveryReportedDecision> {
+    |                                    ++++++++++++++++++++++++++
+
+error[E0425]: cannot find type `SafeInteger` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:201:27
+    |
+201 |     pub provider_lookups: SafeInteger,
+    |                           ^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `ActionIntentV1` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:184:24
+    |
+184 |     pub action: Option<ActionIntentV1>,
+    |                        ^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `ApprovalIntentV1` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:187:24
+    |
+187 |     pub review: Option<ApprovalIntentV1>,
+    |                        ^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `OperationId` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:194:29
+    |
+194 |     pub native_link: Option<OperationId>,
+    |                             ^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `RecoveryReportedDecision` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:199:35
+    |
+199 |     pub reported_decision: Option<RecoveryReportedDecision>,
+    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `ActionIntentV1` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:207:17
+    |
+207 |     pub action: ActionIntentV1,
+    |                 ^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `CommandId` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:219:21
+    |
+219 |     pub command_id: CommandId,
+    |                     ^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `WorkflowId` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:220:22
+    |
+220 |     pub workflow_id: WorkflowId,
+    |                      ^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `SafeInteger` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:221:19
+    |
+221 |     pub revision: SafeInteger,
+    |                   ^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `WorkflowControlV1` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:222:18
+    |
+222 |     pub control: WorkflowControlV1,
+    |                  ^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `EffectObservationV1` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:223:17
+    |
+223 |     pub effect: EffectObservationV1,
+    |                 ^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `ReleaseDispositionV1` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:224:18
+    |
+224 |     pub release: ReleaseDispositionV1,
+    |                  ^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `ActionIntentV1` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:256:14
+    |
+256 |     action: &ActionIntentV1,
+    |              ^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `ReviewDigest` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:258:13
+    |
+258 | ) -> Result<ReviewDigest, crate::KernelError> {
+    |             ^^^^^^^^^^^^ not found in this scope
+    |
+help: you might be missing a type parameter
+    |
+255 | pub fn recovery_review_digest<ReviewDigest>(
+    |                              ++++++++++++++
+
+error[E0425]: cannot find type `KernelError` in the crate root
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:258:34
+    |
+258 | ) -> Result<ReviewDigest, crate::KernelError> {
+    |                                  ^^^^^^^^^^^ not found in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:665:72
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+665 |     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    |                                                                        ^^^^^^^^^^^
+
+error[E0425]: cannot find type `ContinuationId` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:277:26
+    |
+277 |     pub continuation_id: ContinuationId,
+    |                          ^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `IntentDigest` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:281:26
+    |
+281 |     pub unsigned_intent: IntentDigest,
+    |                          ^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `ContinuationId` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:277:26
+    |
+277 |     pub continuation_id: ContinuationId,
+    |                          ^^^^^^^^^^^^^^ not found in this scope
+    |
+help: you might be missing a type parameter
+    |
+274 | pub struct RecoveryProcessReservationV1<ContinuationId> {
+    |                                        ++++++++++++++++
+
+error[E0425]: cannot find type `IntentDigest` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:281:26
+    |
+281 |     pub unsigned_intent: IntentDigest,
+    |                          ^^^^^^^^^^^^ not found in this scope
+    |
+help: you might be missing a type parameter
+    |
+274 | pub struct RecoveryProcessReservationV1<IntentDigest> {
+    |                                        ++++++++++++++
+
+error[E0425]: cannot find type `ProtectedText` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:295:19
+    |
+295 |     pub resource: ProtectedText<2048>,
+    |                   ^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `SafeInteger` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:297:29
+    |
+297 |     pub max_response_bytes: SafeInteger,
+    |                             ^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `SafeInteger` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:297:29
+    |
+297 |     pub max_response_bytes: SafeInteger,
+    |                             ^^^^^^^^^^^ not found in this scope
+    |
+help: you might be missing a type parameter
+    |
+291 | pub struct RecoveryEffectContractV1<SafeInteger> {
+    |                                    +++++++++++++
+
+error[E0425]: cannot find type `AuthorityScopeDigest` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:308:13
+    |
+308 | ) -> Result<AuthorityScopeDigest, crate::KernelError> {
+    |             ^^^^^^^^^^^^^^^^^^^^ not found in this scope
+    |
+help: you might be missing a type parameter
+    |
+306 | pub fn recovery_authority_scope_digest<AuthorityScopeDigest>(
+    |                                       ++++++++++++++++++++++
+
+error[E0425]: cannot find type `KernelError` in the crate root
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:308:42
+    |
+308 | ) -> Result<AuthorityScopeDigest, crate::KernelError> {
+    |                                          ^^^^^^^^^^^ not found in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:665:72
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+665 |     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    |                                                                        ^^^^^^^^^^^
+
+error[E0425]: cannot find type `ApprovalIntentV1` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:357:17
+    |
+357 |     pub intent: ApprovalIntentV1,
+    |                 ^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `ProtectedText` in this scope
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:358:28
+    |
+358 |     pub canonical_preview: ProtectedText<32768>,
+    |                            ^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `KernelError` in the crate root
+   --> crates/kernel/chio-kernel/src/recovery.rs:15:30
+    |
+ 15 | ) -> Result<[u8; 32], crate::KernelError> {
+    |                              ^^^^^^^^^^^ not found in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:665:72
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+665 |     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    |                                                                        ^^^^^^^^^^^
+
+error[E0425]: cannot find type `SecurityInvocationContext` in the crate root
+   --> crates/kernel/chio-kernel/src/knowledge.rs:18:31
+    |
+ 18 |     ) -> Result<Option<crate::SecurityInvocationContext>, crate::KernelError> {
+    |                               ^^^^^^^^^^^^^^^^^^^^^^^^^ not found in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:674:38
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+674 |     SecurityDispatchOutcomeRecorder, SecurityInvocationContext, SecurityInvocationContextAuthority,
+    |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0425]: cannot find type `KernelError` in the crate root
+   --> crates/kernel/chio-kernel/src/knowledge.rs:18:66
+    |
+ 18 |     ) -> Result<Option<crate::SecurityInvocationContext>, crate::KernelError> {
+    |                                                                  ^^^^^^^^^^^ not found in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:665:72
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+665 |     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    |                                                                        ^^^^^^^^^^^
+
+error[E0425]: cannot find type `KernelError` in the crate root
+   --> crates/kernel/chio-kernel/src/knowledge.rs:30:66
+    |
+ 30 |     pub fn enforced(&self, runtime: &str) -> Result<bool, crate::KernelError> {
+    |                                                                  ^^^^^^^^^^^ not found in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:665:72
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+665 |     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    |                                                                        ^^^^^^^^^^^
+
+error[E0425]: cannot find type `ArtifactObjectId` in this scope
+  --> crates/kernel/chio-kernel/src/knowledge.rs:47:17
+   |
+47 |     pub object: ArtifactObjectId,
+   |                 ^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `ProtectedText` in this scope
+  --> crates/kernel/chio-kernel/src/knowledge.rs:48:18
+   |
+48 |     pub runtime: ProtectedText<128>,
+   |                  ^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `ProcessId` in this scope
+  --> crates/kernel/chio-kernel/src/knowledge.rs:49:18
+   |
+49 |     pub process: ProcessId,
+   |                  ^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `CanonicalPayloadDigest` in this scope
+  --> crates/kernel/chio-kernel/src/knowledge.rs:50:18
+   |
+50 |     pub content: CanonicalPayloadDigest,
+   |                  ^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `SafeInteger` in this scope
+  --> crates/kernel/chio-kernel/src/knowledge.rs:51:16
+   |
+51 |     pub bytes: SafeInteger,
+   |                ^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `ProtectedText` in this scope
+  --> crates/kernel/chio-kernel/src/knowledge.rs:52:21
+   |
+52 |     pub generation: ProtectedText<64>,
+   |                     ^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `ArtifactObjectId` in this scope
+  --> crates/kernel/chio-kernel/src/knowledge.rs:47:17
+   |
+47 |     pub object: ArtifactObjectId,
+   |                 ^^^^^^^^^^^^^^^^ not found in this scope
+   |
+help: you might be missing a type parameter
+   |
+46 | pub struct ArtifactBlobSealV1<ArtifactObjectId> {
+   |                              ++++++++++++++++++
+
+error[E0425]: cannot find type `ProcessId` in this scope
+  --> crates/kernel/chio-kernel/src/knowledge.rs:49:18
+   |
+49 |     pub process: ProcessId,
+   |                  ^^^^^^^^^ not found in this scope
+   |
+help: you might be missing a type parameter
+   |
+46 | pub struct ArtifactBlobSealV1<ProcessId> {
+   |                              +++++++++++
+
+error[E0425]: cannot find type `CanonicalPayloadDigest` in this scope
+  --> crates/kernel/chio-kernel/src/knowledge.rs:50:18
+   |
+50 |     pub content: CanonicalPayloadDigest,
+   |                  ^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+   |
+help: you might be missing a type parameter
+   |
+46 | pub struct ArtifactBlobSealV1<CanonicalPayloadDigest> {
+   |                              ++++++++++++++++++++++++
+
+error[E0425]: cannot find type `SafeInteger` in this scope
+  --> crates/kernel/chio-kernel/src/knowledge.rs:51:16
+   |
+51 |     pub bytes: SafeInteger,
+   |                ^^^^^^^^^^^ not found in this scope
+   |
+help: you might be missing a type parameter
+   |
+46 | pub struct ArtifactBlobSealV1<SafeInteger> {
+   |                              +++++++++++++
+
+error[E0425]: cannot find type `KernelError` in the crate root
+   --> crates/kernel/chio-kernel/src/knowledge.rs:69:28
+    |
+ 69 |     ) -> Result<(), crate::KernelError> {
+    |                            ^^^^^^^^^^^ not found in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:665:72
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+665 |     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    |                                                                        ^^^^^^^^^^^
+
+error[E0425]: cannot find type `ProcessId` in this scope
+  --> crates/kernel/chio-kernel/src/knowledge.rs:76:19
+   |
+76 |         process: &ProcessId,
+   |                   ^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `SecurityInvocationContext` in the crate root
+   --> crates/kernel/chio-kernel/src/knowledge.rs:77:26
+    |
+ 77 |         context: &crate::SecurityInvocationContext,
+    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^ not found in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:674:38
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+674 |     SecurityDispatchOutcomeRecorder, SecurityInvocationContext, SecurityInvocationContextAuthority,
+    |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0425]: cannot find type `KernelError` in the crate root
+   --> crates/kernel/chio-kernel/src/knowledge.rs:78:28
+    |
+ 78 |     ) -> Result<(), crate::KernelError>;
+    |                            ^^^^^^^^^^^ not found in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:665:72
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+665 |     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    |                                                                        ^^^^^^^^^^^
+
+error[E0425]: cannot find type `ArtifactObjectId` in this scope
+  --> crates/kernel/chio-kernel/src/knowledge.rs:81:18
+   |
+81 |         object: &ArtifactObjectId,
+   |                  ^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `ProcessId` in this scope
+  --> crates/kernel/chio-kernel/src/knowledge.rs:82:19
+   |
+82 |         process: &ProcessId,
+   |                   ^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `KernelError` in the crate root
+   --> crates/kernel/chio-kernel/src/knowledge.rs:84:44
+    |
+ 84 |     ) -> Result<ArtifactBlobSealV1, crate::KernelError>;
+    |                                            ^^^^^^^^^^^ not found in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:665:72
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+665 |     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    |                                                                        ^^^^^^^^^^^
+
+error[E0425]: cannot find type `ArtifactObjectId` in this scope
+  --> crates/kernel/chio-kernel/src/knowledge.rs:87:18
+   |
+87 |         object: &ArtifactObjectId,
+   |                  ^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `ProcessId` in this scope
+  --> crates/kernel/chio-kernel/src/knowledge.rs:88:19
+   |
+88 |         process: &ProcessId,
+   |                   ^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `CanonicalPayloadDigest` in this scope
+  --> crates/kernel/chio-kernel/src/knowledge.rs:89:18
+   |
+89 |         content: CanonicalPayloadDigest,
+   |                  ^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `SafeInteger` in this scope
+  --> crates/kernel/chio-kernel/src/knowledge.rs:90:16
+   |
+90 |         bytes: SafeInteger,
+   |                ^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `KernelError` in the crate root
+   --> crates/kernel/chio-kernel/src/knowledge.rs:91:44
+    |
+ 91 |     ) -> Result<ArtifactBlobSealV1, crate::KernelError>;
+    |                                            ^^^^^^^^^^^ not found in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:665:72
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+665 |     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    |                                                                        ^^^^^^^^^^^
+
+error[E0425]: cannot find type `KernelError` in the crate root
+   --> crates/kernel/chio-kernel/src/knowledge.rs:92:81
+    |
+ 92 |     fn read_private(&self, seal: &ArtifactBlobSealV1) -> Result<Vec<u8>, crate::KernelError>;
+    |                                                                                 ^^^^^^^^^^^ not found in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:665:72
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+665 |     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    |                                                                        ^^^^^^^^^^^
+
+error[E0425]: cannot find type `KernelError` in the crate root
+   --> crates/kernel/chio-kernel/src/knowledge.rs:93:79
+    |
+ 93 |     fn collect_private(&self, seal: &ArtifactBlobSealV1) -> Result<(), crate::KernelError>;
+    |                                                                               ^^^^^^^^^^^ not found in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:665:72
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+665 |     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    |                                                                        ^^^^^^^^^^^
+
+error[E0425]: cannot find type `ArtifactRecipientV1` in this scope
+  --> crates/kernel/chio-kernel/src/knowledge.rs:99:29
+   |
+99 |     fn recipient(&self) -> &ArtifactRecipientV1;
+   |                             ^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `ArtifactReleaseIntentV1` in this scope
+   --> crates/kernel/chio-kernel/src/knowledge.rs:102:18
+    |
+102 |         intent: &ArtifactReleaseIntentV1,
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `KernelError` in the crate root
+   --> crates/kernel/chio-kernel/src/knowledge.rs:104:28
+    |
+104 |     ) -> Result<(), crate::KernelError>;
+    |                            ^^^^^^^^^^^ not found in the crate root
+    |
+note: found an item that was configured out
+   --> crates/kernel/chio-kernel/src/lib.rs:665:72
+    |
+638 | #[cfg(not(loom))]
+    |          ------ the item is gated here
+...
+665 |     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    |                                                                        ^^^^^^^^^^^
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `chio_supervisor`
+   --> crates/kernel/chio-kernel/src/receipt_store.rs:281:23
+    |
+281 |     pub writer_level: chio_supervisor::HealthLevel,
+    |                       ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_supervisor`
+    |
+    = help: if you wanted to use a crate named `chio_supervisor`, use `cargo add chio_supervisor` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `rusqlite`
+   --> crates/kernel/chio-kernel/src/receipt_store.rs:323:20
+    |
+323 |     Sqlite(#[from] rusqlite::Error),
+    |                    ^^^^^^^^ use of unresolved module or unlinked crate `rusqlite`
+    |
+    = help: if you wanted to use a crate named `rusqlite`, use `cargo add rusqlite` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `serde_json`
+   --> crates/kernel/chio-kernel/src/receipt_store.rs:332:18
+    |
+332 |     Json(#[from] serde_json::Error),
+    |                  ^^^^^^^^^^ use of unresolved module or unlinked crate `serde_json`
+    |
+    = help: if you wanted to use a crate named `serde_json`, use `cargo add serde_json` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `chio_settle`
+   --> crates/kernel/chio-kernel/src/receipt_store.rs:465:50
+    |
+465 |     fn settlement_store_binding(&self) -> Option<chio_settle::SettlementStoreBinding> {
+    |                                                  ^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_settle`
+    |
+    = help: if you wanted to use a crate named `chio_settle`, use `cargo add chio_settle` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `serde_json`
+   --> crates/kernel/chio-kernel/src/receipt_store.rs:872:24
+    |
+872 |         _anchor_json: &serde_json::Value,
+    |                        ^^^^^^^^^^ use of unresolved module or unlinked crate `serde_json`
+    |
+    = help: if you wanted to use a crate named `serde_json`, use `cargo add serde_json` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `serde_json`
+   --> crates/kernel/chio-kernel/src/receipt_store.rs:887:25
+    |
+887 |         _lineage_json: &serde_json::Value,
+    |                         ^^^^^^^^^^ use of unresolved module or unlinked crate `serde_json`
+    |
+    = help: if you wanted to use a crate named `serde_json`, use `cargo add serde_json` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `serde_json`
+   --> crates/kernel/chio-kernel/src/receipt_store.rs:904:27
+    |
+904 |         _statement_json: &serde_json::Value,
+    |                           ^^^^^^^^^^ use of unresolved module or unlinked crate `serde_json`
+    |
+    = help: if you wanted to use a crate named `serde_json`, use `cargo add serde_json` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `serde_json`
+   --> crates/kernel/chio-kernel/src/recovery/ports.rs:282:47
+    |
+282 |         let request: crate::ToolCallRequest = serde_json::from_str(envelope.request.as_str())
+    |                                               ^^^^^^^^^^ use of unresolved module or unlinked crate `serde_json`
+    |
+    = help: if you wanted to use a crate named `serde_json`, use `cargo add serde_json` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of undeclared type `ReviewDigest`
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:265:8
+    |
+265 |     Ok(ReviewDigest::from_bytes(
+    |        ^^^^^^^^^^^^ use of undeclared type `ReviewDigest`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `chio_core_types`
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:266:10
+    |
+266 |         *chio_core_types::sha256(&preimage).as_bytes(),
+    |          ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_core_types`
+    |
+    = help: if you wanted to use a crate named `chio_core_types`, use `cargo add chio_core_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of undeclared type `AuthorityScopeDigest`
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:312:32
+    |
+312 |     unsigned.authority_scope = AuthorityScopeDigest::from_bytes([0; 32]);
+    |                                ^^^^^^^^^^^^^^^^^^^^ use of undeclared type `AuthorityScopeDigest`
+
+error[E0433]: failed to resolve: use of undeclared type `AuthorityScopeDigest`
+   --> crates/kernel/chio-kernel/src/recovery/records.rs:313:8
+    |
+313 |     Ok(AuthorityScopeDigest::from_bytes(super::recovery_digest(
+    |        ^^^^^^^^^^^^^^^^^^^^ use of undeclared type `AuthorityScopeDigest`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `chio_core_types`
+  --> crates/kernel/chio-kernel/src/recovery.rs:16:21
+   |
+16 |     let canonical = chio_core_types::canonical_json_bytes(value)
+   |                     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_core_types`
+   |
+   = help: if you wanted to use a crate named `chio_core_types`, use `cargo add chio_core_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `chio_core_types`
+  --> crates/kernel/chio-kernel/src/recovery.rs:22:9
+   |
+22 |     Ok(*chio_core_types::sha256(&bytes).as_bytes())
+   |         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_core_types`
+   |
+   = help: if you wanted to use a crate named `chio_core_types`, use `cargo add chio_core_types` to add it to your `Cargo.toml`
+
+Some errors have detailed explanations: E0425, E0432, E0433.
+For more information about an error, try `rustc --explain E0425`.
+error: could not compile `chio-kernel` (lib) due to 307 previous errors
+warning: build failed, waiting for other jobs to finish...

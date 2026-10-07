@@ -1,0 +1,9 @@
+
+running 4 tests
+test oversized_stream_is_denied_with_overloaded_streambytes ... ok
+test push_chunk_bounded_sheds_on_chunk_count_even_under_byte_cap ... ok
+test within_budget_stream_is_allowed ... ok
+test push_chunk_bounded_chunk_cap_zero_is_unlimited ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

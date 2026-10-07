@@ -1,0 +1,26 @@
+{
+  "id": "kernel-lib",
+  "actual_command": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "chio-kernel",
+    "--lib"
+  ],
+  "cwd": ".",
+  "environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2",
+    "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+  },
+  "exit_code": 0,
+  "status": "passed",
+  "started_unix_seconds": 1791160120,
+  "duration_seconds": 69.538,
+  "log": "evidence/kernel-lib.log",
+  "log_sha256": "487e7ac4e5dccecfe5a85f87531233c308e1be291d8bf0ac358b5b426d6a72dc",
+  "required_for_local_phase_acceptance": true,
+  "source_binding": "05aa889df57391692c09ef64d3ec178184f5d48c4bd4b6d3a654f470b00e079f"
+}

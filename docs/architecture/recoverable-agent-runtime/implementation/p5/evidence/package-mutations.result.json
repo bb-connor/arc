@@ -1,0 +1,85 @@
+{
+  "schema": "chio.recovery-p5-package-mutations.v1",
+  "status": "passed",
+  "rejected_mutations": [
+    {
+      "name": "false phase completion",
+      "status": "rejected",
+      "expected_reason": "P5 verification differs from recomputation",
+      "actual_exit_code": 1
+    },
+    {
+      "name": "missing required gate",
+      "status": "rejected",
+      "expected_reason": "FileNotFoundError",
+      "actual_exit_code": 1
+    },
+    {
+      "name": "stale source gate",
+      "status": "rejected",
+      "expected_reason": "local gate absent, failed or stale: native",
+      "actual_exit_code": 1
+    },
+    {
+      "name": "changed native log",
+      "status": "rejected",
+      "expected_reason": "local gate absent, failed or stale: native",
+      "actual_exit_code": 1
+    },
+    {
+      "name": "stale Rust review",
+      "status": "rejected",
+      "expected_reason": "source review incomplete or stale",
+      "actual_exit_code": 1
+    },
+    {
+      "name": "stale other-source review",
+      "status": "rejected",
+      "expected_reason": "source review incomplete or stale",
+      "actual_exit_code": 1
+    },
+    {
+      "name": "stale review binding",
+      "status": "rejected",
+      "expected_reason": "source review incomplete or stale",
+      "actual_exit_code": 1
+    },
+    {
+      "name": "open P1 review issue",
+      "status": "rejected",
+      "expected_reason": "source review incomplete or stale",
+      "actual_exit_code": 1
+    },
+    {
+      "name": "missing obligation anchor",
+      "status": "rejected",
+      "expected_reason": "crosswalk anchor drifted",
+      "actual_exit_code": 1
+    },
+    {
+      "name": "fake Linux success",
+      "status": "rejected",
+      "expected_reason": "Linux acceptance inventory incomplete",
+      "actual_exit_code": 1
+    },
+    {
+      "name": "changed baseline archive digest",
+      "status": "rejected",
+      "expected_reason": "P4 archive hash changed",
+      "actual_exit_code": 1
+    },
+    {
+      "name": "changed phase documentation",
+      "status": "rejected",
+      "expected_reason": "P5 artifact changed: OPERATIONS.md",
+      "actual_exit_code": 1
+    },
+    {
+      "name": "unregistered phase artifact",
+      "status": "rejected",
+      "expected_reason": "P5 artifact inventory differs",
+      "actual_exit_code": 1
+    }
+  ],
+  "positive_audits": 15
+}

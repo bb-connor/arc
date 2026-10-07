@@ -1,0 +1,18 @@
+
+failures:
+
+---- recovery::tests::knowledge::product::p6_policy_selected_operator_alone_applies_exact_proposal_and_native_target stdout ----
+
+thread 'recovery::tests::knowledge::product::p6_policy_selected_operator_alone_applies_exact_proposal_and_native_target' (61462) panicked at crates/platform/chio-control-plane/src/recovery/tests/knowledge/product.rs:517:5:
+assertion `left == right` failed: Some("security dispatch outcome requires reconciliation: security native dispatch capture callback failed; authoritative recovery required")
+  left: Deny
+ right: Allow
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    recovery::tests::knowledge::product::p6_policy_selected_operator_alone_applies_exact_proposal_and_native_target
+
+test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 1259 filtered out; finished in 99.85s
+
+error: test failed, to rerun pass `-p chio-control-plane --lib`

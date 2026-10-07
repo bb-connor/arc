@@ -1,0 +1,28 @@
+...........<frozen importlib._bootstrap>:1342: ImportWarning: Cannot set an attribute on 'crewai.rag' for child module 'embeddings'
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/agent/core.py:431: DeprecationWarning: function_calling_llm is deprecated and will be removed in a future release.
+  if self.function_calling_llm and not isinstance(
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/agent/core.py:439: DeprecationWarning: deprecated
+  if self.allow_code_execution:
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/agent/core.py:450: DeprecationWarning: deprecated
+  if self.reasoning and self.planning_config is None:
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/crew.py:650: DeprecationWarning: function_calling_llm is deprecated and will be removed in a future release.
+  if self.function_calling_llm and not isinstance(self.function_calling_llm, LLM):
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/crews/utils.py:372: DeprecationWarning: function_calling_llm is deprecated and will be removed in a future release.
+  crew.function_calling_llm,
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/crews/utils.py:87: DeprecationWarning: function_calling_llm is deprecated and will be removed in a future release.
+  if not agent.function_calling_llm:  # type: ignore[attr-defined]
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/agent/core.py:1299: DeprecationWarning: function_calling_llm is deprecated and will be removed in a future release.
+  function_calling_llm=self.function_calling_llm,
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/crew.py:1675: DeprecationWarning: deprecated
+  if hasattr(agent, "allow_code_execution") and getattr(
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/crew.py:1682: DeprecationWarning: deprecated
+  and hasattr(agent, "multimodal")
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/crew.py:1683: DeprecationWarning: deprecated
+  and getattr(agent, "multimodal", False)
+...
+----------------------------------------------------------------------
+Ran 14 tests in 2.126s
+
+OK

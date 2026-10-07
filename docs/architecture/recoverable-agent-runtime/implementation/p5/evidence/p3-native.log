@@ -1,0 +1,23 @@
+    Finished `test` profile [unoptimized] target(s) in 1.00s
+     Running unittests src/lib.rs (target/debug/deps/chio_control_plane-7c73bd7964d7c479)
+
+running 16 tests
+test recovery::tests::semantic::authority::p3_native_alternate_destination_selects_exact_account_transport ... ok
+test recovery::tests::semantic::authority::p3_native_authority_matrix_rejects_annotation_and_capability_escalation ... ok
+test recovery::tests::semantic::authority::p3_native_completed_withhold_restarts_without_effect_or_raw_release ... ok
+test recovery::tests::semantic::authority::p3_native_evidence_is_one_shot_across_distinct_actions_and_plan_revisions ... ok
+test recovery::tests::semantic::authority::p3_native_protected_semantic_inventory_tamper_fails_before_effect ... ok
+test recovery::tests::semantic::authority::p3_native_provider_error_has_no_raw_fallback_or_replacement_attempt ... ok
+test recovery::tests::semantic::authority::p3_native_reload_is_atomic_stales_uncaptured_and_preserves_original_completed ... ok
+test recovery::tests::semantic::chains::p3_native_derived_bytes_have_a_separate_producer_and_fresh_dependent_authority ... ok
+test recovery::tests::semantic::chains::p3_native_historical_current_and_held_prerequisites_are_distinct ... ok
+test recovery::tests::semantic::p3_native_integrity_only_endorsement_captures_and_returns_without_disclosure_grant ... ok
+test recovery::tests::semantic::p3_native_refuses_stale_acl_endorsement_absence_and_emergency_stop ... ok
+test recovery::tests::semantic::p3_native_support_read_and_separate_projection_have_native_capture ... ok
+test recovery::tests::semantic::p3_native_withhold_preserves_completed_effect_and_replay_never_returns_raw ... ok
+test semantic::http::tests::p3_http_build_binds_provider_account_resource_version_and_native_attempt ... ok
+test semantic::http::tests::p3_http_refuses_raw_response_foreign_account_and_unsupported_routes ... ok
+test semantic::http::tests::p3_submission_owner_is_send_for_the_supervised_kernel_task ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 1219 filtered out; finished in 520.10s
+

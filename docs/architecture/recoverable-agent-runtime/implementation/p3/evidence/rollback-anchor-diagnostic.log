@@ -1,0 +1,12 @@
+
+running 1 test
+Error: SqliteFailure(Error { code: CannotOpen, extended_code: 1550 }, Some("unable to open database: /var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T/.tmphUkPQH/before-import.db"))
+test admission_operation_store::tests::security_participant_migration::integrity::restoring_destination_before_import_is_rejected_by_independent_anchor ... FAILED
+
+failures:
+
+failures:
+    admission_operation_store::tests::security_participant_migration::integrity::restoring_destination_before_import_is_rejected_by_independent_anchor
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1834 filtered out; finished in 1.09s
+

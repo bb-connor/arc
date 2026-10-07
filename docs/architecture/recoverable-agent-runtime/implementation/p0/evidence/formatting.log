@@ -1,0 +1,50 @@
+Diff in /Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-core-types/tests/security_generated_vectors.rs:25:
+ fn generated_recovery_models_preserve_every_positive_field() {
+     let corpus: serde_json::Value = serde_json::from_str(include_str!(
+         "../../../../spec/vectors/recovery/v1/contracts.json"
+-    )).test_expect("shared recovery corpus");
++    ))
++    .test_expect("shared recovery corpus");
+     let vectors = corpus["vectors"].as_array().test_expect("vector inventory");
+     let mut positives = 0;
+     for vector in vectors.iter().filter(|vector| vector["valid"] == true) {
+Diff in /Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-core-types/tests/security_generated_vectors.rs:32:
+         positives += 1;
+-        let wire = vector["wire"].as_str().test_expect("raw canonical bytes").as_bytes();
++        let wire = vector["wire"]
++            .as_str()
++            .test_expect("raw canonical bytes")
++            .as_bytes();
+         match vector["contract"].as_str().test_expect("contract identity") {
+-            "observation" => assert_generated_round_trip::<generated::recovery_trajectory::RecoveryObservationV1>(wire),
+-            "profile" => assert_generated_round_trip::<generated::recovery_effect_contract::RecoveryProfileRequirementsV1>(wire),
+-            "effect_contract" => assert_generated_round_trip::<generated::recovery_effect_contract::SemanticEffectContractV1>(wire),
+-            "graph" => assert_generated_round_trip::<generated::recovery_dependency_graph::RecoveryDependencyGraphV1>(wire),
+-            "trajectory" => assert_generated_round_trip::<generated::recovery_trajectory::RecoveryTrajectoryV1>(wire),
++            "observation" => assert_generated_round_trip::<
++                generated::recovery_trajectory::RecoveryObservationV1,
++            >(wire),
++            "profile" => assert_generated_round_trip::<
++                generated::recovery_effect_contract::RecoveryProfileRequirementsV1,
++            >(wire),
++            "effect_contract" => assert_generated_round_trip::<
++                generated::recovery_effect_contract::SemanticEffectContractV1,
++            >(wire),
++            "graph" => assert_generated_round_trip::<
++                generated::recovery_dependency_graph::RecoveryDependencyGraphV1,
++            >(wire),
++            "trajectory" => assert_generated_round_trip::<
++                generated::recovery_trajectory::RecoveryTrajectoryV1,
++            >(wire),
+             other => panic!("unmapped recovery fixture contract: {other}"),
+         }
+     }
+Diff in /Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-core-types/tests/security_generated_vectors.rs:43:
+-    assert!(positives >= 6, "missing positive coverage for the five contracts and unresolved admission");
++    assert!(
++        positives >= 6,
++        "missing positive coverage for the five contracts and unresolved admission"
++    );
+ }
+ 
+ fn assert_generated_round_trip<T>(bytes: &[u8])

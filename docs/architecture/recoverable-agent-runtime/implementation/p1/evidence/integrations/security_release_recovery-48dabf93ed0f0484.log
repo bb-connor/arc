@@ -1,0 +1,30 @@
+
+running 25 tests
+test checkpoint_faults::unsupported_checkpoint_backend_rejects_before_dispatch ... ok
+test checkpoint_faults::checkpoint_write_failure_cannot_reconsume_a_live_owner ... ok
+test checkpoint_faults::successful_live_release_cannot_renew_a_lease_expired_before_checkpoint ... ok
+test checkpoint_faults::lost_checkpoint_acknowledgement_recovers_the_exact_committed_release ... ok
+test crash::crash_after_acknowledgement_requires_the_missing_checkpoint ... ok
+test crash::crash_before_release_cannot_publish_resolved_output ... ok
+test crash::crash_after_checkpoint_recovers_without_a_second_release_or_effect ... ok
+test final_release_failure_cannot_be_bypassed_after_restart ... ok
+test final_release_failure_cannot_be_bypassed_by_terminal_retry ... ok
+test integrity::a_frozen_no_owner_requirement_does_not_create_release_authority ... ok
+test integrity::acknowledgement_time_follows_the_native_release_callback ... ok
+test integrity::checkpoint_sql_guards_reject_replace_update_and_delete ... ok
+test integrity::decoded_checkpoint_is_exact_data_not_a_live_owner ... ok
+test integrity::checkpoint_survives_authorized_payload_compaction_and_owner_rotation ... ok
+test nested::nested_release_failure_remains_withheld_on_retry ... ok
+test nested::nested_release_success_replays_the_same_terminal ... ok
+test integrity::removing_hook_configuration_cannot_erase_a_pending_release ... ok
+test integrity::checkpoint_omission_and_rewritten_bindings_fail_on_reopen ... ok
+test output::output_release_callback_panic_cannot_publish_or_reinvoke ... ok
+test output::current_output_refusal_withholds_value_and_stream_without_reinvocation ... ok
+test serialization::live_release_callback_can_enter_the_original_mutation_sequence ... ok
+test output::release_owner_receives_redacted_chunks_not_only_their_digests ... ok
+test successful_release_is_checkpointed_before_completion_and_replayed_after_restart ... ok
+test output::release_owner_receives_the_exact_redacted_value ... ok
+test serialization::nested_live_release_callback_can_enter_the_original_mutation_sequence ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 51.70s
+

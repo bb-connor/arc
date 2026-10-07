@@ -1,0 +1,16 @@
+    Finished `test` profile [unoptimized] target(s) in 1.83s
+     Running unittests src/lib.rs (target/debug/deps/chio_control_plane-70f1e8c246e31377)
+
+running 9 tests
+test recovery::explanation::tests::recovery_p2_dry_service_constructs_without_runtime_or_effect_ports ... ok
+test recovery::explanation::tests::recovery_p2_probe_quota_is_fixed_actor_scoped_and_lifetime_bounded ... ok
+test recovery::tests::explanations::recovery_p2_cancelled_control_never_looks_feasible_and_advice_never_renews_it ... ok
+test recovery::tests::explanations::recovery_p2_equal_label_foreign_generation_invalidates_live_resume ... ok
+test recovery::tests::explanations::recovery_p2_limited_native_audience_refuses_without_exposing_private_basis ... ok
+test recovery::tests::explanations::recovery_p2_live_report_recomputes_without_changing_workflow_budget_or_effect ... ok
+test recovery::tests::explanations::recovery_p2_original_revocation_is_observed_and_control_revocation_refuses_advice ... ok
+test recovery::tests::explanations::recovery_p2_policy_and_recipient_changes_cannot_authorize_with_old_advice ... ok
+test recovery::tests::explanations::recovery_p2_signer_roles_and_live_transport_reject_report_as_authority ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 1186 filtered out; finished in 12.67s
+

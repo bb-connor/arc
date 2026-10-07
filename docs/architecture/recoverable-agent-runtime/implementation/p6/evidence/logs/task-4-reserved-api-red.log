@@ -1,0 +1,109 @@
+    Checking chio-control-plane v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-control-plane)
+error[E0433]: failed to resolve: use of undeclared type `RecoveryRuntimeError`
+  --> crates/platform/chio-control-plane/src/recovery/settlement.rs:19:21
+   |
+19 |                 Err(RecoveryRuntimeError::AuthorityDenied)
+   |                     ^^^^^^^^^^^^^^^^^^^^ use of undeclared type `RecoveryRuntimeError`
+   |
+help: consider importing this enum through its public re-export
+   |
+ 4 +     use crate::recovery::RecoveryRuntimeError;
+   |
+
+error[E0433]: failed to resolve: use of undeclared type `RecoveryRuntimeError`
+  --> crates/platform/chio-control-plane/src/recovery/settlement.rs:25:53
+   |
+25 |         assert!(executor.try_submit(Box::new(|| Err(RecoveryRuntimeError::Conflict))).is_err());
+   |                                                     ^^^^^^^^^^^^^^^^^^^^ use of undeclared type `RecoveryRuntimeError`
+   |
+help: consider importing this enum through its public re-export
+   |
+ 4 +     use crate::recovery::RecoveryRuntimeError;
+   |
+
+error[E0433]: failed to resolve: use of undeclared type `RecoveryRuntimeError`
+  --> crates/platform/chio-control-plane/src/recovery/settlement.rs:28:53
+   |
+28 |         assert!(executor.try_submit(Box::new(|| Err(RecoveryRuntimeError::Conflict))).is_err());
+   |                                                     ^^^^^^^^^^^^^^^^^^^^ use of undeclared type `RecoveryRuntimeError`
+   |
+help: consider importing this enum through its public re-export
+   |
+ 4 +     use crate::recovery::RecoveryRuntimeError;
+   |
+
+error[E0433]: failed to resolve: use of undeclared type `RecoveryRuntimeError`
+  --> crates/platform/chio-control-plane/src/recovery/settlement.rs:43:25
+   |
+43 |                    Some(RecoveryRuntimeError::Unavailable));
+   |                         ^^^^^^^^^^^^^^^^^^^^ use of undeclared type `RecoveryRuntimeError`
+   |
+help: consider importing this enum through its public re-export
+   |
+ 4 +     use crate::recovery::RecoveryRuntimeError;
+   |
+
+error[E0433]: failed to resolve: use of undeclared type `RecoveryRuntimeError`
+  --> crates/platform/chio-control-plane/src/recovery/settlement.rs:44:60
+   |
+44 |         let response = executor.try_submit(Box::new(|| Err(RecoveryRuntimeError::InvalidCommand)))?;
+   |                                                            ^^^^^^^^^^^^^^^^^^^^ use of undeclared type `RecoveryRuntimeError`
+   |
+help: consider importing this enum through its public re-export
+   |
+ 4 +     use crate::recovery::RecoveryRuntimeError;
+   |
+
+error[E0433]: failed to resolve: use of undeclared type `RecoveryRuntimeError`
+  --> crates/platform/chio-control-plane/src/recovery/settlement.rs:46:25
+   |
+46 |                    Some(RecoveryRuntimeError::InvalidCommand));
+   |                         ^^^^^^^^^^^^^^^^^^^^ use of undeclared type `RecoveryRuntimeError`
+   |
+help: consider importing this enum through its public re-export
+   |
+ 4 +     use crate::recovery::RecoveryRuntimeError;
+   |
+
+warning: unused import: `super::*`
+ --> crates/platform/chio-control-plane/src/recovery/settlement.rs:4:9
+  |
+4 |     use super::*;
+  |         ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0433]: failed to resolve: use of undeclared type `SettlementExecutor`
+ --> crates/platform/chio-control-plane/src/recovery/settlement.rs:9:24
+  |
+9 |         let executor = SettlementExecutor::new()?;
+  |                        ^^^^^^^^^^^^^^^^^^ use of undeclared type `SettlementExecutor`
+
+error[E0433]: failed to resolve: use of undeclared type `SettlementExecutor`
+  --> crates/platform/chio-control-plane/src/recovery/settlement.rs:40:24
+   |
+40 |         let executor = SettlementExecutor::new()?;
+   |                        ^^^^^^^^^^^^^^^^^^ use of undeclared type `SettlementExecutor`
+
+error[E0282]: type annotations needed
+  --> crates/platform/chio-control-plane/src/recovery/settlement.rs:42:20
+   |
+42 |         assert_eq!(tokio::time::timeout(Duration::from_secs(2), response).await??.err(),
+   |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot infer type
+
+error[E0282]: type annotations needed
+  --> crates/platform/chio-control-plane/src/recovery/settlement.rs:45:20
+   |
+45 |         assert_eq!(tokio::time::timeout(Duration::from_secs(2), response).await??.err(),
+   |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot infer type
+
+error[E0433]: failed to resolve: use of undeclared type `SettlementExecutor`
+  --> crates/platform/chio-control-plane/src/recovery/settlement.rs:53:22
+   |
+53 |         let result = SettlementExecutor::start_with(|index, routine| {
+   |                      ^^^^^^^^^^^^^^^^^^ use of undeclared type `SettlementExecutor`
+
+Some errors have detailed explanations: E0282, E0433.
+For more information about an error, try `rustc --explain E0282`.
+warning: `chio-control-plane` (lib test) generated 1 warning
+error: could not compile `chio-control-plane` (lib test) due to 11 previous errors; 1 warning emitted

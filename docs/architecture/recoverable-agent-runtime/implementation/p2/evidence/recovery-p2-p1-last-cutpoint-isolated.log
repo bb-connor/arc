@@ -1,0 +1,7 @@
+
+running 1 test
+P1_CUTPOINT return-recorded-revoked before=1 after=1 effect=Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }
+test recovery::tests::recovery_p1_fresh_process_cutpoints_preserve_original_ownership ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1178 filtered out; finished in 14.67s
+

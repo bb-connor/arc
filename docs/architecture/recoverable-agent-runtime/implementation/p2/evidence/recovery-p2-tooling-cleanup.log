@@ -1,0 +1,4 @@
+Removed owned tooling symlink sdks/typescript/node_modules
+Removed owned tooling symlink sdks/typescript/scripts/node_modules
+Removed owned tooling symlink sdks/typescript/packages/node-http/node_modules
+Removed owned conformance package overlay; shared external cache untouched

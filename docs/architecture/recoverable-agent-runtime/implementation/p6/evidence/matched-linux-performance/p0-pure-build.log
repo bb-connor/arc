@@ -1,0 +1,5 @@
+   Compiling chio-security-types v0.1.0 (/home/ubuntu/recovery-p0-performance-reference/crates/security/chio-security-types)
+   Compiling chio-semantic-contracts v0.1.0 (/home/ubuntu/recovery-p0-performance-reference/crates/security/chio-semantic-contracts)
+   Compiling chio-core-types v0.1.0 (/home/ubuntu/recovery-p0-performance-reference/crates/core/chio-core-types)
+   Compiling chio-recovery v0.1.0 (/home/ubuntu/recovery-p0-performance-reference/crates/security/chio-recovery)
+    Finished `dev` profile [unoptimized] target(s) in 10.26s

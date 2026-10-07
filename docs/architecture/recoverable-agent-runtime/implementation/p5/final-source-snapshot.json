@@ -1,0 +1,9 @@
+{
+  "schema": "chio.recovery-p5-final-source-snapshot.v1",
+  "source_binding": "562a3c3556f31e5afedbd7c7a426e542cc5e8cd51c28a7a43d8e9704ba4e9bc4",
+  "source_count": 643,
+  "source_archive": "evidence/p5-final-sources.tar.gz",
+  "source_archive_sha256": "85c9c7f4903c3a3c8a9e89c89141ade9a23caf3b1ad3120b0a4d42284d801085",
+  "measured_image_archive": "evidence/measured-linux-images.tar.gz",
+  "measured_image_archive_sha256": "3f6207d380949a52b0a9e41cef53a72fbc6523729e245c4b91d693db25296fa4"
+}

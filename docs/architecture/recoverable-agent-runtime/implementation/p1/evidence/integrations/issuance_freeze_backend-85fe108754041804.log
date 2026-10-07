@@ -1,0 +1,18 @@
+
+running 13 tests
+test apply_and_remove_reconcile_every_ack_loss_boundary ... ok
+test completed_apply_load_result_requires_the_live_external_fence ... ok
+test external_lineage_fence_binds_owner_scheduler_token_and_bounded_orphan_deadline ... ok
+test expired_external_fence_can_be_lifted_from_the_recorded_set ... ok
+test no_scheduler_backend_cannot_apply_an_unbound_issuance_freeze ... ok
+test malformed_operation_shape_is_rejected_before_any_mutation ... ok
+test readiness_requires_both_local_freeze_and_blast_radius_authorities ... ok
+test maintenance_ack_loss_rebinds_durably_fences_stale_owner_and_lifts_once ... ok
+test plan_binding_rejects_narrower_and_broader_approved_sets_before_mutation ... ok
+test rejected_apply_never_leaves_an_orphan_fence ... ok
+test restart_replay_requires_the_exact_external_fence_binding ... ok
+test release_outage_keeps_local_freeze_pending_until_retry ... ok
+test maintenance_completes_release_pending_without_recreating_the_external_fence ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+

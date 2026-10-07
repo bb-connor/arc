@@ -1,0 +1,10 @@
+
+running 3 tests
+test recovery::settlement::tests::p6_reserved_disconnect_and_shutdown_preserve_two_owned_jobs ... ok
+test recovery::settlement::tests::p6_reserved_panic_refuses_and_does_not_destroy_the_worker ... ok
+test recovery::settlement::tests::p6_reserved_partial_startup_failure_reaps_the_first_worker ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 1274 filtered out; finished in 0.00s
+
+    Finished `test` profile [unoptimized] target(s) in 0.70s
+     Running unittests src/lib.rs (target/recovery-p5-linux/host/debug/deps/chio_control_plane-6f8003448d0ced3f)

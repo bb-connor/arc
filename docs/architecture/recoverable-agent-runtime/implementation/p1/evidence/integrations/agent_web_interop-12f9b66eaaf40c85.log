@@ -1,0 +1,14 @@
+
+running 9 tests
+test agent_web_rejects_graphql_http_without_authority_limitation ... ok
+test agent_web_rejects_standard_webhooks_manifest_that_disables_required_signature ... ok
+test agent_web_rejects_dsse_subject_without_chio_receipt_mediation ... ok
+test agent_web_rejects_unsupported_external_authority_claim_marked_native ... ok
+test agent_web_rejects_unsupported_payment_protocol_versions ... ok
+test control_plane_agent_web_reexport_verifies_product_fixture ... ok
+test agent_web_rejects_unsupported_operational_protocol_versions ... ok
+test agent_web_rejects_unsupported_core_protocol_versions ... ok
+test agent_web_rejects_unsupported_supply_chain_protocol_versions ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.91s
+

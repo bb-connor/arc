@@ -1,0 +1,28 @@
+{
+  "id": "p1-native",
+  "actual_command": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "chio-control-plane",
+    "--lib",
+    "recovery_p1_",
+    "--",
+    "--test-threads=1"
+  ],
+  "cwd": ".",
+  "environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2",
+    "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+  },
+  "exit_code": 0,
+  "status": "passed",
+  "started_unix_seconds": 1791076782,
+  "duration_seconds": 476.402,
+  "log": "evidence/p1-native.log",
+  "log_sha256": "a83b749b3955ee002d8f9f9193f74a6c02ab31a88d7735090ddf6463e37540c7",
+  "required_for_local_phase_acceptance": true
+}

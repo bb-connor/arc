@@ -1,0 +1,17 @@
+{
+  "id": "schemas",
+  "actual_command": [
+    "bash",
+    "scripts/check-chio-schema-registry.sh"
+  ],
+  "cwd": ".",
+  "environment": {},
+  "exit_code": 0,
+  "status": "passed",
+  "started_unix_seconds": 1791160360,
+  "duration_seconds": 0.64,
+  "log": "evidence/schemas.log",
+  "log_sha256": "f08ca40211ee4cf16919c55a0c548472ee01a0ff6808eadb1e60a66f4aa43553",
+  "required_for_local_phase_acceptance": true,
+  "source_binding": "05aa889df57391692c09ef64d3ec178184f5d48c4bd4b6d3a654f470b00e079f"
+}

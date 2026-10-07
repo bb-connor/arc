@@ -1,0 +1,16 @@
+Actual model-free preflight passed langgraph support baseline
+Actual model-free preflight passed langgraph support product
+Actual model-free preflight passed langgraph artifact baseline
+Actual model-free preflight passed langgraph artifact product
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Actual model-free preflight passed crewai support baseline
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Actual model-free preflight passed crewai support product
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Actual model-free preflight passed crewai artifact baseline
+/home/ubuntu/recovery-runtime-p6-hosts/lib/python3.12/site-packages/pydantic/main.py:250: UserWarning: function callbacks cannot be serialized and will prevent checkpointing. Use a module-level named function instead.
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+Actual model-free preflight passed crewai artifact product

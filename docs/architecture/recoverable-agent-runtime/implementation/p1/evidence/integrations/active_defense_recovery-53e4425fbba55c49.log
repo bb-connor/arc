@@ -1,0 +1,9 @@
+
+running 4 tests
+test exact_subtree_root_and_every_recorded_descendant_lift ... ok
+test normal_to_restricted_to_normal_at_ttl ... ok
+test overlapping_temporary_actions_expire_in_both_orders_preserving_remaining_contribution ... ok
+test normal_to_quarantined_to_rollback_partial_remains_denied ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.69s
+

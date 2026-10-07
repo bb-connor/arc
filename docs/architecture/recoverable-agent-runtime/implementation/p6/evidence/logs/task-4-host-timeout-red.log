@@ -1,0 +1,18 @@
+.F                                                                       [100%]
+=================================== FAILURES ===================================
+_________ test_host_selected_wait_budget_is_bounded_and_does_not_retry _________
+
+    def test_host_selected_wait_budget_is_bounded_and_does_not_retry():
+        import asyncio
+        import httpx
+        import pytest
+        from chio_sdk.recovery_host import RecoveryHostSession
+        for invalid in [0, 121, True, 1.5]:
+            with pytest.raises(ValueError, match="^recovery.invalid_budget$"):
+>               RecoveryHostSession("http://localhost:1", "private", {"resume":b"{}"}, timeout_seconds=invalid)
+E               TypeError: RecoveryHostSession.__init__() got an unexpected keyword argument 'timeout_seconds'
+
+sdks/python/chio-sdk-python/tests/test_recovery_host_transport.py:37: TypeError
+=========================== short test summary info ============================
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_host_transport.py::test_host_selected_wait_budget_is_bounded_and_does_not_retry
+1 failed, 1 passed in 1.17s

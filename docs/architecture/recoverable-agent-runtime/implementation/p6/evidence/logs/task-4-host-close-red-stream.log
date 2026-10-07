@@ -1,0 +1,12 @@
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <tests.test_recovery_host_transport.test_close_failure_is_a_counted_fixed_refusal_without_retry.<locals>.ClosingFailure object at 0x74544d6d60f0>
+
+    async def aclose(self):
+>       raise RuntimeError("transport-close-canary credential")
+E       RuntimeError: transport-close-canary credential
+
+sdks/python/chio-sdk-python/tests/test_recovery_host_transport.py:20: RuntimeError
+=========================== short test summary info ============================
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_host_transport.py::test_close_failure_is_a_counted_fixed_refusal_without_retry
+1 failed in 1.54s

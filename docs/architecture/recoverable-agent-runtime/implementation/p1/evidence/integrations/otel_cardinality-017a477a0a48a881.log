@@ -1,0 +1,9 @@
+
+running 4 tests
+test builder_emits_only_locked_attributes ... ok
+test locked_span_shape_matches_its_contract ... ok
+test high_cardinality_keys_are_restricted_to_ids ... ok
+test dynamic_attribute_values_are_bounded ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+

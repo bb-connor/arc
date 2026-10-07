@@ -1,0 +1,18 @@
+{
+  "id": "rollback-anchor-diagnostic",
+  "actual_command": [
+    "target/debug/deps/chio_store_sqlite-f12c8dd52e54f54f",
+    "admission_operation_store::tests::security_participant_migration::integrity::restoring_destination_before_import_is_rejected_by_independent_anchor",
+    "--exact",
+    "--nocapture"
+  ],
+  "cwd": ".",
+  "environment": {},
+  "exit_code": 101,
+  "status": "failed",
+  "started_unix_seconds": 1791065495,
+  "duration_seconds": 1.106,
+  "log": "evidence/rollback-anchor-diagnostic.log",
+  "log_sha256": "be37739ee7b657587188f4af9e03d9e34d9b06e0e4a53d9f9160a2a4ec24757d",
+  "required_for_local_phase_acceptance": false
+}

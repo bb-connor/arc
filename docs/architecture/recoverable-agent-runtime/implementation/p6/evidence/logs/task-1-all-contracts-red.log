@@ -1,0 +1,255 @@
+   Compiling chio-core-types v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-core-types)
+error[E0425]: cannot find type `DecisionReportV1` in this scope
+ --> crates/core/chio-core-types/tests/recovery_p6_contracts.rs:5:23
+  |
+5 | fn report() -> Result<DecisionReportV1, Box<dyn std::error::Error>> {
+  |                       ^^^^^^^^^^^^^^^^ not found in this scope
+  |
+help: you might be missing a type parameter
+  |
+5 | fn report<DecisionReportV1>() -> Result<DecisionReportV1, Box<dyn std::error::Error>> {
+  |          ++++++++++++++++++
+
+error[E0422]: cannot find struct, variant or union type `DecisionReportV1` in this scope
+ --> crates/core/chio-core-types/tests/recovery_p6_contracts.rs:6:8
+  |
+6 |     Ok(DecisionReportV1 {
+  |        ^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `DecisionReportV1` in this scope
+  --> crates/core/chio-core-types/tests/recovery_p6_contracts.rs:26:18
+   |
+26 |     let decoded: DecisionReportV1 = decode_contract(&bytes)?;
+   |                  ^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `DecisionReportV1` in this scope
+  --> crates/core/chio-core-types/tests/recovery_p6_contracts.rs:31:31
+   |
+31 |     assert!(decode_contract::<DecisionReportV1>(&canonical_json_bytes(&body)?).is_err());
+   |                               ^^^^^^^^^^^^^^^^ not found in this scope
+   |
+help: you might be missing a type parameter
+   |
+22 | fn p6_product_report_bounds_closed_fields_and_redacted_debug<DecisionReportV1>() -> TestResult {
+   |                                                             ++++++++++++++++++
+
+error[E0425]: cannot find type `DecisionReportV1` in this scope
+  --> crates/core/chio-core-types/tests/recovery_p6_contracts.rs:34:31
+   |
+34 |     assert!(decode_contract::<DecisionReportV1>(&canonical_json_bytes(&body)?).is_err());
+   |                               ^^^^^^^^^^^^^^^^ not found in this scope
+   |
+help: you might be missing a type parameter
+   |
+22 | fn p6_product_report_bounds_closed_fields_and_redacted_debug<DecisionReportV1>() -> TestResult {
+   |                                                             ++++++++++++++++++
+
+error[E0425]: cannot find type `DecisionReportV1` in this scope
+  --> crates/core/chio-core-types/tests/recovery_p6_contracts.rs:37:31
+   |
+37 |     assert!(decode_contract::<DecisionReportV1>(&canonical_json_bytes(&body)?).is_err());
+   |                               ^^^^^^^^^^^^^^^^ not found in this scope
+   |
+help: you might be missing a type parameter
+   |
+22 | fn p6_product_report_bounds_closed_fields_and_redacted_debug<DecisionReportV1>() -> TestResult {
+   |                                                             ++++++++++++++++++
+
+error[E0425]: cannot find type `DecisionReportV1` in this scope
+  --> crates/core/chio-core-types/tests/recovery_p6_contracts.rs:40:31
+   |
+40 |     assert!(decode_contract::<DecisionReportV1>(&canonical_json_bytes(&body)?).is_err());
+   |                               ^^^^^^^^^^^^^^^^ not found in this scope
+   |
+help: you might be missing a type parameter
+   |
+22 | fn p6_product_report_bounds_closed_fields_and_redacted_debug<DecisionReportV1>() -> TestResult {
+   |                                                             ++++++++++++++++++
+
+error[E0425]: cannot find type `DecisionReportV1` in this scope
+  --> crates/core/chio-core-types/tests/recovery_p6_contracts.rs:42:31
+   |
+42 |     assert!(decode_contract::<DecisionReportV1>(duplicate.as_bytes()).is_err());
+   |                               ^^^^^^^^^^^^^^^^ not found in this scope
+   |
+help: you might be missing a type parameter
+   |
+22 | fn p6_product_report_bounds_closed_fields_and_redacted_debug<DecisionReportV1>() -> TestResult {
+   |                                                             ++++++++++++++++++
+
+error[E0422]: cannot find struct, variant or union type `DecisionReportV1` in this scope
+  --> crates/core/chio-core-types/tests/recovery_p6_contracts.rs:43:17
+   |
+43 |     let empty = DecisionReportV1 { reporter_text: ProtectedText::new(" ")?, ..report };
+   |                 ^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `PolicyMaintenanceProposalV1` in this scope
+  --> crates/core/chio-core-types/tests/recovery_p6_contracts.rs:48:25
+   |
+48 | fn proposal() -> Result<PolicyMaintenanceProposalV1, Box<dyn std::error::Error>> {
+   |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+   |
+help: you might be missing a type parameter
+   |
+48 | fn proposal<PolicyMaintenanceProposalV1>() -> Result<PolicyMaintenanceProposalV1, Box<dyn std::error::Error>> {
+   |            +++++++++++++++++++++++++++++
+
+error[E0422]: cannot find struct, variant or union type `PolicyTrajectoryRefV1` in this scope
+  --> crates/core/chio-core-types/tests/recovery_p6_contracts.rs:50:22
+   |
+50 |     let trajectory = PolicyTrajectoryRefV1 {
+   |                      ^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0422]: cannot find struct, variant or union type `PolicyMaintenanceProposalV1` in this scope
+  --> crates/core/chio-core-types/tests/recovery_p6_contracts.rs:59:8
+   |
+59 |     Ok(PolicyMaintenanceProposalV1 {
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0422]: cannot find struct, variant or union type `PolicyTrajectoryRefV1` in this scope
+  --> crates/core/chio-core-types/tests/recovery_p6_contracts.rs:70:65
+   |
+70 |         adversarial_trajectories: NonEmptyBoundedList::new(vec![PolicyTrajectoryRefV1 {
+   |                                                                 ^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `PolicyDeploymentChangeV1` in this scope
+  --> crates/core/chio-core-types/tests/recovery_p6_contracts.rs:79:23
+   |
+79 | fn change() -> Result<PolicyDeploymentChangeV1, Box<dyn std::error::Error>> {
+   |                       ^^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+   |
+help: you might be missing a type parameter
+   |
+79 | fn change<PolicyDeploymentChangeV1>() -> Result<PolicyDeploymentChangeV1, Box<dyn std::error::Error>> {
+   |          ++++++++++++++++++++++++++
+
+error[E0422]: cannot find struct, variant or union type `PolicyDeploymentChangeV1` in this scope
+  --> crates/core/chio-core-types/tests/recovery_p6_contracts.rs:80:8
+   |
+80 |     Ok(PolicyDeploymentChangeV1 {
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `RecoverySetupProbeV1` in this scope
+  --> crates/core/chio-core-types/tests/recovery_p6_contracts.rs:95:22
+   |
+95 | fn probe() -> Result<RecoverySetupProbeV1, Box<dyn std::error::Error>> {
+   |                      ^^^^^^^^^^^^^^^^^^^^ not found in this scope
+   |
+help: you might be missing a type parameter
+   |
+95 | fn probe<RecoverySetupProbeV1>() -> Result<RecoverySetupProbeV1, Box<dyn std::error::Error>> {
+   |         ++++++++++++++++++++++
+
+error[E0422]: cannot find struct, variant or union type `RecoverySetupProbeV1` in this scope
+  --> crates/core/chio-core-types/tests/recovery_p6_contracts.rs:96:8
+   |
+96 |     Ok(RecoverySetupProbeV1 {
+   |        ^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `PolicyMaintenanceProposalV1` in this scope
+   --> crates/core/chio-core-types/tests/recovery_p6_contracts.rs:118:31
+    |
+118 |     assert!(decode_contract::<PolicyMaintenanceProposalV1>(&canonical_json_bytes(&body)?).is_err());
+    |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+    |
+help: you might be missing a type parameter
+    |
+112 | fn p6_proposal_requires_both_trajectory_classes_and_an_actual_policy_change<PolicyMaintenanceProposalV1>() -> TestResult {
+    |                                                                            +++++++++++++++++++++++++++++
+
+error[E0425]: cannot find type `PolicyMaintenanceProposalV1` in this scope
+   --> crates/core/chio-core-types/tests/recovery_p6_contracts.rs:121:31
+    |
+121 |     assert!(decode_contract::<PolicyMaintenanceProposalV1>(&canonical_json_bytes(&body)?).is_err());
+    |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+    |
+help: you might be missing a type parameter
+    |
+112 | fn p6_proposal_requires_both_trajectory_classes_and_an_actual_policy_change<PolicyMaintenanceProposalV1>() -> TestResult {
+    |                                                                            +++++++++++++++++++++++++++++
+
+error[E0422]: cannot find struct, variant or union type `PolicyMaintenanceProposalV1` in this scope
+   --> crates/core/chio-core-types/tests/recovery_p6_contracts.rs:122:21
+    |
+122 |     let unchanged = PolicyMaintenanceProposalV1 { target_policy: proposal.base_policy, ..proposal };
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `SignedPolicyDeploymentChangeV1` in this scope
+   --> crates/core/chio-core-types/tests/recovery_p6_contracts.rs:135:22
+    |
+135 |         let decoded: SignedPolicyDeploymentChangeV1 = decode_contract(&canonical_json_bytes(&body)?)?;
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `SignedPolicyDeploymentChangeV1` in this scope
+   --> crates/core/chio-core-types/tests/recovery_p6_contracts.rs:140:18
+    |
+140 |     let decoded: SignedPolicyDeploymentChangeV1 = decode_contract(&canonical_json_bytes(&body)?)?;
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0422]: cannot find struct, variant or union type `RecoverySetupReportV1` in this scope
+   --> crates/core/chio-core-types/tests/recovery_p6_contracts.rs:153:18
+    |
+153 |     let report = RecoverySetupReportV1 {
+    |                  ^^^^^^^^^^^^^^^^^^^^^
+    |
+   ::: crates/security/chio-security-types/src/recovery/explanation/snapshot.rs:108:1
+    |
+108 | pub struct RecoverySnapshotV1 {
+    | ----------------------------- similarly named struct `RecoverySnapshotV1` defined here
+    |
+help: a struct with a similar name exists
+    |
+153 -     let report = RecoverySetupReportV1 {
+153 +     let report = RecoverySnapshotV1 {
+    |
+
+error[E0422]: cannot find struct, variant or union type `RecoverySetupReportV1` in this scope
+   --> crates/core/chio-core-types/tests/recovery_p6_contracts.rs:166:23
+    |
+166 |     let same_writer = RecoverySetupReportV1 { current_serving_fence: report.previous_serving_fence, ..report };
+    |                       ^^^^^^^^^^^^^^^^^^^^^
+    |
+   ::: crates/security/chio-security-types/src/recovery/explanation/snapshot.rs:108:1
+    |
+108 | pub struct RecoverySnapshotV1 {
+    | ----------------------------- similarly named struct `RecoverySnapshotV1` defined here
+    |
+help: a struct with a similar name exists
+    |
+166 -     let same_writer = RecoverySetupReportV1 { current_serving_fence: report.previous_serving_fence, ..report };
+166 +     let same_writer = RecoverySnapshotV1 { current_serving_fence: report.previous_serving_fence, ..report };
+    |
+
+error[E0422]: cannot find struct, variant or union type `RecoverySetupProbeV1` in this scope
+   --> crates/core/chio-core-types/tests/recovery_p6_contracts.rs:168:19
+    |
+168 |     let expired = RecoverySetupProbeV1 { expires_at_unix_ms: SafeInteger::new(901_001)?, ..probe()? };
+    |                   ^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0433]: failed to resolve: use of undeclared type `SignedPolicyDeploymentChangeV1`
+   --> crates/core/chio-core-types/tests/recovery_p6_contracts.rs:130:18
+    |
+130 |     let signed = SignedPolicyDeploymentChangeV1::sign(change()?, &key)?;
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ use of undeclared type `SignedPolicyDeploymentChangeV1`
+
+error[E0433]: failed to resolve: use of undeclared type `SignedRecoverySetupProbeV1`
+   --> crates/core/chio-core-types/tests/recovery_p6_contracts.rs:142:17
+    |
+142 |     let setup = SignedRecoverySetupProbeV1::sign(probe()?, &key)?;
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^ use of undeclared type `SignedRecoverySetupProbeV1`
+
+error[E0433]: failed to resolve: use of undeclared type `SignedRecoverySetupReportV1`
+   --> crates/core/chio-core-types/tests/recovery_p6_contracts.rs:163:18
+    |
+163 |     let signed = SignedRecoverySetupReportV1::sign(report.clone(), &key)?;
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ use of undeclared type `SignedRecoverySetupReportV1`
+
+error[E0433]: failed to resolve: use of undeclared type `SignedRecoverySetupReportV1`
+   --> crates/core/chio-core-types/tests/recovery_p6_contracts.rs:167:13
+    |
+167 |     assert!(SignedRecoverySetupReportV1::sign(same_writer, &key).is_err());
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^ use of undeclared type `SignedRecoverySetupReportV1`
+
+Some errors have detailed explanations: E0422, E0425, E0433.
+For more information about an error, try `rustc --explain E0422`.
+error: could not compile `chio-core-types` (test "recovery_p6_contracts") due to 29 previous errors

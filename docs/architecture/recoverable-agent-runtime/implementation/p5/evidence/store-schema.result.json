@@ -1,0 +1,29 @@
+{
+  "id": "store-schema",
+  "actual_command": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "chio-store-sqlite",
+    "--lib",
+    "admission_operation_store::tests::schema",
+    "--",
+    "--test-threads=1"
+  ],
+  "cwd": ".",
+  "environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2",
+    "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+  },
+  "exit_code": 0,
+  "status": "passed",
+  "started_unix_seconds": 1791161373,
+  "duration_seconds": 27.352,
+  "log": "evidence/store-schema.log",
+  "log_sha256": "9f071b962ff0b1145ed1693a4d44846ff8c34d0648cfe237751fdf26e18f87cf",
+  "required_for_local_phase_acceptance": true,
+  "source_binding": "562a3c3556f31e5afedbd7c7a426e542cc5e8cd51c28a7a43d8e9704ba4e9bc4"
+}

@@ -1,0 +1,21 @@
+
+running 16 tests
+test checkpoints_use_compare_and_swap_and_cancel_covers_descendants ... ok
+test a_duplicate_while_dispatch_is_live_does_not_create_a_second_effect ... ok
+test cancellation_withholds_inflight_output_and_prevents_further_calls ... ok
+test children_share_a_durable_tree_ceiling_and_cannot_widen_scope ... ok
+test concurrent_opens_cannot_overspend_the_last_call ... ok
+test conflicting_replay_and_capability_substitution_never_dispatch ... ok
+test dormant_parents_cannot_overallocate_sibling_shares_and_cancellation_does_not_reset_them ... ok
+test host_flow_identity_is_bound_to_the_original_process_operation ... ok
+test host_retains_process_signer_and_selects_exact_supplemental_route ... ok
+test journals_written_before_dispatch_attempts_keep_their_first_request_identity ... ok
+test narrowed_child_is_denied_by_the_real_kernel ... ok
+test logical_call_replays_original_signed_receipt_after_kernel_restart ... ok
+test never_invoked_ancestors_are_restored_before_a_grandchild_runs ... ok
+test process_count_depth_and_identity_reuse_are_bounded ... ok
+test opening_against_a_fresh_authority_or_ephemeral_kernel_is_rejected ... ok
+test invalid_process_lineage_produces_attributed_signed_denials_without_dispatch ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.84s
+

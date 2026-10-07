@@ -1,0 +1,11 @@
+
+running 6 tests
+test frost_conflicting_signing_package_burns_external_slot_and_local_nonce ... ok
+test frost_restart_after_external_completion_replays_share_and_erases_nonce ... ok
+test frost_restart_reconciles_external_burn_before_releasing_a_live_commitment ... ok
+test frost_restored_pre_transition_signer_snapshot_is_rejected_by_global_anchor ... ok
+test frost_signer_rejects_different_valid_bound_checkpoint_for_same_message ... ok
+test frost_signer_persists_exact_outputs_across_every_restart_and_zeroizes_nonce ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.15s
+

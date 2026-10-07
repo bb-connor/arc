@@ -1,0 +1,1502 @@
+   Compiling semver v1.0.27
+   Compiling zeroize v1.9.0
+   Compiling parking_lot_core v0.9.12
+   Compiling errno v0.3.14
+   Compiling ahash v0.8.12
+   Compiling serde_json v1.0.149
+   Compiling toml_edit v0.22.27
+   Compiling rand_chacha v0.9.0
+   Compiling schemars v0.8.22
+   Compiling serde_tokenstream v0.2.3
+   Compiling generic-array v0.14.7
+   Compiling der v0.7.10
+   Compiling rustc_version v0.4.1
+   Compiling parking_lot v0.12.5
+   Compiling rustix v1.1.4
+   Compiling rand v0.9.2
+   Compiling curve25519-dalek v4.1.3
+   Compiling referencing v0.46.0
+   Compiling heapless v0.7.17
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling block-padding v0.3.3
+   Compiling digest v0.10.7
+   Compiling inout v0.1.4
+   Compiling cipher v0.4.4
+   Compiling sha2 v0.10.9
+   Compiling hmac v0.12.1
+   Compiling signature v2.2.0
+   Compiling salsa20 v0.10.2
+   Compiling pbkdf2 v0.12.2
+   Compiling cbc v0.1.2
+   Compiling aes v0.8.4
+   Compiling scrypt v0.11.0
+   Compiling chio-security-types v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-security-types)
+   Compiling typify-impl v0.4.3
+   Compiling spki v0.7.3
+   Compiling jsonschema v0.46.0
+   Compiling pkcs5 v0.7.1
+   Compiling tempfile v3.27.0
+   Compiling ring v0.17.14
+   Compiling rusty-fork v0.3.1
+   Compiling pkcs8 v0.10.2
+   Compiling proptest v1.10.0
+   Compiling ed25519 v2.2.3
+   Compiling ed25519-dalek v2.2.0
+   Compiling toml v0.8.23
+   Compiling rs_merkle v1.5.0
+   Compiling signal-hook-registry v1.4.8
+   Compiling rustls-pki-types v1.14.0
+   Compiling mio v1.1.1
+   Compiling socket2 v0.6.3
+   Compiling aws-lc-rs v1.18.1 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/third_party/aws-lc-rs-chio)
+   Compiling tokio v1.50.0
+   Compiling postcard v1.1.3
+   Compiling sha3 v0.10.8
+   Compiling frost-core v3.0.0
+   Compiling alloy-primitives v1.5.7
+   Compiling ff v0.13.1
+   Compiling group v0.13.0
+   Compiling sec1 v0.7.3
+   Compiling hkdf v0.12.4
+   Compiling crypto-bigint v0.5.5
+   Compiling frost-rerandomized v3.0.0
+   Compiling security-framework-sys v2.17.0
+   Compiling rustls-webpki v0.103.15
+   Compiling frost-ed25519 v3.0.0
+   Compiling core-foundation v0.10.1
+   Compiling rustls v0.23.45
+   Compiling elliptic-curve v0.13.8
+   Compiling ruint v1.20.0
+   Compiling bytes v1.11.1
+   Compiling const-hex v1.18.1
+   Compiling alloy-sol-type-parser v1.5.7
+   Compiling security-framework v3.7.0
+   Compiling rand_chacha v0.3.1
+   Compiling rfc6979 v0.4.0
+   Compiling rand v0.8.6
+   Compiling typify-macro v0.4.3
+   Compiling ecdsa v0.16.9
+   Compiling primeorder v0.13.6
+   Compiling cpufeatures v0.3.0
+   Compiling sha2 v0.11.0
+   Compiling alloy-json-abi v1.5.7
+   Compiling pkcs1 v0.7.5
+   Compiling num-bigint-dig v0.8.6
+   Compiling universal-hash v0.5.1
+   Compiling oauth2 v5.0.0
+   Compiling poly1305 v0.8.0
+   Compiling tls_codec v0.4.2
+   Compiling p384 v0.13.1
+   Compiling typify v0.4.3
+   Compiling p256 v0.13.2
+   Compiling jsonwebtoken v10.4.0
+   Compiling chio-spec-codegen v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/tooling/chio-spec-codegen)
+   Compiling rsa v0.9.10
+   Compiling sha1 v0.10.6
+   Compiling aead v0.5.2
+   Compiling hyper v1.8.1
+   Compiling tokio-util v0.7.18
+   Compiling tower v0.5.3
+   Compiling openidconnect v4.0.1
+   Compiling alloy-sol-macro-input v1.5.7
+   Compiling tower-http v0.6.8
+   Compiling alloy-sol-macro-expander v1.5.7
+   Compiling hyper-util v0.1.20
+   Compiling crypto_secretbox v0.1.1
+   Compiling x509-cert v0.2.5
+   Compiling scrypt v0.12.0
+   Compiling pairing v0.23.0
+   Compiling webpki-roots v1.0.6
+   Compiling rusqlite v0.39.0
+   Compiling webpki-roots v0.26.11
+   Compiling bls12_381_plus v0.8.13
+   Compiling jsonwebtoken v9.3.1
+   Compiling tokio-rustls v0.26.4
+   Compiling rustls-platform-verifier v0.6.2
+   Compiling tough v0.22.0
+   Compiling x509-parser v0.16.0
+   Compiling dashmap v6.1.0
+   Compiling affinidi-bbs v0.1.0
+   Compiling hyper-rustls v0.27.7
+   Compiling reqwest v0.13.2
+   Compiling ureq v2.12.1
+   Compiling uuid v1.22.0
+   Compiling is-terminal v0.4.17
+   Compiling alloy-sol-macro v1.5.7
+   Compiling env_logger v0.10.2
+   Compiling chio-sqlite-file-identity v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-sqlite-file-identity)
+   Compiling serde_yaml_ng v0.10.0
+   Compiling chio-spec-validate v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/tooling/chio-spec-validate)
+   Compiling opentimestamps v0.2.0
+   Compiling alloy-sol-types v1.5.7
+   Compiling oci-client v0.17.0
+   Compiling chio-egress-contract v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/protocol/chio-egress-contract)
+   Compiling alloy-core v1.5.7
+   Compiling alloy v1.8.3
+   Compiling chio-web3-bindings v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-web3-bindings)
+   Compiling sigstore v0.14.0
+   Compiling chio-core-types v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-core-types)
+   Compiling chio-semantic-contracts v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-semantic-contracts)
+   Compiling chio-recovery v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-recovery)
+   Compiling chio-listing v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-listing)
+   Compiling chio-revocation-oracle v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-revocation-oracle)
+   Compiling chio-pheromone v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-pheromone)
+   Compiling chio-fincred v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-fincred)
+   Compiling chio-did v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-did)
+   Compiling chio-attest-verify v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-attest-verify)
+   Compiling chio-lineage v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/observability/chio-lineage)
+   Compiling chio-kernel-core v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-kernel-core)
+   Compiling chio-quarantine v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-quarantine)
+   Compiling chio-finding v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-finding)
+   Compiling chio-custody-hw v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-custody-hw)
+   Compiling chio-weights v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-weights)
+   Compiling chio-disclosure-lineage v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-disclosure-lineage)
+   Compiling chio-runtime-proof-parity v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-runtime-proof-parity)
+   Compiling chio-swarm-authority v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-swarm-authority)
+   Compiling chio-eval-receipt v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/sdk/chio-eval-receipt)
+   Compiling chio-flow v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-flow)
+   Compiling chio-fiscal v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-fiscal)
+   Compiling chio-governance v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-governance)
+   Compiling chio-appraisal v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-appraisal)
+   Compiling chio-open-market v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-open-market)
+   Compiling xtask v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/xtask)
+   Compiling chio-underwriting v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-underwriting)
+   Compiling chio-federation v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-federation)
+   Compiling chio-credit v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-credit)
+   Compiling chio-web3 v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-web3)
+   Compiling chio-market v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-market)
+   Compiling chio-autonomy v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-autonomy)
+   Compiling chio-core v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-core)
+   Compiling chio-manifest v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-manifest)
+   Compiling chio-settle v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-settle)
+   Compiling chio-workflow v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-workflow)
+   Compiling chio-link v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-link)
+   Compiling chio-selective-disclosure v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-selective-disclosure)
+   Compiling chio-tool-call-fabric v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/protocol/chio-tool-call-fabric)
+   Compiling chio-attest-buyer-core v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-attest-buyer-core)
+   Compiling chio-kernel v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-kernel)
+   Compiling chio-runtime-core v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-runtime-core)
+   Compiling chio-anchor v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-anchor)
+   Compiling chio-formal-diff-tests v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/formal/diff-tests)
+    Finished `test` profile [unoptimized] target(s) in 1m 39s
+     Running unittests src/lib.rs (target/debug/deps/chio_core_types-a2dadb27e2942e82)
+
+running 425 tests
+test canonical::tests::arrays ... ok
+test canonical::tests::empty_array ... ok
+test canonical::tests::integers ... ok
+test canonical::tests::empty_object ... ok
+test canonical::tests::deeply_nested ... ok
+test canonical::tests::deterministic_output ... ok
+test canonical::tests::canonical_bytes_from_value_matches_canonicalizer ... ok
+test canonical::tests::del_and_c1_controls_pass_through_per_rfc8785 ... ok
+test canonical::tests::canonical_bytes_newtype_matches_existing_bytes ... ok
+test canonical::tests::canonical_bytes_match_string ... ok
+test canonical::tests::negative_zero_is_zero ... ok
+test canonical::tests::nested_objects ... ok
+test canonical::tests::null_and_booleans ... ok
+test canonical::tests::numeric_string_keys_sort_by_code_units ... ok
+test canonical::tests::non_finite_rejected ... ok
+test canonical::tests::sorted_keys_basic ... ok
+test canonical::tests::rfc8785_section3_number_examples ... ok
+test canonical::tests::jcs_numbers ... ok
+test canonical::tests::rfc8785_mixed_document ... ok
+test canonical::tests::sorted_keys_utf16_code_units ... ok
+test canonical::tests::strict_preserves_unicode_key_ordering ... ok
+test canonical::tests::strict_accepts_safe_range_boundary ... ok
+test canonical::tests::strict_bytes_match_string ... ok
+test canonical::tests::strict_rejects_duplicate_keys_last_wins_collapse_proof ... ok
+test canonical::tests::strict_rejects_duplicate_keys_nested ... ok
+test canonical::tests::strict_matches_typed_path_for_wellformed_ijson ... ok
+test canonical::tests::strict_rejects_duplicate_keys ... ok
+test canonical::tests::strict_accepts_exactly_representable_fractional ... ok
+test canonical::tests::strict_accepts_genuine_fractionals ... ok
+test canonical::tests::strict_rejects_integer_literal_beyond_safe_range ... ok
+test canonical::tests::strict_rejects_integer_valued_float_form ... ok
+test canonical::tests::strict_rejects_negative_integer_literal_beyond_safe_range ... ok
+test canonical::tests::strict_rejects_huge_integer_literal_that_overflows_u64 ... ok
+test canonical::tests::strict_rejects_non_finite_via_overflow ... ok
+test canonical::tests::strict_rejects_rounded_fractional_f64 ... ok
+test canonical::tests::strict_rejects_safe_range_boundary_plus_one ... ok
+test canonical::tests::strict_rejects_same_digit_count_different_value ... ok
+test canonical::tests::strict_rejects_over_precise_fractional ... ok
+test canonical::tests::strict_roundtrips_losslessly ... ok
+test canonical::tests::string_escaping ... ok
+test canonical::tests::unicode_passthrough ... ok
+test canonical::tests::write_canonical_value_matches_public_canonicalize ... ok
+test canonical::tests::strict_rejects_trailing_data ... ok
+test capability::aggregate_invocation_tests::aggregate_invocation_absent_field_preserves_signing_bytes ... ok
+test capability::aggregate_invocation_tests::aggregate_invocation_nested_shapes_reject_unknown_fields ... ok
+test capability::aggregate_invocation_tests::aggregate_invocation_present_field_disables_legacy_body_fallback ... ok
+test capability::aggregate_invocation_tests::aggregate_invocation_capability_scope_rejects_all_delegation_grants ... ok
+test capability::aggregate_invocation_tests::aggregate_invocation_all_nested_shapes_reject_unknown_fields ... ok
+test capability::aggregate_invocation_tests::aggregate_invocation_backend_binding_survives_root_round_trip ... ok
+test capability::aggregate_invocation_tests::aggregate_invocation_family_root_and_descendant_share_owner ... ok
+test capability::aggregate_invocation_tests::aggregate_invocation_rejects_family_creation_below_unbound_root ... ok
+test capability::aggregate_invocation_tests::aggregate_invocation_rejects_changed_maximum_and_binding_graft ... ok
+test capability::aggregate_invocation_tests::aggregate_invocation_rejects_descendant_maximum_changes_and_scope_conversion ... ok
+test capability::aggregate_invocation_tests::aggregate_invocation_authenticates_ordinary_root_delegation_bounds ... ok
+test capability::aggregate_invocation_tests::aggregate_invocation_delegate_projects_marker_across_hops ... ok
+test capability::aggregate_invocation_tests::aggregate_invocation_root_helper_rejects_delegated_body ... ok
+test capability::aggregate_invocation_tests::aggregate_invocation_rejects_untrusted_leaf_and_final_subject_mismatch ... ok
+test capability::aggregate_invocation_tests::aggregate_invocation_rejects_forged_root_fields ... ok
+test capability::aggregate_invocation_tests::aggregate_invocation_rejects_wrong_root_binding_signature ... ok
+test capability::aggregate_invocation_tests::aggregate_invocation_rejects_untrusted_root_and_tampered_chain ... ok
+test capability::aggregate_invocation_tests::aggregate_invocation_rejects_widened_or_predated_descendant ... ok
+test capability::aggregate_invocation_tests::delegation_marker_rejects_noncanonical_root_digest ... ok
+test capability::aggregate_invocation_tests::aggregate_invocation_rejects_multi_hop_scope_pivot_and_intermediate_predating ... ok
+test capability::aggregate_invocation_tests::aggregate_invocation_root_evidence_detects_first_hop_omission ... ok
+test capability::aggregate_invocation_tests::aggregate_invocation_rejects_each_changed_root_commitment_field ... ok
+test capability::caveat_and_delegation_guard_tests::capability_caveats_reject_fail_closed_until_admission_enforces_them ... ok
+test capability::caveat_and_delegation_guard_tests::delegate_rejects_child_grant_without_delegate_on_covering_parent_grant ... ok
+test capability::aggregate_invocation_tests::aggregate_invocation_zero_limit_round_trips_and_verifies ... ok
+test capability::cumulative_approval_tests::cumulative_approval_delegable_direct_signing_requires_family_helper ... ok
+test capability::caveat_and_delegation_guard_tests::security_binding_mutation_invalidates_capability_signature ... ok
+test capability::caveat_and_delegation_guard_tests::security_binding_is_canonical_signed_and_strict ... ok
+test capability::backend_identity_tests::capability_and_budget_roots_refuse_a_retired_original_signer ... ok
+test capability::cumulative_approval_tests::cumulative_approval_delegation_rejects_fresh_constraint ... ok
+test capability::cumulative_approval_tests::cumulative_approval_direct_nondelegable_constraint_has_no_family_binding ... ok
+test capability::cumulative_approval_tests::cumulative_approval_delegation_rejects_binding_mutation ... ok
+test capability::cumulative_approval_tests::cumulative_approval_delegation_rejects_omission ... ok
+test capability::cumulative_approval_tests::aggregate_and_cumulative_roots_require_a_joint_binding ... ok
+test capability::cumulative_approval_tests::cumulative_approval_backend_root_round_trip ... ok
+test capability::cumulative_approval_tests::cumulative_approval_link_scope_hash_authenticates_bound_root_scope ... ok
+test capability::backend_identity_tests::capability_and_budget_roots_reject_mismatched_atomic_results ... ok
+test capability::backend_identity_tests::capability_and_budget_roots_use_the_original_atomic_identity ... ok
+test capability::cumulative_approval_tests::cumulative_approval_grafted_grant_binding_rejects ... ok
+test capability::cumulative_approval_tests::cumulative_approval_identical_budget_fields_on_distinct_grants_have_distinct_owners ... ok
+test capability::cumulative_approval_tests::cumulative_approval_wire_is_distinct_from_legacy_per_request_threshold ... ok
+test capability::cumulative_approval_tests::cumulative_approval_root_binds_signer_key_epoch ... ok
+test capability::cumulative_approval_tests::cumulative_approval_wire_rejects_unknown_fields ... ok
+test capability::delegation_trust_root_tests::delegation_chain_trust_root_rejects_mismatched_first_scope_hash ... ok
+test capability::delegation_trust_root_tests::delegation_chain_trust_root_accepts_matching_first_scope_hash ... ok
+test capability::cumulative_approval_tests::cumulative_approval_projection_preserves_sparse_grant_indices ... ok
+test capability::delegation_trust_root_tests::delegation_chain_trust_root_rejects_multi_hop_without_per_hop_witnesses ... ok
+test capability::tests::active_response_intent_checks_plan_body_hash_and_effect_order ... ok
+test capability::tests::attenuated_capability_chain_binding_feature_disabled_fails_closed ... ok
+test capability::tests::attenuated_capability_requires_attenuation_proof ... ok
+test capability::cumulative_approval_tests::cumulative_approval_marker_is_bounded_sorted_and_deduplicated ... ok
+test capability::tests::attenuation_proof_validation_rejects_non_subset_scope ... ok
+test capability::tests::attenuation_witness_roundtrip_and_forgery_rejection ... ok
+test capability::tests::attenuation_serde_roundtrip ... ok
+test capability::tests::bac573_approval_token_verify_at_bad_signature_fails_first ... ok
+test capability::cumulative_approval_tests::cumulative_approval_verifier_rejects_unrelated_root_evidence ... ok
+test capability::cumulative_approval_tests::cumulative_approval_family_root_and_sibling_share_owner ... ok
+test capability::tests::attenuated_capability_schema_and_budget_fail_closed ... ok
+test capability::tests::bac573_approval_token_verify_at_window_enforced ... ok
+test capability::tests::bac573_capability_token_verify_at_expired_is_rejected ... ok
+test capability::tests::bac573_capability_token_verify_at_within_window_passes ... ok
+test capability::tests::bac573_capability_token_verify_at_not_yet_valid_is_rejected ... ok
+test capability::cumulative_approval_tests::cumulative_approval_rejects_multi_hop_scope_pivot_and_intermediate_predating ... ok
+test capability::tests::bac573_capability_token_verify_with_floor_at_folds_time_and_floor ... ok
+test capability::cumulative_approval_tests::cumulative_approval_rejects_every_root_binding_field_mutation ... ok
+test capability::cumulative_approval_tests::cumulative_approval_rejects_link_witness_and_receipt_projection_changes ... ok
+test capability::tests::bac573_continuation_token_verify_at_bad_signature_fails_first ... ok
+test capability::tests::bac573_continuation_token_verify_at_window_enforced ... ok
+test capability::tests::capability_negotiation_preserves_explicit_disabled_features ... ok
+test capability::tests::capability_negotiation_intersection_rejects_malformed_feature ... ok
+test capability::tests::bac573_capability_token_verify_with_floor_at_bad_signature_fails_first ... ok
+test capability::tests::bac573_capability_token_verify_at_bad_signature_fails_before_time_check ... ok
+test capability::tests::bac573_upstream_proof_verify_at_bad_signature_fails_first ... ok
+test capability::tests::bac573_upstream_proof_verify_at_window_enforced ... ok
+test capability::tests::constraint_serde_roundtrip ... ok
+test capability::tests::call_chain_continuation_token_roundtrip_and_matching_helpers ... ok
+test capability::tests::capability_token_backend_signing_with_ed25519_verifies ... ok
+test capability::tests::chain_binding_disabled_does_not_reject_v1_tokens ... ok
+test capability::tests::capability_token_signature_verification ... ok
+test capability::tests::capability_token_serde_roundtrip ... ok
+test capability::cumulative_approval_tests::cumulative_approval_rejects_root_binding_and_first_marker_grafts ... ok
+test capability::tests::delegate_accepts_valid_narrowing_step ... ok
+test capability::tests::delegate_accepts_wildcard_remove_operation_step_reflected_in_concrete_child ... ok
+test capability::tests::delegate_rejects_concrete_remove_operation_step_not_reflected_in_wildcard_child ... ok
+test capability::tests::delegate_honors_wildcard_parent_grant_in_step_validation ... ok
+test capability::tests::delegate_rejects_cost_step_currency_switch ... ok
+test capability::tests::delegate_allows_omitted_share_for_full_share_parent ... ok
+test capability::tests::delegate_enforces_parent_relative_budget_share ... ok
+test capability::tests::delegate_mints_signed_link_for_subset_scope ... ok
+test capability::tests::delegate_rejects_parent_without_delegate_operation ... ok
+test capability::tests::delegate_rejects_extending_expiry ... ok
+test capability::tests::delegate_rejects_signed_at_at_or_after_parent_expiry ... ok
+test capability::tests::delegate_rejects_step_for_unknown_tool ... ok
+test capability::tests::delegate_rejects_step_not_reflected_in_child ... ok
+test capability::tests::delegate_rejects_widening_step ... ok
+test capability::tests::delegate_rejects_widening_scope ... ok
+test capability::tests::delegate_rejects_parent_before_issued_at ... ok
+test capability::tests::delegate_rejects_tampered_parent_signature ... ok
+test capability::tests::delegate_rejects_wildcard_remove_operation_step_not_reflected_in_concrete_child ... ok
+test capability::tests::delegation_chain_exceeds_depth ... ok
+test capability::tests::delegation_link_serde_roundtrip ... ok
+test capability::tests::delegation_chain_broken_connectivity ... ok
+test capability::tests::delegation_chain_invalid_signature ... ok
+test capability::tests::delegate_requires_child_share_under_attenuated_parent ... ok
+test capability::tests::delegation_chain_valid ... ok
+test capability::tests::governed_call_chain_provenance_separates_asserted_and_verified_views ... ok
+test capability::tests::ed25519_capability_token_is_byte_identical_without_algorithm_field ... ok
+test capability::tests::empty_child_scope_attenuation_proof_survives_serialization ... ok
+test capability::tests::delegation_chain_non_monotonic_timestamps ... ok
+test capability::tests::delegate_searches_all_matching_grants_for_step_narrowing ... ok
+test capability::tests::grant_subset_with_constraints ... ok
+test capability::tests::governed_intents::bound_tool_invocation_intent_hash_commits_canonical_parameters ... ok
+test capability::tests::grant_subset_with_invocation_budget ... ok
+test capability::tests::delegate_rejects_wrong_delegator_key ... ok
+test capability::tests::grant_subset_with_wildcard_server ... ok
+test capability::tests::metered_billing_quote_validity_window_respects_optional_expiry ... ok
+test capability::tests::operation_serde_roundtrip ... ok
+test capability::tests::runtime_attestation_evidence_validity_window_is_half_open ... ok
+test capability::tests::governed_intents::governed_transaction_intent_binding_hash_changes_with_payload ... ok
+test capability::tests::runtime_attestation_normalizes_spiffe_runtime_identity ... ok
+test capability::tests::runtime_attestation_rejects_conflicting_explicit_workload_identity ... ok
+test capability::tests::governed_upstream_call_chain_proof_roundtrip_and_context_extraction ... ok
+test capability::tests::runtime_attestation_trust_policy_matches_google_family_and_required_assertions ... ok
+test capability::tests::runtime_attestation_trust_policy_covers_remaining_fail_closed_paths ... ok
+test capability::tests::runtime_attestation_trust_policy_rejects_disallowed_attestation_type ... ok
+test capability::tests::runtime_attestation_trust_policy_rebinds_effective_tier ... ok
+test capability::tests::scope_subset_fewer_grants ... ok
+test capability::tests::governed_approval_token_signature_roundtrip ... ok
+test capability::tests::runtime_attestation_trust_policy_rejects_missing_required_assertion ... ok
+test capability::tests::requires_chain_binding_tracks_only_new_attenuation ... ok
+test capability::tests::runtime_attestation_trust_policy_rejects_stale_verified_evidence ... ok
+test capability::tests::scope_not_subset_different_server ... ok
+test capability::tests::runtime_attestation_trust_policy_rejects_untrusted_verifier ... ok
+test capability::tests::scope_not_subset_different_tool ... ok
+test capability::tests::scope_subset_fewer_operations ... ok
+test capability::tests::scope_subset_same ... ok
+test capability::tests::scope_subset_wildcard_tool ... ok
+test capability::tests::validate_attenuation_escalation_fails ... ok
+test capability::tests::validate_attenuation_ok ... ok
+test capability::tests::workload_identity_parses_spiffe_uri ... ok
+test capability::tests::workload_identity_rejects_invalid_spiffe_variants ... ok
+test capability::tests::plain_delegated_token_without_attenuation_proof_verifies_and_skips_chain_binding ... ok
+test capability::tests::workload_identity_validation_and_runtime_identity_conflicts_cover_remaining_paths ... ok
+test capability::threshold_approval::tests::duplicate_keys_and_invalid_quorums_reject ... ok
+test capability::tests::legacy_body_signed_capability_token_still_verifies ... ok
+test capability::tests::time_validation ... ok
+test capability::threshold_approval::tests::eligible_set_digest_is_order_independent ... ok
+test crypto::tests::algorithm_enum_defaults_to_ed25519 ... ok
+test crypto::ed25519_verification::tests::ordinary_success_never_satisfies_strict_verification ... ok
+test crypto::ed25519_verification::tests::failures_are_rechecked ... ok
+test capability::tests::wrong_key_signature_fails ... ok
+test crypto::tests::canonical_json_key_order ... ok
+test crypto::tests::atomic_signing_rejects_a_signature_from_another_identity ... ok
+test crypto::tests::deterministic_from_seed ... ok
+test crypto::tests::ed25519_hex_is_bare_64_chars ... ok
+test crypto::tests::backend_signing_reuses_supplied_shared_canonical_bytes ... ok
+test crypto::tests::keypair_seed_hex_roundtrip ... ok
+test crypto::tests::atomic_signing_outcome_binds_identity_algorithm_and_signature ... ok
+test crypto::tests::ed25519_backend_round_trip ... ok
+test crypto::ed25519_verification::tests::repeated_success_reuses_only_the_same_verification_input ... ok
+test crypto::tests::non_ed25519_as_bytes_fails_closed ... ok
+test crypto::tests::pubkey_hex_roundtrip ... ok
+test crypto::tests::pubkey_hex_with_0x_prefix ... ok
+test crypto::tests::rejects_non_matching_algorithm_pair ... ok
+test crypto::tests::pubkey_serde_roundtrip ... ok
+test crypto::tests::sha256_hex_known_value ... ok
+test crypto::tests::strict_verification_rejects_weak_ed25519_key ... ok
+test capability::threshold_approval_tests::threshold_approval_proposal_and_set_bind_complete_artifacts ... ok
+test crypto::tests::sign_canonical_roundtrip ... ok
+test crypto::tests::signature_hex_roundtrip ... ok
+test crypto::tests::sign_and_verify ... ok
+test crypto::tests::wrong_key_fails ... ok
+test crypto::tests::signature_serde_roundtrip ... ok
+test crypto::tests::sign_canonical_shared_returns_shared_canonical_bytes ... ok
+test crypto::tests::wrong_message_fails ... ok
+test capability::threshold_approval::tests::oversized_eligible_set_rejects ... ok
+test declassification::tests::domain_separated_signature_round_trips_strictly ... ok
+test delegation_receipt::tests::aggregate_budget_projection_must_match_signed_link ... ok
+test delegation_receipt::tests::nonce_rejects_wrong_length_hex ... ok
+test delegation_receipt::tests::nonce_round_trips_as_hex ... ok
+test delegation_receipt::tests::scope_attenuation_helpers_default_and_from_steps ... ok
+test declassification::tests::substituted_body_and_unknown_envelope_field_reject ... ok
+test delegation_receipt::tests::receipt_canonical_bytes_round_trip ... ok
+test delegation_receipt::tests::complete_chain_appends_minted_link ... ok
+test delegation_receipt::tests::receipt_rejects_unknown_fields ... ok
+test delegation_receipt::tests::receipt_canonical_bytes_are_byte_stable ... ok
+test economic_continuity_anchor_tests::completed_effect_authority_requires_the_exact_anchored_slot ... ok
+test economic_continuity_anchor_tests::batch_verifier_rejects_an_incomplete_multi_resource_projection ... ok
+test economic_continuity_anchor_tests::effect_slot_decoder_binds_outer_anchor_namespace_and_lifecycle ... ok
+test economic_continuity_anchor_tests::cancellation_requires_a_strict_lifecycle_fence_advance ... ok
+test economic_continuity_anchor_tests::batch_advance_rechecks_current_heads_sequence_signature_and_consumer_proofs ... ok
+test economic_continuity_anchor_tests::generic_batch_qualification_rejects_effect_dispatch_transitions ... ok
+test economic_continuity_anchor_tests::effect_dispatch_requires_the_exact_current_target_resource_head ... ok
+test economic_continuity_anchor_tests::readiness_is_false_for_missing_behind_ahead_and_divergent_views ... ok
+test economic_continuity_anchor_tests::generic_batch_qualification_rejects_no_effect_transitions ... ok
+test economic_continuity_anchor_tests::n_of_m_transition_verifier_binds_the_complete_frost_authorization ... ok
+test crypto::ed25519_verification::tests::eviction_and_borrow_conflicts_fall_back_to_real_verification ... ok
+test economic_continuity_anchor_tests::batch_commit_requires_exact_request_replays ... ok
+test economic_continuity_anchor_tests::target_status_and_idempotent_retry_require_separate_qualification ... ok
+test economic_continuity_tests::batch_rejects_unsorted_duplicate_and_tampered_transitions ... ok
+test economic_continuity_anchor_tests::retained_request_mapping_rejects_conflict_before_batch_cas ... ok
+test economic_continuity_anchor_tests::signed_anchor_view_authenticates_values_absence_and_pins ... ok
+test economic_continuity_tests::permanent_request_replay_mapping_rejects_conflicting_truth ... ok
+test economic_continuity_tests::post_dispatch_no_effect_requires_verified_post_commit_proof ... ok
+test economic_continuity_tests::effect_slots_enforce_closed_transition_graph_and_retained_terminal_bytes ... ok
+test economic_continuity_anchor_tests::prepared_effect_batches_require_explicit_admission_verification ... ok
+test economic_continuity_tests::resource_heads_reject_regression_and_wrong_predecessor ... ok
+test economic_continuity_anchor_tests::anchor_view_and_dispatch_commit_wire_schemas_match_signed_values ... ok
+test economic_continuity_anchor_tests::dispatch_commit_retains_the_exact_target_resource_head ... ok
+test economic_continuity_tests::unknown_fields_and_unknown_versions_fail_closed ... ok
+test hashing::tests::test_concat_hashes ... ok
+test hashing::tests::test_hash_display ... ok
+test hashing::tests::test_hash_from_hex ... ok
+test hashing::tests::test_hash_serde ... ok
+test hashing::tests::test_sha256 ... ok
+test hashing::tests::test_sha256_hex ... ok
+test hashing::tests::test_zero_hash ... ok
+test loaded_weights::tests::byte_slice_implements_loaded_weights ... ok
+test loaded_weights::tests::digest_matches_sha256_known_vector ... ok
+test manifest::tests::manifest_sign_and_verify ... ok
+test loaded_weights::tests::chunked_digest_matches_single_slice_digest ... ok
+test economic_continuity_tests::signed_batch_round_trips_with_stable_canonical_identity ... ok
+test manifest::tests::tool_annotations_default ... ok
+test manifest::tests::manifest_wrong_key_fails ... ok
+test manifest::tests::tool_annotations_reject_legacy_duration ... ok
+test manifest::tests::manifest_serde_roundtrip ... ok
+test manifest::tests::tool_definition_serde_roundtrip ... ok
+test merkle::tests::consistency_deserialization_rejects_overlong_paths_before_growth ... ok
+test merkle::tests::consistency_fixed_paths_match_rfc_6962_example_shape ... ok
+test merkle::tests::consistency_fixed_roots_match_rfc_6962_tree_hashing ... ok
+test merkle::tests::consistency_generation_rejects_zero_and_oversized_old_tree ... ok
+test merkle::tests::consistency_proof_rejects_tampered_roots_and_proofs ... ok
+test merkle::tests::consistency_proof_size_edge_cases ... ok
+test merkle::tests::consistency_rejects_malformed_proofs_and_roots ... ok
+test economic_continuity_anchor_tests::only_signed_cas_commit_mints_effect_dispatch_authority ... ok
+test merkle::tests::empty_tree_fails ... ok
+test merkle::tests::from_hashes_matches_from_leaves ... ok
+test merkle::tests::inclusion_proof_rejects_wrong_leaf ... ok
+test economic_continuity_tests::batch_binds_prepared_effect_slot_and_request_replay ... ok
+test merkle::tests::inclusion_proofs_roundtrip ... ok
+test merkle::tests::proof_out_of_bounds ... ok
+test merkle::tests::proof_serialization_roundtrip ... ok
+test merkle::tests::single_leaf_tree ... ok
+test merkle::tests::standard_build_node_hash_uses_rfc6962_sha256 ... ok
+test economic_continuity_tests::wire_schemas_accept_canonical_values_and_reject_one_field_tampering ... ok
+test merkle::tests::consistency_all_pairs_verify_through_sixteen_leaves ... ok
+test economic_continuity_tests::composite_prepared_effect_batch_accepts_two_exact_operation_owners ... ok
+test economic_continuity_anchor_tests::only_verified_cancellation_cas_mints_no_dispatch_authority ... ok
+test merkle::tests::two_leaf_tree ... ok
+test message::tests::agent_message_heartbeat_serde_roundtrip ... ok
+test merkle::tests::verify_hash_works ... ok
+test message::tests::agent_message_list_capabilities_serde_roundtrip ... ok
+test message::tests::agent_message_tool_call_authorization_fields_are_optional_on_the_wire ... ok
+test message::tests::agent_message_tool_call_serde_roundtrip ... ok
+test message::tests::kernel_message_capability_revoked_serde_roundtrip ... ok
+test message::tests::kernel_message_tool_chunk_serde_roundtrip ... ok
+test message::tests::tool_call_error_serde_roundtrip ... ok
+test message::tests::tool_call_result_cancelled_serde_roundtrip ... ok
+test merkle_fixtures::tests::bounded_fixtures_match_real_tree_builder ... ok
+test message::tests::authorization_conflict_rejects_incompatible_approval_sets ... ok
+test message::tests::tool_call_result_err_serde_roundtrip ... ok
+test message::tests::tool_call_result_incomplete_serde_roundtrip ... ok
+test message::tests::tool_call_result_ok_serde_roundtrip ... ok
+test message::tests::tool_call_result_stream_complete_serde_roundtrip ... ok
+test plan::tests::aggregate_all_denied ... ok
+test plan::tests::aggregate_all_allowed ... ok
+test message::tests::kernel_message_tool_response_serde_roundtrip ... ok
+test plan::tests::aggregate_partially_denied ... ok
+test plan::tests::aggregate_empty_plan_is_allowed ... ok
+test plan::tests::planned_call_roundtrips_through_serde ... ok
+test provider_attempt::tests::checkpoint_and_nested_binding_substitution_fail ... ok
+test provider_attempt::tests::cancellation_and_execution_fences_are_enforced ... ok
+test merkle::tests::root_matches_recursive_reference ... ok
+test receipt::authoritative_spend::tests::guarantee_floor_fails_when_below_minimum ... ok
+test receipt::authoritative_spend::tests::authoritative_receipt_with_bound_nonce_passes ... ok
+test provider_attempt::tests::predecessor_sequence_and_immutable_payload_changes_fail ... ok
+test provider_attempt::tests::canonical_digests_are_stable_and_domain_separated ... ok
+test provider_attempt::tests::exact_lifecycle_and_cancel_branch_validate ... ok
+test receipt::authoritative_spend::tests::guarantee_floor_passes_when_at_or_above_minimum ... ok
+test receipt::authoritative_spend::tests::guarantee_level_rank_ordering ... ok
+test receipt::authoritative_spend::tests::guarantee_floor_with_unrecognized_minimum_is_rejected ... ok
+test provider_attempt::tests::schemas_digests_sizes_and_chain_length_are_bounded ... ok
+test receipt::authoritative_spend::tests::nonce_reserving_a_different_hold_is_rejected ... ok
+test receipt::authoritative_spend::tests::mediated_spend_profile_mismatch_is_rejected ... ok
+test provider_attempt::tests::terminal_anchor_allows_no_extra_checkpoint ... ok
+test receipt::authoritative_spend::tests::mediated_spend_profile_absent_is_rejected ... ok
+test receipt::authoritative_spend::tests::nonce_reserving_the_committed_hold_passes ... ok
+test receipt::authoritative_spend::tests::r4_receipt_claiming_ha_linearizable_fails_single_node_operator_floor ... ok
+test receipt::authoritative_spend::tests::nonce_without_reserved_hold_is_permitted ... ok
+test receipt::authoritative_spend::tests::r1_forged_mediated_label_without_budget_authority_is_rejected ... ok
+test receipt::metadata::tests::finding_status_metadata_rejects_non_i_json_integers ... ok
+test receipt::authoritative_spend::tests::receipt_with_unrecognized_guarantee_level_is_rejected ... ok
+test receipt::metadata::tests::finding_status_metadata_requires_the_protocol_key_domain ... ok
+test receipt::authoritative_spend::tests::tampered_receipt_body_with_admitted_key_is_rejected ... ok
+test receipt::tests::checkpoint_publication_and_trust_anchor_identities_roundtrip ... ok
+test receipt::tests::checkpoint_publication_trust_anchor_binding_rejects_blank_fields ... ok
+test receipt::tests::checkpoint_publication_trust_anchor_binding_serde_and_validation ... ok
+test receipt::tests::child_receipt_serde_roundtrip ... ok
+test receipt::tests::backend_identity::receipt_signing_uses_only_the_embedded_identity_entrypoint ... ok
+test receipt::tests::child_receipt_sign_and_verify ... ok
+test receipt::tests::chio_receipt_extracts_typed_financial_and_budget_authority_metadata ... ok
+test receipt::tests::backend_identity::receipt_signing_rejects_each_mismatched_atomic_result ... ok
+test receipt::tests::decision_serde_roundtrip ... ok
+test receipt::tests::chio_internal_tool_origin_roundtrips_as_closed_vocabulary ... ok
+test receipt::tests::economic_authorization_receipt_metadata_serde_roundtrip ... ok
+test receipt::tests::financial_budget_authority_metadata_serde_roundtrip ... ok
+test receipt::tests::financial_receipt_metadata_attempted_cost_optional ... ok
+test receipt::tests::financial_receipt_metadata_serde_roundtrip ... ok
+test receipt::tests::financial_receipt_metadata_under_financial_key ... ok
+test receipt::tests::ed25519_receipt_is_byte_identical_without_algorithm_field ... ok
+test receipt::tests::ed25519_receipt_without_algorithm_field_verifies ... ok
+test receipt::tests::governed_transaction_receipt_metadata_helpers_split_asserted_and_verified_call_chain ... ok
+test receipt::tests::guard_evidence_serde_roundtrip ... ok
+test receipt::tests::receipt_attribution_metadata_serde_roundtrip ... ok
+test receipt::tests::non_mediated_receipt_cannot_sign_any_decision ... ok
+test receipt::tests::mediated_receipt_requires_decision ... ok
+test receipt::authoritative_spend::tests::security_critical_rejections ... ok
+test receipt::tests::receipt_cancelled_decision ... ok
+test receipt::tests::receipt_floor_rejects_ed25519_under_pq_required ... ok
+test receipt::tests::receipt_floor_accepts_ed25519_under_allow_classical ... ok
+test receipt::tests::receipt_id_is_authoritative_and_content_addressed ... ok
+test receipt::tests::governed_transaction_receipt_metadata_serde_roundtrip ... ok
+test receipt::tests::receipt_deny_decision ... ok
+test receipt::tests::receipt_incomplete_decision ... ok
+test receipt::tests::receipt_lineage_statement_sign_and_verify ... ok
+test receipt::tests::receipt_rejects_schema_invalid_bbs_signature_material ... ok
+test receipt::tests::receipt_semantics_authorized_only_for_mediated_prevent_allow ... ok
+test receipt::tests::receipt_semantics_are_signed_top_level_fields ... ok
+test receipt::tests::receipt_rejects_invalid_bbs_projection_bindings ... ok
+test receipt::tests::receipt_round_trips_bbs_projection_metadata ... ok
+test receipt::tests::receipt_serde_roundtrip ... ok
+test receipt::tests::receipt_sign_and_verify ... ok
+test receipt::tests::settlement_status_serde_roundtrip ... ok
+test receipt::tests::receipt_signature_binds_typed_id_and_body_wrapper ... ok
+test receipt::tests::receipt_wrong_key_fails ... ok
+test receipt::tests::receipt_signing_nonce_preserves_repeated_invocation_identity ... ok
+test receipt::tests::sign_prepared_with_bbs_using_handle_rejects_render_a_sign_b ... ok
+test receipt::tests::tool_call_action_hash_verification ... ok
+test receipt::tests::tool_call_action_tampered_hash ... ok
+test receipt::tests::trace_and_advisory_semantics_cannot_authorize ... ok
+test receipt::tests::sign_prepared_with_bbs_using_handle_accepts_matching_content ... ok
+test runtime_attestation::tests::derive_runtime_attestation_trust_material_normalizes_vendor_specific_claims ... ok
+test runtime_attestation::tests::derive_runtime_attestation_trust_material_rejects_unsupported_schema ... ok
+test runtime_attestation::tests::verifier_family_mapping_covers_supported_and_unknown_schemas ... ok
+test session::tests::anonymous_session_auth_context_has_no_principal ... ok
+test receipt::tests::signed_export_envelope_roundtrip ... ok
+test session::tests::chio_identity_assertion_rejects_remaining_invalid_fields ... ok
+test session::tests::chio_identity_assertion_rejects_stale_or_empty_fields ... ok
+test session::tests::classifies_filesystem_resource_uris_for_runtime ... ok
+test session::tests::chio_identity_assertion_roundtrips_and_validates ... ok
+test session::tests::classifies_non_file_roots_as_metadata_only ... ok
+test session::tests::classifies_non_filesystem_resource_uris_without_forcing_root_checks ... ok
+test session::tests::completion_result_roundtrip ... ok
+test session::tests::create_elicitation_operation_roundtrip ... ok
+test session::tests::create_elicitation_result_roundtrip ... ok
+test session::tests::marks_non_local_file_roots_as_unenforceable ... ok
+test session::tests::marks_unenforceable_filesystem_resource_uris_as_fail_closed ... ok
+test session::tests::create_message_operation_roundtrip ... ok
+test session::tests::normalizes_enforceable_file_roots_for_runtime ... ok
+test session::tests::normalizes_windows_style_file_roots_for_runtime ... ok
+test session::tests::operation_context_new_sets_default_lineage_fields ... ok
+test session::tests::operation_terminal_state_and_kind_helpers_cover_all_variants ... ok
+test session::tests::operation_context_roundtrip_preserves_lineage ... ok
+test session::tests::oauth_session_auth_context_roundtrips_with_federated_claims ... ok
+test session::tests::progress_token_accepts_integer_or_string ... ok
+test session::tests::ownership_snapshots_roundtrip_with_expected_defaults ... ok
+test receipt::tests::trace_receipt_omits_decision_field ... ok
+test session::tests::prompt_result_roundtrip ... ok
+test session::tests::request_lineage_record_rejects_unknown_schema ... ok
+test session::tests::request_lineage_record_tracks_continuation_and_capability_binding ... ok
+test session::tests::root_definition_roundtrip ... ok
+test session::tests::session_auth_context_helpers_cover_in_process_and_oauth_without_principal ... ok
+test session::tests::session_auth_context_roundtrip_and_principal_helpers ... ok
+test session::tests::session_id_roundtrip ... ok
+test session::tests::session_operation_reports_kind ... ok
+test session::tests::root_and_resource_normalization_cover_remaining_helper_edges ... ok
+test session::tests::session_anchor_detects_material_auth_context_drift ... ok
+test session::tests::session_anchor_signing_binds_auth_context_and_reference ... ok
+test session::tests::session_operation_roundtrip_preserves_tool_call_payload ... ok
+test provider_attempt::tests::every_other_transition_is_rejected ... ok
+test merkle::tests::consistency_proofs_match_reference_and_verify_for_all_size_pairs ... ok
+test merkle::tests::one_tree_derives_every_prefix_root_and_proof ... ok
+
+test result: ok. 425 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.50s
+
+     Running tests/_generated_check.rs (target/debug/deps/_generated_check-a438d6190c1e702c)
+
+running 2 tests
+test generated_mod_rs_exists ... ok
+test every_generated_file_has_canonical_header ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/canonical_bytes_vectors.rs (target/debug/deps/canonical_bytes_vectors-7cb0fddbb6488638)
+
+running 1 test
+test canonical_bytes_match_checked_in_vectors ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/canonical_signature_boundary.rs (target/debug/deps/canonical_signature_boundary-cfb1f65adf70187f)
+
+running 10 tests
+test canonical_json_is_byte_stable_across_object_order ... ok
+test signing_handle_recomputes_content_hash_over_canonical_content ... ok
+test sign_with_backend_using_handle_rejects_mismatch ... ok
+test sign_with_handle_rejects_render_a_sign_b ... ok
+test debug_redacts_preimage ... ok
+test tampering_any_signed_receipt_field_fails_verification ... ok
+test sign_with_backend_using_handle_accepts_matching_content ... ok
+test sign_with_handle_accepts_matching_content ... ok
+test receipt_signature_body_excludes_signature_field ... ok
+test json_formatting_does_not_change_receipt_verification ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/capability_constraint_variants.rs (target/debug/deps/capability_constraint_variants-a90b4ec2f88c29f1)
+
+running 23 tests
+test memory_store_allowlist_roundtrips ... ok
+test column_denylist_roundtrips ... ok
+test existing_path_prefix_still_deserializes ... ok
+test max_rows_returned_roundtrips ... ok
+test model_constraint_with_both_fields_roundtrips ... ok
+test memory_write_deny_patterns_roundtrips ... ok
+test max_transaction_amount_usd_roundtrips ... ok
+test model_constraint_with_only_allowed_ids ... ok
+test content_review_tier_roundtrips ... ok
+test audience_allowlist_accepts_string_list ... ok
+test model_metadata_accepts_partial_payload_with_only_model_id ... ok
+test model_metadata_omits_absent_optional_fields ... ok
+test model_metadata_roundtrips_full ... ok
+test operation_class_enum_serializes ... ok
+test require_dual_approval_roundtrips ... ok
+test require_finding_purchase_is_preserved_only_by_the_identical_marker ... ok
+test require_finding_purchase_escrow_selector_roundtrips ... ok
+test require_finding_purchase_local_serializes_with_expected_shape ... ok
+test require_finding_purchase_rejects_unknown_marker_fields ... ok
+test require_finding_purchase_rejects_unknown_settlement_mode ... ok
+test require_finding_recovery_rejects_unknown_fields ... ok
+test require_finding_recovery_serializes_with_closed_shape ... ok
+test table_allowlist_serializes_with_expected_tag ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/capability_hybrid.rs (target/debug/deps/capability_hybrid-f3246941f10beb4e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/claim_registry_integrity.rs (target/debug/deps/claim_registry_integrity-23df0ceb4785104a)
+
+running 10 tests
+test launch_schema_boundary_matches_registry_owner_acceptance ... ok
+test financial_credential_required_claim_rows_are_registered ... ok
+test commerce_order_emitted_claim_rows_are_registered ... ok
+test swarm_authority_claims_reference_positive_fixture ... ok
+test public_settlement_claims_reference_positive_fixture ... ok
+test enforced_claims_reference_live_proof_manifests ... ok
+test transaction_passport_required_claim_rows_are_registered ... ok
+test agent_web_positive_fixture_refs_cover_valid_projection_artifacts ... ok
+test proof_manifest_rust_test_refs_point_to_live_files ... ok
+test expected_claim_evidence_refs_are_manifested ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running tests/crypto_wire_bounds.rs (target/debug/deps/crypto_wire_bounds-6a9cd8aec4dcc6f7)
+
+running 15 tests
+test malformed_hex_within_the_bound_classifies_as_invalid_hex ... ok
+test malformed_unicode_and_prefixes_reject_without_panicking ... ok
+test hash_wire_size_is_checked_before_hex_decoding ... ok
+test nested_hybrids_reject_before_decoding_inner_material ... ok
+test hash_serde_borrows_input_and_preserves_prefixed_wire_format ... ok
+test oversized_hex_rejects_before_decoding_invalid_digits ... ok
+test oversized_ecdsa_wire_signatures_are_rejected ... ok
+test serde_accepts_borrowed_and_owned_strings_without_requesting_a_copy ... ok
+test ecdsa_and_hybrid_wire_bounds_preserve_maximal_encodings ... ok
+test valid_ed25519_and_hybrid_transport_encodings_round_trip ... ok
+test deeply_nested_signature_json_returns_an_error_without_crashing ... ok
+test deeply_nested_key_json_returns_an_error_without_crashing ... ok
+test deeply_nested_key_wire_returns_an_error_without_crashing ... ok
+test prefixed_hex_wire_round_trips_when_decoding_succeeds ... ok
+test deeply_nested_signature_wire_returns_an_error_without_crashing ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/delivery_contract_metadata.rs (target/debug/deps/delivery_contract_metadata-7973c95300884f89)
+
+running 9 tests
+test valid_delivery_contract_passes_typed_validation ... ok
+test typed_validation_rejects_bad_schema_and_digests ... ok
+test deny_unknown_fields_is_enforced_on_deserialization ... ok
+test removing_delivery_contract_metadata_breaks_verify_signature ... ok
+test accessor_absent_without_the_block ... ok
+test mutating_delivery_contract_metadata_breaks_verify_signature ... ok
+test delivery_contract_survives_receipt_round_trip ... ok
+test schema_rejects_malformed_delivery_contracts ... ok
+test valid_delivery_contract_matches_registered_schema ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/governed_active_response_intent.rs (target/debug/deps/governed_active_response_intent-40791b9197e8ef26)
+
+running 8 tests
+test response_plan_hashing_rejects_bodies_above_the_governance_node_ceiling ... ok
+test response_plan_rejects_unknown_fields_and_partial_variant_markers ... ok
+test active_response_plan_uses_an_explicit_typed_variant_and_binds_the_complete_body ... ok
+test response_plan_rejects_empty_duplicate_and_unsupported_effects ... ok
+test response_plan_rejects_raw_hash_substitution_and_body_hash_mismatch ... ok
+test response_plan_rejects_invalid_digests_and_expiry_bounds ... ok
+test response_plan_rejects_unbounded_identifiers_and_canonical_bodies ... ok
+test response_plan_hashing_enforces_the_exact_canonical_byte_ceiling ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/hybrid_bitflip.rs (target/debug/deps/hybrid_bitflip-01b105379307562a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/merkle_walk.rs (target/debug/deps/merkle_walk-13c285a8c0d14ed2)
+
+running 5 tests
+test inclusion_steps_cover_left_right_and_carry ... ok
+test production_walk_rejects_invalid_geometry_before_hashing ... ok
+test production_walk_rejects_truncated_and_padded_paths ... ok
+test production_walk_rejects_misordered_odd_index_path ... ok
+test production_walk_roundtrips_required_tree_geometries ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/no_std_build.rs (target/debug/deps/no_std_build-680cda325d889ac2)
+
+running 6 tests
+test id_aliases_resolve_through_alloc ... ok
+test error_result_type_alias ... ok
+test hashing_surface ... ok
+test merkle_root_is_reachable ... ok
+test canonical_json_roundtrip ... ok
+test keypair_sign_verify ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/property_capability_algebra.rs (target/debug/deps/property_capability_algebra-e4f1897e4bac6957)
+
+running 8 tests
+test scope_subset_reflexive ... ok
+test tool_grant_subset_implies_scope_subset ... ok
+test delegate_strictly_weakens ... ok
+test scope_subset_transitive_normalized ... ok
+test delegate_chain_extension_monotone ... ok
+test validate_attenuation_monotonic_under_chain_extension ... ok
+test delegate_revoked_parent_revokes_children ... ok
+test delegation_depth_bounded_by_root ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/protocol_error_registry.rs (target/debug/deps/protocol_error_registry-6c7e3dec7986d789)
+
+running 3 tests
+test protocol_error_registry_includes_launch_transaction_failures ... ok
+test protocol_error_registry_has_unique_codes_and_complete_categories ... ok
+test protocol_error_registry_version_negotiation_artifact_is_consistent ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/protocol_primitives_generated.rs (target/debug/deps/protocol_primitives_generated-82235c84b65d2e4c)
+
+running 1 test
+test generated_rust_shapes_parse_reject_and_round_trip_shared_fixtures ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/receipt_tenant_id.rs (target/debug/deps/receipt_tenant_id-757a74ef8ae7bc1a)
+
+running 5 tests
+test receipt_body_serde_emits_tenant_id_when_set ... ok
+test receipt_body_serde_omits_tenant_id_when_none ... ok
+test deserializing_receipt_without_tenant_id_defaults_to_none ... ok
+test tenant_id_absent_is_byte_identical_on_the_wire ... ok
+test tenant_id_serde_roundtrip_present ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/recovery_contracts.rs (target/debug/deps/recovery_contracts-5ef1e7afd50f9307)
+
+running 6 tests
+test nested_allocation_and_aggregate_budgets_refuse_before_typed_decode ... ok
+test malformed_tokens_and_nested_duplicates_have_no_permissive_fallback ... ok
+test domains_frame_canonical_bodies_and_refuse_cross_domain_substitution ... ok
+test public_errors_and_debug_do_not_expose_canaries ... ok
+test shared_negative_recovery_vectors ... ok
+test schemas_share_structural_vectors_with_typed_reader ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+     Running tests/recovery_p1_contracts.rs (target/debug/deps/recovery_p1_contracts-1e9b5acbdff54999)
+
+running 2 tests
+test recovery_p1_version_selection_preserves_legacy_bytes_and_refuses_downgrade ... ok
+test recovery_p1_shared_closed_wire_and_signature_corpus ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.58s
+
+     Running tests/security_generated_vectors.rs (target/debug/deps/security_generated_vectors-4e08033cc6eca740)
+
+running 6 tests
+test legacy_response_transition_canonical_digest_is_unchanged ... ok
+test generated_response_plan_requires_exact_execution_binding ... ok
+test generated_recovery_models_preserve_every_positive_field ... ok
+test native_receipt_types_reject_unsafe_json_integers ... ok
+test generated_active_defense_types_decode_reencode_and_reject ... ok
+OK security wire vectors: indexes=5 positives=90 negatives=270
+test active_defense_schema_and_semantics_reject_mutation_corpus ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.01s
+
+     Running tests/security_receipts.rs (target/debug/deps/security_receipts-28f5fc5c64f2ca4f)
+
+running 17 tests
+test header_requires_exact_schema_time_and_sorted_unique_prior_links ... ok
+test applying_lease_timeout_after_every_effect_applied_is_still_partial_completion ... ok
+test correlated_finding_requires_ordered_unique_events_and_matching_evidence ... ok
+test closed_vocabulary_round_trips_every_kind ... ok
+test declassification_receipts_enforce_one_way_consumption_states ... ok
+test completion_dispatch_proofs_require_an_exact_nonzero_paired_binding ... ok
+test closed_bodies_reject_secret_bearing_and_unknown_fields ... ok
+test flow_denial_digest_and_evidence_id_match_fixed_vectors ... ok
+test failed_completion_requires_a_resolved_unapplied_effect_shape ... ok
+test health_receipts_reject_zero_or_future_operational_state ... ok
+test lift_completion_allows_effects_that_durably_never_applied_but_not_unknown_requests ... ok
+test partial_rollback_cannot_validate_as_lifted_completion ... ok
+test partial_apply_cannot_validate_as_active_completion ... ok
+test response_plan_requires_the_exact_trigger_finding_receipt_as_a_prior ... ok
+test response_state_transition_enforces_exact_edge_cause_and_applying_lease ... ok
+test response_plan_requires_canonical_effect_order_and_target_binding ... ok
+test every_active_defense_body_field_tamper_fails_closed ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+     Running tests/signed_artifact_schema.rs (target/debug/deps/signed_artifact_schema-2642818772b49aca)
+
+running 22 tests
+test bbs_projection_manifest_v2_schema_is_registered ... ok
+test economic_continuity_schemas_are_registered ... ok
+test channel_signed_artifact_schemas_are_registered ... ok
+test clearing_signed_artifact_schemas_are_registered ... ok
+test financial_credential_signed_artifact_schemas_are_registered ... ok
+test econsim_qualification_matrix_is_registered_and_unknown_versions_fail_closed ... ok
+test known_signed_artifact_schemas_are_supported ... ok
+test fiscal_genesis_policy_remains_outside_the_signed_artifact_registry ... ok
+test fiscal_signed_artifact_registry_names_exact_schema_files ... ok
+test finding_family_schema_registry_parity_is_bidirectional ... ok
+test governed_action_evidence_schemas_are_registered ... ok
+test fiscal_signed_artifact_schemas_are_registered ... ok
+test outcome_signed_artifact_schemas_are_registered_exactly ... ok
+test schema_tagged_request_lineage_record_rejects_unsupported_schema_id ... ok
+test public_settlement_anchor_evidence_schemas_are_registered ... ok
+test schema_tagged_signers_reject_unsupported_schema_ids ... ok
+test proof_room_fixture_catalog_schema_is_registered ... ok
+test schema_tagged_verifiers_reject_supported_key_with_unsupported_schema ... ok
+test public_settlement_dispatch_and_receipt_schemas_are_supported ... ok
+test built_in_signed_artifact_registry_matches_public_metadata ... ok
+test new_economy_artifact_families_are_registered_exactly ... ok
+test known_signed_artifact_schemas_match_public_registry_or_internal_exemption ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/signed_json.rs (target/debug/deps/signed_json-49bcedeb9bd4f854)
+
+running 2 tests
+test both_existing_writers_preserve_signed_values ... ok
+test duplicate_and_lossy_tokens_reject_before_value_construction ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/signed_security_event.rs (target/debug/deps/signed_security_event-00a45bfde9f9cde6)
+
+running 5 tests
+test trusted_producer_binding_rejects_wrong_identity_key_id_and_key ... ok
+test wrong_domain_signature_is_rejected ... ok
+test trusted_producer_round_trip_uses_the_security_event_domain ... ok
+test strict_wire_decode_rejects_unknown_or_unsigned_envelopes ... ok
+test every_body_field_and_envelope_cryptographic_field_is_bound ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+
+     Running tests/signer_binding.rs (target/debug/deps/signer_binding-eabcd6ac16577e84)
+
+running 11 tests
+test receipt_lineage_sign_rejects_embedded_kernel_key_mismatch ... ok
+test manifest_sign_rejects_embedded_server_key_mismatch ... ok
+test child_receipt_signers_reject_embedded_kernel_key_mismatches ... ok
+test capability_sign_rejects_embedded_issuer_mismatch ... ok
+test receipt_sign_rejects_embedded_kernel_key_mismatch ... ok
+test delegated_artifact_signers_reject_embedded_key_mismatches ... ok
+test approval_signers_reject_embedded_approver_mismatches ... ok
+test export_envelope_backend_path_matches_keypair_signing ... ok
+test delegation_link_sign_rejects_embedded_delegator_mismatch ... ok
+test session_anchor_sign_rejects_embedded_kernel_key_mismatch ... ok
+test capability_backend_sign_rejects_embedded_issuer_mismatch ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+     Running tests/threat_model_artifacts.rs (target/debug/deps/threat_model_artifacts-338c83b05aef1fc9)
+
+running 2 tests
+test threat_model_transport_requirements_cover_required_surfaces ... ok
+test threat_model_register_lists_required_threats_with_mitigations ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+     Running tests/verified_outcome_request.rs (target/debug/deps/verified_outcome_request-e686c99330724a95)
+
+running 3 tests
+test verified_outcome_extension_is_canonical_and_request_bound ... ok
+test verified_outcome_extension_rejects_unknown_fields ... ok
+test verified_outcome_extension_validates_derived_ids_and_schema ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/wire_protocol_schema.rs (target/debug/deps/wire_protocol_schema-4195eb866a9b5d3b)
+
+running 10 tests
+test pending_approval::pending_approval_result_preserves_the_proposal_on_round_trip ... ok
+test tool_call_response_schema_rejects_allow_shaped_trace_receipts ... ok
+test pending_approval::pending_approval_frame_rejects_execution_nonce ... ok
+test operation_nonce::operation_nonce_schema_preserves_both_profiles_and_rejects_unknown_versions ... ok
+test pending_approval::pending_approval_result_rejects_missing_unknown_and_malformed_fields ... ok
+test protocol_primitives_schema_conditions_fail_closed ... ok
+test receipt_schemas_accept_signed_internal_origin_and_keep_closed_vocabulary ... ok
+test receipt_schema_accepts_bound_bbs_signature_and_rejects_malformed_bindings ... ok
+test wire_protocol_schema_cases_validate_live_serialization ... ok
+test protocol_primitives_shared_fixtures_match_authoritative_schemas ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.25s
+
+     Running unittests src/lib.rs (target/debug/deps/chio_flow-fb58437fa13133d5)
+
+running 46 tests
+test classification::tests::identity_request_and_payload_mismatch_deny ... ok
+test classification::tests::authenticated_empty_result_retains_request_and_classifier_binding ... ok
+test engine::tests::accumulated_knowledge_blocks_unclassified_egress ... ok
+test classification::tests::unknown_category_and_malformed_findings_deny ... ok
+test classification::tests::category_map_is_bounded_and_rejects_top ... ok
+test classification::tests::category_join_overflow_denies ... ok
+test classification::tests::verified_evidence_retains_exact_findings_without_payload_or_debug_locations ... ok
+test classification::tests::pii_phi_secret_and_tenant_categories_join_all_restrictions ... ok
+test engine::tests::every_policy_clearance_must_accept_the_complete_source ... ok
+test declassification::tests::all_static_bindings_and_store_failure_deny_before_release ... ok
+test engine::tests::fence_is_prepared_only_after_taint_persistence ... ok
+test declassification::tests::exact_grant_consumes_once_and_persists_terminal_dispatch_outcomes ... ok
+test declassification::tests::concurrent_consumers_produce_exactly_one_verified_result ... ok
+test engine::tests::complete_source_joins_payload_floor_and_all_durable_labels ... ok
+test declassification::tests::time_purpose_trust_signature_and_label_fail_closed ... ok
+test engine::tests::input_join_overflow_retains_top_taint_and_denies_admission ... ok
+test engine::tests::fresh_consumption_retains_the_actual_commit_observation ... ok
+test engine::tests::non_egress_call_retains_taint_without_clearance_or_fence ... ok
+test engine::tests::payload_only_declassification_binding_cannot_downgrade_accumulated_knowledge ... ok
+test engine::tests::many_small_outputs_accumulate_taint_monotonically ... ok
+test engine::tests::post_invocation_rejects_classification_from_another_representation ... ok
+test engine::tests::post_invocation_rejects_classification_from_another_tenant ... ok
+test engine::tests::post_invocation_overflow_transitions_to_top ... ok
+test engine::tests::one_shot_downgrade_substitutes_the_exact_signed_target_for_egress ... ok
+test engine::tests::post_invocation_joins_classifier_and_declared_floors_before_delivery ... ok
+test lattice::tests::adding_an_owner_restriction_is_upward_in_the_order ... ok
+test engine::tests::remote_topology_uses_policy_when_manifest_adds_no_egress_clearance ... ok
+test engine::tests::pre_invocation_precheck_persists_full_taint_without_consuming_declassification ... ok
+test engine::tests::prepared_declassification_cannot_omit_its_participant ... ok
+test engine::tests::publisher_clearance_cannot_replace_policy_clearance ... ok
+test engine::tests::top_source_and_top_policy_clearance_deny ... ok
+test engine::tests::prepared_declassification_requires_live_commit_time_before_consumption ... ok
+test lattice::tests::join_cardinality_overflow_returns_a_validation_error ... ok
+test engine::tests::static_denials_do_not_consume_and_replay_cannot_reenter ... ok
+test engine::tests::verified_grant_cannot_cross_identity_authority_or_expiry_boundary ... ok
+test lattice::tests::narrowing_readers_is_upward_in_the_order ... ok
+test lattice::tests::redundant_same_owner_policies_cannot_create_unequal_equivalent_labels ... ok
+test lattice::tests::lattice_order_is_reflexive ... ok
+test lattice::tests::top_is_mathematical_top_but_operationally_denied_on_egress ... ok
+test lattice::tests::join_is_idempotent ... ok
+test lattice::tests::lattice_order_is_antisymmetric ... ok
+test lattice::tests::each_operand_flows_to_its_join ... ok
+test lattice::tests::join_flows_to_every_generated_common_upper_bound ... ok
+test lattice::tests::join_is_commutative ... ok
+test lattice::tests::join_is_associative ... ok
+test lattice::tests::lattice_order_is_transitive ... ok
+
+test result: ok. 46 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/recovery_authority.rs (target/debug/deps/recovery_authority-d5ed851821cd9b02)
+
+running 4 tests
+test recovery_alias_rotation_and_integrity_powers_cannot_manufacture_coverage ... ok
+test recovery_multiple_owners_require_conjunctive_scoped_coverage ... ok
+test recovery_resigned_context_substitutions_fail_the_intended_binding ... ok
+test recovery_all_resigned_grant_binding_fields_refuse_foreign_contexts ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running unittests src/lib.rs (target/debug/deps/chio_recovery-82bcef16ef3d605e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/workflow.rs (target/debug/deps/workflow-33d0f60cee7741a4)
+
+running 4 tests
+test useful_pre_admission_and_native_approval_advice_have_positive_controls ... ok
+test unknown_and_pending_operations_keep_identity_across_cancellation ... ok
+test unresolved_admission_never_recommends_a_new_submission ... ok
+test settled_effects_do_not_become_another_submission_when_output_is_denied ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/lib.rs (target/debug/deps/chio_security_types-a08af5bee20dee9c)
+
+running 20 tests
+test flow::tests::configured_limits_cannot_widen_protocol_limits ... ok
+test flow::tests::bottom_is_unique_public_label ... ok
+test flow::tests::blank_principal_and_compartment_are_rejected ... ok
+test flow::tests::borrowed_identifier_is_validated_before_owned_allocation ... ok
+test flow::tests::duplicate_owner_json_is_rejected ... ok
+test flow::tests::duplicate_reader_and_compartment_values_are_rejected ... ok
+test flow::tests::information_label_order_rejects_reversed_readers_and_partial_constraints ... ok
+test flow::tests::configured_cardinality_overflow_is_rejected ... ok
+test flow::tests::owner_must_be_its_own_reader ... ok
+test flow::tests::known_and_top_canonical_vectors_round_trip ... ok
+test declassification::tests::invalid_time_and_top_target_reject_before_signing ... ok
+test flow::tests::tool_flow_declaration_is_strict_and_canonical ... ok
+test flow::tests::noncanonical_input_normalizes_to_identical_canonical_bytes ... ok
+test declassification::tests::validated_body_round_trips_strictly ... ok
+test flow::tests::unknown_and_variant_payload_fields_are_rejected ... ok
+test flow::tests::internal_control_identifier_is_rejected_by_schema_and_runtime ... ok
+test flow::tests::utf8_identifier_limit_is_normative_in_bytes ... ok
+test flow::tests::c1_control_identifier_is_rejected_by_schema_and_runtime ... ok
+test flow::tests::schema_and_runtime_enforce_every_default_cardinality_bound ... ok
+test flow::tests::information_label_schema_positive_and_negative_vectors ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/capability_set_suspension.rs (target/debug/deps/capability_set_suspension-39f738d1100c670c)
+
+running 4 tests
+test affected_set_commitment_uses_canonical_object_key_order ... ok
+test affected_set_commitment_binds_tenant_order_and_membership ... ok
+test wrong_set_contribution_and_noncanonical_snapshot_fail_closed ... ok
+test effect_scoped_contributions_compose_and_remove_out_of_order ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/egress_restriction.rs (target/debug/deps/egress_restriction-0b06b3116a3690da)
+
+running 2 tests
+test destination_set_requires_nonempty_strict_canonical_order ... ok
+test egress_overlay_contracts_bind_session_effect_ttl_and_fence ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/event.rs (target/debug/deps/event-4b47298c9b77f100)
+
+running 3 tests
+test correlated_finding_preserves_event_to_source_receipt_cardinality_and_order ... ok
+test event_constructor_enforces_time_and_evidence_bounds ... ok
+test portable_event_and_finding_reject_unknown_or_inconsistent_shapes ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/issuance_freeze.rs (target/debug/deps/issuance_freeze-bd56665b5da424ba)
+
+running 4 tests
+test external_fence_and_exact_set_rebinding_fail_validation ... ok
+test installed_identity_survives_bounded_external_lease_renewal_and_takeover ... ok
+test snapshot_order_and_admission_operation_shapes_are_closed ... ok
+test overlapping_freezes_are_effect_scoped_and_remove_out_of_order ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ports_compile.rs (target/debug/deps/ports_compile-39bbe6b65c7b88d8)
+
+running 7 tests
+test one_fake_can_satisfy_every_port_contract ... ok
+test canonical_bodies_enforce_the_protocol_byte_ceiling ... ok
+test port_errors_preserve_the_failure_class ... ok
+test identifiers_reject_noncanonical_decoding ... ok
+test strict_port_shapes_reject_unknown_fields ... ok
+test authoritative_record_sets_are_strictly_sorted_and_unique ... ok
+test bounded_collections_reject_excess_items ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/recovery_bounds.rs (target/debug/deps/recovery_bounds-f5bd26d34852b1f0)
+
+running 3 tests
+test old_host_wrong_deployment_and_stripped_participant_refuse ... ok
+test identifier_and_integer_boundaries_are_closed ... ok
+test collection_ceiling_precedes_next_element_decoding ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/response.rs (target/debug/deps/response-b100d8f5646d1dae)
+
+running 16 tests
+test permanent_revocation_is_not_a_reversible_effect_kind ... ok
+test fresh_live_admission_refuses_simulated_plans ... ok
+test live_execution_rules_name_the_binding_that_refused ... ok
+test prepared_dispatch_binding_is_strict_and_plan_bound ... ok
+test execution_binding_preserves_its_closed_wire_shape ... ok
+test execution_binding_rejects_unsupported_wire_versions ... ok
+test execution_binding_rejection_carries_the_compared_versions ... ok
+test mutation_capacity_accepts_the_exact_bound_and_rejects_one_more ... ok
+test mutation_capacity_reserves_the_complete_sixty_four_effect_lifecycle ... ok
+test prepared_dispatch_binding_rejects_unknown_serialized_fields ... ok
+test response_plan_rejects_zero_cryptographic_commitments ... ok
+test response_execution_binding_is_preserved_in_authorization ... ok
+test response_targets_and_mutation_records_reject_unknown_fields ... ok
+test mutation_capacity_tracks_rollback_failure_and_retry_boundaries ... ok
+test response_plans_and_authorization_require_explicit_execution ... ok
+test response_transition_matrix_contains_only_the_specified_edges ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/response_dispatch.rs (target/debug/deps/response_dispatch-224c0f2fb2ccf4bf)
+
+running 4 tests
+test dispatch_lease_and_load_outcome_are_explicit ... ok
+test dispatch_recovery_binds_the_exact_action_and_fencing_observation ... ok
+test execution_dispatch_binding_rejects_zero_and_mismatched_authority_fields ... ok
+test dispatch_authorization_binds_every_security_identity ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/session_throttle.rs (target/debug/deps/session_throttle-e90d3cf183960762)
+
+running 3 tests
+test limits_are_nonzero_and_bounded ... ok
+test window_identity_is_aligned_deterministic_and_effect_scoped ... ok
+test versions_bind_each_independent_contribution_and_out_of_order_removal ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/chio_semantic_contracts-f90035a62bb98224)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/graph.rs (target/debug/deps/graph-6633eff4bb8c831f)
+
+running 4 tests
+test cycles_duplicate_identities_missing_evidence_and_unsafe_costs_fail_closed ... ok
+test full_step_ceiling_has_a_successful_bounded_positive_control ... ok
+test deterministic_topology_and_cost_ignore_input_insertion_order ... ok
+test repeated_expansion_consumes_shared_budget_and_exhaustion_is_irreversible ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/chio_spec_codegen-e71535fc8fb4be3e)
+
+running 23 tests
+test tests::header_is_non_empty ... ok
+test tests::is_schema_json_recognises_canonical_extension ... ok
+test tests::missing_schemas_dir_is_error ... ok
+test tests::render_chio_wire_v1_rejects_external_schema_ref ... ok
+test statemachines_pass::tests::dead_non_terminal_state_is_rejected ... ok
+test statemachines_pass::tests::duplicate_guard_is_rejected ... ok
+test threat_coverage_doc::tests::coverage_state_parses_known_values ... ok
+test statemachines_pass::tests::unreachable_state_is_rejected ... ok
+test statemachines_pass::tests::duplicate_edge_is_rejected ... ok
+test threat_coverage_doc::tests::coverage_state_rejects_unknown_values ... ok
+test threat_model::tests::is_valid_id_accepts_snake_case ... ok
+test threat_model::tests::live_unimplemented_marker_ignores_comments ... ok
+test statemachines_pass::tests::unknown_state_is_rejected ... ok
+test statemachines_pass::tests::valid_table_loads ... ok
+test tests::walk_schema_files_rejects_symlinked_schema_file ... ok
+test threat_model::tests::render_stub_strips_block_comment_terminator_in_surfaces ... ok
+test threat_model::tests::render_stub_contains_threat_id_and_unimplemented ... ok
+test threat_model::tests::sanitize_doc_comment_collapses_runs_of_unsafe_chars ... ok
+test threat_model::tests::render_stub_strips_doc_comment_escape_in_name ... ok
+test threat_coverage_doc::tests::rendered_doc_contains_six_initial_threat_headings ... ok
+test schema_catalog::tests::known_ids_resolve_offline_and_mirror_locally ... ok
+test statemachines_pass::tests::stale_and_unexpected_outputs_are_rejected ... ok
+test tests::tool_call_response_receipt_keeps_record_type has been running for over 60 seconds
+test tests::tool_call_response_receipt_keeps_record_type ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 110.72s
+
+     Running unittests src/main.rs (target/debug/deps/chio_spec_codegen-306ec949b06bf7b4)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/threat_model_schema_test.rs (target/debug/deps/threat_model_schema_test-973ce15445a4dea6)
+
+running 7 tests
+test schema_rejects_threat_missing_required_field ... ok
+test schema_accepts_covered_by_tests_alias ... ok
+test schema_accepts_pending_with_deferred_to ... ok
+test schema_rejects_invalid_boundary_surface ... ok
+test schema_validates_threat_model_v1 ... ok
+test schema_rejects_invalid_coverage_state ... ok
+test schema_accepts_weak_coverage_state ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/main.rs (target/debug/deps/xtask-d9e78f271712a39a)
+
+running 180 tests
+test adapter_no_bypass::constructors::tests::constructor_alias_and_macro_mutations_cannot_escape_inventory ... ok
+test adapter_no_bypass::constructors::tests::dispatch_inventory_includes_trait_methods_and_function_references ... ok
+test adapter_no_bypass::constructors::tests::constructor_inventory_retains_nested_and_function_pointer_references ... ok
+test adapter_no_bypass::source::tests::unsafe_or_dynamic_include_paths_fail_closed ... ok
+test adapter_no_bypass::tests::cfg_test_impls_are_ignored ... ok
+test adapter_no_bypass::tests::compatibility_exception_requires_the_feature_cfg ... ok
+test adapter_no_bypass::tests::comments_strings_and_unrelated_functions_do_not_mediate_command_new ... ok
+test adapter_no_bypass::tests::explicit_compatibility_exception_is_accepted ... ok
+test adapter_no_bypass::source::tests::production_include_under_a_test_named_path_is_still_checked ... ok
+test adapter_no_bypass::tests::inherent_and_trait_methods_with_the_same_name_do_not_merge ... ok
+test adapter_no_bypass::source::tests::symlinked_includes_and_ancestors_fail_closed ... ok
+test adapter_no_bypass::tests::native_launch_gate_must_propagate_reauthorization_before_spawning ... ok
+test adapter_no_bypass::tests::process_lifecycle_exception_is_function_scoped ... ok
+test adapter_no_bypass::source::tests::missing_and_cyclic_includes_fail_closed ... ok
+test adapter_no_bypass::tests::strings_do_not_satisfy_named_call_contracts ... ok
+test adapter_no_bypass::constructors::tests::new_and_removed_physical_constructor_sites_fail_the_inventory ... ok
+test adapter_no_bypass::source::tests::included_rs_sources_are_not_counted_twice ... ok
+test adapter_no_bypass::source::tests::test_only_includes_are_not_required ... ok
+test adapter_no_bypass::tests::supervision_thread_exception_does_not_authorize_a_process_launch_in_its_closure ... ok
+test adapter_no_bypass::tests::unrelated_evaluate_function_does_not_mediate_spawn ... ok
+test adapter_no_bypass::tests::unrelated_kernel_function_does_not_mediate_invoke ... ok
+test cli::tests::check_fixtures_parses_with_facet ... ok
+test cli::tests::check_fixtures_requires_a_facet ... ok
+test cli::tests::check_fixtures_schema_only_and_negative_only_conflict ... ok
+test cli::tests::check_fixtures_schema_only_parses ... ok
+test adapter_no_bypass::source::tests::nested_fragments_are_checked_at_their_physical_path ... ok
+test cli::tests::check_formal_mirrors_defaults_to_check_mode ... ok
+test cli::tests::check_formal_mirrors_parses_bless_flag ... ok
+test cli::tests::flat_alias_codegen_positional_and_flag_parse ... ok
+test cli::tests::flat_alias_eval_receipt_regen_check_parses ... ok
+test cli::tests::flat_alias_errors_and_snippets_regen_parse ... ok
+test cli::tests::flat_alias_freeze_vectors_check_parses ... ok
+test cli::tests::flat_alias_validate_scenarios_parses ... ok
+test cli::tests::new_check_crate_paths_parses ... ok
+test cli::tests::gen_proof_coverage_parses_check_mode ... ok
+test cli::tests::new_gen_codegen_parses ... ok
+test cli::tests::formal_itf_conversion_parses ... ok
+test cli::tests::no_subcommand_parses_to_none ... ok
+test codegen::python::manifest_models::tests::caller_cost_requires_presence_without_rejecting_null ... ok
+test cli::tests::qualify_unknown_profile_is_a_parse_error ... ok
+test cli::tests::qualify_bounded_chio_parses ... ok
+test cli::tests::verify_launch_acceptance_parses ... ok
+test cli::tests::unknown_subcommand_is_a_parse_error ... ok
+test codegen::python::manifest_models::tests::changed_generated_manifest_inventory_fails_closed ... ok
+test codegen::python::manifest_models::tests::extensible_payloads_keep_null_semantics_but_reject_numeric_coercion ... ok
+test codegen::python::manifest_models::tests::manifest_wire_hardening_preserves_fields_and_default_omission ... ok
+test codegen::python::root_models::tests::regex_root_model_keeps_the_validated_field_and_configuration ... ok
+test codegen::python::root_models::tests::regex_root_model_refuses_changed_generator_shapes ... ok
+test crate_paths::tests::extract_captures_paths_and_stops_at_delimiters ... ok
+test crate_paths::tests::extract_catches_group_less_literal ... ok
+test crate_paths::tests::glob_segment_matches_handles_prefix_suffix_and_middle ... ok
+test crate_paths::tests::normalize_classifies_dir_prefix_glob_and_exact ... ok
+test crate_paths::tests::normalize_rejects_bare_or_nameless_prefixes ... ok
+test crate_paths::tests::normalize_strips_trailing_sentence_period ... ok
+test fixtures::tests::assert_schema_shape_frozen_requires_id ... ok
+test crate_paths::tests::find_violations_dir_prefix_and_exact_still_resolve ... ok
+test fixtures::tests::assert_schema_shape_strict_rejects_open_object ... ok
+test fixtures::tests::corrupted_schema_map_yields_validation_error ... ok
+test crate_paths::tests::scan_targets_includes_existing_workflows_and_skips_absent_files ... ok
+test fixtures::tests::empty_glob_match_set_fails_closed ... ok
+test crate_paths::tests::find_violations_flags_only_missing_paths ... ok
+test crate_paths::tests::find_violations_glob_requires_at_least_one_match ... ok
+test fixtures::tests::glob_matches_prefix_suffix ... ok
+test fixtures::tests::every_known_runtime_facet_resolves ... ok
+test fixtures::tests::mode_from_flags_rejects_both ... ok
+test fixtures::tests::every_facet_kind_is_dispatchable ... ok
+test fixtures::tests::passed_test_detector_requires_nonzero ... ok
+test fixtures::tests::every_known_facet_resolves ... ok
+test fixtures::tests::every_runtime_facet_kind_is_dispatchable ... ok
+test fixtures::tests::manifest_enumerates_all_known_facets ... ok
+test fixtures::tests::recurse_edges_point_at_known_facets ... ok
+test fixtures::tests::external_retention_expected_codes_pass_against_committed_fixture ... ok
+test fixtures::tests::runtime_cargo_test_tails_are_present_where_expected ... ok
+test fixtures::tests::runtime_facet_names_are_disjoint_from_pheromone_facets ... ok
+test fixtures::tests::runtime_facets_carry_runtime_prefix ... ok
+test fixtures::tests::runtime_manifest_enumerates_all_known_facets ... ok
+test fixtures::tests::runtime_attack_and_chaos_facets_are_first_class ... ok
+test fixtures::tests::runtime_manifest_passes_enumeration_assertion ... ok
+test fixtures::tests::tail_named_filter_detection ... ok
+test fixtures::tests::runtime_spine_fixtures_validate_pairs_use_root_relative_docs ... ok
+test fixtures::tests::schema_check_values_are_valid ... ok
+test formal::itf::tests::out_of_range_loop_marker_is_rejected ... ok
+test formal::itf::tests::valid_loop_marker_is_retained ... ok
+test adapter_no_bypass::source::tests::include_depth_is_bounded_without_rejecting_the_limit ... ok
+test fixtures::tests::unknown_runtime_facet_is_an_error_not_a_skip ... ok
+test formal_mirrors::dispatch_anchors::tests::complete_dispatch_coverage_is_accepted ... ok
+test fixtures::tests::unknown_facet_is_an_error_not_a_skip ... ok
+test formal_mirrors::dispatch_anchors::tests::overlapping_coverage_groups_require_one_complete_manifest_entry ... ok
+test formal_mirrors::dispatch_anchors::tests::implementation_edits_drift_even_when_forwarder_is_unchanged ... ok
+test formal_mirrors::tests::ambiguous_method_is_rejected ... ok
+test formal_mirrors::dispatch_anchors::tests::wrong_model_source_or_relationship_cannot_satisfy_coverage ... ok
+test formal_mirrors::tests::bless_changes_only_hash_values ... ok
+test formal_mirrors::tests::body_token_edit_changes_hash ... ok
+test formal_mirrors::tests::doc_comment_edit_does_not_change_hash ... ok
+test formal_mirrors::tests::drift_message_names_symbol_mirror_and_bless_command ... ok
+test formal_mirrors::tests::impl_header_edit_changes_method_hash ... ok
+test fixtures::tests::schema_only_path_passes_for_relay_observability_against_committed_fixtures ... ok
+test formal_mirrors::tests::lean_abstraction_anchor_is_explicitly_supported ... ok
+test formal_mirrors::tests::missing_symbol_is_rejected ... ok
+test formal_mirrors::tests::model_kind_and_relationship_must_agree ... ok
+test formal_mirrors::tests::nested_doc_comment_edit_does_not_change_hash ... ok
+test formal_mirrors::tests::non_doc_attribute_edit_changes_hash ... ok
+test formal_mirrors::tests::tla_drift_message_marks_the_entry_as_an_abstraction_anchor ... ok
+test fixtures::tests::relay_schema_block_and_metadata_pass_against_committed_fixtures ... ok
+test formal_mirrors::tests::rollup_hash_depends_on_symbol_order ... ok
+test formal_mirrors::tests::same_method_name_on_different_types_resolves_by_self_type ... ok
+test launch_acceptance::tests::acceptance_manifest_includes_proof_coverage_page ... ok
+test formal_mirrors::tests::whitespace_and_regular_comments_do_not_change_hash ... ok
+test launch_acceptance::tests::failed_agent_web_exit_gate_downgrades_verdict ... ok
+test launch_acceptance::tests::full_run_report_verdict_is_verified ... ok
+test launch_acceptance::tests::missing_stage_downgrades_verdict ... ok
+test launch_acceptance::tests::missing_agent_web_exit_gate_downgrades_verdict ... ok
+test launch_acceptance::tests::schema_only_report_verdict_is_not_verified ... ok
+test launch_acceptance::tests::stage_verdict_parity_mismatch_downgrades_verdict ... ok
+test proof_coverage::tests::committed_markdown_drift_is_rejected ... ok
+test proof_coverage::tests::aeneas::aeneas_production_targets_require_generated_equivalence ... ok
+test proof_coverage::tests::aeneas::aeneas_production_symbols_are_attributed_to_their_sources ... ok
+test proof_coverage::tests::fuzz_owner_keys_must_match_targets_exactly ... ok
+test proof_coverage::tests::current_mapping_parses_without_warnings ... ok
+test proof_coverage::tests::lane_postures_reject_missing_posture ... ok
+test proof_coverage::tests::lean_abstraction_anchor_is_review_metadata ... ok
+test adapter_no_bypass::tests::prepared_runtime_boundary_requires_both_entry_and_leaf_calls ... ok
+test proof_coverage::tests::loom_registry_schema_and_values_fail_closed ... ok
+test proof_coverage::tests::malformed_mapping_row_produces_a_deterministic_warning ... ok
+test proof_coverage::tests::matrix_rows_stay_within_source_width_limit ... ok
+test proof_coverage::tests::multi_file_evidence_uses_conservative_ownership ... ok
+test proof_coverage::tests::mapping_source_and_rust_path_validation_fail_closed ... ok
+test launch_acceptance::tests::reset_output_dir_rejects_workspace_root ... ok
+test fixtures::tests::schema_only_path_passes_for_transit_against_committed_fixtures ... ok
+test formal_mirrors::dispatch_anchors::tests::checked_in_manifest_covers_required_dispatch_implementations ... ok
+test adapter_no_bypass::tests::startup_factory_flow_gates_cannot_be_removed ... ok
+test proof_coverage::tests::mutation::formal_mutation_observation_rejects_symlink_evidence ... ok
+test proof_coverage::tests::mutation::formal_mutation_report_rejects_non_regular_inputs ... ok
+test proof_coverage::tests::mutation::formal_mutation_report_rejects_noncanonical_worktree_evidence ... ok
+test proof_coverage::tests::mutation::formal_mutation_report_rejects_symlink_inputs ... ok
+test proof_coverage::tests::mutation::formal_mutation_report_requires_the_exact_current_input_set ... ok
+test proof_coverage::tests::mutation::formal_mutation_report_binds_inputs_to_its_evidence_commit ... ok
+test proof_coverage::tests::mutation::formal_mutation_observation_counts_timeouts_in_activation ... ok
+test proof_coverage::tests::mutation::formal_mutation_report_requires_an_ancestor_commit_object ... ok
+test formal_mirrors::dispatch_anchors::tests::every_required_symbol_is_independently_enforced ... ok
+test proof_coverage::tests::mutation_globs_require_live_files_and_apply_exclusions ... ok
+test proof_coverage::tests::nonexistent_kani_crate_fails_closed ... ok
+test proof_coverage::tests::optional_registry_files_add_concurrency_lanes ... ok
+test proof_coverage::tests::recorded_mutation_evidence_requires_completed_structured_result ... ok
+test proof_coverage::tests::refinement_registry_schema_and_fields_are_exact ... ok
+test proof_coverage::tests::mutation::formal_mutation_report_preserves_per_target_source_attribution ... ok
+test proof_coverage::tests::unmapped_kani_fallback_is_limited_to_known_receipt_harnesses ... ok
+test qualify::tests::committed_bounded_gate_passes_end_to_end ... ok
+test qualify::tests::committed_bounded_matrix_satisfies_the_contract ... ok
+test qualify::tests::drifted_entrypoint_fails_closed ... ok
+test qualify::tests::empty_gate_conditions_fail_closed ... ok
+test qualify::tests::gate_condition_without_id_fails_closed ... ok
+test qualify::tests::known_profiles_are_nonempty_and_kebab_case ... ok
+test qualify::tests::missing_cognition_market_gate_fails_closed ... ok
+test qualify::tests::resolve_existing_repo_file_rejects_symlink_escape ... ok
+test qualify::tests::resolve_repo_relative_accepts_plain_path ... ok
+test qualify::tests::resolve_repo_relative_rejects_absolute ... ok
+test qualify::tests::resolve_repo_relative_rejects_parent_escape ... ok
+test qualify::tests::unknown_profile_is_an_error_not_a_skip ... ok
+test qualify::tests::wrong_scope_fails_closed ... ok
+test tests::build_schema_index_rejects_missing_root ... ok
+test tests::codegen_argv_rejects_language_given_twice ... ok
+test tests::codegen_argv_round_trips_positional_and_flag ... ok
+test tests::collect_scenario_files_rejects_missing_directory ... ok
+test tests::normalize_ts_chunk_strips_trailing_newlines ... ok
+test tests::pascal_case_handles_kebab_and_snake ... ok
+test tests::pascal_case_passes_through_pascal_input ... ok
+test tests::resolve_schema_path_rejects_prefix_traversal ... ok
+test tests::ts_header_includes_pin_and_sha ... ok
+test tests::ts_namespace_name_derives_group_and_stem ... ok
+test tests::ts_namespace_name_rejects_non_schema_paths ... ok
+test proof_coverage::tests::mutation::proof_mutation_report_rejects_stale_compiled_dependencies ... ok
+test proof_coverage::tests::mutation::spec_mutation_report_rejects_stale_cfg_import_and_negative_registry ... ok
+test adapter_no_bypass::tests::every_current_mediation_contract_detects_a_removed_required_call ... ok
+test proof_coverage::tests::mutation::spec_mutation_report_rejects_weak_source_despite_strong_global_activation ... ok
+test proof_coverage::tests::mutation::spec_mutation_report_binds_registered_seeds_to_killed_inventory_results ... ok
+test proof_coverage::tests::mutation::spec_mutation_report_binds_exact_registered_negative_preflight ... ok
+test proof_coverage::tests::current_registries_have_total_primary_attribution ... ok
+test proof_coverage::tests::rendering_is_byte_deterministic ... ok
+test proof_coverage::tests::mutation::spec_mutation_report_binds_exact_positive_baselines ... ok
+
+test result: ok. 180 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.39s
+
+     Running tests/itf_to_regression.rs (target/debug/deps/itf_to_regression-9780d4a7956a4d2f)
+
+running 14 tests
+test generated_fixture::regression_formal_receipt_before_allow_abfe825d1266_trace_shape ... ok
+test generated_fixture::regression_formal_receipt_before_allow_abfe825d1266_replay ... ok
+test malformed_receipt_is_rejected_without_output ... ok
+test nonviolating_trace_is_rejected_without_output ... ok
+test malformed_trace_is_rejected_without_output ... ok
+test unknown_replay_family_is_rejected_without_output ... ok
+test duplicate_collections_are_rejected_without_output ... ok
+test malformed_family_integer_is_rejected_without_output ... ok
+test empty_action_metadata_uses_state_difference ... ok
+test allowed_without_budget_check_is_still_a_violation ... ok
+test unix_backslash_in_trace_name_is_preserved ... ok
+test divergent_existing_output_is_not_overwritten ... ok
+test conversion_is_deterministic_and_matches_golden ... ok
+test unix_fifo_trace_is_rejected_without_blocking ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.34s
+
+     Running tests/qualify_parity.rs (target/debug/deps/qualify_parity-553f352c3677a4ab)
+
+running 1 test
+test bounded_matrix_entrypoint_points_at_the_xtask_leaf ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/workspace_root.rs (target/debug/deps/workspace_root-ad815866dd6b2f9d)
+
+running 6 tests
+test symlinked_working_directory_resolves_the_physical_checkout ... ok
+test incomplete_or_misidentified_chio_workspaces_fail_closed ... ok
+test outside_checkout_refuses_a_stale_manifest_environment ... ok
+test reused_binary_checks_and_updates_only_the_invocation_checkout ... ok
+test member_and_plain_subdirectories_find_their_checkout ... ok
+test nested_unrelated_boundaries_refuse_the_containing_checkout ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.40s
+
+   Doc-tests chio_core_types
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests chio_flow
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests chio_recovery
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests chio_security_types
+
+running 4 tests
+test crates/security/chio-security-types/src/response_execution.rs - response_execution::ResponseExecutionBinding (line 27) - compile fail ... ok
+test crates/security/chio-security-types/src/response_execution.rs - response_execution::FreshLiveAdmission (line 107) - compile fail ... ok
+test crates/security/chio-security-types/src/recovery/identifiers.rs - recovery::identifiers (line 3) - compile fail ... ok
+test crates/security/chio-security-types/src/recovery/identifiers.rs - recovery::identifiers (line 9) - compile fail ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+   Doc-tests chio_semantic_contracts
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests chio_spec_codegen
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+

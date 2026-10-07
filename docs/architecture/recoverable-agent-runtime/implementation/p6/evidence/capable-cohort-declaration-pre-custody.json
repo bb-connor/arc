@@ -1,0 +1,12 @@
+{
+  "schema": "chio.recovery-p6-additional-qualification.v1",
+  "declared_at_utc": "2026-10-05T10:00:26.012446+00:00",
+  "id": "capable-model-qualification",
+  "trials": 96,
+  "manifest_sha256": "f5f535b837a198fe4ec92cfae4f2b203580170fd3594235709c6189cccfb2bc7",
+  "prior_planned_trials": 192,
+  "combined_planned_trials": 288,
+  "change": "Exact model only: gpt-5.4-2026-03-05, same OpenAI provider and low reasoning. Sources, native owners, hosts, tasks, authority, 96 trial identities, repetitions, original budgets and positive-stratum thresholds remain identical. Prior failed and interrupted cohorts remain retained; no row replacement.",
+  "reason": "Complete mini-model cohort failed useful-tool thresholds in two CrewAI artifact positive strata. This is a new matched model qualification, not a rerun of selected successful rows.",
+  "separate_diagnostic_requests": 4
+}

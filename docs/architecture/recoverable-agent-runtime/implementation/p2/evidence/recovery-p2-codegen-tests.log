@@ -1,0 +1,323 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling chio-security-types v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-security-types)
+   Compiling proptest v1.10.0
+   Compiling chio-core-types v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-core-types)
+   Compiling chio-listing v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-listing)
+   Compiling chio-revocation-oracle v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-revocation-oracle)
+   Compiling chio-pheromone v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-pheromone)
+   Compiling chio-fincred v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-fincred)
+   Compiling chio-did v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-did)
+   Compiling chio-lineage v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/observability/chio-lineage)
+   Compiling chio-attest-verify v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-attest-verify)
+   Compiling chio-disclosure-lineage v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-disclosure-lineage)
+   Compiling chio-quarantine v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-quarantine)
+   Compiling chio-finding v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-finding)
+   Compiling chio-custody-hw v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-custody-hw)
+   Compiling chio-kernel-core v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-kernel-core)
+   Compiling chio-weights v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-weights)
+   Compiling chio-swarm-authority v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-swarm-authority)
+   Compiling chio-runtime-proof-parity v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-runtime-proof-parity)
+   Compiling chio-eval-receipt v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/sdk/chio-eval-receipt)
+   Compiling chio-fiscal v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-fiscal)
+   Compiling chio-governance v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-governance)
+   Compiling xtask v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/xtask)
+   Compiling chio-open-market v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-open-market)
+   Compiling chio-appraisal v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-appraisal)
+   Compiling chio-underwriting v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-underwriting)
+   Compiling chio-federation v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-federation)
+   Compiling chio-credit v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-credit)
+   Compiling chio-web3 v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-web3)
+   Compiling chio-market v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-market)
+   Compiling chio-autonomy v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-autonomy)
+   Compiling chio-core v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-core)
+   Compiling chio-manifest v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-manifest)
+   Compiling chio-settle v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-settle)
+   Compiling chio-link v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-link)
+   Compiling chio-workflow v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-workflow)
+   Compiling chio-selective-disclosure v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-selective-disclosure)
+   Compiling chio-tool-call-fabric v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/protocol/chio-tool-call-fabric)
+   Compiling chio-attest-buyer-core v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-attest-buyer-core)
+   Compiling chio-kernel v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-kernel)
+   Compiling chio-anchor v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-anchor)
+   Compiling chio-runtime-core v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-runtime-core)
+   Compiling chio-formal-diff-tests v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/formal/diff-tests)
+    Finished `test` profile [unoptimized] target(s) in 1m 53s
+     Running unittests src/lib.rs (target/debug/deps/chio_spec_codegen-e71535fc8fb4be3e)
+
+running 23 tests
+test tests::header_is_non_empty ... ok
+test tests::is_schema_json_recognises_canonical_extension ... ok
+test tests::missing_schemas_dir_is_error ... ok
+test tests::render_chio_wire_v1_rejects_external_schema_ref ... ok
+test tests::walk_schema_files_rejects_symlinked_schema_file ... ok
+test threat_coverage_doc::tests::coverage_state_parses_known_values ... ok
+test threat_coverage_doc::tests::coverage_state_rejects_unknown_values ... ok
+test statemachines_pass::tests::unknown_state_is_rejected ... ok
+test statemachines_pass::tests::dead_non_terminal_state_is_rejected ... ok
+test threat_model::tests::is_valid_id_accepts_snake_case ... ok
+test statemachines_pass::tests::unreachable_state_is_rejected ... ok
+test threat_model::tests::live_unimplemented_marker_ignores_comments ... ok
+test statemachines_pass::tests::valid_table_loads ... ok
+test threat_model::tests::render_stub_contains_threat_id_and_unimplemented ... ok
+test statemachines_pass::tests::duplicate_edge_is_rejected ... ok
+test statemachines_pass::tests::duplicate_guard_is_rejected ... ok
+test threat_model::tests::sanitize_doc_comment_collapses_runs_of_unsafe_chars ... ok
+test threat_model::tests::render_stub_strips_block_comment_terminator_in_surfaces ... ok
+test threat_model::tests::render_stub_strips_doc_comment_escape_in_name ... ok
+test threat_coverage_doc::tests::rendered_doc_contains_six_initial_threat_headings ... ok
+test schema_catalog::tests::known_ids_resolve_offline_and_mirror_locally ... ok
+test statemachines_pass::tests::stale_and_unexpected_outputs_are_rejected ... ok
+test tests::tool_call_response_receipt_keeps_record_type ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.56s
+
+     Running unittests src/main.rs (target/debug/deps/chio_spec_codegen-306ec949b06bf7b4)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/threat_model_schema_test.rs (target/debug/deps/threat_model_schema_test-973ce15445a4dea6)
+
+running 7 tests
+test schema_rejects_invalid_boundary_surface ... ok
+test schema_accepts_covered_by_tests_alias ... ok
+test schema_validates_threat_model_v1 ... ok
+test schema_rejects_invalid_coverage_state ... ok
+test schema_accepts_pending_with_deferred_to ... ok
+test schema_accepts_weak_coverage_state ... ok
+test schema_rejects_threat_missing_required_field ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/main.rs (target/debug/deps/xtask-8a6a1d50395e497b)
+
+running 180 tests
+test adapter_no_bypass::constructors::tests::constructor_alias_and_macro_mutations_cannot_escape_inventory ... ok
+test adapter_no_bypass::constructors::tests::dispatch_inventory_includes_trait_methods_and_function_references ... ok
+test adapter_no_bypass::constructors::tests::constructor_inventory_retains_nested_and_function_pointer_references ... ok
+test adapter_no_bypass::tests::cfg_test_impls_are_ignored ... ok
+test adapter_no_bypass::source::tests::test_only_includes_are_not_required ... ok
+test adapter_no_bypass::source::tests::unsafe_or_dynamic_include_paths_fail_closed ... ok
+test adapter_no_bypass::tests::compatibility_exception_requires_the_feature_cfg ... ok
+test adapter_no_bypass::tests::comments_strings_and_unrelated_functions_do_not_mediate_command_new ... ok
+test adapter_no_bypass::tests::inherent_and_trait_methods_with_the_same_name_do_not_merge ... ok
+test adapter_no_bypass::tests::explicit_compatibility_exception_is_accepted ... ok
+test adapter_no_bypass::source::tests::nested_fragments_are_checked_at_their_physical_path ... ok
+test adapter_no_bypass::source::tests::production_include_under_a_test_named_path_is_still_checked ... ok
+test adapter_no_bypass::source::tests::included_rs_sources_are_not_counted_twice ... ok
+test adapter_no_bypass::tests::process_lifecycle_exception_is_function_scoped ... ok
+test adapter_no_bypass::tests::strings_do_not_satisfy_named_call_contracts ... ok
+test adapter_no_bypass::tests::native_launch_gate_must_propagate_reauthorization_before_spawning ... ok
+test adapter_no_bypass::tests::unrelated_evaluate_function_does_not_mediate_spawn ... ok
+test adapter_no_bypass::tests::supervision_thread_exception_does_not_authorize_a_process_launch_in_its_closure ... ok
+test adapter_no_bypass::tests::unrelated_kernel_function_does_not_mediate_invoke ... ok
+test cli::tests::check_fixtures_parses_with_facet ... ok
+test cli::tests::check_fixtures_requires_a_facet ... ok
+test cli::tests::check_fixtures_schema_only_and_negative_only_conflict ... ok
+test adapter_no_bypass::source::tests::symlinked_includes_and_ancestors_fail_closed ... ok
+test adapter_no_bypass::source::tests::missing_and_cyclic_includes_fail_closed ... ok
+test cli::tests::check_fixtures_schema_only_parses ... ok
+test cli::tests::flat_alias_eval_receipt_regen_check_parses ... ok
+test cli::tests::check_formal_mirrors_defaults_to_check_mode ... ok
+test cli::tests::check_formal_mirrors_parses_bless_flag ... ok
+test cli::tests::flat_alias_errors_and_snippets_regen_parse ... ok
+test adapter_no_bypass::constructors::tests::new_and_removed_physical_constructor_sites_fail_the_inventory ... ok
+test cli::tests::flat_alias_codegen_positional_and_flag_parse ... ok
+test cli::tests::flat_alias_validate_scenarios_parses ... ok
+test cli::tests::flat_alias_freeze_vectors_check_parses ... ok
+test cli::tests::new_check_crate_paths_parses ... ok
+test cli::tests::new_gen_codegen_parses ... ok
+test cli::tests::gen_proof_coverage_parses_check_mode ... ok
+test cli::tests::formal_itf_conversion_parses ... ok
+test cli::tests::no_subcommand_parses_to_none ... ok
+test cli::tests::qualify_bounded_chio_parses ... ok
+test cli::tests::qualify_unknown_profile_is_a_parse_error ... ok
+test cli::tests::unknown_subcommand_is_a_parse_error ... ok
+test cli::tests::verify_launch_acceptance_parses ... ok
+test codegen::python::manifest_models::tests::caller_cost_requires_presence_without_rejecting_null ... ok
+test codegen::python::manifest_models::tests::changed_generated_manifest_inventory_fails_closed ... ok
+test codegen::python::manifest_models::tests::extensible_payloads_keep_null_semantics_but_reject_numeric_coercion ... ok
+test codegen::python::manifest_models::tests::manifest_wire_hardening_preserves_fields_and_default_omission ... ok
+test codegen::python::root_models::tests::regex_root_model_keeps_the_validated_field_and_configuration ... ok
+test codegen::python::root_models::tests::regex_root_model_refuses_changed_generator_shapes ... ok
+test crate_paths::tests::extract_captures_paths_and_stops_at_delimiters ... ok
+test crate_paths::tests::extract_catches_group_less_literal ... ok
+test crate_paths::tests::glob_segment_matches_handles_prefix_suffix_and_middle ... ok
+test crate_paths::tests::normalize_classifies_dir_prefix_glob_and_exact ... ok
+test crate_paths::tests::normalize_rejects_bare_or_nameless_prefixes ... ok
+test crate_paths::tests::normalize_strips_trailing_sentence_period ... ok
+test fixtures::tests::assert_schema_shape_frozen_requires_id ... ok
+test fixtures::tests::assert_schema_shape_strict_rejects_open_object ... ok
+test fixtures::tests::corrupted_schema_map_yields_validation_error ... ok
+test crate_paths::tests::find_violations_dir_prefix_and_exact_still_resolve ... ok
+test fixtures::tests::empty_glob_match_set_fails_closed ... ok
+test crate_paths::tests::find_violations_glob_requires_at_least_one_match ... ok
+test crate_paths::tests::scan_targets_includes_existing_workflows_and_skips_absent_files ... ok
+test crate_paths::tests::find_violations_flags_only_missing_paths ... ok
+test fixtures::tests::glob_matches_prefix_suffix ... ok
+test fixtures::tests::every_known_facet_resolves ... ok
+test fixtures::tests::every_runtime_facet_kind_is_dispatchable ... ok
+test fixtures::tests::mode_from_flags_rejects_both ... ok
+test fixtures::tests::every_known_runtime_facet_resolves ... ok
+test fixtures::tests::every_facet_kind_is_dispatchable ... ok
+test fixtures::tests::external_retention_expected_codes_pass_against_committed_fixture ... ok
+test fixtures::tests::passed_test_detector_requires_nonzero ... ok
+test fixtures::tests::runtime_facet_names_are_disjoint_from_pheromone_facets ... ok
+test fixtures::tests::manifest_enumerates_all_known_facets ... ok
+test fixtures::tests::runtime_facets_carry_runtime_prefix ... ok
+test fixtures::tests::recurse_edges_point_at_known_facets ... ok
+test fixtures::tests::runtime_cargo_test_tails_are_present_where_expected ... ok
+test fixtures::tests::runtime_manifest_enumerates_all_known_facets ... ok
+test fixtures::tests::runtime_manifest_passes_enumeration_assertion ... ok
+test fixtures::tests::runtime_spine_fixtures_validate_pairs_use_root_relative_docs ... ok
+test fixtures::tests::runtime_attack_and_chaos_facets_are_first_class ... ok
+test fixtures::tests::tail_named_filter_detection ... ok
+test fixtures::tests::unknown_runtime_facet_is_an_error_not_a_skip ... ok
+test fixtures::tests::schema_check_values_are_valid ... ok
+test formal::itf::tests::valid_loop_marker_is_retained ... ok
+test formal::itf::tests::out_of_range_loop_marker_is_rejected ... ok
+test formal_mirrors::dispatch_anchors::tests::complete_dispatch_coverage_is_accepted ... ok
+test fixtures::tests::unknown_facet_is_an_error_not_a_skip ... ok
+test formal_mirrors::dispatch_anchors::tests::implementation_edits_drift_even_when_forwarder_is_unchanged ... ok
+test formal_mirrors::dispatch_anchors::tests::overlapping_coverage_groups_require_one_complete_manifest_entry ... ok
+test formal_mirrors::dispatch_anchors::tests::wrong_model_source_or_relationship_cannot_satisfy_coverage ... ok
+test formal_mirrors::tests::ambiguous_method_is_rejected ... ok
+test adapter_no_bypass::source::tests::include_depth_is_bounded_without_rejecting_the_limit ... ok
+test formal_mirrors::tests::body_token_edit_changes_hash ... ok
+test formal_mirrors::tests::bless_changes_only_hash_values ... ok
+test formal_mirrors::tests::doc_comment_edit_does_not_change_hash ... ok
+test formal_mirrors::tests::impl_header_edit_changes_method_hash ... ok
+test formal_mirrors::tests::drift_message_names_symbol_mirror_and_bless_command ... ok
+test formal_mirrors::tests::lean_abstraction_anchor_is_explicitly_supported ... ok
+test formal_mirrors::tests::missing_symbol_is_rejected ... ok
+test formal_mirrors::tests::model_kind_and_relationship_must_agree ... ok
+test formal_mirrors::tests::nested_doc_comment_edit_does_not_change_hash ... ok
+test formal_mirrors::tests::non_doc_attribute_edit_changes_hash ... ok
+test formal_mirrors::tests::rollup_hash_depends_on_symbol_order ... ok
+test formal_mirrors::tests::tla_drift_message_marks_the_entry_as_an_abstraction_anchor ... ok
+test formal_mirrors::tests::same_method_name_on_different_types_resolves_by_self_type ... ok
+test fixtures::tests::relay_schema_block_and_metadata_pass_against_committed_fixtures ... ok
+test formal_mirrors::tests::whitespace_and_regular_comments_do_not_change_hash ... ok
+test launch_acceptance::tests::acceptance_manifest_includes_proof_coverage_page ... ok
+test launch_acceptance::tests::failed_agent_web_exit_gate_downgrades_verdict ... ok
+test launch_acceptance::tests::full_run_report_verdict_is_verified ... ok
+test launch_acceptance::tests::missing_stage_downgrades_verdict ... ok
+test launch_acceptance::tests::missing_agent_web_exit_gate_downgrades_verdict ... ok
+test launch_acceptance::tests::schema_only_report_verdict_is_not_verified ... ok
+test launch_acceptance::tests::stage_verdict_parity_mismatch_downgrades_verdict ... ok
+test proof_coverage::tests::aeneas::aeneas_production_symbols_are_attributed_to_their_sources ... ok
+test proof_coverage::tests::committed_markdown_drift_is_rejected ... ok
+test proof_coverage::tests::aeneas::aeneas_production_targets_require_generated_equivalence ... ok
+test fixtures::tests::schema_only_path_passes_for_relay_observability_against_committed_fixtures ... ok
+test proof_coverage::tests::fuzz_owner_keys_must_match_targets_exactly ... ok
+test proof_coverage::tests::lane_postures_reject_missing_posture ... ok
+test proof_coverage::tests::current_mapping_parses_without_warnings ... ok
+test proof_coverage::tests::lean_abstraction_anchor_is_review_metadata ... ok
+test proof_coverage::tests::loom_registry_schema_and_values_fail_closed ... ok
+test proof_coverage::tests::malformed_mapping_row_produces_a_deterministic_warning ... ok
+test proof_coverage::tests::matrix_rows_stay_within_source_width_limit ... ok
+test proof_coverage::tests::multi_file_evidence_uses_conservative_ownership ... ok
+test fixtures::tests::schema_only_path_passes_for_transit_against_committed_fixtures ... ok
+test proof_coverage::tests::mapping_source_and_rust_path_validation_fail_closed ... ok
+test launch_acceptance::tests::reset_output_dir_rejects_workspace_root ... ok
+test formal_mirrors::dispatch_anchors::tests::checked_in_manifest_covers_required_dispatch_implementations ... ok
+test adapter_no_bypass::tests::prepared_runtime_boundary_requires_both_entry_and_leaf_calls ... ok
+test adapter_no_bypass::tests::startup_factory_flow_gates_cannot_be_removed ... ok
+test formal_mirrors::dispatch_anchors::tests::every_required_symbol_is_independently_enforced ... ok
+test proof_coverage::tests::mutation::formal_mutation_observation_rejects_symlink_evidence ... ok
+test proof_coverage::tests::mutation::formal_mutation_report_rejects_non_regular_inputs ... ok
+test proof_coverage::tests::mutation::formal_mutation_report_rejects_noncanonical_worktree_evidence ... ok
+test proof_coverage::tests::mutation::formal_mutation_report_rejects_symlink_inputs ... ok
+test proof_coverage::tests::mutation::formal_mutation_report_requires_the_exact_current_input_set ... ok
+test proof_coverage::tests::mutation::formal_mutation_report_requires_an_ancestor_commit_object ... ok
+test proof_coverage::tests::mutation::formal_mutation_observation_counts_timeouts_in_activation ... ok
+test proof_coverage::tests::mutation::formal_mutation_report_binds_inputs_to_its_evidence_commit ... ok
+test proof_coverage::tests::mutation_globs_require_live_files_and_apply_exclusions ... ok
+test proof_coverage::tests::nonexistent_kani_crate_fails_closed ... ok
+test proof_coverage::tests::optional_registry_files_add_concurrency_lanes ... ok
+test proof_coverage::tests::recorded_mutation_evidence_requires_completed_structured_result ... ok
+test proof_coverage::tests::refinement_registry_schema_and_fields_are_exact ... ok
+test proof_coverage::tests::mutation::formal_mutation_report_preserves_per_target_source_attribution ... ok
+test proof_coverage::tests::unmapped_kani_fallback_is_limited_to_known_receipt_harnesses ... ok
+test qualify::tests::committed_bounded_gate_passes_end_to_end ... ok
+test qualify::tests::committed_bounded_matrix_satisfies_the_contract ... ok
+test qualify::tests::drifted_entrypoint_fails_closed ... ok
+test qualify::tests::empty_gate_conditions_fail_closed ... ok
+test qualify::tests::gate_condition_without_id_fails_closed ... ok
+test qualify::tests::known_profiles_are_nonempty_and_kebab_case ... ok
+test qualify::tests::missing_cognition_market_gate_fails_closed ... ok
+test qualify::tests::resolve_existing_repo_file_rejects_symlink_escape ... ok
+test qualify::tests::resolve_repo_relative_accepts_plain_path ... ok
+test qualify::tests::resolve_repo_relative_rejects_absolute ... ok
+test qualify::tests::resolve_repo_relative_rejects_parent_escape ... ok
+test qualify::tests::unknown_profile_is_an_error_not_a_skip ... ok
+test qualify::tests::wrong_scope_fails_closed ... ok
+test tests::build_schema_index_rejects_missing_root ... ok
+test tests::codegen_argv_rejects_language_given_twice ... ok
+test tests::codegen_argv_round_trips_positional_and_flag ... ok
+test tests::collect_scenario_files_rejects_missing_directory ... ok
+test tests::normalize_ts_chunk_strips_trailing_newlines ... ok
+test tests::pascal_case_handles_kebab_and_snake ... ok
+test tests::pascal_case_passes_through_pascal_input ... ok
+test tests::resolve_schema_path_rejects_prefix_traversal ... ok
+test tests::ts_header_includes_pin_and_sha ... ok
+test tests::ts_namespace_name_derives_group_and_stem ... ok
+test tests::ts_namespace_name_rejects_non_schema_paths ... ok
+test adapter_no_bypass::tests::every_current_mediation_contract_detects_a_removed_required_call ... ok
+test proof_coverage::tests::mutation::proof_mutation_report_rejects_stale_compiled_dependencies ... ok
+test proof_coverage::tests::mutation::spec_mutation_report_rejects_stale_cfg_import_and_negative_registry ... ok
+test proof_coverage::tests::mutation::spec_mutation_report_rejects_weak_source_despite_strong_global_activation ... ok
+test proof_coverage::tests::mutation::spec_mutation_report_binds_exact_registered_negative_preflight ... ok
+test proof_coverage::tests::mutation::spec_mutation_report_binds_registered_seeds_to_killed_inventory_results ... ok
+test proof_coverage::tests::mutation::spec_mutation_report_binds_exact_positive_baselines ... ok
+test proof_coverage::tests::rendering_is_byte_deterministic ... ok
+test proof_coverage::tests::current_registries_have_total_primary_attribution ... ok
+
+test result: ok. 180 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.07s
+
+     Running tests/itf_to_regression.rs (target/debug/deps/itf_to_regression-0e78998ec3bc9201)
+
+running 14 tests
+test generated_fixture::regression_formal_receipt_before_allow_abfe825d1266_trace_shape ... ok
+test generated_fixture::regression_formal_receipt_before_allow_abfe825d1266_replay ... ok
+test nonviolating_trace_is_rejected_without_output ... ok
+test malformed_trace_is_rejected_without_output ... ok
+test malformed_receipt_is_rejected_without_output ... ok
+test unknown_replay_family_is_rejected_without_output ... ok
+test malformed_family_integer_is_rejected_without_output ... ok
+test unix_fifo_trace_is_rejected_without_blocking ... ok
+test duplicate_collections_are_rejected_without_output ... ok
+test empty_action_metadata_uses_state_difference ... ok
+test unix_backslash_in_trace_name_is_preserved ... ok
+test allowed_without_budget_check_is_still_a_violation ... ok
+test divergent_existing_output_is_not_overwritten ... ok
+test conversion_is_deterministic_and_matches_golden ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.46s
+
+     Running tests/qualify_parity.rs (target/debug/deps/qualify_parity-ede127609873ef8b)
+
+running 1 test
+test bounded_matrix_entrypoint_points_at_the_xtask_leaf ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/workspace_root.rs (target/debug/deps/workspace_root-a4d2972e4d7902a3)
+
+running 6 tests
+test outside_checkout_refuses_a_stale_manifest_environment ... ok
+test symlinked_working_directory_resolves_the_physical_checkout ... ok
+test incomplete_or_misidentified_chio_workspaces_fail_closed ... ok
+test member_and_plain_subdirectories_find_their_checkout ... ok
+test reused_binary_checks_and_updates_only_the_invocation_checkout ... ok
+test nested_unrelated_boundaries_refuse_the_containing_checkout ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+   Doc-tests chio_spec_codegen
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

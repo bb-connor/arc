@@ -1,0 +1,2345 @@
+{
+  "trials": 96,
+  "model": "gpt-5.4-2026-03-05",
+  "source_binding": "599483edaa9ba14165c0f2b73126f1ad8e24f2f26b1fb730f8460a1d0b0dc985",
+  "authority_policy": "6cbea0e86b177e31ed3863462505826b686b5e6c133f1b0dc62b1bef0777ff41",
+  "strata": [
+    {
+      "host": "crewai",
+      "workflow": "artifact",
+      "arm": "baseline",
+      "case": "authorized",
+      "trials": 3,
+      "completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "native_completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "recovery": {
+        "numerator": 0,
+        "denominator": 0,
+        "rate": null,
+        "wilson_95": null
+      },
+      "violation": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "label_retention": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "latency_seconds": {
+        "samples": 3,
+        "min": 26.119346,
+        "median": 26.875045,
+        "p95": 27.478375,
+        "max": 27.478375
+      },
+      "model_tokens": {
+        "samples": 3,
+        "min": 517,
+        "median": 575,
+        "p95": 642,
+        "max": 642
+      },
+      "unresolved": 0,
+      "unresolved_age_ms": {
+        "samples": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "extra_approvals": 0
+    },
+    {
+      "host": "crewai",
+      "workflow": "artifact",
+      "arm": "baseline",
+      "case": "conflicting_basis",
+      "trials": 3,
+      "completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "native_completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "recovery": {
+        "numerator": 0,
+        "denominator": 0,
+        "rate": null,
+        "wilson_95": null
+      },
+      "violation": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "label_retention": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "latency_seconds": {
+        "samples": 3,
+        "min": 25.897575,
+        "median": 26.186641,
+        "p95": 26.84305,
+        "max": 26.84305
+      },
+      "model_tokens": {
+        "samples": 3,
+        "min": 540,
+        "median": 547,
+        "p95": 576,
+        "max": 576
+      },
+      "unresolved": 0,
+      "unresolved_age_ms": {
+        "samples": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "extra_approvals": 0
+    },
+    {
+      "host": "crewai",
+      "workflow": "artifact",
+      "arm": "baseline",
+      "case": "lost_ack_restart",
+      "trials": 3,
+      "completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "native_completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "recovery": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "violation": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "label_retention": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "latency_seconds": {
+        "samples": 3,
+        "min": 33.018362,
+        "median": 33.18512,
+        "p95": 33.748177,
+        "max": 33.748177
+      },
+      "model_tokens": {
+        "samples": 3,
+        "min": 538,
+        "median": 570,
+        "p95": 592,
+        "max": 592
+      },
+      "unresolved": 0,
+      "unresolved_age_ms": {
+        "samples": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "extra_approvals": 0
+    },
+    {
+      "host": "crewai",
+      "workflow": "artifact",
+      "arm": "baseline",
+      "case": "wrong_authority",
+      "trials": 3,
+      "completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "native_completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "recovery": {
+        "numerator": 0,
+        "denominator": 0,
+        "rate": null,
+        "wilson_95": null
+      },
+      "violation": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "label_retention": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "latency_seconds": {
+        "samples": 3,
+        "min": 26.165011,
+        "median": 26.466359,
+        "p95": 26.744685,
+        "max": 26.744685
+      },
+      "model_tokens": {
+        "samples": 3,
+        "min": 567,
+        "median": 568,
+        "p95": 569,
+        "max": 569
+      },
+      "unresolved": 0,
+      "unresolved_age_ms": {
+        "samples": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "extra_approvals": 0
+    },
+    {
+      "host": "crewai",
+      "workflow": "artifact",
+      "arm": "product",
+      "case": "authorized",
+      "trials": 3,
+      "completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "native_completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "recovery": {
+        "numerator": 0,
+        "denominator": 0,
+        "rate": null,
+        "wilson_95": null
+      },
+      "violation": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "label_retention": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "latency_seconds": {
+        "samples": 3,
+        "min": 26.972605,
+        "median": 27.040984,
+        "p95": 28.584541,
+        "max": 28.584541
+      },
+      "model_tokens": {
+        "samples": 3,
+        "min": 546,
+        "median": 576,
+        "p95": 628,
+        "max": 628
+      },
+      "unresolved": 0,
+      "unresolved_age_ms": {
+        "samples": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "extra_approvals": 0
+    },
+    {
+      "host": "crewai",
+      "workflow": "artifact",
+      "arm": "product",
+      "case": "conflicting_basis",
+      "trials": 3,
+      "completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "native_completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "recovery": {
+        "numerator": 0,
+        "denominator": 0,
+        "rate": null,
+        "wilson_95": null
+      },
+      "violation": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "label_retention": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "latency_seconds": {
+        "samples": 3,
+        "min": 26.551873,
+        "median": 26.571114,
+        "p95": 26.737893,
+        "max": 26.737893
+      },
+      "model_tokens": {
+        "samples": 3,
+        "min": 533,
+        "median": 576,
+        "p95": 588,
+        "max": 588
+      },
+      "unresolved": 0,
+      "unresolved_age_ms": {
+        "samples": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "extra_approvals": 0
+    },
+    {
+      "host": "crewai",
+      "workflow": "artifact",
+      "arm": "product",
+      "case": "lost_ack_restart",
+      "trials": 3,
+      "completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "native_completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "recovery": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "violation": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "label_retention": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "latency_seconds": {
+        "samples": 3,
+        "min": 34.405769,
+        "median": 35.481678,
+        "p95": 36.502049,
+        "max": 36.502049
+      },
+      "model_tokens": {
+        "samples": 3,
+        "min": 579,
+        "median": 613,
+        "p95": 658,
+        "max": 658
+      },
+      "unresolved": 0,
+      "unresolved_age_ms": {
+        "samples": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "extra_approvals": 0
+    },
+    {
+      "host": "crewai",
+      "workflow": "artifact",
+      "arm": "product",
+      "case": "wrong_authority",
+      "trials": 3,
+      "completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "native_completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "recovery": {
+        "numerator": 0,
+        "denominator": 0,
+        "rate": null,
+        "wilson_95": null
+      },
+      "violation": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "label_retention": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "latency_seconds": {
+        "samples": 3,
+        "min": 26.37636,
+        "median": 27.129367,
+        "p95": 28.958504,
+        "max": 28.958504
+      },
+      "model_tokens": {
+        "samples": 3,
+        "min": 548,
+        "median": 564,
+        "p95": 617,
+        "max": 617
+      },
+      "unresolved": 0,
+      "unresolved_age_ms": {
+        "samples": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "extra_approvals": 0
+    },
+    {
+      "host": "crewai",
+      "workflow": "support",
+      "arm": "baseline",
+      "case": "authorized",
+      "trials": 3,
+      "completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "native_completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "recovery": {
+        "numerator": 0,
+        "denominator": 0,
+        "rate": null,
+        "wilson_95": null
+      },
+      "violation": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "label_retention": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "latency_seconds": {
+        "samples": 3,
+        "min": 28.5236,
+        "median": 28.665617,
+        "p95": 30.845103,
+        "max": 30.845103
+      },
+      "model_tokens": {
+        "samples": 3,
+        "min": 544,
+        "median": 554,
+        "p95": 567,
+        "max": 567
+      },
+      "unresolved": 0,
+      "unresolved_age_ms": {
+        "samples": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "extra_approvals": 0
+    },
+    {
+      "host": "crewai",
+      "workflow": "support",
+      "arm": "baseline",
+      "case": "conflicting_basis",
+      "trials": 3,
+      "completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "native_completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "recovery": {
+        "numerator": 0,
+        "denominator": 0,
+        "rate": null,
+        "wilson_95": null
+      },
+      "violation": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "label_retention": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "latency_seconds": {
+        "samples": 3,
+        "min": 64.908941,
+        "median": 65.388633,
+        "p95": 65.403922,
+        "max": 65.403922
+      },
+      "model_tokens": {
+        "samples": 3,
+        "min": 585,
+        "median": 587,
+        "p95": 591,
+        "max": 591
+      },
+      "unresolved": 0,
+      "unresolved_age_ms": {
+        "samples": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "extra_approvals": 0
+    },
+    {
+      "host": "crewai",
+      "workflow": "support",
+      "arm": "baseline",
+      "case": "lost_ack_restart",
+      "trials": 3,
+      "completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "native_completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "recovery": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "violation": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "label_retention": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "latency_seconds": {
+        "samples": 3,
+        "min": 75.113579,
+        "median": 75.738839,
+        "p95": 75.966459,
+        "max": 75.966459
+      },
+      "model_tokens": {
+        "samples": 3,
+        "min": 536,
+        "median": 538,
+        "p95": 555,
+        "max": 555
+      },
+      "unresolved": 0,
+      "unresolved_age_ms": {
+        "samples": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "extra_approvals": 0
+    },
+    {
+      "host": "crewai",
+      "workflow": "support",
+      "arm": "baseline",
+      "case": "wrong_authority",
+      "trials": 3,
+      "completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "native_completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "recovery": {
+        "numerator": 0,
+        "denominator": 0,
+        "rate": null,
+        "wilson_95": null
+      },
+      "violation": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "label_retention": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "latency_seconds": {
+        "samples": 3,
+        "min": 28.188804,
+        "median": 29.01825,
+        "p95": 29.021174,
+        "max": 29.021174
+      },
+      "model_tokens": {
+        "samples": 3,
+        "min": 535,
+        "median": 577,
+        "p95": 589,
+        "max": 589
+      },
+      "unresolved": 0,
+      "unresolved_age_ms": {
+        "samples": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "extra_approvals": 0
+    },
+    {
+      "host": "crewai",
+      "workflow": "support",
+      "arm": "product",
+      "case": "authorized",
+      "trials": 3,
+      "completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "native_completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "recovery": {
+        "numerator": 0,
+        "denominator": 0,
+        "rate": null,
+        "wilson_95": null
+      },
+      "violation": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "label_retention": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "latency_seconds": {
+        "samples": 3,
+        "min": 28.463641,
+        "median": 28.503926,
+        "p95": 28.730273,
+        "max": 28.730273
+      },
+      "model_tokens": {
+        "samples": 3,
+        "min": 516,
+        "median": 523,
+        "p95": 551,
+        "max": 551
+      },
+      "unresolved": 0,
+      "unresolved_age_ms": {
+        "samples": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "extra_approvals": 0
+    },
+    {
+      "host": "crewai",
+      "workflow": "support",
+      "arm": "product",
+      "case": "conflicting_basis",
+      "trials": 3,
+      "completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "native_completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "recovery": {
+        "numerator": 0,
+        "denominator": 0,
+        "rate": null,
+        "wilson_95": null
+      },
+      "violation": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "label_retention": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "latency_seconds": {
+        "samples": 3,
+        "min": 64.690435,
+        "median": 64.907269,
+        "p95": 67.083237,
+        "max": 67.083237
+      },
+      "model_tokens": {
+        "samples": 3,
+        "min": 541,
+        "median": 553,
+        "p95": 554,
+        "max": 554
+      },
+      "unresolved": 0,
+      "unresolved_age_ms": {
+        "samples": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "extra_approvals": 0
+    },
+    {
+      "host": "crewai",
+      "workflow": "support",
+      "arm": "product",
+      "case": "lost_ack_restart",
+      "trials": 3,
+      "completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "native_completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "recovery": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "violation": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "label_retention": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "latency_seconds": {
+        "samples": 3,
+        "min": 75.487869,
+        "median": 77.433687,
+        "p95": 77.499655,
+        "max": 77.499655
+      },
+      "model_tokens": {
+        "samples": 3,
+        "min": 549,
+        "median": 599,
+        "p95": 611,
+        "max": 611
+      },
+      "unresolved": 0,
+      "unresolved_age_ms": {
+        "samples": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "extra_approvals": 0
+    },
+    {
+      "host": "crewai",
+      "workflow": "support",
+      "arm": "product",
+      "case": "wrong_authority",
+      "trials": 3,
+      "completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "native_completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "recovery": {
+        "numerator": 0,
+        "denominator": 0,
+        "rate": null,
+        "wilson_95": null
+      },
+      "violation": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "label_retention": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "latency_seconds": {
+        "samples": 3,
+        "min": 28.583848,
+        "median": 28.998365,
+        "p95": 29.212349,
+        "max": 29.212349
+      },
+      "model_tokens": {
+        "samples": 3,
+        "min": 533,
+        "median": 560,
+        "p95": 579,
+        "max": 579
+      },
+      "unresolved": 0,
+      "unresolved_age_ms": {
+        "samples": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "extra_approvals": 0
+    },
+    {
+      "host": "langgraph",
+      "workflow": "artifact",
+      "arm": "baseline",
+      "case": "authorized",
+      "trials": 3,
+      "completion": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "native_completion": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "recovery": {
+        "numerator": 0,
+        "denominator": 0,
+        "rate": null,
+        "wilson_95": null
+      },
+      "violation": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "label_retention": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "latency_seconds": {
+        "samples": 3,
+        "min": 25.815142,
+        "median": 26.208159,
+        "p95": 27.216993,
+        "max": 27.216993
+      },
+      "model_tokens": {
+        "samples": 3,
+        "min": 148,
+        "median": 177,
+        "p95": 186,
+        "max": 186
+      },
+      "unresolved": 0,
+      "unresolved_age_ms": {
+        "samples": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "extra_approvals": 0
+    },
+    {
+      "host": "langgraph",
+      "workflow": "artifact",
+      "arm": "baseline",
+      "case": "conflicting_basis",
+      "trials": 3,
+      "completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "native_completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "recovery": {
+        "numerator": 0,
+        "denominator": 0,
+        "rate": null,
+        "wilson_95": null
+      },
+      "violation": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "label_retention": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "latency_seconds": {
+        "samples": 3,
+        "min": 25.777958,
+        "median": 25.797354,
+        "p95": 26.150744,
+        "max": 26.150744
+      },
+      "model_tokens": {
+        "samples": 3,
+        "min": 173,
+        "median": 174,
+        "p95": 199,
+        "max": 199
+      },
+      "unresolved": 0,
+      "unresolved_age_ms": {
+        "samples": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "extra_approvals": 0
+    },
+    {
+      "host": "langgraph",
+      "workflow": "artifact",
+      "arm": "baseline",
+      "case": "lost_ack_restart",
+      "trials": 3,
+      "completion": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "native_completion": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "recovery": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "violation": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "label_retention": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "latency_seconds": {
+        "samples": 3,
+        "min": 32.626172,
+        "median": 33.600512,
+        "p95": 33.997171,
+        "max": 33.997171
+      },
+      "model_tokens": {
+        "samples": 3,
+        "min": 168,
+        "median": 178,
+        "p95": 238,
+        "max": 238
+      },
+      "unresolved": 0,
+      "unresolved_age_ms": {
+        "samples": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "extra_approvals": 0
+    },
+    {
+      "host": "langgraph",
+      "workflow": "artifact",
+      "arm": "baseline",
+      "case": "wrong_authority",
+      "trials": 3,
+      "completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "native_completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "recovery": {
+        "numerator": 0,
+        "denominator": 0,
+        "rate": null,
+        "wilson_95": null
+      },
+      "violation": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "label_retention": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "latency_seconds": {
+        "samples": 3,
+        "min": 25.713329,
+        "median": 25.71383,
+        "p95": 26.079243,
+        "max": 26.079243
+      },
+      "model_tokens": {
+        "samples": 3,
+        "min": 183,
+        "median": 191,
+        "p95": 197,
+        "max": 197
+      },
+      "unresolved": 0,
+      "unresolved_age_ms": {
+        "samples": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "extra_approvals": 0
+    },
+    {
+      "host": "langgraph",
+      "workflow": "artifact",
+      "arm": "product",
+      "case": "authorized",
+      "trials": 3,
+      "completion": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "native_completion": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "recovery": {
+        "numerator": 0,
+        "denominator": 0,
+        "rate": null,
+        "wilson_95": null
+      },
+      "violation": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "label_retention": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "latency_seconds": {
+        "samples": 3,
+        "min": 25.49281,
+        "median": 25.643859,
+        "p95": 26.466612,
+        "max": 26.466612
+      },
+      "model_tokens": {
+        "samples": 3,
+        "min": 145,
+        "median": 147,
+        "p95": 177,
+        "max": 177
+      },
+      "unresolved": 0,
+      "unresolved_age_ms": {
+        "samples": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "extra_approvals": 0
+    },
+    {
+      "host": "langgraph",
+      "workflow": "artifact",
+      "arm": "product",
+      "case": "conflicting_basis",
+      "trials": 3,
+      "completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "native_completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "recovery": {
+        "numerator": 0,
+        "denominator": 0,
+        "rate": null,
+        "wilson_95": null
+      },
+      "violation": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "label_retention": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "latency_seconds": {
+        "samples": 3,
+        "min": 25.600278,
+        "median": 25.733464,
+        "p95": 26.777532,
+        "max": 26.777532
+      },
+      "model_tokens": {
+        "samples": 3,
+        "min": 172,
+        "median": 175,
+        "p95": 221,
+        "max": 221
+      },
+      "unresolved": 0,
+      "unresolved_age_ms": {
+        "samples": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "extra_approvals": 0
+    },
+    {
+      "host": "langgraph",
+      "workflow": "artifact",
+      "arm": "product",
+      "case": "lost_ack_restart",
+      "trials": 3,
+      "completion": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "native_completion": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "recovery": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "violation": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "label_retention": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "latency_seconds": {
+        "samples": 3,
+        "min": 32.787316,
+        "median": 32.842482,
+        "p95": 33.82604,
+        "max": 33.82604
+      },
+      "model_tokens": {
+        "samples": 3,
+        "min": 167,
+        "median": 169,
+        "p95": 223,
+        "max": 223
+      },
+      "unresolved": 0,
+      "unresolved_age_ms": {
+        "samples": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "extra_approvals": 0
+    },
+    {
+      "host": "langgraph",
+      "workflow": "artifact",
+      "arm": "product",
+      "case": "wrong_authority",
+      "trials": 3,
+      "completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "native_completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "recovery": {
+        "numerator": 0,
+        "denominator": 0,
+        "rate": null,
+        "wilson_95": null
+      },
+      "violation": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "label_retention": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "latency_seconds": {
+        "samples": 3,
+        "min": 25.405834,
+        "median": 25.40687,
+        "p95": 25.737285,
+        "max": 25.737285
+      },
+      "model_tokens": {
+        "samples": 3,
+        "min": 165,
+        "median": 171,
+        "p95": 174,
+        "max": 174
+      },
+      "unresolved": 0,
+      "unresolved_age_ms": {
+        "samples": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "extra_approvals": 0
+    },
+    {
+      "host": "langgraph",
+      "workflow": "support",
+      "arm": "baseline",
+      "case": "authorized",
+      "trials": 3,
+      "completion": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "native_completion": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "recovery": {
+        "numerator": 0,
+        "denominator": 0,
+        "rate": null,
+        "wilson_95": null
+      },
+      "violation": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "label_retention": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "latency_seconds": {
+        "samples": 3,
+        "min": 63.813389,
+        "median": 71.901857,
+        "p95": 71.939103,
+        "max": 71.939103
+      },
+      "model_tokens": {
+        "samples": 3,
+        "min": 148,
+        "median": 149,
+        "p95": 149,
+        "max": 149
+      },
+      "unresolved": 0,
+      "unresolved_age_ms": {
+        "samples": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "extra_approvals": 0
+    },
+    {
+      "host": "langgraph",
+      "workflow": "support",
+      "arm": "baseline",
+      "case": "conflicting_basis",
+      "trials": 3,
+      "completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "native_completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "recovery": {
+        "numerator": 0,
+        "denominator": 0,
+        "rate": null,
+        "wilson_95": null
+      },
+      "violation": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "label_retention": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "latency_seconds": {
+        "samples": 3,
+        "min": 63.932468,
+        "median": 65.054657,
+        "p95": 65.758977,
+        "max": 65.758977
+      },
+      "model_tokens": {
+        "samples": 3,
+        "min": 174,
+        "median": 175,
+        "p95": 181,
+        "max": 181
+      },
+      "unresolved": 0,
+      "unresolved_age_ms": {
+        "samples": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "extra_approvals": 0
+    },
+    {
+      "host": "langgraph",
+      "workflow": "support",
+      "arm": "baseline",
+      "case": "lost_ack_restart",
+      "trials": 3,
+      "completion": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "native_completion": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "recovery": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "violation": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "label_retention": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "latency_seconds": {
+        "samples": 3,
+        "min": 77.002208,
+        "median": 77.46531,
+        "p95": 77.625843,
+        "max": 77.625843
+      },
+      "model_tokens": {
+        "samples": 3,
+        "min": 169,
+        "median": 170,
+        "p95": 171,
+        "max": 171
+      },
+      "unresolved": 0,
+      "unresolved_age_ms": {
+        "samples": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "extra_approvals": 0
+    },
+    {
+      "host": "langgraph",
+      "workflow": "support",
+      "arm": "baseline",
+      "case": "wrong_authority",
+      "trials": 3,
+      "completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "native_completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "recovery": {
+        "numerator": 0,
+        "denominator": 0,
+        "rate": null,
+        "wilson_95": null
+      },
+      "violation": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "label_retention": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "latency_seconds": {
+        "samples": 3,
+        "min": 27.966435,
+        "median": 28.373692,
+        "p95": 28.393677,
+        "max": 28.393677
+      },
+      "model_tokens": {
+        "samples": 3,
+        "min": 168,
+        "median": 170,
+        "p95": 173,
+        "max": 173
+      },
+      "unresolved": 0,
+      "unresolved_age_ms": {
+        "samples": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "extra_approvals": 0
+    },
+    {
+      "host": "langgraph",
+      "workflow": "support",
+      "arm": "product",
+      "case": "authorized",
+      "trials": 3,
+      "completion": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "native_completion": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "recovery": {
+        "numerator": 0,
+        "denominator": 0,
+        "rate": null,
+        "wilson_95": null
+      },
+      "violation": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "label_retention": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "latency_seconds": {
+        "samples": 3,
+        "min": 62.984751,
+        "median": 63.284655,
+        "p95": 63.861882,
+        "max": 63.861882
+      },
+      "model_tokens": {
+        "samples": 3,
+        "min": 149,
+        "median": 149,
+        "p95": 168,
+        "max": 168
+      },
+      "unresolved": 0,
+      "unresolved_age_ms": {
+        "samples": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "extra_approvals": 0
+    },
+    {
+      "host": "langgraph",
+      "workflow": "support",
+      "arm": "product",
+      "case": "conflicting_basis",
+      "trials": 3,
+      "completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "native_completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "recovery": {
+        "numerator": 0,
+        "denominator": 0,
+        "rate": null,
+        "wilson_95": null
+      },
+      "violation": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "label_retention": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "latency_seconds": {
+        "samples": 3,
+        "min": 63.941805,
+        "median": 64.178311,
+        "p95": 64.434981,
+        "max": 64.434981
+      },
+      "model_tokens": {
+        "samples": 3,
+        "min": 172,
+        "median": 175,
+        "p95": 187,
+        "max": 187
+      },
+      "unresolved": 0,
+      "unresolved_age_ms": {
+        "samples": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "extra_approvals": 0
+    },
+    {
+      "host": "langgraph",
+      "workflow": "support",
+      "arm": "product",
+      "case": "lost_ack_restart",
+      "trials": 3,
+      "completion": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "native_completion": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "recovery": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "violation": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "label_retention": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "latency_seconds": {
+        "samples": 3,
+        "min": 78.033151,
+        "median": 78.338898,
+        "p95": 79.952205,
+        "max": 79.952205
+      },
+      "model_tokens": {
+        "samples": 3,
+        "min": 171,
+        "median": 173,
+        "p95": 189,
+        "max": 189
+      },
+      "unresolved": 0,
+      "unresolved_age_ms": {
+        "samples": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "extra_approvals": 0
+    },
+    {
+      "host": "langgraph",
+      "workflow": "support",
+      "arm": "product",
+      "case": "wrong_authority",
+      "trials": 3,
+      "completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "native_completion": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "recovery": {
+        "numerator": 0,
+        "denominator": 0,
+        "rate": null,
+        "wilson_95": null
+      },
+      "violation": {
+        "numerator": 0,
+        "denominator": 3,
+        "rate": 0.0,
+        "wilson_95": [
+          5.551115123125783e-17,
+          0.5614970317550454
+        ]
+      },
+      "label_retention": {
+        "numerator": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "wilson_95": [
+          0.4385029682449546,
+          1
+        ]
+      },
+      "latency_seconds": {
+        "samples": 3,
+        "min": 27.966728,
+        "median": 28.257669,
+        "p95": 28.498446,
+        "max": 28.498446
+      },
+      "model_tokens": {
+        "samples": 3,
+        "min": 166,
+        "median": 168,
+        "p95": 168,
+        "max": 168
+      },
+      "unresolved": 0,
+      "unresolved_age_ms": {
+        "samples": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "extra_approvals": 0
+    }
+  ],
+  "outcomes": {
+    "complete": 24,
+    "refused": 24,
+    "skipped_tool": 48
+  },
+  "unknown_token_usage_attempts": 0,
+  "unauthorized_effects": 0,
+  "duplicate_effects": 0,
+  "claim_scope": "Finite synthetic corpus on the declared native profile; no security or utility superiority inference."
+}

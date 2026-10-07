@@ -1,0 +1,44 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling chio-recovery v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-recovery)
+   Compiling chio-core-types v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-core-types)
+    Finished `test` profile [unoptimized] target(s) in 2m 53s
+     Running tests/recovery_contracts.rs (target/debug/deps/recovery_contracts-2faf5ab41a4137e8)
+
+running 6 tests
+test nested_allocation_and_aggregate_budgets_refuse_before_typed_decode ... ok
+test malformed_tokens_and_nested_duplicates_have_no_permissive_fallback ... ok
+test domains_frame_canonical_bodies_and_refuse_cross_domain_substitution ... ok
+test public_errors_and_debug_do_not_expose_canaries ... ok
+test shared_negative_recovery_vectors ... ok
+test schemas_share_structural_vectors_with_typed_reader ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running tests/workflow.rs (target/debug/deps/workflow-2bacaeff8d6f3fcb)
+
+running 3 tests
+test useful_pre_admission_and_native_approval_advice_have_positive_controls ... ok
+test unknown_and_pending_operations_keep_identity_across_cancellation ... ok
+test settled_effects_do_not_become_another_submission_when_output_is_denied ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/recovery_bounds.rs (target/debug/deps/recovery_bounds-0ba12fc0605bb1be)
+
+running 3 tests
+test collection_ceiling_precedes_next_element_decoding ... ok
+test identifier_and_integer_boundaries_are_closed ... ok
+test old_host_wrong_deployment_and_stripped_participant_refuse ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/graph.rs (target/debug/deps/graph-c6c9f70000f27c54)
+
+running 4 tests
+test repeated_expansion_consumes_shared_budget_and_exhaustion_is_irreversible ... ok
+test cycles_duplicate_identities_missing_evidence_and_unsafe_costs_fail_closed ... ok
+test deterministic_topology_and_cost_ignore_input_insertion_order ... ok
+test full_step_ceiling_has_a_successful_bounded_positive_control ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

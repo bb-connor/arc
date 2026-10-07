@@ -1,0 +1,37 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling chio-manifest v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-manifest)
+   Compiling chio-custody-hw v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-custody-hw)
+   Compiling chio-quarantine v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-quarantine)
+   Compiling chio-tool-call-fabric v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/protocol/chio-tool-call-fabric)
+   Compiling chio-kernel v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-kernel)
+   Compiling chio-finding-verifier v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-finding-verifier)
+   Compiling chio-transaction-passport v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-transaction-passport)
+   Compiling chio-risk-comptroller v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-risk-comptroller)
+   Compiling chio-commerce-order v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-commerce-order)
+   Compiling chio-agent-web-interop v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-agent-web-interop)
+   Compiling chio-store-sqlite v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-store-sqlite)
+    Finished `test` profile [unoptimized] target(s) in 1m 09s
+   Doc-tests chio_kernel
+
+running 8 tests
+test crates/kernel/chio-kernel/src/kernel/active_response_dispatch.rs - kernel::active_response_dispatch::ResponseDispatchPreparationRequest (line 117) - compile fail ... ok
+test crates/kernel/chio-kernel/src/runtime/recovery_review.rs - runtime::recovery_review::RecoveryRequestProjection (line 29) - compile fail ... ok
+test crates/kernel/chio-kernel/src/runtime/recovery_review.rs - runtime::recovery_review::RecoveryRequestProjection (line 22) - compile fail ... ok
+test crates/kernel/chio-kernel/src/admission_operation/projection.rs - admission_operation::projection::VerifiedAdmissionReceipt (line 118) - compile fail ... ok
+test crates/kernel/chio-kernel/src/kernel/active_response_dispatch.rs - kernel::active_response_dispatch::ResponseDispatchPreparationRequest (line 109) - compile fail ... ok
+test crates/kernel/chio-kernel/src/dispatch_status.rs - dispatch_status::QualifiedDispatchStatusProvider (line 166) - compile fail ... ok
+test crates/kernel/chio-kernel/src/runtime/recovery_review.rs - runtime::recovery_review::RecoveryRequestProjection (line 16) - compile fail ... ok
+test crates/kernel/chio-kernel/src/kernel/verified_treaty.rs - kernel::verified_treaty::VerifiedFederationTreatyMaterial (line 37) - compile fail ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.17s
+
+   Doc-tests chio_security_types
+
+running 4 tests
+test crates/security/chio-security-types/src/response_execution.rs - response_execution::FreshLiveAdmission (line 107) - compile fail ... ok
+test crates/security/chio-security-types/src/recovery/identifiers.rs - recovery::identifiers (line 9) - compile fail ... ok
+test crates/security/chio-security-types/src/recovery/identifiers.rs - recovery::identifiers (line 3) - compile fail ... ok
+test crates/security/chio-security-types/src/response_execution.rs - response_execution::ResponseExecutionBinding (line 27) - compile fail ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+

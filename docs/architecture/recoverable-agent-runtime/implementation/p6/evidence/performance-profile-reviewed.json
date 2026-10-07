@@ -1,0 +1,13 @@
+{
+  "system": "Darwin",
+  "machine": "arm64",
+  "kernel": "25.4.0",
+  "processor": "Apple M1 Max",
+  "rustc": "rustc 1.94.1 (e408947bf 2026-03-25)\nbinary: rustc\ncommit-hash: e408947bfd200af42db322daf0fadfe7e26d3bd1\ncommit-date: 2026-03-25\nhost: aarch64-apple-darwin\nrelease: 1.94.1\nLLVM version: 21.1.8\n",
+  "cargo": "cargo 1.94.1 (29ea6fb6a 2026-03-24)\n",
+  "profile": "debug",
+  "incremental": false,
+  "build_jobs": 2,
+  "native_ceiling_ns": 220683049,
+  "sampling": "Quiet 64 native samples, eight warmups/eight exact replays; pure 1000 samples/100 warmups; existing same-host P0 ceiling unchanged."
+}

@@ -1,0 +1,8 @@
+xtask: codegen tool failed: datamodel-codegen exited exit status: 1
+stdout: 
+stderr: × No solution found when resolving tool dependencies:
+  ╰─▶ Because datamodel-code-generator was not found in the cache and you
+      require datamodel-code-generator==0.34.0, we can conclude that your
+      requirements are unsatisfiable.
+
+hint: Packages were unavailable because the network was disabled. When the network is disabled, registry packages may only be read from the cache.

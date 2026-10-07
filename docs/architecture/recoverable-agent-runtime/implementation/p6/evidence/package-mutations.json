@@ -1,0 +1,72 @@
+{
+  "schema": "chio.recovery-p6-package-mutations.v1",
+  "rejected_mutations": 13,
+  "restored_positive_audits": 14,
+  "results": [
+    {
+      "mutation": "failed-gate",
+      "rejected": true,
+      "restored_positive": true
+    },
+    {
+      "mutation": "stale-gate",
+      "rejected": true,
+      "restored_positive": true
+    },
+    {
+      "mutation": "missing-gate",
+      "rejected": true,
+      "restored_positive": true
+    },
+    {
+      "mutation": "changed-command",
+      "rejected": true,
+      "restored_positive": true
+    },
+    {
+      "mutation": "raised-ceiling",
+      "rejected": true,
+      "restored_positive": true
+    },
+    {
+      "mutation": "empty-native-performance",
+      "rejected": true,
+      "restored_positive": true
+    },
+    {
+      "mutation": "unknown-effects-hidden",
+      "rejected": true,
+      "restored_positive": true
+    },
+    {
+      "mutation": "interrupted-slots-omitted",
+      "rejected": true,
+      "restored_positive": true
+    },
+    {
+      "mutation": "open-important-review",
+      "rejected": true,
+      "restored_positive": true
+    },
+    {
+      "mutation": "foreign-review-source",
+      "rejected": true,
+      "restored_positive": true
+    },
+    {
+      "mutation": "missing-obligation",
+      "rejected": true,
+      "restored_positive": true
+    },
+    {
+      "mutation": "whole-system-proof-claim",
+      "rejected": true,
+      "restored_positive": true
+    },
+    {
+      "mutation": "old-linux-challenge",
+      "rejected": true,
+      "restored_positive": true
+    }
+  ]
+}

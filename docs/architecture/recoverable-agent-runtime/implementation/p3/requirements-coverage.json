@@ -1,0 +1,545 @@
+{
+  "schema": "chio.recovery-p3-coverage.v1",
+  "phase": "P3",
+  "architecture_revision": 3,
+  "count": 15,
+  "requirements": [
+    {
+      "id": "SEC-11",
+      "obligation": "Policy and semantic packages MUST NOT widen the caller's capability authority.",
+      "document": "01-security-model.md",
+      "proposed_acceptance_test": "contracts::approval_without_capability",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/semantic/capture.rs",
+          "anchor": "verify_capture_tx"
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/capture.rs",
+          "anchor": "VerifiedNativeCapture"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/semantic/authority.rs",
+          "anchor": "p3_native_authority_matrix_rejects_annotation_and_capability_escalation"
+        }
+      ],
+      "evidence": [
+        "evidence/native.log",
+        "evidence/owning-tests.log",
+        "evidence/conformance-lib.log",
+        "evidence/clippy.log",
+        "evidence/vector-recompute.log"
+      ],
+      "scope": "Declared local native semantic profile and pure bounded contracts; vendor/network/platform release qualification remains separate."
+    },
+    {
+      "id": "REC-12",
+      "obligation": "A bounded plan's prerequisite edges MUST reference verified effects under exact scope and provenance.",
+      "document": "03-recovery-protocol.md",
+      "proposed_acceptance_test": "recovery::prerequisite_substitution_and_cycles",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/security/chio-semantic-contracts/src/plans.rs",
+          "anchor": "validate_semantic_plan"
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/semantic/materialization.rs",
+          "anchor": "verify_materialized_plan"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/security/chio-semantic-contracts/tests/semantic_p3.rs",
+          "anchor": "prerequisite_dags_refuse_cycles_duplicates_missing_and_undeclared_future_inputs"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/semantic/chains.rs",
+          "anchor": "p3_native_historical_current_and_held_prerequisites_are_distinct"
+        }
+      ],
+      "evidence": [
+        "evidence/native.log",
+        "evidence/owning-tests.log",
+        "evidence/conformance-lib.log",
+        "evidence/clippy.log",
+        "evidence/vector-recompute.log"
+      ],
+      "scope": "Declared local native semantic profile and pure bounded contracts; vendor/network/platform release qualification remains separate."
+    },
+    {
+      "id": "REC-13",
+      "obligation": "Withheld output MUST preserve completed-effect identity and prevent replacement dispatch.",
+      "document": "03-recovery-protocol.md",
+      "proposed_acceptance_test": "recovery::withheld_output_is_not_no_effect",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/semantic.rs",
+          "anchor": "apply_captured_semantic_disposition"
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/semantic/materialization.rs",
+          "anchor": "step_key"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/semantic.rs",
+          "anchor": "p3_native_withhold_preserves_completed_effect_and_replay_never_returns_raw"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/semantic/authority.rs",
+          "anchor": "p3_native_completed_withhold_restarts_without_effect_or_raw_release"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/semantic/authority.rs",
+          "anchor": "p3_native_evidence_is_one_shot_across_distinct_actions_and_plan_revisions"
+        }
+      ],
+      "evidence": [
+        "evidence/native.log",
+        "evidence/owning-tests.log",
+        "evidence/conformance-lib.log",
+        "evidence/clippy.log",
+        "evidence/vector-recompute.log"
+      ],
+      "scope": "Declared local native semantic profile and pure bounded contracts; vendor/network/platform release qualification remains separate."
+    },
+    {
+      "id": "REC-17",
+      "obligation": "Exact offers and approvals MUST bind materialized step inputs; accepting a plan MUST NOT authorize unknown future output or bypass per-step authority.",
+      "document": "03-recovery-protocol.md",
+      "proposed_acceptance_test": "recovery::prerequisite_result_materialization",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/semantic/materialization.rs",
+          "anchor": "verify_materialized_plan"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/semantic.rs",
+          "anchor": "frame_action"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/semantic/chains.rs",
+          "anchor": "p3_native_derived_bytes_have_a_separate_producer_and_fresh_dependent_authority"
+        },
+        {
+          "path": "crates/security/chio-semantic-contracts/tests/semantic_p3.rs",
+          "anchor": "future_inputs_require_declared_prerequisites"
+        }
+      ],
+      "evidence": [
+        "evidence/native.log",
+        "evidence/owning-tests.log",
+        "evidence/conformance-lib.log",
+        "evidence/clippy.log",
+        "evidence/vector-recompute.log"
+      ],
+      "scope": "Declared local native semantic profile and pure bounded contracts; vendor/network/platform release qualification remains separate."
+    },
+    {
+      "id": "CON-01",
+      "obligation": "Package publisher identity MUST remain distinct from tenant deployment authority.",
+      "document": "05-semantic-contracts.md",
+      "proposed_acceptance_test": "contracts::package_cannot_bind_operator_authority",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/security/chio-semantic-contracts/src/registry.rs",
+          "anchor": "compile_semantic_registry"
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/semantic.rs",
+          "anchor": "NativeSemanticInstallationV1"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/security/chio-semantic-contracts/tests/semantic_p3.rs",
+          "anchor": "signed_packages_cannot_install_tenant_authority_or_missing_coverage"
+        }
+      ],
+      "evidence": [
+        "evidence/native.log",
+        "evidence/owning-tests.log",
+        "evidence/conformance-lib.log",
+        "evidence/clippy.log",
+        "evidence/vector-recompute.log"
+      ],
+      "scope": "Declared local native semantic profile and pure bounded contracts; vendor/network/platform release qualification remains separate."
+    },
+    {
+      "id": "CON-02",
+      "obligation": "Every exposed tool/channel MUST have complete authenticated coverage or refuse.",
+      "document": "05-semantic-contracts.md",
+      "proposed_acceptance_test": "contracts::uncovered_nested_stream_and_error_paths",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/security/chio-semantic-contracts/src/registry.rs",
+          "anchor": "validate_semantic_channels"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/semantic/connector.rs",
+          "anchor": "invoke_native"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/security/chio-semantic-contracts/tests/semantic_p3.rs",
+          "anchor": "signed_packages_cannot_install_tenant_authority_or_missing_coverage"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/semantic/http/tests.rs",
+          "anchor": "p3_http_refuses_raw_response_foreign_account_and_unsupported_routes"
+        }
+      ],
+      "evidence": [
+        "evidence/native.log",
+        "evidence/owning-tests.log",
+        "evidence/conformance-lib.log",
+        "evidence/clippy.log",
+        "evidence/vector-recompute.log"
+      ],
+      "scope": "Declared local native semantic profile and pure bounded contracts; vendor/network/platform release qualification remains separate."
+    },
+    {
+      "id": "CON-03",
+      "obligation": "Policy composition MUST expose resolved precedence and preserve kernel/operator ceilings.",
+      "document": "05-semantic-contracts.md",
+      "proposed_acceptance_test": "contracts::override_and_ceiling_matrix",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/security/chio-semantic-contracts/src/registry.rs",
+          "anchor": "validate_selectors"
+        },
+        {
+          "path": "crates/security/chio-semantic-contracts/src/verification.rs",
+          "anchor": "operator_selectors"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/security/chio-semantic-contracts/tests/semantic_p3.rs",
+          "anchor": "reviewed_package_override_preserves_operator_selector_ceiling"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/semantic/authority.rs",
+          "anchor": "p3_native_authority_matrix_rejects_annotation_and_capability_escalation"
+        }
+      ],
+      "evidence": [
+        "evidence/native.log",
+        "evidence/owning-tests.log",
+        "evidence/conformance-lib.log",
+        "evidence/clippy.log",
+        "evidence/vector-recompute.log"
+      ],
+      "scope": "Declared local native semantic profile and pure bounded contracts; vendor/network/platform release qualification remains separate."
+    },
+    {
+      "id": "CON-04",
+      "obligation": "Recipient resolution MUST bind the actual provider/account/resource and enforced transport.",
+      "document": "05-semantic-contracts.md",
+      "proposed_acceptance_test": "contracts::recipient_redirect_and_account_substitution",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/platform/chio-control-plane/src/semantic/transport.rs",
+          "anchor": "SemanticTransportRouter"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/semantic/http.rs",
+          "anchor": "decode_response"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/semantic/authority.rs",
+          "anchor": "p3_native_alternate_destination_selects_exact_account_transport"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/semantic/http/tests.rs",
+          "anchor": "p3_http_build_binds_provider_account_resource_version_and_native_attempt"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/semantic/http/tests.rs",
+          "anchor": "p3_http_refuses_raw_response_foreign_account_and_unsupported_routes"
+        }
+      ],
+      "evidence": [
+        "evidence/native.log",
+        "evidence/owning-tests.log",
+        "evidence/conformance-lib.log",
+        "evidence/clippy.log",
+        "evidence/vector-recompute.log"
+      ],
+      "scope": "Declared local native semantic profile and pure bounded contracts; vendor/network/platform release qualification remains separate."
+    },
+    {
+      "id": "CON-05",
+      "obligation": "ACL observations MUST be scoped, fresh, complete and fail closed on uncertainty.",
+      "document": "05-semantic-contracts.md",
+      "proposed_acceptance_test": "contracts::acl_cache_outage_and_pagination",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/security/chio-semantic-contracts/src/verification.rs",
+          "anchor": "validate_semantic_provider_version"
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/semantic.rs",
+          "anchor": "install_semantic_audience"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/security/chio-semantic-contracts/tests/semantic_p3.rs",
+          "anchor": "complete_pagination_and_single_strong_provider_version_are_required"
+        },
+        {
+          "path": "crates/security/chio-semantic-contracts/tests/semantic_p3.rs",
+          "anchor": "substitution_matrix_refuses_changed_exact_actions_and_acl_uncertainty"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/semantic.rs",
+          "anchor": "p3_native_refuses_stale_acl_endorsement_absence_and_emergency_stop"
+        }
+      ],
+      "evidence": [
+        "evidence/native.log",
+        "evidence/owning-tests.log",
+        "evidence/conformance-lib.log",
+        "evidence/clippy.log",
+        "evidence/vector-recompute.log"
+      ],
+      "scope": "Declared local native semantic profile and pure bounded contracts; vendor/network/platform release qualification remains separate."
+    },
+    {
+      "id": "CON-06",
+      "obligation": "Dynamic annotators MUST have explicit bounded powers; confidence MUST NOT grant authority.",
+      "document": "05-semantic-contracts.md",
+      "proposed_acceptance_test": "contracts::annotator_power_escalation",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/security/chio-semantic-contracts/src/verification.rs",
+          "anchor": "may_attest_facts"
+        },
+        {
+          "path": "crates/security/chio-semantic-contracts/src/registry.rs",
+          "anchor": "annotators"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/security/chio-semantic-contracts/tests/semantic_p3.rs",
+          "anchor": "annotator_confidence_cannot_create_facts_or_endorsement"
+        },
+        {
+          "path": "crates/security/chio-semantic-contracts/tests/semantic_p3.rs",
+          "anchor": "aggregate_facts_share_a_limit_across_selected_annotation_and_endorsement_roles"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/semantic/authority.rs",
+          "anchor": "p3_native_authority_matrix_rejects_annotation_and_capability_escalation"
+        }
+      ],
+      "evidence": [
+        "evidence/native.log",
+        "evidence/owning-tests.log",
+        "evidence/conformance-lib.log",
+        "evidence/clippy.log",
+        "evidence/vector-recompute.log"
+      ],
+      "scope": "Declared local native semantic profile and pure bounded contracts; vendor/network/platform release qualification remains separate."
+    },
+    {
+      "id": "CON-07",
+      "obligation": "Influence/endorsement MUST be independent of confidentiality and transport authentication.",
+      "document": "05-semantic-contracts.md",
+      "proposed_acceptance_test": "integrity::trusted_transport_untrusted_ticket",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/security/chio-semantic-contracts/src/verification.rs",
+          "anchor": "semantic_annotated_influence"
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/semantic/materialization.rs",
+          "anchor": "materialized_influence"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/security/chio-semantic-contracts/tests/semantic_p3.rs",
+          "anchor": "annotation_restrictions_and_influence_are_bound_without_creating_authority"
+        },
+        {
+          "path": "crates/security/chio-semantic-contracts/tests/semantic_p3.rs",
+          "anchor": "endorsement_cannot_erase_owner_policy_or_lower_confidentiality"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/semantic.rs",
+          "anchor": "p3_native_integrity_only_endorsement_captures_and_returns_without_disclosure_grant"
+        }
+      ],
+      "evidence": [
+        "evidence/native.log",
+        "evidence/owning-tests.log",
+        "evidence/conformance-lib.log",
+        "evidence/clippy.log",
+        "evidence/vector-recompute.log"
+      ],
+      "scope": "Declared local native semantic profile and pure bounded contracts; vendor/network/platform release qualification remains separate."
+    },
+    {
+      "id": "CON-08",
+      "obligation": "Transformation release MUST bind exact inputs, code, output, authority and purpose.",
+      "document": "05-semantic-contracts.md",
+      "proposed_acceptance_test": "transforms::input_output_code_and_scope_substitution",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/security/chio-semantic-contracts/src/selectors.rs",
+          "anchor": "project_semantic_fields"
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/semantic/materialization.rs",
+          "anchor": "transformation provenance"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/security/chio-semantic-contracts/tests/semantic_p3.rs",
+          "anchor": "transform_and_prerequisite_claims_bind_action_scope_output_and_role"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/semantic/chains.rs",
+          "anchor": "p3_native_derived_bytes_have_a_separate_producer_and_fresh_dependent_authority"
+        }
+      ],
+      "evidence": [
+        "evidence/native.log",
+        "evidence/owning-tests.log",
+        "evidence/conformance-lib.log",
+        "evidence/clippy.log",
+        "evidence/vector-recompute.log"
+      ],
+      "scope": "Declared local native semantic profile and pure bounded contracts; vendor/network/platform release qualification remains separate."
+    },
+    {
+      "id": "CON-10",
+      "obligation": "Bound output disposition MUST cover success, failure, stream and alternate channels without raw fallback.",
+      "document": "05-semantic-contracts.md",
+      "proposed_acceptance_test": "transforms::failure_and_withhold_channels",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/semantic.rs",
+          "anchor": "apply_captured_semantic_disposition"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/semantic/http.rs",
+          "anchor": "response.status().is_success()"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/semantic.rs",
+          "anchor": "p3_native_withhold_preserves_completed_effect_and_replay_never_returns_raw"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/semantic/authority.rs",
+          "anchor": "p3_native_provider_error_has_no_raw_fallback_or_replacement_attempt"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/semantic/chains.rs",
+          "anchor": "withheld-transform"
+        }
+      ],
+      "evidence": [
+        "evidence/native.log",
+        "evidence/owning-tests.log",
+        "evidence/conformance-lib.log",
+        "evidence/clippy.log",
+        "evidence/vector-recompute.log"
+      ],
+      "scope": "Declared local native semantic profile and pure bounded contracts; vendor/network/platform release qualification remains separate."
+    },
+    {
+      "id": "CON-11",
+      "obligation": "Reload MUST activate a complete verified generation while preserving captured historical operations.",
+      "document": "05-semantic-contracts.md",
+      "proposed_acceptance_test": "contracts::reload_during_offer_and_unknown_effect",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/semantic.rs",
+          "anchor": "configure_semantic_deployment"
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/semantic/capture.rs",
+          "anchor": "captured_semantic_output_disposition"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/semantic/authority.rs",
+          "anchor": "p3_native_reload_is_atomic_stales_uncaptured_and_preserves_original_completed"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/semantic/authority.rs",
+          "anchor": "p3_native_completed_withhold_restarts_without_effect_or_raw_release"
+        }
+      ],
+      "evidence": [
+        "evidence/native.log",
+        "evidence/owning-tests.log",
+        "evidence/conformance-lib.log",
+        "evidence/clippy.log",
+        "evidence/vector-recompute.log"
+      ],
+      "scope": "Declared local native semantic profile and pure bounded contracts; vendor/network/platform release qualification remains separate."
+    },
+    {
+      "id": "CON-13",
+      "obligation": "Prerequisites MUST distinguish historical facts, current predicates and held reservations at the dependent effect boundary.",
+      "document": "05-semantic-contracts.md",
+      "proposed_acceptance_test": "recovery::expired_lock_and_changed_reviewed_version",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/semantic/materialization.rs",
+          "anchor": "verify_current_prerequisites"
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/semantic/materialization.rs",
+          "anchor": "verify_dispatch_prerequisites"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/semantic/chains.rs",
+          "anchor": "p3_native_historical_current_and_held_prerequisites_are_distinct"
+        }
+      ],
+      "evidence": [
+        "evidence/native.log",
+        "evidence/owning-tests.log",
+        "evidence/conformance-lib.log",
+        "evidence/clippy.log",
+        "evidence/vector-recompute.log"
+      ],
+      "scope": "Declared local native semantic profile and pure bounded contracts; vendor/network/platform release qualification remains separate."
+    }
+  ]
+}

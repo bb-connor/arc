@@ -1,0 +1,42 @@
+{
+  "id": "kernel-listener-attempt",
+  "actual_command": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "chio-core-types",
+    "-p",
+    "chio-security-types",
+    "-p",
+    "chio-flow",
+    "-p",
+    "chio-recovery",
+    "-p",
+    "chio-semantic-contracts",
+    "-p",
+    "chio-kernel",
+    "-p",
+    "chio-process",
+    "-p",
+    "chio-store-sqlite",
+    "-p",
+    "chio-spec-codegen",
+    "-p",
+    "xtask"
+  ],
+  "cwd": ".",
+  "environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "exit_code": 101,
+  "status": "failed",
+  "started_unix_seconds": 1791064171,
+  "duration_seconds": 278.992,
+  "log": "evidence/kernel-listener-attempt.log",
+  "log_sha256": "d224fdc9aff0c1be34fcd3975fefd447a78bae3203c81ab8797207492131c6bb",
+  "required_for_local_phase_acceptance": false,
+  "qualification": "Kernel broad owning run: 1448 kernel library tests passed; 12 exact native payment HTTP listener tests failed to bind EPERM. Retained as a failed broad run."
+}

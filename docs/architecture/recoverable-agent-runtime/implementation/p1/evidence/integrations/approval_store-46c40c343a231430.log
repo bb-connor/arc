@@ -1,0 +1,12 @@
+
+running 7 tests
+test record_consumed_is_idempotent_on_first_write_only ... ok
+test filter_list_by_subject_and_server ... ok
+test count_approved_ignores_denied_rows ... ok
+test resolve_rejects_replay ... ok
+test resolve_marks_approved_and_records_consumption ... ok
+test store_and_retrieve_round_trip ... ok
+test persistence_survives_restart ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+

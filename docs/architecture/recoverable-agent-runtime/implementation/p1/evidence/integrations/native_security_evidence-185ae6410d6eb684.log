@@ -1,0 +1,17 @@
+
+running 12 tests
+test detector_health_evidence_is_signed_persisted_and_append_failure_propagates ... ok
+test attested_correlation_writer_fails_closed_before_append_without_exact_policy_hash ... ok
+test attested_correlation_writer_publishes_only_read_back_authoritative_evidence ... ok
+test indexed_evidence_readiness_rejects_same_name_no_op_trigger ... ok
+test indexed_evidence_rejects_conflicting_logical_mapping ... ok
+test native_sink_rejects_every_claim_that_disagrees_with_the_closed_body ... ok
+test native_finding_authority_fails_closed_on_tampering_mismatch_and_outage ... ok
+test outbox_rejects_idempotency_rebinding_and_scheduler_wrapper_mismatch ... ok
+test sqlite_siem_outbox_recovers_ack_loss_with_the_same_dedup_key_and_durable_status ... ok
+test native_finding_authority_loads_only_trusted_indexed_correlated_findings ... ok
+test native_finding_authority_restarts_from_the_durable_index_without_a_caller_body ... ok
+test native_sink_signs_appends_idempotently_and_verifies_the_exact_stored_receipt ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.95s
+

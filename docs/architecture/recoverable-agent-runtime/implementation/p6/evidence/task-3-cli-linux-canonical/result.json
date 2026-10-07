@@ -1,0 +1,24 @@
+{
+  "passed": true,
+  "operator_actions": [
+    {
+      "action": "probe",
+      "exit_code": 0
+    },
+    {
+      "action": "qualify",
+      "exit_code": 1
+    },
+    {
+      "action": "operator_writer_restart",
+      "exit_code": 0
+    },
+    {
+      "action": "qualify",
+      "exit_code": 0
+    }
+  ],
+  "effects": 1,
+  "tree_calls": 1,
+  "host": "real Linux OCI native fixture"
+}

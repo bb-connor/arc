@@ -1,0 +1,19 @@
+   Compiling chio-core-types v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-core-types)
+    Finished `test` profile [unoptimized] target(s) in 3.25s
+     Running tests/recovery_p6_contracts.rs (target/debug/deps/recovery_p6_contracts-35601220fc98dbe5)
+
+running 1 test
+test p6_product_shared_vectors_recompute_and_match_closed_schemas ... FAILED
+
+failures:
+
+---- p6_product_shared_vectors_recompute_and_match_closed_schemas stdout ----
+Error: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+
+
+failures:
+    p6_product_shared_vectors_recompute_and_match_closed_schemas
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.12s
+
+error: test failed, to rerun pass `-p chio-core-types --test recovery_p6_contracts`

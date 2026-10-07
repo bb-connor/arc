@@ -1,0 +1,13 @@
+   Compiling chio-control-plane v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-control-plane)
+    Finished `test` profile [unoptimized] target(s) in 38.58s
+   Doc-tests chio_control_plane
+
+running 5 tests
+test crates/platform/chio-control-plane/src/security/adapters/flow_dispatch.rs - security::adapters::flow_dispatch::PreparedFlowDispatch (line 24) - compile fail ... ok
+test crates/platform/chio-control-plane/src/security/adapters/flow_dispatch.rs - security::adapters::flow_dispatch::PreparedFlowDispatch (line 14) - compile fail ... ok
+test crates/platform/chio-control-plane/src/semantic/connector.rs - semantic::connector::CapturedSemanticSubmissionV1 (line 12) - compile fail ... ok
+test crates/platform/chio-control-plane/src/semantic/connector.rs - semantic::connector::CapturedSemanticSubmissionV1 (line 17) - compile fail ... ok
+test crates/platform/chio-control-plane/src/semantic/connector.rs - semantic::connector::CapturedSemanticSubmissionV1 (line 21) - compile fail ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.26s
+

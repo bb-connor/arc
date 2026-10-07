@@ -1,0 +1,17 @@
+
+running 12 tests
+test chain_digest_is_genesis_on_empty_store ... ok
+test append_is_idempotent_by_receipt_id ... ok
+test append_links_successive_entries_via_prev_hash ... ok
+test get_entry_returns_the_committed_row ... ok
+test latest_for_key_returns_most_recent_entry ... ok
+test latest_for_key_returns_none_for_unknown_key ... ok
+test verify_entry_accepts_valid_chain ... ok
+test verify_entry_detects_broken_link_when_prev_row_mutated ... ok
+test verify_entry_detects_hash_tamper ... ok
+test append_assigns_genesis_prev_hash_for_first_entry ... ok
+test verify_entry_flags_unknown_entry_as_no_provenance ... ok
+test chain_persists_across_reopen ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

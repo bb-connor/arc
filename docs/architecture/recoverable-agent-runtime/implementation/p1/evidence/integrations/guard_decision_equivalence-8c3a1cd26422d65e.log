@@ -1,0 +1,9 @@
+
+running 4 tests
+test inconsistent_projection_results_remain_fail_closed ... ok
+test only_allow_projection_permits_continuation ... ok
+test pending_approval_and_error_projections_fail_closed ... ok
+test verdict_fold_matches_bounded_pipeline ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

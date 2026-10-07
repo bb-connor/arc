@@ -1,0 +1,17 @@
+
+running 1 test
+
+thread 'recovery::tests::knowledge::setup::p6_setup_initial_operator_bootstrap_binds_after_approval_and_restarts_once' (45865) panicked at crates/platform/chio-control-plane/src/recovery/tests/knowledge/setup.rs:205:5:
+assertion failed: matches!(prepared.command.command, RecoveryCommandBodyV1::ResumeWorkflow
+    { expected_revision, .. } if expected_revision ==
+    f.f.record(&workflow)?.revision)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test recovery::tests::knowledge::setup::p6_setup_initial_operator_bootstrap_binds_after_approval_and_restarts_once ... FAILED
+
+failures:
+
+failures:
+    recovery::tests::knowledge::setup::p6_setup_initial_operator_bootstrap_binds_after_approval_and_restarts_once
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1281 filtered out; finished in 2.92s
+

@@ -1,0 +1,29 @@
+
+running 24 tests
+test cas_rejects_immutable_mutation_stale_state_and_generation_skips ... ok
+test concurrent_identical_observations_preserve_one_first_attribution ... ok
+test concurrent_expected_generation_writers_have_one_winner ... ok
+test concurrent_distinct_watermark_observations_never_misreport_duplicates ... ok
+test durable_open_rejects_memory_uris_queries_and_fragments ... ok
+test durable_open_rejects_constraint_incompatible_preexisting_schema ... ok
+test concurrent_identical_sequence_retries_are_exactly_idempotent ... ok
+test every_read_surface_is_tenant_isolated ... ok
+test concurrent_watermark_sequence_writers_have_one_winner ... ok
+test marker_collision_is_tenant_and_surface_scoped ... ok
+test malformed_record_and_transition_rows_fail_closed ... ok
+test operation_reuse_across_artifacts_and_transition_mutation_conflict ... ok
+test malformed_watermark_state_fails_closed ... ok
+test public_reference_shape_follows_surface_lifecycle ... ok
+test scan_uses_byte_ordered_opaque_cursor_without_duplicates ... ok
+test public_reference_lookup_is_keyed_unique_and_tenant_scoped ... ok
+test transition_replay_rejects_shape_valid_equal_generation_tampering ... ok
+test stable_operation_can_record_distinct_retry_transitions_for_one_artifact ... ok
+test sqlite_fixture_contains_tokens_and_ciphertext_but_no_raw_secrets ... ok
+test transition_replay_returns_original_snapshot_after_later_update_and_reopen ... ok
+test watermark_sequence_operation_ids_are_tenant_wide ... ok
+test watermark_observation_retry_preserves_first_attribution_and_rejects_mutation ... ok
+test watermark_observation_identity_is_source_tenant_scoped ... ok
+test watermark_sequence_reservation_is_durable_monotonic_and_exactly_idempotent ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+

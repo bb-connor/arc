@@ -1,0 +1,215 @@
+    Checking chio-security-types v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-security-types)
+    Checking num-bigint-dig v0.8.6
+    Checking rsa v0.9.10
+    Checking oauth2 v5.0.0
+    Checking openidconnect v4.0.1
+    Checking sigstore v0.14.0
+    Checking chio-egress-contract v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/protocol/chio-egress-contract)
+    Checking tracing-subscriber v0.3.23
+    Checking chio-web3-bindings v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-web3-bindings)
+    Checking chio-core-types v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-core-types)
+    Checking chio-log-redact v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/observability/chio-log-redact)
+    Checking sqlx-postgres v0.8.6
+    Checking chio-sqlite-file-identity v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-sqlite-file-identity)
+    Checking chio-finding-market-migrations v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-finding-market-migrations)
+    Checking sqlx v0.8.6
+    Checking chio-http-serve v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/protocol/chio-http-serve)
+    Checking chio-spec-validate v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/tooling/chio-spec-validate)
+    Checking chio-listing v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-listing)
+    Checking chio-revocation-oracle v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-revocation-oracle)
+    Checking chio-finding v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-finding)
+    Checking chio-fiscal v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-fiscal)
+    Checking chio-governance v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-governance)
+    Checking chio-pheromone v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-pheromone)
+    Checking chio-appraisal v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-appraisal)
+    Checking chio-open-market v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-open-market)
+    Checking chio-underwriting v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-underwriting)
+    Checking chio-federation v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-federation)
+    Checking chio-did v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-did)
+    Checking chio-fincred v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-fincred)
+    Checking chio-attest-verify v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-attest-verify)
+    Checking chio-lineage v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/observability/chio-lineage)
+    Checking chio-weights v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-weights)
+    Checking chio-custody-hw v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-custody-hw)
+    Checking chio-credit v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-credit)
+    Checking chio-swarm-authority v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-swarm-authority)
+    Checking chio-kernel-core v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-kernel-core)
+    Checking chio-quarantine v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-quarantine)
+    Checking chio-disclosure-lineage v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-disclosure-lineage)
+    Checking chio-flow v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-flow)
+    Checking chio-semantic-contracts v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-semantic-contracts)
+    Checking chio-finding-market-port v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-finding-market-port)
+    Checking chio-finding-market-store-postgres v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-finding-market-store-postgres)
+    Checking chio-market v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-market)
+    Checking chio-web3 v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-web3)
+    Checking chio-decoy v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-decoy)
+    Checking chio-autonomy v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-autonomy)
+    Checking chio-keyring v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-keyring)
+    Checking chio-core v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-core)
+    Checking chio-manifest v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-manifest)
+    Checking chio-link v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-link)
+    Checking chio-tool-call-fabric v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/protocol/chio-tool-call-fabric)
+    Checking chio-settle v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-settle)
+    Checking chio-workflow v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-workflow)
+    Checking chio-selective-disclosure v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-selective-disclosure)
+    Checking chio-attest-buyer-core v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-attest-buyer-core)
+    Checking chio-cage v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-cage)
+    Checking chio-federation-authority v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-federation-authority)
+    Checking chio-metering v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-metering)
+    Checking chio-kernel v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-kernel)
+    Checking chio-reputation v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-reputation)
+    Checking chio-credentials v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-credentials)
+    Checking chio-signing-remote v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-signing-remote)
+    Checking chio-finding-worker v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-finding-worker)
+    Checking chio-recovery v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-recovery)
+    Checking chio-runtime-proof-parity v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-runtime-proof-parity)
+    Checking chio-finding-verifier v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-finding-verifier)
+    Checking chio-http-session v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-http-session)
+    Checking chio-guards v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/guards/chio-guards)
+    Checking chio-transaction-passport v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-transaction-passport)
+    Checking chio-cross-protocol v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/protocol/chio-cross-protocol)
+    Checking chio-risk-comptroller v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-risk-comptroller)
+    Checking chio-edge-metrics v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/protocol/chio-edge-metrics)
+    Checking chio-mcp-edge v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/protocol/chio-mcp-edge)
+    Checking chio-commerce-order v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-commerce-order)
+    Checking chio-trace-validate v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/tooling/chio-trace-validate)
+    Checking chio-agent-web-interop v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-agent-web-interop)
+    Checking chio-mcp-adapter v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/protocol/chio-mcp-adapter)
+    Checking chio-store-sqlite v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-store-sqlite)
+    Checking chio-trust-market-context v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-trust-market-context)
+error[E0364]: `verify_status` is private, and cannot be re-exported
+  --> crates/platform/chio-store-sqlite/src/admission_operation_store/recovery.rs:18:43
+   |
+18 | pub(super) use validation::{verify_actor, verify_status};
+   |                                           ^^^^^^^^^^^^^
+   |
+note: consider marking `verify_status` as `pub` in the imported module
+  --> crates/platform/chio-store-sqlite/src/admission_operation_store/recovery.rs:18:43
+   |
+18 | pub(super) use validation::{verify_actor, verify_status};
+   |                                           ^^^^^^^^^^^^^
+
+    Checking chio-enterprise-export v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-enterprise-export)
+error[E0603]: function import `verify_status` is private
+   --> crates/platform/chio-store-sqlite/src/admission_operation_store/setup.rs:138:22
+    |
+138 |     super::recovery::verify_status(actor, profile, &record)?;
+    |                      ^^^^^^^^^^^^^ private function import
+    |
+note: the function import `verify_status` is defined here...
+   --> crates/platform/chio-store-sqlite/src/admission_operation_store/recovery.rs:18:43
+    |
+ 18 | pub(super) use validation::{verify_actor, verify_status};
+    |                                           ^^^^^^^^^^^^^
+note: ...and refers to the function `verify_status` which is defined here
+   --> crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/validation.rs:126:1
+    |
+126 | / pub(super) fn verify_status(
+127 | |     actor: &AuthenticatedRecoveryActor,
+128 | |     profile: &RecoveryDeploymentV1,
+129 | |     record: &RecoveryWorkflowRecordV1,
+...   |
+134 | |     Ok(())
+135 | | }
+    | |_^
+
+error[E0603]: function `located` is private
+   --> crates/platform/chio-store-sqlite/src/admission_operation_store/setup.rs:291:43
+    |
+291 |     let record = super::recovery::native::located(tx, operation.binding())?
+    |                                           ^^^^^^^ private function
+    |
+note: the function `located` is defined here
+   --> crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/native.rs:5:1
+    |
+  5 | / pub(super) fn located(
+  6 | |     tx: &Connection,
+  7 | |     operation: &AdmissionOperationBindingV1,
+  8 | | ) -> Result<Option<RecoveryWorkflowRecordV1>, AdmissionOperationStoreError> {
+...   |
+ 15 | |     .transpose()
+ 16 | | }
+    | |_^
+
+    Checking chio-policy v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/guards/chio-policy)
+error[E0308]: mismatched types
+    --> crates/platform/chio-store-sqlite/src/admission_operation_store/setup.rs:152:33
+     |
+ 152 |         load_by_operation_id_tx(tx, &AdmissionOperationId::from_persisted(id.as_str())?)?
+     |         ----------------------- ^^ expected `&Transaction<'_>`, found `&Connection`
+     |         |
+     |         arguments to this function are incorrect
+     |
+     = note: expected reference `&rusqlite::Transaction<'_>`
+                found reference `&rusqlite::Connection`
+note: function defined here
+    --> crates/platform/chio-store-sqlite/src/admission_operation_store.rs:1322:4
+     |
+1322 | fn load_by_operation_id_tx(
+     |    ^^^^^^^^^^^^^^^^^^^^^^^
+1323 |     transaction: &Transaction<'_>,
+     |     -----------------------------
+
+error[E0027]: pattern does not mention field `expected_revision`
+   --> crates/platform/chio-store-sqlite/src/admission_operation_store/setup.rs:212:12
+    |
+212 |     if let RecoveryCommandBodyV1::ResumeWorkflow { workflow_id } = body {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing field `expected_revision`
+    |
+help: include the missing field in the pattern
+    |
+212 |     if let RecoveryCommandBodyV1::ResumeWorkflow { workflow_id, expected_revision } = body {
+    |                                                               +++++++++++++++++++
+help: if you don't care about this missing field, you can explicitly ignore it
+    |
+212 |     if let RecoveryCommandBodyV1::ResumeWorkflow { workflow_id, expected_revision: _ } = body {
+    |                                                               ++++++++++++++++++++++
+help: or always ignore missing fields here
+    |
+212 |     if let RecoveryCommandBodyV1::ResumeWorkflow { workflow_id, .. } = body {
+    |                                                               ++++
+
+error[E0308]: mismatched types
+    --> crates/platform/chio-store-sqlite/src/admission_operation_store/setup.rs:215:53
+     |
+ 215 |             let operation = load_by_operation_id_tx(tx, &AdmissionOperationId::from_persisted(id.as_str())?)?
+     |                             ----------------------- ^^ expected `&Transaction<'_>`, found `&Connection`
+     |                             |
+     |                             arguments to this function are incorrect
+     |
+     = note: expected reference `&rusqlite::Transaction<'_>`
+                found reference `&rusqlite::Connection`
+note: function defined here
+    --> crates/platform/chio-store-sqlite/src/admission_operation_store.rs:1322:4
+     |
+1322 | fn load_by_operation_id_tx(
+     |    ^^^^^^^^^^^^^^^^^^^^^^^
+1323 |     transaction: &Transaction<'_>,
+     |     -----------------------------
+
+error[E0369]: binary operation `!=` cannot be applied to type `chio_core_types::capability::token::CapabilityToken`
+   --> crates/platform/chio-store-sqlite/src/admission_operation_store/setup.rs:422:46
+    |
+422 |                 || denied_request.capability != *actor.capability()
+    |                    ------------------------- ^^ ------------------- chio_core_types::capability::token::CapabilityToken
+    |                    |
+    |                    chio_core_types::capability::token::CapabilityToken
+    |
+note: `chio_core_types::capability::token::CapabilityToken` does not implement `PartialEq`
+   --> crates/core/chio-core-types/src/capability/token.rs:122:1
+    |
+122 | pub struct CapabilityToken {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^ `chio_core_types::capability::token::CapabilityToken` is defined in another crate
+
+    Checking chio-data-guards v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/guards/chio-data-guards)
+    Checking chio-external-guards v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/guards/chio-external-guards)
+    Checking chio-finding-challenge v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-finding-challenge)
+    Checking chio-finding-hosted-edge v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-finding-hosted-edge)
+    Checking chio-siem v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/observability/chio-siem)
+    Checking chio-security-kernel v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-security-kernel)
+    Checking chio-process v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-process)
+    Checking chio-runtime-core v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-runtime-core)
+    Checking chio-anchor v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-anchor)
+Some errors have detailed explanations: E0027, E0308, E0364, E0369, E0603.
+For more information about an error, try `rustc --explain E0027`.
+error: could not compile `chio-store-sqlite` (lib) due to 7 previous errors

@@ -1,0 +1,94 @@
+[
+  {
+    "gate": "native-recovery-full",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "chio-control-plane",
+      "--lib",
+      "recovery::tests::",
+      "--",
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "source_stable": true,
+    "source_binding": "3c2dc49ad8a73714e716a903fe3b4c551f50157000ffea61b47ed5422253e74a",
+    "seconds": 2421.148,
+    "log": "native-recovery-full.log",
+    "log_sha256": "e9a82d9cabda020ac7a6a1ec5d15d249b1eb2a0fa6379f266d6b19da8d55c952",
+    "passed_tests": 120,
+    "failed_tests": 0,
+    "ignored_tests": 5
+  },
+  {
+    "gate": "store-full",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "chio-store-sqlite",
+      "--lib",
+      "--",
+      "--test-threads=2"
+    ],
+    "exit_code": 0,
+    "source_stable": true,
+    "source_binding": "3c2dc49ad8a73714e716a903fe3b4c551f50157000ffea61b47ed5422253e74a",
+    "seconds": 1955.346,
+    "log": "store-full.log",
+    "log_sha256": "3b6a8614ed4636f64b2f9adb5fdf2e473188242a72b0feb21f758023364b0010",
+    "passed_tests": 1832,
+    "failed_tests": 0,
+    "ignored_tests": 4
+  },
+  {
+    "gate": "kernel-linux-full",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "chio-kernel",
+      "--lib",
+      "--",
+      "--test-threads=2"
+    ],
+    "exit_code": 0,
+    "source_stable": true,
+    "source_binding": "3c2dc49ad8a73714e716a903fe3b4c551f50157000ffea61b47ed5422253e74a",
+    "seconds": 143.148,
+    "log": "kernel-linux-full.log",
+    "log_sha256": "3eb63a0c5b17a7c8b5b20b9fdd2b5b1d98b65e230cf5c2bc6a787b022890e43b",
+    "passed_tests": 1460,
+    "failed_tests": 0,
+    "ignored_tests": 0
+  },
+  {
+    "gate": "cli-setup",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "chio-cli",
+      "--test",
+      "recovery_setup"
+    ],
+    "exit_code": 0,
+    "source_stable": true,
+    "source_binding": "3c2dc49ad8a73714e716a903fe3b4c551f50157000ffea61b47ed5422253e74a",
+    "seconds": 179.916,
+    "log": "cli-setup.log",
+    "log_sha256": "c787de515e56f4640d15829d6b0202f12344dffd5170baf2554e48ef5ffbe79d",
+    "passed_tests": 3,
+    "failed_tests": 0,
+    "ignored_tests": 0
+  }
+]

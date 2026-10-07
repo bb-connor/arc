@@ -1,0 +1,45 @@
+
+running 1 test
+test recovery::tests::knowledge::setup::p6_setup_every_foreign_binding_and_old_profile_refuses ... [New Thread 0x7ffff7bff6c0 (LWP 68208)]
+[New Thread 0x7ffff79fe6c0 (LWP 68209)]
+[New Thread 0x7ffff77fd6c0 (LWP 68210)]
+[New Thread 0x7ffff75fc6c0 (LWP 68211)]
+[New Thread 0x7ffff73fb6c0 (LWP 68212)]
+[New Thread 0x7ffff71fa6c0 (LWP 68213)]
+[New Thread 0x7ffff6ff96c0 (LWP 68214)]
+[New Thread 0x7ffff6df86c0 (LWP 68215)]
+[New Thread 0x7ffff6bf76c0 (LWP 68216)]
+[New Thread 0x7ffff69f66c0 (LWP 68217)]
+[New Thread 0x7ffff67f56c0 (LWP 68218)]
+
+Thread 2 "recovery::tests" received signal SIGSEGV, Segmentation fault.
+[Switching to Thread 0x7ffff7bff6c0 (LWP 68208)]
+0x00005555616b645e in curve25519_dalek::backend::serial::u64::field::FieldElement51::pow2k ()
+#0  0x00005555616b645e in curve25519_dalek::backend::serial::u64::field::FieldElement51::pow2k ()
+#1  0x00005555616b7593 in curve25519_dalek::backend::serial::u64::field::FieldElement51::square ()
+#2  0x00005555616b5e11 in curve25519_dalek::field::<impl curve25519_dalek::backend::serial::u64::field::FieldElement51>::pow22501 ()
+#3  0x00005555616b5d9f in curve25519_dalek::field::<impl curve25519_dalek::backend::serial::u64::field::FieldElement51>::pow_p58 ()
+#4  0x00005555616b5b49 in curve25519_dalek::field::<impl curve25519_dalek::backend::serial::u64::field::FieldElement51>::sqrt_ratio_i ()
+#5  0x00005555616ab680 in curve25519_dalek::edwards::decompress::step_1 ()
+#6  0x00005555616abd93 in curve25519_dalek::edwards::CompressedEdwardsY::decompress ()
+#7  0x000055556140822e in ed25519_dalek::verifying::VerifyingKey::from_bytes ()
+#8  0x0000555561567c9d in chio_core_types::crypto::PublicKey::from_bytes ()
+#9  0x00005555614f73be in chio_core_types::crypto::wire::ClassicalWire::public_key ()
+#10 0x00005555614f8952 in chio_core_types::crypto::wire::public_key_from_hex ()
+#11 0x000055556156a55d in chio_core_types::crypto::PublicKey::from_hex ()
+#12 0x00005555612fb641 in <chio_core_types::wire_text::deserialize::WireVisitor<T> as serde_core::de::Visitor>::visit_str ()
+#13 0x00005555612fc571 in serde_core::de::Visitor::visit_borrowed_str ()
+#14 0x0000555560f95df6 in <&mut serde_json::de::Deserializer<R> as serde_core::de::Deserializer>::deserialize_str ()
+#15 0x0000555560fcada6 in chio_core_types::wire_text::deserialize ()
+#16 0x0000555561057f41 in <chio_core_types::crypto::PublicKey as serde_core::de::Deserialize>::deserialize ()
+#17 0x0000555561022e0e in <core::marker::PhantomData<T> as serde_core::de::DeserializeSeed>::deserialize ()
+#18 0x0000555560f8f6e5 in <serde_json::de::MapAccess<R> as serde_core::de::MapAccess>::next_value_seed ()
+#19 0x0000555560f8c24e in serde_core::de::MapAccess::next_value ()
+#20 0x000055555f3bf8d6 in <chio_core_types::capability::token::_::<impl serde_core::de::Deserialize for chio_core_types::capability::token::CapabilityToken>::deserialize::__Visitor as serde_core::de::Visitor>::visit_map ()
+#21 0x000055555e858704 in <&mut serde_json::de::Deserializer<R> as serde_core::de::Deserializer>::deserialize_struct ()
+#22 0x000055555f3b7c05 in chio_core_types::capability::token::_::<impl serde_core::de::Deserialize for chio_core_types::capability::token::CapabilityToken>::deserialize ()
+#23 0x000055555f0ce09e in <core::marker::PhantomData<T> as serde_core::de::DeserializeSeed>::deserialize ()
+#24 0x000055555e784265 in <serde_json::de::MapAccess<R> as serde_core::de::MapAccess>::next_value_seed ()
+#25 0x000055555e763ffe in serde_core::de::MapAccess::next_value ()
+#26 0x000055555f071e88 in <chio_kernel::runtime::_::<impl serde_core::de::Deserialize for chio_kernel::runtime::ToolCallRequest>::deserialize::__Visitor as serde_core::de::Visitor>::visit_map ()
+#27 0x000055555e811755 in <&mut serde_json::de::Deserializer<R> as serde_core::de::Deserializer>::deserialize_struct ()

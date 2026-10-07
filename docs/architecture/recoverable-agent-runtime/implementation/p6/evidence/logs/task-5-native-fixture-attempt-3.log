@@ -1,0 +1,27 @@
+   Compiling chio-control-plane v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-control-plane)
+error: future cannot be sent between threads safely
+   --> crates/platform/chio-control-plane/src/recovery/tests/knowledge/qualification/fixture.rs:80:5
+    |
+ 80 | /     Box::pin(async move {
+ 81 | |         if !matches!(workflow, "support" | "artifact") || !matches!(case,
+ 82 | |             "authorized" | "lost_ack_restart" | "wrong_authority" | "conflicting_basis") {
+ 83 | |             return Err("unsupported qualification case".into());
+...   |
+151 | |         Ok(fixture)
+152 | |     })
+    | |______^ future created by async block is not `Send`
+    |
+    = help: the trait `std::marker::Send` is not implemented for `dyn StdError`
+note: future is not `Send` as this value is used across an await
+   --> crates/platform/chio-control-plane/src/recovery/tests.rs:480:14
+    |
+477 |                     request_seed: text(&self.seed)?,
+    |                                   ----------------- has type `ControlFlow<std::result::Result<Infallible, Box<dyn StdError>>, chio_security_types::recovery::ProtectedText<32768>>` which is not `Send`
+...
+480 |             .await?;
+    |              ^^^^^ await occurs here, with `text(&self.seed)?` maybe used later
+    = note: required for the cast from `Pin<Box<...>>` to `Pin<Box<dyn Future<Output = Result<CaseFixture, Box<...>>> + Send>>`
+    = note: the full name for the type has been written to '/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/target/debug/deps/chio_control_plane-7c73bd7964d7c479.long-type-5215749855840023479.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+
+error: could not compile `chio-control-plane` (lib test) due to 1 previous error

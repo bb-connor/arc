@@ -1,0 +1,3 @@
+Current final outcomes: {'complete': 46, 'refused': 44, 'skipped_tool': 6}
+All five native/request/frame audits: 435 measured, 45 unknown, 480 planned; no observed unauthorized/duplicate effects
+All sixteen positive strata passed unchanged minimum one of three completions

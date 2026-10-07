@@ -1,0 +1,52 @@
+    Finished `test` profile [unoptimized] target(s) in 1.72s
+     Running unittests src/lib.rs (target/debug/deps/chio_conformance-cf63ab4aa0254fb3)
+
+running 45 tests
+test load::tests::load_scenarios_rejects_missing_directory ... ok
+test load::tests::load_results_rejects_missing_directory ... ok
+test load::tests::load_scenarios_rejects_empty_directory ... ok
+test load::tests::collect_json_files_rejects_symlinked_json_file ... ok
+test native_suite::tests::load_native_scenarios_rejects_missing_directory ... ok
+test native_suite::tests::load_native_scenarios_rejects_empty_directory ... ok
+test native_suite::tests::load_native_scenarios_rejects_symlinked_json_file ... ok
+test econsim::tests::short_unknown_and_cross_field_invalid_matrices_reject ... ok
+test econsim::tests::high_finding_and_missing_target_do_not_cross_signing_boundary ... ok
+test peers::tests::checkout_anchor_child ... ok
+test load::tests::loads_scenarios_and_results_from_json_directories ... ok
+test econsim::tests::complete_held_matrix_signs_and_verifies ... ok
+test peers::tests::entries_for_filters_by_language_and_target ... ok
+test peers::tests::parses_valid_lockfile ... ok
+test peers::tests::published_defaults_to_true ... ok
+test peers::tests::rejects_empty_peer_list ... ok
+test peers::tests::partition_by_published_separates_skipped_entries ... ok
+test peers::tests::rejects_short_sha256 ... ok
+test peers::tests::rejects_non_https_url ... ok
+test peers::tests::rejects_unsupported_language ... ok
+test peers::tests::checkout_anchor_rejects_unrelated_manifests_and_missing_fixtures ... ok
+test peers::tests::rejects_uppercase_sha256 ... ok
+test peers::tests::rejects_unsafe_binary_paths ... ok
+test peers::tests::sha256_hex_matches_known_vector ... ok
+test peers::tests::rejects_wrong_schema ... ok
+test peers::tests::shipped_lockfile_validates ... ok
+test peers::tests::shipped_lockfile_marks_placeholders_as_unpublished ... ok
+test report::tests::report_summary_and_sections_include_xfail_results ... ok
+test report::tests::generates_grouped_markdown_matrix ... ok
+test native_suite::tests::native_fixture_responses_include_governed_receipt_metadata ... ok
+test native_suite::tests::load_native_scenarios_reads_checked_in_suite ... ok
+test runner::tests::fixture_root_falls_back_to_packaged_crate_tree ... ok
+test runner::tests::fixture_root_prefers_workspace_tree_when_present ... ok
+test runner::tests::credential_preflight_recovers_after_distinct_tokens_are_supplied ... ok
+test runner::tests::remote_edge_receives_all_native_security_pins ... ok
+test runner::tests::store_less_fixture_opts_into_ephemeral_revocation ... ok
+test recovery_trajectory::tests::trajectory_effect_assertions_reject_each_independent_mutation ... ok
+test runner::tests::local_oauth_child_env_removes_inherited_static_bearer_token ... ok
+test runner::tests::runtime_state_is_private_and_removed_after_the_run ... ok
+test runner::tests::credential_preflight_rejects_missing_and_reused_tokens_before_effects ... ok
+test native_suite::tests::runtime_trace_refuses_a_dropped_admission_callback ... ok
+test native_suite::tests::native_trace_observations_are_signed_and_non_vacuous ... ok
+test native_suite::tests::blind_store_capture_retains_the_prior_direct_revocation ... ok
+test native_suite::tests::runtime_trace_mutations_reach_the_formal_projection ... ok
+test peers::tests::out_of_tree_executable_requires_a_valid_explicit_checkout_anchor ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.50s
+

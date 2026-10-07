@@ -1,0 +1,9 @@
+   Compiling chio-control-plane v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-control-plane)
+    Finished `test` profile [unoptimized] target(s) in 56.30s
+     Running unittests src/lib.rs (target/recovery-p5-linux/host/debug/deps/chio_control_plane-6f8003448d0ced3f)
+
+running 1 test
+test recovery::tests::knowledge::confinement::linux::p5_linux_fixed_environment_rejects_parent_controlled_channels ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1257 filtered out; finished in 3.20s
+

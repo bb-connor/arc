@@ -1,0 +1,15 @@
+
+running 10 tests
+test cases::cross_key_flow_contract_holds_for_in_memory_model ... ok
+test cases::overlay_action_binding_contract_holds_for_in_memory_model ... ok
+test cases::durable_write_contracts_hold_for_in_memory_model ... ok
+test cases::cross_key_flow_contract_holds_for_sqlite ... ok
+test cases::overlay_action_binding_contract_holds_for_sqlite ... ok
+test cases::response_effect_recovery_contract_holds_for_in_memory_model ... ok
+test cases::durable_write_contracts_hold_for_sqlite ... ok
+test cases::scheduler_takeover_contract_holds_for_in_memory_model ... ok
+test cases::response_effect_recovery_contract_holds_for_sqlite ... ok
+test cases::scheduler_takeover_contract_holds_for_sqlite ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.61s
+

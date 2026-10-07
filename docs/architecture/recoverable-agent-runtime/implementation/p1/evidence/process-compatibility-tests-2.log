@@ -1,0 +1,13 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling chio-store-sqlite v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-store-sqlite)
+   Compiling chio-process v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-process)
+    Finished `test` profile [unoptimized] target(s) in 1m 29s
+     Running unittests src/lib.rs (target/debug/deps/chio_process-c65aa898b5400c77)
+
+running 3 tests
+test binding::tests::recovery_p1_all_legacy_mode_route_and_profile_bytes_match_the_fixed_reference ... ok
+test integrity_tests::persisted_thin_unknown_receipts_remain_original_evidence_not_redispatch_authority ... ok
+test store::recovery::tests::recovery_p1_populated_legacy_journal_preserves_bytes_and_refuses_downgrade ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+

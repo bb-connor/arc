@@ -1,0 +1,36 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_______ test_setup_transports_exact_probe_and_one_qualification_request ________
+
+    @pytest.mark.asyncio
+    async def test_setup_transports_exact_probe_and_one_qualification_request():
+        calls = []
+        def respond(request):
+            body = json.loads(request.content); calls.append((request.url.path, body))
+            return httpx.Response(200, json=PROBE if request.url.path.endswith("probe") else REPORT)
+        client = RecoveryClient("https://host.example", transport=httpx.MockTransport(respond))
+        proof = json.dumps(PROBE, sort_keys=True, separators=(",", ":")).encode()
+        try:
+>           assert (await client.setup_probe("cap", "self-test")).model_dump(mode="json") == PROBE
+                          ^^^^^^^^^^^^^^^^^^
+E           AttributeError: 'RecoveryClient' object has no attribute 'setup_probe'
+
+sdks/python/chio-sdk-python/tests/test_recovery_setup_client.py:21: AttributeError
+_______________ test_setup_invalid_proof_refuses_before_network ________________
+
+    @pytest.mark.asyncio
+    async def test_setup_invalid_proof_refuses_before_network():
+        calls = []
+        client = RecoveryClient("https://host.example", transport=httpx.MockTransport(lambda r: calls.append(r)))
+        try:
+            for proof in [b"\xff", b"x" * 32769]:
+                with pytest.raises(ValueError, match="^recovery\\."):
+>                   await client.setup_qualify("cap", proof)
+                          ^^^^^^^^^^^^^^^^^^^^
+E                   AttributeError: 'RecoveryClient' object has no attribute 'setup_qualify'
+
+sdks/python/chio-sdk-python/tests/test_recovery_setup_client.py:36: AttributeError
+=========================== short test summary info ============================
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_setup_client.py::test_setup_transports_exact_probe_and_one_qualification_request
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_setup_client.py::test_setup_invalid_proof_refuses_before_network
+2 failed in 0.88s

@@ -1,0 +1,40 @@
+{
+  "id": "owning-tests",
+  "actual_command": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "chio-core-types",
+    "-p",
+    "chio-security-types",
+    "-p",
+    "chio-flow",
+    "-p",
+    "chio-recovery",
+    "-p",
+    "chio-semantic-contracts",
+    "-p",
+    "chio-process",
+    "-p",
+    "chio-spec-codegen",
+    "-p",
+    "xtask",
+    "--",
+    "--test-threads=2"
+  ],
+  "cwd": ".",
+  "environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2",
+    "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+  },
+  "exit_code": 0,
+  "status": "passed",
+  "started_unix_seconds": 1791076494,
+  "duration_seconds": 180.084,
+  "log": "evidence/owning-tests.log",
+  "log_sha256": "63aa580430a7724bf5dc99aa85b6bf9c6365273b4f31c43eb4e95ecd6a327404",
+  "required_for_local_phase_acceptance": true
+}

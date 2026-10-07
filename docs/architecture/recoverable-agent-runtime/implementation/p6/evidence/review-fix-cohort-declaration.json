@@ -1,0 +1,25 @@
+{
+  "schema": "chio.recovery-p6-review-fix-cohort-declaration.v1",
+  "id": "review-fix-qualification",
+  "created_at_utc": "2026-10-05T13:44:02.014681+00:00",
+  "manifest_sha256": "43f6b57ee7eca0752c316a62b7791ab086cdd1980fd96623a43d190d762755c0",
+  "source_binding": "b1bcd48cadb7b9c7f1ff5dd4ad8d9910056590e22058527756114e21239c1063",
+  "trials": 96,
+  "prior_planned_trials": 384,
+  "combined_planned_trials": 480,
+  "runtime_fix_paths": [
+    "crates/platform/chio-control-plane/src/recovery/tests/knowledge/setup.rs",
+    "crates/platform/chio-control-plane/src/recovery/tests/knowledge/setup/cli_host.rs",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/setup.rs",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/setup/service.rs",
+    "fixtures/recovery-product/preflight.py",
+    "fixtures/recovery-product/test_campaign_runner.py"
+  ],
+  "model": "gpt-5.4-2026-03-05",
+  "framework_protocol": {
+    "crewai": "BaseLLM._apply_stop_words before CrewAI parsing; retain provider output and framework-visible frame; no action synthesis or retry",
+    "langgraph": "unchanged closed explicit action parser"
+  },
+  "reason": "Single primary TDD fix pass for the two original fresh-review P1 findings. Complete newly source-bound qualification, with exact model/tasks/authority/hosts/budgets/thresholds and all earlier attempts preserved.",
+  "precollection_gates": "Nine actual default-stack native setup tests and fourteen pinned framework harness tests passed; all-target owner clippy and format passed before declaration. Public eight-case model-free native preflight must pass before the first provider request."
+}

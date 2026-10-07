@@ -1,0 +1,26 @@
+..F.
+======================================================================
+FAIL: test_prompt_snapshot_survives_framework_and_provider_input_mutation (test_campaign_runner.ModelBoundaryTest.test_prompt_snapshot_survives_framework_and_provider_input_mutation)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/fixtures/recovery-product/test_campaign_runner.py", line 22, in test_prompt_snapshot_survives_framework_and_provider_input_mutation
+    self.assertEqual(snapshot["messages"], [{"role":"user", "content":"Public synthetic task"}])
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Lists differ: [{'ro[20 chars]t': 'framework mutation'}, {'role': 'assistant[30 chars]on'}] != [{'ro[20 chars]t': 'Public synthetic task'}]
+
+First differing element 0:
+{'role': 'user', 'content': 'framework mutation'}
+{'role': 'user', 'content': 'Public synthetic task'}
+
+First list contains 1 additional elements.
+First extra element 1:
+{'role': 'assistant', 'content': 'provider mutation'}
+
++ [{'content': 'Public synthetic task', 'role': 'user'}]
+- [{'content': 'framework mutation', 'role': 'user'},
+-  {'content': 'provider mutation', 'role': 'assistant'}]
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.002s
+
+FAILED (failures=1)

@@ -1,0 +1,18 @@
+
+running 13 tests
+test dpop_expired_proof_rejected ... ok
+test dpop_issued_at_u64_max_rejected_as_future_dated ... ok
+test dpop_nonce_replay_after_local_ttl_is_rejected ... ok
+test dpop_nonce_replay_within_ttl_rejected ... ok
+test dpop_identity_byte_limit_is_shared_by_stateless_and_consuming_verification ... ok
+test dpop_oversized_identity_is_refused_before_signature_canonicalization ... ok
+test dpop_required_field_roundtrip ... ok
+test dpop_wrong_action_hash_rejected ... ok
+test dpop_wrong_capability_id_rejected ... ok
+test dpop_wrong_agent_key_rejected ... ok
+test dpop_valid_proof_accepted ... ok
+test dpop_wrong_tool_name_rejected ... ok
+test dpop_wrong_tool_server_rejected ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

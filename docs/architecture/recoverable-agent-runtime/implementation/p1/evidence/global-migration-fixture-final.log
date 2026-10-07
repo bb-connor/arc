@@ -1,0 +1,12 @@
+   Compiling chio-store-sqlite v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-store-sqlite)
+    Finished `test` profile [unoptimized] target(s) in 16.86s
+     Running unittests src/lib.rs (target/debug/deps/chio_store_sqlite-f6bc21373ae2eaa6)
+
+running 4 tests
+test serving_owner::global_commit_chain::schema_tests::nonhistorical_runtime_kind_without_status_is_not_an_upgrade_predecessor ... ok
+test serving_owner::global_commit_chain::schema_tests::ignored_check_cannot_smuggle_future_projection_into_a_supported_predecessor ... ok
+test serving_owner::global_commit_chain::schema_tests::unexpected_trigger_on_previous_global_schema_is_not_repaired ... ok
+test serving_owner::global_commit_chain::schema_tests::supported_previous_global_schemas_preserve_history_when_adding_replay_kinds ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 1831 filtered out; finished in 0.14s
+

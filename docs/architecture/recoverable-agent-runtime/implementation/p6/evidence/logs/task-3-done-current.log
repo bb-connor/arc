@@ -1,0 +1,6 @@
+test p6_setup_cli_qualify_refuses_wrong_shape_and_redirect_without_retries ... ok
+test p6_setup_cli_reports_only_known_bounded_refusal_categories ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.87s
+
+ledger: Task 3: complete (commits de84fc3..de84fc3, tests: cargo test --offline --locked -p chio-cli --test recovery_setup → test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.87s)

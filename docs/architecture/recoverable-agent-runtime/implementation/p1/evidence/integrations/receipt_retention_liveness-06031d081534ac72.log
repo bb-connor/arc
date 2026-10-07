@@ -1,0 +1,65 @@
+
+running 5 tests
+test appends_wait_behind_the_rotation_holding_the_archive_sync ... FAILED
+test retention_workload_commits_are_serialized_on_writer has been running for over 60 seconds
+test rotation_waits_behind_the_writer_commit_it_cannot_preempt has been running for over 60 seconds
+test sync_shim::failed_open_tests::failed_parent_open_keeps_its_required_close_callback has been running for over 60 seconds
+test rotation_waits_behind_the_writer_commit_it_cannot_preempt ... FAILED
+test sync_shim::failed_open_tests::failed_parent_open_keeps_its_required_close_callback ... ok
+test retention_workload_commits_are_serialized_on_writer ... FAILED
+test workload::released_caller_timeout_reports_the_stalled_step ... ok
+
+failures:
+
+---- appends_wait_behind_the_rotation_holding_the_archive_sync stdout ----
+
+thread 'appends_wait_behind_the_rotation_holding_the_archive_sync' (19590194) panicked at crates/platform/chio-store-sqlite/tests/receipt_retention_liveness.rs:410:10:
+the rotation's archive sync reaches the gate: expected Some(..), got None
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- rotation_waits_behind_the_writer_commit_it_cannot_preempt stdout ----
+
+thread 'rotation_waits_behind_the_writer_commit_it_cannot_preempt' (19590196) panicked at crates/platform/chio-store-sqlite/tests/receipt_retention_liveness.rs:244:10:
+the append's WAL sync reaches the gate: expected Some(..), got None
+
+---- retention_workload_commits_are_serialized_on_writer stdout ----
+24 cases, 375 ops, 133 rotations, 0 syncs in 27.923626209s (induced sync delay 0ns)
+syncs by file: {}
+  case  0: ops=19 rotations= 6 archived= 21 syncs=   0 {}
+  case  1: ops= 5 rotations= 2 archived=  4 syncs=   0 {}
+  case  2: ops=11 rotations= 3 archived=  9 syncs=   0 {}
+  case  3: ops=14 rotations= 5 archived= 14 syncs=   0 {}
+  case  4: ops= 8 rotations= 1 archived=  0 syncs=   0 {}
+  case  5: ops=15 rotations= 5 archived= 17 syncs=   0 {}
+  case  6: ops= 4 rotations= 2 archived=  3 syncs=   0 {}
+  case  7: ops=16 rotations= 3 archived= 15 syncs=   0 {}
+  case  8: ops=25 rotations=10 archived= 28 syncs=   0 {}
+  case  9: ops= 8 rotations= 4 archived=  8 syncs=   0 {}
+  case 10: ops= 5 rotations= 0 archived=  0 syncs=   0 {}
+  case 11: ops=21 rotations=11 archived= 24 syncs=   0 {}
+  case 12: ops=17 rotations= 2 archived=  0 syncs=   0 {}
+  case 13: ops=18 rotations= 5 archived= 15 syncs=   0 {}
+  case 14: ops=15 rotations= 4 archived= 14 syncs=   0 {}
+  case 15: ops= 7 rotations= 2 archived=  7 syncs=   0 {}
+  case 16: ops=22 rotations= 8 archived= 30 syncs=   0 {}
+  case 17: ops=23 rotations= 9 archived= 28 syncs=   0 {}
+  case 18: ops=16 rotations= 5 archived= 20 syncs=   0 {}
+  case 19: ops=27 rotations=13 archived= 34 syncs=   0 {}
+  case 20: ops=17 rotations= 6 archived= 10 syncs=   0 {}
+  case 21: ops=33 rotations=15 archived= 41 syncs=   0 {}
+  case 22: ops=20 rotations= 8 archived= 23 syncs=   0 {}
+  case 23: ops= 9 rotations= 4 archived=  9 syncs=   0 {}
+
+thread 'retention_workload_commits_are_serialized_on_writer' (19590195) panicked at crates/platform/chio-store-sqlite/tests/receipt_retention_liveness.rs:166:5:
+assertion `left == right` failed: every live WAL write-lock sync during the workload must be issued by the supervised writer thread
+  left: {}
+ right: {Some("chio-receipt-writer")}
+
+
+failures:
+    appends_wait_behind_the_rotation_holding_the_archive_sync
+    retention_workload_commits_are_serialized_on_writer
+    rotation_waits_behind_the_writer_commit_it_cannot_preempt
+
+test result: FAILED. 2 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 88.15s
+

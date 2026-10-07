@@ -1,0 +1,9 @@
+
+running 4 tests
+test ambiguous_or_malformed_host_routes_refuse_configuration ... ok
+test authenticated_worker_context_cannot_replace_host_route_or_process_attribution ... ok
+test route_absence_denies_before_effect_and_legacy_binding_cannot_gain_a_route ... ok
+test reopen_requires_original_route_and_preserves_completed_receipt_without_second_effect ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.34s
+

@@ -1,0 +1,22 @@
+
+running 17 tests
+test cumulative_approval_grants_preflight_and_decide_approval_at_execution ... ok
+test budget_exhaustion_at_execution_compensates_without_dispatch ... ok
+test execution_rejects_foreign_nonces_without_touching_the_operation ... ok
+test dropped_execution_after_dispatch_commit_never_redispatches ... ok
+test opt_in_nonces_deny_under_durable_admission ... ok
+test expired_issuance_denies_execution_and_is_compensated_by_startup_recovery ... ok
+test preflight_replay_redelivers_the_retained_nonce_without_a_second_hold ... ok
+test live_issuance_survives_startup_recovery_until_it_expires ... ok
+test reserve_for_caller_authorization_denies_durable_nonce_operations ... ok
+test reserved_nonce_operation_is_compensated_by_startup_recovery ... ok
+test security_binding::sqlite_ordinary_terminal_rejects_changed_security_identity_after_restart ... ok
+test restart_between_preflight_and_execution_keeps_the_issuance ... ok
+test security_binding::sqlite_nonce_preflight_retains_security_identity_across_restart ... ok
+test session_flow_preflights_and_executes_with_the_same_participant ... ok
+test strict_preflight_issues_durable_nonce_then_executes_once ... ok
+test unconfirmed_preflight_cleanup_is_compensated_by_startup_recovery ... ok
+test unconfirmed_preflight_cleanup_replays_on_the_next_preflight ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 22.75s
+

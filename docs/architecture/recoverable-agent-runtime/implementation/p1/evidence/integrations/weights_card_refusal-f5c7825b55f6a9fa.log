@@ -1,0 +1,12 @@
+
+running 7 tests
+test banned_tool_first_overlap_is_returned_lexicographically ... ok
+test bind_rejects_banned_tool_intersection ... ok
+test bind_rejects_scope_outside_allowed_set ... ok
+test bind_rejects_weights_hash_mismatch ... ok
+test bind_succeeds_when_weights_scope_and_tools_all_admissible ... ok
+test empty_request_accepts_when_card_matches_weights ... ok
+test weights_mismatch_short_circuits_before_scope_check ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

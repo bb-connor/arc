@@ -1,0 +1,11 @@
+
+running 6 tests
+test legacy_limits_keep_their_serialized_identity ... ok
+test operator_reads_retained_data_without_live_authority_or_schema_writes ... ok
+test state_reader_rejects_broad_modes_symlinks_and_nonregular_journals ... ok
+test reader_opens_basename_in_private_cwd ... ok
+test blobs_persist_are_owned_and_detect_corruption ... ok
+test tree_quota_is_atomic_across_connections_and_dedup_survives_full_quota ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.91s
+

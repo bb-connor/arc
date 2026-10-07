@@ -1,0 +1,18 @@
+{
+  "id": "rust-codegen",
+  "actual_command": [
+    "target/debug/xtask",
+    "codegen",
+    "rust",
+    "--check"
+  ],
+  "cwd": ".",
+  "environment": {},
+  "exit_code": 0,
+  "status": "passed",
+  "started_unix_seconds": 1791074422,
+  "duration_seconds": 5.363,
+  "log": "evidence/rust-codegen.log",
+  "log_sha256": "ea8fe1220f36dfa900d0a6c80d0115d96df53ad47f2a28dd52418de956d7cfb9",
+  "required_for_local_phase_acceptance": true
+}

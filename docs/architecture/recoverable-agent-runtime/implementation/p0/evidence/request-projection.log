@@ -1,0 +1,9 @@
+   Compiling chio-process v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-process)
+    Finished `test` profile [unoptimized] target(s) in 5.67s
+     Running tests/recovery_p0_baseline.rs (target/debug/deps/recovery_p0_baseline-ff7175ec2f41f015)
+
+running 1 test
+test exhaustive_request_review_preserves_native_owned_attachment_boundary ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 1.64s
+

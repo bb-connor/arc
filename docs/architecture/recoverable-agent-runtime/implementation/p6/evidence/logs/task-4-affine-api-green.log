@@ -1,0 +1,35 @@
+    Checking chio-kernel v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-kernel)
+error[E0583]: file not found for module `prepared_commit`
+  --> crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress.rs:19:1
+   |
+19 | mod prepared_commit;
+   | ^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: to create the module `prepared_commit`, create file "crates/kernel/chio-kernel/src/kernel/admission_coordinator/prepared_commit.rs" or "crates/kernel/chio-kernel/src/kernel/admission_coordinator/prepared_commit/mod.rs"
+   = note: if there is a `mod prepared_commit` elsewhere in the crate already, import it with `use crate::...` instead
+
+error[E0425]: cannot find type `AdmissionRecoveryLease` in this scope
+   --> crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress.rs:478:49
+    |
+478 |     fn prepare_commit_context(&self) -> Result<(AdmissionRecoveryLease, u64), KernelError> {
+    |                                                 ^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+    |
+help: consider importing this struct
+    |
+  3 + use crate::admission_operation::AdmissionRecoveryLease;
+    |
+
+error[E0425]: cannot find type `AdmissionRecoveryLease` in this scope
+   --> crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress.rs:496:17
+    |
+496 |         lease: &AdmissionRecoveryLease,
+    |                 ^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+    |
+help: consider importing this struct
+    |
+  3 + use crate::admission_operation::AdmissionRecoveryLease;
+    |
+
+Some errors have detailed explanations: E0425, E0583.
+For more information about an error, try `rustc --explain E0425`.
+error: could not compile `chio-kernel` (lib) due to 3 previous errors

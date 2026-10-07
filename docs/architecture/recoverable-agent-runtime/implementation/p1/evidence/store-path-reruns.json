@@ -1,0 +1,223 @@
+[
+  {
+    "command": [
+      "target/debug/deps/chio_store_sqlite-f6bc21373ae2eaa6",
+      "admission_operation_store::tests::security_participant_migration::integrity::restoring_destination_before_import_is_rejected_by_independent_anchor",
+      "--exact",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "environment": {
+      "TMPDIR": "/private/tmp"
+    },
+    "exit_code": 0,
+    "log": "evidence/store-path-reruns/restoring_destination_before_import_is_rejected_by_independent_anchor.log",
+    "sha256": "616befa4f8aa6502d61edb5013e5537db09212dfe89a07f19a62c4660412d508",
+    "elapsed_seconds": 1.368,
+    "original_log_path": "target/recovery-p1-store-path-reruns/restoring_destination_before_import_is_rejected_by_independent_anchor.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/chio_store_sqlite-f6bc21373ae2eaa6",
+      "admission_operation_store::tests::security_participant_state::integrity::restoring_private_database_before_hydration_cannot_erase_the_anchored_initialization",
+      "--exact",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "environment": {
+      "TMPDIR": "/private/tmp"
+    },
+    "exit_code": 0,
+    "log": "evidence/store-path-reruns/restoring_private_database_before_hydration_cannot_erase_the_anchored_initialization.log",
+    "sha256": "65b7aa227ab5d19ab08cc18bdb13e2a317d5d0e32e49a1e6695c5dffec04fe95",
+    "elapsed_seconds": 1.43,
+    "original_log_path": "target/recovery-p1-store-path-reruns/restoring_private_database_before_hydration_cannot_erase_the_anchored_initialization.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/chio_store_sqlite-f6bc21373ae2eaa6",
+      "admission_operation_store::tests::security_participant_state::mutations::faults::restoring_database_before_join_cannot_erase_acknowledged_mutation_history",
+      "--exact",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "environment": {
+      "TMPDIR": "/private/tmp"
+    },
+    "exit_code": 0,
+    "log": "evidence/store-path-reruns/restoring_database_before_join_cannot_erase_acknowledged_mutation_history.log",
+    "sha256": "600d901eab0621b9c0490487ef3d7b8bfd4154ee3bfd0d990ea0d99f17d0fbb1",
+    "elapsed_seconds": 1.506,
+    "original_log_path": "target/recovery-p1-store-path-reruns/restoring_database_before_join_cannot_erase_acknowledged_mutation_history.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/chio_store_sqlite-f6bc21373ae2eaa6",
+      "enterprise_migration_state::connection_recovery::a_denied_rollback_fences_the_store",
+      "--exact",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "environment": {
+      "TMPDIR": "/private/tmp"
+    },
+    "exit_code": 0,
+    "log": "evidence/store-path-reruns/a_denied_rollback_fences_the_store.log",
+    "sha256": "d23f5636e83150fba8dd894fdc2d659f07b5b6a754d29aee23819d4b0c3699f1",
+    "elapsed_seconds": 0.03,
+    "original_log_path": "target/recovery-p1-store-path-reruns/a_denied_rollback_fences_the_store.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/chio_store_sqlite-f6bc21373ae2eaa6",
+      "enterprise_migration_state::connection_recovery::a_panic_after_commit_recovers_with_the_write_visible",
+      "--exact",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "environment": {
+      "TMPDIR": "/private/tmp"
+    },
+    "exit_code": 0,
+    "log": "evidence/store-path-reruns/a_panic_after_commit_recovers_with_the_write_visible.log",
+    "sha256": "74c4ea14837b9e86a7122691630b900c0229deb399ea947b6cb821d0d732004d",
+    "elapsed_seconds": 0.023,
+    "original_log_path": "target/recovery-p1-store-path-reruns/a_panic_after_commit_recovers_with_the_write_visible.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/chio_store_sqlite-f6bc21373ae2eaa6",
+      "enterprise_migration_state::connection_recovery::a_panic_before_commit_rolls_back_and_the_store_serves",
+      "--exact",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "environment": {
+      "TMPDIR": "/private/tmp"
+    },
+    "exit_code": 0,
+    "log": "evidence/store-path-reruns/a_panic_before_commit_rolls_back_and_the_store_serves.log",
+    "sha256": "a9286a718120f8a41fb1ed1b77538531e18302c221736b25010ebbc87751375b",
+    "elapsed_seconds": 0.023,
+    "original_log_path": "target/recovery-p1-store-path-reruns/a_panic_before_commit_rolls_back_and_the_store_serves.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/chio_store_sqlite-f6bc21373ae2eaa6",
+      "enterprise_migration_state::connection_recovery::the_store_pairs_no_artifact_with_a_commit",
+      "--exact",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "environment": {
+      "TMPDIR": "/private/tmp"
+    },
+    "exit_code": 0,
+    "log": "evidence/store-path-reruns/the_store_pairs_no_artifact_with_a_commit.log",
+    "sha256": "01577c8a410414ea081bcb9d576152ba0770e91df0657884af55b379eabf9d9f",
+    "elapsed_seconds": 0.021,
+    "original_log_path": "target/recovery-p1-store-path-reruns/the_store_pairs_no_artifact_with_a_commit.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/chio_store_sqlite-f6bc21373ae2eaa6",
+      "finding_challenge_store::tests::submission_retention::offline_repair_atomically_restores_v13_exact_submission_bytes",
+      "--exact",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "environment": {
+      "TMPDIR": "/private/tmp"
+    },
+    "exit_code": 0,
+    "log": "evidence/store-path-reruns/offline_repair_atomically_restores_v13_exact_submission_bytes.log",
+    "sha256": "0353790641a06f752ddb927cebc7caf10f9c30bab7de2cec04b4559ccd121833",
+    "elapsed_seconds": 0.112,
+    "original_log_path": "target/recovery-p1-store-path-reruns/offline_repair_atomically_restores_v13_exact_submission_bytes.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/chio_store_sqlite-f6bc21373ae2eaa6",
+      "read_companion::tests::a_lazy_reader_rejects_a_replaced_database_path",
+      "--exact",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "environment": {
+      "TMPDIR": "/private/tmp"
+    },
+    "exit_code": 0,
+    "log": "evidence/store-path-reruns/a_lazy_reader_rejects_a_replaced_database_path.log",
+    "sha256": "ab3cf1e4d6cfd104e27e3ca6bc6e10ee163f21e038ffaa9d6a312848c023836b",
+    "elapsed_seconds": 0.025,
+    "original_log_path": "target/recovery-p1-store-path-reruns/a_lazy_reader_rejects_a_replaced_database_path.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/chio_store_sqlite-f6bc21373ae2eaa6",
+      "read_companion::tests::a_reader_waits_for_a_return_once_the_bound_is_reached",
+      "--exact",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "environment": {
+      "TMPDIR": "/private/tmp"
+    },
+    "exit_code": 0,
+    "log": "evidence/store-path-reruns/a_reader_waits_for_a_return_once_the_bound_is_reached.log",
+    "sha256": "87d5d564d80e695965b9c6d92bfddc3ca96fa22737cf7f61788fc4ab8925432c",
+    "elapsed_seconds": 0.023,
+    "original_log_path": "target/recovery-p1-store-path-reruns/a_reader_waits_for_a_return_once_the_bound_is_reached.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/chio_store_sqlite-f6bc21373ae2eaa6",
+      "read_companion::tests::a_restored_path_cannot_hide_a_connection_opened_on_a_clone",
+      "--exact",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "environment": {
+      "TMPDIR": "/private/tmp"
+    },
+    "exit_code": 0,
+    "log": "evidence/store-path-reruns/a_restored_path_cannot_hide_a_connection_opened_on_a_clone.log",
+    "sha256": "d1108098467e745e3c789ef214a0dcf04cb4aa64ec8767b8e831ae2a18e42f58",
+    "elapsed_seconds": 0.018,
+    "original_log_path": "target/recovery-p1-store-path-reruns/a_restored_path_cannot_hide_a_connection_opened_on_a_clone.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/chio_store_sqlite-f6bc21373ae2eaa6",
+      "read_companion::tests::a_returned_connection_is_reused_rather_than_reopened",
+      "--exact",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "environment": {
+      "TMPDIR": "/private/tmp"
+    },
+    "exit_code": 0,
+    "log": "evidence/store-path-reruns/a_returned_connection_is_reused_rather_than_reopened.log",
+    "sha256": "1e06d27369d41007a3fd838a009dae958972d07ae93683a66dc6909a91d316fe",
+    "elapsed_seconds": 0.019,
+    "original_log_path": "target/recovery-p1-store-path-reruns/a_returned_connection_is_reused_rather_than_reopened.log"
+  },
+  {
+    "command": [
+      "target/debug/deps/chio_store_sqlite-f6bc21373ae2eaa6",
+      "read_companion::tests::concurrent_readers_hold_separate_connections",
+      "--exact",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "environment": {
+      "TMPDIR": "/private/tmp"
+    },
+    "exit_code": 0,
+    "log": "evidence/store-path-reruns/concurrent_readers_hold_separate_connections.log",
+    "sha256": "0872f5cb2370760d3b7464f85f69a5434bfce7eb7201f89a472b1c537a52042e",
+    "elapsed_seconds": 0.019,
+    "original_log_path": "target/recovery-p1-store-path-reruns/concurrent_readers_hold_separate_connections.log"
+  }
+]

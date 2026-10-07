@@ -1,0 +1,6 @@
+schemas passed 0.299
+wire-lock passed 5.561
+python passed 3.356
+ts failed 1.995
+ts-node-build passed 1.02
+ts-conformance-build failed 0.664

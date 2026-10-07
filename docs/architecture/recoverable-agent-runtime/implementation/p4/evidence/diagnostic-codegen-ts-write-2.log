@@ -1,0 +1,34 @@
+xtask: subprocess error: json2ts exited exit status: 1 for schema /var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T/chio-codegen-ts-99121-1791073715155433000/recovery/artifact-influence.schema.json: [
+  Error: Refs should have been resolved by the resolver! {
+    '$schema': 'https://json-schema.org/draft/2020-12/schema',
+    '$id': 'https://chio.computer/schemas/chio-wire/v1/recovery/artifact-influence.schema.json',
+    title: 'Artifact Influence V1',
+    '$defs': {
+      artifactInfluence: {
+        type: 'object',
+        additionalProperties: false,
+        required: [Array],
+        properties: [Object]
+      },
+      recoveryDigest32: {
+        type: 'array',
+        minItems: 32,
+        maxItems: 32,
+        items: [Array],
+        title: 'Recovery digest32',
+        description: '@minItems 32\n@maxItems 32'
+      }
+    },
+    '$ref': '#/%24defs/artifactInfluence/properties/commitment'
+  }
+      at parseNonLiteral (/Users/connor/Medica/backbay/standalone/arc/sdks/typescript/scripts/node_modules/json-schema-to-typescript/dist/src/parser.js:172:19)
+      at parseAsTypeWithCache (/Users/connor/Medica/backbay/standalone/arc/sdks/typescript/scripts/node_modules/json-schema-to-typescript/dist/src/parser.js:54:31)
+      at parse (/Users/connor/Medica/backbay/standalone/arc/sdks/typescript/scripts/node_modules/json-schema-to-typescript/dist/src/parser.js:29:21)
+      at /Users/connor/Medica/backbay/standalone/arc/sdks/typescript/scripts/node_modules/json-schema-to-typescript/dist/src/parser.js:305:14
+      at /Users/connor/Medica/backbay/standalone/arc/sdks/typescript/scripts/node_modules/lodash/lodash.js:3590:27
+      at /Users/connor/Medica/backbay/standalone/arc/sdks/typescript/scripts/node_modules/lodash/lodash.js:4998:15
+      at baseForOwn (/Users/connor/Medica/backbay/standalone/arc/sdks/typescript/scripts/node_modules/lodash/lodash.js:3037:24)
+      at /Users/connor/Medica/backbay/standalone/arc/sdks/typescript/scripts/node_modules/lodash/lodash.js:4967:18
+      at baseMap (/Users/connor/Medica/backbay/standalone/arc/sdks/typescript/scripts/node_modules/lodash/lodash.js:3589:7)
+      at map (/Users/connor/Medica/backbay/standalone/arc/sdks/typescript/scripts/node_modules/lodash/lodash.js:9653:14)
+]

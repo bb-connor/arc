@@ -1,0 +1,10 @@
+
+running 5 tests
+test sqlite_capability_authority_rejects_snapshot_with_invalid_public_key ... ok
+test sqlite_capability_authority_rotates_and_applies_newer_snapshot ... ok
+test sqlite_budget_and_revocation_paths_cover_limits_and_ordering ... ok
+test sqlite_budget_hold_authority_metadata_persists_across_reopen ... ok
+test sqlite_budget_authorize_idempotency_persists_across_reopen ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+

@@ -1,0 +1,197 @@
+{
+  "count": 27,
+  "status": "successful_case_coverage_across_retained_runs",
+  "single_full_stress_run_passed": false,
+  "note": "The serialized parent completed 26 cases before its last child failed to reach a cutpoint; that case passed in isolation. Focused non-parent regression acceptance is separately successful. Earlier broader failures remain unqualified, without a proven root-cause diagnosis.",
+  "cutpoints": [
+    {
+      "cutpoint": "creation",
+      "before_effects": 0,
+      "after_effects": 1,
+      "effect_observation": "Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }",
+      "log": "evidence/recovery-p2-p1-native-serial.log"
+    },
+    {
+      "cutpoint": "action",
+      "before_effects": 0,
+      "after_effects": 1,
+      "effect_observation": "Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }",
+      "log": "evidence/recovery-p2-p1-native-serial.log"
+    },
+    {
+      "cutpoint": "reservation",
+      "before_effects": 0,
+      "after_effects": 1,
+      "effect_observation": "Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }",
+      "log": "evidence/recovery-p2-p1-native-serial.log"
+    },
+    {
+      "cutpoint": "reservation-attached",
+      "before_effects": 0,
+      "after_effects": 1,
+      "effect_observation": "Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }",
+      "log": "evidence/recovery-p2-p1-native-serial.log"
+    },
+    {
+      "cutpoint": "selection",
+      "before_effects": 0,
+      "after_effects": 1,
+      "effect_observation": "Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }",
+      "log": "evidence/recovery-p2-p1-native-serial.log"
+    },
+    {
+      "cutpoint": "review",
+      "before_effects": 0,
+      "after_effects": 1,
+      "effect_observation": "Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }",
+      "log": "evidence/recovery-p2-p1-native-serial.log"
+    },
+    {
+      "cutpoint": "approval",
+      "before_effects": 0,
+      "after_effects": 1,
+      "effect_observation": "Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }",
+      "log": "evidence/recovery-p2-p1-native-serial.log"
+    },
+    {
+      "cutpoint": "issuance",
+      "before_effects": 0,
+      "after_effects": 1,
+      "effect_observation": "Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }",
+      "log": "evidence/recovery-p2-p1-native-serial.log"
+    },
+    {
+      "cutpoint": "signed",
+      "before_effects": 0,
+      "after_effects": 1,
+      "effect_observation": "Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }",
+      "log": "evidence/recovery-p2-p1-native-serial.log"
+    },
+    {
+      "cutpoint": "signature-attached",
+      "before_effects": 0,
+      "after_effects": 1,
+      "effect_observation": "Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }",
+      "log": "evidence/recovery-p2-p1-native-serial.log"
+    },
+    {
+      "cutpoint": "envelope",
+      "before_effects": 0,
+      "after_effects": 1,
+      "effect_observation": "Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }",
+      "log": "evidence/recovery-p2-p1-native-serial.log"
+    },
+    {
+      "cutpoint": "process-finalized",
+      "before_effects": 0,
+      "after_effects": 1,
+      "effect_observation": "Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }",
+      "log": "evidence/recovery-p2-p1-native-serial.log"
+    },
+    {
+      "cutpoint": "admission",
+      "before_effects": 0,
+      "after_effects": 0,
+      "effect_observation": "ClosedBeforeEffect { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(6) }, closure: EvidenceRef([redacted]) }",
+      "log": "evidence/recovery-p2-p1-native-serial.log"
+    },
+    {
+      "cutpoint": "capture-before-commit",
+      "before_effects": 0,
+      "after_effects": 0,
+      "effect_observation": "ClosedBeforeEffect { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(6) }, closure: EvidenceRef([redacted]) }",
+      "log": "evidence/recovery-p2-p1-native-serial.log"
+    },
+    {
+      "cutpoint": "capture-before-anchor",
+      "before_effects": 0,
+      "after_effects": 0,
+      "effect_observation": "Unknown { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(7) } }",
+      "log": "evidence/recovery-p2-p1-native-serial.log"
+    },
+    {
+      "cutpoint": "effect",
+      "before_effects": 1,
+      "after_effects": 1,
+      "effect_observation": "Unknown { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(7) } }",
+      "log": "evidence/recovery-p2-p1-native-serial.log"
+    },
+    {
+      "cutpoint": "return-recorded",
+      "before_effects": 1,
+      "after_effects": 1,
+      "effect_observation": "Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }",
+      "log": "evidence/recovery-p2-p1-native-serial.log"
+    },
+    {
+      "cutpoint": "evaluation",
+      "before_effects": 1,
+      "after_effects": 1,
+      "effect_observation": "Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }",
+      "log": "evidence/recovery-p2-p1-native-serial.log"
+    },
+    {
+      "cutpoint": "resolved",
+      "before_effects": 1,
+      "after_effects": 1,
+      "effect_observation": "Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }",
+      "log": "evidence/recovery-p2-p1-native-serial.log"
+    },
+    {
+      "cutpoint": "release-ack",
+      "before_effects": 1,
+      "after_effects": 1,
+      "effect_observation": "Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }",
+      "log": "evidence/recovery-p2-p1-native-serial.log"
+    },
+    {
+      "cutpoint": "release-checkpoint",
+      "before_effects": 1,
+      "after_effects": 1,
+      "effect_observation": "Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }",
+      "log": "evidence/recovery-p2-p1-native-serial.log"
+    },
+    {
+      "cutpoint": "terminal",
+      "before_effects": 1,
+      "after_effects": 1,
+      "effect_observation": "Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }",
+      "log": "evidence/recovery-p2-p1-native-serial.log"
+    },
+    {
+      "cutpoint": "returned-response",
+      "before_effects": 1,
+      "after_effects": 1,
+      "effect_observation": "Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }",
+      "log": "evidence/recovery-p2-p1-native-serial.log"
+    },
+    {
+      "cutpoint": "projection",
+      "before_effects": 1,
+      "after_effects": 1,
+      "effect_observation": "Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }",
+      "log": "evidence/recovery-p2-p1-native-serial.log"
+    },
+    {
+      "cutpoint": "nonce-preflight",
+      "before_effects": 0,
+      "after_effects": 1,
+      "effect_observation": "Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(10) }, effect_count: SafeInteger(1) }",
+      "log": "evidence/recovery-p2-p1-native-serial.log"
+    },
+    {
+      "cutpoint": "nonce-attached",
+      "before_effects": 0,
+      "after_effects": 1,
+      "effect_observation": "Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(10) }, effect_count: SafeInteger(1) }",
+      "log": "evidence/recovery-p2-p1-native-serial.log"
+    },
+    {
+      "cutpoint": "return-recorded-revoked",
+      "before_effects": 1,
+      "after_effects": 1,
+      "effect_observation": "Complete { operation: OperationRef { operation_id: OperationId([redacted]), native_admission_digest: NativeAdmissionDigest([redacted]), operation_version: SafeInteger(8) }, effect_count: SafeInteger(1) }",
+      "log": "evidence/recovery-p2-p1-last-cutpoint-isolated.log"
+    }
+  ]
+}

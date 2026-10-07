@@ -1,0 +1,44 @@
+   Compiling libc v0.2.189
+   Compiling syn v2.0.117
+   Compiling smallvec v1.15.1
+   Compiling curve25519-dalek v4.1.3
+   Compiling subtle v2.6.1
+   Compiling signature v2.2.0
+   Compiling percent-encoding v2.3.2
+   Compiling zeroize v1.9.0
+   Compiling ed25519 v2.2.3
+   Compiling sha2 v0.10.9
+   Compiling form_urlencoded v1.2.2
+   Compiling memchr v2.8.0
+   Compiling hex v0.4.3
+   Compiling serde_json v1.0.149
+   Compiling getrandom v0.2.17
+   Compiling rand_core v0.6.4
+   Compiling synstructure v0.13.2
+   Compiling zerofrom-derive v0.1.6
+   Compiling yoke-derive v0.8.1
+   Compiling zerovec-derive v0.11.2
+   Compiling displaydoc v0.2.5
+   Compiling serde_derive v1.0.228
+   Compiling curve25519-dalek-derive v0.1.1
+   Compiling zerofrom v0.1.6
+   Compiling yoke v0.8.1
+   Compiling zerovec v0.11.5
+   Compiling zerotrie v0.2.3
+   Compiling ed25519-dalek v2.2.0
+   Compiling tinystr v0.8.2
+   Compiling potential_utf v0.1.4
+   Compiling icu_collections v2.1.1
+   Compiling icu_locale_core v2.1.1
+   Compiling serde v1.0.228
+   Compiling icu_provider v2.1.1
+   Compiling icu_properties v2.1.2
+   Compiling icu_normalizer v2.1.1
+   Compiling chio-security-types v0.1.0 (/home/ubuntu/recovery-p0-performance-reference/crates/security/chio-security-types)
+   Compiling idna_adapter v1.2.1
+   Compiling idna v1.1.0
+   Compiling url v2.5.8
+   Compiling chio-semantic-contracts v0.1.0 (/home/ubuntu/recovery-p0-performance-reference/crates/security/chio-semantic-contracts)
+   Compiling chio-recovery v0.1.0 (/home/ubuntu/recovery-p0-performance-reference/crates/security/chio-recovery)
+   Compiling chio-core-types v0.1.0 (/home/ubuntu/recovery-p0-performance-reference/crates/core/chio-core-types)
+    Finished `dev` profile [unoptimized] target(s) in 20.89s

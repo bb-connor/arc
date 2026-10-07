@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/fixtures/recovery-product/host_acceptance.py", line 153, in <module>
+    main()
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/fixtures/recovery-product/host_acceptance.py", line 95, in main
+    from chio_sdk.recovery_host import RecoveryHostSession
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/sdks/python/chio-sdk-python/src/chio_sdk/__init__.py", line 4, in <module>
+    from chio_sdk.recovery import RecoveryClient
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/sdks/python/chio-sdk-python/src/chio_sdk/recovery.py", line 12, in <module>
+    from ._generated.recovery.decision_report_view_schema import DecisionReportViewV1
+ModuleNotFoundError: No module named 'chio_sdk._generated.recovery.decision_report_view_schema'

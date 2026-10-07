@@ -1,0 +1,65 @@
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+__________ test_product_client_canonical_report_proposal_and_no_retry __________
+
+    @pytest.mark.asyncio
+    async def test_product_client_canonical_report_proposal_and_no_retry():
+        requests = []
+        def handle(request):
+            data = json.loads(request.content); requests.append((request.url.path, data))
+            if request.url.path.endswith('reports/read'):
+                body = REPORT
+            else:
+                body = json.loads(data.get('report', data.get('proposal', '{}')))
+            if 'reports' in request.url.path:
+                reply = {'domain_version': 1, 'id': 'retained-report', 'digest': [7] * 32, 'report': body,
+                         'label': {'kind': 'public'}, 'influence': {'commitment': [8] * 32, 'externally_influenced': True, 'unknown': True}}
+            else:
+                reply = {'domain_version': 1, 'digest': [9] * 32, 'proposal': body,
+                         'label': {'kind': 'public'}, 'influence': {'commitment': [10] * 32, 'externally_influenced': True, 'unknown': True}}
+            return httpx.Response(200, json=reply)
+        client = RecoveryClient('https://host.example', transport=httpx.MockTransport(handle))
+        try:
+            canonical = json.dumps(REPORT, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode()
+>           first = await client.submit_report('capability-canary', 'stable-report-command', canonical)
+                          ^^^^^^^^^^^^^^^^^^^^
+E           AttributeError: 'RecoveryClient' object has no attribute 'submit_report'
+
+sdks/python/chio-sdk-python/tests/test_recovery_product_client.py:32: AttributeError
+_______ test_product_refusal_never_retries_or_exposes_raw_error[reply0] ________
+
+reply = <Response [503 Service Unavailable]>
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('reply', [httpx.Response(503, text='private-error-canary'), httpx.Response(200, json={})])
+    async def test_product_refusal_never_retries_or_exposes_raw_error(reply):
+        calls = []
+        client = RecoveryClient('https://host.example', transport=httpx.MockTransport(lambda request: calls.append(request) or reply))
+        try:
+            with pytest.raises(RuntimeError, match='^recovery\\.') as error:
+>               await client.submit_report('private-capability-canary', 'stable-report-command', json.dumps(REPORT).encode())
+                      ^^^^^^^^^^^^^^^^^^^^
+E               AttributeError: 'RecoveryClient' object has no attribute 'submit_report'
+
+sdks/python/chio-sdk-python/tests/test_recovery_product_client.py:51: AttributeError
+_______ test_product_refusal_never_retries_or_exposes_raw_error[reply1] ________
+
+reply = <Response [200 OK]>
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('reply', [httpx.Response(503, text='private-error-canary'), httpx.Response(200, json={})])
+    async def test_product_refusal_never_retries_or_exposes_raw_error(reply):
+        calls = []
+        client = RecoveryClient('https://host.example', transport=httpx.MockTransport(lambda request: calls.append(request) or reply))
+        try:
+            with pytest.raises(RuntimeError, match='^recovery\\.') as error:
+>               await client.submit_report('private-capability-canary', 'stable-report-command', json.dumps(REPORT).encode())
+                      ^^^^^^^^^^^^^^^^^^^^
+E               AttributeError: 'RecoveryClient' object has no attribute 'submit_report'
+
+sdks/python/chio-sdk-python/tests/test_recovery_product_client.py:51: AttributeError
+=========================== short test summary info ============================
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_product_client.py::test_product_client_canonical_report_proposal_and_no_retry
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_product_client.py::test_product_refusal_never_retries_or_exposes_raw_error[reply0]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_product_client.py::test_product_refusal_never_retries_or_exposes_raw_error[reply1]
+3 failed in 1.38s

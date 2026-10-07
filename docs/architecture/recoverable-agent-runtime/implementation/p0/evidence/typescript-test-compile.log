@@ -1,0 +1,3 @@
+sdks/typescript/packages/conformance/test/recovery_schema.test.ts(1,30): error TS2307: Cannot find module 'node:fs' or its corresponding type declarations.
+sdks/typescript/packages/conformance/test/recovery_schema.test.ts(2,34): error TS2307: Cannot find module 'node:path' or its corresponding type declarations.
+sdks/typescript/packages/conformance/test/recovery_schema.test.ts(3,31): error TS2307: Cannot find module 'node:url' or its corresponding type declarations.

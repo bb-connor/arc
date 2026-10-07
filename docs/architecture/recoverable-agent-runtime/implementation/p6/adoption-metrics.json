@@ -1,0 +1,60 @@
+{
+  "schema": "chio.recovery-p6-adoption-measurements.v1",
+  "measured_source_files": [
+    {
+      "path": "sdks/python/chio-sdk-python/src/chio_sdk/recovery_host.py",
+      "lines": 95,
+      "bytes": 4305
+    },
+    {
+      "path": "sdks/python/chio-langgraph/src/chio_langgraph/recovery.py",
+      "lines": 20,
+      "bytes": 984
+    },
+    {
+      "path": "sdks/python/chio-crewai/src/chio_crewai/recovery.py",
+      "lines": 41,
+      "bytes": 1653
+    },
+    {
+      "path": "fixtures/recovery-product/campaign_baseline.py",
+      "lines": 53,
+      "bytes": 2191
+    }
+  ],
+  "supervisory_code_removed_lines": 0,
+  "installation_actions_observed": [
+    "Install pinned host/provider distributions",
+    "Overlay exact current SDK sources",
+    "Compose protected native listener and selected operator profile",
+    "Execute existing reviewed self-test operation",
+    "Probe native outcome",
+    "Restart all native writers",
+    "Qualify retained exact operation"
+  ],
+  "installation_action_scope": "These are observed qualification fixture actions, not a general customer installation cost. No production migration or labor savings were measured.",
+  "cli": {
+    "passed": true,
+    "operator_actions": [
+      {
+        "action": "probe",
+        "exit_code": 0
+      },
+      {
+        "action": "qualify",
+        "exit_code": 1
+      },
+      {
+        "action": "operator_writer_restart",
+        "exit_code": 0
+      },
+      {
+        "action": "qualify",
+        "exit_code": 0
+      }
+    ],
+    "effects": 1,
+    "tree_calls": 1,
+    "host": "real Linux OCI native fixture"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "id": "p2-native",
+  "actual_command": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "chio-control-plane",
+    "--lib",
+    "recovery_p2_",
+    "--",
+    "--test-threads=1"
+  ],
+  "cwd": ".",
+  "environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "exit_code": 0,
+  "status": "passed",
+  "started_unix_seconds": 1791064114,
+  "duration_seconds": 14.67,
+  "log": "evidence/p2-native.log",
+  "log_sha256": "e94716db066aa8774b7a7b909137c46a1e1c014141c6e39d20a0c1502b09c95d",
+  "required_for_local_phase_acceptance": true
+}

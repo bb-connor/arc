@@ -1,0 +1,20 @@
+
+::test_actual_crew_has_no_fallback_and_retains_no_credentials_or_raw_errors
+  /tmp/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/agent/core.py:1299: DeprecationWarning: function_calling_llm is deprecated and will be removed in a future release.
+    function_calling_llm=self.function_calling_llm,
+
+::test_actual_crew_has_no_fallback_and_retains_no_credentials_or_raw_errors
+::test_actual_crew_has_no_fallback_and_retains_no_credentials_or_raw_errors
+  /tmp/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/crew.py:1675: DeprecationWarning: deprecated
+    if hasattr(agent, "allow_code_execution") and getattr(
+
+::test_actual_crew_has_no_fallback_and_retains_no_credentials_or_raw_errors
+  /tmp/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/crew.py:1682: DeprecationWarning: deprecated
+    and hasattr(agent, "multimodal")
+
+::test_actual_crew_has_no_fallback_and_retains_no_credentials_or_raw_errors
+  /tmp/recovery-runtime-p6-hosts/lib/python3.12/site-packages/crewai/crew.py:1683: DeprecationWarning: deprecated
+    and getattr(agent, "multimodal", False)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+2 passed, 14 warnings in 4.08s

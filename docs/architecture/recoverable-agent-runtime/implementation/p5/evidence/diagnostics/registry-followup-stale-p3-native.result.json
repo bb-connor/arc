@@ -1,0 +1,30 @@
+{
+  "id": "p3-native",
+  "actual_command": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "chio-control-plane",
+    "--lib",
+    "p3_",
+    "--",
+    "--test-threads=1"
+  ],
+  "cwd": ".",
+  "environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2",
+    "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+  },
+  "exit_code": 0,
+  "status": "failed",
+  "started_unix_seconds": 1791090782,
+  "duration_seconds": 478.105,
+  "log": "evidence/p3-native.log",
+  "log_sha256": "1f42a534d0c8558cb20e0f5638a85c6eb75f851ccbcc1f49c12b68c21c373f23",
+  "required_for_local_phase_acceptance": true,
+  "source_binding": "1a90665cd557d2736c40e6a775295cd7be180fb50fcea22f3565231a1d3d9d9a",
+  "reason": "source changed during gate execution"
+}

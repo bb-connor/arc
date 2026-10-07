@@ -1,0 +1,46 @@
+{
+  "schema": "chio.recovery-p5-tooling.v1",
+  "mode": "isolated_npm_ci_with_current_workspace_links",
+  "lock_exact_installation": true,
+  "lifecycle_scripts_executed": false,
+  "node_version": "v26.7.0",
+  "npm_version": "11.19.0",
+  "tools": [
+    {
+      "tool": "vitest",
+      "version": "4.1.11",
+      "used_from": "sdks/typescript/node_modules/vitest/package.json"
+    },
+    {
+      "tool": "vite",
+      "version": "8.3.0",
+      "used_from": "sdks/typescript/node_modules/vite/package.json"
+    },
+    {
+      "tool": "esbuild",
+      "version": "0.28.1",
+      "used_from": "sdks/typescript/node_modules/esbuild/package.json"
+    },
+    {
+      "tool": "typescript",
+      "version": "5.7.3",
+      "used_from": "sdks/typescript/node_modules/typescript/package.json"
+    },
+    {
+      "tool": "ajv",
+      "version": "8.20.0",
+      "used_from": "sdks/typescript/node_modules/ajv/package.json"
+    },
+    {
+      "tool": "json-schema-to-typescript",
+      "version": "15.0.4",
+      "used_from": "sdks/typescript/scripts/node_modules/json-schema-to-typescript/package.json"
+    }
+  ],
+  "npm_ci_logs": [
+    "evidence/diagnostics/node-overlay-20261004/npm-ci.log",
+    "evidence/diagnostics/node-overlay-20261004/npm-scripts-ci.log"
+  ],
+  "python_interpreter": "/Users/connor/Medica/backbay/standalone/arc/sdks/python/chio-crewai/.venv/bin/python",
+  "overlays_removed_before_sealing": true
+}

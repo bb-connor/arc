@@ -1,0 +1,9 @@
+    Blocking waiting for file lock on artifact directory
+    Finished `test` profile [unoptimized] target(s) in 1m 51s
+     Running tests/explanations.rs (target/debug/deps/explanations-7cb15a9428c266e5)
+
+running 1 test
+test explanations::verification::export_p2_positive ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 16 filtered out; finished in 0.01s
+

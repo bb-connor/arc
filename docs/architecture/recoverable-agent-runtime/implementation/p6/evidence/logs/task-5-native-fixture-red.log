@@ -1,0 +1,36 @@
+   Compiling chio-control-plane v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-control-plane)
+error[E0425]: cannot find function `prepare_case` in this scope
+ --> crates/platform/chio-control-plane/src/recovery/tests/knowledge/qualification.rs:8:27
+  |
+8 |             let fixture = prepare_case(workflow, case).await?;
+  |                           ^^^^^^^^^^^^ not found in this scope
+
+error[E0282]: type annotations needed
+ --> crates/platform/chio-control-plane/src/recovery/tests/knowledge/qualification.rs:8:17
+  |
+8 |             let fixture = prepare_case(workflow, case).await?;
+  |                 ^^^^^^^
+9 |             let result = fixture.execute().await;
+  |                          ------- type must be known at this point
+  |
+help: consider giving `fixture` an explicit type
+  |
+8 |             let fixture: /* Type */ = prepare_case(workflow, case).await?;
+  |                        ++++++++++++
+
+error[E0282]: type annotations needed
+  --> crates/platform/chio-control-plane/src/recovery/tests/knowledge/qualification.rs:9:17
+   |
+ 9 |             let result = fixture.execute().await;
+   |                 ^^^^^^
+10 |             let facts = fixture.facts(result.is_ok())?;
+   |                                       ------ type must be known at this point
+   |
+help: consider giving `result` an explicit type
+   |
+ 9 |             let result: /* Type */ = fixture.execute().await;
+   |                       ++++++++++++
+
+Some errors have detailed explanations: E0282, E0425.
+For more information about an error, try `rustc --explain E0282`.
+error: could not compile `chio-control-plane` (lib test) due to 3 previous errors

@@ -1,0 +1,28 @@
+
+Thread 2 "recovery::tests" received signal SIGSEGV, Segmentation fault.
+[Switching to Thread 0x7ffff7bff6c0 (LWP 68498)]
+0x00005555616b645e in curve25519_dalek::backend::serial::u64::field::FieldElement51::pow2k ()
+STACK_FRAME 332912 chio_control_plane::recovery::runtime::RecoveryRuntime::execute_command_inner::{{closure}}
+STACK_FRAME 284368 chio_kernel::kernel::admission_coordinator::terminal::<impl chio_kernel::kernel::kernel_struct::ChioKernel>::finalize_durable_tool_return_with_security_release
+STACK_FRAME 272800 chio_control_plane::recovery::tests::knowledge::setup::p6_setup_every_foreign_binding_and_old_profile_refuses::{{closure}}
+STACK_FRAME 174208 chio_kernel::kernel::evaluation::async_evaluation_core::<impl chio_kernel::kernel::kernel_struct::ChioKernel>::evaluate_tool_call_async_with_session_context_scoped::{{closure}}
+STACK_FRAME 95520 chio_control_plane::recovery::tests::knowledge::setup::p6_setup_every_foreign_binding_and_old_profile_refuses
+STACK_FRAME 79824 chio_store_sqlite::admission_operation_store::security_participant_state::output::write::<impl chio_store_sqlite::admission_operation_store::SqliteAdmissionOperationStore>::join_security_participant_output
+STACK_FRAME 74352 chio_control_plane::recovery::setup::RecoverySetupService::probe::{{closure}}
+STACK_FRAME 58544 chio_store_sqlite::admission_operation_store::security_participant_state::output::contract::require_original
+STACK_FRAME 51024 <chio_kernel::runtime::_::<impl serde_core::de::Deserialize for chio_kernel::runtime::ToolCallRequest>::deserialize::__Visitor as serde_core::de::Visitor>::visit_map
+STACK_FRAME 50864 <&mut serde_json::de::Deserializer<R> as serde_core::de::Deserializer>::deserialize_struct
+STACK_FRAME 41568 chio_store_sqlite::admission_operation_store::security_participant_state::dispatch_ledger::record::Record::validate
+STACK_FRAME 34000 chio_kernel::kernel::admission_coordinator::native_output::<impl chio_kernel::kernel::kernel_struct::ChioKernel>::prepare_durable_native_output
+STACK_FRAME 27504 chio_kernel::kernel::evaluation::evaluation_entry::<impl chio_kernel::kernel::kernel_struct::ChioKernel>::evaluate_tool_call_async_with_session_context::{{closure}}
+STACK_FRAME 26560 chio_process::ProcessRuntime::invoke_with_recovery::{{closure}}
+STACK_FRAME 25872 chio_kernel::kernel::admission_coordinator::native_output::NativeSecurityOutputJoinAuthority::join_once
+STACK_FRAME 25680 chio_store_sqlite::admission_operation_store::security_participant_state::egress::readback::portable::load_history
+#0  0x00005555616b645e in curve25519_dalek::backend::serial::u64::field::FieldElement51::pow2k ()
+#1  0x00005555616b7593 in curve25519_dalek::backend::serial::u64::field::FieldElement51::square ()
+#2  0x00005555616b5e11 in curve25519_dalek::field::<impl curve25519_dalek::backend::serial::u64::field::FieldElement51>::pow22501 ()
+#3  0x00005555616b5d9f in curve25519_dalek::field::<impl curve25519_dalek::backend::serial::u64::field::FieldElement51>::pow_p58 ()
+#4  0x00005555616b5b49 in curve25519_dalek::field::<impl curve25519_dalek::backend::serial::u64::field::FieldElement51>::sqrt_ratio_i ()
+#5  0x00005555616ab680 in curve25519_dalek::edwards::decompress::step_1 ()
+#6  0x00005555616abd93 in curve25519_dalek::edwards::CompressedEdwardsY::decompress ()
+#7  0x000055556140822e in ed25519_dalek::verifying::VerifyingKey::from_bytes ()

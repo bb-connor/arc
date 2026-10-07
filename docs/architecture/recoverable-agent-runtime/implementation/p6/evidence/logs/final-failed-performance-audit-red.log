@@ -1,0 +1,14 @@
+.E.
+======================================================================
+ERROR: test_matched_linux_budget_and_original_absolute_ceiling_both_apply (test_measurements.PerformanceAuditTest.test_matched_linux_budget_and_original_absolute_ceiling_both_apply)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/docs/architecture/recoverable-agent-runtime/implementation/p6/evidence/test_measurements.py", line 58, in test_matched_linux_budget_and_original_absolute_ceiling_both_apply
+    self.assertEqual(package_measurements.audit_failed_matched_performance(
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'package_measurements' has no attribute 'audit_failed_matched_performance'. Did you mean: 'audit_matched_performance'?
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.003s
+
+FAILED (errors=1)

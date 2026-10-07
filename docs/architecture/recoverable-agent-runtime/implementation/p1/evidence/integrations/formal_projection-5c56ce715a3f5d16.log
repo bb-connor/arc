@@ -1,0 +1,9 @@
+
+running 4 tests
+test budget_snapshot_projection_preserves_single_node_bounds ... ok
+test revocation_snapshot_projection_denies_token_and_ancestor ... ok
+test dpop_nonce_projection_rejects_replay ... ok
+test receipt_projection_couples_decision_to_evidence_body ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

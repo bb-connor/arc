@@ -1,0 +1,20 @@
+{
+  "schema": "chio.recovery-p6-additional-qualification.v1",
+  "declared_at_utc": "2026-10-05T10:00:26.012446+00:00",
+  "id": "capable-model-qualification",
+  "trials": 96,
+  "manifest_sha256": "57dc71abfe9642bbffc2001c6af9bf61fec01510a93d2a6f7d189ae1584a4c18",
+  "prior_planned_trials": 192,
+  "combined_planned_trials": 288,
+  "change": "Exact model gpt-5.4-2026-03-05 and two source files fixing immutable prompt-record custody (implementation and behavioral regression). No native Rust, SDK, task, authority, actor, budget, repetition or threshold change. Correction sealed before any third-cohort native/model trial; all earlier rows remain retained.",
+  "reason": "Complete mini-model cohort failed useful-tool thresholds in two CrewAI artifact positive strata. This is a new matched model qualification, not a rerun of selected successful rows.",
+  "separate_diagnostic_requests": 4,
+  "precollection_custody_correction_at_utc": "2026-10-05T10:13:09.088796+00:00",
+  "runtime_source_binding": "599483edaa9ba14165c0f2b73126f1ad8e24f2f26b1fb730f8460a1d0b0dc985",
+  "prompt_custody_fix_sources": [
+    "fixtures/recovery-product/campaign_runner.py",
+    "fixtures/recovery-product/test_campaign_runner.py"
+  ],
+  "previous_precollection_manifest_sha256": "f5f535b837a198fe4ec92cfae4f2b203580170fd3594235709c6189cccfb2bc7",
+  "qualification_previously_started": false
+}

@@ -1,0 +1,7 @@
+error: unrecognized subcommand 'setup'
+
+  tip: a similar subcommand exists: 'settle'
+
+Usage: chio recovery [OPTIONS] <COMMAND>
+
+For more information, try '--help'.

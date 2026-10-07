@@ -1,0 +1,68 @@
+    Blocking waiting for file lock on artifact directory
+    Finished `test` profile [unoptimized] target(s) in 12.44s
+   Doc-tests chio_kernel
+
+running 3 tests
+error[E0596]: cannot borrow `*owner` as mutable, as it is behind a `&` reference
+  --> crates/kernel/chio-kernel/src/runtime/recovery_review.rs:35:13
+   |
+35 |     let _ = owner.capture(prepared, ledger, b"{}");
+   |             ^^^^^ `owner` is a `&` reference, so it cannot be borrowed as mutable
+   |
+help: consider changing this to be a mutable reference
+   |
+32 | fn dispatch_shared(owner: &mut NativeSecurityDispatchCaptureAuthority<'_, '_>,
+   |                            +++
+
+error: aborting due to 1 previous error
+
+For more information about this error, try `rustc --explain E0596`.
+test crates/kernel/chio-kernel/src/runtime/recovery_review.rs - runtime::recovery_review::RecoveryRequestProjection (line 29) - compile fail ... ok
+error[E0277]: the trait bound `NativeSecurityDispatchCaptureAuthority<'_, '_>: Clone` is not satisfied
+  --> crates/kernel/chio-kernel/src/runtime/recovery_review.rs:26:74
+   |
+26 |     let _: NativeSecurityDispatchCaptureAuthority<'_, '_> = Clone::clone(owner);
+   |                                                             ------------ ^^^^^ the trait `Clone` is not implemented for `NativeSecurityDispatchCaptureAuthority<'_, '_>`
+   |                                                             |
+   |                                                             required by a bound introduced by this call
+
+error: aborting due to 1 previous error
+
+For more information about this error, try `rustc --explain E0277`.
+test crates/kernel/chio-kernel/src/runtime/recovery_review.rs - runtime::recovery_review::RecoveryRequestProjection (line 22) - compile fail ... ok
+error[E0277]: the trait bound `NativeSecurityDispatchCaptureAuthority<'_, 'static>: serde::Deserialize<'de>` is not satisfied
+    --> crates/kernel/chio-kernel/src/runtime/recovery_review.rs:20:5
+     |
+  20 |     serde_json::from_str("{}");
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `serde_core::de::Deserialize<'_>` is not implemented for `NativeSecurityDispatchCaptureAuthority<'_, 'static>`
+     |
+     = note: for local types consider adding `#[derive(serde::Deserialize)]` to your `NativeSecurityDispatchCaptureAuthority<'_, 'static>` type
+     = note: for types from other crates check whether the crate offers a `serde` feature flag
+     = help: the following other types implement trait `serde_core::de::Deserialize<'de>`:
+               &'a Path
+               &'a [u8]
+               &'a str
+               ()
+               (T,)
+               (T0, T1)
+               (T0, T1, T2)
+               (T0, T1, T2, T3)
+             and 2801 others
+note: required by a bound in `serde_json::from_str`
+    --> /Users/connor/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_json-1.0.149/src/de.rs:2701:8
+     |
+2699 | pub fn from_str<'a, T>(s: &'a str) -> Result<T>
+     |        -------- required by a bound in this function
+2700 | where
+2701 |     T: de::Deserialize<'a>,
+     |        ^^^^^^^^^^^^^^^^^^^ required by this bound in `from_str`
+     = note: the full name for the type has been written to '/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T/rustdoctestKK2b34/rust_out.long-type-11672199787241616822.txt'
+     = note: consider using `--verbose` to print the full type name to the console
+
+error: aborting due to 1 previous error
+
+For more information about this error, try `rustc --explain E0277`.
+test crates/kernel/chio-kernel/src/runtime/recovery_review.rs - runtime::recovery_review::RecoveryRequestProjection (line 16) - compile fail ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.52s
+

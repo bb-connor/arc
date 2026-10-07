@@ -1,0 +1,97 @@
+{
+  "schema": "chio.recovery-architecture-validation.v1",
+  "status": "structural_checks_passed",
+  "scope": "Architecture documents, traceability, source hashes and retained bounded-model evidence only",
+  "source_revision_checked": "de84fc306efbb4c8dd6de748d0ad2a8d695fd30e",
+  "live_source_tree_checked": false,
+  "requirements": 111,
+  "functionality_mappings": 15,
+  "markdown_files": 24,
+  "local_links_checked": 148,
+  "development_source_inputs_verified": 57,
+  "source_findings": 22,
+  "model": {
+    "reachable_states": 325,
+    "transitions": 774,
+    "mutations_rejected": [
+      "OverlappingSelection",
+      "IgnoreOwnerEpoch",
+      "ReplayUnknown",
+      "UnknownMeansNoEffect"
+    ],
+    "scope": "One effectful step, two continuations/coordinators, two owner epochs; no production proof"
+  },
+  "review_models": {
+    "baselines": [
+      {
+        "name": "Admission",
+        "reachable_states": 22,
+        "transitions": 30
+      },
+      {
+        "name": "Knowledge",
+        "reachable_states": 9,
+        "transitions": 8
+      },
+      {
+        "name": "Replay",
+        "reachable_states": 10,
+        "transitions": 14
+      },
+      {
+        "name": "PartialEffect",
+        "reachable_states": 7,
+        "transitions": 8
+      }
+    ],
+    "mutations_rejected": [
+      "CloseFromProjection",
+      "IgnoreAdmissionTombstone",
+      "IgnoreCancellation",
+      "ReleaseWithoutJoin",
+      "IgnoreKnowledgeFence",
+      "RevisionBeforeReplay",
+      "CachedResponseAfterRevocation",
+      "PartialFailureAsNoEffect"
+    ],
+    "source_and_output_hashes_verified": true,
+    "scope": "Four independent bounded seams; not a composed or production proof",
+    "third_pass": {
+      "nonce_reachable_states": 133,
+      "nonce_transitions": 252,
+      "coverage_cases": 3844,
+      "mutations_rejected": [
+        "FinalizeWithoutCustody",
+        "PreflightBeforeIntent",
+        "RenewMissingNonce",
+        "RewriteProcessEnvelope",
+        "RequireLiveInitiator",
+        "AnyOwnerSuffices",
+        "IgnoreApprovalContext",
+        "CountSignatureAliases"
+      ],
+      "scope": "Bounded nonce custody protocol and symbolic coverage; not cryptographic or production qualification"
+    }
+  },
+  "root_manifest_and_lock_unchanged": true,
+  "implementation_tests_rerun": false,
+  "retained_foundation_test_evidence_verified": true,
+  "foundation_test_evidence": {
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "chio-process",
+      "--test",
+      "nonce_recovery"
+    ],
+    "passed": 3,
+    "failed": 0,
+    "count_note": "Three top-level harness tests include one subprocess helper. Nested child invocations are not additional unique tests.",
+    "scope": "Existing process/kernel strict-nonce foundation only; no proposed grant-v2 or recovery-participant implementation.",
+    "record_kind": "Tool-observed command/result summary, not a full build attestation or retained stdout transcript.",
+    "new_architecture_implementation_qualified": false
+  },
+  "architecture_approved": false
+}

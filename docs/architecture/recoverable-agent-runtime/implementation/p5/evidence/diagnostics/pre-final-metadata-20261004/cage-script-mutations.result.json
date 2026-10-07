@@ -1,0 +1,17 @@
+{
+  "id": "cage-script-mutations",
+  "actual_command": [
+    "bash",
+    "scripts/tests/check-cage-enforcement.test.sh"
+  ],
+  "cwd": ".",
+  "environment": {},
+  "exit_code": 0,
+  "status": "passed",
+  "started_unix_seconds": 1791160376,
+  "duration_seconds": 17.12,
+  "log": "evidence/cage-script-mutations.log",
+  "log_sha256": "3279c61c6da9453f2870e4c2b2864be4e48585ff92e7198a7383a48d8c03e012",
+  "required_for_local_phase_acceptance": true,
+  "source_binding": "05aa889df57391692c09ef64d3ec178184f5d48c4bd4b6d3a654f470b00e079f"
+}

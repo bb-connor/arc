@@ -1,0 +1,18 @@
+[
+  {
+    "path": "sdks/typescript/scripts/node_modules",
+    "removed_symlink_target": "/Users/connor/Medica/backbay/standalone/arc/sdks/typescript/scripts/node_modules"
+  },
+  {
+    "path": "sdks/typescript/node_modules",
+    "removed_symlink_target": "/Users/connor/Medica/backbay/standalone/arc/sdks/typescript/node_modules"
+  },
+  {
+    "path": "sdks/typescript/packages/node-http/node_modules",
+    "removed_symlink_target": "/Users/connor/Medica/backbay/standalone/arc/sdks/typescript/packages/conformance/node_modules"
+  },
+  {
+    "path": "sdks/typescript/packages/conformance/node_modules",
+    "removed": "task_created_local_overlay"
+  }
+]

@@ -1,0 +1,15 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Finished `test` profile [unoptimized] target(s) in 2.84s
+     Running tests/recovery_p5_contracts.rs (target/debug/deps/recovery_p5_contracts-d8d5578bd9fa8681)
+
+running 4 tests
+test p5_write_shared_vectors ... ok
+test p5_projection_and_packet_bounds_do_not_release_schema_only_predicates ... ok
+test p5_disclosure_cannot_substitute_for_integrity_and_exact_binding_mutations_fail ... ok
+test p5_closed_contracts_and_shared_vectors ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+

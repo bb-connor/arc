@@ -1,0 +1,16 @@
+{
+  "id": "domains",
+  "actual_command": [
+    "python3",
+    "scripts/check-domain-separation.py"
+  ],
+  "cwd": ".",
+  "environment": {},
+  "exit_code": 0,
+  "status": "passed",
+  "started_unix_seconds": 1791074484,
+  "duration_seconds": 1.537,
+  "log": "evidence/domains.log",
+  "log_sha256": "9660e42dc2a0efbad4e490330d6a6385e58a420c7c1648c95bc9031c502670af",
+  "required_for_local_phase_acceptance": true
+}

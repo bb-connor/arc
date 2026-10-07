@@ -1,0 +1,207 @@
+   Compiling chio-security-types v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-security-types)
+   Compiling rustc_version v0.4.1
+   Compiling ahash v0.8.12
+   Compiling getrandom v0.2.17
+   Compiling signature v2.2.0
+   Compiling fancy-regex v0.17.0
+   Compiling schemars v0.8.22
+   Compiling form_urlencoded v1.2.2
+   Compiling thiserror-impl v1.0.69
+   Compiling hex v0.4.3
+error[E0753]: expected outer doc comment
+ --> crates/security/chio-security-types/src/recovery/identifiers.rs:3:1
+  |
+3 | //! Digest and identity domains cannot be substituted by assigning equal bytes.
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: inner doc comments like this (starting with `//!` or `/*!`) can only appear before items
+help: you might have meant to write a regular comment
+  |
+3 - //! Digest and identity domains cannot be substituted by assigning equal bytes.
+3 + // Digest and identity domains cannot be substituted by assigning equal bytes.
+  |
+
+error[E0753]: expected outer doc comment
+ --> crates/security/chio-security-types/src/recovery/identifiers.rs:4:1
+  |
+4 | //!
+  | ^^^
+  |
+  = note: inner doc comments like this (starting with `//!` or `/*!`) can only appear before items
+help: you might have meant to write a regular comment
+  |
+4 - //!
+4 + //
+  |
+
+error[E0753]: expected outer doc comment
+ --> crates/security/chio-security-types/src/recovery/identifiers.rs:5:1
+  |
+5 | //! ```compile_fail
+  | ^^^^^^^^^^^^^^^^^^^
+  |
+  = note: inner doc comments like this (starting with `//!` or `/*!`) can only appear before items
+help: you might have meant to write a regular comment
+  |
+5 - //! ```compile_fail
+5 + // ```compile_fail
+  |
+
+error[E0753]: expected outer doc comment
+ --> crates/security/chio-security-types/src/recovery/identifiers.rs:6:1
+  |
+6 | //! use chio_security_types::recovery::{NativeAdmissionDigest, ProcessRequestDigest};
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: inner doc comments like this (starting with `//!` or `/*!`) can only appear before items
+help: you might have meant to write a regular comment
+  |
+6 - //! use chio_security_types::recovery::{NativeAdmissionDigest, ProcessRequestDigest};
+6 + // use chio_security_types::recovery::{NativeAdmissionDigest, ProcessRequestDigest};
+  |
+
+error[E0753]: expected outer doc comment
+ --> crates/security/chio-security-types/src/recovery/identifiers.rs:7:1
+  |
+7 | //! let native = NativeAdmissionDigest::from_bytes([0; 32]);
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: inner doc comments like this (starting with `//!` or `/*!`) can only appear before items
+help: you might have meant to write a regular comment
+  |
+7 - //! let native = NativeAdmissionDigest::from_bytes([0; 32]);
+7 + // let native = NativeAdmissionDigest::from_bytes([0; 32]);
+  |
+
+error[E0753]: expected outer doc comment
+ --> crates/security/chio-security-types/src/recovery/identifiers.rs:8:1
+  |
+8 | //! let _: ProcessRequestDigest = native;
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: inner doc comments like this (starting with `//!` or `/*!`) can only appear before items
+help: you might have meant to write a regular comment
+  |
+8 - //! let _: ProcessRequestDigest = native;
+8 + // let _: ProcessRequestDigest = native;
+  |
+
+error[E0753]: expected outer doc comment
+ --> crates/security/chio-security-types/src/recovery/identifiers.rs:9:1
+  |
+9 | //! ```
+  | ^^^^^^^
+  |
+  = note: inner doc comments like this (starting with `//!` or `/*!`) can only appear before items
+help: you might have meant to write a regular comment
+  |
+9 - //! ```
+9 + // ```
+  |
+
+error[E0753]: expected outer doc comment
+  --> crates/security/chio-security-types/src/recovery/identifiers.rs:10:1
+   |
+10 | //!
+   | ^^^
+   |
+   = note: inner doc comments like this (starting with `//!` or `/*!`) can only appear before items
+help: you might have meant to write a regular comment
+   |
+10 - //!
+10 + //
+   |
+
+error[E0753]: expected outer doc comment
+  --> crates/security/chio-security-types/src/recovery/identifiers.rs:11:1
+   |
+11 | //! ```compile_fail
+   | ^^^^^^^^^^^^^^^^^^^
+   |
+   = note: inner doc comments like this (starting with `//!` or `/*!`) can only appear before items
+help: you might have meant to write a regular comment
+   |
+11 - //! ```compile_fail
+11 + // ```compile_fail
+   |
+
+error[E0753]: expected outer doc comment
+  --> crates/security/chio-security-types/src/recovery/identifiers.rs:12:1
+   |
+12 | //! use chio_security_types::recovery::{ContinuationId, WorkflowId};
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: inner doc comments like this (starting with `//!` or `/*!`) can only appear before items
+help: you might have meant to write a regular comment
+   |
+12 - //! use chio_security_types::recovery::{ContinuationId, WorkflowId};
+12 + // use chio_security_types::recovery::{ContinuationId, WorkflowId};
+   |
+
+error[E0753]: expected outer doc comment
+  --> crates/security/chio-security-types/src/recovery/identifiers.rs:13:1
+   |
+13 | //! fn accept(_: WorkflowId) {}
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: inner doc comments like this (starting with `//!` or `/*!`) can only appear before items
+help: you might have meant to write a regular comment
+   |
+13 - //! fn accept(_: WorkflowId) {}
+13 + // fn accept(_: WorkflowId) {}
+   |
+
+error[E0753]: expected outer doc comment
+  --> crates/security/chio-security-types/src/recovery/identifiers.rs:14:1
+   |
+14 | //! let continuation = ContinuationId::new("continuation-a").unwrap_or_else(|e| panic!("{e}"));
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: inner doc comments like this (starting with `//!` or `/*!`) can only appear before items
+help: you might have meant to write a regular comment
+   |
+14 - //! let continuation = ContinuationId::new("continuation-a").unwrap_or_else(|e| panic!("{e}"));
+14 + // let continuation = ContinuationId::new("continuation-a").unwrap_or_else(|e| panic!("{e}"));
+   |
+
+error[E0753]: expected outer doc comment
+  --> crates/security/chio-security-types/src/recovery/identifiers.rs:15:1
+   |
+15 | //! accept(continuation);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: inner doc comments like this (starting with `//!` or `/*!`) can only appear before items
+help: you might have meant to write a regular comment
+   |
+15 - //! accept(continuation);
+15 + // accept(continuation);
+   |
+
+error[E0753]: expected outer doc comment
+  --> crates/security/chio-security-types/src/recovery/identifiers.rs:16:1
+   |
+16 | //! ```
+   | ^^^^^^^
+17 | use alloc::string::{String, ToString};
+   | -------------------------------------- the inner doc comment doesn't annotate this `use` import
+   |
+help: to annotate the `use` import, change the doc comment from inner to outer style
+   |
+16 - //! ```
+16 + /// ```
+   |
+
+   Compiling referencing v0.46.0
+   Compiling rand_core v0.6.4
+   Compiling ed25519 v2.2.3
+   Compiling url v2.5.8
+   Compiling proptest v1.10.0
+   Compiling curve25519-dalek v4.1.3
+   Compiling typify-impl v0.4.3
+   Compiling jsonschema v0.46.0
+   Compiling thiserror v1.0.69
+   Compiling ed25519-dalek v2.2.0
+   Compiling typify v0.4.3
+   Compiling chio-spec-codegen v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/tooling/chio-spec-codegen)
+For more information about this error, try `rustc --explain E0753`.
+error: could not compile `chio-security-types` (lib) due to 14 previous errors

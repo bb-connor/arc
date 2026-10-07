@@ -1,0 +1,30 @@
+ownership: compiled and completed
+BASELINE PASS: 325 reachable states, 774 transitions; exhaustive within the stated bounds.
+MUTATION REJECTED OverlappingSelection: more than one unresolved continuation owns the step
+MUTATION REJECTED IgnoreOwnerEpoch: a stale coordinator epoch captured live ownership
+MUTATION REJECTED ReplayUnknown: the one modeled effectful step executed more than once
+MUTATION REJECTED UnknownMeansNoEffect: an actual effect was classified as closed without effect
+review: compiled and completed
+REVIEW BASELINE PASS Admission: 22 reachable states, 30 transitions; exhaustive within stated bounds.
+REVIEW BASELINE PASS Knowledge: 9 reachable states, 8 transitions; exhaustive within stated bounds.
+REVIEW BASELINE PASS Replay: 10 reachable states, 14 transitions; exhaustive within stated bounds.
+REVIEW BASELINE PASS PartialEffect: 7 reachable states, 8 transitions; exhaustive within stated bounds.
+REVIEW MUTATION REJECTED CloseFromProjection: missing projection closed a potentially effective native operation
+REVIEW MUTATION REJECTED IgnoreAdmissionTombstone: late submission reopened a closed admission intent
+REVIEW MUTATION REJECTED IgnoreCancellation: capture followed an earlier committed cancellation
+REVIEW MUTATION REJECTED ReleaseWithoutJoin: bytes escaped before native knowledge joined
+REVIEW MUTATION REJECTED IgnoreKnowledgeFence: stale public preparation captured after restricted observation
+REVIEW MUTATION REJECTED RevisionBeforeReplay: committed command replay incorrectly conflicted on its old revision
+REVIEW MUTATION REJECTED CachedResponseAfterRevocation: cached protected response escaped after read revocation
+REVIEW MUTATION REJECTED PartialFailureAsNoEffect: partial failure caused a second external effect for the same step
+third: compiled and completed
+THIRD BASELINE PASS Nonce: 133 reachable states, 252 transitions; useful restart reachable.
+THIRD MUTATION REJECTED FinalizeWithoutCustody: process finalized without durable exact request custody
+THIRD MUTATION REJECTED PreflightBeforeIntent: native preflight preceded durable admission intent
+THIRD MUTATION REJECTED RenewMissingNonce: missing process acknowledgement minted another native nonce
+THIRD MUTATION REJECTED RewriteProcessEnvelope: native attachment rewrote the frozen process envelope
+THIRD MUTATION REJECTED RequireLiveInitiator: expired initiator blocked authorized historical settlement
+THIRD CONTRACT PASS Coverage: 3844 bounded cases.
+THIRD MUTATION REJECTED AnyOwnerSuffices: partial owner or power coverage authorized the complete release
+THIRD MUTATION REJECTED IgnoreApprovalContext: approval from another action target challenge or source satisfied coverage
+THIRD MUTATION REJECTED CountSignatureAliases: two aliases of one principal satisfied a two-principal obligation

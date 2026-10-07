@@ -1,0 +1,23 @@
+[
+  {
+    "source": "/Users/connor/Medica/playground/live-coding-interview-v2/.env",
+    "requested_model": "gpt-5.4-mini-2026-03-17",
+    "separate_diagnostic": true,
+    "transport_retries": 0,
+    "success": true,
+    "returned_model": "gpt-5.4-mini-2026-03-17",
+    "input_tokens": 15,
+    "output_tokens": 14
+  },
+  {
+    "source": "/Users/connor/Medica/backbay/standalone/chio-developer-base/.env",
+    "requested_model": "gpt-5.4-mini-2026-03-17",
+    "separate_diagnostic": true,
+    "transport_retries": 0,
+    "success": false,
+    "exception_class": "RateLimitError",
+    "http_status": 429,
+    "code": "credit_balance_exhausted",
+    "error_type": "insufficient_quota"
+  }
+]

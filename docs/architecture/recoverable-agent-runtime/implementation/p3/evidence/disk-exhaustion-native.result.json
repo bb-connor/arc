@@ -1,0 +1,25 @@
+{
+  "id": "disk-exhaustion-native",
+  "actual_command": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "chio-control-plane",
+    "--lib",
+    "p3_",
+    "--",
+    "--test-threads=1"
+  ],
+  "cwd": ".",
+  "environment": {},
+  "exit_code": 101,
+  "status": "failed",
+  "started_unix_seconds": 1791062749,
+  "duration_seconds": 482.883,
+  "log": "evidence/disk-exhaustion-native.log",
+  "log_sha256": "5b8d87531d1b5aeb6e1051f96a13ed0f8a80529920b21ba4ac932022ef2391c8",
+  "required_for_local_phase_acceptance": false,
+  "qualification": "Unqualified diagnostic run during disk exhaustion; native/SQLite/LLVM I/O failures were retained and not counted as passing."
+}

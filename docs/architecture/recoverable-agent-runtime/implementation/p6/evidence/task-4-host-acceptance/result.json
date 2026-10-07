@@ -1,0 +1,59 @@
+{
+  "passed": true,
+  "cases": [
+    {
+      "framework": "langgraph",
+      "outputs": {
+        "first": {
+          "category": "complete",
+          "command_id": "host-native-original",
+          "workflow_id": "workflow:9b739f8bdd120ec58c5dbee3911de9ed718dd4ba0ac7c0271d9b942d61cf4bc7"
+        },
+        "replay": {
+          "category": "complete",
+          "command_id": "host-native-original",
+          "workflow_id": "workflow:9b739f8bdd120ec58c5dbee3911de9ed718dd4ba0ac7c0271d9b942d61cf4bc7"
+        },
+        "revoked": {
+          "category": "refused"
+        }
+      },
+      "native": {
+        "distinct_attempts": 2,
+        "effects": 2,
+        "revoked": true,
+        "setup_effects": 1,
+        "tree_calls": 2,
+        "workload_effects": 1
+      },
+      "tool_actions": 3
+    },
+    {
+      "framework": "crewai",
+      "outputs": {
+        "first": {
+          "category": "complete",
+          "command_id": "host-native-original",
+          "workflow_id": "workflow:d393128eb104e5c294000a5e6fc53ebce358aa032d9486f821ddcab93ff1f879"
+        },
+        "replay": {
+          "category": "complete",
+          "command_id": "host-native-original",
+          "workflow_id": "workflow:d393128eb104e5c294000a5e6fc53ebce358aa032d9486f821ddcab93ff1f879"
+        },
+        "revoked": {
+          "category": "refused"
+        }
+      },
+      "native": {
+        "distinct_attempts": 2,
+        "effects": 2,
+        "revoked": true,
+        "setup_effects": 1,
+        "tree_calls": 2,
+        "workload_effects": 1
+      },
+      "tool_actions": 3
+    }
+  ]
+}

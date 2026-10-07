@@ -1,0 +1,9 @@
+
+running 4 tests
+test tenant_filter_without_read_context_fails_closed ... ok
+test tenant_a_queries_never_return_tenant_b_rows ... ok
+test tenant_scoped_queries_respect_and_leak_only_null_tenant_rows ... ok
+test explicit_admin_context_returns_all_rows_regardless_of_tags ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+

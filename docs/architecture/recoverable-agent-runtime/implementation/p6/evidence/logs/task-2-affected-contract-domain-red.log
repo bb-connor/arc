@@ -1,0 +1,16 @@
+   Compiling chio-core-types v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-core-types)
+error[E0308]: `?` operator has incompatible types
+  --> crates/core/chio-core-types/tests/recovery_p6_contracts.rs:71:29
+   |
+71 |           affected_contracts: NonEmptyBoundedList::new(vec![SemanticPackageDigest::from_bytes(
+   |  _____________________________^
+72 | |             [4; 32],
+73 | |         )])?,
+   | |____________^ expected `NonEmptyBoundedList<..., 16>`, found `NonEmptyBoundedList<..., _>`
+   |
+   = note: `?` operator cannot convert from `chio_security_types::recovery::NonEmptyBoundedList<chio_security_types::recovery::SemanticPackageDigest, _>` to `chio_security_types::recovery::NonEmptyBoundedList<ReturnContractDigest, 16>`
+   = note: expected struct `chio_security_types::recovery::NonEmptyBoundedList<ReturnContractDigest, 16>`
+              found struct `chio_security_types::recovery::NonEmptyBoundedList<chio_security_types::recovery::SemanticPackageDigest, _>`
+
+For more information about this error, try `rustc --explain E0308`.
+error: could not compile `chio-core-types` (test "recovery_p6_contracts") due to 1 previous error

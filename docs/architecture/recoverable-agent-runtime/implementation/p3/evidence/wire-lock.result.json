@@ -1,0 +1,16 @@
+{
+  "id": "wire-lock",
+  "actual_command": [
+    "python3",
+    "scripts/check-wire-schemas.py"
+  ],
+  "cwd": ".",
+  "environment": {},
+  "exit_code": 0,
+  "status": "passed",
+  "started_unix_seconds": 1791062725,
+  "duration_seconds": 5.416,
+  "log": "evidence/wire-lock.log",
+  "log_sha256": "2578bc582d112583423567d8051b03ccbc0f34b79c4dd5b25819534e049e84ae",
+  "required_for_local_phase_acceptance": true
+}

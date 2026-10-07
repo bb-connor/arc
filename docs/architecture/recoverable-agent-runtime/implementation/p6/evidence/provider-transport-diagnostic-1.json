@@ -1,0 +1,7 @@
+{
+  "success": false,
+  "exception_class": "RateLimitError",
+  "http_status": 429,
+  "code": "unclassified",
+  "requested_model": "gpt-5.4-mini-2026-03-17"
+}

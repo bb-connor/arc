@@ -1,0 +1,20 @@
+   Compiling chio-control-plane v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-control-plane)
+    Finished `test` profile [unoptimized] target(s) in 56.80s
+     Running unittests src/lib.rs (target/recovery-p5-linux/host/debug/deps/chio_control_plane-6f8003448d0ced3f)
+
+running 1 test
+test recovery::tests::knowledge::setup::p6_setup_cannot_accept_a_new_native_semantic_plan_before_ready ... 
+thread 'recovery::tests::knowledge::setup::p6_setup_cannot_accept_a_new_native_semantic_plan_before_ready' (66891) panicked at crates/platform/chio-control-plane/src/recovery/tests/knowledge/setup.rs:142:5:
+assertion failed: super::super::semantic::prepare(&f.f, "unqualified-native-plan",
+        SemanticOutputDispositionV1::ReturnValue).is_err()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    recovery::tests::knowledge::setup::p6_setup_cannot_accept_a_new_native_semantic_plan_before_ready
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1268 filtered out; finished in 2.71s
+
+error: test failed, to rerun pass `-p chio-control-plane --lib`

@@ -1,0 +1,23 @@
+{
+  "id": "msrv-std",
+  "actual_command": [
+    "cargo",
+    "+1.93.0",
+    "check",
+    "--offline",
+    "--locked",
+    "--manifest-path",
+    "fixtures/recovery-portable-consumer/Cargo.toml",
+    "--features",
+    "std"
+  ],
+  "cwd": ".",
+  "environment": {},
+  "exit_code": 0,
+  "status": "passed",
+  "started_unix_seconds": 1791062871,
+  "duration_seconds": 16.502,
+  "log": "evidence/msrv-std.log",
+  "log_sha256": "201487da20b52218bf34f677073a3b87fdc236817416bfc2d2d1e1c2b0364339",
+  "required_for_local_phase_acceptance": true
+}

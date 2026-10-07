@@ -1,0 +1,399 @@
+{
+  "cases": [
+    {
+      "host": "langgraph",
+      "workflow": "support",
+      "arm": "baseline",
+      "case": "authorized",
+      "native": {
+        "approval_records": 2,
+        "artifact_deliveries": 0,
+        "artifact_releases": 0,
+        "artifacts": 0,
+        "charges": 1,
+        "duplicate_effects": 0,
+        "effects": 1,
+        "extra_approvals": 0,
+        "fence": {
+          "lease_id": "01a10c55-a706-7e13-9aa0-adc5c47de947",
+          "owner_epoch": 2,
+          "store_uuid": "01a10c55-5c66-75b1-bd09-04847ef2e7e6"
+        },
+        "native_actions": 1,
+        "preexisting_effects": 0,
+        "provider_effects_total": 2,
+        "recovery_success": false,
+        "setup_effects": 1,
+        "source_label_retained": true,
+        "unauthorized_effects": 0,
+        "unresolved": 0,
+        "unresolved_age_ms": 0,
+        "useful_completion": true
+      },
+      "outcome": {
+        "category": "complete",
+        "command_id": "trial-owned-original",
+        "workflow_id": "workflow:c907347a51cd355fcecd975ac3db2034e2d7941e8a40e0701ac5143d57b8c271"
+      },
+      "model_free_actions": 1,
+      "provider_requests": 0,
+      "scripted_external_input": true,
+      "model_frames": [
+        {
+          "mode": "model-free",
+          "provider_requests": 0,
+          "completion": "Thought: Check the owned command.\nAction: recovery\nAction Input: {\"choice\":\"resume\"}"
+        }
+      ],
+      "authority_policy": "6cbea0e86b177e31ed3863462505826b686b5e6c133f1b0dc62b1bef0777ff41"
+    },
+    {
+      "host": "langgraph",
+      "workflow": "support",
+      "arm": "product",
+      "case": "authorized",
+      "native": {
+        "approval_records": 2,
+        "artifact_deliveries": 0,
+        "artifact_releases": 0,
+        "artifacts": 0,
+        "charges": 1,
+        "duplicate_effects": 0,
+        "effects": 1,
+        "extra_approvals": 0,
+        "fence": {
+          "lease_id": "01a10c56-9ebc-7011-941a-8ac38ac4bcda",
+          "owner_epoch": 2,
+          "store_uuid": "01a10c56-5599-75a1-91ae-8be379a22f92"
+        },
+        "native_actions": 1,
+        "preexisting_effects": 0,
+        "provider_effects_total": 2,
+        "recovery_success": false,
+        "setup_effects": 1,
+        "source_label_retained": true,
+        "unauthorized_effects": 0,
+        "unresolved": 0,
+        "unresolved_age_ms": 0,
+        "useful_completion": true
+      },
+      "outcome": {
+        "category": "complete",
+        "command_id": "trial-owned-original",
+        "workflow_id": "workflow:7fec4871a76e6b34a04a8916a9428bd8e129ec2e440cd58c175adf1e879fa890"
+      },
+      "model_free_actions": 1,
+      "provider_requests": 0,
+      "scripted_external_input": true,
+      "model_frames": [
+        {
+          "mode": "model-free",
+          "provider_requests": 0,
+          "completion": "Thought: Check the owned command.\nAction: recovery\nAction Input: {\"choice\":\"resume\"}"
+        }
+      ],
+      "authority_policy": "6cbea0e86b177e31ed3863462505826b686b5e6c133f1b0dc62b1bef0777ff41"
+    },
+    {
+      "host": "langgraph",
+      "workflow": "artifact",
+      "arm": "baseline",
+      "case": "authorized",
+      "native": {
+        "approval_records": 1,
+        "artifact_deliveries": 1,
+        "artifact_releases": 1,
+        "artifacts": 1,
+        "charges": 0,
+        "duplicate_effects": 0,
+        "effects": 1,
+        "extra_approvals": 0,
+        "fence": {
+          "lease_id": "01a10c57-9560-7452-b51a-b4b5ac2dfac7",
+          "owner_epoch": 2,
+          "store_uuid": "01a10c57-4bdf-7be0-9b22-6aba1286fec8"
+        },
+        "native_actions": 1,
+        "preexisting_effects": 0,
+        "provider_effects_total": 1,
+        "recovery_success": false,
+        "setup_effects": 1,
+        "source_label_retained": true,
+        "unauthorized_effects": 0,
+        "unresolved": 0,
+        "unresolved_age_ms": 0,
+        "useful_completion": true
+      },
+      "outcome": {
+        "category": "complete",
+        "command_id": "trial-owned-original",
+        "workflow_id": "workflow:c8a9dc0f6ee3d1f96bc4e1ca9935f99eac788f3814db59b9c2c5b992a97442af"
+      },
+      "model_free_actions": 1,
+      "provider_requests": 0,
+      "scripted_external_input": true,
+      "model_frames": [
+        {
+          "mode": "model-free",
+          "provider_requests": 0,
+          "completion": "Thought: Check the owned command.\nAction: recovery\nAction Input: {\"choice\":\"resume\"}"
+        }
+      ],
+      "authority_policy": "6cbea0e86b177e31ed3863462505826b686b5e6c133f1b0dc62b1bef0777ff41"
+    },
+    {
+      "host": "langgraph",
+      "workflow": "artifact",
+      "arm": "product",
+      "case": "authorized",
+      "native": {
+        "approval_records": 1,
+        "artifact_deliveries": 1,
+        "artifact_releases": 1,
+        "artifacts": 1,
+        "charges": 0,
+        "duplicate_effects": 0,
+        "effects": 1,
+        "extra_approvals": 0,
+        "fence": {
+          "lease_id": "01a10c57-f5a0-7670-a966-60705a86f63c",
+          "owner_epoch": 2,
+          "store_uuid": "01a10c57-ac4c-7e50-a91d-3b46e7362ada"
+        },
+        "native_actions": 1,
+        "preexisting_effects": 0,
+        "provider_effects_total": 1,
+        "recovery_success": false,
+        "setup_effects": 1,
+        "source_label_retained": true,
+        "unauthorized_effects": 0,
+        "unresolved": 0,
+        "unresolved_age_ms": 0,
+        "useful_completion": true
+      },
+      "outcome": {
+        "category": "complete",
+        "command_id": "trial-owned-original",
+        "workflow_id": "workflow:a44cb6dce290cdf7a36e6a1aa3abb59971d1d8ca57407135bfcc8c057fc53c4a"
+      },
+      "model_free_actions": 1,
+      "provider_requests": 0,
+      "scripted_external_input": true,
+      "model_frames": [
+        {
+          "mode": "model-free",
+          "provider_requests": 0,
+          "completion": "Thought: Check the owned command.\nAction: recovery\nAction Input: {\"choice\":\"resume\"}"
+        }
+      ],
+      "authority_policy": "6cbea0e86b177e31ed3863462505826b686b5e6c133f1b0dc62b1bef0777ff41"
+    },
+    {
+      "host": "crewai",
+      "workflow": "support",
+      "arm": "baseline",
+      "case": "authorized",
+      "native": {
+        "approval_records": 2,
+        "artifact_deliveries": 0,
+        "artifact_releases": 0,
+        "artifacts": 0,
+        "charges": 1,
+        "duplicate_effects": 0,
+        "effects": 1,
+        "extra_approvals": 0,
+        "fence": {
+          "lease_id": "01a10c58-5508-7982-8fa2-740180531d18",
+          "owner_epoch": 2,
+          "store_uuid": "01a10c58-0c52-7823-994f-42fd65cf4064"
+        },
+        "native_actions": 1,
+        "preexisting_effects": 0,
+        "provider_effects_total": 2,
+        "recovery_success": false,
+        "setup_effects": 1,
+        "source_label_retained": true,
+        "unauthorized_effects": 0,
+        "unresolved": 0,
+        "unresolved_age_ms": 0,
+        "useful_completion": true
+      },
+      "outcome": {
+        "category": "complete",
+        "command_id": "trial-owned-original",
+        "workflow_id": "workflow:d5d6bef8e696e7cdcf49bf8d70e36885c6d6e3557849976a077c219a48a62d1c"
+      },
+      "model_free_actions": 1,
+      "provider_requests": 0,
+      "scripted_external_input": true,
+      "model_frames": [
+        {
+          "mode": "model-free",
+          "provider_requests": 0,
+          "completion": "Thought: Check the owned command.\nAction: recovery\nAction Input: {\"choice\":\"resume\"}",
+          "framework_stop_sequences": [
+            "\nObservation:"
+          ],
+          "framework_completion": "Thought: Check the owned command.\nAction: recovery\nAction Input: {\"choice\":\"resume\"}"
+        }
+      ],
+      "authority_policy": "6cbea0e86b177e31ed3863462505826b686b5e6c133f1b0dc62b1bef0777ff41"
+    },
+    {
+      "host": "crewai",
+      "workflow": "support",
+      "arm": "product",
+      "case": "authorized",
+      "native": {
+        "approval_records": 2,
+        "artifact_deliveries": 0,
+        "artifact_releases": 0,
+        "artifacts": 0,
+        "charges": 1,
+        "duplicate_effects": 0,
+        "effects": 1,
+        "extra_approvals": 0,
+        "fence": {
+          "lease_id": "01a10c59-511a-77f3-b8a4-53d25ea59bef",
+          "owner_epoch": 2,
+          "store_uuid": "01a10c59-081f-7062-8365-eccdd0bcbcbd"
+        },
+        "native_actions": 1,
+        "preexisting_effects": 0,
+        "provider_effects_total": 2,
+        "recovery_success": false,
+        "setup_effects": 1,
+        "source_label_retained": true,
+        "unauthorized_effects": 0,
+        "unresolved": 0,
+        "unresolved_age_ms": 0,
+        "useful_completion": true
+      },
+      "outcome": {
+        "category": "complete",
+        "command_id": "trial-owned-original",
+        "workflow_id": "workflow:d543b6d865b5cc8d64a6da5406938bd586af98c72d6c56b0985e9de7aa4c6109"
+      },
+      "model_free_actions": 1,
+      "provider_requests": 0,
+      "scripted_external_input": true,
+      "model_frames": [
+        {
+          "mode": "model-free",
+          "provider_requests": 0,
+          "completion": "Thought: Check the owned command.\nAction: recovery\nAction Input: {\"choice\":\"resume\"}",
+          "framework_stop_sequences": [
+            "\nObservation:"
+          ],
+          "framework_completion": "Thought: Check the owned command.\nAction: recovery\nAction Input: {\"choice\":\"resume\"}"
+        }
+      ],
+      "authority_policy": "6cbea0e86b177e31ed3863462505826b686b5e6c133f1b0dc62b1bef0777ff41"
+    },
+    {
+      "host": "crewai",
+      "workflow": "artifact",
+      "arm": "baseline",
+      "case": "authorized",
+      "native": {
+        "approval_records": 1,
+        "artifact_deliveries": 1,
+        "artifact_releases": 1,
+        "artifacts": 1,
+        "charges": 0,
+        "duplicate_effects": 0,
+        "effects": 1,
+        "extra_approvals": 0,
+        "fence": {
+          "lease_id": "01a10c5a-45c9-7790-ba5a-7837f86bd09e",
+          "owner_epoch": 2,
+          "store_uuid": "01a10c59-fd1e-7ee0-8e68-dbd7327dc6a3"
+        },
+        "native_actions": 1,
+        "preexisting_effects": 0,
+        "provider_effects_total": 1,
+        "recovery_success": false,
+        "setup_effects": 1,
+        "source_label_retained": true,
+        "unauthorized_effects": 0,
+        "unresolved": 0,
+        "unresolved_age_ms": 0,
+        "useful_completion": true
+      },
+      "outcome": {
+        "category": "complete",
+        "command_id": "trial-owned-original",
+        "workflow_id": "workflow:14c1526db5a3177457809b5ca3d7833a6e4cd6c1171725ada64aec528245e3fe"
+      },
+      "model_free_actions": 1,
+      "provider_requests": 0,
+      "scripted_external_input": true,
+      "model_frames": [
+        {
+          "mode": "model-free",
+          "provider_requests": 0,
+          "completion": "Thought: Check the owned command.\nAction: recovery\nAction Input: {\"choice\":\"resume\"}",
+          "framework_stop_sequences": [
+            "\nObservation:"
+          ],
+          "framework_completion": "Thought: Check the owned command.\nAction: recovery\nAction Input: {\"choice\":\"resume\"}"
+        }
+      ],
+      "authority_policy": "6cbea0e86b177e31ed3863462505826b686b5e6c133f1b0dc62b1bef0777ff41"
+    },
+    {
+      "host": "crewai",
+      "workflow": "artifact",
+      "arm": "product",
+      "case": "authorized",
+      "native": {
+        "approval_records": 1,
+        "artifact_deliveries": 1,
+        "artifact_releases": 1,
+        "artifacts": 1,
+        "charges": 0,
+        "duplicate_effects": 0,
+        "effects": 1,
+        "extra_approvals": 0,
+        "fence": {
+          "lease_id": "01a10c5a-a82d-7d01-9279-09e6c655b40b",
+          "owner_epoch": 2,
+          "store_uuid": "01a10c5a-5ca7-75b1-a51d-24bcfefbc025"
+        },
+        "native_actions": 1,
+        "preexisting_effects": 0,
+        "provider_effects_total": 1,
+        "recovery_success": false,
+        "setup_effects": 1,
+        "source_label_retained": true,
+        "unauthorized_effects": 0,
+        "unresolved": 0,
+        "unresolved_age_ms": 0,
+        "useful_completion": true
+      },
+      "outcome": {
+        "category": "complete",
+        "command_id": "trial-owned-original",
+        "workflow_id": "workflow:a34b1fa68465053873019e678887f5262db5e4891a0721dc32626dca0d3c50bc"
+      },
+      "model_free_actions": 1,
+      "provider_requests": 0,
+      "scripted_external_input": true,
+      "model_frames": [
+        {
+          "mode": "model-free",
+          "provider_requests": 0,
+          "completion": "Thought: Check the owned command.\nAction: recovery\nAction Input: {\"choice\":\"resume\"}",
+          "framework_stop_sequences": [
+            "\nObservation:"
+          ],
+          "framework_completion": "Thought: Check the owned command.\nAction: recovery\nAction Input: {\"choice\":\"resume\"}"
+        }
+      ],
+      "authority_policy": "6cbea0e86b177e31ed3863462505826b686b5e6c133f1b0dc62b1bef0777ff41"
+    }
+  ],
+  "passed": true,
+  "mode": "model-free-native-preflight",
+  "provider_requests": 0
+}

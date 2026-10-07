@@ -1,0 +1,3 @@
+    Finished `dev` profile [unoptimized] target(s) in 1.66s
+     Running `target/debug/examples/p0_baseline`
+P0_PURE_BASELINE {"digest":{"elapsed_ns":33400000,"max_ns":2239667,"p50_ns":24500,"p95_ceiling_ns":250000,"p95_ns":26458,"p99_ns":216667,"samples":1000,"warmups":100},"errors":0,"graph_16_steps":{"elapsed_ns":8492416,"max_ns":100875,"p50_ns":8166,"p95_ceiling_ns":1000000,"p95_ns":8334,"p99_ns":9584,"samples":1000,"warmups":100},"intake":{"elapsed_ns":222630792,"max_ns":24818584,"p50_ns":123334,"p95_ceiling_ns":5000000,"p95_ns":375625,"p99_ns":2208375,"samples":1000,"warmups":100},"profile":"debug","reduction":{"elapsed_ns":85834,"max_ns":167,"p50_ns":42,"p95_ceiling_ns":250000,"p95_ns":83,"p99_ns":84,"samples":1000,"warmups":100}}

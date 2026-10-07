@@ -1,0 +1,28 @@
+{
+  "id": "p1-strengthened-snapshot-attempt",
+  "actual_command": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "chio-control-plane",
+    "--lib",
+    "recovery_p1_",
+    "--",
+    "--test-threads=1"
+  ],
+  "cwd": ".",
+  "environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2",
+    "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+  },
+  "exit_code": 101,
+  "status": "failed",
+  "started_unix_seconds": 1791075297,
+  "duration_seconds": 458.966,
+  "log": "evidence/p1-strengthened-snapshot-attempt.log",
+  "log_sha256": "954877617fa38dcf4f1c653675c3ed65729db1a955ae93fb95e086d52365b607",
+  "required_for_local_phase_acceptance": false
+}

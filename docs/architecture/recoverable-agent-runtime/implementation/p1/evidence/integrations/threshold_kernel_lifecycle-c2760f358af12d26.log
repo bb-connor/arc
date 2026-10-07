@@ -1,0 +1,15 @@
+
+running 10 tests
+test collector_rechecks_current_directory_and_original_submitter ... ok
+test collector_checks_operator_separation_rules_and_expiry_without_mutation ... ok
+test collector_rechecks_revocation_after_voting_without_mutation ... ok
+test collector_rejects_changed_policy_after_restart_without_mutation ... ok
+test collector_rejects_policy_changes_during_original_context_resolution ... ok
+test invalid_capability_has_no_original_context_to_collect ... ok
+test original_context_requires_startup_and_policy_binding ... ok
+test collector_requires_original_admission_even_for_a_trusted_signed_proposal ... ok
+test expired_pending_approval_is_retired_by_startup_recovery ... ok
+test original_request_collects_after_reopen_and_execution_replays_once ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.27s
+

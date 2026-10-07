@@ -1,0 +1,25 @@
+   Compiling chio-control-plane v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-control-plane)
+    Finished `test` profile [unoptimized] target(s) in 32.88s
+     Running unittests src/lib.rs (target/debug/deps/chio_control_plane-35a129c110f1a6b2)
+
+running 17 tests
+test recovery::tests::additional_refusals::recovery_p1_constrained_control_tokens_cannot_skip_their_enforcement ... ok
+test recovery::tests::additional_refusals::recovery_p1_current_preview_clearance_does_not_leak_the_retained_payload ... ok
+test recovery::tests::additional_refusals::recovery_p1_equal_labels_with_a_new_foreign_generation_are_stale ... ok
+test recovery::tests::additional_refusals::recovery_p1_protected_identity_and_history_tampering_fail_closed ... ok
+test recovery::tests::recovery_p1_cancel_after_capture_preserves_effect_and_no_lock_spans_await ... ok
+test recovery::tests::recovery_p1_cancel_negative_lookup_fences_late_original_admission ... ok
+test recovery::tests::recovery_p1_command_replay_conflict_rotation_and_revocation ... ok
+test recovery::tests::recovery_p1_crash_child ... ignored, only the fresh-process P1 parent starts this child
+test recovery::tests::recovery_p1_expired_initiating_authority_cannot_renew_pending_work ... ok
+test recovery::tests::recovery_p1_export_signed_vectors ... ignored, explicit regeneration of public synthetic P1 conformance vectors
+test recovery::tests::recovery_p1_frozen_denial_gets_a_distinct_successful_native_continuation ... ok
+test recovery::tests::recovery_p1_native_disclosure_once_and_exact_receipt_replay ... ok
+test recovery::tests::recovery_p1_partial_finality_is_positive_scoped_and_spends_the_original ... ok
+test recovery::tests::recovery_p1_rotated_scope_refuses_pending_approval_without_replacing_identity ... ok
+test recovery::tests::recovery_p1_transport_closed_replay_and_audience_refusals ... ok
+test recovery::tests::recovery_p1_two_coordinators_select_once_and_review_exact_payload ... ok
+test recovery::tests::recovery_p1_workflow_flood_retains_settlement_and_tombstones ... ok
+
+test result: ok. 15 passed; 0 failed; 2 ignored; 0 measured; 1153 filtered out; finished in 118.36s
+

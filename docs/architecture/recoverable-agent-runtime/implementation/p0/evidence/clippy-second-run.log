@@ -1,0 +1,102 @@
+    Checking chio-fiscal v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-fiscal)
+    Checking chio-governance v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-governance)
+    Checking chio-quarantine v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-quarantine)
+    Checking directories-next v2.0.0
+    Checking chio-keyring v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-keyring)
+    Checking zstd v0.13.3
+    Checking bitcoin-private v0.1.0
+   Compiling wasmtime-internal-wit-bindgen v46.0.3
+    Checking wasmtime-internal-unwinder v46.0.3
+    Checking cranelift-native v0.133.3
+    Checking cranelift-frontend v0.133.3
+    Checking serde_yaml v0.9.34+deprecated
+    Checking iroh-io v0.6.2
+    Checking debugid v0.8.0
+    Checking chio-spec-validate v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/tooling/chio-spec-validate)
+    Checking chio-errors v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-errors)
+    Checking positioned-io v0.3.5
+    Checking id-arena v2.3.0
+    Checking self_cell v1.2.2
+    Checking fixedbitset v0.5.7
+    Checking unicode-xid v0.2.6
+    Checking humantime v2.3.0
+    Checking wit-parser v0.251.0
+    Checking bao-tree v0.16.0
+    Checking futures-concurrency v7.7.1
+    Checking env_logger v0.10.2
+    Checking wasmtime-internal-cranelift v46.0.3
+    Checking fxprof-processed-profile v0.8.1
+    Checking bitcoin_hashes v0.12.0
+   Compiling wasmtime-internal-component-macro v46.0.3
+    Checking wasmtime-internal-cache v46.0.3
+    Checking wasmtime-internal-fiber v46.0.3
+    Checking wasmtime-internal-jit-debug v46.0.3
+    Checking wasm-compose v0.251.0
+    Checking redb v4.1.0
+    Checking iroh-util v0.6.0
+    Checking iroh-tickets v1.0.0
+    Checking addr2line v0.26.1
+    Checking wasmtime-internal-jit-icache-coherence v46.0.3
+    Checking chio-open-market v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-open-market)
+    Checking chio-appraisal v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-appraisal)
+    Checking filetime v0.2.27
+    Checking fsevent-sys v4.1.0
+    Checking encoding_rs v0.8.35
+    Checking reflink-copy v0.1.30
+    Checking mach2 v0.6.0
+    Checking notify v6.1.1
+    Checking opentimestamps v0.2.0
+    Checking wasmparser v0.221.3
+    Checking pollster v0.4.0
+    Checking chio-kernel-browser v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-kernel-browser)
+    Checking chio-tee-frame v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-tee-frame)
+    Checking chio-adversarial-suite v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/core/chio-adversarial-suite)
+    Checking gimli v0.32.3
+    Checking iroh-blobs v0.103.0
+    Checking plotters-backend v0.3.7
+    Checking object v0.37.3
+    Checking cast v0.3.0
+    Checking wasmtime v46.0.3
+    Checking plotters-svg v0.3.7
+    Checking criterion-plot v0.5.0
+    Checking chio-underwriting v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/economy/chio-underwriting)
+    Checking plotters v0.3.7
+    Checking generator v0.8.8
+    Checking chio-federation v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/trust/chio-federation)
+    Checking chio-finding-market-store-postgres v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-finding-market-store-postgres)
+    Checking iroh-gossip v0.101.0
+    Checking tinytemplate v1.2.1
+    Checking scoped-tls v1.0.1
+    Checking oorandom v11.1.5
+    Checking mintex v0.1.4
+    Checking rustc-hash v1.1.0
+    Checking thousands v0.2.0
+    Checking addr2line v0.25.1
+    Checking anes v0.1.6
+    Checking criterion v0.5.1
+    Checking loom v0.7.2
+   Compiling serde_derive_internals v0.29.1
+    Checking unicode-ident v1.0.24
+    Checking backtrace v0.3.76
+    Checking proc-macro2 v1.0.106
+   Compiling schemars_derive v0.8.22
+    Checking dhat v0.3.3
+    Checking quote v1.0.45
+   Compiling regress v0.10.5
+    Checking syn v2.0.117
+    Checking chio-semantic-contracts v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-semantic-contracts)
+   Compiling serde_tokenstream v0.2.3
+    Checking chio-recovery v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-recovery)
+error[E0277]: the trait bound `chio_security_types::recovery::AdmissionIntentRef: std::convert::TryFrom<&str>` is not satisfied
+  --> crates/security/chio-recovery/tests/workflow.rs:64:67
+   |
+64 |             WorkflowDirective::ResolveAdmission("intent-original".try_into()?)
+   |                                                                   ^^^^^^^^ the trait `std::convert::From<&str>` is not implemented for `chio_security_types::recovery::AdmissionIntentRef`
+   |
+   = note: required for `&str` to implement `std::convert::Into<chio_security_types::recovery::AdmissionIntentRef>`
+   = note: required for `chio_security_types::recovery::AdmissionIntentRef` to implement `std::convert::TryFrom<&str>`
+   = note: required for `&str` to implement `std::convert::TryInto<chio_security_types::recovery::AdmissionIntentRef>`
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `chio-recovery` (test "workflow") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

@@ -1,0 +1,6 @@
+    recovery::tests::knowledge::product::p6_policy_selected_operator_alone_applies_exact_proposal_and_native_target
+
+test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 1235 filtered out; finished in 121.24s
+
+error: test failed, to rerun pass `-p chio-control-plane --lib`
+task-done: test command exited 101; Task 2 NOT recorded (full output: /Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/.superpowers/sdd/P6-PRODUCT-PLAN/task-2-tests.log)

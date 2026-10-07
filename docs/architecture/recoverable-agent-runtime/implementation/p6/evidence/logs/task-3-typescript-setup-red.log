@@ -1,0 +1,46 @@
+
+ RUN  v4.1.11 /Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/sdks/typescript/packages/conformance
+
+ ❯ test/recovery_setup_client.test.ts (2 tests | 2 failed) 7ms
+   × preserves exact native setup proof and makes one request per explicit action 3ms
+   × rejects invalid or oversized proof before contacting the host 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/recovery_setup_client.test.ts > preserves exact native setup proof and makes one request per explicit action
+TypeError: client.setupProbe is not a function
+ ❯ test/recovery_setup_client.test.ts:15:23
+     13|     return new Response(JSON.stringify(String(url).endsWith("probe") ?…
+     14|   });
+     15|   expect(await client.setupProbe("cap", "self-test")).toEqual(probe);
+       |                       ^
+     16|   const exact = canonicalJsonString(probe);
+     17|   expect(await client.setupQualify("cap", exact)).toEqual(report);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/recovery_setup_client.test.ts > rejects invalid or oversized proof before contacting the host
+AssertionError: expected [Function] to throw error matching /^recovery\./ but got 'client.setupQualify is not a function'
+
+- Expected:
+/^recovery\./
+
++ Received:
+"client.setupQualify is not a function"
+
+ ❯ test/recovery_setup_client.test.ts:24:53
+     22|   const client = new RecoveryClient("https://host.example", async () =…
+     23|   for (const proof of ["{}", "x".repeat(32769)]) {
+     24|     expect(() => client.setupQualify("cap", proof)).toThrow(/^recovery…
+       |                                                     ^
+     25|   }
+     26|   expect(calls).toBe(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed (2)
+   Start at  00:41:34
+   Duration  454ms (transform 116ms, setup 0ms, import 212ms, tests 7ms, environment 0ms)
+

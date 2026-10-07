@@ -1,0 +1,260 @@
+{
+  "phase": "P2",
+  "count": 8,
+  "requirements": [
+    {
+      "id": "SIM-01",
+      "obligation": "Counterfactual evaluation MUST operate only on explicit bounded facts and have no effect ports.",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/security/chio-recovery/src/evaluation.rs",
+          "anchor": "evaluate_explanation"
+        },
+        {
+          "path": "crates/security/chio-recovery/Cargo.toml",
+          "anchor": "[dependencies]"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/explanation/service.rs",
+          "anchor": "pub fn evaluate"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/explanation/tests.rs",
+          "anchor": "recovery_p2_dry_service_constructs_without_runtime_or_effect_ports"
+        },
+        {
+          "path": "scripts/tests/check-recovery-p0.test.py",
+          "anchor": "effect_dependency"
+        }
+      ],
+      "evidence": [
+        "evidence/recovery-p2-dependency-guard.log",
+        "evidence/recovery-p2-guard-mutations.log",
+        "evidence/recovery-p2-native-reviewed.log"
+      ]
+    },
+    {
+      "id": "SIM-02",
+      "obligation": "Cross-store observations MUST retain versions and uncertainty without claiming global atomicity.",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/security/chio-security-types/src/recovery/explanation/snapshot.rs",
+          "anchor": "RecoverySnapshotV1"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/explanation/native.rs",
+          "anchor": "current_basis"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/security/chio-recovery/tests/explanations/basis.rs",
+          "anchor": "mixed_versions_and_all_truth_assignments_preserve_fail_closed_meaning"
+        },
+        {
+          "path": "crates/security/chio-recovery/tests/explanations/basis.rs",
+          "anchor": "gaps_unverified_and_expired_positive_facts_never_become_feasible"
+        }
+      ],
+      "evidence": [
+        "evidence/recovery-p2-pure-final.log",
+        "evidence/recovery-p2-native-reviewed.log"
+      ]
+    },
+    {
+      "id": "SIM-03",
+      "obligation": "Advice/report objects MUST be rejected by every live authority/capture API.",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/security/chio-recovery/src/lib.rs",
+          "anchor": "compile_fail"
+        },
+        {
+          "path": "crates/kernel/chio-kernel/src/recovery/observation.rs",
+          "anchor": "observe_recovery_capability_liveness"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/security/chio-recovery/tests/explanations/verification.rs",
+          "anchor": "advisory_bytes_are_rejected_as_every_live_authority_contract"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/explanations.rs",
+          "anchor": "recovery_p2_signer_roles_and_live_transport_reject_report_as_authority"
+        }
+      ],
+      "evidence": [
+        "evidence/recovery-p2-pure-final.log",
+        "evidence/recovery-p2-native-reviewed.log"
+      ]
+    },
+    {
+      "id": "SIM-04",
+      "obligation": "Explanations and candidate existence MUST be projected to the authorized audience.",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/security/chio-recovery/src/projection.rs",
+          "anchor": "project_explanation"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/explanation/native.rs",
+          "anchor": "inspect_explanation"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/security/chio-recovery/tests/explanations/privacy.rs",
+          "anchor": "hidden_membership_candidates_costs_and_deadlines_have_identical_public_signatures"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/explanations.rs",
+          "anchor": "recovery_p2_limited_native_audience_refuses_without_exposing_private_basis"
+        }
+      ],
+      "evidence": [
+        "evidence/recovery-p2-pure-final.log",
+        "evidence/recovery-p2-native-reviewed.log"
+      ]
+    },
+    {
+      "id": "SIM-05",
+      "obligation": "Search MUST be deterministic, bounded and explicit about incompleteness.",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/security/chio-recovery/src/evaluation.rs",
+          "anchor": "dominates"
+        },
+        {
+          "path": "crates/security/chio-security-types/src/recovery/explanation/registry.rs",
+          "anchor": "pub fn normalized"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/security/chio-recovery/tests/explanations/basis.rs",
+          "anchor": "permutations_are_canonical_without_claiming_store_atomicity"
+        },
+        {
+          "path": "crates/security/chio-recovery/tests/explanations/basis.rs",
+          "anchor": "partial_order_retains_distinct_audiences_and_incomparable_labels"
+        },
+        {
+          "path": "crates/security/chio-recovery/tests/explanations/basis.rs",
+          "anchor": "bounded_search_reports_incompleteness_and_never_no_remedy"
+        }
+      ],
+      "evidence": [
+        "evidence/recovery-p2-pure-final.log"
+      ]
+    },
+    {
+      "id": "SIM-06",
+      "obligation": "Signed reports MUST bind expected signer, deployment, snapshot, intent and recomputed result.",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/security/chio-recovery/src/report.rs",
+          "anchor": "verify_explanation_report"
+        },
+        {
+          "path": "crates/core/chio-core-types/src/recovery/explanation.rs",
+          "anchor": "RECOVERY_EXPLANATION_REPORT_SIGNATURE_DOMAIN"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/security/chio-recovery/tests/explanations/verification.rs",
+          "anchor": "recomputation_refuses_validly_resigned_semantic_substitutions"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/explanations.rs",
+          "anchor": "recovery_p2_live_report_recomputes_without_changing_workflow_budget_or_effect"
+        }
+      ],
+      "evidence": [
+        "evidence/recovery-p2-pure-final.log",
+        "evidence/recovery-p2-native-reviewed.log"
+      ]
+    },
+    {
+      "id": "SIM-07",
+      "obligation": "Live use MUST freshly validate relevant observations rather than trust a prior feasible result.",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/explanation/native.rs",
+          "anchor": "recheck_explanation_audience"
+        },
+        {
+          "path": "crates/kernel/chio-kernel/src/recovery/observation.rs",
+          "anchor": "validate_non_tool_capability"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/explanations.rs",
+          "anchor": "recovery_p2_equal_label_foreign_generation_invalidates_live_resume"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/explanations.rs",
+          "anchor": "recovery_p2_policy_and_recipient_changes_cannot_authorize_with_old_advice"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/tests/explanations.rs",
+          "anchor": "recovery_p2_original_revocation_is_observed_and_control_revocation_refuses_advice"
+        }
+      ],
+      "evidence": [
+        "evidence/recovery-p2-native-reviewed.log",
+        "evidence/recovery-p2-p1-native-focused.log"
+      ]
+    },
+    {
+      "id": "SIM-08",
+      "obligation": "Projected reports and authorization references MUST NOT expose unauthorized transitive commitments or low-entropy secret digests.",
+      "status": "implemented_locally_verified_and_reviewed",
+      "sources": [
+        {
+          "path": "crates/security/chio-recovery/src/report.rs",
+          "anchor": "explanation_view_payload"
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/recovery/explanation/service.rs",
+          "anchor": "random_reference"
+        }
+      ],
+      "acceptance_tests": [
+        {
+          "path": "crates/security/chio-recovery/tests/explanations/privacy.rs",
+          "anchor": "restricted_views_do_not_commit_to_transitive_hidden_graphs_or_their_expiry"
+        },
+        {
+          "path": "crates/security/chio-recovery/tests/explanations/privacy.rs",
+          "anchor": "hidden_full_search_exhaustion_cannot_exhaust_an_authorized_projection"
+        },
+        {
+          "path": "crates/security/chio-recovery/tests/explanations/privacy.rs",
+          "anchor": "secret_disclosure_constraints_cannot_influence_public_ranking_even_with_public_candidate_label"
+        },
+        {
+          "path": "crates/security/chio-recovery/tests/explanations/verification.rs",
+          "anchor": "projection_provenance_requires_expected_key_recipient_and_domain"
+        }
+      ],
+      "evidence": [
+        "evidence/recovery-p2-pure-final.log",
+        "evidence/recovery-p2-native-reviewed.log",
+        "evidence/recovery-p2-ts-final.log",
+        "evidence/recovery-p2-python-sdk-all.log"
+      ]
+    }
+  ]
+}

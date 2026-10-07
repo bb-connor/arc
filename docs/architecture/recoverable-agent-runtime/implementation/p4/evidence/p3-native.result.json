@@ -1,0 +1,28 @@
+{
+  "id": "p3-native",
+  "actual_command": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "chio-control-plane",
+    "--lib",
+    "p3_",
+    "--",
+    "--test-threads=1"
+  ],
+  "cwd": ".",
+  "environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2",
+    "TMPDIR": "/private/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T"
+  },
+  "exit_code": 0,
+  "status": "passed",
+  "started_unix_seconds": 1791074515,
+  "duration_seconds": 763.758,
+  "log": "evidence/p3-native.log",
+  "log_sha256": "881f8529158016fddfbd8cf1da97aeb2239624379396cb29e9e1de16b353be43",
+  "required_for_local_phase_acceptance": true
+}

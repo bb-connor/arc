@@ -1,0 +1,23 @@
+   Compiling chio-cli v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/products/chio-cli)
+warning: field `keyring` is never read
+   --> crates/products/chio-cli/src/bin/../cli/process_host/state.rs:522:9
+    |
+516 | pub(super) struct Host {
+    |                   ---- field in this struct
+...
+522 |     pub keyring: Option<super::keyring::HostKeyring>,
+    |         ^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `chio-cli` (bin "chio") generated 1 warning
+    Finished `test` profile [unoptimized] target(s) in 47.37s
+     Running tests/recovery_setup.rs (target/debug/deps/recovery_setup-3111ad6adb971d76)
+
+running 3 tests
+test p6_setup_cli_probe_preserves_native_proof_and_requests_operator_restart ... ok
+test p6_setup_cli_qualify_refuses_wrong_shape_and_redirect_without_retries ... ok
+test p6_setup_cli_reports_only_known_bounded_refusal_categories ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.93s
+

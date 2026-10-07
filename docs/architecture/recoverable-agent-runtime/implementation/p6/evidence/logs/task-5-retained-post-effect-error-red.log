@@ -1,0 +1,21 @@
+..E..
+======================================================================
+ERROR: test_framework_failure_after_native_completion_remains_unsuccessful (test_campaign_report.CampaignReportTest.test_framework_failure_after_native_completion_remains_unsuccessful)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/fixtures/recovery-product/test_campaign_report.py", line 80, in test_framework_failure_after_native_completion_remains_unsuccessful
+    report = summarize(manifest, rows)
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/fixtures/recovery-product/campaign_report.py", line 79, in summarize
+    validate_results(manifest, rows)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/fixtures/recovery-product/campaign_report.py", line 54, in validate_results
+    _refuse(actions > 0 and row["outcome"] == "complete", "completion_without_action")
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/fixtures/recovery-product/campaign_report.py", line 8, in _refuse
+    raise ValueError("campaign." + reason)
+ValueError: campaign.completion_without_action
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.002s
+
+FAILED (errors=1)

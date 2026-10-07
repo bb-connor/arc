@@ -1,0 +1,13 @@
+   Compiling chio-store-sqlite v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-store-sqlite)
+   Compiling chio-conformance v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/tooling/chio-conformance)
+   Compiling chio-secret-broker v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-secret-broker)
+   Compiling chio-control-plane v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-control-plane)
+    Finished `test` profile [unoptimized] target(s) in 46.86s
+     Running unittests src/lib.rs (target/debug/deps/chio_control_plane-35a129c110f1a6b2)
+
+running 2 tests
+test recovery::connector::tests::pinned_connector_refuses_unscoped_execution_and_unsafe_configuration ... ok
+test recovery::connector::tests::pinned_connector_request_keeps_credentials_and_native_correlation_out_of_input ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 1168 filtered out; finished in 0.01s
+

@@ -1,0 +1,3 @@
+Domain separation: 340 byte-string domain constants, 334 distinct values, 6 declared more than once, 32 off the convention
+
+Domain separation check passed

@@ -1,0 +1,1917 @@
+..........................................FFFFFFFFFFFFFFFFFFFFFFFFFFFFFF [ 86%]
+FFFFFFFFFFF                                                              [100%]
+=================================== FAILURES ===================================
+_ test_p4_generated_types_preserve_exact_structural_bytes[artifact-reference.schema.json] _
+
+vector = {'body': {'artifact': 'fixture-artifact', 'provenance': [103, 234, 243, 119, 7, 120, ...], 'scope': {'authority_domain...ion'}, 'name': 'artifact-reference.schema.json', 'schema': 'artifact-reference.schema.json', 'schema_valid': True, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_preserve_exact_structural_bytes(vector):
+>       model = model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_preserve_exact_structural_bytes[artifact-influence.schema.json] _
+
+vector = {'body': {'commitment': [218, 218, 218, 218, 218, 218, ...], 'externally_influenced': True, 'unknown': True}, 'name': 'artifact-influence.schema.json', 'schema': 'artifact-influence.schema.json', 'schema_valid': True, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_preserve_exact_structural_bytes(vector):
+>       model = model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_preserve_exact_structural_bytes[artifact-producer.schema.json] _
+
+vector = {'body': {'evidence': 'fixture-classification', 'kind': 'adoption'}, 'name': 'artifact-producer.schema.json', 'schema': 'artifact-producer.schema.json', 'schema_valid': True, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_preserve_exact_structural_bytes(vector):
+>       model = model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_preserve_exact_structural_bytes[artifact-version.schema.json] _
+
+vector = {'body': {'artifact': 'fixture-artifact', 'content': [2, 72, 245, 101, 119, 230, ...], 'contract': [220, 220, 220, 220...: 1, ...}, 'name': 'artifact-version.schema.json', 'schema': 'artifact-version.schema.json', 'schema_valid': True, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_preserve_exact_structural_bytes(vector):
+>       model = model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_preserve_exact_structural_bytes[artifact-recipient.schema.json] _
+
+vector = {'body': {'clearance': {'compartments': [], 'kind': 'known', 'owners': {}}, 'context_generation': 1, 'isolation_epoch'... ...}, 'name': 'artifact-recipient.schema.json', 'schema': 'artifact-recipient.schema.json', 'schema_valid': True, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_preserve_exact_structural_bytes(vector):
+>       model = model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_preserve_exact_structural_bytes[artifact-certificate.schema.json] _
+
+vector = {'body': {'artifact': 'fixture-artifact', 'configuration': [222, 222, 222, 222, 222, 222, ...], 'content': [2, 72, 245...}, 'name': 'artifact-certificate.schema.json', 'schema': 'artifact-certificate.schema.json', 'schema_valid': True, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_preserve_exact_structural_bytes(vector):
+>       model = model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_preserve_exact_structural_bytes[signed-artifact-certificate.schema.json] _
+
+vector = {'body': {'algorithm': 'ed25519', 'authority_key': '9ff6204d61b59a9e61afdd64fdf294bfe8a16687ba0538823ba59db6cb7b21ff',...gned-artifact-certificate.schema.json', 'schema': 'signed-artifact-certificate.schema.json', 'schema_valid': True, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_preserve_exact_structural_bytes(vector):
+>       model = model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_preserve_exact_structural_bytes[artifact-archive-manifest.schema.json] _
+
+vector = {'body': {'domain_version': 1, 'root': {'artifact': 'fixture-artifact', 'provenance': [103, 234, 243, 119, 7, 120, ...... 'artifact-archive-manifest.schema.json', 'schema': 'artifact-archive-manifest.schema.json', 'schema_valid': True, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_preserve_exact_structural_bytes(vector):
+>       model = model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_preserve_exact_structural_bytes[signed-artifact-archive-manifest.schema.json] _
+
+vector = {'body': {'algorithm': 'ed25519', 'authority_key': '25fc32c478a5a4f84e4557a0342e08278c883641b6149bdb0b4a986ab6c2cb78',...act-archive-manifest.schema.json', 'schema': 'signed-artifact-archive-manifest.schema.json', 'schema_valid': True, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_preserve_exact_structural_bytes(vector):
+>       model = model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_preserve_exact_structural_bytes[model-context.schema.json] _
+
+vector = {'body': {'account': 'fixture-account', 'cache': 'fixture-cache', 'context': 'fixture-model', 'contract': [220, 220, 2...220, ...], ...}, 'name': 'model-context.schema.json', 'schema': 'model-context.schema.json', 'schema_valid': True, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_preserve_exact_structural_bytes(vector):
+>       model = model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_preserve_exact_structural_bytes[labeled-checkpoint.schema.json] _
+
+vector = {'body': {'artifacts': [{'artifact': 'fixture-artifact', 'provenance': [103, 234, 243, 119, 7, 120, ...], 'scope': {'a... ...}, 'name': 'labeled-checkpoint.schema.json', 'schema': 'labeled-checkpoint.schema.json', 'schema_valid': True, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_preserve_exact_structural_bytes(vector):
+>       model = model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_preserve_exact_structural_bytes[artifact-release-intent.schema.json] _
+
+vector = {'body': {'admitted_label': {'compartments': [], 'kind': 'known', 'owners': {}}, 'artifact': {'artifact': 'fixture-art...me': 'artifact-release-intent.schema.json', 'schema': 'artifact-release-intent.schema.json', 'schema_valid': True, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_preserve_exact_structural_bytes(vector):
+>       model = model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_preserve_exact_structural_bytes[artifact-handle.schema.json] _
+
+vector = {'body': {'handle': 'fixture-handle', 'recipient': 'fixture-recipient'}, 'name': 'artifact-handle.schema.json', 'schema': 'artifact-handle.schema.json', 'schema_valid': True, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_preserve_exact_structural_bytes(vector):
+>       model = model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_preserve_exact_structural_bytes[signed-artifact-certificate.schema.json:invalid-signature] _
+
+vector = {'body': {'algorithm': 'ed25519', 'authority_key': '9ff6204d61b59a9e61afdd64fdf294bfe8a16687ba0538823ba59db6cb7b21ff',...ificate.schema.json:invalid-signature', 'schema': 'signed-artifact-certificate.schema.json', 'schema_valid': True, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_preserve_exact_structural_bytes(vector):
+>       model = model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_preserve_exact_structural_bytes[signed-artifact-archive-manifest.schema.json:invalid-signature] _
+
+vector = {'body': {'algorithm': 'ed25519', 'authority_key': '25fc32c478a5a4f84e4557a0342e08278c883641b6149bdb0b4a986ab6c2cb78',...st.schema.json:invalid-signature', 'schema': 'signed-artifact-archive-manifest.schema.json', 'schema_valid': True, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_preserve_exact_structural_bytes(vector):
+>       model = model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-reference.schema.json:unknown-field] _
+
+vector = {'body': {'artifact': 'fixture-artifact', 'provenance': [103, 234, 243, 119, 7, 120, ...], 'scope': {'authority_domain...'artifact-reference.schema.json:unknown-field', 'schema': 'artifact-reference.schema.json', 'schema_valid': False, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if not v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_refuse_unknown_and_missing_fields(vector):
+        with pytest.raises(ValidationError):
+>           model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-reference.schema.json:missing-field] _
+
+vector = {'body': {'provenance': [103, 234, 243, 119, 7, 120, ...], 'scope': {'authority_domain': 'knowledge-fixture-authority'...'artifact-reference.schema.json:missing-field', 'schema': 'artifact-reference.schema.json', 'schema_valid': False, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if not v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_refuse_unknown_and_missing_fields(vector):
+        with pytest.raises(ValidationError):
+>           model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-influence.schema.json:unknown-field] _
+
+vector = {'body': {'commitment': [218, 218, 218, 218, 218, 218, ...], 'externally_influenced': True, 'unexpected': True, 'unkno...'artifact-influence.schema.json:unknown-field', 'schema': 'artifact-influence.schema.json', 'schema_valid': False, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if not v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_refuse_unknown_and_missing_fields(vector):
+        with pytest.raises(ValidationError):
+>           model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-influence.schema.json:missing-field] _
+
+vector = {'body': {'externally_influenced': True, 'unknown': True}, 'name': 'artifact-influence.schema.json:missing-field', 'schema': 'artifact-influence.schema.json', 'schema_valid': False, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if not v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_refuse_unknown_and_missing_fields(vector):
+        with pytest.raises(ValidationError):
+>           model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-producer.schema.json:unknown-field] _
+
+vector = {'body': {'evidence': 'fixture-classification', 'kind': 'adoption', 'unexpected': True}, 'name': 'artifact-producer.schema.json:unknown-field', 'schema': 'artifact-producer.schema.json', 'schema_valid': False, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if not v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_refuse_unknown_and_missing_fields(vector):
+        with pytest.raises(ValidationError):
+>           model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-producer.schema.json:missing-field] _
+
+vector = {'body': {'kind': 'adoption'}, 'name': 'artifact-producer.schema.json:missing-field', 'schema': 'artifact-producer.schema.json', 'schema_valid': False, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if not v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_refuse_unknown_and_missing_fields(vector):
+        with pytest.raises(ValidationError):
+>           model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-version.schema.json:unknown-field] _
+
+vector = {'body': {'artifact': 'fixture-artifact', 'content': [2, 72, 245, 101, 119, 230, ...], 'contract': [220, 220, 220, 220...e': 'artifact-version.schema.json:unknown-field', 'schema': 'artifact-version.schema.json', 'schema_valid': False, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if not v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_refuse_unknown_and_missing_fields(vector):
+        with pytest.raises(ValidationError):
+>           model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-version.schema.json:missing-field] _
+
+vector = {'body': {'content': [2, 72, 245, 101, 119, 230, ...], 'contract': [220, 220, 220, 220, 220, 220, ...], 'creation_sequ...e': 'artifact-version.schema.json:missing-field', 'schema': 'artifact-version.schema.json', 'schema_valid': False, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if not v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_refuse_unknown_and_missing_fields(vector):
+        with pytest.raises(ValidationError):
+>           model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-recipient.schema.json:unknown-field] _
+
+vector = {'body': {'clearance': {'compartments': [], 'kind': 'known', 'owners': {}}, 'context_generation': 1, 'isolation_epoch'...'artifact-recipient.schema.json:unknown-field', 'schema': 'artifact-recipient.schema.json', 'schema_valid': False, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if not v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_refuse_unknown_and_missing_fields(vector):
+        with pytest.raises(ValidationError):
+>           model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-recipient.schema.json:missing-field] _
+
+vector = {'body': {'context_generation': 1, 'isolation_epoch': 'fixture-isolation', 'lineage': 'fixture-lineage', 'principal': ...'artifact-recipient.schema.json:missing-field', 'schema': 'artifact-recipient.schema.json', 'schema_valid': False, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if not v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_refuse_unknown_and_missing_fields(vector):
+        with pytest.raises(ValidationError):
+>           model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-certificate.schema.json:unknown-field] _
+
+vector = {'body': {'artifact': 'fixture-artifact', 'configuration': [222, 222, 222, 222, 222, 222, ...], 'content': [2, 72, 245...ifact-certificate.schema.json:unknown-field', 'schema': 'artifact-certificate.schema.json', 'schema_valid': False, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if not v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_refuse_unknown_and_missing_fields(vector):
+        with pytest.raises(ValidationError):
+>           model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-certificate.schema.json:missing-field] _
+
+vector = {'body': {'configuration': [222, 222, 222, 222, 222, 222, ...], 'content': [2, 72, 245, 101, 119, 230, ...], 'dependen...ifact-certificate.schema.json:missing-field', 'schema': 'artifact-certificate.schema.json', 'schema_valid': False, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if not v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_refuse_unknown_and_missing_fields(vector):
+        with pytest.raises(ValidationError):
+>           model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_refuse_unknown_and_missing_fields[signed-artifact-certificate.schema.json:unknown-field] _
+
+vector = {'body': {'algorithm': 'ed25519', 'authority_key': '9ff6204d61b59a9e61afdd64fdf294bfe8a16687ba0538823ba59db6cb7b21ff',...ertificate.schema.json:unknown-field', 'schema': 'signed-artifact-certificate.schema.json', 'schema_valid': False, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if not v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_refuse_unknown_and_missing_fields(vector):
+        with pytest.raises(ValidationError):
+>           model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_refuse_unknown_and_missing_fields[signed-artifact-certificate.schema.json:missing-field] _
+
+vector = {'body': {'authority_key': '9ff6204d61b59a9e61afdd64fdf294bfe8a16687ba0538823ba59db6cb7b21ff', 'body': {'artifact': 'f...ertificate.schema.json:missing-field', 'schema': 'signed-artifact-certificate.schema.json', 'schema_valid': False, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if not v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_refuse_unknown_and_missing_fields(vector):
+        with pytest.raises(ValidationError):
+>           model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-archive-manifest.schema.json:unknown-field] _
+
+vector = {'body': {'domain_version': 1, 'root': {'artifact': 'fixture-artifact', 'provenance': [103, 234, 243, 119, 7, 120, ......ive-manifest.schema.json:unknown-field', 'schema': 'artifact-archive-manifest.schema.json', 'schema_valid': False, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if not v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_refuse_unknown_and_missing_fields(vector):
+        with pytest.raises(ValidationError):
+>           model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-archive-manifest.schema.json:missing-field] _
+
+vector = {'body': {'root': {'artifact': 'fixture-artifact', 'provenance': [103, 234, 243, 119, 7, 120, ...], 'scope': {'authori...ive-manifest.schema.json:missing-field', 'schema': 'artifact-archive-manifest.schema.json', 'schema_valid': False, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if not v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_refuse_unknown_and_missing_fields(vector):
+        with pytest.raises(ValidationError):
+>           model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_refuse_unknown_and_missing_fields[signed-artifact-archive-manifest.schema.json:unknown-field] _
+
+vector = {'body': {'algorithm': 'ed25519', 'authority_key': '25fc32c478a5a4f84e4557a0342e08278c883641b6149bdb0b4a986ab6c2cb78',...ifest.schema.json:unknown-field', 'schema': 'signed-artifact-archive-manifest.schema.json', 'schema_valid': False, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if not v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_refuse_unknown_and_missing_fields(vector):
+        with pytest.raises(ValidationError):
+>           model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_refuse_unknown_and_missing_fields[signed-artifact-archive-manifest.schema.json:missing-field] _
+
+vector = {'body': {'authority_key': '25fc32c478a5a4f84e4557a0342e08278c883641b6149bdb0b4a986ab6c2cb78', 'body': {'domain_versio...ifest.schema.json:missing-field', 'schema': 'signed-artifact-archive-manifest.schema.json', 'schema_valid': False, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if not v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_refuse_unknown_and_missing_fields(vector):
+        with pytest.raises(ValidationError):
+>           model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_refuse_unknown_and_missing_fields[model-context.schema.json:unknown-field] _
+
+vector = {'body': {'account': 'fixture-account', 'cache': 'fixture-cache', 'context': 'fixture-model', 'contract': [220, 220, 2..., 'name': 'model-context.schema.json:unknown-field', 'schema': 'model-context.schema.json', 'schema_valid': False, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if not v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_refuse_unknown_and_missing_fields(vector):
+        with pytest.raises(ValidationError):
+>           model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_refuse_unknown_and_missing_fields[model-context.schema.json:missing-field] _
+
+vector = {'body': {'cache': 'fixture-cache', 'context': 'fixture-model', 'contract': [220, 220, 220, 220, 220, 220, ...], 'conv..., 'name': 'model-context.schema.json:missing-field', 'schema': 'model-context.schema.json', 'schema_valid': False, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if not v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_refuse_unknown_and_missing_fields(vector):
+        with pytest.raises(ValidationError):
+>           model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_refuse_unknown_and_missing_fields[labeled-checkpoint.schema.json:unknown-field] _
+
+vector = {'body': {'artifacts': [{'artifact': 'fixture-artifact', 'provenance': [103, 234, 243, 119, 7, 120, ...], 'scope': {'a...'labeled-checkpoint.schema.json:unknown-field', 'schema': 'labeled-checkpoint.schema.json', 'schema_valid': False, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if not v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_refuse_unknown_and_missing_fields(vector):
+        with pytest.raises(ValidationError):
+>           model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_refuse_unknown_and_missing_fields[labeled-checkpoint.schema.json:missing-field] _
+
+vector = {'body': {'checkpoint': 'fixture-checkpoint', 'domain_version': 1, 'influence': {'commitment': [218, 218, 218, 218, 21...'labeled-checkpoint.schema.json:missing-field', 'schema': 'labeled-checkpoint.schema.json', 'schema_valid': False, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if not v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_refuse_unknown_and_missing_fields(vector):
+        with pytest.raises(ValidationError):
+>           model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-release-intent.schema.json:unknown-field] _
+
+vector = {'body': {'admitted_label': {'compartments': [], 'kind': 'known', 'owners': {}}, 'artifact': {'artifact': 'fixture-art...release-intent.schema.json:unknown-field', 'schema': 'artifact-release-intent.schema.json', 'schema_valid': False, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if not v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_refuse_unknown_and_missing_fields(vector):
+        with pytest.raises(ValidationError):
+>           model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-release-intent.schema.json:missing-field] _
+
+vector = {'body': {'artifact': {'artifact': 'fixture-artifact', 'provenance': [103, 234, 243, 119, 7, 120, ...], 'scope': {'aut...release-intent.schema.json:missing-field', 'schema': 'artifact-release-intent.schema.json', 'schema_valid': False, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if not v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_refuse_unknown_and_missing_fields(vector):
+        with pytest.raises(ValidationError):
+>           model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-handle.schema.json:unknown-field] _
+
+vector = {'body': {'handle': 'fixture-handle', 'recipient': 'fixture-recipient', 'unexpected': True}, 'name': 'artifact-handle.schema.json:unknown-field', 'schema': 'artifact-handle.schema.json', 'schema_valid': False, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if not v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_refuse_unknown_and_missing_fields(vector):
+        with pytest.raises(ValidationError):
+>           model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+_ test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-handle.schema.json:missing-field] _
+
+vector = {'body': {'recipient': 'fixture-recipient'}, 'name': 'artifact-handle.schema.json:missing-field', 'schema': 'artifact-handle.schema.json', 'schema_valid': False, ...}
+
+    @pytest.mark.parametrize("vector", [v for v in VECTORS if not v["schema_valid"]], ids=lambda vector: vector["name"])
+    def test_p4_generated_types_refuse_unknown_and_missing_fields(vector):
+        with pytest.raises(ValidationError):
+>           model_for(vector["schema"]).model_validate_json(json.dumps(vector["body"]), strict=True)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py:29: in model_for
+    module = importlib.import_module("chio_sdk._generated.recovery." + name.replace("-", "_") + "_schema")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/connor/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1310: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:488: in _call_with_frames_removed
+    ???
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'chio_sdk._generated', import_ = <function _gcd_import at 0x1041dc4a0>
+
+>   ???
+E   ModuleNotFoundError: No module named 'chio_sdk._generated'
+
+<frozen importlib._bootstrap>:1324: ModuleNotFoundError
+=========================== short test summary info ============================
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_preserve_exact_structural_bytes[artifact-reference.schema.json]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_preserve_exact_structural_bytes[artifact-influence.schema.json]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_preserve_exact_structural_bytes[artifact-producer.schema.json]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_preserve_exact_structural_bytes[artifact-version.schema.json]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_preserve_exact_structural_bytes[artifact-recipient.schema.json]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_preserve_exact_structural_bytes[artifact-certificate.schema.json]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_preserve_exact_structural_bytes[signed-artifact-certificate.schema.json]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_preserve_exact_structural_bytes[artifact-archive-manifest.schema.json]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_preserve_exact_structural_bytes[signed-artifact-archive-manifest.schema.json]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_preserve_exact_structural_bytes[model-context.schema.json]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_preserve_exact_structural_bytes[labeled-checkpoint.schema.json]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_preserve_exact_structural_bytes[artifact-release-intent.schema.json]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_preserve_exact_structural_bytes[artifact-handle.schema.json]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_preserve_exact_structural_bytes[signed-artifact-certificate.schema.json:invalid-signature]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_preserve_exact_structural_bytes[signed-artifact-archive-manifest.schema.json:invalid-signature]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-reference.schema.json:unknown-field]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-reference.schema.json:missing-field]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-influence.schema.json:unknown-field]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-influence.schema.json:missing-field]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-producer.schema.json:unknown-field]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-producer.schema.json:missing-field]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-version.schema.json:unknown-field]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-version.schema.json:missing-field]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-recipient.schema.json:unknown-field]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-recipient.schema.json:missing-field]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-certificate.schema.json:unknown-field]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-certificate.schema.json:missing-field]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_refuse_unknown_and_missing_fields[signed-artifact-certificate.schema.json:unknown-field]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_refuse_unknown_and_missing_fields[signed-artifact-certificate.schema.json:missing-field]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-archive-manifest.schema.json:unknown-field]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-archive-manifest.schema.json:missing-field]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_refuse_unknown_and_missing_fields[signed-artifact-archive-manifest.schema.json:unknown-field]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_refuse_unknown_and_missing_fields[signed-artifact-archive-manifest.schema.json:missing-field]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_refuse_unknown_and_missing_fields[model-context.schema.json:unknown-field]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_refuse_unknown_and_missing_fields[model-context.schema.json:missing-field]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_refuse_unknown_and_missing_fields[labeled-checkpoint.schema.json:unknown-field]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_refuse_unknown_and_missing_fields[labeled-checkpoint.schema.json:missing-field]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-release-intent.schema.json:unknown-field]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-release-intent.schema.json:missing-field]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-handle.schema.json:unknown-field]
+FAILED sdks/python/chio-sdk-python/tests/test_recovery_p4_contracts.py::test_p4_generated_types_refuse_unknown_and_missing_fields[artifact-handle.schema.json:missing-field]
+41 failed, 42 passed in 0.92s

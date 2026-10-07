@@ -1,0 +1,33 @@
+    Checking chio-kernel v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/kernel/chio-kernel)
+error[E0624]: method `validate_ledger_input` is private
+   --> crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/prepared_commit.rs:64:14
+    |
+ 64 |               .validate_ledger_input(grant_index, policy_json)?;
+    |                ^^^^^^^^^^^^^^^^^^^^^ private method
+    |
+   ::: crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/ledger.rs:113:5
+    |
+113 | /     fn validate_ledger_input(
+114 | |         &self,
+115 | |         grant_index: usize,
+116 | |         policy_json: &[u8],
+117 | |     ) -> Result<serde_json::Value, KernelError> {
+    | |_______________________________________________- private method defined here
+
+error[E0624]: method `retain_dispatch_ledger_current` is private
+   --> crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/prepared_commit.rs:83:31
+    |
+ 83 |           let ledger = prepared.retain_dispatch_ledger_current(grant_index, policy_json)?;
+    |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ private method
+    |
+   ::: crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/ledger.rs:139:5
+    |
+139 | /     fn retain_dispatch_ledger_current(
+140 | |         &self,
+141 | |         grant_index: usize,
+142 | |         policy_json: &[u8],
+143 | |     ) -> Result<NativeSecurityDispatchLedgerRecordV1, KernelError> {
+    | |__________________________________________________________________- private method defined here
+
+For more information about this error, try `rustc --explain E0624`.
+error: could not compile `chio-kernel` (lib) due to 2 previous errors

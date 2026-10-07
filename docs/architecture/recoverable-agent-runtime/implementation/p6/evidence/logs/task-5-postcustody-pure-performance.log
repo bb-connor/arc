@@ -1,0 +1,5 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on artifact directory
+    Finished `dev` profile [unoptimized] target(s) in 1m 25s
+     Running `target/debug/examples/p0_baseline`
+P0_PURE_BASELINE {"digest":{"elapsed_ns":32753542,"max_ns":2252000,"p50_ns":24833,"p95_ceiling_ns":250000,"p95_ns":44125,"p99_ns":164709,"samples":1000,"warmups":100},"errors":0,"graph_16_steps":{"elapsed_ns":11506625,"max_ns":766167,"p50_ns":8167,"p95_ceiling_ns":1000000,"p95_ns":10250,"p99_ns":55292,"samples":1000,"warmups":100},"intake":{"elapsed_ns":142566750,"max_ns":3615750,"p50_ns":127125,"p95_ceiling_ns":5000000,"p95_ns":162000,"p99_ns":509833,"samples":1000,"warmups":100},"profile":"debug","reduction":{"elapsed_ns":108459,"max_ns":417,"p50_ns":42,"p95_ceiling_ns":250000,"p95_ns":125,"p99_ns":208,"samples":1000,"warmups":100}}

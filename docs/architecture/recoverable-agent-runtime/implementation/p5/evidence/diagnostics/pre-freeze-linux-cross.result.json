@@ -1,0 +1,17 @@
+{
+  "id": "linux-cross",
+  "actual_command": [
+    "python3",
+    "docs/architecture/recoverable-agent-runtime/implementation/p5/evidence/check-linux-cross.py"
+  ],
+  "cwd": ".",
+  "environment": {},
+  "exit_code": 101,
+  "status": "failed",
+  "started_unix_seconds": 1791087952,
+  "duration_seconds": 42.741,
+  "log": "evidence/linux-cross.log",
+  "log_sha256": "420a15d75a46d802e9f06bfaa94786ca17632d7f9dcf0bd187d7b241ce9b57bc",
+  "required_for_local_phase_acceptance": true,
+  "source_binding": "8c21e583e48bb02a33691c509c18252385d30b659237cb899982fd3583a00b93"
+}

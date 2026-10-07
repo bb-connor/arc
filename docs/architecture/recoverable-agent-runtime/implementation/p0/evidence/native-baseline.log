@@ -1,0 +1,10 @@
+    Blocking waiting for file lock on artifact directory
+    Finished `test` profile [unoptimized] target(s) in 12.22s
+     Running tests/recovery_p0_baseline.rs (target/debug/deps/recovery_p0_baseline-ff7175ec2f41f015)
+
+running 1 test
+P0_NATIVE_BASELINE {"effect_count":72,"elapsed_ns":12660851667,"errors":0,"fixture":"native admission + SQLite authority/process stores + counting connector","logical_call_charges":72,"max_ns":203390750,"p50_ns":171782041,"p95_ns":183069208,"p99_ns":203390750,"profile":"debug","replays":8,"samples":64,"warmups":8}
+test measured_native_baseline ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 13.49s
+

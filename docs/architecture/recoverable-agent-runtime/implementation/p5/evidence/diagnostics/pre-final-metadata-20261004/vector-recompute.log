@@ -1,0 +1,9 @@
+    Finished `test` profile [unoptimized] target(s) in 0.70s
+     Running tests/recovery_p5_contracts.rs (target/debug/deps/recovery_p5_contracts-d8d5578bd9fa8681)
+
+running 1 test
+test p5_write_shared_vectors ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.02s
+
+PASS: 26 shared P5 vectors exactly recomputed

@@ -1,0 +1,70 @@
+{
+  "arm": "product",
+  "case": "authorized",
+  "host": "langgraph",
+  "id": "langgraph-artifact-product-authorized-r3",
+  "repetition": 3,
+  "workflow": "artifact",
+  "requested_model": "gpt-5.4-mini-2026-03-17",
+  "authority_policy": "6cbea0e86b177e31ed3863462505826b686b5e6c133f1b0dc62b1bef0777ff41",
+  "source_binding": "3c2dc49ad8a73714e716a903fe3b4c551f50157000ffea61b47ed5422253e74a",
+  "model_attempts": [
+    {
+      "model": "gpt-5.4-mini-2026-03-17",
+      "error": null,
+      "input_tokens": 119,
+      "output_tokens": 34,
+      "seconds": 0.523497,
+      "prompt_bytes": 659,
+      "prompt_sha256": "c8fc57c551829df57df00784a8245bd94827040735cce118f8bc7c19b85575e2",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You have one tool: recovery(choice). To call it, end with exactly:\nAction: recovery\nAction Input: {\"choice\":\"resume\"}\nDo not invent a result."
+        },
+        {
+          "role": "user",
+          "content": "Reuse the retained protected research checkpoint through the existing native artifact mediator and authorized agent sink. Return only confirmation, never checkpoint bytes. After restart, keep its original artifact and release identity. Current authority and reviewed task are available. Call the recovery tool once with choice resume. Accept its bounded category. Do not guess success, create new operations, include credentials, or bypass a refusal."
+        }
+      ],
+      "request_id": "chatcmpl-EVZPmx5FuCFDIwR2cf6PHarehAc7U",
+      "completion": "Action: recovery\nAction Input: {\"choice\":\"resume\"}"
+    }
+  ],
+  "tool_actions": 1,
+  "hidden_retries": 0,
+  "outcome": "complete",
+  "native": {
+    "approval_records": 1,
+    "artifact_deliveries": 1,
+    "artifact_releases": 1,
+    "artifacts": 1,
+    "charges": 0,
+    "duplicate_effects": 0,
+    "effects": 1,
+    "extra_approvals": 0,
+    "fence": {
+      "lease_id": "01a10b6c-3dd4-7f72-9b0d-5954f594be3a",
+      "owner_epoch": 2,
+      "store_uuid": "01a10b6b-f51a-7742-bc35-6bb2c9b1bfcf"
+    },
+    "native_actions": 1,
+    "preexisting_effects": 0,
+    "provider_effects_total": 1,
+    "recovery_success": false,
+    "setup_effects": 1,
+    "source_label_retained": true,
+    "unauthorized_effects": 0,
+    "unresolved": 0,
+    "unresolved_age_ms": 0,
+    "useful_completion": true
+  },
+  "elapsed_seconds": 24.936074,
+  "native_preparation_seconds": 23.854248,
+  "host_model_native_seconds": 0.949469,
+  "host_output": {
+    "category": "complete",
+    "command_id": "trial-owned-original",
+    "workflow_id": "workflow:88d46cd4d59b9e70a94e1fae8c078de592d0343676b04b8360dd7385e07b28c3"
+  }
+}

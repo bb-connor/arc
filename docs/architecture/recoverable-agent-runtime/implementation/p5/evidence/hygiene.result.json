@@ -1,0 +1,17 @@
+{
+  "id": "hygiene",
+  "actual_command": [
+    "python3",
+    "scripts/check-rust-file-hygiene.py"
+  ],
+  "cwd": ".",
+  "environment": {},
+  "exit_code": 0,
+  "status": "passed",
+  "started_unix_seconds": 1791161498,
+  "duration_seconds": 5.515,
+  "log": "evidence/hygiene.log",
+  "log_sha256": "8a042dc9be100f4bb26acbd559187ef2d12a01a1a8f2688721bac34201c9e679",
+  "required_for_local_phase_acceptance": true,
+  "source_binding": "562a3c3556f31e5afedbd7c7a426e542cc5e8cd51c28a7a43d8e9704ba4e9bc4"
+}

@@ -1,0 +1,35 @@
+   Compiling chio-store-sqlite v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-store-sqlite)
+   Compiling chio-secret-broker v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/security/chio-secret-broker)
+   Compiling chio-conformance v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/tooling/chio-conformance)
+   Compiling chio-control-plane v0.1.0 (/Users/connor/Medica/backbay/standalone/arc-worktrees/recoverable-agent-runtime-20261002/crates/platform/chio-control-plane)
+    Finished `test` profile [unoptimized] target(s) in 1m 22s
+     Running unittests src/lib.rs (target/debug/deps/chio_control_plane-70f1e8c246e31377)
+
+running 24 tests
+test recovery::tests::knowledge::acceptance::p4_artifacts_clearance_reduction_refuses_publication_metadata_and_checkpoint ... ok
+test recovery::tests::knowledge::acceptance::p4_artifacts_corrupt_blob_quarantines_and_staging_cannot_hide_mutation ... ok
+test recovery::tests::knowledge::acceptance::p4_artifacts_delayed_collection_cannot_delete_a_new_storage_generation ... ok
+test recovery::tests::knowledge::acceptance::p4_artifacts_journal_symlink_hard_link_and_rename_refuse_before_bytes ... ok
+test recovery::tests::knowledge::acceptance::p4_artifacts_pending_approval_has_a_native_version_pin ... ok
+test recovery::tests::knowledge::acceptance::p4_artifacts_restart_folds_native_knowledge_and_reuses_release_identity ... ok
+test recovery::tests::knowledge::acceptance::p4_artifacts_summary_and_dependency_overflow_refuse_missing_paths ... ok
+test recovery::tests::knowledge::acceptance::p4_artifacts_unreachable_staging_is_collected_without_identity_reuse ... ok
+test recovery::tests::knowledge::acceptance::p4_memory_model_context_and_side_files_remain_bound_on_restore ... ok
+test recovery::tests::knowledge::acceptance::p4_memory_open_legacy_reader_is_revoked_by_durable_activation ... ok
+test recovery::tests::knowledge::native::p4_artifacts_gc_keeps_unknown_native_operation_and_receipt_pins ... ok
+test recovery::tests::knowledge::native::p4_artifacts_join_and_native_capture_race_proves_both_commit_orders ... ok
+test recovery::tests::knowledge::native::p4_artifacts_observed_model_influence_invalidates_old_scoped_endorsement ... ok
+test recovery::tests::knowledge::native::p4_artifacts_projection_recomputes_native_producer_and_refuses_one_shot_authority ... ok
+test recovery::tests::knowledge::native::p4_artifacts_withheld_native_output_cannot_gain_projection_authority ... ok
+test recovery::tests::knowledge::p4_artifacts_collection_barrier_dedup_and_identity_tombstones ... ok
+test recovery::tests::knowledge::p4_artifacts_copy_restore_archive_and_aliases_preserve_every_origin ... ok
+test recovery::tests::knowledge::p4_artifacts_equal_bytes_different_provenance_and_cross_tenant_oracle ... ok
+test recovery::tests::knowledge::p4_artifacts_missing_blob_quarantines_and_never_substitutes_same_digest ... ok
+test recovery::tests::knowledge::p4_artifacts_native_publication_and_taint_commit_before_first_byte ... ok
+test recovery::tests::knowledge::p4_artifacts_publication_commit_cutpoints_reconcile_original_identity ... ok
+test recovery::tests::knowledge::p4_artifacts_release_readback_uncertainty_and_live_revocation ... ok
+test recovery::tests::knowledge::p4_memory_legacy_state_activation_and_exact_adoption ... ok
+test recovery::tests::knowledge::p4_memory_old_checkpoint_cannot_reset_context_and_cas_pins ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 1195 filtered out; finished in 85.71s
+
