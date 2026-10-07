@@ -142,7 +142,7 @@ fn compliance_certificate_rejects_empty_invalid_and_non_compliant_receipts() {
                 &signer,
                 "session-budget",
                 &format!("receipt-budget-{idx}"),
-                now + idx,
+                now - 5 + idx,
                 "fs/read_text_file",
                 Decision::Allow,
                 vec![GuardEvidence {
