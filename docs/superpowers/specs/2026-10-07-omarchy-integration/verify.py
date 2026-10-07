@@ -277,6 +277,12 @@ def self_test():
     stale_record['counts']['fixtures'] = -1
     changed_pins = decode(pins, {})
     changed_pins['_freshness_probe'] = True
+    response_schema = ROOT / 'contracts/operator-response.schema.json'
+    weakened_response = decode(response_schema, {})
+    scope_shape = next(shape for shape in weakened_response['oneOf']
+                       if shape['properties']['method'].get('const') == 'scope.get'
+                       and shape['properties']['ok'].get('const') is True)
+    scope_shape['properties']['result']['properties']['value']['properties']['limits']['items'].pop('allOf', None)
     mutants = {
         'missing acceptance': ({first: text.replace(heading, '### removed:', 1)}, 'missing acceptance definition'),
         'duplicate requirement': ({first: text + '\n' + row + '\n'}, 'duplicate requirements'),
@@ -288,6 +294,8 @@ def self_test():
         'malformed validation record': ({record: '{'}, 'reviews/document-validation.json: invalid JSON'),
         'stale record counts': ({record: json.dumps(stale_record)}, 'document-validation.json is stale'),
         'stale source digest': ({pins: json.dumps(changed_pins)}, 'document-validation.json is stale'),
+        'missing enforced ceiling check': ({response_schema: json.dumps(weakened_response)},
+                                           'invalid-response-scope-enforced-null.json: expected valid=False, got True'),
     }
     failures = []
     for name, (overrides, expected) in mutants.items():

@@ -389,6 +389,31 @@
       "file": "examples/invalid-release-sha256-trailing-newline.json",
       "schema": "contracts/release-evidence.schema.json",
       "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-enforced-null.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-enforced-fraction.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-enforced-overflow.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/response-scope-enforced-zero.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/response-scope-enforced-maximum.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
     }
   ]
 }

@@ -49,6 +49,12 @@ envelope, never the unselected candidate. All non-Hello request and event schema
 retain the exact selected v1 constant; they require a successfully negotiated
 connection. Every reconnect renegotiates.
 
+`scope.get` limits marked `enforced` require an explicit safe-integer ceiling
+from 0 through 9,007,199,254,740,991. Null is allowed only for `measured_only` or
+`unavailable`, and is never presented as an enforced ceiling. Zero denotes a
+zero allowance, not an unlimited budget. The controller validates the shape
+before projecting or committing the reviewed scope.
+
 ## Method inventory
 
 Desktop task, owner, project, enrollment and control IDs are opaque UUIDs.

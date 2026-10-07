@@ -1,12 +1,12 @@
 {
   "scope": "documents and synthetic schemas only",
   "passed": true,
-  "source_digest_sha256": "6c186bebf5dec1e411fd8d9ab664d1e33d3c9623ea3d2ad83d80fcbfbfd2b2db",
+  "source_digest_sha256": "b7eeaf70adbb6f4f324ca67234cd333fe6c3f4f447df652527e3c70304f29ea9",
   "counts": {
-    "json_files": 88,
+    "json_files": 93,
     "schemas": 6,
-    "fixtures": 77,
-    "response_substitutions": 156,
+    "fixtures": 82,
+    "response_substitutions": 180,
     "specs": 17,
     "requirements": 209,
     "acceptance_cases": 209,

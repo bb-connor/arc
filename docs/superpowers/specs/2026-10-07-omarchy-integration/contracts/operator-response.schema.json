@@ -1117,7 +1117,28 @@
                       "enforcement",
                       "value"
                     ],
-                    "additionalProperties": false
+                    "additionalProperties": false,
+                    "allOf": [
+                      {
+                        "if": {
+                          "properties": {
+                            "enforcement": {
+                              "const": "enforced"
+                            }
+                          },
+                          "required": [
+                            "enforcement"
+                          ]
+                        },
+                        "then": {
+                          "properties": {
+                            "value": {
+                              "$ref": "common.schema.json#/$defs/safe_integer"
+                            }
+                          }
+                        }
+                      }
+                    ]
                   },
                   "maxItems": 16
                 },

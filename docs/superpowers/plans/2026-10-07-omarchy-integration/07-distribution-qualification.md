@@ -116,13 +116,15 @@ def require_cases(required, rows, tuple_digest):
 
 ```python
 import errno
+import json
 import os
 import signal
 import sys
 import tempfile
 import unittest
 from pathlib import Path
-from integrations.omarchy.qualification.process import command_passed, run_bounded
+from integrations.omarchy.qualification.process import (
+    command_passed, initialize_fixture_worker, run_bounded)
 
 class ProcessTests(unittest.TestCase):
     def assert_launch_refused(self, argv, expected_errno, reason):
@@ -197,18 +199,51 @@ class ProcessTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "qualified cgroup"):
             run_bounded([sys.executable, "-c", "import os; os.setsid()"],
                         timeout=2, limit=1024, may_escape_group=True)
+
+if __name__ == "__main__":
+    refusal = initialize_fixture_worker()
+    if refusal is not None:
+        print(json.dumps({"outcome": "unknown", "blocker": refusal}))
+        raise SystemExit(2)
+    unittest.main()
 ```
 
-- [ ] Run `python3 -m unittest integrations.omarchy.tests.test_process -v`; expected red until the bounded runner exists.
+- [ ] Run `python3 -m integrations.omarchy.tests.test_process -v` in its own process; expected red until the bounded runner exists. Its explicit entrypoint initializes descendant custody before running tests. Do not import this suite into a shared application/test-runner process and initialize custody there.
 - [ ] Implement literal-argv process execution with a new session, no inherited secrets, pipe readers that terminate once the combined byte limit is exceeded, a monotonic deadline, TERM/KILL and observed wait. Use this exact result contract and failure condition in `process.py`. `wrapper_reaped` and `descendants_absent` are independent observations. This helper is restricted to reviewed harness fixtures whose complete descendant behavior excludes `setsid` and `setpgid`; `may_escape_group=False` is not an enforcement mechanism. Any command that may change process group/session, including arbitrary guest code, requires the qualified per-task cgroup executor and its independently observed unpopulated state. Such commands must set `may_escape_group=True` here and are refused before spawn. There is no process-group fallback for them:
 
 ```python
+import ctypes
 import errno
 import os
 import selectors
 import signal
 import subprocess
+import sys
+import threading
 import time
+
+_fixture_worker_pid = None
+
+
+def initialize_fixture_worker():
+    # Entry-point operation for a dedicated, single-threaded harness process only.
+    # Never call this from the desktop controller, a library import or shared runner.
+    global _fixture_worker_pid
+    _fixture_worker_pid = None
+    refusal = {"prerequisite": "harness-child-subreaper", "errno": None,
+               "reason": "dedicated_single_threaded_worker_required"}
+    if threading.active_count() != 1 or threading.current_thread() is not threading.main_thread():
+        return refusal
+    if sys.platform == "linux":
+        libc = ctypes.CDLL(None, use_errno=True)
+        if libc.prctl(36, 1, 0, 0, 0) != 0:  # PR_SET_CHILD_SUBREAPER
+            return {**refusal, "errno": ctypes.get_errno(), "reason": "subreaper_unavailable"}
+        enabled = ctypes.c_int()
+        if libc.prctl(37, ctypes.byref(enabled), 0, 0, 0) != 0 or enabled.value != 1:
+            return {**refusal, "errno": ctypes.get_errno() or None,
+                    "reason": "subreaper_verification_failed"}
+    _fixture_worker_pid = os.getpid()
+    return None
 
 
 def command_passed(result):
@@ -230,6 +265,23 @@ def _group_exists(pgid):
         return None  # Inaccessible/unverifiable is not absent.
 
 
+def _reap_owned_descendants(process, result):
+    # Popen owns the wrapper's status; never let waitpid below consume it.
+    if process.poll() is None:
+        return
+    for _ in range(64):  # Bound each drain; the caller also owns a monotonic deadline.
+        try:
+            pid, _ = os.waitpid(-process.pid, os.WNOHANG)
+        except ChildProcessError:
+            return
+        except OSError as error:
+            if error.errno not in result["cleanup_errors"]:
+                result["cleanup_errors"].append(error.errno)
+            return
+        if pid == 0:
+            return
+
+
 def _stop_and_observe_group(process, result):
     # This group is owned by a reviewed harness fixture, not arbitrary code.
     state = _group_exists(process.pid)
@@ -247,6 +299,7 @@ def _stop_and_observe_group(process, result):
         until = time.monotonic() + grace
         while True:
             process.poll()  # Reap the wrapper, independently of group absence.
+            _reap_owned_descendants(process, result)
             state = _group_exists(process.pid)
             if state is False or time.monotonic() >= until:
                 break
@@ -273,6 +326,10 @@ def run_bounded(argv, *, timeout, limit, may_escape_group=False,
               "timed_out": False, "overflow": False, "wrapper_reaped": False,
               "descendants_absent": False, "unexpected_descendants": False,
               "cleanup_errors": [], "containment": "reviewed-fixture-process-group"}
+    if sys.platform == "linux" and _fixture_worker_pid != os.getpid():
+        result["launch_error"] = {"prerequisite": "harness-child-subreaper",
+                                  "errno": None, "reason": "not_initialized"}
+        return result
     with selectors.DefaultSelector() as selector:
         try:
             process = subprocess.Popen(
@@ -326,7 +383,9 @@ def run_bounded(argv, *, timeout, limit, may_escape_group=False,
 ```
 
 - [ ] Preserve launch refusals as failed command records with `launched=false`, `returncode=null`, empty output and the bounded `launch_error` object. No wrapper/group observation occurred, so neither observation flag becomes true. The case dispatcher supplies the checked-in fixture's prerequisite ID and retains this record alongside the literal argv/adapter identity before returning exit 2 for that named unavailable prerequisite. It records the case outcome as `unknown` with its blocker, never `pass`; an observation failure after launch returns exit 1. Do not let an uncaught `Popen` exception erase partial case evidence. Test missing file, denied execution, invalid executable format and a generic OS launch error; exception text must not enter the artifact.
-- [ ] Add executable tests for a 2 MiB stdout/stderr flood with a 64 KiB cap, nonzero exit, invalid argv, unverifiable group observation and a descendant that keeps stdout open. Retain the separate closed-pipe descendant regression above. Expected: captured bytes never exceed the cap; failures remain failures and all stoppable owned fixture processes disappear. Unverifiable absence returns `descendants_absent=false` and can never pass. An unexpected surviving child makes the command fail even when cleanup subsequently proves absence. Run `python3 -m unittest integrations.omarchy.tests.test_process -v`.
+- [ ] Run these commands only inside a dedicated single-threaded fixture worker whose entrypoint calls `initialize_fixture_worker` once. On Linux this process adopts orphaned fixture descendants with `PR_SET_CHILD_SUBREAPER`; it remains alive until their bounded cleanup finishes. Library import and `run_bounded` never change the caller's subreaper state. Missing initialization refuses the named `harness-child-subreaper` prerequisite before launch. The initializer returns a bounded refusal object on unavailable custody; the qualification dispatcher retains it with partial evidence and exits 2, as the component entrypoint above does. This worker has no application/controller duties. Shared orchestration invokes it as a separate executable and observes its termination; it does not turn the controller or shared test runner into a subreaper. If bounded cleanup cannot establish absence, retain failed cleanup and unresolved custody for the supervising executor; worker exit is not proof of descendant cleanup. [Linux subreaper contract](https://man7.org/linux/man-pages/man2/PR_SET_CHILD_SUBREAPER.2const.html)
+- [ ] Reap adopted descendants only with `waitpid(-fixture_pgid, WNOHANG)` after `Popen.poll()` has reaped the direct wrapper. Never use `waitpid(-1, ...)`, block waiting for a live child, or treat zombie detection alone as proof of cleanup. Each drain processes at most 64 waitable children before the monotonic cleanup deadline is checked again. Add tests with a non-reaping Linux PID 1, closed/open descendant pipes, nested descendants and an unrelated child in another process group whose original wait status must remain available to its owner. [Process-group wait semantics](https://man7.org/linux/man-pages/man2/waitpid.2.html)
+- [ ] Add executable tests for a 2 MiB stdout/stderr flood with a 64 KiB cap, nonzero exit, invalid argv, unverifiable group observation and a descendant that keeps stdout open. Retain the separate closed-pipe descendant regression above. Expected: captured bytes never exceed the cap; failures remain failures and all stoppable owned fixture processes disappear. Unverifiable absence returns `descendants_absent=false` and can never pass. An unexpected surviving child makes the command fail even when cleanup subsequently proves absence. Run `python3 -m integrations.omarchy.tests.test_process -v` in its dedicated worker process.
 - [ ] Commit with `test(omarchy): bound qualification command execution`. The product task cgroup implementation remains a separate prerequisite; this runner is not a substitute for it.
 
 ## Task 3: Collect actual platform facts and immutable runtime identities
@@ -473,14 +532,16 @@ Future example after implementing the selected case: `python3 integrations/omarc
 
 ## Task 5: Lock public package inputs and produce a reproducible package
 
-**Files:** Create `packaging/omarchy/release-lock.json`, `packaging/omarchy/release_lock.py`, `packaging/omarchy/tests/test_release_lock.py`, `packaging/omarchy/PKGBUILD`, `packaging/omarchy/tests/test_package_contents.py`.
+**Files:** Create `packaging/omarchy/release-lock.json`, `packaging/omarchy/release_lock.py`, `packaging/omarchy/tests/test_release_lock.py`, `packaging/omarchy/tests/fixtures/reviewed-release-lock.json`, `packaging/omarchy/PKGBUILD`, `packaging/omarchy/tests/test_package_contents.py`.
 
 Consume the controller plan's three explicitly declared binaries and its desktop entry/menu fixtures. Their source ownership remains with that plan; package their reviewed bytes without generating alternate registration assets here.
 
 - [ ] Define the release lock as strict data with required fields `version`, `architecture`, `source_url`, `source_sha256`, `public_revision`, `runtime_inventory_sha256`, `compatibility_sha256`, `profiles`, `state_read_abis`, `state_write_abi`, `signer_identity` and `native_prerequisites`. Populate only from publicly reachable pinned artifacts. An absent field is a hard error, not an empty default.
-- [ ] Add the first tests around the proposed parser `validate_release_lock` in `packaging/omarchy/release_lock.py`:
+- [ ] Capture a complete reviewed release lock in `packaging/omarchy/tests/fixtures/reviewed-release-lock.json`, retaining all required fields and its public provenance. This future fixture depends on real reviewed inputs; do not invent release provenance to unblock implementation. Add the first tests around the proposed parser `validate_release_lock` in `packaging/omarchy/release_lock.py`. Its success contract returns the validated lock; the floating-revision test changes exactly one field after a positive control:
 
 ```python
+import copy
+import json
 import unittest
 from pathlib import Path
 import importlib.util
@@ -490,16 +551,41 @@ module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 
 class ReleaseLockTests(unittest.TestCase):
+    def setUp(self):
+        self.valid_lock = json.loads(
+            (Path(__file__).parent / "fixtures/reviewed-release-lock.json").read_text())
+        self.assertEqual(module.validate_release_lock(copy.deepcopy(self.valid_lock)),
+                         self.valid_lock)
+
+    def test_complete_reviewed_lock_is_accepted(self):
+        self.assertEqual(module.validate_release_lock(copy.deepcopy(self.valid_lock)),
+                         self.valid_lock)
+
     def test_empty_lock_is_rejected(self):
         with self.assertRaises(ValueError):
             module.validate_release_lock({})
 
     def test_floating_revision_is_rejected(self):
-        with self.assertRaises(ValueError):
-            module.validate_release_lock({"public_revision": "main"})
+        mutated = copy.deepcopy(self.valid_lock)
+        mutated["public_revision"] = "main"
+        self.assertEqual({key for key in mutated if mutated[key] != self.valid_lock[key]},
+                         {"public_revision"})
+        with self.assertRaisesRegex(ValueError,
+                                    "^public_revision must be an immutable 40-hex commit$"):
+            module.validate_release_lock(mutated)
 ```
 
-- [ ] Run `python3 -m unittest discover -s packaging/omarchy/tests -p test_release_lock.py -v`; expected red. Add the validator with exact required-field checks, `architecture == "x86_64"`, 40-hex public revision, 64-hex digests, an HTTPS URL on the reviewed publisher host, closed known profiles and nonempty native prerequisite bindings. Test each rejected field and a real reviewed lock; expected green. Do not create a fake production lock just to pass a test.
+- [ ] Run `python3 -m unittest discover -s packaging/omarchy/tests -p test_release_lock.py -v`; expected red. Add the validator with exact required-field checks, `architecture == "x86_64"`, 40-hex public revision, 64-hex digests, an HTTPS URL on the reviewed publisher host, closed known profiles and nonempty native prerequisite bindings. Invoke this revision check from the full validator after the required-field check:
+
+```python
+import re
+
+def require_public_revision(value):
+    if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{40}", value) is None:
+        raise ValueError("public_revision must be an immutable 40-hex commit")
+```
+
+- [ ] Test each rejected field and the complete reviewed positive control; expected green. Temporarily remove only `require_public_revision` from the validator: the complete-lock floating-revision test must turn red while the positive control remains green. Missing-field rejection cannot satisfy this test. Do not create a fake production lock just to pass a test.
 - [ ] Build `PKGBUILD` around the actual reviewed public source archive and vendored dependency closure. The key package steps are:
 
 ```bash

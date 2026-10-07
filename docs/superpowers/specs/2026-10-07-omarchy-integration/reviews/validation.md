@@ -8,12 +8,12 @@ or implemented by this change. All AT-* runtime cases remain proposed.
 
 | Check | Result and scope |
 | --- | --- |
-| Package verifier with self-test | Passed: 17 specs, 209 requirement/acceptance mappings, 6 schemas, 77 fixtures, 156 response substitutions and 28 validator mutants; documents/synthetic shapes only |
+| Package verifier with self-test | Passed: 17 specs, 209 requirement/acceptance mappings, 6 schemas, 82 fixtures, 180 response substitutions and 29 validator mutants; documents/synthetic shapes only |
 | Source research | Omarchy release/development source, public Pi/native source crosswalk, OMCP and Linux/systemd/Arch primary references inspected and pinned where available |
 | Proposed plugin manifest | Passed the inspected upstream structural validator using temporary placeholder entry files; no QML behavior qualified |
 | Independent review | All identified P2 issues addressed and re-reviewed; [finding record](independent-review.md) |
-| Runner example regression | 24 persistent extracted-sample component tests passed on macOS arm64: launch refusal, bounded process cleanup, phase parser and package inventory; no Linux runtime conclusion |
-| Python/JSON syntax | 24 Python snippets and the validator/regression script parsed; 5 JSON snippets decoded, 8 Bash snippets passed syntax checks; 88 JSON documents parsed |
+| Runner example regression | 32 persistent extracted-sample component tests passed on macOS arm64 and Linux aarch64: launch refusal, adopted-descendant reaping, phase parser, package inventory and release-lock controls; no Omarchy runtime conclusion |
+| Python/JSON syntax | 26 Python snippets and retained validator/regression scripts parsed; 5 JSON snippets decoded, 12 Bash snippets passed syntax checks; 93 JSON documents parsed |
 | `cargo fmt --all -- --check` | Passed |
 | `cargo build --workspace` | Failed on pre-existing finding-worker product imports and missing method |
 | `cargo test --workspace` | Failed during compilation on the same finding-worker product surface; no workspace test-pass claim |
@@ -72,3 +72,72 @@ Both commands pass locally. The release-copy wording failure in plan 01 was
 corrected by enumerating the controls whose navigation behavior must be checked.
 The component suite does not execute the future Linux qualifier, build an Arch
 package or close any proposed runtime acceptance.
+
+## Second review round
+
+The wire limit contract now requires a safe integer for `enforced`; null never
+means an enforced ceiling. Invalid null/fraction/overflow fixtures and valid
+zero/maximum controls pass. The retained
+[scope matrix](scope-limit-review-regressions.py) checks 189 cases across all
+seven dimensions and three enforcement states. Removing the conditional ceiling
+check is independently rejected by a validator mutant.
+
+```bash
+/tmp/chio-omarchy-doc-validation/bin/python docs/superpowers/specs/2026-10-07-omarchy-integration/reviews/scope-limit-review-regressions.py
+```
+
+The prerequisite examples pass 16 retained regression tests, including all 35
+profile/artifact-removal cells, missing/extra profile inventories, unknown-profile
+refusals and omission mutants for tuple/classification diagnostics. The synthetic
+control remains unqualified, and removing a specific check now fails its test.
+
+The distribution example passes 32 tests on macOS arm64 (Python 3.11.4) and Linux
+aarch64 (kernel 6.8.0-64-generic, glibc 2.36, Python 3.11.2). The original suite
+reproduced both descendant failures beneath a non-reaping Linux PID 1; the revised
+dedicated subreaper worker completed with zero zombies in the final `/proc`
+census. The container used existing local image `chio-docs-transcript:20260930`
+with image ID `sha256:f4b2f90e4bb056cb523b2a86b1a393a9a67023383776e5bdea6864012a1ed163`,
+a read-only checkout mount and no network. This proves only the extracted helper's
+component behavior on that Linux environment, not non-root x86_64 Omarchy
+confinement or package qualification. The complete-lock test also detects a
+validator that checks missing fields while ignoring floating revisions.
+
+```bash
+python3 docs/superpowers/specs/2026-10-07-omarchy-integration/reviews/prerequisite-review-regressions.py
+```
+
+Reproduce the Linux component run from this checkout using that retained local
+image. Python PID 1 waits only for its direct test worker; leaked orphan zombies
+remain visible to the final census:
+
+```bash
+validation_repo=$(pwd)
+docker run --rm -i --network none \
+  --mount "type=bind,src=$validation_repo,dst=/source,readonly" \
+  --entrypoint python3 \
+  sha256:f4b2f90e4bb056cb523b2a86b1a393a9a67023383776e5bdea6864012a1ed163 - <<'PYTHON'
+import os
+import subprocess
+import sys
+from pathlib import Path
+assert os.getpid() == 1
+result = subprocess.run([
+    sys.executable,
+    "/source/docs/superpowers/specs/2026-10-07-omarchy-integration/reviews/distribution-review-regressions.py",
+], timeout=30)
+zombies = []
+for path in Path("/proc").glob("[0-9]*/stat"):
+    try:
+        state = path.read_text().rsplit(") ", 1)[1].split()[0]
+    except FileNotFoundError:
+        continue
+    if state == "Z":
+        zombies.append(path.parent.name)
+print("Remaining zombie PIDs:", zombies)
+sys.exit(result.returncode or bool(zombies))
+PYTHON
+```
+
+The concurrent non-normative architecture review is preserved unchanged. Its
+product/sequence decisions remain review input; these line-level bot repairs do
+not implement or claim resolution of that separate architecture review.
