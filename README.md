@@ -54,7 +54,7 @@ Chio is a Rust kernel that sits between an AI agent and everything it touches. E
 call, file read, API request, and payment goes through it, the same way every syscall goes
 through an operating system kernel.
 
-Before an agent can do anything, it presents a [signed token](spec/PROTOCOL.md#5-capability-contract) that says who it is, what it
+When an agent calls a tool through Chio, it presents a [signed token](spec/PROTOCOL.md#5-capability-contract) that says who it is, what it
 may call, and how much it may spend. Chio checks the token, runs the call, and writes a
 [signed receipt](spec/PROTOCOL.md#6-receipt-contract) of what happened. **If the token does not check out, the call does not run.**
 
@@ -125,7 +125,7 @@ writes the audit log. Chio is that layer for agents, and each part has a direct 
 <p align="center">
   <picture>
     <source media="(max-width: 500px)" srcset="docs/assets/kernel-boundary-mobile.svg" />
-    <img src="docs/assets/kernel-boundary.svg" alt="The Chio kernel boundary: agents, sub-agents, and tool servers run untrusted in user space; every call crosses into the kernel, which verifies, budgets, guards, dispatches, meters, and signs; protocol and provider adapters sit beneath it as drivers; every decision lands in an append-only receipt log." width="900" />
+    <img src="docs/assets/kernel-boundary.svg" alt="The Chio kernel boundary: agents, sub-agents, and tool servers are untrusted; calls routed through Chio enter the kernel for verification, budgets, guards, dispatch, metering, and signed receipts. Protocol and provider adapters connect native owners. OS isolation depends on the selected runtime profile; native calls outside those routes are not mediated." width="900" />
   </picture>
 </p>
 
