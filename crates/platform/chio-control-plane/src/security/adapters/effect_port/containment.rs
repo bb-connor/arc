@@ -54,16 +54,17 @@ impl SessionSuspensionOverlayBackend {
             contribution_hash: request.contribution_hash,
             expires_at_unix_ms: Some(request.plan_expires_at_unix_ms),
         };
-        if let Some(existing) = current
+        // Contributions are keyed by effect and compose as a maximum, so any
+        // valid overlay without this effect's contribution differs from the
+        // observed base only by other effects' contributions. An installed
+        // contribution is answered from the command journal; any other
+        // command for it is refused.
+        if current
             .active_contributions
             .as_slice()
             .iter()
-            .find(|entry| entry.effect_id == request.effect_id)
+            .any(|entry| entry.effect_id == request.effect_id)
         {
-            if existing != &desired {
-                return Err(PortError::conflict());
-            }
-        } else if overlay_version_hash(&current)? != request.expected_version_hash {
             return Err(PortError::conflict());
         }
         let predicted =

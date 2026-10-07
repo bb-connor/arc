@@ -410,10 +410,10 @@ fn stale_fences_and_action_rebinding_fail_closed() {
 
     let mut wrong_base = apply_request(
         first_action.clone(),
-        effect("containment-wrong-base-effect"),
+        first.contribution.effect_id.clone(),
         &applied,
         first_work.fencing_token,
-        9,
+        5,
         "containment-wrong-base",
     );
     wrong_base.command.request.expected_version_hash = digest(b"forged-base-version");

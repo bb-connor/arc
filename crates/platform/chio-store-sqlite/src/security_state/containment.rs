@@ -136,8 +136,15 @@ impl ContainmentOverlayStore for SqliteSecurityStateStore {
             }
         }
         let current = load_overlay_snapshot(&transaction, &request.target)?;
-        if containment_overlay_version_hash(&current)?
-            != request.command.request.expected_version_hash
+        let current_version = containment_overlay_version_hash(&current)?;
+        // Effect-keyed contributions compose, so only an already installed
+        // contribution for this effect is bound to the observed base.
+        if current
+            .active_contributions
+            .as_slice()
+            .iter()
+            .any(|entry| entry.effect_id == request.contribution.effect_id)
+            && current_version != request.command.request.expected_version_hash
         {
             return Err(PortError::conflict());
         }

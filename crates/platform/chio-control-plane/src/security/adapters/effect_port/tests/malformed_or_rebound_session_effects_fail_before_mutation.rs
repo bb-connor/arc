@@ -13,10 +13,6 @@ fn malformed_or_rebound_session_effects_fail_before_mutation() {
     let zero_error = require_error(port.execute(&zero_rank));
     assert_eq!(zero_error.kind(), PortErrorKind::InvalidData);
 
-    let stale = request(EffectOperation::Apply, Digest32::new([71; 32]), 2);
-    let stale_error = require_error(port.execute(&stale));
-    assert_eq!(stale_error.kind(), PortErrorKind::Conflict);
-
     zero_rank = request(EffectOperation::Apply, base, 2);
     zero_rank.contribution_hash = Digest32::new([99; 32]);
     let hash_error = require_error(port.execute(&zero_rank));
