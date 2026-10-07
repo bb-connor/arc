@@ -15,7 +15,7 @@ and CLI entry points are additional clients of the same controller and proposed
 `chio.operator.v1` projection. The controller is an S1 C-layer component outside
 the trusted computing base, in a separate process from the gateway and process
 host. It holds no authority signing keys, asserts no trusted facts, issues no
-capabilities and maintains no competing ledger.
+capabilities and maintains no competing ledger. The existing `chio` CLI is an explicit shared delivery obligation (packet 4a), with its own native and installed cross-client conformance; platform UI acceptance cannot substitute for a missing terminal client.
 
 The first execution product is **sealed, single-owner work**: select a project,
 review a fixed recipe and acceptance contract, run an eligible host using

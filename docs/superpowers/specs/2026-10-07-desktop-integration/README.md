@@ -35,7 +35,7 @@ to any external destination are separately scoped operations; neither sets W1
 acceptance by a caller-provided boolean.
 
 The CLI, Omarchy plugin and macOS menu bar open or control this same workflow.
-They share recovery and status semantics. They never infer acceptance from a
+The existing `chio` binary receives its operator consumer in delivery packet 4a; source and installed CLI conformance are required before this promised client counts as delivered. They share recovery and status semantics. They never infer acceptance from a
 successful process exit, authorize an operation from a notification click, or
 turn a lost reply into a fresh execution.
 
