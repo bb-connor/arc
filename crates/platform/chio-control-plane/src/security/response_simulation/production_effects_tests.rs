@@ -368,8 +368,16 @@ impl ProductionEffectsFixture {
     }
 
     fn session_suspension_spec(&self, session_id: &SessionId) -> ResponseEffectSpec {
+        self.ranked_session_suspension_spec(session_id, 4)
+    }
+
+    fn ranked_session_suspension_spec(
+        &self,
+        session_id: &SessionId,
+        posture_rank: u32,
+    ) -> ResponseEffectSpec {
         let (canonical_contribution, contribution_hash) =
-            canonical(&serde_json::json!({ "posture_rank": 4 }));
+            canonical(&serde_json::json!({ "posture_rank": posture_rank }));
         let target = session_containment_target(&tenant(), session_id)
             .unwrap_or_else(|error| panic!("session target: {error}"));
         ResponseEffectSpec {
@@ -392,6 +400,16 @@ impl ProductionEffectsFixture {
         affected_ids: Vec<RecordId>,
         effects: Vec<ResponseEffectSpec>,
     ) -> (ResponsePlan, ScheduledWork) {
+        self.dispatch_with_ttl(action_id, affected_ids, effects, 120_000)
+    }
+
+    fn dispatch_with_ttl(
+        &self,
+        action_id: &str,
+        affected_ids: Vec<RecordId>,
+        effects: Vec<ResponseEffectSpec>,
+        ttl_ms: u64,
+    ) -> (ResponsePlan, ScheduledWork) {
         let plan = build_response_plan(ResponsePlanInput {
             execution: ResponseExecutionBinding::new(ResponseExecutionMode::Live),
             action_id: chio_security_types::ports::ActionId::new(action_id)
@@ -405,12 +423,15 @@ impl ProductionEffectsFixture {
             policy_hash: digest(b"production-effects-policy"),
             affected_ids,
             effects,
-            ttl_ms: 120_000,
+            ttl_ms,
             created_at_unix_ms: self.trusted_now,
             operator_capability: OperatorCapabilityBinding {
                 capability_id: record("production-effects-capability"),
                 capability_digest: digest(b"production-effects-capability"),
-                expires_at_unix_ms: self.trusted_now.saturating_add(300_000),
+                expires_at_unix_ms: self
+                    .trusted_now
+                    .saturating_add(ttl_ms)
+                    .saturating_add(180_000),
                 executor_subject: record("production-effects-executor"),
             },
             approval_requirement: ResponseApprovalRequirement::Automatic,
@@ -797,5 +818,98 @@ fn production_effects_refuse_effects_outside_the_live_plan() {
     assert_eq!(
         observed, expected,
         "a live lease for one action cannot execute or read effects outside its durable plan"
+    );
+}
+
+fn effective_posture_rank(store: &SqliteSecurityStateStore, session_id: &SessionId) -> u32 {
+    let target = session_containment_target(&tenant(), session_id)
+        .unwrap_or_else(|error| panic!("session target: {error}"));
+    chio_security_types::ports::ContainmentOverlayStore::load_effective(store, &target)
+        .unwrap_or_else(|error| panic!("load session overlay: {error}"))
+        .map_or(0, |snapshot| snapshot.effective_posture_rank)
+}
+
+#[test]
+fn session_suspensions_planned_on_one_base_both_hold() {
+    let fixture = ProductionEffectsFixture::new();
+    let shared_session = session("production-effects-shared-base-session");
+    let first_spec = fixture.ranked_session_suspension_spec(&shared_session, 3);
+    let second_spec = fixture.ranked_session_suspension_spec(&shared_session, 8);
+    assert_eq!(
+        first_spec.observed_base_version_hash, second_spec.observed_base_version_hash,
+        "both plans observed the same overlay base"
+    );
+    let (first_plan, first_work) = fixture.dispatch_with_ttl(
+        "production-effects-shared-base-first",
+        vec![record(shared_session.as_str())],
+        vec![first_spec],
+        600_000,
+    );
+    let (second_plan, second_work) = fixture.dispatch_with_ttl(
+        "production-effects-shared-base-second",
+        vec![record(shared_session.as_str())],
+        vec![second_spec],
+        3_600_000,
+    );
+    let effects = fixture.effects();
+    let first_effect = first_plan
+        .effects
+        .as_slice()
+        .first()
+        .unwrap_or_else(|| panic!("first suspension missing"));
+    let second_effect = second_plan
+        .effects
+        .as_slice()
+        .first()
+        .unwrap_or_else(|| panic!("second suspension missing"));
+
+    let first_applied = effects
+        .execute(&effect_request(
+            &first_plan,
+            first_effect,
+            &first_work,
+            "shared-base-first",
+        ))
+        .unwrap_or_else(|error| panic!("apply first suspension: {error}"));
+    assert_eq!(
+        effective_posture_rank(&fixture.store, &shared_session),
+        3,
+        "the first suspension holds alone"
+    );
+
+    let second = effect_request(
+        &second_plan,
+        second_effect,
+        &second_work,
+        "shared-base-second",
+    );
+    let second_apply = effects
+        .execute(&second)
+        .map(|result| result.applied)
+        .map_err(|error| error.kind());
+    let second_retry = effects
+        .execute(&second)
+        .map(|result| result.applied)
+        .map_err(|error| error.kind());
+    let rank_with_both = effective_posture_rank(&fixture.store, &shared_session);
+
+    let mut lift_first = effect_request(
+        &first_plan,
+        first_effect,
+        &first_work,
+        "shared-base-lift-first",
+    );
+    lift_first.operation = EffectOperation::Remove;
+    lift_first.expected_version_hash = first_applied.resulting_version_hash;
+    let lifted = effects
+        .execute(&lift_first)
+        .unwrap_or_else(|error| panic!("lift first suspension: {error}"));
+    assert!(!lifted.applied);
+    let rank_after_lift = effective_posture_rank(&fixture.store, &shared_session);
+
+    assert_eq!(
+        (second_apply, second_retry, rank_with_both, rank_after_lift),
+        (Ok(true), Ok(true), 8, 8),
+        "a suspension planned on the same base must compose with the first and outlive its lift"
     );
 }
