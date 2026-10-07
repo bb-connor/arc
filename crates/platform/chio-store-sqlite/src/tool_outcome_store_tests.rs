@@ -33,6 +33,9 @@ mod recovery_component;
 mod compaction_fixture;
 use compaction_fixture::completed_return;
 
+#[path = "tool_outcome_store_tests/compaction_read_bounds.rs"]
+mod compaction_read_bounds;
+
 struct Fixture {
     _temp: TempDir,
     database: PathBuf,
@@ -1153,6 +1156,10 @@ fn legacy_compaction_obeys_a_bounded_page_instead_of_global_erasure() {
         .outcomes
         .compact_retained_invocation_blobs(cutoff, &fixture.fence, cutoff)
         .expect("legacy pass");
+    assert!(
+        summary.compacted > 0,
+        "the default page must make bounded progress"
+    );
     assert!(
         summary.compacted <= 64,
         "legacy compatibility may not erase all 65 rows in a one-page pass"

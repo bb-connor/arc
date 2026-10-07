@@ -16,9 +16,10 @@ pub(super) enum ReplayOwners {
 
 pub(super) fn qualified_replay_owners(
     transaction: &Transaction<'_>,
+    owner_reader: &crate::admission_operation_store::ToolOutcomeReplayOwnerReader<'_, '_>,
     raw: &RawInvocationOutcomeV1,
+    raw_bytes: &[u8],
     digest: &AdmissionDigest,
-    raw_size: u64,
     page: &mut ToolOutcomeCompactionPage,
     limits: ToolOutcomeCompactionLimits,
 ) -> Result<ReplayOwners, ToolOutcomeStoreError> {
@@ -52,7 +53,7 @@ pub(super) fn qualified_replay_owners(
         rows.collect::<Result<Vec<_>, _>>().map_err(sqlite_error)?
     };
     for owner in owners {
-        let verification_bytes = owner_verification_bytes(transaction, &owner, raw_size)?;
+        let verification_bytes = owner_verification_bytes(transaction, &owner)?;
         let total = page
             .inspected_payload_bytes
             .checked_add(page.inspected_verification_bytes)
@@ -76,7 +77,11 @@ pub(super) fn qualified_replay_owners(
         require_no_unaccounted_sidecars(transaction, &owner_id)?;
         // The complete existing qualified reader still authorizes every erase
         // candidate; its additional profile sidecar payloads are now absent.
-        let operation = load_operation_for_participant_tx(transaction, &owner_id)
+        let crate::admission_operation_store::QualifiedToolOutcomeReplayOwner {
+            operation,
+            terminal_receipt: receipt_bytes,
+        } = owner_reader
+            .load(&owner_id)
             .map_err(admission_error)?
             .ok_or_else(|| invariant("retention owner disappeared"))?;
         if operation != envelope {
@@ -112,7 +117,11 @@ pub(super) fn qualified_replay_owners(
             None if begin_digest.is_none() => true,
             None => return Err(invariant("committed original retained request disappeared")),
         };
-        let projection = super::super::projection::load_verified_projection(transaction, &owner)?;
+        let projection = super::super::projection::load_verified_projection_with_retained_inputs(
+            transaction,
+            &operation,
+            raw_bytes,
+        )?;
         if projection.raw.as_ref() != Some(raw)
             || !projection.has_resolved_output
             || !projection.evaluation.as_ref().is_some_and(|evaluation| {
@@ -131,14 +140,9 @@ pub(super) fn qualified_replay_owners(
         {
             return Err(invariant("unprofiled retained raw request conflicts with its admission and frozen evaluation"));
         }
-        let Some(AdmissionTerminalReplay::Receipt { receipt_id, .. }) = operation.terminal_replay()
-        else {
+        let Some(AdmissionTerminalReplay::Receipt { .. }) = operation.terminal_replay() else {
             return Ok(ReplayOwners::Unsupported);
         };
-        let receipt_bytes: Option<Vec<u8>> = transaction.query_row(
-            "SELECT CASE WHEN length(record_json) BETWEEN 1 AND 1048576 THEN record_json END FROM admission_operation_terminal_records WHERE operation_id=?1 AND record_kind='receipt' AND record_id=?2",
-            params![&owner,receipt_id.as_str()],|row|row.get(0),
-        ).optional().map_err(sqlite_error)?.flatten();
         let Some(receipt_bytes) = receipt_bytes else {
             return Ok(ReplayOwners::Unsupported);
         };
@@ -182,19 +186,19 @@ pub(super) fn qualified_replay_owners(
 fn owner_verification_bytes(
     connection: &Connection,
     owner: &str,
-    raw_size: u64,
 ) -> Result<u64, ToolOutcomeStoreError> {
     let size:i64 = connection.query_row(
-        "SELECT length(a.operation_json)*3 + length(o.outcome_json) + COALESCE(length(e.evaluation_json),0)
-           + ?2 + COALESCE(b.blob_size_bytes,0)
+        "SELECT length(a.operation_json)*2 + length(o.outcome_json) + COALESCE(length(e.evaluation_json),0)
+           + COALESCE(b.blob_size_bytes,0)
            + COALESCE((SELECT length(projection_json)+length(manifest_json) FROM admission_operation_terminal_projections WHERE operation_id=?1),0)
-           + COALESCE((SELECT SUM(length(record_json))*2 FROM admission_operation_terminal_records WHERE operation_id=?1),0)
+           + COALESCE((SELECT SUM(length(record_json)) FROM admission_operation_terminal_records WHERE operation_id=?1),0)
            + COALESCE((SELECT length(request_json) FROM admission_operation_tool_requests WHERE operation_id=?1),0)
+           + COALESCE((SELECT length(canonical_status)*2 FROM admission_operation_recovery_deferrals WHERE operation_id=?1),0)
          FROM admission_operations a JOIN tool_outcomes o ON o.operation_id=a.operation_id
          LEFT JOIN post_return_evaluations e ON e.operation_id=a.operation_id
          LEFT JOIN tool_outcome_blobs b ON b.digest=json_extract(o.outcome_json,'$.disposition.resolved_output.digest')
          WHERE a.operation_id=?1",
-        params![owner,i64::try_from(raw_size).map_err(|_|invariant("invalid raw size"))?],|row|row.get(0),
+        [owner],|row|row.get(0),
     ).map_err(sqlite_error)?;
     u64::try_from(size).map_err(|_| invariant("invalid replay verification byte size"))
 }
@@ -263,6 +267,7 @@ fn require_no_unaccounted_sidecars(
     // never select a sidecar payload. Unsupported owners were retained above;
     // a supported envelope with any unexpected physical sidecar is corruption.
     for table in [
+        "admission_nonce_preflight_holds",
         "admission_execution_nonce_issuances",
         "admission_execution_nonce_reservations",
         "admission_execution_nonce_transitions",

@@ -892,6 +892,16 @@ pub(super) fn verify_stored_terminal_projection_with_history(
     stored_operation: &StoredOperation,
     history: &CheckedHistoryScope<'_>,
 ) -> Result<(), AdmissionOperationStoreError> {
+    load_verified_terminal_receipt_with_history(connection, stored_operation, history).map(|_| ())
+}
+
+/// Move the selected physical receipt out only after every existing terminal
+/// projection, participant, recovery and authenticated chronology check.
+pub(super) fn load_verified_terminal_receipt_with_history(
+    connection: &Connection,
+    stored_operation: &StoredOperation,
+    history: &CheckedHistoryScope<'_>,
+) -> Result<Option<Vec<u8>>, AdmissionOperationStoreError> {
     history.require_connection(connection)?;
     let operation = &stored_operation.operation;
     let projection = load_terminal_projection_tx(connection, operation.binding().operation_id())?;
@@ -903,7 +913,8 @@ pub(super) fn verify_stored_terminal_projection_with_history(
         }
         return super::credit_exposure::verify_credit_exposure_operation_state(
             connection, operation, None,
-        );
+        )
+        .map(|_| None);
     }
     let projection = projection
         .ok_or_else(|| invariant("terminal admission operation lacks its projection row"))?;
@@ -1042,7 +1053,16 @@ pub(super) fn verify_stored_terminal_projection_with_history(
         operation,
         Some(&projection_digest),
     )?;
-    terminal_time::verify(connection, stored_operation, &projection, history)
+    terminal_time::verify(connection, stored_operation, &projection, history)?;
+    let Some(AdmissionTerminalReplay::Receipt { receipt_id, .. }) = operation.terminal_replay()
+    else {
+        return Ok(None);
+    };
+    Ok(records.into_iter().find_map(|record| {
+        (record.kind == AdmissionProjectionRecordKind::Receipt.as_str()
+            && record.record_id == receipt_id.as_str())
+        .then_some(record.record_json)
+    }))
 }
 
 fn projection_sidecar_count(

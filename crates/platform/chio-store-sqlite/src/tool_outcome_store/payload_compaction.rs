@@ -230,6 +230,8 @@ impl SqliteToolOutcomeStore {
             sql_steps: 0,
         };
         let mut last_inspected = after_digest.cloned();
+        let owner_reader =
+            crate::admission_operation_store::ToolOutcomeReplayOwnerReader::new(&transaction);
         for (digest, size, recorded_at, present) in rows {
             page.inspected = page.inspected.saturating_add(1);
             let digest = AdmissionDigest::try_new("compaction_digest", digest)
@@ -297,9 +299,10 @@ impl SqliteToolOutcomeStore {
                     }
                     match qualified_replay_owners(
                         &transaction,
+                        &owner_reader,
                         &raw,
+                        &bytes,
                         &digest,
-                        size,
                         &mut page,
                         limits,
                     )? {
@@ -343,6 +346,7 @@ impl SqliteToolOutcomeStore {
         if full_page || page.byte_budget_exhausted {
             page.next_digest = last_inspected;
         }
+        drop(owner_reader);
         self.commit_write(transaction)?;
         self.sync_after_write(connection)?;
         Ok(page)

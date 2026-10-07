@@ -34,19 +34,57 @@ pub(super) fn load_verified_projection(
         .map_err(|error| invariant(format!("admission operation decode failed: {error}")))?;
     let operation = AdmissionOperationV1::from_persisted(persisted)
         .map_err(|error| invariant(error.to_string()))?;
+    load_projection_artifacts(connection, operation_id, outcome, &operation, None)
+}
+
+/// Reuse only physical inputs already verified inside this maintenance
+/// transaction. The canonical raw decoder still binds the original bytes to
+/// the completely qualified admission owner and the physical outcome row.
+pub(super) fn load_verified_projection_with_retained_inputs(
+    connection: &Connection,
+    operation: &AdmissionOperationV1,
+    raw_bytes: &[u8],
+) -> Result<VerifiedProjection, ToolOutcomeStoreError> {
+    let operation_id = operation.binding().operation_id().as_str();
+    let outcome = load_outcome_connection(connection, operation_id)?
+        .ok_or_else(|| invariant("tool outcome projection disappeared"))?;
+    load_projection_artifacts(
+        connection,
+        operation_id,
+        outcome,
+        operation,
+        Some(raw_bytes),
+    )
+}
+
+fn load_projection_artifacts(
+    connection: &Connection,
+    operation_id: &str,
+    outcome: ToolOutcomeRecordV1,
+    operation: &AdmissionOperationV1,
+    retained_raw_bytes: Option<&[u8]>,
+) -> Result<VerifiedProjection, ToolOutcomeStoreError> {
     if operation.tool_outcome_id() != Some(outcome.outcome_id()) {
         return Err(invariant(
             "tool outcome is not attached to its admission operation",
         ));
     }
     outcome
-        .validate_against(&operation)
+        .validate_against(operation)
         .map_err(|error| invariant(error.to_string()))?;
-    let raw = match load_blob_bytes_connection(connection, outcome.raw_output_digest())? {
+    let stored_raw_bytes = if retained_raw_bytes.is_some() {
+        None
+    } else {
+        load_blob_bytes_connection(connection, outcome.raw_output_digest())?
+    };
+    let raw_bytes = retained_raw_bytes
+        .map(Some)
+        .or_else(|| stored_raw_bytes.as_ref().map(|bytes| bytes.as_deref()));
+    let raw = match raw_bytes {
         None => return Err(invariant("tool outcome canonical blob is absent")),
         Some(Some(bytes)) => Some(
             outcome
-                .decode_canonical_bytes(&operation, &bytes)
+                .decode_canonical_bytes(operation, bytes)
                 .map_err(|error| invariant(error.to_string()))?,
         ),
         // Retention preserves digest and size; there are no payload bytes to decode.
@@ -54,7 +92,7 @@ pub(super) fn load_verified_projection(
     };
     if let Some(raw) = raw.as_ref() {
         crate::SqliteAdmissionOperationStore::verify_original_native_return_tx(
-            connection, &operation, raw, false,
+            connection, operation, raw, false,
         )
         .map_err(admission_error)?;
     }
@@ -74,7 +112,7 @@ pub(super) fn load_verified_projection(
     let (expected_outcome_digest, expected_evaluation_digest, mut expected_latest_digest) =
         if let Some(evaluation) = &evaluation {
             evaluation
-                .validate_against(&operation, &outcome)
+                .validate_against(operation, &outcome)
                 .map_err(|error| invariant(error.to_string()))?;
             let outcome_json = encode_outcome(&outcome)?;
             let evaluation_json = encode_evaluation(evaluation)?;
@@ -123,7 +161,7 @@ pub(super) fn load_verified_projection(
     }
     if let Some(digest) = security_release::verify_projection(
         connection,
-        &operation,
+        operation,
         &outcome,
         evaluation.as_ref(),
         raw.as_ref(),
@@ -132,7 +170,7 @@ pub(super) fn load_verified_projection(
     }
     // Recovery owns a separate canonical participant. Validate that current
     // component before selecting the latest outcome-bearing commitment.
-    crate::admission_operation_store::verify_outcome_recovery_status(connection, &operation)
+    crate::admission_operation_store::verify_outcome_recovery_status(connection, operation)
         .map_err(admission_error)?;
     let latest: Option<String> = connection
         .query_row(

@@ -48,6 +48,10 @@ mod caller_wait;
 mod commit_chain;
 mod history_scope;
 use history_scope::CheckedHistoryScope;
+mod tool_outcome_replay;
+pub(crate) use tool_outcome_replay::{
+    QualifiedToolOutcomeReplayOwner, ToolOutcomeReplayOwnerReader,
+};
 mod credit_exposure;
 #[cfg(feature = "admission-test-support")]
 mod dispatch_ledger_test_support;
@@ -1353,6 +1357,20 @@ fn load_by_operation_id_tx_with_history(
     operation_id: &AdmissionOperationId,
     history: &CheckedHistoryScope<'_>,
 ) -> Result<Option<StoredOperation>, AdmissionOperationStoreError> {
+    load_by_operation_id_tx_with_history_and_terminal_receipt(transaction, operation_id, history)
+        .map(|stored| stored.map(|stored| stored.stored))
+}
+
+struct StoredOperationWithTerminalReceipt {
+    stored: StoredOperation,
+    terminal_receipt: Option<Vec<u8>>,
+}
+
+fn load_by_operation_id_tx_with_history_and_terminal_receipt(
+    transaction: &Transaction<'_>,
+    operation_id: &AdmissionOperationId,
+    history: &CheckedHistoryScope<'_>,
+) -> Result<Option<StoredOperationWithTerminalReceipt>, AdmissionOperationStoreError> {
     let raw = transaction
         .prepare_cached(
             r#"
@@ -1371,6 +1389,7 @@ fn load_by_operation_id_tx_with_history(
         .optional()
         .map_err(sqlite_error)?;
     let stored = raw.map(decode_row).transpose()?;
+    let mut terminal_receipt = None;
     if let Some(stored) = &stored {
         verify_latest_commit(transaction, stored)?;
         execution_nonce::verify_reservation(transaction, &stored.operation)?;
@@ -1382,9 +1401,13 @@ fn load_by_operation_id_tx_with_history(
         runtime_participant::verify_operation(transaction, &stored.operation)?;
         governed_approval_claim::verify_stored_operation(transaction, &stored.operation)?;
         dpop_claim::verify_stored_operation(transaction, &stored.operation)?;
-        projection::verify_stored_terminal_projection_with_history(transaction, stored, history)?;
+        terminal_receipt =
+            projection::load_verified_terminal_receipt_with_history(transaction, stored, history)?;
     }
-    Ok(stored)
+    Ok(stored.map(|stored| StoredOperationWithTerminalReceipt {
+        stored,
+        terminal_receipt,
+    }))
 }
 
 pub(crate) fn begin_prepared_operation_tx(
