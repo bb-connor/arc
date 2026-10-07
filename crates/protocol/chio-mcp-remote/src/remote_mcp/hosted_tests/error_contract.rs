@@ -89,8 +89,8 @@ fn hosted_mcp_rejects_initialize_without_request_id() {
 fn hosted_mcp_rejects_initialize_with_session_header_without_issuing_session() {
     let server = start_http_server("test-token");
 
-    // Session ingress is resolved before the body is decoded, so an unknown
-    // session is refused as unknown without classifying the message.
+    // Initialize names no session, so the header is refused before any named
+    // session is resolved, whether or not that session exists.
     let unknown = server.post_raw(
         Some("test-token"),
         Some("bogus-session"),
@@ -98,11 +98,13 @@ fn hosted_mcp_rejects_initialize_with_session_header_without_issuing_session() {
         "application/json",
         &initialize_request(true),
     );
-    assert_eq!(unknown.status(), reqwest::StatusCode::NOT_FOUND);
+    assert_eq!(unknown.status(), reqwest::StatusCode::BAD_REQUEST);
     assert!(unknown.headers().get("MCP-Session-Id").is_none());
+    let body: Value = unknown.json().expect("unknown session header body json");
+    assert_eq!(body["error"]["code"], -32600);
     assert_eq!(
-        unknown.text().expect("unknown session body"),
-        "unknown MCP session"
+        body["error"]["message"].as_str(),
+        Some("initialize request must not include MCP-Session-Id")
     );
 
     let session = server.initialize_session();

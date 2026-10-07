@@ -292,6 +292,14 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
     // Reserve authenticated session ingress before allocating the full DOM.
     // Initialization has a temporary owner until its fresh inbox exists.
     let ingress_session = if let Some(header) = headers.get(MCP_SESSION_ID_HEADER) {
+        // Initialize names no session, so it is refused before any is resolved.
+        if let Some(has_request_id) = initialize_request_shape(&body) {
+            return if has_request_id {
+                initialize_session_header_refusal()
+            } else {
+                initialize_without_id_refusal()
+            };
+        }
         let session_id = match header.to_str() {
             Ok(session_id) => session_id,
             Err(_) => return plain_http_error(StatusCode::BAD_REQUEST, "invalid MCP-Session-Id"),
@@ -377,11 +385,7 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
     let is_request = message.get("id").is_some() && message.get("method").is_some();
     if is_initialize {
         if !is_request {
-            return jsonrpc_http_error(
-                StatusCode::BAD_REQUEST,
-                -32600,
-                "initialize must be a JSON-RPC request with an id",
-            );
+            return initialize_without_id_refusal();
         }
         let (message, _reservation) = message.into_parts();
         return handle_initialize_post(state, request_auth_context, &headers, message).await;
@@ -580,11 +584,7 @@ async fn handle_initialize_post(
     message: Value,
 ) -> Response {
     if mcp_session_id_header(headers) != McpSessionIdHeader::Missing {
-        return jsonrpc_http_error(
-            StatusCode::BAD_REQUEST,
-            -32600,
-            "initialize request must not include MCP-Session-Id",
-        );
+        return initialize_session_header_refusal();
     }
 
     let initialize_params = message.get("params").cloned().unwrap_or_else(|| json!({}));
@@ -1008,6 +1008,46 @@ async fn handle_delete(State(state): State<RemoteAppState>, request: Request) ->
 
 fn is_initialize_request(message: &Value) -> bool {
     message.get("method").and_then(Value::as_str) == Some("initialize")
+}
+
+/// For a body whose top-level method is `initialize`, whether it has an `id`
+/// member. `None` for any other method or a body that does not parse; those
+/// keep the accounted decode. Members other than `method` and `id` are skipped
+/// without building a document.
+fn initialize_request_shape(body: &[u8]) -> Option<bool> {
+    #[derive(Default)]
+    struct Present(bool);
+    impl<'de> serde::Deserialize<'de> for Present {
+        fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+            <serde::de::IgnoredAny as serde::Deserialize<'de>>::deserialize(deserializer)
+                .map(|_| Self(true))
+        }
+    }
+    #[derive(serde::Deserialize)]
+    struct Shape<'a> {
+        #[serde(default, borrow)]
+        method: std::borrow::Cow<'a, str>,
+        #[serde(default)]
+        id: Present,
+    }
+    let shape: Shape<'_> = serde_json::from_slice(body).ok()?;
+    (shape.method == "initialize").then_some(shape.id.0)
+}
+
+fn initialize_without_id_refusal() -> Response {
+    jsonrpc_http_error(
+        StatusCode::BAD_REQUEST,
+        -32600,
+        "initialize must be a JSON-RPC request with an id",
+    )
+}
+
+fn initialize_session_header_refusal() -> Response {
+    jsonrpc_http_error(
+        StatusCode::BAD_REQUEST,
+        -32600,
+        "initialize request must not include MCP-Session-Id",
+    )
 }
 
 fn is_terminal_response_for_request(message: &Value, request_id: &Value) -> bool {
