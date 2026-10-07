@@ -136,6 +136,7 @@ impl KeyringDelivery {
         );
         let receipt_anchors = tempfile::Builder::new()
             .prefix("chio-native-keyring-anchors-")
+            .permissions(fs::Permissions::from_mode(0o700))
             .tempdir_in("/dev/shm")?;
         let receipts = Arc::new(SqliteReceiptStore::open_for_finding_pool(
             directory.join("key-receipts.sqlite3"),
