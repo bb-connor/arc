@@ -396,10 +396,7 @@ impl<'de> Visitor<'de> for RequestSeed<'_> {
             destination: required(destination, "destination")?,
             headers: required(headers, "headers")?,
             body: required(body, "body")?,
-            approved_preview_sha256: match approved_preview_sha256 {
-                Some(value) => value,
-                None => None,
-            },
+            approved_preview_sha256: approved_preview_sha256.flatten(),
             options: required(options, "options")?,
         })
     }

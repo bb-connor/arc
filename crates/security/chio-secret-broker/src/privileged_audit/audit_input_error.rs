@@ -52,6 +52,6 @@ impl Error for AuditInputError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         self.source
             .as_deref()
-            .map(|source| source as &(dyn Error + 'static))
+            .map(|source| -> &(dyn Error + 'static) { source })
     }
 }
