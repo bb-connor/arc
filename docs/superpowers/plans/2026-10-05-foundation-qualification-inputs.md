@@ -3,11 +3,13 @@
 ## Current user review ruling (2026-10-07)
 
 The user explicitly directs execution to continue within the existing landing
-scope despite the Codex review service quota. Current review acceptance requires
-Greptile review of the exact final candidate and a positive independent internal
-source review. Historical Codex reviews and quota failures remain preserved;
-service availability is no longer a required acceptance or authorization gate.
-A changed candidate requires refreshed review of that candidate.
+scope despite review service quota or availability failures. Request Greptile
+review of the exact final candidate when available, and retain any failed or
+unavailable attempt with its candidate binding. A positive independent internal
+review of the exact candidate source remains required. Historical reviews and
+quota failures remain preserved; review service availability is not an acceptance
+or authorization gate. A changed candidate requires refreshed internal review
+and a fresh Greptile request when available.
 
 All native, cold mutation, trusted capture, authenticated publication, terminal
 exact-candidate checks and protected merge requirements remain required. This
@@ -35,9 +37,10 @@ features or landing PRs.
    host and TLS component checks. Reproduce the actual failure and repair the
    owning boundary, then rerun the native handoff and uncertain recovery lanes.
 4. Run the affected suites and structural checks, retain their results, update
-   the ledger, commit and push. Obtain exact-candidate Greptile review and a
-   positive independent internal source review before rotating trusted source
-   authorization and launching a fresh campaign.
+   the ledger, commit and push. Obtain a positive independent internal review of
+   the exact candidate source and request Greptile review when available before
+   rotating trusted source authorization and launching a fresh campaign. Retain
+   any unavailable Greptile attempt under the current user review ruling.
 
 Review focus: build input provenance and bounded reads, unchanged package
 closure, authenticated caller projection, configuration rejection reasons,
@@ -100,8 +103,9 @@ This source passed independent GitHub Codex review. Qualification remains open.
 - [ ] Preserve terminal hosted outcomes, skipped cases, controller queue expiry
   and the separate read-only #1029 reconciliation. Update the landing ledger,
   verify affected boundaries and commit one reviewed repair checkpoint. Obtain
-  exact-source Greptile review and independent internal source review before
-  rotating source authorization.
+  independent internal review of the exact source and request Greptile review
+  when available before rotating source authorization. Retain any unavailable
+  Greptile attempt under the current user review ruling.
 
 Do not count the old authorized-tooling image results as qualification of the
 retained CA input. Native diagnostics on the isolated worker are component
