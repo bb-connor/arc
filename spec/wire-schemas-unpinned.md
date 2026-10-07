@@ -8,9 +8,9 @@ lock. Written by `scripts/check-wire-schemas.py --update`; the gate fails
 when an unpinned constant is missing from this list, and an entry that has
 since been pinned is removed by the next `--update`.
 
-169 of 508 identifier constants in the security crates are unpinned.
+213 of 599 identifier constants in the security crates are unpinned.
 
-## crates/core/chio-core-types (26)
+## crates/core/chio-core-types (70)
 
 - `crates/core/chio-core-types/src/capability/caveat.rs:10` `CAPABILITY_SECURITY_BINDING_SCHEMA` = `chio.capability-security-binding.v1`
 - `crates/core/chio-core-types/src/declassification.rs:12` `DECLASSIFICATION_GRANT_SIGNATURE_DOMAIN` = `chio:declassification-grant:v1`
@@ -38,11 +38,55 @@ since been pinned is removed by the next `--update`.
 - `crates/core/chio-core-types/src/provider_attempt.rs:38` `COMPLETION_DIGEST_DOMAIN` = `chio.provider-completion.v1`
 - `crates/core/chio-core-types/src/receipt/economics.rs:8` `CHIO_CHANNEL_RECEIPT_METADATA_SCHEMA` = `chio.channel.receipt-metadata.v1`
 - `crates/core/chio-core-types/src/receipt/metadata.rs:483` `FINDING_RECOVERY_SCHEMA` = `chio.finding.recovery.v1`
+- `crates/core/chio-core-types/src/recovery/authority.rs:170` `RECOVERY_PROVIDER_SIGNATURE_DOMAIN` = `chio:recovery-provider-finality:v1`
+- `crates/core/chio-core-types/src/recovery/confinement.rs:11` `CONFINED_DISCLOSURE_SIGNATURE_DOMAIN` = `chio:confined-disclosure:v1`
+- `crates/core/chio-core-types/src/recovery/confinement.rs:12` `CONFINED_ENDORSEMENT_SIGNATURE_DOMAIN` = `chio:confined-endorsement:v1`
+- `crates/core/chio-core-types/src/recovery/domains.rs:8` `OFFER_DOMAIN` = `chio.recovery.offer.v1`
+- `crates/core/chio-core-types/src/recovery/domains.rs:9` `PLAN_DOMAIN` = `chio.recovery.plan.v1`
+- `crates/core/chio-core-types/src/recovery/domains.rs:10` `BASIS_DOMAIN` = `chio.recovery.basis.v1`
+- `crates/core/chio-core-types/src/recovery/domains.rs:11` `EXPLANATION_DOMAIN` = `chio.recovery.explanation.v1`
+- `crates/core/chio-core-types/src/recovery/domains.rs:14` `ARTIFACT_PROVENANCE_DOMAIN` = `chio.artifact.provenance.v1`
+- `crates/core/chio-core-types/src/recovery/domains.rs:15` `RETURN_CONTRACT_DOMAIN` = `chio.isolation.return-contract.v1`
+- `crates/core/chio-core-types/src/recovery/domains.rs:18` `EXPLANATION_EVALUATION_DOMAIN` = `chio.recovery.explanation-evaluation.v1`
+- `crates/core/chio-core-types/src/recovery/domains.rs:19` `EXPLANATION_PROJECTION_DOMAIN` = `chio.recovery.explanation-projection.v1`
+- `crates/core/chio-core-types/src/recovery/domains.rs:35` `ACTIVE_WORKFLOW_OWNER_DOMAIN` = `chio.recovery.active-owner.v1`
+- `crates/core/chio-core-types/src/recovery/domains.rs:38` `EFFECT_CONTRACT_DOMAIN` = `chio.recovery.effect-contract.v1`
+- `crates/core/chio-core-types/src/recovery/domains.rs:39` `PREVIEW_DOMAIN` = `chio.recovery.preview.v1`
+- `crates/core/chio-core-types/src/recovery/domains.rs:40` `SETUP_CREATION_LEGACY_DOMAIN` = `chio.recovery.setup.creation.v1`
+- `crates/core/chio-core-types/src/recovery/domains.rs:43` `SETUP_SOURCE_PROFILE_LEGACY_DOMAIN` = `chio.recovery.setup.source-profile.v1`
+- `crates/core/chio-core-types/src/recovery/domains.rs:44` `SETUP_RETIREMENT_DOMAIN` = `chio.recovery.setup.retirement.v1`
+- `crates/core/chio-core-types/src/recovery/domains.rs:45` `SETUP_BENIGN_RECEIPT_DOMAIN` = `chio.recovery.setup.benign-receipt.v1`
+- `crates/core/chio-core-types/src/recovery/domains.rs:46` `SETUP_DENIED_COMMAND_DOMAIN` = `chio.recovery.setup.denied-command.v1`
+- `crates/core/chio-core-types/src/recovery/domains.rs:47` `SETUP_NATIVE_AUTHORITY_DOMAIN` = `chio.recovery.setup.native-authority.v1`
+- `crates/core/chio-core-types/src/recovery/domains.rs:48` `SETUP_REQUIRED_COVERAGE_DOMAIN` = `chio.recovery.setup.required-coverage.v1`
+- `crates/core/chio-core-types/src/recovery/domains.rs:49` `DECISION_REPORT_DOMAIN` = `chio.recovery.decision-report.v1`
+- `crates/core/chio-core-types/src/recovery/domains.rs:50` `POLICY_MAINTENANCE_PROPOSAL_DOMAIN` = `chio.recovery.policy-maintenance-proposal.v1`
+- `crates/core/chio-core-types/src/recovery/domains.rs:55` `SEMANTIC_CONTENT_DOMAIN` = `chio.semantic.content.v1`
+- `crates/core/chio-core-types/src/recovery/domains.rs:57` `SEMANTIC_NATIVE_REQUEST_SEMANTICS_DOMAIN` = `chio.semantic.native-request-semantics.v1`
+- `crates/core/chio-core-types/src/recovery/domains.rs:58` `SEMANTIC_NATIVE_OUTPUT_ORIGIN_DOMAIN` = `chio.semantic.native-output-origin.v1`
+- `crates/core/chio-core-types/src/recovery/domains.rs:69` `KNOWLEDGE_INFLUENCE_SCOPE_DOMAIN` = `chio.knowledge.influence-scope.v1`
+- `crates/core/chio-core-types/src/recovery/domains.rs:70` `KNOWLEDGE_INFLUENCE_FOLD_DOMAIN` = `chio.knowledge.influence-fold.v1`
+- `crates/core/chio-core-types/src/recovery/domains.rs:71` `KNOWLEDGE_HANDLE_IDENTITY_DOMAIN` = `chio.knowledge.handle-identity.v1`
+- `crates/core/chio-core-types/src/recovery/domains.rs:72` `KNOWLEDGE_ACTOR_IDENTITY_DOMAIN` = `chio.knowledge.actor-identity.v1`
+- `crates/core/chio-core-types/src/recovery/domains.rs:73` `KNOWLEDGE_REFERENCE_IDENTITY_DOMAIN` = `chio.knowledge.reference-identity.v1`
+- `crates/core/chio-core-types/src/recovery/domains.rs:74` `KNOWLEDGE_REFERENCE_OWNER_DOMAIN` = `chio.knowledge.reference-owner.v1`
+- `crates/core/chio-core-types/src/recovery/domains.rs:75` `KNOWLEDGE_OBJECT_CUSTODY_DOMAIN` = `chio.knowledge.object-custody.v1`
+- `crates/core/chio-core-types/src/recovery/domains.rs:77` `PARTICIPANT_OWNER_DOMAIN` = `chio.participant.owner.v1`
+- `crates/core/chio-core-types/src/recovery/domains.rs:78` `SEMANTIC_NATIVE_STATUS_ORIGIN_DOMAIN` = `chio.semantic.native-status-origin.v1`
+- `crates/core/chio-core-types/src/recovery/explanation.rs:11` `RECOVERY_EXPLANATION_REPORT_SIGNATURE_DOMAIN` = `chio:recovery-explanation-report:v1`
+- `crates/core/chio-core-types/src/recovery/explanation.rs:13` `RECOVERY_EXPLANATION_VIEW_SIGNATURE_DOMAIN` = `chio:recovery-explanation-view:v1`
+- `crates/core/chio-core-types/src/recovery/knowledge.rs:14` `ARTIFACT_ARCHIVE_SIGNATURE_DOMAIN` = `chio:artifact-archive:v1`
+- `crates/core/chio-core-types/src/recovery/semantic.rs:13` `SEMANTIC_PACKAGE_SIGNATURE_DOMAIN` = `chio:semantic-package:v1`
+- `crates/core/chio-core-types/src/recovery/semantic.rs:14` `SEMANTIC_DEPLOYMENT_SIGNATURE_DOMAIN` = `chio:semantic-deployment:v1`
+- `crates/core/chio-core-types/src/recovery/semantic.rs:15` `SEMANTIC_AUDIENCE_SIGNATURE_DOMAIN` = `chio:semantic-audience:v1`
+- `crates/core/chio-core-types/src/recovery/semantic.rs:17` `SEMANTIC_ANNOTATION_SIGNATURE_DOMAIN` = `chio:semantic-annotation:v1`
+- `crates/core/chio-core-types/src/recovery/semantic.rs:18` `SEMANTIC_TRANSFORMATION_SIGNATURE_DOMAIN` = `chio:semantic-transformation:v1`
+- `crates/core/chio-core-types/src/recovery/semantic.rs:19` `SEMANTIC_PREREQUISITE_SIGNATURE_DOMAIN` = `chio:semantic-prerequisite:v1`
 
 ## crates/kernel/chio-kernel (49)
 
 - `crates/kernel/chio-kernel/src/admission_operation.part1.inc:9` `ADMISSION_OPERATION_SCHEMA` = `chio.security-admission-operation.v1`
-- `crates/kernel/chio-kernel/src/admission_operation.rs:83` `ADMISSION_REQUEST_NAMESPACE_SCHEMA` = `chio.admission-request-namespace.v1`
+- `crates/kernel/chio-kernel/src/admission_operation.rs:86` `ADMISSION_REQUEST_NAMESPACE_SCHEMA` = `chio.admission-request-namespace.v1`
 - `crates/kernel/chio-kernel/src/admission_operation/caller_dispatch_context.rs:9` `SCHEMA` = `chio.admission-caller-dispatch-context.v1`
 - `crates/kernel/chio-kernel/src/admission_operation/governed_approval_replay.rs:12` `SCHEMA` = `chio.governed-approval-replay-source-seal.v1`
 - `crates/kernel/chio-kernel/src/admission_operation/native_security_binding.rs:6` `SCHEMA` = `chio.native-security-authority-binding.v1`
@@ -68,7 +112,7 @@ since been pinned is removed by the next `--update`.
 - `crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller.rs:12` `SIGNING_SCHEMA` = `chio.kernel-caller-return-context.v2`
 - `crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller.rs:13` `PARTICIPANT_SCHEMA` = `chio.kernel-caller-return-context.v3`
 - `crates/kernel/chio-kernel/src/kernel/admission_terminal_receipt.rs:11` `TERMINAL_RECEIPT_OUTBOX_SCHEMA` = `chio.admission-terminal-receipt.v1`
-- `crates/kernel/chio-kernel/src/kernel/mod.rs:143` `MANIFEST_SECURITY_METADATA_KEY` = `chio_manifest_security_v1`
+- `crates/kernel/chio-kernel/src/kernel/mod.rs:147` `MANIFEST_SECURITY_METADATA_KEY` = `chio_manifest_security_v1`
 - `crates/kernel/chio-kernel/src/kernel/recovery_gate.rs:34` `FINDING_RECOVERY_REQUEST_BINDING_SCHEMA` = `chio.finding.recovery-request-binding.v1`
 - `crates/kernel/chio-kernel/src/memory_provenance.rs:46` `MEMORY_PROVENANCE_ENTRY_SCHEMA` = `chio.memory_provenance_entry.v1`
 - `crates/kernel/chio-kernel/src/operator_report/constants.rs:23` `ECONOMIC_COMPLETION_FLOW_SCHEMA` = `chio.economic-completion-flow.v1`

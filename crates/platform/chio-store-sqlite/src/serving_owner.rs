@@ -23,6 +23,9 @@ use crate::{SqliteBudgetStore, SqliteRevocationStore};
 
 mod finding_market_snapshot_versions;
 mod global_commit_chain;
+mod native_source_transaction;
+pub(crate) use global_commit_chain::GlobalCommitAppendReceipt;
+pub(crate) use native_source_transaction::NativeSourceTransactionOrigin;
 mod lease_history;
 mod path_identity;
 mod relocation;
@@ -44,6 +47,14 @@ pub use relocation::{
 #[cfg(feature = "fuzz")]
 pub(crate) use rollback_anchor::exercise_slot_image;
 use rollback_anchor::{AnchorRecord, RollbackAnchor};
+
+/// Validate retained projection references before recognizing legacy recovery
+/// planning data without a protected allocation baseline.
+pub(crate) fn verify_authenticated_recovery_history(
+    connection: &Connection,
+) -> Result<(), SqliteServingOwnerError> {
+    global_commit_chain::verify_global_commit_chain(connection).map(|_| ())
+}
 
 #[cfg(test)]
 pub(crate) fn verify_finding_market_projection_for_tests(
@@ -192,6 +203,21 @@ impl SqliteServingOwner {
         self.rollback_anchor.verify_current(connection)
     }
 
+    fn require_connection_current(
+        &self,
+        connection: &Connection,
+    ) -> Result<(), SqliteServingOwnerError> {
+        self.require_unpoisoned()?;
+        let actual = authority_data_version(connection)?;
+        if actual != self.expected_data_version.load(Ordering::Acquire) {
+            self.poisoned.store(true, Ordering::Release);
+            return Err(SqliteServingOwnerError::OutcomeUnknown(
+                "authority database changed outside its serving-owner connection".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     /// Verify custody from the read-only companion connection.
     ///
     /// `PRAGMA data_version` is connection-local and advances here for
@@ -238,6 +264,24 @@ impl SqliteServingOwner {
         projection_sequence: u64,
     ) -> Result<(), SqliteServingOwnerError> {
         append_global_commit(
+            transaction,
+            mutation_kind,
+            projection_kind,
+            projection_key,
+            projection_sequence,
+            &self.fence,
+        )
+    }
+
+    pub(crate) fn append_global_commit_with_receipt(
+        &self,
+        transaction: &Transaction<'_>,
+        mutation_kind: &str,
+        projection_kind: &str,
+        projection_key: &str,
+        projection_sequence: u64,
+    ) -> Result<GlobalCommitAppendReceipt, SqliteServingOwnerError> {
+        global_commit_chain::append_global_commit_with_receipt(
             transaction,
             mutation_kind,
             projection_kind,
@@ -803,6 +847,7 @@ impl SqliteAuthorityStore {
             &mut connection,
             &owner,
         )?;
+        crate::admission_operation_store::repair_completed_at_startup(&mut connection, &owner)?;
         let read_companions = crate::read_companion::ReadCompanionPool::open(
             &database_path,
             record.database_device,
@@ -839,6 +884,18 @@ impl SqliteAuthorityStore {
     #[must_use]
     pub fn mutation_fence(&self) -> StoreMutationFence {
         self.owner.fence.clone()
+    }
+
+    /// Test-only handoff releases the actual OS lock while retaining every
+    /// old handle, fence, anchor and poison bit for live stale-owner checks.
+    #[cfg(any(test, feature = "admission-test-support"))]
+    pub fn release_serving_lock_for_stale_owner_test(&self) -> Result<(), SqliteServingOwnerError> {
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+        self.owner.verify_authority_anchor(&connection)?;
+        self.owner.rollback_anchor.release_serving_lock_for_test()
     }
 
     /// Verify that this live serving owner is bound to the configured

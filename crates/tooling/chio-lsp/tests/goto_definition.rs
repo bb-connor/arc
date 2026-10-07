@@ -154,8 +154,5 @@ fn error_urn_is_not_a_definition_target() {
     let uri = Url::parse("file:///proj/chio.yaml").unwrap();
     let pos = Position::new(0, 30);
     let loc = definition(DocumentLanguage::ChioYaml, &uri, text, pos);
-    assert!(
-        loc.is_none(),
-        "error URNs are not definition targets in P4.T5"
-    );
+    assert!(loc.is_none(), "error URNs are not definition targets");
 }

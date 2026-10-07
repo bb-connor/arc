@@ -37,7 +37,7 @@ fn spool_persists_fixture_payloads_encrypted_at_rest() -> Result<(), Box<dyn std
     let db_path = dir.path().join("tee-spool.sqlite3");
     let store = SqliteEncryptedBlobStore::open(&db_path)?;
     let spool = TeeBlobSpool::new(TeeBlobPersistence::new(store));
-    let tenant = TenantId::new("tenant-m07-fixtures");
+    let tenant = TenantId::new("tenant-encryption-fixtures");
     let key = TenantKey::from_bytes([7; 32]);
 
     let traffic =
@@ -72,14 +72,14 @@ fn spool_keeps_multiple_provider_fixtures_tenant_scoped() -> Result<(), Box<dyn 
 {
     let store = SqliteEncryptedBlobStore::open_in_memory()?;
     let spool = TeeBlobSpool::new(TeeBlobPersistence::new(store));
-    let tenant = TenantId::new("tenant-m07-bedrock");
+    let tenant = TenantId::new("tenant-bedrock");
     let key = TenantKey::from_bytes([11; 32]);
 
     let traffic = spool.persist_traffic(&tenant, &key, BEDROCK_ASSUMED_ROLE, OPENAI_SINGLE_TOOL)?;
 
     assert_eq!(
         traffic.request.handle.tenant_id().as_str(),
-        "tenant-m07-bedrock"
+        "tenant-bedrock"
     );
     assert_eq!(
         spool.read_blob(&traffic.request.handle, &key)?,

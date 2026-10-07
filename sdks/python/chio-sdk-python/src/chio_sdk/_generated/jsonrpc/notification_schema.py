@@ -2,36 +2,25 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: eb3605a1594254370980dcf328ad3f0c7a751ff746d1530b9981c40163f5694a
+# Schema sha256: 35f8e30cf30553986a159b074ee485804a85db29547a8102522cd7bfa3080d2e
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
 # under sdks/python/chio-sdk-python/src/chio_sdk/_generated/.
 
-
 from __future__ import annotations
-
 from typing import Any, Literal
-
 from pydantic import BaseModel, ConfigDict, Field, constr
 
-
-class ChioJsonRpc20Notification(BaseModel):
+class ChioJSONRPC20Notification(BaseModel):
     """
     JSON-RPC 2.0 notification envelope used by Chio for MCP and A2A wire framing. Mirrors the inline serde shape constructed by `send_notification` in `crates/protocol/chio-mcp-adapter` and the streaming-chunk and cancellation notifications in `crates/protocol/chio-mcp-edge` and `crates/protocol/chio-mcp-adapter`. A notification is structurally a request with no `id` field; the receiver MUST NOT respond. Common Chio notification methods include 'notifications/initialized', 'notifications/cancelled', 'notifications/tasks/status', 'notifications/resources/updated', 'notifications/resources/list_changed', and the Chio-specific tool-streaming chunk method exposed as `CHIO_TOOL_STREAMING_NOTIFICATION_METHOD`.
     """
+    model_config = ConfigDict(extra='forbid')
+    jsonrpc: Literal['2.0'] = Field(..., description="Protocol version literal. Always the string '2.0'.")
+    method: constr(min_length=1) = Field(..., description="Notification method name (for example 'notifications/initialized', 'notifications/cancelled', 'notifications/tasks/status').")
+    params: dict[str, Any] | list | None = Field(None, description='Method parameters. JSON-RPC 2.0 allows omission; Chio call sites typically supply at least an empty object.')
 
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    jsonrpc: Literal["2.0"] = Field(
-        ..., description="Protocol version literal. Always the string '2.0'."
-    )
-    method: constr(min_length=1) = Field(
-        ...,
-        description="Notification method name (for example 'notifications/initialized', 'notifications/cancelled', 'notifications/tasks/status').",
-    )
-    params: dict[str, Any] | list | None = Field(
-        None,
-        description="Method parameters. JSON-RPC 2.0 allows omission; Chio call sites typically supply at least an empty object.",
-    )
+# Public compatibility aliases reference the actual current model classes.
+ChioJsonRpc20Notification = ChioJSONRPC20Notification
+JsonrpcNotificationChioJSONRPC20Notification = ChioJSONRPC20Notification

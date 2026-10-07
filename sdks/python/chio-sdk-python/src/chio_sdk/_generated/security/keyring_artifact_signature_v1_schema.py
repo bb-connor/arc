@@ -2,56 +2,45 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: eb3605a1594254370980dcf328ad3f0c7a751ff746d1530b9981c40163f5694a
+# Schema sha256: 35f8e30cf30553986a159b074ee485804a85db29547a8102522cd7bfa3080d2e
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
 # under sdks/python/chio-sdk-python/src/chio_sdk/_generated/.
 
-
 from __future__ import annotations
-
 from enum import Enum
 from typing import Literal
-
 from pydantic import BaseModel, ConfigDict, Field, RootModel, conint, constr
 
-
-class Hash(RootModel[constr(pattern=r"^0x[0-9a-f]{64}$")]):
-    root: constr(pattern=r"^0x[0-9a-f]{64}$")
-
+class Hash(RootModel[constr(pattern='^0x[0-9a-f]{64}$')]):
+    root: constr(pattern='^0x[0-9a-f]{64}$')
 
 class U64(RootModel[conint(ge=0, le=18446744073709551615)]):
     root: conint(ge=0, le=18446744073709551615)
 
+class SecurityKeyringArtifactSignatureV1DefinitionsAlgorithm(Enum):
+    ed25519 = 'ed25519'
+    p256 = 'p256'
+    p384 = 'p384'
+    hybrid = 'hybrid'
 
-class Algorithm(Enum):
-    ed25519 = "ed25519"
-    p256 = "p256"
-    p384 = "p384"
-    hybrid = "hybrid"
-
-
-class Signature(
-    RootModel[
-        constr(
-            pattern=r"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\+mldsa65)$"
-        )
-    ]
-):
-    root: constr(
-        pattern=r"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\+mldsa65)$"
-    )
-
+class Signature(RootModel[constr(pattern='^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$')]):
+    root: constr(pattern='^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$')
 
 class ChioKeyringArtifactSignatureEvidenceV1(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    schema_: Literal["chio.keyring.artifact-signature.v1"] = Field(..., alias="schema")
+    model_config = ConfigDict(extra='forbid')
+    schema_: Literal['chio.keyring.artifact-signature.v1'] = Field(..., alias='schema')
     artifact_hash: Hash
     key_id: Hash
     signing_epoch: U64
-    algorithm: Algorithm
+    algorithm: SecurityKeyringArtifactSignatureV1DefinitionsAlgorithm
     artifact_signature: Signature
     fence_signature: Signature
+
+# Public compatibility aliases reference the actual current model classes.
+Algorithm = SecurityKeyringArtifactSignatureV1DefinitionsAlgorithm
+SecurityKeyringArtifactSignatureV1ChioKeyringArtifactSignatureEvidenceV1 = ChioKeyringArtifactSignatureEvidenceV1
+SecurityKeyringArtifactSignatureV1Hash = Hash
+SecurityKeyringArtifactSignatureV1Signature = Signature
+SecurityKeyringArtifactSignatureV1U64 = U64

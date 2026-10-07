@@ -1,7 +1,7 @@
 """Run an initialized governed host with its existing process supervisor.
 
 This exports independently checked worker responses. It does not yet produce
-M5's complete terminal/confinement/scenario acceptance artifact.
+the complete terminal, confinement and scenario acceptance artifact.
 """
 
 import argparse
@@ -175,7 +175,7 @@ def main():
         "verified_workers": verified,
         "runner": run_report,
         "completed_run": run_verification,
-        "m5_acceptance_complete": False,
+        "qualification_complete": False,
     }
     write(output / "run.json", result)
     print(json.dumps(result))

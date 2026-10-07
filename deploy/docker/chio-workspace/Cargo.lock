@@ -2665,6 +2665,7 @@ name = "chio-cage"
 version = "0.1.0"
 dependencies = [
  "chio-core",
+ "chio-core-types",
  "chio-manifest",
  "chio-test-support",
  "libc",
@@ -2673,6 +2674,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+ "zeroize",
 ]
 
 [[package]]
@@ -3049,6 +3051,7 @@ version = "0.1.0"
 dependencies = [
  "aws-lc-rs",
  "chio-security-types",
+ "chio-semantic-contracts",
  "chio-spec-codegen",
  "chio-test-support",
  "ed25519-dalek 2.2.0",
@@ -3706,6 +3709,7 @@ dependencies = [
  "chio-log-redact",
  "chio-manifest",
  "chio-metrics-spec",
+ "chio-quarantine",
  "chio-security-types",
  "chio-settle",
  "chio-store-sqlite",
@@ -4229,6 +4233,7 @@ name = "chio-quarantine"
 version = "0.1.0"
 dependencies = [
  "chio-core-types",
+ "chio-kernel",
  "chio-security-types",
  "hex",
  "proptest",
@@ -4460,6 +4465,15 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-semantic-contracts"
+version = "0.1.0"
+dependencies = [
+ "chio-security-types",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

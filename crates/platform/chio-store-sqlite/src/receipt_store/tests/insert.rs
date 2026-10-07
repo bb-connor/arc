@@ -898,7 +898,7 @@ fn group_commit_isolates_per_record_failure() -> Result<(), Box<dyn std::error::
 
     // Pre-commit a base receipt so its receipt_id already exists with its own
     // stored raw_json (claim-log entry 1).
-    let base = sample_receipt_with_keypair("rcpt-p2-base", 1, &keypair);
+    let base = sample_receipt_with_keypair("rcpt-concurrent-base", 1, &keypair);
     store.append_chio_receipt_returning_seq(&base)?;
     store.flush_receipt_writes()?;
 
@@ -906,8 +906,8 @@ fn group_commit_isolates_per_record_failure() -> Result<(), Box<dyn std::error::
     // appends bracketing ONE bad request that reuses `base`'s receipt_id with
     // DIFFERENT raw JSON (a conflicting duplicate). `append_chio_receipt_tx`
     // rejects it with "already exists with different content".
-    let good_one = sample_receipt_with_keypair("rcpt-p2-good-1", 2, &keypair);
-    let good_two = sample_receipt_with_keypair("rcpt-p2-good-2", 3, &keypair);
+    let good_one = sample_receipt_with_keypair("rcpt-concurrent-good-1", 2, &keypair);
+    let good_two = sample_receipt_with_keypair("rcpt-concurrent-good-2", 3, &keypair);
     let (r0_tx, _r0) = std::sync::mpsc::sync_channel(1);
     let (r1_tx, _r1) = std::sync::mpsc::sync_channel(1);
     let (r2_tx, _r2) = std::sync::mpsc::sync_channel(1);

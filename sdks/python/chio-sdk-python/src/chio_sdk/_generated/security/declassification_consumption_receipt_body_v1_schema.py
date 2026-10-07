@@ -2,30 +2,26 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: eb3605a1594254370980dcf328ad3f0c7a751ff746d1530b9981c40163f5694a
+# Schema sha256: 35f8e30cf30553986a159b074ee485804a85db29547a8102522cd7bfa3080d2e
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
 # under sdks/python/chio-sdk-python/src/chio_sdk/_generated/.
 
-
 from __future__ import annotations
-
 from typing import Literal
-
 from pydantic import BaseModel, ConfigDict
-
 from . import flow_denial_receipt_body_v1_schema
 
-
 class ChioDeclassificationConsumptionReceiptBodyV1(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    header: flow_denial_receipt_body_v1_schema.Header
-    policy: flow_denial_receipt_body_v1_schema.Policy
+    model_config = ConfigDict(extra='forbid')
+    header: flow_denial_receipt_body_v1_schema.SecurityFlowDenialReceiptBodyV1DefinitionsHeader
+    policy: flow_denial_receipt_body_v1_schema.SecurityFlowDenialReceiptBodyV1DefinitionsPolicy
     grant_id: flow_denial_receipt_body_v1_schema.Identifier
     grant_hash: flow_denial_receipt_body_v1_schema.Digest
     request_hash: flow_denial_receipt_body_v1_schema.Digest
     event_id: flow_denial_receipt_body_v1_schema.Identifier
-    state: Literal["consumed_pending_dispatch"]
+    state: Literal['consumed_pending_dispatch']
+
+# Public compatibility aliases reference the actual current model classes.
+SecurityDeclassificationConsumptionReceiptBodyV1ChioDeclassificationConsumptionReceiptBodyV1 = ChioDeclassificationConsumptionReceiptBodyV1

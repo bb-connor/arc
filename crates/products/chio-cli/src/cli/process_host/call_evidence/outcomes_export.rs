@@ -137,7 +137,7 @@ pub(crate) fn export(state: &Path, plan: &Path, output: &Path) -> Result<(), Cli
     )?;
     println!(
         "{}",
-        json!({"artifact": output, "receipt_id": signed.id, "runtime_id": run.runtime_id, "workers": run.calls.len(), "m5_acceptance_complete": false})
+        json!({"artifact": output, "receipt_id": signed.id, "runtime_id": run.runtime_id, "workers": run.calls.len(), "qualification_complete": false})
     );
     Ok(())
 }

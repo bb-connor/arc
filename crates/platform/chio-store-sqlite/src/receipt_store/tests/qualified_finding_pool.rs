@@ -583,7 +583,7 @@ fn qualified_receipt_sink_anchors_checkpoint_publication_bindings(
         ),
         trust_anchor_ref: "qualified-anchor-root".to_owned(),
         signer_cert_ref: "qualified-cert-chain".to_owned(),
-        publication_profile_version: "phase4-pilot".to_owned(),
+        publication_profile_version: "evidence-pilot.v1".to_owned(),
     };
     store.record_checkpoint_publication_trust_anchor_binding(checkpoint_seq, &binding)?;
     let connection = rusqlite::Connection::open(&database)?;

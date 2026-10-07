@@ -54,7 +54,30 @@ pub(in crate::admission_operation_store) fn observe_authority_time(
             |row| row.get(0),
         )
         .map_err(sqlite_error)?;
-    if observed < stored_u64(high_water, "trusted_time_high_water_unix_ms")? {
+    let recovery_table:bool=transaction.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name='admission_operation_recovery_events')",[],|row|row.get(0)).map_err(sqlite_error)?;
+    let recovery_high_water: i64 = if recovery_table {
+        transaction
+            .query_row(
+                "SELECT coalesce(max(observed_at),0) FROM admission_operation_recovery_events",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(sqlite_error)?
+    } else {
+        0
+    };
+    if observed
+        < stored_u64(
+            high_water.max(recovery_high_water),
+            "trusted_time_high_water_unix_ms",
+        )?
+    {
+        #[cfg(feature = "admission-test-support")]
+        super::super::recovery::command_quota_test_support::record_clock_regression(
+            observed,
+            high_water,
+            recovery_high_water,
+        );
         return Err(invariant("trusted admission authority time regressed"));
     }
     Ok(observed)

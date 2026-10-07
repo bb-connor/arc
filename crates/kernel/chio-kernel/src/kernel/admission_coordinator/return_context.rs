@@ -17,6 +17,12 @@ use participants::FrozenDispatchParticipants;
 pub(crate) enum DurableDispatchCommitError {
     #[error(transparent)]
     RejectedBeforeCommit(KernelError),
+    #[error("{error}")]
+    RejectedNativePolicyBeforeCommit {
+        #[source]
+        error: KernelError,
+        refusal: NativeFlowPolicyRefusal,
+    },
     #[error(transparent)]
     CommitUnconfirmed(KernelError),
 }

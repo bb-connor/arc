@@ -373,7 +373,7 @@ impl CapabilityToken {
 
     /// Delegation chain-binding check.
     ///
-    /// Closes the P0 soundness bug where `attenuation_proof.parent_scope_hash`
+    /// Rejects attenuation witnesses where `attenuation_proof.parent_scope_hash`
     /// was unbound from the issuer's actual upstream parent capability. An
     /// issuer with true authority `scope_X` can no longer mint a token
     /// claiming `parent_scope = scope_BIGGER` and have the verifier accept
@@ -443,7 +443,7 @@ impl CapabilityToken {
 
     /// Whether the token's shape requires the chain-binding rule to fire.
     ///
-    /// Chain binding closes the P0 soundness gap where an issuer could mint
+    /// Chain binding prevents an issuer from minting
     /// an attenuated token claiming `parent_scope = scope_BIGGER` and
     /// supply an internally consistent witness. The rule binds
     /// `attenuation_proof.parent_scope_hash` to either the trust-root scope

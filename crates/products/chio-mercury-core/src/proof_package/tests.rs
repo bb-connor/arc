@@ -486,7 +486,7 @@ fn sample_bundle_with_publication_records() -> (EvidenceExportBundle, Checkpoint
         ),
         trust_anchor_ref: "anchor-root-1".to_string(),
         signer_cert_ref: "cert-chain-1".to_string(),
-        publication_profile_version: "phase4-pilot".to_string(),
+        publication_profile_version: "evidence-pilot.v1".to_string(),
     };
     transparency.publications = vec![
         build_trust_anchored_checkpoint_publication(&first_checkpoint, binding.clone())

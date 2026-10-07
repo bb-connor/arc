@@ -1,8 +1,11 @@
 //! Original capture hands one live owner to the common durable finalizer.
-//! Historical readback can validate that owner, but can never construct it.
+//! Exact physically captured, recorded returns can restore only release custody.
 use super::*;
 use crate::kernel::credential_reservation::DispatchCredentialReservation;
 use crate::tool_outcome::DurableSecurityReleaseContext;
+
+#[path = "lifecycle/recorded_return.rs"]
+mod recorded_return;
 
 pub(super) struct CapturedLifecycle {
     pub context: DurableToolReturnContext,
@@ -205,14 +208,29 @@ impl ChioKernel {
             metadata: metadata.as_ref(),
             attempted: false,
             failed: false,
+            policy_refusal: None,
             return_input: Some(input),
             captured_lifecycle: None,
         };
-        let result = crate::kernel::security_dispatch::callback("native dispatch capture", || {
-            hook.commit_native_dispatch(&mut authority)
-        });
+        let result = crate::kernel::security_dispatch::callback_with_failure_kind(
+            "native dispatch capture",
+            || hook.commit_native_dispatch(&mut authority),
+        );
         let attempted = authority.attempted;
-        let result = result.and_then(|()| {
+        let refusal = if !attempted
+            && !authority.failed
+            && matches!(
+                &result,
+                Err((
+                    _,
+                    crate::kernel::security_dispatch::SecurityCallbackFailureKind::ReturnedError
+                ))
+            ) {
+            authority.policy_refusal
+        } else {
+            None
+        };
+        let result = result.map_err(|(error, _)| error).and_then(|()| {
             if authority.failed {
                 return Err(invalid(
                     "native lifecycle callback suppressed capture failure",
@@ -228,6 +246,8 @@ impl ChioKernel {
         result.map_err(|error| {
             if attempted {
                 DurableDispatchCommitError::CommitUnconfirmed(error)
+            } else if let Some(refusal) = refusal {
+                DurableDispatchCommitError::RejectedNativePolicyBeforeCommit { error, refusal }
             } else {
                 rejected(error)
             }

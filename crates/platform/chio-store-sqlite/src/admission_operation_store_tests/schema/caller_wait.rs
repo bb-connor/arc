@@ -50,6 +50,7 @@ fn rebuild_predecessor(connection: &Connection) -> rusqlite::Result<()> {
     if !sql.contains("'awaiting_caller_report'") {
         return Ok(());
     }
+    super::recovery::remove_empty_recovery_tables(connection)?;
     connection.execute_batch(
         "DROP INDEX admission_operations_replay_key;
         DROP INDEX admission_operations_request_id;
@@ -137,7 +138,7 @@ fn populated_v33_caller_wait_upgrade_preserves_original_rows_and_commit_chain() 
         rows(&connection, "admission_operation_commits")?,
         before_commits
     );
-    assert_eq!(connection.query_row("SELECT version FROM chio_store_schema_versions WHERE store_key = 'admission_operation'", [], |row| row.get::<_, i64>(0))?, 34);
+    assert_eq!(connection.query_row("SELECT version FROM chio_store_schema_versions WHERE store_key = 'admission_operation'", [], |row| row.get::<_, i64>(0))?, i64::from(crate::admission_operation_store::ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION));
     let bad_foreign_key: bool = connection.query_row(
         "SELECT EXISTS(SELECT 1 FROM pragma_foreign_key_check)",
         [],

@@ -48,15 +48,8 @@ impl SqliteAdmissionOperationStore {
         context: &NativeSecurityEgressContext<'_>,
         command: &EgressFenceCommit,
     ) -> Result<CommittedEgressFence, AdmissionOperationStoreError> {
-        let initialized = self.resolve_native_egress_initialization(context)?;
-        self.commit_security_participant_egress(
-            context.operation,
-            context.lease,
-            &initialized,
-            context.security_context,
-            context.request,
-            command,
-            context.trusted_now_unix_ms,
-        )
+        // Resolve the exact selected binding in the actual commit writer, where
+        // the new event clock is sampled after any wait for physical ownership.
+        self.commit_selected_native_egress(context, command)
     }
 }

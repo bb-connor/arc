@@ -9,6 +9,7 @@ pub(super) fn projection_reference_digest(
     sequence: u64,
 ) -> Result<String, SqliteServingOwnerError> {
     match kind {
+        "recovery" => crate::admission_operation_store::recovery_projection_reference(connection,key,sequence),
         "native_dispatch_ledger" => {
             crate::admission_operation_store::native_dispatch_ledger_projection_reference(
                 connection, key, sequence,

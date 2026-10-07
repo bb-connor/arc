@@ -140,7 +140,7 @@ init_case "$bumped"
 populate "$bumped"
 commit_case "$bumped"
 run_checker "$bumped" /dev/null /dev/null --update >/dev/null
-sed -i 's/chio.example.broker-execute.v1/chio.example.broker-execute.v2/' "$bumped/crates/security/chio-example/src/lib.rs"
+sed -i.bak 's/chio.example.broker-execute.v1/chio.example.broker-execute.v2/' "$bumped/crates/security/chio-example/src/lib.rs"
 assert_rc "$(run_checker "$bumped" "$work/bumped.out" "$work/bumped.err")" 1 \
   "a bumped identifier without a lock change fails"
 grep -F 'crates/security/chio-example/src/lib.rs:2 BROKER_EXECUTE_SCHEMA = "chio.example.broker-execute.v2" is not in the lock (new or bumped identifier)' \
@@ -181,7 +181,7 @@ init_case "$removed"
 populate "$removed"
 commit_case "$removed"
 run_checker "$removed" /dev/null /dev/null --update >/dev/null
-sed -i '/REPORT_FORMAT/,/chio.example.report/d' "$removed/crates/products/chio-example-cli/src/lib.rs"
+sed -i.bak '/REPORT_FORMAT/,/chio.example.report/d' "$removed/crates/products/chio-example-cli/src/lib.rs"
 assert_rc "$(run_checker "$removed" "$work/removed.out" "$work/removed.err")" 1 \
   "a removed identifier still in the lock fails"
 grep -E 'spec/wire-schemas.lock:[0-9]+ chio.example.report/v2 lists crates/products/chio-example-cli/src/lib.rs, which no longer declares it' \
@@ -204,7 +204,7 @@ init_case "$not_test_bumped"
 populate "$not_test_bumped"
 commit_case "$not_test_bumped"
 run_checker "$not_test_bumped" /dev/null /dev/null --update >/dev/null
-sed -i 's/chio.example.production-only.v1/chio.example.production-only.v2/' "$not_test_bumped/crates/security/chio-example/src/lib.rs"
+sed -i.bak 's/chio.example.production-only.v1/chio.example.production-only.v2/' "$not_test_bumped/crates/security/chio-example/src/lib.rs"
 assert_rc "$(run_checker "$not_test_bumped" "$work/not-test-bumped.out" "$work/not-test-bumped.err")" 1 \
   "a bumped identifier under cfg(not(test)) is production code and fails without a lock change"
 grep -F 'crates/security/chio-example/src/lib.rs:6 PRODUCTION_ONLY_SCHEMA = "chio.example.production-only.v2" is not in the lock (new or bumped identifier)' \
@@ -215,7 +215,7 @@ init_case "$unlisted"
 populate "$unlisted"
 commit_case "$unlisted"
 run_checker "$unlisted" /dev/null /dev/null --update >/dev/null
-sed -i '/BROKER_EXECUTE_SCHEMA/d' "$unlisted/spec/wire-schemas-unpinned.md"
+sed -i.bak '/BROKER_EXECUTE_SCHEMA/d' "$unlisted/spec/wire-schemas-unpinned.md"
 assert_rc "$(run_checker "$unlisted" "$work/unlisted.out" "$work/unlisted.err")" 1 \
   "an unpinned security-crate constant missing from the report fails"
 grep -F 'BROKER_EXECUTE_SCHEMA = "chio.example.broker-execute.v1" has no pinning literal and is not listed in spec/wire-schemas-unpinned.md' \

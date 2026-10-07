@@ -174,9 +174,12 @@ pub(super) fn recorded_version(
     ).map_err(sqlite_error)?;
     match version {
         28 => Ok(28),
-        // Later admission versions add independent journals and the v34 caller
-        // wait state. They do not change the v29 native row catalog/digest.
-        29..=34 => Ok(29),
+        // Later admission versions add independent journals, the v34 caller
+        // wait state, v35 recovery journals, v36 historical custody and v37
+        // auxiliary holds and independent protected projections, then v38
+        // command aliases. They
+        // preserve the v29 native row catalog and digest.
+        29..=40 => Ok(29),
         _ => Err(invalid("native security schema version is unsupported")),
     }
 }

@@ -10,6 +10,8 @@ use crate::tool_outcome::{
 
 #[path = "security_release/native_caller.rs"]
 mod native_caller;
+#[path = "security_release/recovery.rs"]
+mod recovery;
 
 pub(super) struct DurableSecurityReleaseInput<'a> {
     pub admission: &'a DurableToolAdmission,
@@ -107,11 +109,17 @@ impl ChioKernel {
                 ))
             };
         }
-        let permit = match permit {
-            Some(permit) => Some(permit),
-            None => self.recover_native_caller_release_owner(input.admission, input.raw)?,
-        }
-        .ok_or_else(|| {
+        let (permit, scoped_recovery) = match permit {
+            Some(permit) => (Some(permit), false),
+            None => match self.recover_native_caller_release_owner(input.admission, input.raw)? {
+                Some(permit) => (Some(permit), false),
+                None => match self.recover_original_release_owner(input.admission, input.raw)? {
+                    Some(permit) => (Some(permit), true),
+                    None => (self.recover_recorded_native_release_owner(&input)?, false),
+                },
+            },
+        };
+        let permit = permit.ok_or_else(|| {
             recovery_required(
                 "the original release owner is unavailable; fresh admission cannot replace it",
             )
@@ -129,7 +137,14 @@ impl ChioKernel {
             },
             runtime.fence.clone(),
             input.trusted_now_unix_ms,
-            |context| self.prepare_durable_native_output(input.admission, input.lease, context),
+            |context| {
+                self.prepare_durable_native_output(
+                    input.admission,
+                    input.lease,
+                    context,
+                    scoped_recovery,
+                )
+            },
         )?;
         self.reach_durable_finalization_cutpoint(
             DurableFinalizationCutpoint::SecurityReleaseAcknowledged,

@@ -1,14 +1,14 @@
-// C++ peer P0 conformance gate.
+// C++ peer core conformance gate.
 //
-// The C++ peer P0 surface is locked to `mcp_core` and `auth` only.
+// The C++ peer core surface is locked to `mcp_core` and `auth` only.
 // `chio-extensions`, `tasks`, `nested_callbacks`, and `notifications`
 // are deferred and are NOT exercised here. If you need to extend the
 // C++ peer's coverage, add a separate integration test rather than
-// expanding this one (its purpose is to be the immutable P0 gate).
+// expanding this one (its purpose is to be the core protocol gate).
 //
 // The C++ peer is the conformance-peer binary built from
 // `sdks/cpp/chio-cpp` via CMake; that binary links against
-// `crates/chio-cpp-kernel-ffi` (the C ABI surface for the Chio offline
+// `crates/sdk/chio-cpp-kernel-ffi` (the C ABI surface for the Chio offline
 // kernel). Driving the binary therefore exercises the FFI end-to-end.
 //
 // This test is gated behind the `CHIO_CPP_LIVE_CONFORMANCE` environment
@@ -17,7 +17,7 @@
 // always available on every dev workstation or CI runner, and the harness
 // also needs to spawn the chio binary plus the local OAuth fixtures. When
 // the variable is unset (the default), the test prints a skip notice and
-// returns success so `cargo test -p chio-conformance --test cpp_peer_p0`
+// returns success so `cargo test -p chio-conformance --test cpp_peer_core`
 // passes uniformly.
 
 #![allow(clippy::expect_used, clippy::unwrap_used)]
@@ -26,10 +26,10 @@ mod common;
 
 use chio_conformance::{run_conformance_harness, ConformanceAuthMode};
 
-// P0 scenarios for the C++ peer. Keep these lists in lockstep with
+// Core scenarios for the C++ peer. Keep these lists in lockstep with
 // `tests/conformance/scenarios/{mcp_core,auth}/` and the per-area
 // `mcp_core_cpp_live.rs` / `auth_cpp_live.rs` assertions.
-const MCP_CORE_P0_SCENARIOS: &[&str] = &[
+const MCP_CORE_SCENARIOS: &[&str] = &[
     "initialize",
     "tools-list",
     "tools-call-simple-text",
@@ -37,7 +37,7 @@ const MCP_CORE_P0_SCENARIOS: &[&str] = &[
     "prompts-list",
 ];
 
-const AUTH_P0_SCENARIOS: &[&str] = &[
+const AUTH_SCENARIOS: &[&str] = &[
     "auth-unauthorized-challenge",
     "auth-protected-resource-metadata",
     "auth-authorization-server-metadata",
@@ -45,7 +45,7 @@ const AUTH_P0_SCENARIOS: &[&str] = &[
     "auth-token-exchange-initialize",
 ];
 
-// Areas explicitly outside the P0 gate and not exercised by the C++ peer.
+// Areas explicitly outside the core gate and not exercised by the C++ peer.
 const DEFERRED_AREAS: &[&str] = &[
     "chio-extensions",
     "tasks",
@@ -54,10 +54,10 @@ const DEFERRED_AREAS: &[&str] = &[
 ];
 
 #[test]
-fn cpp_peer_p0_mcp_core_and_auth_pass() {
+fn cpp_peer_core_mcp_core_and_auth_pass() {
     if common::skip_cpp_live_conformance_unless_enabled() {
         eprintln!(
-            "cpp_peer_p0: deferred areas (not asserted in P0): {}",
+            "cpp_peer_core: deferred areas (not asserted here): {}",
             DEFERRED_AREAS.join(", ")
         );
         return;
@@ -65,7 +65,7 @@ fn cpp_peer_p0_mcp_core_and_auth_pass() {
 
     if !common::command_available("cmake") || !common::python3_supports_chio_sdk() {
         eprintln!(
-            "cpp_peer_p0: required toolchain unavailable (cmake or python3>=3.11 with chio-sdk-python); skipping"
+            "cpp_peer_core: required toolchain unavailable (cmake or python3>=3.11 with chio-sdk-python); skipping"
         );
         return;
     }
@@ -78,10 +78,10 @@ fn cpp_peer_p0_mcp_core_and_auth_pass() {
         std::fs::read_to_string(mcp_core_summary.results_dir.join("cpp-remote-http.json"))
             .expect("read mcp_core cpp results");
 
-    for scenario in MCP_CORE_P0_SCENARIOS {
+    for scenario in MCP_CORE_SCENARIOS {
         assert!(
             common::scenario_passed(&mcp_core_results, scenario),
-            "C++ peer must pass P0 mcp_core scenario `{scenario}`; results: {mcp_core_results}"
+            "C++ peer must pass mcp_core scenario `{scenario}`; results: {mcp_core_results}"
         );
     }
 
@@ -93,18 +93,18 @@ fn cpp_peer_p0_mcp_core_and_auth_pass() {
         std::fs::read_to_string(auth_summary.results_dir.join("cpp-remote-http.json"))
             .expect("read auth cpp results");
 
-    for scenario in AUTH_P0_SCENARIOS {
+    for scenario in AUTH_SCENARIOS {
         assert!(
             common::scenario_passed(&auth_results, scenario),
-            "C++ peer must pass P0 auth scenario `{scenario}`; results: {auth_results}"
+            "C++ peer must pass auth scenario `{scenario}`; results: {auth_results}"
         );
     }
 }
 
 // Compile-time guard: deferred areas live on disk but are intentionally not
-// driven through the C++ peer in P0. If a deferred-area scenarios directory
+// driven through the C++ peer here. If a deferred-area scenarios directory
 // disappears, that is a signal that follow-on coverage has begun and the
-// P0 gate should be revisited.
+// core gate should be revisited.
 #[test]
 fn deferred_areas_still_present_on_disk() {
     let repo_root = chio_conformance::default_repo_root();
@@ -113,7 +113,7 @@ fn deferred_areas_still_present_on_disk() {
         assert!(
             area_dir.exists(),
             "deferred scenario area `{area}` missing at {}; \
-             if follow-on coverage has started, update cpp_peer_p0.rs to cover it",
+             if follow-on coverage has started, update cpp_peer_core.rs to cover it",
             area_dir.display()
         );
     }

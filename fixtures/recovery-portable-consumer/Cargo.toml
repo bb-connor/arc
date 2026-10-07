@@ -1,0 +1,21 @@
+[package]
+name = "chio-recovery-portable-consumer"
+version = "0.0.0"
+edition = "2021"
+rust-version = "1.93"
+publish = false
+
+# A distinct resolver is intentional: workspace/dev feature unification cannot
+# hide an accidental std dependency in the pure recovery libraries.
+[workspace]
+resolver = "2"
+
+[dependencies]
+chio-core-types = { path = "../../crates/core/chio-core-types", default-features = false }
+chio-security-types = { path = "../../crates/security/chio-security-types", default-features = false }
+chio-recovery = { path = "../../crates/security/chio-recovery", default-features = false }
+chio-semantic-contracts = { path = "../../crates/security/chio-semantic-contracts", default-features = false }
+
+[features]
+default = []
+std = ["chio-core-types/std", "chio-security-types/std", "chio-recovery/std", "chio-semantic-contracts/std"]

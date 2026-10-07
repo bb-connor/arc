@@ -20,6 +20,8 @@ default = []
 pq = ["chio-core/pq", "chio-kernel/pq", "chio-store-sqlite/pq"]
 
 [dependencies]
+chio-cage = { workspace = true }
+chio-semantic-contracts = { path = "../../security/chio-semantic-contracts", features = ["std"] }
 async-trait = { workspace = true }
 chio-agent-web-interop = { workspace = true }
 chio-finding = { workspace = true }
@@ -40,11 +42,13 @@ chio-decoy = { workspace = true }
 chio-errors = { workspace = true }
 chio-enterprise-export = { workspace = true }
 chio-did = { workspace = true }
-chio-egress-contract = { workspace = true }
+chio-egress-contract = { workspace = true, features = ["reqwest-egress"] }
 chio-external-guards = { workspace = true }
 chio-federation = { workspace = true }
 chio-fiscal = { workspace = true }
 chio-flow = { workspace = true }
+chio-process = { workspace = true }
+chio-recovery = { path = "../../security/chio-recovery" }
 chio-http-serve = { workspace = true }
 # The market verifiers this crate installs are kernel seams that only
 # exist with the kernel's finding-market lane compiled in.
@@ -114,6 +118,7 @@ windows-sys = { version = "0.60.2", features = [
 ] }
 
 [dev-dependencies]
+chio-process = { workspace = true, features = ["admission-test-support"] }
 chio-anchor = { workspace = true }
 chio-secret-broker = { workspace = true, features = ["kernel-admission"] }
 chio-runtime-core = { workspace = true }
@@ -124,6 +129,7 @@ chio-store-sqlite = { workspace = true, features = ["cognition-market-test-suppo
 chio-test-support = { workspace = true }
 proptest = { workspace = true }
 rcgen = "0.13"
+tokio-rustls = { version = "0.26", default-features = false, features = ["aws_lc_rs", "tls12"] }
 tempfile = { workspace = true }
 tower = { workspace = true }
 

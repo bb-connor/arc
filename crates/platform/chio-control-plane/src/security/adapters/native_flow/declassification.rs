@@ -5,19 +5,18 @@ use super::*;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 pub(super) fn prepare_consumption(
-    custody: &PreparedNativeSecurityEgress<'_>,
+    request: &chio_kernel::ToolCallRequest,
     flow: &chio_flow::PreparedFlowAdmission,
     policy: &NativeFlowPolicyEvidence,
     now: u64,
 ) -> Result<Option<DeclassificationConsumptionEvidenceCommit>, NativeFlowError> {
     let Some(verified) = flow.declassification() else {
-        if custody.request().declassification_grant.is_some() {
+        if request.declassification_grant.is_some() {
             return Err(NativeFlowError::PolicyEvidence);
         }
         return Ok(None);
     };
-    let signed = custody
-        .request()
+    let signed = request
         .declassification_grant
         .as_ref()
         .ok_or(NativeFlowError::PolicyEvidence)?;
@@ -25,7 +24,7 @@ pub(super) fn prepare_consumption(
         tenant_id: verified.tenant_id().clone(),
         grant_id: verified.grant_id().clone(),
         request_hash: verified.request_hash(),
-        request_id: RequestId::new(&custody.request().request_id)
+        request_id: RequestId::new(&request.request_id)
             .map_err(|_| NativeFlowError::PolicyEvidence)?,
     };
     let body = declassification_consumption_body(
@@ -59,18 +58,32 @@ pub(super) fn prepare_consumption(
 
 pub(super) fn confirm_consumption(
     flow: chio_flow::PreparedFlowAdmission,
-    expected: Option<&DeclassificationConsumptionEvidenceCommit>,
+    request: &chio_kernel::ToolCallRequest,
+    policy: &NativeFlowPolicyEvidence,
     history: Option<&NativeSecurityEgressHistoryV1>,
 ) -> Result<FlowAdmission, NativeFlowError> {
-    let actual = history
-        .and_then(|history| history.commitment.as_ref())
-        .and_then(|commitment| commitment.declassification.as_ref());
-    if actual != expected || flow.declassification().is_some() != expected.is_some() {
+    let commitment = history.and_then(|history| history.commitment.as_ref());
+    let actual = commitment.and_then(|commitment| commitment.declassification.as_ref());
+    if flow.declassification().is_some() != actual.is_some() {
         return Err(NativeFlowError::PolicyEvidence);
     }
-    let Some(expected) = expected else {
+    let Some(commitment) = commitment.filter(|commitment| commitment.declassification.is_some())
+    else {
         return flow.into_admission().map_err(Into::into);
     };
+    // Reuse the same live verified flow, signed grant and selected policy to
+    // reconstruct the event accepted by the affine kernel writer. Historical
+    // timestamps do not renew authority or select a replacement policy.
+    let expected = prepare_consumption(
+        request,
+        &flow,
+        policy,
+        commitment.commitment.committed_at_unix_ms,
+    )?
+    .ok_or(NativeFlowError::PolicyEvidence)?;
+    if actual != Some(&expected) {
+        return Err(NativeFlowError::PolicyEvidence);
+    }
     // This bridge confirms the write just performed by the affine kernel
     // handle. It cannot record outcomes, select another request, or repeat use.
     struct Confirmation<'a> {

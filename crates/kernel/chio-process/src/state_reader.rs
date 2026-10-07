@@ -56,7 +56,7 @@ impl ProcessStateReader {
             [],
             |row| row.get(0),
         )?;
-        if version != 1 {
+        if !matches!(version, 1 | 2) {
             return Err(ProcessError::Configuration(
                 "unsupported process journal version",
             ));
@@ -64,8 +64,23 @@ impl ProcessStateReader {
         Ok(Self { connection })
     }
 
+    fn require_raw_knowledge(&self) -> Result<(), ProcessError> {
+        let version: u32 = self.connection.query_row(
+            "SELECT version FROM process_runtime WHERE singleton=1",
+            [],
+            |row| row.get(0),
+        )?;
+        if version >= 3 {
+            return Err(ProcessError::Configuration(
+                "durable knowledge requires mediated release",
+            ));
+        }
+        Ok(())
+    }
+
     /// Read a bounded checkpoint. No capability token is decoded or returned.
     pub fn checkpoint(&self, process: &str) -> Result<Checkpoint, ProcessError> {
+        self.require_raw_knowledge()?;
         let row: Option<(i64, Option<String>)> = self
             .connection
             .query_row(
@@ -88,6 +103,7 @@ impl ProcessStateReader {
 
     /// Read one process's immutable blob, verifying its bounds and digest.
     pub fn blob(&self, process: &str, sha256: &str) -> Result<Vec<u8>, ProcessError> {
+        self.require_raw_knowledge()?;
         if sha256.len() != 64
             || !sha256
                 .bytes()

@@ -1384,6 +1384,11 @@ fn claimed_authorization_error(
         ),
         Store::Invariant(detail) => AdmissionBudgetAuthorizationError::Invariant(detail),
         Store::OutcomeUnknown(detail) => AdmissionBudgetAuthorizationError::OutcomeUnknown(detail),
+        Store::RecoveryAuthorityDenied | Store::RecoveryMediationRequired => {
+            AdmissionBudgetAuthorizationError::Invariant(
+                "recovery preview refusal is outside budget authorization".into(),
+            )
+        }
         Store::Operation(error) => AdmissionBudgetAuthorizationError::Operation(error),
     }
 }
@@ -1399,6 +1404,9 @@ fn claimed_capture_error(
         Store::NotFound => Capture::Invariant("admission operation was not found".to_owned()),
         Store::Invariant(detail) => Capture::Invariant(detail),
         Store::OutcomeUnknown(detail) => Capture::OutcomeUnknown(detail),
+        Store::RecoveryAuthorityDenied | Store::RecoveryMediationRequired => {
+            Capture::Invariant("recovery preview refusal is outside capture claims".into())
+        }
         Store::Operation(error) => Capture::Operation(error),
     }
 }

@@ -1731,7 +1731,7 @@ impl ChioKernel {
             self.reach_durable_finalization_cutpoint(
                 DurableFinalizationCutpoint::ToolReturnRecorded,
             );
-            return self.finalize_durable_tool_return_with_security_release(
+            return self.finalize_public_durable_tool_return_with_security_release(
                 admission,
                 request,
                 outcome,

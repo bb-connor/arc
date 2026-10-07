@@ -264,6 +264,8 @@ impl ChioKernel {
             native_egress_checkpoint_hook: None,
             #[cfg(feature = "admission-test-support")]
             native_capture_checkpoint_hook: None,
+            #[cfg(feature = "admission-test-support")]
+            native_capture_observer: None,
             unsafe_ephemeral_financial_dispatch: false,
             guards: std::sync::Arc::new(Vec::new()),
             post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline::new(),
@@ -325,6 +327,7 @@ impl ChioKernel {
             swarm_admission_required: false,
             security_pre_dispatch_policy: SecurityPreDispatchPolicy::Optional,
             security_pre_dispatch_hook: None,
+            native_flow_policy_witness_registration: None,
             runtime_admission_readiness_timeout: Duration::from_millis(
                 DEFAULT_RUNTIME_ADMISSION_READINESS_TIMEOUT_MS,
             ),
@@ -1098,6 +1101,7 @@ impl ChioKernel {
     }
 
     pub fn set_security_pre_dispatch_hook(&mut self, hook: Arc<dyn SecurityPreDispatchHook>) {
+        self.native_flow_policy_witness_registration = None;
         self.security_pre_dispatch_hook = Some(hook);
     }
 
@@ -1109,6 +1113,7 @@ impl ChioKernel {
     }
 
     pub fn clear_security_pre_dispatch_hook(&mut self) {
+        self.native_flow_policy_witness_registration = None;
         self.security_pre_dispatch_hook = None;
     }
 

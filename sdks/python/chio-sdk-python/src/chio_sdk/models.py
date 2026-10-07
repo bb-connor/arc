@@ -42,7 +42,6 @@ from chio_sdk._generated import (
     TrustControlTier as RuntimeAssuranceTier,
 )
 from chio_sdk._generated.capability.token_schema import MonetaryAmount
-from chio_sdk._generated.receipt.record_schema import Decision1, Decision2
 
 # These types have no generated equivalent and are sourced from
 # models_supplemental.
@@ -69,7 +68,7 @@ generated = _generated
 
 
 def _decision_allow(cls: type[Decision]) -> Decision:
-    return cls(root=Decision1(verdict="allow"))
+    return cls.model_validate({"verdict": "allow"})
 
 
 def _decision_deny(
@@ -77,7 +76,7 @@ def _decision_deny(
     reason: str,
     guard: str,
 ) -> Decision:
-    return cls(root=Decision2(verdict="deny", reason=reason, guard=guard))
+    return cls.model_validate({"verdict": "deny", "reason": reason, "guard": guard})
 
 
 def _decision_verdict(self: Decision) -> str:

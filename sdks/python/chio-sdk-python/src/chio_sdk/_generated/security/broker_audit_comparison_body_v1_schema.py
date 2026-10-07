@@ -2,29 +2,22 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: eb3605a1594254370980dcf328ad3f0c7a751ff746d1530b9981c40163f5694a
+# Schema sha256: 35f8e30cf30553986a159b074ee485804a85db29547a8102522cd7bfa3080d2e
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
 # under sdks/python/chio-sdk-python/src/chio_sdk/_generated/.
 
-
 from __future__ import annotations
-
 from typing import Literal
-
 from pydantic import BaseModel, ConfigDict, Field, RootModel, conint, constr
 
-
-class Digest(RootModel[constr(pattern=r"^[0-9a-f]{64}$")]):
-    root: constr(pattern=r"^[0-9a-f]{64}$")
-
+class Digest(RootModel[constr(pattern='^[0-9a-f]{64}$')]):
+    root: constr(pattern='^[0-9a-f]{64}$')
 
 class ChioBrokerAuditComparisonBodyV1(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    schema_: Literal["chio.broker-audit-comparison.v1"] = Field(..., alias="schema")
+    model_config = ConfigDict(extra='forbid')
+    schema_: Literal['chio.broker-audit-comparison.v1'] = Field(..., alias='schema')
     issuedAtUnixSeconds: conint(ge=1)
     capabilitySha256: Digest
     proofSha256: Digest
@@ -41,3 +34,7 @@ class ChioBrokerAuditComparisonBodyV1(BaseModel):
     networkDispatchCount: Literal[0]
     accountingMutationCount: Literal[0]
     rawCredentialReturned: Literal[False]
+
+# Public compatibility aliases reference the actual current model classes.
+SecurityBrokerAuditComparisonBodyV1ChioBrokerAuditComparisonBodyV1 = ChioBrokerAuditComparisonBodyV1
+SecurityBrokerAuditComparisonBodyV1Digest = Digest

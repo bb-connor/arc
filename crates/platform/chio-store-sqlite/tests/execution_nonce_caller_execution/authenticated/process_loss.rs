@@ -8,8 +8,8 @@ use std::os::unix::process::ExitStatusExt;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-const ROOT: &str = "CHIO_M3_CRASH_ROOT";
-const CUT: &str = "CHIO_M3_CRASH_CUT";
+const ROOT: &str = "CHIO_CALLER_CRASH_ROOT";
+const CUT: &str = "CHIO_CALLER_CRASH_CUT";
 
 fn persist(path: &Path, bytes: &[u8]) -> TestResult {
     let mut file = std::fs::OpenOptions::new()
@@ -28,10 +28,10 @@ fn process_loss_retains_capture_and_never_reexecutes_original_attempt() -> TestR
         let cut = std::env::var(CUT)?;
         let mut fixture = Fixture::attach(
             root.clone(),
-            &std::env::var("CHIO_M3_KERNEL_SEED")?,
-            &std::env::var("CHIO_M3_AGENT_SEED")?,
+            &std::env::var("CHIO_CALLER_CRASH_KERNEL_SEED")?,
+            &std::env::var("CHIO_CALLER_CRASH_AGENT_SEED")?,
         )?;
-        let key = Keypair::from_seed_hex(&std::env::var("CHIO_M3_EXECUTOR_SEED")?)?;
+        let key = Keypair::from_seed_hex(&std::env::var("CHIO_CALLER_CRASH_EXECUTOR_SEED")?)?;
         let executor = CallerExecutorIdentityV1 {
             executor_id: AdmissionIdentifier::try_new("executor_id", "trusted-test-executor")?,
             public_key: key.public_key(),
@@ -89,9 +89,9 @@ fn process_loss_retains_capture_and_never_reexecutes_original_attempt() -> TestR
         let mut child = Command::new(std::env::current_exe()?)
             .args(["--exact", "authenticated::process_loss::process_loss_retains_capture_and_never_reexecutes_original_attempt", "--nocapture"])
             .env(ROOT, root).env(CUT, cut)
-            .env("CHIO_M3_KERNEL_SEED", fixture.signer.seed_hex())
-            .env("CHIO_M3_AGENT_SEED", fixture.agent.seed_hex())
-            .env("CHIO_M3_EXECUTOR_SEED", executor_key.seed_hex())
+            .env("CHIO_CALLER_CRASH_KERNEL_SEED", fixture.signer.seed_hex())
+            .env("CHIO_CALLER_CRASH_AGENT_SEED", fixture.agent.seed_hex())
+            .env("CHIO_CALLER_CRASH_EXECUTOR_SEED", executor_key.seed_hex())
             .stdin(Stdio::null()).stdout(Stdio::null()).spawn()?;
         let deadline = std::time::Instant::now() + Duration::from_secs(30);
         let status = loop {

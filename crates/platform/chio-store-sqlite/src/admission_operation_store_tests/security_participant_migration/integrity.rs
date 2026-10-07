@@ -124,7 +124,9 @@ fn restoring_destination_before_import_is_rejected_by_independent_anchor() -> An
     let fixture = fixture();
     let source = source(&fixture)?;
     let expected = pin(&fixture, &source)?;
-    let backup = fixture._temp.path().join("before-import.db");
+    // VACUUM inherits the serving connection's no-symlink policy. Resolve the
+    // existing parent so platform temporary-directory aliases remain valid.
+    let backup = fs::canonicalize(fixture._temp.path())?.join("before-import.db");
     fixture.store.connection()?.execute(
         "VACUUM INTO ?1",
         [backup.to_str().ok_or("non-UTF8 fixture path")?],

@@ -10,6 +10,7 @@ publish = false
 
 [features]
 default = []
+admission-test-support = []
 worker-server = ["dep:tokio", "dep:rand", "dep:hex", "dep:base64"]
 mailboxes = ["dep:async-trait", "dep:chio-manifest"]
 

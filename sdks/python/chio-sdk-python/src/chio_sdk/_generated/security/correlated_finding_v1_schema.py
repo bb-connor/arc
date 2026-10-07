@@ -2,54 +2,32 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: eb3605a1594254370980dcf328ad3f0c7a751ff746d1530b9981c40163f5694a
+# Schema sha256: 35f8e30cf30553986a159b074ee485804a85db29547a8102522cd7bfa3080d2e
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
 # under sdks/python/chio-sdk-python/src/chio_sdk/_generated/.
 
-
 from __future__ import annotations
-
 from pydantic import BaseModel, ConfigDict, Field, RootModel, conint, constr
 
-
-class Identifier(
-    RootModel[
-        constr(
-            pattern=r"^[^\s\u0000-\u001F\u007F-\u009F](?:[^\u0000-\u001F\u007F-\u009F]*[^\s\u0000-\u001F\u007F-\u009F])?$",
-            min_length=1,
-            max_length=256,
-        )
-    ]
-):
-    root: constr(
-        pattern=r"^[^\s\u0000-\u001F\u007F-\u009F](?:[^\u0000-\u001F\u007F-\u009F]*[^\s\u0000-\u001F\u007F-\u009F])?$",
-        min_length=1,
-        max_length=256,
-    )
-
+class Identifier(RootModel[constr(pattern='^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$', min_length=1, max_length=256)]):
+    root: constr(pattern='^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$', min_length=1, max_length=256)
 
 class DigestItem(RootModel[conint(ge=0, le=255)]):
     root: conint(ge=0, le=255)
 
-
 class Digest(RootModel[list[DigestItem]]):
     root: list[DigestItem] = Field(..., max_length=32, min_length=32)
-
 
 class Identifiers(RootModel[list[Identifier]]):
     root: list[Identifier] = Field(..., max_length=64, min_length=1)
 
-
 class Time(RootModel[conint(ge=0, le=9007199254740991)]):
     root: conint(ge=0, le=9007199254740991)
 
-
 class ChioCorrelatedFindingV1(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
+    model_config = ConfigDict(extra='forbid')
     finding_id: Identifier
     tenant_id: Identifier
     rule_id: Identifier
@@ -62,3 +40,11 @@ class ChioCorrelatedFindingV1(BaseModel):
     first_event_time_unix_ms: Time
     last_event_time_unix_ms: Time
     lineage_seed: Identifier
+
+# Public compatibility aliases reference the actual current model classes.
+SecurityCorrelatedFindingV1ChioCorrelatedFindingV1 = ChioCorrelatedFindingV1
+SecurityCorrelatedFindingV1Digest = Digest
+SecurityCorrelatedFindingV1DigestItem = DigestItem
+SecurityCorrelatedFindingV1Identifier = Identifier
+SecurityCorrelatedFindingV1Identifiers = Identifiers
+SecurityCorrelatedFindingV1Time = Time

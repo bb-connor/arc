@@ -101,21 +101,25 @@ pub use verified_treaty::{
 #[cfg(feature = "admission-test-support")]
 pub use admission_coordinator::DurableFinalizationCutpointHook;
 #[cfg(feature = "admission-test-support")]
-pub use admission_coordinator::NativeSecurityCaptureCheckpointHook;
-pub use admission_coordinator::NativeSecurityDispatchCaptureAuthority;
-#[cfg(feature = "admission-test-support")]
 pub use admission_coordinator::NativeSecurityEgressCheckpointHook;
 pub use admission_coordinator::NativeSecurityOutputJoinAuthority;
 pub use admission_coordinator::{
     AcquiredNativeSecurityEgress, DurableFinalizationCutpoint, NativeSecurityFlowJoinAuthority,
     NativeSecurityNoncePreflightJoinAuthority, PreparedNativeSecurityEgress,
-    RuntimeParticipantClaimAuthority,
+    PreparedNativeSecurityEgressCommit, RuntimeParticipantClaimAuthority,
 };
 #[cfg(feature = "admission-test-support")]
 pub use admission_coordinator::{CallerExecutionCheckpoint, CallerExecutionCheckpointHook};
 pub(crate) use admission_coordinator::{
     DurableAdmissionRuntime, DurableDispatchCommitError, DurableToolAdmission,
     DurableToolReturnContextInput, DurableToolReturnInput,
+};
+pub use admission_coordinator::{
+    NativeFlowPolicyRefusal, NativeFlowPolicyRefusalOwner, NativeSecurityDispatchCaptureAuthority,
+};
+#[cfg(feature = "admission-test-support")]
+pub use admission_coordinator::{
+    NativeSecurityCaptureCheckpointHook, NativeSecurityCaptureObserver,
 };
 pub use credential_reservation::VerifiedNativeDispatchCredentials;
 pub(crate) use kernel_drop_guard::{PostAdmissionDropGuard, PostAdmissionReceiptContext};
@@ -466,6 +470,20 @@ pub trait SecurityPreDispatchHook: Send + Sync {
         Err(KernelError::DurableAdmission(
             "native security output preparation is unsupported".into(),
         ))
+    }
+
+    /// Classify the exact retained resolved result under current host policy.
+    /// This read-only callback grants no output join, capture or release rights.
+    /// Unsupported classification withholds the result without changing effect
+    /// truth or replacing the original frozen evaluation contract.
+    fn classify_recovery_result(
+        &self,
+        _context: &crate::recovery::RecoveryResultClassificationContext<'_>,
+    ) -> Result<
+        chio_security_types::InformationLabel,
+        crate::recovery::RecoveryResultClassificationError,
+    > {
+        Err(crate::recovery::RecoveryResultClassificationError::Unavailable)
     }
 
     fn acquire_request_lifecycle(

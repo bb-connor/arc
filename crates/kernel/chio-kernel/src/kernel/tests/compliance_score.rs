@@ -34,7 +34,7 @@ fn clean_report() -> ComplianceReport {
 }
 
 #[test]
-fn phase_19_1_zero_denies_in_1000_calls_scores_above_900() {
+fn zero_denies_in_1000_calls_scores_above_900() {
     let report = clean_report();
     let inputs = ComplianceScoreInputs::new(1000, 0, 1, 0, 1000, 0, Some(0));
     let score = compliance_score(
@@ -55,7 +55,7 @@ fn phase_19_1_zero_denies_in_1000_calls_scores_above_900() {
 }
 
 #[test]
-fn phase_19_1_revoked_capability_scores_below_500() {
+fn revoked_capability_scores_below_500() {
     let report = clean_report();
     // One observed capability, fully revoked. any_revoked forces the
     // revocation factor to max.
@@ -81,7 +81,7 @@ fn phase_19_1_revoked_capability_scores_below_500() {
 }
 
 #[test]
-fn phase_19_1_breakdown_surfaces_per_factor_details() {
+fn breakdown_surfaces_per_factor_details() {
     let report = clean_report();
     let inputs = ComplianceScoreInputs::new(1000, 100, 5, 0, 500, 50, Some(1_000));
     let score = compliance_score(

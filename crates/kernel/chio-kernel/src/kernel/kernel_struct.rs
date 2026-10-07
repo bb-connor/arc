@@ -555,6 +555,8 @@ pub struct ChioKernel {
     pub(super) native_egress_checkpoint_hook: Option<super::NativeSecurityEgressCheckpointHook>,
     #[cfg(feature = "admission-test-support")]
     pub(super) native_capture_checkpoint_hook: Option<super::NativeSecurityCaptureCheckpointHook>,
+    #[cfg(feature = "admission-test-support")]
+    pub(super) native_capture_observer: Option<super::NativeSecurityCaptureObserver>,
     /// Explicit compatibility escape for development fixtures that exercise the
     /// legacy non-durable financial lifecycle. Production construction leaves
     /// this false, so a financial hold cannot cross a connector boundary without
@@ -645,6 +647,8 @@ pub struct ChioKernel {
     pub(super) swarm_admission_required: bool,
     pub(super) security_pre_dispatch_policy: SecurityPreDispatchPolicy,
     pub(super) security_pre_dispatch_hook: Option<Arc<dyn SecurityPreDispatchHook>>,
+    pub(super) native_flow_policy_witness_registration:
+        Option<admission_coordinator::NativeFlowPolicyWitnessRegistration>,
     pub(super) runtime_admission_readiness_timeout: Duration,
     pub(super) runtime_trace_observer: Option<Arc<dyn RuntimeTraceObserver>>,
     pub(super) runtime_trace_transition_lock: Mutex<()>,

@@ -1,6 +1,6 @@
 use crate::{HttpEgressContract, HttpEgressError, PreparedHttpEgressContract};
 use reqwest::header::{
-    HeaderMap, HeaderName, AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, COOKIE, HOST, LOCATION,
+    AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, COOKIE, HOST, HeaderMap, HeaderName, LOCATION,
     PROXY_AUTHORIZATION,
 };
 use reqwest::{Method, StatusCode, Url};
@@ -50,9 +50,13 @@ impl ContractResponse {
 
 /// Wrap a `reqwest::Client::execute` call with [`HttpEgressContract`]
 /// enforcement before each network hop and while reading the response body.
-/// The supplied client must be built with [`client_builder_with_contract`],
-/// which disables reqwest's automatic redirect following so this helper can
-/// validate each `Location` target before issuing the next request.
+/// The supplied client must be built with [`client_builder_with_contract`]
+/// from the same immutable [`HttpEgressContract`] passed here. Rebuild the
+/// client whenever that contract changes. Automatic redirect following is
+/// disabled so this helper can validate each `Location` target before issuing
+/// the next request. URL
+/// preflight performs no DNS. The client's mandatory asynchronous resolver
+/// validates the actual connect addresses under its configured timeout.
 pub async fn send_with_contract(
     contract: &HttpEgressContract,
     client: &reqwest::Client,
@@ -64,7 +68,7 @@ pub async fn send_with_contract(
 
     loop {
         let request_url = request.url().clone();
-        prepared.enforce_url_with_dns(request_url.as_str(), redirect_chain_len)?;
+        prepared.enforce_url(request_url.as_str(), redirect_chain_len)?;
         let reusable_request = request.try_clone();
         let redirect_request = RedirectRequestParts {
             method: request.method().clone(),
@@ -100,7 +104,7 @@ pub async fn send_with_contract(
                     ))
                 })?;
                 let next_chain_len = redirect_chain_len.saturating_add(1);
-                prepared.enforce_url_with_dns(next_url.as_str(), next_chain_len)?;
+                prepared.enforce_url(next_url.as_str(), next_chain_len)?;
                 let cross_origin = !same_origin(&request_url, &next_url);
                 request = build_redirect_request(
                     client,
@@ -144,6 +148,39 @@ impl ContractClientBuilder {
         self
     }
 
+    #[must_use]
+    pub fn connect_timeout(mut self, timeout: std::time::Duration) -> Self {
+        self.inner = self.inner.connect_timeout(timeout);
+        self
+    }
+
+    /// Add an explicitly trusted provider CA without changing the immutable
+    /// DNS, proxy, redirect or retry protections of this contract-backed client.
+    #[must_use]
+    pub fn add_root_certificate(mut self, certificate: reqwest::Certificate) -> Self {
+        self.inner = self.inner.add_root_certificate(certificate);
+        self
+    }
+
+    #[must_use]
+    pub fn pool_max_idle_per_host(mut self, maximum: usize) -> Self {
+        self.inner = self.inner.pool_max_idle_per_host(maximum);
+        self
+    }
+
+    #[must_use]
+    pub fn https_only(mut self, enabled: bool) -> Self {
+        self.inner = self.inner.https_only(enabled);
+        self
+    }
+
+    /// Disable automatic transport retries for an affine native attempt.
+    #[must_use]
+    pub fn no_retries(mut self) -> Self {
+        self.inner = self.inner.retry(reqwest::retry::never());
+        self
+    }
+
     pub fn build(self) -> Result<reqwest::Client, reqwest::Error> {
         self.inner.build()
     }
@@ -151,12 +188,14 @@ impl ContractClientBuilder {
 
 /// Build a contract-backed reqwest client builder. [`send_with_contract`]
 /// manually follows redirects after validating each hop and stripping
-/// sensitive headers on cross-origin hops.
+/// sensitive headers on cross-origin hops. Automatic transport retries are
+/// disabled so a protocol refusal cannot replay a native attempt.
 pub fn client_builder_with_contract(contract: &HttpEgressContract) -> ContractClientBuilder {
     ContractClientBuilder {
         inner: reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
             .no_proxy()
+            .retry(reqwest::retry::never())
             .dns_resolver(Arc::new(ContractDnsResolver::new(contract.clone()))),
     }
 }
@@ -181,7 +220,19 @@ impl reqwest::dns::Resolve for ContractDnsResolver {
                 return Err(boxed_egress_error(error));
             }
 
-            let lookup = match tokio::net::lookup_host((host.as_str(), 0)).await {
+            #[cfg(not(test))]
+            let lookup = tokio::net::lookup_host((host.as_str(), 0)).await;
+            #[cfg(test)]
+            let lookup = match dns_deadline_tests::lookup_addresses(&host) {
+                Some(addresses) => Ok(Box::new(addresses.into_iter()) as reqwest::dns::Addrs),
+                None => tokio::net::lookup_host((host.as_str(), 0))
+                    .await
+                    .map(|addresses| {
+                        let addresses = addresses.collect::<Vec<_>>();
+                        Box::new(addresses.into_iter()) as reqwest::dns::Addrs
+                    }),
+            };
+            let lookup = match lookup {
                 Ok(lookup) => lookup,
                 Err(error) => {
                     return Err(boxed_egress_error(HttpEgressError::DnsResolutionFailed {
@@ -347,3 +398,11 @@ fn map_reqwest_error(err: reqwest::Error) -> HttpEgressError {
     };
     HttpEgressError::InvalidUrl(format!("dispatch failed ({kind}): {err}"))
 }
+
+#[cfg(test)]
+#[path = "tests/single_attempt.rs"]
+mod single_attempt_tests;
+
+#[cfg(test)]
+#[path = "tests/dns_deadline.rs"]
+pub(crate) mod dns_deadline_tests;

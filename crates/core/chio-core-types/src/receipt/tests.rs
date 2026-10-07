@@ -961,7 +961,7 @@ fn checkpoint_publication_trust_anchor_binding_serde_and_validation() {
         ),
         trust_anchor_ref: "chio_checkpoint_witness_chain".to_string(),
         signer_cert_ref: "did:web:chio.example#checkpoint-signer".to_string(),
-        publication_profile_version: "phase4-preview.v1".to_string(),
+        publication_profile_version: "evidence-preview.v1".to_string(),
     };
 
     let json = serde_json::to_string(&binding).unwrap();
@@ -984,7 +984,7 @@ fn checkpoint_publication_trust_anchor_binding_rejects_blank_fields() {
         ),
         trust_anchor_ref: " ".to_string(),
         signer_cert_ref: "did:web:chio.example#checkpoint-signer".to_string(),
-        publication_profile_version: "phase4-preview.v1".to_string(),
+        publication_profile_version: "evidence-preview.v1".to_string(),
     }
     .validate()
     .expect_err("blank trust anchor must be rejected");

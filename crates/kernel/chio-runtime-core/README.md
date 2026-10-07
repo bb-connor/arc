@@ -23,8 +23,8 @@ references retain their canonical binding. No request can supply its own trust
 roots, capability identity or trusted route metadata.
 
 This verifies live authority, not completed execution. The complete-artifact
-verifier remains strict about every graph join and terminal evidence. M5 must
-join actual worker outcomes and durable accounting before claiming completion.
+verifier remains strict about every graph join and terminal evidence. Completion requires joining actual worker outcomes and
+durable accounting before accepting a completed result.
 
 ### Operation-owned replay custody
 

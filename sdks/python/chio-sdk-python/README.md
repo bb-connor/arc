@@ -75,6 +75,38 @@ full signed token can drive the mediated route with
 
 Point the client at a non-default sidecar with `ChioClient(base_url=...)`.
 
+## Recovery transport
+
+`RecoveryClient` carries explicit commands to the native recovery host. The
+configured endpoint may include a service mount path. Requests preserve that
+path, disable ambient proxies and redirects, and send each command once.
+Ordinary requests default to 20 seconds; setup requests default to 120 seconds.
+`timeout_seconds` can override these waits within the 1-120 second bound.
+`RecoveryError.code` preserves the host's closed category, including unknown
+effects, unavailable service, stale setup proofs, busy intake and a committed
+response whose projection exceeds the transport bound.
+
+The mediated `original_response.result` retains arbitrary-size Python integer
+literals within the interpreter's explicit digit-conversion limit. Larger
+integer literals, fractional, exponent and negative-zero tokens use the public
+immutable `LosslessJsonNumber` type. Its `source` preserves the numeric spelling;
+`to_decimal()`, integer-literal `to_int()` and exact `to_float()` make conversions
+explicit. An inexact or non-finite float conversion raises `ValueError`.
+Ordinary JSON and Pydantic serialization refuse these token objects so they
+cannot silently become a JSON object or a rounded number.
+
+```python
+from chio_sdk import LosslessJsonNumber, RecoveryClient, RecoveryError
+
+number = LosslessJsonNumber("0.1234567890123456789")
+assert str(number.to_decimal()) == number.source
+```
+
+Responses enforce UTF-8, duplicate-member, nesting and byte bounds before
+generated-model validation. Signed recovery metadata retains its own bounded
+integer profile. The native host owns signature trust, authority, settlement
+and current release checks.
+
 ## What is in the box
 
 - `ChioClient` -- async client for sidecar health, capability minting and

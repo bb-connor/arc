@@ -74,7 +74,7 @@ fn make_kernel(receipt_store_path: &std::path::Path) -> ChioKernel {
         keypair: Keypair::generate(),
         ca_public_keys: vec![],
         max_delegation_depth: 5,
-        policy_hash: "policy-p0-002".to_string(),
+        policy_hash: "policy-current-thread-runtime".to_string(),
         allow_sampling: false,
         allow_sampling_tool_use: false,
         allow_elicitation: false,
@@ -116,7 +116,7 @@ fn make_scope() -> ChioScope {
 
 #[test]
 fn current_thread_runtime_returns_typed_error_instead_of_deadlocking() {
-    let path = unique_db_path("p0-002-current-thread");
+    let path = unique_db_path("current-thread-runtime");
     let kernel = make_kernel(&path);
 
     let agent_kp = Keypair::generate();
@@ -129,7 +129,7 @@ fn current_thread_runtime_returns_typed_error_instead_of_deadlocking() {
         tool_name: TOOL.to_string(),
         server_id: SRV.to_string(),
         agent_id: cap.subject.to_hex(),
-        arguments: serde_json::json!({"input": "p0-002"}),
+        arguments: serde_json::json!({"input": "current-thread-runtime"}),
         dpop_proof: None,
         execution_nonce: None,
         governed_intent: None,
@@ -195,7 +195,7 @@ fn no_runtime_attached_drives_future_to_completion() {
     // executor path is still safe (no surrounding reactor to collide
     // with). This is the path unit tests with synchronous in-process
     // tool servers rely on.
-    let path = unique_db_path("p0-002-no-runtime");
+    let path = unique_db_path("missing-runtime");
     let kernel = make_kernel(&path);
 
     let agent_kp = Keypair::generate();
@@ -208,7 +208,7 @@ fn no_runtime_attached_drives_future_to_completion() {
         tool_name: TOOL.to_string(),
         server_id: SRV.to_string(),
         agent_id: cap.subject.to_hex(),
-        arguments: serde_json::json!({"input": "p0-002-no-rt"}),
+        arguments: serde_json::json!({"input": "missing-runtime"}),
         dpop_proof: None,
         execution_nonce: None,
         governed_intent: None,

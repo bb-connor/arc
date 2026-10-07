@@ -308,6 +308,11 @@ impl RetainedToolAdmissionRequestV1 {
         self.wire.authority_profile.as_ref()
     }
 
+    /// Frozen historical verifier identities, never authority for new work.
+    pub(crate) fn post_return_steps(&self) -> &[FrozenEvaluationStepV1] {
+        &self.wire.post_return_steps
+    }
+
     /// Historical authority selection only. It cannot authorize a new write.
     #[must_use]
     pub fn native_security_authority_binding(&self) -> Option<&NativeSecurityAuthorityBindingV1> {

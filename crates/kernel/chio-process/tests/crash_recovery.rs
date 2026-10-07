@@ -485,10 +485,9 @@ async fn subprocess_worker() -> Result {
             "request_hash": vec![2; 32], "issued_at_unix_seconds": 100,
             "expires_at_unix_seconds": 200, "authority_key_id": "authority-a"
         }))?;
-        request.declassification_grant = Some(chio_core_types::SignedDeclassificationGrant::sign(
-            body,
-            &support::issuer(),
-        )?);
+        request.declassification_grant = Some(
+            chio_core_types::SignedDeclassificationGrant::sign(body, &support::issuer())?.into(),
+        );
         let response = runtime.invoke("root", "peek", &request).await?;
         assert_eq!(phase, "recover-granted-read");
         assert_eq!(response.verdict, Verdict::Deny);

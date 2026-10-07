@@ -2,6 +2,36 @@
 //! marker or imported fence. Historical retry results are not fresh permission.
 use super::*;
 
+enum InitializationSelection<'a> {
+    Original(&'a SecurityParticipantStateInitialization),
+    Binding(&'a chio_kernel::admission_operation::NativeSecurityAuthorityBindingV1),
+}
+
+impl InitializationSelection<'_> {
+    fn authority(&self) -> &AdmissionIdentifier {
+        match self {
+            Self::Original(initialized) => &initialized.authority,
+            Self::Binding(binding) => binding.security_authority_id(),
+        }
+    }
+
+    fn validate(
+        &self,
+        actual: &SecurityParticipantStateInitialization,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        let exact = match self {
+            Self::Original(initialized) => *initialized == actual,
+            Self::Binding(binding) => actual.admission_binding()? == **binding,
+        };
+        if !exact {
+            return Err(invalid(
+                "native egress initialization differs from selected destination",
+            ));
+        }
+        Ok(())
+    }
+}
+
 impl SqliteAdmissionOperationStore {
     #[allow(clippy::too_many_arguments)]
     pub fn acquire_security_participant_egress(
@@ -17,7 +47,7 @@ impl SqliteAdmissionOperationStore {
         match self.mutate_security_participant_egress(
             operation,
             lease,
-            initialized,
+            InitializationSelection::Original(initialized),
             context,
             request,
             NativeEgressCommand::Acquire(plan.clone()),
@@ -44,7 +74,7 @@ impl SqliteAdmissionOperationStore {
         match self.mutate_security_participant_egress(
             operation,
             lease,
-            initialized,
+            InitializationSelection::Original(initialized),
             context,
             request,
             NativeEgressCommand::Commit(commitment.clone()),
@@ -63,16 +93,6 @@ impl SqliteAdmissionOperationStore {
         commitment: &EgressFenceCommit,
         consumption: &chio_security_types::ports::DeclassificationConsumptionEvidenceCommit,
     ) -> Result<CommittedEgressFence, AdmissionOperationStoreError> {
-        let initialized = self
-            .load_security_participant_state(
-                context.binding.security_authority_id(),
-                context.lease.store_fence(),
-                context.trusted_now_unix_ms,
-            )?
-            .ok_or_else(|| invalid("native declassification initialization is absent"))?;
-        if initialized.admission_binding()? != *context.binding {
-            return Err(invalid("native declassification initialization differs"));
-        }
         let signed = context
             .request
             .declassification_grant
@@ -84,7 +104,7 @@ impl SqliteAdmissionOperationStore {
         match self.mutate_security_participant_egress(
             context.operation,
             context.lease,
-            &initialized,
+            InitializationSelection::Binding(context.binding),
             context.security_context,
             context.request,
             command,
@@ -97,12 +117,33 @@ impl SqliteAdmissionOperationStore {
         }
     }
 
+    pub(in crate::admission_operation_store) fn commit_selected_native_egress(
+        &self,
+        context: &chio_kernel::admission_operation::NativeSecurityEgressContext<'_>,
+        commitment: &EgressFenceCommit,
+    ) -> Result<CommittedEgressFence, AdmissionOperationStoreError> {
+        match self.mutate_security_participant_egress(
+            context.operation,
+            context.lease,
+            InitializationSelection::Binding(context.binding),
+            context.security_context,
+            context.request,
+            NativeEgressCommand::Commit(commitment.clone()),
+            context.trusted_now_unix_ms,
+        )? {
+            NativeEgressResult::Committed(result) => Ok(result),
+            NativeEgressResult::Acquired(_) => {
+                Err(invalid("native commitment returned acquisition"))
+            }
+        }
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn mutate_security_participant_egress(
         &self,
         operation: &AdmissionOperationV1,
         lease: &AdmissionRecoveryLease,
-        initialized: &SecurityParticipantStateInitialization,
+        selection: InitializationSelection<'_>,
         context: &SecurityInvocationContext,
         request: &ToolCallRequest,
         command: NativeEgressCommand,
@@ -111,13 +152,21 @@ impl SqliteAdmissionOperationStore {
         let fence = command.fence().map_err(invalid)?;
         let mut connection = self.connection()?;
         let tx = self.begin_write(&mut connection, Some(lease.store_fence()))?;
+        // A first commitment constructs its event in this writer. Preparation
+        // is a lower bound, never a renewal of its original expiring authority.
+        let decision_at = if matches!(command, NativeEgressCommand::Acquire(_)) {
+            decision_at
+        } else {
+            physical_commit_time(&tx, decision_at)?
+        };
         super::super::observed_time(&tx, decision_at)?;
         verify_participant_recovery_tx(&tx, &self.serving_owner, operation, lease, decision_at)?;
         ensure_no_reserved_terminal_stage(&tx, operation.binding().operation_id())?;
         verify_catalog(&tx)?;
-        let actual = super::super::records::load_metadata(&tx, initialized.authority.as_str())?
+        let actual = super::super::records::load_metadata(&tx, selection.authority().as_str())?
             .ok_or_else(|| invalid("native egress initialization is absent"))?;
-        if &actual != initialized || actual.fence.store_uuid != lease.store_fence().store_uuid {
+        selection.validate(&actual)?;
+        if actual.fence.store_uuid != lease.store_fence().store_uuid {
             return Err(invalid(
                 "native egress initialization differs from selected destination",
             ));
@@ -144,7 +193,10 @@ impl SqliteAdmissionOperationStore {
         {
             if existing.authority != actual.authority
                 || existing.initialization != actual.digest
-                || existing.command != command
+                || !existing
+                    .command
+                    .matches_preparation(&command)
+                    .map_err(invalid)?
                 || existing.live_request_hash != live_request_hash
             {
                 return Err(invalid("native egress retry replaced its original command"));
@@ -191,6 +243,12 @@ impl SqliteAdmissionOperationStore {
         let (mut current_rows, mut current_bytes) =
             super::super::history::ordered::latest_totals(&tx, &actual)?;
         let before = footprint(&tx)?;
+        let (command, decision_at) = if matches!(command, NativeEgressCommand::Acquire(_)) {
+            (command, decision_at)
+        } else {
+            let event_at = physical_commit_time(&tx, decision_at)?;
+            (command.at_event_time(event_at).map_err(invalid)?, event_at)
+        };
         let observed_at = super::super::observed_time(&tx, decision_at)?;
         if let NativeEgressCommand::CommitDeclassified { grant, .. } = &command {
             let (snapshot, generation) = crate::security_state::observe_native_flow_state(
@@ -330,6 +388,19 @@ impl SqliteAdmissionOperationStore {
         super::super::cutpoint(16)?;
         Ok(result)
     }
+}
+
+fn physical_commit_time(
+    tx: &Transaction<'_>,
+    prepared_at: u64,
+) -> Result<u64, AdmissionOperationStoreError> {
+    let observed = super::super::super::schema::observe_authority_time(tx)?;
+    if prepared_at > observed {
+        // Preserve the existing future-clock bound. Only time spent waiting
+        // before a new physical event is excluded from evidence skew.
+        super::super::super::schema::authority_validation_time(tx, prepared_at)?;
+    }
+    Ok(observed.max(prepared_at))
 }
 
 fn footprint(

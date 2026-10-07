@@ -167,3 +167,133 @@ impl NativeRowChange {
         Ok(())
     }
 }
+
+impl NativeRowChange {
+    /// Data-only predecessor reconstruction from already authenticated owned
+    /// journal images. This creates no source, lease or mutation authority.
+    pub(crate) fn predecessor_snapshot_for_native_flow_join(
+        request: &FlowJoinRequest,
+        result: &chio_security_types::ports::FlowStateSnapshot,
+        changes: &[Self],
+    ) -> PortResult<chio_security_types::ports::FlowStateSnapshot> {
+        if result.key != request.key || changes.is_empty() || changes.len() > super::MAX_CHANGES {
+            return Err(PortError::integrity_failure());
+        }
+        let mut principal = result.principal_label.clone();
+        let mut lineage = result.lineage_label.clone();
+        // An actual join stores the result's effective session label. Reverse
+        // the stored image before recomputing inherited predecessor labels.
+        let mut session = result.session_label.clone();
+        let mut generation = result.context_generation;
+        let mut context_seen = false;
+        for change in changes.iter().rev() {
+            change.validate_flow_join(request)?;
+            if !matches!(
+                change.table.as_str(),
+                "security_principal_flow_state"
+                    | "security_lineage_flow_state"
+                    | "security_session_flow_state"
+                    | "security_flow_contexts"
+            ) {
+                continue;
+            }
+            let after = Row::decode(
+                &change.table,
+                change
+                    .after
+                    .as_deref()
+                    .ok_or_else(PortError::integrity_failure)?,
+            )?;
+            if !after.text_matches("tenant_id", request.key.tenant_id.as_str()) {
+                return Err(PortError::integrity_failure());
+            }
+            let selected = match change.table.as_str() {
+                "security_principal_flow_state" => after.principal(&request.key),
+                "security_lineage_flow_state" => after.lineage(&request.key),
+                "security_session_flow_state" => after.session(&request.key),
+                "security_flow_contexts" => {
+                    after.session(&request.key) && after.lineage(&request.key)
+                }
+                _ => false,
+            };
+            if !selected {
+                continue;
+            }
+            // The supported semantic source is fully initialized before an
+            // owned join. A missing predecessor is not inferred as Bottom.
+            let before = Row::decode(
+                &change.table,
+                change
+                    .before
+                    .as_deref()
+                    .ok_or_else(PortError::integrity_failure)?,
+            )?;
+            match change.table.as_str() {
+                "security_flow_contexts" => {
+                    let next = u64::try_from(Row::integer(after.cell("generation")?)?)
+                        .map_err(|_| PortError::integrity_failure())?;
+                    if next != generation {
+                        return Err(PortError::integrity_failure());
+                    }
+                    generation = u64::try_from(Row::integer(before.cell("generation")?)?)
+                        .map_err(|_| PortError::integrity_failure())?;
+                    context_seen = true;
+                }
+                "security_principal_flow_state" => {
+                    if after.label()? != principal {
+                        return Err(PortError::integrity_failure());
+                    }
+                    principal = before.label()?;
+                }
+                "security_lineage_flow_state" => {
+                    if after.label()? != lineage {
+                        return Err(PortError::integrity_failure());
+                    }
+                    lineage = before.label()?;
+                }
+                "security_session_flow_state" => {
+                    if after.label()? != session {
+                        return Err(PortError::integrity_failure());
+                    }
+                    session = before.label()?;
+                }
+                _ => return Err(PortError::integrity_failure()),
+            }
+        }
+        if !context_seen || generation == 0 || generation >= result.context_generation {
+            return Err(PortError::integrity_failure());
+        }
+        let session = session
+            .join_restrictions(&principal)
+            .and_then(|label| label.join_restrictions(&lineage))
+            .map_err(|_| PortError::integrity_failure())?;
+        let before = chio_security_types::ports::FlowStateSnapshot {
+            key: request.key.clone(),
+            principal_label: principal,
+            lineage_label: lineage,
+            session_label: session,
+            context_generation: generation,
+        };
+        let next_principal = before
+            .principal_label
+            .join_restrictions(&request.principal_join)
+            .map_err(|_| PortError::integrity_failure())?;
+        let next_lineage = before
+            .lineage_label
+            .join_restrictions(&request.lineage_join)
+            .map_err(|_| PortError::integrity_failure())?;
+        let next_session = before
+            .session_label
+            .join_restrictions(&request.session_join)
+            .and_then(|label| label.join_restrictions(&next_principal))
+            .and_then(|label| label.join_restrictions(&next_lineage))
+            .map_err(|_| PortError::integrity_failure())?;
+        if next_principal != result.principal_label
+            || next_lineage != result.lineage_label
+            || next_session != result.session_label
+        {
+            return Err(PortError::integrity_failure());
+        }
+        Ok(before)
+    }
+}

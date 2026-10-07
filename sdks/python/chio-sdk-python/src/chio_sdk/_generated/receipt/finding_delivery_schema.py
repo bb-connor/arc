@@ -2,60 +2,46 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: eb3605a1594254370980dcf328ad3f0c7a751ff746d1530b9981c40163f5694a
+# Schema sha256: 35f8e30cf30553986a159b074ee485804a85db29547a8102522cd7bfa3080d2e
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
 # under sdks/python/chio-sdk-python/src/chio_sdk/_generated/.
 
-
 from __future__ import annotations
-
 from enum import Enum
 from typing import Literal
-
 from pydantic import BaseModel, ConfigDict, Field, RootModel, conint, constr
 
-
 class TransformProfile(Enum):
-    identity = "identity"
+    identity = 'identity'
 
+class ReceiptFindingDeliveryDigestCheck(Enum):
+    matched = 'matched'
+    mismatched = 'mismatched'
 
-class DigestCheck(Enum):
-    matched = "matched"
-    mismatched = "mismatched"
-
-
-class MediaTypeCheck(Enum):
-    matched = "matched"
-    mismatched = "mismatched"
-    not_evaluated = "not_evaluated"
-
+class ReceiptFindingDeliveryMediaTypeCheck(Enum):
+    matched = 'matched'
+    mismatched = 'mismatched'
+    not_evaluated = 'not_evaluated'
 
 class SettlementMode(Enum):
-    local_reversible_hold = "local_reversible_hold"
+    local_reversible_hold = 'local_reversible_hold'
 
+class Digest(RootModel[constr(pattern='^[0-9a-f]{64}$')]):
+    root: constr(pattern='^[0-9a-f]{64}$')
 
-class Digest(RootModel[constr(pattern=r"^[0-9a-f]{64}$")]):
-    root: constr(pattern=r"^[0-9a-f]{64}$")
+class Identifier(RootModel[constr(pattern='^[A-Za-z0-9._:-]{1,512}$')]):
+    root: constr(pattern='^[A-Za-z0-9._:-]{1,512}$')
 
-
-class Identifier(RootModel[constr(pattern=r"^[A-Za-z0-9._:-]{1,512}$")]):
-    root: constr(pattern=r"^[A-Za-z0-9._:-]{1,512}$")
-
-
-class HierarchicalIdentifier(RootModel[constr(pattern=r"^[A-Za-z0-9._:/-]{1,512}$")]):
-    root: constr(pattern=r"^[A-Za-z0-9._:/-]{1,512}$")
-
+class HierarchicalIdentifier(RootModel[constr(pattern='^[A-Za-z0-9._:/-]{1,512}$')]):
+    root: constr(pattern='^[A-Za-z0-9._:/-]{1,512}$')
 
 class IJsonU64NonZero(RootModel[conint(ge=1, le=9007199254740991)]):
     root: conint(ge=1, le=9007199254740991)
 
-
-class StatusProof(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
+class ReceiptFindingDeliveryDefinitionsStatusProof(BaseModel):
+    model_config = ConfigDict(extra='forbid')
     feed_id: HierarchicalIdentifier
     key_domain_nonce: Literal[3318287169837494]
     map_epoch: IJsonU64NonZero
@@ -64,21 +50,30 @@ class StatusProof(BaseModel):
     root_hash: Digest
     non_inclusion_checked_at: IJsonU64NonZero
 
-
 class ChioFindingDeliveryReceiptMetadata(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    schema_: Literal["chio.finding.delivery.v1"] = Field(..., alias="schema")
+    model_config = ConfigDict(extra='forbid')
+    schema_: Literal['chio.finding.delivery.v1'] = Field(..., alias='schema')
     finding_id: Identifier
     listing_id: Identifier
     transform_profile: TransformProfile
-    digest_check: DigestCheck
-    media_type_check: MediaTypeCheck
+    digest_check: ReceiptFindingDeliveryDigestCheck
+    media_type_check: ReceiptFindingDeliveryMediaTypeCheck
     settlement_mode: SettlementMode
     accepted_bid_envelope_sha256: Digest
     venue_admission_envelope_sha256: Digest
     reservation_id: Identifier
     purchase_intent_id: Identifier
     authoritative_payment_operation_id: Identifier
-    status_proof: StatusProof | None = None
+    status_proof: ReceiptFindingDeliveryDefinitionsStatusProof | None = None
+
+# Public compatibility aliases reference the actual current model classes.
+DigestCheck = ReceiptFindingDeliveryDigestCheck
+MediaTypeCheck = ReceiptFindingDeliveryMediaTypeCheck
+ReceiptFindingDeliveryChioFindingDeliveryReceiptMetadata = ChioFindingDeliveryReceiptMetadata
+ReceiptFindingDeliveryDigest = Digest
+ReceiptFindingDeliveryHierarchicalIdentifier = HierarchicalIdentifier
+ReceiptFindingDeliveryIJsonU64NonZero = IJsonU64NonZero
+ReceiptFindingDeliveryIdentifier = Identifier
+ReceiptFindingDeliverySettlementMode = SettlementMode
+ReceiptFindingDeliveryTransformProfile = TransformProfile
+StatusProof = ReceiptFindingDeliveryDefinitionsStatusProof

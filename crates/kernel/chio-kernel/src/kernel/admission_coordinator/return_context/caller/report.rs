@@ -144,7 +144,12 @@ impl ChioKernel {
             self.reach_durable_finalization_cutpoint(
                 DurableFinalizationCutpoint::ToolReturnRecorded,
             );
-            self.finalize_durable_tool_return(&mut admission, &request, &returned)
+            self.finalize_public_durable_tool_return_with_security_release(
+                &mut admission,
+                &request,
+                &returned,
+                None,
+            )
         })
     }
 }

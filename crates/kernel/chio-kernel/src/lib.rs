@@ -69,7 +69,6 @@ pub mod finding_denial;
 #[cfg(all(not(loom), feature = "finding-market"))]
 pub mod finding_pool;
 #[cfg(not(loom))]
-#[cfg(not(loom))]
 pub mod security_admission_operation;
 /// With the market lane compiled out, only the ledger error vocabulary
 /// remains so integration seams keep one signature in both builds.
@@ -106,9 +105,12 @@ pub mod provider_verdict;
 pub mod receipt_analytics;
 #[cfg(not(loom))]
 pub mod receipt_query;
+#[cfg(not(loom))]
 pub mod receipt_store;
 #[cfg(not(loom))]
 mod receipt_support;
+#[cfg(not(loom))]
+pub mod recovery;
 #[cfg(not(loom))]
 mod replay_retention;
 #[cfg(not(loom))]
@@ -195,9 +197,10 @@ pub(crate) use receipt_support::*;
 #[cfg(not(loom))]
 pub use receipt_support::{
     fixed_runtime_unix_secs_for_current_thread, kernel_signing_backend,
-    receipt_body_fields_coupled, scope_fixed_runtime_for_current_thread,
-    sign_receipt_body_hybrid_canonical, sign_receipt_body_with_backend, FixedRuntimeScope,
-    KernelCryptoFloor, KernelSigningBackendError, ReceiptCouplingExpectation, SignedHybridReceipt,
+    receipt_body_fields_coupled, scope_fixed_runtime_clock_for_current_thread,
+    scope_fixed_runtime_for_current_thread, sign_receipt_body_hybrid_canonical,
+    sign_receipt_body_with_backend, FixedRuntimeClockScope, FixedRuntimeScope, KernelCryptoFloor,
+    KernelSigningBackendError, ReceiptCouplingExpectation, SignedHybridReceipt,
 };
 #[cfg(not(loom))]
 pub(crate) use request_matching::{
@@ -587,9 +590,9 @@ pub use revocation_store::{RevocationRecord, RevocationStoreError};
 #[cfg(not(loom))]
 pub use runtime::{
     BlockingToolServerAdapter, BlockingToolServerConnection, NestedFlowBridge, NestedFlowClient,
-    ToolCallChunk, ToolCallOutput, ToolCallRequest, ToolCallResponse, ToolCallStream,
-    ToolDispatchContext, ToolInvocationContext, ToolInvocationCost, ToolServerConnection,
-    ToolServerEvent, ToolServerOutput, ToolServerStreamResult, Verdict,
+    RecoveryRequestCustody, ToolCallChunk, ToolCallOutput, ToolCallRequest, ToolCallResponse,
+    ToolCallStream, ToolDispatchContext, ToolInvocationContext, ToolInvocationCost,
+    ToolServerConnection, ToolServerEvent, ToolServerOutput, ToolServerStreamResult, Verdict,
 };
 #[cfg(not(loom))]
 pub use runtime_trace::{RuntimeTraceEvent, RuntimeTraceObserver};
@@ -665,13 +668,14 @@ pub use kernel::{
     MemoryBudgetConfig, NativeSecurityAdmissionContext, NativeSecurityFlowJoinAuthority,
     NativeSecurityNoncePreflightJoinAuthority, NestedToolCallProofs, OverloadResource,
     PreDispatchActiveResponseReconstruction, PreparedActiveResponseAdmission,
-    PreparedNativeSecurityEgress, PromptProvider, ReceiptLog, ReplayClockDirection,
-    ResourceProvider, ResponseDispatchPreparationRequest, RuntimeAdmissionContext,
-    RuntimeAdmissionDecision, RuntimeAdmissionHook, RuntimeAdmissionReadinessToken,
-    RuntimeAdmissionRevalidationContext, RuntimeParticipantClaimAuthority, SecurityDispatchOutcome,
-    SecurityDispatchOutcomeHandle, SecurityDispatchOutcomeRecorder, SecurityInvocationContext,
-    SecurityInvocationContextAuthority, SecurityInvocationContextV1, SecurityPreDispatchContext,
-    SecurityPreDispatchHook, SecurityPreDispatchPolicy, SecurityRequestLifecyclePermit, ServerId,
+    PreparedNativeSecurityEgress, PreparedNativeSecurityEgressCommit, PromptProvider, ReceiptLog,
+    ReplayClockDirection, ResourceProvider, ResponseDispatchPreparationRequest,
+    RuntimeAdmissionContext, RuntimeAdmissionDecision, RuntimeAdmissionHook,
+    RuntimeAdmissionReadinessToken, RuntimeAdmissionRevalidationContext,
+    RuntimeParticipantClaimAuthority, SecurityDispatchOutcome, SecurityDispatchOutcomeHandle,
+    SecurityDispatchOutcomeRecorder, SecurityInvocationContext, SecurityInvocationContextAuthority,
+    SecurityInvocationContextV1, SecurityPreDispatchContext, SecurityPreDispatchHook,
+    SecurityPreDispatchPolicy, SecurityRequestLifecyclePermit, ServerId,
     SettlementRuntimeConfigError, StructuredErrorReport, VerifiedActiveResponseBindings,
     VerifiedFederationTreatyMaterial, VerifiedResponseSimulationAuthorization,
     ACTIVE_RESPONSE_ADMISSION_ARTIFACT_PAYLOAD_SCHEMA,
@@ -684,20 +688,26 @@ pub use kernel::{
 
 #[cfg(not(loom))]
 pub use kernel::evaluator::ToolEvaluator;
+#[cfg(not(loom))]
 pub use kernel::DurableFinalizationCutpoint;
-#[cfg(feature = "admission-test-support")]
+#[cfg(all(not(loom), feature = "admission-test-support"))]
 pub use kernel::DurableFinalizationCutpointHook;
-#[cfg(feature = "admission-test-support")]
-pub use kernel::NativeSecurityCaptureCheckpointHook;
-pub use kernel::NativeSecurityDispatchCaptureAuthority;
-#[cfg(feature = "admission-test-support")]
+#[cfg(all(not(loom), feature = "admission-test-support"))]
 pub use kernel::NativeSecurityEgressCheckpointHook;
 #[cfg(not(loom))]
 pub use kernel::NativeSecurityOutputJoinAuthority;
+#[cfg(not(loom))]
 pub use kernel::VerifiedNativeDispatchCredentials;
-#[cfg(feature = "admission-test-support")]
+#[cfg(all(not(loom), feature = "admission-test-support"))]
 pub use kernel::{CallerExecutionCheckpoint, CallerExecutionCheckpointHook};
+#[cfg(not(loom))]
 pub use kernel::{CallerExecutionReport, CallerStartCredentials, CallerStartResponse};
+#[cfg(not(loom))]
+pub use kernel::{
+    NativeFlowPolicyRefusal, NativeFlowPolicyRefusalOwner, NativeSecurityDispatchCaptureAuthority,
+};
+#[cfg(all(not(loom), feature = "admission-test-support"))]
+pub use kernel::{NativeSecurityCaptureCheckpointHook, NativeSecurityCaptureObserver};
 
 #[cfg(not(loom))]
 /// Settlement observer surface. Re-exported so integration tests and
@@ -722,5 +732,8 @@ pub const SIGNING_CHANNEL_DEFAULT_CAPACITY: usize =
 /// blocks under backpressure.
 pub use kernel::signing_task::METRIC_CHIO_SIGNING_QUEUE_BLOCK_TOTAL;
 
-#[cfg(feature = "admission-test-support")]
+#[cfg(all(not(loom), feature = "admission-test-support"))]
 pub use kernel::active_response_test_support;
+
+#[cfg(not(loom))]
+pub mod knowledge;

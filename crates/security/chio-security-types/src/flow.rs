@@ -1,4 +1,4 @@
-use alloc::collections::{btree_map::Entry, BTreeMap, BTreeSet};
+use alloc::collections::{BTreeMap, BTreeSet, btree_map::Entry};
 use alloc::format;
 use alloc::string::String;
 use core::fmt;
@@ -7,7 +7,9 @@ use serde::de::{self, MapAccess, SeqAccess, Visitor};
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-const MAX_IDENTIFIER_BYTES: usize = 256;
+/// UTF-8 byte ceiling shared by flow principals, compartments and purposes.
+pub const MAX_FLOW_IDENTIFIER_BYTES: usize = 256;
+const MAX_IDENTIFIER_BYTES: usize = MAX_FLOW_IDENTIFIER_BYTES;
 
 fn deserialize_present_option<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
 where
@@ -729,13 +731,13 @@ impl<'de> Deserialize<'de> for InformationLabel {
 #[cfg(test)]
 mod tests {
     use super::{
-        Compartment, InformationLabel, LabelLimits, LabelValidationError, PrincipalId,
-        ToolFlowDeclaration, DEFAULT_LABEL_LIMITS, MAX_IDENTIFIER_BYTES,
+        Compartment, DEFAULT_LABEL_LIMITS, InformationLabel, LabelLimits, LabelValidationError,
+        MAX_IDENTIFIER_BYTES, PrincipalId, ToolFlowDeclaration,
     };
     use alloc::collections::{BTreeMap, BTreeSet};
     use alloc::format;
     use alloc::vec::Vec;
-    use serde_json::{from_str, json, to_string, Value};
+    use serde_json::{Value, from_str, json, to_string};
 
     struct BorrowedIdentifierDeserializer<'de>(&'de str);
 
@@ -911,18 +913,24 @@ mod tests {
             r#"{"output_label":{"kind":"known","owners":{},"compartments":["pii"]},"input_clearance":{"kind":"known","owners":{},"compartments":["pii"]},"egress":true,"declassification_purposes":["billing","support"]}"#
         );
 
-        assert!(from_str::<ToolFlowDeclaration>(
-            r#"{"egress":true,"declassification_purposes":["billing","billing"]}"#
-        )
-        .is_err());
-        assert!(from_str::<ToolFlowDeclaration>(
-            r#"{"egress":true,"declassification_purposes":[],"unknown":true}"#
-        )
-        .is_err());
-        assert!(from_str::<ToolFlowDeclaration>(
-            r#"{"output_label":{"kind":"top"},"egress":false,"declassification_purposes":[]}"#
-        )
-        .is_err());
+        assert!(
+            from_str::<ToolFlowDeclaration>(
+                r#"{"egress":true,"declassification_purposes":["billing","billing"]}"#
+            )
+            .is_err()
+        );
+        assert!(
+            from_str::<ToolFlowDeclaration>(
+                r#"{"egress":true,"declassification_purposes":[],"unknown":true}"#
+            )
+            .is_err()
+        );
+        assert!(
+            from_str::<ToolFlowDeclaration>(
+                r#"{"output_label":{"kind":"top"},"egress":false,"declassification_purposes":[]}"#
+            )
+            .is_err()
+        );
         assert!(from_str::<ToolFlowDeclaration>(
             r#"{"input_clearance":{"kind":"top"},"egress":false,"declassification_purposes":[]}"#
         )

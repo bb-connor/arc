@@ -25,8 +25,40 @@ impl ChioKernel {
         let plan = self.durable_post_return_plan()?;
         // Raw outcome context is committed historical data for finalization,
         // never a source of authority for a new invocation or redispatch.
-        let security_binding =
-            self.admission_security_binding(raw.security_invocation_context())?;
+        let security_binding = match self.captured_recovery_deployment(&admission.operation)? {
+            Some(crate::recovery::RecoveryCapturedDeploymentV1::Verified(profile)) => {
+                let original = admission.original_retained_request().ok_or_else(|| {
+                    KernelError::DurableAdmission(
+                        "captured recovery original request absent".into(),
+                    )
+                })?;
+                original
+                    .validate_binding(admission.operation.binding())
+                    .map_err(durable_store_error)?;
+                original
+                    .validate_native_security_authority(&profile.native_authority)
+                    .map_err(durable_store_error)?;
+                original
+                    .validate_native_security_context(
+                        raw.security_invocation_context().ok_or_else(|| {
+                            KernelError::DurableAdmission(
+                                "captured recovery original context absent".into(),
+                            )
+                        })?,
+                    )
+                    .map_err(durable_store_error)?;
+                original.security_binding().cloned()
+            }
+            Some(
+                crate::recovery::RecoveryCapturedDeploymentV1::LegacyUnavailable
+                | crate::recovery::RecoveryCapturedDeploymentV1::Quarantined,
+            ) => {
+                return Err(KernelError::DurableAdmission(
+                    "captured recovery historical verifier unavailable".into(),
+                ));
+            }
+            None => self.admission_security_binding(raw.security_invocation_context())?,
+        };
         let recovered_request_hash = immutable_tool_admission_request_hash(
             request,
             &matching_grants,

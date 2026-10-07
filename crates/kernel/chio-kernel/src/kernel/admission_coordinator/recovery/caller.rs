@@ -3,7 +3,7 @@
 use super::*;
 
 impl ChioKernel {
-    pub(super) fn retain_authenticated_caller_wait(
+    pub(in crate::kernel::admission_coordinator) fn retain_authenticated_caller_wait(
         &self,
         operation: &AdmissionOperationV1,
         now: u64,

@@ -135,7 +135,7 @@ def main():
         "worker_image": args.worker_image,
         "runner": report,
         "probe_sha256": hashlib.sha256(harness.probe.read_bytes()).hexdigest(),
-        "m5_acceptance_complete": False,
+        "qualification_complete": False,
         "limits": [
             "operator revocation requires a stopped host",
             "not a complete scenario artifact",

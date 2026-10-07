@@ -35,3 +35,9 @@ export {
   type WebInterceptionOutcome,
   type PreserveReadableBodyOptions,
 } from "./interceptor.js";
+
+export { RecoveryClient, RecoveryError, LosslessJsonNumber,
+  type RecoveryCommandResult, type RecoveryClientOptions, type RecoveryErrorCode,
+  type LosslessJsonValue } from "./recovery.js";
+export { canonicalJsonString, canonicalJsonBytes } from "./canonical.js";
+export type { Recovery_Command, Recovery_CommandResult, Recovery_CommandResponse, Recovery_ReviewDocument } from "./_generated/index.js";

@@ -219,7 +219,7 @@ report = {
         "ASSUME-FINDING-STATUS-OPERATOR-COMPLETENESS",
         "ASSUME-FINDING-SELLER-TOOL-SERVER",
     ],
-    "m7": {
+    "bilateral_deployment": {
         "triggered": False,
         "disposition": "conditional-unbuilt",
         "basis": "no verified bilateral seller and buyer deployment request",

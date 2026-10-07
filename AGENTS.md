@@ -52,6 +52,9 @@ cargo fmt --all -- --check
 - **Serialization**: canonical JSON (RFC 8785) for all signed payloads.
 - **Commit messages**: conventional commits (`feat:`, `fix:`, `docs:`, `test:`, etc.).
 - **No em dashes** in code, comments, or documentation. Use hyphens or parentheses.
+- **Behavioral names**: name source files, symbols, tests, fixtures and tooling after
+  the behavior or contract they implement. Keep numbered roadmap and task labels
+  in planning documents and historical acceptance evidence.
 
 ## Key Files
 

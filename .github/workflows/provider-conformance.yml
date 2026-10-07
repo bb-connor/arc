@@ -3,9 +3,9 @@ name: Provider conformance
 on:
   pull_request:
     branches:
-      - project/roadmap-04-25-2026
+      - project/**
       - main
-      - chio/autonomous-commerce-brainstorm
+      - chio/**
     paths:
       - Cargo.toml
       - Cargo.lock
@@ -22,7 +22,7 @@ on:
       - .github/workflows/provider-conformance.yml
   push:
     branches:
-      - project/roadmap-04-25-2026
+      - project/**
       - main
     paths:
       - Cargo.toml

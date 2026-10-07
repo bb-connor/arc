@@ -2,58 +2,37 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: eb3605a1594254370980dcf328ad3f0c7a751ff746d1530b9981c40163f5694a
+# Schema sha256: 35f8e30cf30553986a159b074ee485804a85db29547a8102522cd7bfa3080d2e
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
 # under sdks/python/chio-sdk-python/src/chio_sdk/_generated/.
 
-
 from __future__ import annotations
-
 from enum import Enum
-
 from pydantic import BaseModel, ConfigDict, Field, conint, constr
 
-
-class Reason(Enum):
+class TrustControlTerminateReason(Enum):
     """
     Typed reason for releasing the lease. `leader_handoff` covers planned reassignment, `quorum_lost` covers detected loss of cluster quorum, `operator_stepdown` covers explicit operator action, and `term_advanced` covers a higher election term superseding the lease.
     """
-
-    leader_handoff = "leader_handoff"
-    quorum_lost = "quorum_lost"
-    operator_stepdown = "operator_stepdown"
-    term_advanced = "term_advanced"
-
+    leader_handoff = 'leader_handoff'
+    quorum_lost = 'quorum_lost'
+    operator_stepdown = 'operator_stepdown'
+    term_advanced = 'term_advanced'
 
 class ChioTrustControlLeaseTermination(BaseModel):
     """
     One trust-control termination request that voluntarily releases a held authority lease before its TTL expires. Termination names the lease being released (`leaseId` plus `leaseEpoch`), the leader URL releasing it, and a typed `reason` so operators can distinguish leader handoff from quorum loss or operator-initiated stepdown. The contract is anchored by `spec/PROTOCOL.md` section 9, where loss of quorum or a leader change clears the lease expiry and bumps the election term. Wire field names are camelCase to match the sibling lease projection so the families stay consistent on the wire.
     """
+    model_config = ConfigDict(extra='forbid')
+    leaseId: constr(min_length=1) = Field(..., description='Lease identifier being released. Must match the `leaseId` previously projected by the lease schema.')
+    leaseEpoch: conint(ge=0) = Field(..., description='Lease epoch carried alongside `leaseId`.')
+    leaderUrl: constr(min_length=1) = Field(..., description='Normalized URL of the leader releasing the lease.')
+    reason: TrustControlTerminateReason = Field(..., description='Typed reason for releasing the lease. `leader_handoff` covers planned reassignment, `quorum_lost` covers detected loss of cluster quorum, `operator_stepdown` covers explicit operator action, and `term_advanced` covers a higher election term superseding the lease.')
+    observedAt: conint(ge=0) = Field(..., description='Unix-millisecond timestamp at which the releasing leader observed the condition that motivated termination.')
+    successorLeaderUrl: constr(min_length=1) | None = Field(None, description='Optional normalized URL of the successor leader, when termination is part of a planned handoff.')
 
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    leaseId: constr(min_length=1) = Field(
-        ...,
-        description="Lease identifier being released. Must match the `leaseId` previously projected by the lease schema.",
-    )
-    leaseEpoch: conint(ge=0) = Field(
-        ..., description="Lease epoch carried alongside `leaseId`."
-    )
-    leaderUrl: constr(min_length=1) = Field(
-        ..., description="Normalized URL of the leader releasing the lease."
-    )
-    reason: Reason = Field(
-        ...,
-        description="Typed reason for releasing the lease. `leader_handoff` covers planned reassignment, `quorum_lost` covers detected loss of cluster quorum, `operator_stepdown` covers explicit operator action, and `term_advanced` covers a higher election term superseding the lease.",
-    )
-    observedAt: conint(ge=0) = Field(
-        ...,
-        description="Unix-millisecond timestamp at which the releasing leader observed the condition that motivated termination.",
-    )
-    successorLeaderUrl: constr(min_length=1) | None = Field(
-        None,
-        description="Optional normalized URL of the successor leader, when termination is part of a planned handoff.",
-    )
+# Public compatibility aliases reference the actual current model classes.
+Reason = TrustControlTerminateReason
+TrustControlTerminateChioTrustControlLeaseTermination = ChioTrustControlLeaseTermination

@@ -7,6 +7,11 @@ use chio_security_types::ports::{BoundedVec, FlowJoinRequest, FlowStateSnapshot}
 mod command;
 use command::Command;
 
+struct JoinedNativeCommand {
+    record: history::Record,
+    refused: bool,
+}
+
 /// Affine, crate-private authority created only inside the verified admission
 /// transaction. Inspection, serialized history and raw SQL handles cannot mint
 /// it. It authorizes this monotone join, never external execution.
@@ -83,7 +88,7 @@ impl SqliteAdmissionOperationStore {
             Command::Raw(request),
             trusted_now_unix_ms,
         )
-        .map(|record| record.result)
+        .map(|joined| joined.record.result)
     }
 
     pub(in crate::admission_operation_store) fn join_security_participant_input(
@@ -106,7 +111,34 @@ impl SqliteAdmissionOperationStore {
             Command::Input(input),
             trusted_now_unix_ms,
         )?
+        .record
         .input_record(initialized)
+    }
+
+    pub(in crate::admission_operation_store) fn join_security_participant_input_classified<
+        'call,
+    >(
+        &self,
+        initialized: &SecurityParticipantStateInitialization,
+        classification: &'call chio_kernel::admission_operation::NativeSecurityInputClassificationAuthority<'call>,
+    ) -> Result<
+        chio_kernel::admission_operation::NativeSecurityInputJoinOutcome<'call>,
+        AdmissionOperationStoreError,
+    > {
+        let joined = self.join_native_command(
+            classification.operation(),
+            classification.lease(),
+            initialized,
+            classification.context(),
+            Command::Input(classification.input()),
+            classification.trusted_now_unix_ms(),
+        )?;
+        let record = joined.record.input_record(initialized)?;
+        if joined.refused {
+            classification.refused(record)
+        } else {
+            classification.eligible(record)
+        }
     }
 
     fn join_native_command(
@@ -117,7 +149,7 @@ impl SqliteAdmissionOperationStore {
         context: &SecurityInvocationContext,
         command: Command<'_>,
         trusted_now_unix_ms: u64,
-    ) -> Result<history::Record, AdmissionOperationStoreError> {
+    ) -> Result<JoinedNativeCommand, AdmissionOperationStoreError> {
         let mut connection = self.connection()?;
         let tx = self.begin_write(&mut connection, Some(lease.store_fence()))?;
         observed_time(&tx, trusted_now_unix_ms)?;
@@ -150,7 +182,10 @@ impl SqliteAdmissionOperationStore {
                     "native operation cannot replace its authority or command",
                 ));
             }
-            return Ok(record);
+            return Ok(JoinedNativeCommand {
+                record,
+                refused: false,
+            });
         }
         // Existing context-only journals remain historical data. They cannot
         // acquire a first native mutation without an original authority binding.
@@ -201,7 +236,59 @@ impl SqliteAdmissionOperationStore {
         // Resolve every inherited label in this same write transaction, before
         // minting the affine mutation owner. No partial snapshot or raw writer
         // escapes. The common mutator still validates epoch and membership.
-        let request = command.resolve(&tx, actual.authority.as_str())?;
+        let mut request = command.resolve(&tx, actual.authority.as_str())?;
+        let mut refused = false;
+        if let Some(input) = command.input() {
+            let binding = actual.admission_binding()?;
+            let (before, _) = crate::security_state::observe_native_flow_state(
+                &tx,
+                actual.authority.as_str(),
+                input.key(),
+            )
+            .map_err(invalid)?;
+            let witnessed_at = observed_time(&tx, trusted_now_unix_ms)?;
+            if let Some(witness) = super::super::semantic::verify_input_tx(
+                &tx,
+                super::super::semantic::SemanticInputObservation {
+                    operation,
+                    original: &original,
+                    binding: &binding,
+                    context,
+                    input,
+                    before: before.as_ref(),
+                    resolved: &request,
+                    now: witnessed_at,
+                },
+            )? {
+                refused = witness.is_refused();
+                #[cfg(feature = "admission-test-support")]
+                let modeled_predecessor =
+                    super::super::semantic::modeled_legacy_input_floor_selected(
+                        &lease.store_fence().store_uuid,
+                        &original,
+                    )?;
+                #[cfg(not(feature = "admission-test-support"))]
+                let modeled_predecessor = false;
+                if !modeled_predecessor {
+                    let mut floor = witness.restriction_floor().clone();
+                    if let Some(status) = witness.withheld_status_audience() {
+                        floor = floor.join_restrictions(status).map_err(invalid)?;
+                    }
+                    request.principal_join = request
+                        .principal_join
+                        .join_restrictions(&floor)
+                        .map_err(invalid)?;
+                    request.lineage_join = request
+                        .lineage_join
+                        .join_restrictions(&floor)
+                        .map_err(invalid)?;
+                    request.session_join = request
+                        .session_join
+                        .join_restrictions(&floor)
+                        .map_err(invalid)?;
+                }
+            }
+        }
         // Source/history verification can take time. Recheck the actual lease
         // immediately before enabling writes, using the later trusted time for
         // expiry but retaining the independent observation as historical data.
@@ -289,6 +376,6 @@ impl SqliteAdmissionOperationStore {
         }
         self.sync_after_write(&connection)?;
         cutpoint(11)?;
-        Ok(record)
+        Ok(JoinedNativeCommand { record, refused })
     }
 }

@@ -63,12 +63,12 @@ pub(crate) fn observe_native_flow_state(
 ) -> PortResult<(Option<FlowStateSnapshot>, Option<u64>)> {
     let reader = FlowReader::native(transaction, authority);
     let stored_context_generation = load_context_generation(reader, key)?;
-    let snapshot = load_scoped_flow_snapshot(reader, key)?;
+    let snapshot = load_observed_flow_snapshot(reader, key)?;
     Ok((snapshot, stored_context_generation))
 }
 
 /// Validate the actual post-mutation rows, not only the computed return value.
-pub(super) fn verify_native_join_snapshot(
+pub(crate) fn verify_native_join_snapshot(
     connection: &Connection,
     authority: &str,
     expected: &FlowStateSnapshot,

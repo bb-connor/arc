@@ -2,35 +2,25 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: eb3605a1594254370980dcf328ad3f0c7a751ff746d1530b9981c40163f5694a
+# Schema sha256: 35f8e30cf30553986a159b074ee485804a85db29547a8102522cd7bfa3080d2e
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
 # under sdks/python/chio-sdk-python/src/chio_sdk/_generated/.
 
-
 from __future__ import annotations
-
 from typing import Literal
-
 from pydantic import BaseModel, ConfigDict
-
-from . import (
-    cage_enforcement_prepared_v1_schema,
-    cage_exec_transition_observed_v1_schema,
-)
-
+from . import cage_enforcement_prepared_v1_schema, cage_exec_transition_observed_v1_schema
 
 class ChioCageFullyEnforcedEvidenceV1(BaseModel):
     """
     Composite evidence requiring a prepared confinement record, the matching observed target exec transition, and EOF on the private helper status channel.
     """
-
-    model_config = ConfigDict(
-        extra="forbid",
-    )
+    model_config = ConfigDict(extra='forbid')
     prepared: cage_enforcement_prepared_v1_schema.ChioCageEnforcementPreparedEvidenceV1
-    exec_transition: (
-        cage_exec_transition_observed_v1_schema.ChioCageExecTransitionObservationV1
-    )
+    exec_transition: cage_exec_transition_observed_v1_schema.ChioCageExecTransitionObservationV1
     status_eof_observed: Literal[True]
+
+# Public compatibility aliases reference the actual current model classes.
+SecurityCageFullyEnforcedEvidenceV1ChioCageFullyEnforcedEvidenceV1 = ChioCageFullyEnforcedEvidenceV1

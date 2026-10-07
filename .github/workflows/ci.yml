@@ -152,6 +152,12 @@ jobs:
           python3 scripts/tests/check-fuzz-manifest-selection.test.py
           bash scripts/tests/check-drogon-consumer-gate.test.sh
           bash ./scripts/tests/check-flow-security.test.sh
+          python3 ./scripts/check-portable-recovery-lock.py
+          python3 ./scripts/tests/check-portable-recovery-lock.test.py
+          python3 ./scripts/check-recovery-boundaries.py
+          python3 ./scripts/tests/check-recovery-boundaries.test.py
+          python3 ./scripts/check-source-names.py
+          python3 ./scripts/tests/check-source-names.test.py
           bash ./scripts/tests/check-deception-security.test.sh
           /bin/bash -p ./scripts/tests/check-temporal-security.test.sh
           bash ./scripts/tests/check-response-recovery.test.sh

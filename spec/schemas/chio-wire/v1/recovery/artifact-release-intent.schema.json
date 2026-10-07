@@ -1,0 +1,337 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.computer/schemas/chio-wire/v1/recovery/artifact-release-intent.schema.json",
+  "title": "Artifact Release Intent V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "domain_version",
+    "release",
+    "kind",
+    "artifact",
+    "source_label",
+    "admitted_label",
+    "influence",
+    "recipient",
+    "policy",
+    "authorization",
+    "observation_transition",
+    "observation_generation",
+    "state"
+  ],
+  "properties": {
+    "domain_version": {
+      "const": 1
+    },
+    "release": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "kind": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "operation"
+          ],
+          "properties": {
+            "kind": {
+              "const": "captured_output"
+            },
+            "operation": {
+              "$ref": "#/$defs/opaqueId"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "request"
+          ],
+          "properties": {
+            "kind": {
+              "const": "independently_admitted"
+            },
+            "request": {
+              "$ref": "#/$defs/opaqueId"
+            }
+          }
+        }
+      ]
+    },
+    "artifact": {
+      "$ref": "#/$defs/artifactReference"
+    },
+    "source_label": {
+      "$ref": "https://chio.world/schemas/chio-wire/v1/security/information-label.schema.json"
+    },
+    "admitted_label": {
+      "$ref": "https://chio.world/schemas/chio-wire/v1/security/information-label.schema.json"
+    },
+    "influence": {
+      "$ref": "#/$defs/artifactInfluence"
+    },
+    "recipient": {
+      "$ref": "#/$defs/artifactRecipient"
+    },
+    "policy": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "authorization": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "observation_transition": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "observation_generation": {
+      "$ref": "#/$defs/safeInteger"
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "admitted",
+        "uncertain",
+        "delivered"
+      ]
+    }
+  },
+  "$defs": {
+    "artifactInfluence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commitment",
+        "externally_influenced",
+        "unknown"
+      ],
+      "properties": {
+        "commitment": {
+          "$ref": "#/$defs/recoveryDigest32"
+        },
+        "externally_influenced": {
+          "type": "boolean"
+        },
+        "unknown": {
+          "type": "boolean"
+        }
+      }
+    },
+    "artifactRecipient": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "recipient",
+        "scope",
+        "runtime",
+        "principal",
+        "lineage",
+        "isolation_epoch",
+        "context_generation",
+        "clearance",
+        "sink"
+      ],
+      "properties": {
+        "recipient": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "runtime": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "x-maxUtf8Bytes": 128
+        },
+        "principal": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "x-maxUtf8Bytes": 256
+        },
+        "lineage": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "isolation_epoch": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "x-maxUtf8Bytes": 128
+        },
+        "context_generation": {
+          "$ref": "#/$defs/safeInteger"
+        },
+        "clearance": {
+          "$ref": "https://chio.world/schemas/chio-wire/v1/security/information-label.schema.json"
+        },
+        "sink": {
+          "$ref": "#/$defs/artifactSink"
+        }
+      }
+    },
+    "artifactReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope",
+        "artifact",
+        "version",
+        "provenance"
+      ],
+      "properties": {
+        "scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "artifact": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "version": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "provenance": {
+          "$ref": "#/$defs/recoveryDigest32"
+        }
+      }
+    },
+    "artifactSink": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "agent"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "context"
+          ],
+          "properties": {
+            "kind": {
+              "const": "model"
+            },
+            "context": {
+              "$ref": "#/$defs/modelContext"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "archive"
+            }
+          }
+        }
+      ]
+    },
+    "modelContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "context",
+        "provider",
+        "account",
+        "conversation",
+        "cache",
+        "side_files",
+        "contract"
+      ],
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "provider": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "account": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "conversation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "x-maxUtf8Bytes": 128
+        },
+        "cache": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "x-maxUtf8Bytes": 128
+        },
+        "side_files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/artifactReference"
+          },
+          "minItems": 0,
+          "maxItems": 8
+        },
+        "contract": {
+          "$ref": "#/$defs/recoveryDigest32"
+        }
+      }
+    },
+    "opaqueId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "not": {
+        "pattern": "[\\r\\n]"
+      }
+    },
+    "recoveryDigest32": {
+      "type": "array",
+      "minItems": 32,
+      "maxItems": 32,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255,
+        "title": "Recovery digest octet"
+      },
+      "title": "Recovery digest32"
+    },
+    "safeInteger": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority_domain",
+        "tenant_id",
+        "process_id"
+      ],
+      "properties": {
+        "authority_domain": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "tenant_id": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "process_id": {
+          "$ref": "#/$defs/opaqueId"
+        }
+      }
+    }
+  }
+}

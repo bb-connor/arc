@@ -15,6 +15,9 @@ impl SqliteAdmissionOperationStore {
     ) -> Result<NativeSecurityOutputJoinRecordV1, AdmissionOperationStoreError> {
         let mut connection = self.connection()?;
         let tx = self.begin_write(&mut connection, Some(lease.store_fence()))?;
+        #[cfg(feature = "admission-test-support")]
+        let _modeled_legacy_output_join =
+            super::legacy_test::selected(&self.serving_owner.fence.store_uuid)?;
         observed_time(&tx, decision_at)?;
         verify_participant_recovery_tx(&tx, &self.serving_owner, operation, lease, decision_at)?;
         ensure_no_reserved_terminal_stage(&tx, operation.binding().operation_id())?;

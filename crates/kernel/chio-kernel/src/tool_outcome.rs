@@ -1805,6 +1805,12 @@ fn claimed_outcome_error(error: AdmissionOperationStoreError) -> ToolOutcomeStor
         AdmissionOperationStoreError::OutcomeUnknown(detail) => ToolOutcomeStoreError::Unavailable(
             format!("recovery claim durable outcome is unknown: {detail}"),
         ),
+        AdmissionOperationStoreError::RecoveryAuthorityDenied
+        | AdmissionOperationStoreError::RecoveryMediationRequired => {
+            ToolOutcomeStoreError::Invariant(
+                "recovery preview refusal is outside outcome claims".into(),
+            )
+        }
         AdmissionOperationStoreError::Operation(error) => {
             ToolOutcomeStoreError::Invariant(error.to_string())
         }

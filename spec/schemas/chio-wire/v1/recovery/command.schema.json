@@ -1,0 +1,242 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/recovery/command.schema.json",
+  "title": "Recovery command V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "command_id",
+    "command"
+  ],
+  "properties": {
+    "schema": {
+      "const": "chio.recovery.command.v1"
+    },
+    "version": {
+      "const": 1
+    },
+    "command_id": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "command": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "creation_key",
+            "template",
+            "request_seed"
+          ],
+          "properties": {
+            "kind": {
+              "const": "create_workflow"
+            },
+            "creation_key": {
+              "$ref": "#/$defs/opaqueId"
+            },
+            "template": {
+              "type": "string",
+              "enum": [
+                "support_ticket_public_issue"
+              ]
+            },
+            "request_seed": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "workflow_id"
+          ],
+          "properties": {
+            "kind": {
+              "const": "inspect_workflow"
+            },
+            "workflow_id": {
+              "$ref": "#/$defs/opaqueId"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "workflow_id",
+            "expected_revision",
+            "offer_id"
+          ],
+          "properties": {
+            "kind": {
+              "const": "select_offer"
+            },
+            "workflow_id": {
+              "$ref": "#/$defs/opaqueId"
+            },
+            "expected_revision": {
+              "$ref": "#/$defs/safeInteger"
+            },
+            "offer_id": {
+              "$ref": "#/$defs/opaqueId"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "workflow_id",
+            "expected_revision",
+            "approval"
+          ],
+          "properties": {
+            "kind": {
+              "const": "submit_approval"
+            },
+            "workflow_id": {
+              "$ref": "#/$defs/opaqueId"
+            },
+            "expected_revision": {
+              "$ref": "#/$defs/safeInteger"
+            },
+            "approval": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "workflow_id",
+            "expected_revision"
+          ],
+          "properties": {
+            "kind": {
+              "const": "resume_workflow"
+            },
+            "workflow_id": {
+              "$ref": "#/$defs/opaqueId"
+            },
+            "expected_revision": {
+              "$ref": "#/$defs/safeInteger"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "workflow_id",
+            "expected_revision"
+          ],
+          "properties": {
+            "kind": {
+              "const": "cancel_workflow"
+            },
+            "workflow_id": {
+              "$ref": "#/$defs/opaqueId"
+            },
+            "expected_revision": {
+              "$ref": "#/$defs/safeInteger"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "workflow_id",
+            "expected_revision",
+            "decision"
+          ],
+          "properties": {
+            "kind": {
+              "const": "report_decision"
+            },
+            "workflow_id": {
+              "$ref": "#/$defs/opaqueId"
+            },
+            "expected_revision": {
+              "$ref": "#/$defs/safeInteger"
+            },
+            "decision": {
+              "type": "string",
+              "enum": [
+                "accepted",
+                "declined",
+                "needs_review"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "opaqueId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "not": {
+        "pattern": "[\\r\\n]"
+      }
+    },
+    "recoveryDigest32": {
+      "type": "array",
+      "minItems": 32,
+      "maxItems": 32,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255,
+        "title": "Recovery digest octet"
+      },
+      "title": "Recovery digest32"
+    },
+    "safeInteger": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority_domain",
+        "tenant_id",
+        "process_id"
+      ],
+      "properties": {
+        "authority_domain": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "tenant_id": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "process_id": {
+          "$ref": "#/$defs/opaqueId"
+        }
+      }
+    }
+  }
+}

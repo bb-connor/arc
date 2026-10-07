@@ -16,6 +16,63 @@ use chio_kernel::dpop::authority::DpopReplayAuthorityV1;
 mod native_security;
 
 impl AdmissionOperationStore for SqliteAdmissionOperationStore {
+    fn verify_confined_process_attachment(
+        &self,
+        input: chio_kernel::admission_operation::ConfinedProcessAttachment<'_>,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        SqliteAdmissionOperationStore::verify_confined_process_attachment(self, input, fence, now)
+    }
+    fn confined_process_context(
+        &self,
+        runtime: &str,
+        root_process: &str,
+        process: &str,
+        lineage: &[chio_core::capability::token::CapabilityToken],
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<Option<chio_kernel::SecurityInvocationContext>, AdmissionOperationStoreError> {
+        SqliteAdmissionOperationStore::confined_process_context(
+            self,
+            runtime,
+            root_process,
+            process,
+            lineage,
+            fence,
+            now,
+        )
+    }
+    fn durable_knowledge_enforced(
+        &self,
+        runtime: &str,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<bool, AdmissionOperationStoreError> {
+        let mut connection = self.connection()?;
+        let tx = self.begin_read(&mut connection)?;
+        verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
+        schema::authority_validation_time(&tx, now)?;
+        let value = super::knowledge::enforced(&tx, runtime)?;
+        tx.commit().map_err(sqlite_error)?;
+        Ok(value)
+    }
+
+    fn semantic_output_disposition(
+        &self,
+        operation: &AdmissionOperationV1,
+        request: &chio_kernel::ToolCallRequest,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<
+        Option<chio_security_types::semantic::SemanticOutputDispositionV1>,
+        AdmissionOperationStoreError,
+    > {
+        self.captured_semantic_output_disposition(operation, request, fence, now)
+    }
+    fn recovery_authority(&self) -> Option<&dyn chio_kernel::recovery::RecoveryAuthorityPort> {
+        Some(self)
+    }
     fn await_caller_report(
         &self,
         command: &AdmissionOperationCommand,
@@ -86,6 +143,29 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         // The same fenced writer independently verifies initialization, original
         // admission and the actual lease before resolving inherited labels.
         self.join_security_participant_input(operation, lease, &initialized, context, command, now)
+    }
+
+    fn join_native_security_input_classified<'call>(
+        &self,
+        classification: &'call chio_kernel::admission_operation::NativeSecurityInputClassificationAuthority<'call>,
+    ) -> Result<
+        chio_kernel::admission_operation::NativeSecurityInputJoinOutcome<'call>,
+        AdmissionOperationStoreError,
+    > {
+        let binding = classification.binding();
+        let lease = classification.lease();
+        let now = classification.trusted_now_unix_ms();
+        let initialized = self
+            .load_security_participant_state(
+                binding.security_authority_id(),
+                lease.store_fence(),
+                now,
+            )?
+            .ok_or_else(|| invariant("selected native initialization is absent"))?;
+        if initialized.admission_binding()? != *binding {
+            return Err(invariant("selected native initialization binding differs"));
+        }
+        self.join_security_participant_input_classified(&initialized, classification)
     }
 
     fn join_native_security_nonce_preflight(

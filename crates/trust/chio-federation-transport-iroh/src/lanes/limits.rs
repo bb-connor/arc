@@ -22,7 +22,7 @@
 //! ## What this module deliberately does NOT set
 //!
 //! The QUIC `Endpoint::max_idle_timeout` is a transport-level backstop owned by
-//! the WIRING (Phase 4), not by this crate. It should sit comfortably above the
+//! the runtime wiring, not by this crate. It should sit comfortably above the
 //! app-level [`AcceptLimitConfig::linger_timeout`] so a legitimately slow but
 //! live exchange is not killed underneath these bounds. See
 //! [`RECOMMENDED_MAX_IDLE_TIMEOUT`] for the value the wiring can consume.
@@ -100,7 +100,7 @@ pub const DEFAULT_MAX_IN_FLIGHT_PER_PEER: usize = 16;
 /// (bounded queueing, never unbounded) with [`ACCEPT_BUSY_CLOSE_CODE`].
 pub const DEFAULT_SHED_WAIT: Duration = Duration::from_millis(250);
 
-/// Recommended `Endpoint::max_idle_timeout` for the WIRING (Phase 4) to consume.
+/// Recommended `Endpoint::max_idle_timeout` for the runtime wiring to consume.
 ///
 /// The QUIC idle timeout is a transport backstop BELOW these app-level bounds.
 /// Set it above [`DEFAULT_LINGER_TIMEOUT`] so a legitimately slow live exchange

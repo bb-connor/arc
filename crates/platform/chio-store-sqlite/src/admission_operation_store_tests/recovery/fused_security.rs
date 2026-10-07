@@ -1,4 +1,4 @@
-//! Fused claims preserve the same M4 authority boundary as separate commands.
+//! Fused claims preserve the same authority boundary as separate commands.
 use super::*;
 
 #[test]

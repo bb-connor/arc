@@ -273,7 +273,7 @@ fn native_declassification_egress_observation_enforces_both_issuer_time_bounds()
             committed_at_unix_ms: 1_000,
         },
         consumed,
-        &signed,
+        &signed.into(),
     )?;
     // The consumption and commitment timestamps are otherwise within allowed
     // clock skew. Neither may pull the issuer's start time into the future.

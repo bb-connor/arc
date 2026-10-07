@@ -1,6 +1,8 @@
 //! Classified input is resolved by the physical writer under its actual lease.
 use super::*;
-use crate::admission_operation::NativeSecurityInputJoinRequestV1;
+use crate::admission_operation::{
+    NativeSecurityInputClassificationAuthority, NativeSecurityInputJoinRequestV1,
+};
 
 impl NativeSecurityFlowJoinAuthority<'_> {
     /// Join classified input plus all inherited native labels into each of the
@@ -47,15 +49,18 @@ impl NativeSecurityFlowJoinAuthority<'_> {
                     // caller start may verify it, never create another join.
                     return Ok(snapshot);
                 }
+                let classification = NativeSecurityInputClassificationAuthority::new(
+                    operation,
+                    lease,
+                    &self.binding,
+                    self.context,
+                    &input,
+                    now,
+                );
                 let acknowledged = store_call(|| {
-                    runtime.store.join_native_security_input(
-                        operation,
-                        lease,
-                        &self.binding,
-                        self.context,
-                        &input,
-                        now,
-                    )
+                    runtime
+                        .store
+                        .join_native_security_input_classified(&classification)
                 });
                 // Inspect independently even after failure or panic. A durable
                 // write does not turn a lost acknowledgement into success.
@@ -71,8 +76,9 @@ impl NativeSecurityFlowJoinAuthority<'_> {
                     history?.ok_or_else(|| invalid("native input operation readback is absent"))?;
                 let history = history
                     .ok_or_else(|| invalid("native input preparation has no recorded join"))?;
-                if current != *operation
-                    || history != acknowledged
+                if !acknowledged.belongs_to(&classification)
+                    || current != *operation
+                    || &history != acknowledged.record()
                     || history.input != input
                     || history.join.binding != self.binding
                     || history.join.operation_id != *operation.binding().operation_id()
@@ -82,6 +88,13 @@ impl NativeSecurityFlowJoinAuthority<'_> {
                     ));
                 }
                 history.validate().map_err(durable_store_error)?;
+                if acknowledged.is_refused() {
+                    // The truthful monotone join is durable. Preserve explicit
+                    // callback failure before any capture or external effect.
+                    return Err(KernelError::GuardDenied(
+                        "native semantic input authorization refused".into(),
+                    ));
+                }
                 let snapshot = history.join.snapshot.clone();
                 self.confirm(history.join)?;
                 Ok(snapshot)

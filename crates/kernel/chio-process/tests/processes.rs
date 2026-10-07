@@ -51,6 +51,81 @@ fn server(calls: &Arc<AtomicUsize>) -> Box<Server> {
 }
 
 #[tokio::test]
+async fn ordinary_depth_64_keeps_root_context_and_normal_admission() -> Result {
+    let directory = tempfile::tempdir()?;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let mut configuration = support::config();
+    configuration.max_delegation_depth = 64;
+    let kernel = support::kernel_with_configuration(
+        directory.path(),
+        server(&calls),
+        false,
+        false,
+        false,
+        configuration,
+    )?;
+    let ordinary = ProcessRuntime::open(directory.path().join("process.db"), kernel.clone())?;
+    let secured = ordinary
+        .clone()
+        .with_security_profile(chio_process::ProcessSecurityProfile {
+            tenant_id: "ordinary-tenant".into(),
+            isolation_epoch_id: "ordinary-epoch".into(),
+            generation: 1,
+        })?;
+    let mut parent_key = parent_key();
+    let mut parent =
+        kernel.issue_capability(&parent_key.public_key(), scope(&["append", "read"]), 3600)?;
+    ordinary.create_root(
+        "root",
+        &parent,
+        chio_process::ProcessLimits {
+            max_processes: 65,
+            max_depth: 64,
+            max_calls: 1,
+            state: Default::default(),
+        },
+    )?;
+    let root_context = secured.recovery_security_context("root")?;
+    let mut parent_id = "root".to_owned();
+    for depth in 1_u8..=64 {
+        let next_key = Keypair::from_seed(&[depth + 64; 32]);
+        let next_id = format!("ordinary-{depth}");
+        let next = child(
+            &parent,
+            &parent_key,
+            &next_id,
+            &next_key,
+            scope(&["append", "read"]),
+        )?;
+        ordinary.spawn(&parent_id, &next_id, &next)?;
+        parent = next;
+        parent_key = next_key;
+        parent_id = next_id;
+    }
+    let leaf_context = secured.recovery_security_context(&parent_id)?;
+    assert_eq!(
+        leaf_context.as_v1().lineage_root_id(),
+        root_context.as_v1().lineage_root_id()
+    );
+    assert_eq!(
+        leaf_context.as_v1().isolation_epoch_id().as_str(),
+        "ordinary-epoch"
+    );
+    let request = ordinary.tool_request(
+        &parent_id,
+        "deep-read",
+        "tools",
+        "read",
+        json!({"depth":64}),
+    )?;
+    let response = ordinary.invoke(&parent_id, "deep-read", &request).await?;
+    assert_eq!(response.verdict, Verdict::Allow);
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    assert_eq!(ordinary.process("root")?.tree_calls, 1);
+    Ok(())
+}
+
+#[tokio::test]
 async fn host_flow_identity_is_bound_to_the_original_process_operation() -> Result {
     let directory = tempfile::tempdir()?;
     let calls = Arc::new(AtomicUsize::new(0));

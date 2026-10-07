@@ -82,6 +82,10 @@ impl SqliteAdmissionOperationStore {
     ) -> Result<AdmissionTerminal, AdmissionOperationStoreError> {
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection, Some(active_fence))?;
+        let origin = self
+            .serving_owner
+            .prepare_native_source_transaction(&transaction)
+            .map_err(map_owner_error)?;
         verify_trusted_time(&transaction, trusted_now_unix_ms)?;
         let (verified, binding) =
             crate::economic_state_cache::load_anchored_terminal_projection_in_transaction(
@@ -91,11 +95,12 @@ impl SqliteAdmissionOperationStore {
                 true,
             )
             .map_err(map_economic_cache_error)?;
-        let terminal = self.commit_verified_signed_terminal_projection_in_transaction(
+        let terminal = self.commit_verified_signed_terminal_projection_with_origin_in_transaction(
             &transaction,
             &verified,
             trusted_now_unix_ms,
             Some(&binding),
+            Some(&origin),
         )?;
         crate::economic_state_cache::finalize_stage_in_transaction(
             &transaction,
@@ -109,12 +114,13 @@ impl SqliteAdmissionOperationStore {
         Ok(terminal)
     }
 
-    pub(super) fn commit_verified_signed_terminal_projection_in_transaction(
+    pub(super) fn commit_verified_signed_terminal_projection_with_origin_in_transaction(
         &self,
         transaction: &Transaction<'_>,
         verified: &VerifiedAdmissionTerminalProjectionV1,
         apply_time_unix_ms: u64,
         anchored_binding: Option<&crate::economic_state_cache::EconomicOperationStageBinding>,
+        origin: Option<&crate::serving_owner::NativeSourceTransactionOrigin<'_>>,
     ) -> Result<AdmissionTerminal, AdmissionOperationStoreError> {
         let context = verified.context();
         if anchored_binding.is_none() && verified.requires_anchored_economic_commit() {
@@ -162,6 +168,11 @@ impl SqliteAdmissionOperationStore {
                 )
                 .map_err(map_channel_terminal_error)?;
             }
+            recovery::terminal_custody::publish_completed(
+                transaction,
+                &self.serving_owner,
+                &stored.operation,
+            )?;
             return Ok(terminal);
         }
         if stored.operation != *verified.source_operation()
@@ -264,7 +275,7 @@ impl SqliteAdmissionOperationStore {
             )
             .map_err(map_channel_terminal_error)?;
         }
-        append_operation_commit(
+        let append = commit_chain::append_operation_commit_with_receipt(
             transaction,
             updated,
             &encoded,
@@ -273,7 +284,16 @@ impl SqliteAdmissionOperationStore {
             &self.serving_owner,
             apply_time_unix_ms,
         )?;
+        if let Some(origin) = origin {
+            projection::native_status::verify_native_status_terminal_append(
+                transaction,
+                self,
+                origin,
+                append,
+            )?;
+        }
         execution_nonce::verify_reservation(transaction, updated)?;
+        recovery::terminal_custody::publish_completed(transaction, &self.serving_owner, updated)?;
         terminal_from_operation(updated)
     }
 }

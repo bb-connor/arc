@@ -26,6 +26,14 @@ pub enum AdmissionBeginResult {
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum AdmissionOperationStoreError {
+    /// Fixed refusal from an authenticated actor-facing recovery authority gate.
+    /// This carries no workflow identity or captured-effect conclusion.
+    #[error("recovery authority denied")]
+    RecoveryAuthorityDenied,
+    /// A selected native setup requires its validated live mediator before
+    /// new work. This exposes no private setup cause or execution authority.
+    #[error("recovery mediation is required")]
+    RecoveryMediationRequired,
     #[error("admission operation store is unavailable: {0}")]
     Unavailable(String),
     #[error("admission operation mutation was fenced")]
@@ -116,7 +124,84 @@ pub fn claim_qualified_lease(
     lease(&operation, claim)
 }
 
+/// Exact process-journal attachment selected by the trusted host. Capability
+/// identifiers alone cannot attach a confined child outside its reserved slot.
+pub struct ConfinedProcessAttachment<'a> {
+    pub runtime: &'a str,
+    pub root_process: &'a str,
+    pub parent_process: &'a str,
+    pub child_process: &'a str,
+    pub parent_lineage: &'a [chio_core::capability::token::CapabilityToken],
+    pub child_capability: &'a chio_core::capability::token::CapabilityToken,
+}
+impl core::fmt::Debug for ConfinedProcessAttachment<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("ConfinedProcessAttachment([redacted])")
+    }
+}
+
 pub trait AdmissionOperationStore: Send + Sync {
+    /// Enforced knowledge runtimes check every attachment against the native
+    /// confined-capability index before consuming a process or sibling share.
+    fn verify_confined_process_attachment(
+        &self,
+        _input: ConfinedProcessAttachment<'_>,
+        _fence: &StoreMutationFence,
+        _now: u64,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "confined attachment unavailable".into(),
+        ))
+    }
+    /// Only an anchored host-issued boundary can branch observation lineage.
+    fn confined_process_context(
+        &self,
+        _runtime: &str,
+        _root_process: &str,
+        _process: &str,
+        _lineage: &[chio_core::capability::token::CapabilityToken],
+        _fence: &StoreMutationFence,
+        _now: u64,
+    ) -> Result<Option<crate::SecurityInvocationContext>, AdmissionOperationStoreError> {
+        Ok(None)
+    }
+    /// Anchored enforced-profile marker. Journal rollback cannot reactivate raw reads.
+    fn durable_knowledge_enforced(
+        &self,
+        _runtime: &str,
+        _fence: &StoreMutationFence,
+        _now: u64,
+    ) -> Result<bool, AdmissionOperationStoreError> {
+        Ok(false)
+    }
+
+    /// Read the original capture-bound disposition. A semantic invocation may
+    /// never fall back to raw output when its participant is unavailable.
+    fn semantic_output_disposition(
+        &self,
+        _operation: &AdmissionOperationV1,
+        request: &crate::ToolCallRequest,
+        _fence: &StoreMutationFence,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<
+        Option<chio_security_types::semantic::SemanticOutputDispositionV1>,
+        AdmissionOperationStoreError,
+    > {
+        if request
+            .arguments
+            .get("schema")
+            .and_then(serde_json::Value::as_str)
+            == Some("chio.semantic.invocation.v1")
+        {
+            return Err(AdmissionOperationStoreError::Unavailable(
+                "native semantic output participant is unsupported".into(),
+            ));
+        }
+        Ok(None)
+    }
+    fn recovery_authority(&self) -> Option<&dyn crate::recovery::RecoveryAuthorityPort> {
+        None
+    }
     /// Retain exact native policy and actual physical participant references.
     /// This is not atomic budget capture, dispatch authority or activation.
     fn retain_native_dispatch_ledger(
@@ -192,6 +277,19 @@ pub trait AdmissionOperationStore: Send + Sync {
     ) -> Result<NativeSecurityInputJoinRecordV1, AdmissionOperationStoreError> {
         Err(AdmissionOperationStoreError::Unavailable(
             "operation-owned native input joins are unsupported".into(),
+        ))
+    }
+
+    /// The owning writer commits truthful input restrictions and explicitly
+    /// classifies the callback before capture. The affine authority is Kernel
+    /// created; a caller-provided record or boolean cannot replace it. This
+    /// mandatory path never falls back to the legacy historical-data method.
+    fn join_native_security_input_classified<'call>(
+        &self,
+        _classification: &'call NativeSecurityInputClassificationAuthority<'call>,
+    ) -> Result<NativeSecurityInputJoinOutcome<'call>, AdmissionOperationStoreError> {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "operation-owned classified native input is unsupported".into(),
         ))
     }
 

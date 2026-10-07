@@ -2,70 +2,50 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: eb3605a1594254370980dcf328ad3f0c7a751ff746d1530b9981c40163f5694a
+# Schema sha256: 35f8e30cf30553986a159b074ee485804a85db29547a8102522cd7bfa3080d2e
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
 # under sdks/python/chio-sdk-python/src/chio_sdk/_generated/.
 
-
 from __future__ import annotations
-
 from enum import Enum
-
 from chio_sdk._manifest_wire import SecurityWireModel as BaseModel
-
 from pydantic import ConfigDict, RootModel, conint, constr
 
+class CapabilityGovernedApprovalTokenDecision(Enum):
+    approved = 'approved'
+    denied = 'denied'
 
-class Decision(Enum):
-    approved = "approved"
-    denied = "denied"
+class CapabilityGovernedApprovalTokenAlgorithm(Enum):
+    ed25519 = 'ed25519'
+    p256 = 'p256'
+    p384 = 'p384'
+    hybrid = 'hybrid'
 
+class GovernedApprovalPublicKey(RootModel[constr(pattern='^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$')]):
+    root: constr(pattern='^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$')
 
-class Algorithm(Enum):
-    ed25519 = "ed25519"
-    p256 = "p256"
-    p384 = "p384"
-    hybrid = "hybrid"
-
-
-class GovernedApprovalPublicKey(
-    RootModel[
-        constr(
-            pattern=r"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\+mldsa65)$"
-        )
-    ]
-):
-    root: constr(
-        pattern=r"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\+mldsa65)$"
-    )
-
-
-class GovernedApprovalSignature(
-    RootModel[
-        constr(
-            pattern=r"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\+mldsa65)$"
-        )
-    ]
-):
-    root: constr(
-        pattern=r"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\+mldsa65)$"
-    )
-
+class GovernedApprovalSignature(RootModel[constr(pattern='^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$')]):
+    root: constr(pattern='^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$')
 
 class ChioGovernedApprovalToken(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
+    model_config = ConfigDict(extra='forbid')
     id: constr(min_length=1)
     approver: GovernedApprovalPublicKey
     subject: GovernedApprovalPublicKey
-    governed_intent_hash: constr(pattern=r"^[0-9a-f]{64}$")
+    governed_intent_hash: constr(pattern='^[0-9a-f]{64}$')
     request_id: constr(min_length=1)
-    threshold_proposal_hash: constr(pattern=r"^[0-9a-f]{64}$") | None = None
+    threshold_proposal_hash: constr(pattern='^[0-9a-f]{64}$') | None = None
     issued_at: conint(strict=True, ge=0)
     expires_at: conint(strict=True, ge=0)
-    decision: Decision
-    algorithm: Algorithm | None = None
+    decision: CapabilityGovernedApprovalTokenDecision
+    algorithm: CapabilityGovernedApprovalTokenAlgorithm | None = None
     signature: GovernedApprovalSignature
+
+# Public compatibility aliases reference the actual current model classes.
+Algorithm = CapabilityGovernedApprovalTokenAlgorithm
+CapabilityGovernedApprovalTokenChioGovernedApprovalToken = ChioGovernedApprovalToken
+CapabilityGovernedApprovalTokenGovernedApprovalPublicKey = GovernedApprovalPublicKey
+CapabilityGovernedApprovalTokenGovernedApprovalSignature = GovernedApprovalSignature
+Decision = CapabilityGovernedApprovalTokenDecision

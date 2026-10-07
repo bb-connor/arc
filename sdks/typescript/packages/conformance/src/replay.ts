@@ -55,7 +55,7 @@ export interface ReplayScenarioOutput {
   checkpoint: ReplayCheckpoint;
   receiptBytes: Uint8Array;
   checkpointBytes: Uint8Array;
-  phase1RootHex: string;
+  receiptCheckpointRootHex: string;
   anchoredRoot: ReplayAnchoredRootTuple;
 }
 
@@ -142,7 +142,7 @@ export function runReplayScenario(scenario: ReplayScenario): ReplayScenarioOutpu
   const checkpoint = buildReplayCheckpoint(scenario.manifest);
   const receiptBytes = canonicalJsonBytes(receipt);
   const checkpointBytes = canonicalJsonBytes(checkpoint);
-  const phase1RootHex = sha256Hex(concatBytes(receiptBytes, checkpointBytes));
+  const receiptCheckpointRootHex = sha256Hex(concatBytes(receiptBytes, checkpointBytes));
   const anchoredRoot = buildAnchoredRootTuple({
     receiptId: scenario.name,
     receiptIndex: 0,
@@ -155,7 +155,7 @@ export function runReplayScenario(scenario: ReplayScenario): ReplayScenarioOutpu
     checkpoint,
     receiptBytes,
     checkpointBytes,
-    phase1RootHex,
+    receiptCheckpointRootHex,
     anchoredRoot,
   };
 }
@@ -620,7 +620,7 @@ export function assertBareRootHex(rootHex: string): void {
   }
 }
 
-export function phase1RootHexForOutput(output: ReplayScenarioOutput): string {
-  assertBareRootHex(output.phase1RootHex);
-  return output.phase1RootHex;
+export function receiptCheckpointRootHexForOutput(output: ReplayScenarioOutput): string {
+  assertBareRootHex(output.receiptCheckpointRootHex);
+  return output.receiptCheckpointRootHex;
 }

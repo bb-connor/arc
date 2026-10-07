@@ -12,8 +12,10 @@ impl ChioKernel {
         match admission.state() {
             AdmissionOperationState::Finalizing => {
                 let tool_return = self.load_durable_tool_return(admission)?;
-                self.finalize_durable_tool_return(admission, request, &tool_return)
-                    .map(Some)
+                let response =
+                    self.finalize_durable_tool_return(admission, request, &tool_return)?;
+                self.require_current_public_tool_response(admission, request, &response)?;
+                Ok(Some(response))
             }
             AdmissionOperationState::Completed | AdmissionOperationState::DeniedAfterDelivery => {
                 self.completed_durable_tool_response(admission, request)

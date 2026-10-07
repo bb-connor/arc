@@ -307,7 +307,7 @@ mod tests {
         let key = RevocationKey::new(SubjectId::from("subject-a"), EpochNonce::new(7));
         oracle.insert(key, 10)?;
         let signer = crate::Ed25519RootSigner::from_signing_key(
-            "m04-test",
+            "revocation-test",
             "0303030303030303030303030303030303030303030303030303030303030303",
         )?;
 

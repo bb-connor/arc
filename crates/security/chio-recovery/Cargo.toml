@@ -1,0 +1,25 @@
+[package]
+name = "chio-recovery"
+description = "Pure bounded recovery advice for Chio, without execution authority"
+version.workspace = true
+edition.workspace = true
+rust-version = "1.93"
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+chio-security-types = { path = "../chio-security-types", default-features = false }
+chio-core-types = { path = "../../core/chio-core-types", default-features = false }
+chio-semantic-contracts = { path = "../chio-semantic-contracts", default-features = false }
+serde = { version = "1", default-features = false, features = ["derive", "alloc"] }
+
+[features]
+default = []
+std = ["chio-security-types/std", "chio-core-types/std", "chio-semantic-contracts/std", "serde/std"]
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+serde_json = { workspace = true }

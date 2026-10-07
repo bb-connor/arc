@@ -1,0 +1,419 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.computer/schemas/chio-wire/v1/recovery/semantic-deployment.schema.json",
+  "title": "Semantic Deployment V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "domain_version",
+    "scope",
+    "generation",
+    "native_binding",
+    "context_binding",
+    "exposure_binding",
+    "packages",
+    "routes"
+  ],
+  "properties": {
+    "domain_version": {
+      "const": 1
+    },
+    "scope": {
+      "$ref": "#/$defs/scope"
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "native_binding": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "context_binding": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "exposure_binding": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "packages": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/recoveryDigest32"
+      },
+      "minItems": 1,
+      "maxItems": 16
+    },
+    "routes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/semanticRoute"
+      },
+      "minItems": 1,
+      "maxItems": 16
+    }
+  },
+  "$defs": {
+    "opaqueId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "not": {
+        "pattern": "[\\r\\n]"
+      }
+    },
+    "recoveryDigest32": {
+      "type": "array",
+      "minItems": 32,
+      "maxItems": 32,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255,
+        "title": "Recovery digest octet"
+      },
+      "title": "Recovery digest32"
+    },
+    "safeInteger": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority_domain",
+        "tenant_id",
+        "process_id"
+      ],
+      "properties": {
+        "authority_domain": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "tenant_id": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "process_id": {
+          "$ref": "#/$defs/opaqueId"
+        }
+      }
+    },
+    "semanticAnnotator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "facts",
+        "may_attest_facts"
+      ],
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/recoveryDigest32"
+        },
+        "facts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/opaqueId"
+          },
+          "minItems": 0,
+          "maxItems": 8
+        },
+        "may_attest_facts": {
+          "type": "boolean"
+        }
+      }
+    },
+    "semanticDestination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "destination",
+        "provider",
+        "account",
+        "resource",
+        "endpoint",
+        "audience",
+        "purpose",
+        "subject_mapping",
+        "acl_query",
+        "require_provider_precondition"
+      ],
+      "properties": {
+        "destination": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "provider": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "account": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "resource": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "endpoint": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048,
+          "x-maxUtf8Bytes": 2048
+        },
+        "audience": {
+          "$ref": "https://chio.world/schemas/chio-wire/v1/security/information-label.schema.json"
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "x-maxUtf8Bytes": 256
+        },
+        "subject_mapping": {
+          "$ref": "#/$defs/recoveryDigest32"
+        },
+        "acl_query": {
+          "$ref": "#/$defs/recoveryDigest32"
+        },
+        "require_provider_precondition": {
+          "type": "boolean"
+        }
+      }
+    },
+    "semanticOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selector_index",
+        "reason",
+        "fixture_digests"
+      ],
+      "properties": {
+        "selector_index": {
+          "$ref": "#/$defs/safeInteger"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "x-maxUtf8Bytes": 512
+        },
+        "fixture_digests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/recoveryDigest32"
+          },
+          "minItems": 1,
+          "maxItems": 8
+        }
+      }
+    },
+    "semanticRoute": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "server",
+        "tool",
+        "package",
+        "operation",
+        "implementation",
+        "input_schema",
+        "output_schema",
+        "destinations",
+        "operator_selectors",
+        "reviewed_overrides",
+        "resolver_key",
+        "endorsement_key",
+        "prerequisite_key",
+        "transformation_key",
+        "annotators"
+      ],
+      "properties": {
+        "server": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "x-maxUtf8Bytes": 128
+        },
+        "tool": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "x-maxUtf8Bytes": 128
+        },
+        "package": {
+          "$ref": "#/$defs/recoveryDigest32"
+        },
+        "operation": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "implementation": {
+          "$ref": "#/$defs/recoveryDigest32"
+        },
+        "input_schema": {
+          "$ref": "#/$defs/recoveryDigest32"
+        },
+        "output_schema": {
+          "$ref": "#/$defs/recoveryDigest32"
+        },
+        "destinations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/semanticDestination"
+          },
+          "minItems": 1,
+          "maxItems": 16
+        },
+        "operator_selectors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/semanticSelector"
+          },
+          "minItems": 0,
+          "maxItems": 16
+        },
+        "reviewed_overrides": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/semanticOverride"
+          },
+          "minItems": 0,
+          "maxItems": 16
+        },
+        "resolver_key": {
+          "$ref": "#/$defs/recoveryDigest32"
+        },
+        "endorsement_key": {
+          "$ref": "#/$defs/recoveryDigest32"
+        },
+        "prerequisite_key": {
+          "$ref": "#/$defs/recoveryDigest32"
+        },
+        "transformation_key": {
+          "$ref": "#/$defs/recoveryDigest32"
+        },
+        "annotators": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/semanticAnnotator"
+          },
+          "minItems": 0,
+          "maxItems": 16
+        }
+      }
+    },
+    "semanticSelector": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "field"
+          ],
+          "properties": {
+            "kind": {
+              "const": "present"
+            },
+            "field": {
+              "$ref": "#/$defs/opaqueId"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "field",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "const": "equals"
+            },
+            "field": {
+              "$ref": "#/$defs/opaqueId"
+            },
+            "value": {
+              "$ref": "#/$defs/semanticValue"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "field",
+            "bytes"
+          ],
+          "properties": {
+            "kind": {
+              "const": "text_bytes_at_most"
+            },
+            "field": {
+              "$ref": "#/$defs/opaqueId"
+            },
+            "bytes": {
+              "$ref": "#/$defs/safeInteger"
+            }
+          }
+        }
+      ]
+    },
+    "semanticValue": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "const": "text"
+            },
+            "value": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096,
+              "x-maxUtf8Bytes": 4096
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "const": "integer"
+            },
+            "value": {
+              "$ref": "#/$defs/safeInteger"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "const": "boolean"
+            },
+            "value": {
+              "type": "boolean"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

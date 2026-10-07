@@ -2,25 +2,21 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: eb3605a1594254370980dcf328ad3f0c7a751ff746d1530b9981c40163f5694a
+# Schema sha256: 35f8e30cf30553986a159b074ee485804a85db29547a8102522cd7bfa3080d2e
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
 # under sdks/python/chio-sdk-python/src/chio_sdk/_generated/.
 
-
 from __future__ import annotations
-
 from typing import Literal
-
 from pydantic import BaseModel, ConfigDict, Field
-
 from . import cage_receipt_body_v1_schema
 
-
 class ChioCageReceiptMetadataV1(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    schema_: Literal["chio.cage.receipt-metadata.v1"] = Field(..., alias="schema")
+    model_config = ConfigDict(extra='forbid')
+    schema_: Literal['chio.cage.receipt-metadata.v1'] = Field(..., alias='schema')
     cage_receipt: cage_receipt_body_v1_schema.ChioCageReceiptBodyV1
+
+# Public compatibility aliases reference the actual current model classes.
+SecurityCageReceiptMetadataV1ChioCageReceiptMetadataV1 = ChioCageReceiptMetadataV1

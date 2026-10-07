@@ -1,6 +1,26 @@
 use super::*;
 
 impl ChioKernel {
+    /// Qualification bridge to the existing session-aware evaluator. Its
+    /// production visibility and every admission check remain unchanged.
+    #[cfg(feature = "admission-test-support")]
+    pub(in crate::kernel) async fn evaluate_authenticated_original_session_for_test(
+        &self,
+        request: &ToolCallRequest,
+        session: &SessionId,
+        context: &SecurityInvocationContext,
+    ) -> Result<ToolCallResponse, KernelError> {
+        Box::pin(self.evaluate_tool_call_async_with_session_context(
+            request,
+            None,
+            None,
+            Some(session),
+            Some(context),
+            EvaluationDisposition::kernel(),
+        ))
+        .await
+    }
+
     pub(super) async fn evaluate_tool_call_async_with_session_context(
         &self,
         request: &ToolCallRequest,

@@ -36,7 +36,9 @@ pub mod issuance;
 mod keyring_runtime;
 pub mod passport_verifier;
 pub mod policy;
+pub mod recovery;
 pub mod reputation;
+pub mod semantic;
 pub use chio_risk_comptroller as risk_comptroller;
 pub mod scim_lifecycle;
 pub mod security;
@@ -944,3 +946,6 @@ mod tests {
         assert!(kernel.post_invocation_hook_count() >= 1);
     }
 }
+
+pub mod confinement;
+pub mod knowledge;

@@ -23,6 +23,7 @@ pub struct NativeSecurityOutputJoinAuthority<'a> {
     attempted: Cell<bool>,
     failed: Cell<bool>,
     confirmed: RefCell<Option<NativeSecurityOutputJoinRecordV1>>,
+    scoped_recovery: bool,
 }
 
 impl fmt::Debug for NativeSecurityOutputJoinAuthority<'_> {
@@ -82,11 +83,12 @@ impl NativeSecurityOutputJoinAuthority<'_> {
                 "native output observation changed identity or time",
             ));
         }
-        let prior = if self
-            .admission
-            .operation
-            .provider_attempt()
-            .is_some_and(ProviderAttemptBindingV1::is_native_caller_report)
+        let prior = if self.scoped_recovery
+            || self
+                .admission
+                .operation
+                .provider_attempt()
+                .is_some_and(ProviderAttemptBindingV1::is_native_caller_report)
         {
             self.read_optional_history(runtime, now)?
         } else {
@@ -141,9 +143,9 @@ impl NativeSecurityOutputJoinAuthority<'_> {
 
     /// A crash after taint persistence must not invent a second transition at
     /// the now-advanced flow generation or consume declassification again.
-    /// Classification and current inherited restrictions are still checked;
-    /// the physical writer then revalidates the new recovery lease while
-    /// replaying only the exact original intent, without a new mutation.
+    /// Live caller replay still checks current classification and inherited
+    /// restrictions. Captured recovery preserves the immutable original join;
+    /// its independent current result gate checks delivery restrictions.
     fn original_replay_intent(
         &self,
         prior: NativeSecurityOutputJoinRecordV1,
@@ -165,11 +167,14 @@ impl NativeSecurityOutputJoinAuthority<'_> {
         if prior.join.binding != self.binding
             || prior.join.operation_id != *self.admission.operation.binding().operation_id()
             || prior.output.key() != observed.key()
-            || prior.output.output_label() != classified
+            || (!self.scoped_recovery && prior.output.output_label() != classified)
         {
             return Err(invalid(
                 "native caller output replay changed its original classification or identity",
             ));
+        }
+        if self.scoped_recovery {
+            return Ok(prior.output);
         }
         let current = observed
             .snapshot()
@@ -318,7 +323,7 @@ impl ChioKernel {
             issued_nonce: None,
             nonce_preflight: None,
         };
-        self.prepare_durable_native_output(&admission, lease, context)
+        self.prepare_durable_native_output(&admission, lease, context, false)
     }
 
     pub(super) fn prepare_durable_native_output(
@@ -326,9 +331,10 @@ impl ChioKernel {
         admission: &DurableToolAdmission,
         lease: &AdmissionRecoveryLease,
         context: &DurableSecurityReleaseContext<'_>,
+        scoped_recovery: bool,
     ) -> Result<(), KernelError> {
         let original = admission.original_native_security_authority_binding();
-        if self.native_security_authority_binding()?.as_ref() != original {
+        if !scoped_recovery && self.native_security_authority_binding()?.as_ref() != original {
             return Err(invalid(
                 "native output selection differs from original admission",
             ));
@@ -339,22 +345,40 @@ impl ChioKernel {
         let retained = admission
             .original_retained_request()
             .ok_or_else(|| invalid("native output original request is absent"))?;
-        self.validate_original_authority_profile(retained)?;
         let request: ToolCallRequest = serde_json::from_str(context.request_canonical_json())
             .map_err(|_| invalid("native output request is invalid"))?;
-        // Workload binding can call a configured capability authority. Like
-        // classification, it must never run while holding the mutation lock.
-        super::super::security_dispatch::callback("native output identity", || {
-            self.validate_security_invocation_context_binding(
-                &request,
-                Some(context.security_context()),
-                None,
-            )
-        })?;
-        let hook = self
-            .security_pre_dispatch_hook
-            .as_ref()
-            .ok_or_else(|| invalid("native output hook is absent"))?;
+        if scoped_recovery {
+            // This mode is selected only after the release-only owner proves
+            // physical captured custody. Reverify that selection here; no old
+            // deployment or initiating identity can authorize fresh dispatch.
+            let historical = match self.captured_recovery_deployment(&admission.operation)? {
+                Some(crate::recovery::RecoveryCapturedDeploymentV1::Verified(profile)) => profile,
+                _ => return Err(invalid("native output captured historical verifier absent")),
+            };
+            retained
+                .validate_request_material(&request)
+                .map_err(durable_store_error)?;
+            retained
+                .validate_native_security_authority(&historical.native_authority)
+                .and_then(|()| {
+                    retained.validate_native_security_context(context.security_context())
+                })
+                .map_err(durable_store_error)?;
+            if binding != &historical.native_authority {
+                return Err(invalid("native output historical authority changed"));
+            }
+        } else {
+            self.validate_original_authority_profile(retained)?;
+            // Current workload authorization remains required for the live
+            // path and runs outside the native mutation sequencer.
+            super::super::security_dispatch::callback("native output identity", || {
+                self.validate_security_invocation_context_binding(
+                    &request,
+                    Some(context.security_context()),
+                    None,
+                )
+            })?;
+        }
         let authority = NativeSecurityOutputJoinAuthority {
             kernel: self,
             admission,
@@ -364,6 +388,7 @@ impl ChioKernel {
             attempted: Cell::new(false),
             failed: Cell::new(false),
             confirmed: RefCell::new(None),
+            scoped_recovery,
         };
         {
             let runtime = self.durable_runtime()?;
@@ -373,6 +398,54 @@ impl ChioKernel {
                 runtime.refresh_trusted_time(current_unix_timestamp_ms()),
             )?;
         }
+        if scoped_recovery {
+            let prior = {
+                let runtime = self.durable_runtime()?;
+                let _guard = runtime.lock_mutations()?;
+                authority.read_optional_history(
+                    runtime,
+                    runtime.refresh_trusted_time(current_unix_timestamp_ms()),
+                )?
+            };
+            let label = if let Some(prior) = prior {
+                // The join writer rechecks all artifacts and immutable history
+                // before replaying this exact original classification.
+                prior.output.output_label().clone()
+            } else {
+                let selected = self.native_security_authority_binding()?;
+                let classification = if let Some(hook) = &self.security_pre_dispatch_hook {
+                    super::super::security_dispatch::callback(
+                        "historical result classification",
+                        || {
+                            Ok(hook.classify_recovery_result(
+                                &crate::recovery::RecoveryResultClassificationContext {
+                                    operation: &admission.operation,
+                                    request: &request,
+                                    security_context: context.security_context(),
+                                    output: context.output(),
+                                },
+                            ))
+                        },
+                    )?
+                } else {
+                    Err(crate::recovery::RecoveryResultClassificationError::Unavailable)
+                };
+                if self.native_security_authority_binding()? != selected {
+                    InformationLabel::Top
+                } else {
+                    // Only a typed classification refusal becomes conservative
+                    // taint. Callback panics and physical integrity failures
+                    // propagate before any custody acknowledgement.
+                    classification.unwrap_or(InformationLabel::Top)
+                }
+            };
+            authority.join_output(label)?;
+            return authority.finish();
+        }
+        let hook = self
+            .security_pre_dispatch_hook
+            .as_ref()
+            .ok_or_else(|| invalid("native output hook is absent"))?;
         // The original live lifecycle owner remains required by the caller.
         // Arbitrary classification and hook callbacks run outside the sequencer.
         super::super::security_dispatch::callback("native output preparation", || {

@@ -53,7 +53,10 @@ pub use native_egress::{
 };
 pub use native_flow_join::NativeSecurityFlowJoinRecordV1;
 pub use native_flow_observation::NativeSecurityFlowObservationV1;
-pub use native_input_join::{NativeSecurityInputJoinRecordV1, NativeSecurityInputJoinRequestV1};
+pub use native_input_join::{
+    NativeSecurityInputClassificationAuthority, NativeSecurityInputJoinOutcome,
+    NativeSecurityInputJoinRecordV1, NativeSecurityInputJoinRequestV1,
+};
 pub use native_nonce_preflight::{
     NativeSecurityNoncePreflightJoinRecordV1, NativeSecurityNoncePreflightJoinRequestV1,
 };

@@ -6,11 +6,14 @@
 
 #![forbid(unsafe_code)]
 
+mod binding;
 #[cfg(test)]
 mod integrity_tests;
 #[cfg(feature = "mailboxes")]
 pub mod mailboxes;
+mod recovery;
 mod registry;
+pub use recovery::RecoveryCallReservation;
 mod routes;
 mod security;
 mod state_reader;
@@ -48,7 +51,7 @@ pub use types::{
 /// documents, and the relocation manifest. A host records the ABI it was
 /// initialized under and refuses to serve, run or import state recorded under
 /// another; an incompatible change to any covered surface is a new ABI.
-pub const PROCESS_ABI: &str = "chio.process.abi.v2";
+pub const PROCESS_ABI: &str = "chio.process.abi.v3";
 
 /// Dispatch attempts one logical operation may consume: the first, plus a bounded
 /// number of fresh dispatches after the kernel reports an unknown outcome for a
@@ -56,17 +59,29 @@ pub const PROCESS_ABI: &str = "chio.process.abi.v2";
 /// Retained-response verifiers must use this same bound when checking attempts.
 pub const MAX_DISPATCH_ATTEMPTS: u32 = 3;
 
+/// Test-only acknowledgement boundaries. Production builds have no observer.
+#[cfg(feature = "admission-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RecoveryProcessTestCutpoint {
+    NativeNonceIssued,
+    ProcessNonceRetained,
+}
+
 /// A persistent process namespace bound to one durable kernel authority.
 /// Clones share a connection; separate opens serialize mutations in SQLite.
 #[derive(Clone)]
 pub struct ProcessRuntime {
     kernel: Arc<ChioKernel>,
     store: Arc<Mutex<Store>>,
+    original_snapshot: Arc<store::OriginalProcessSnapshot>,
     namespace: String,
+    enforcement: chio_kernel::knowledge::DurableKnowledgeEnforcement,
     routes: Arc<BTreeMap<String, ProcessRoute>>,
     launch_receipts: Arc<BTreeMap<String, ProcessLaunchReceipt>>,
     security_profile: Option<ProcessSecurityProfile>,
     supplemental_route: Option<(String, String)>,
+    #[cfg(feature = "admission-test-support")]
+    recovery_test_cutpoint: Option<Arc<dyn Fn(RecoveryProcessTestCutpoint) + Send + Sync>>,
 }
 
 impl ProcessRuntime {
@@ -76,15 +91,42 @@ impl ProcessRuntime {
     pub fn open(path: impl AsRef<Path>, kernel: Arc<ChioKernel>) -> Result<Self, ProcessError> {
         let registry = ProcessRegistry::open(path, &kernel)?;
         let namespace = registry.namespace.clone();
+        let original_snapshot = {
+            let authority =
+                kernel
+                    .durable_admission_store_uuid()
+                    .ok_or(ProcessError::Configuration(
+                        "a qualified durable admission store is required",
+                    ))?;
+            let store = registry
+                .store
+                .lock()
+                .map_err(|_| ProcessError::StorePoisoned)?;
+            Arc::new(store.original_snapshot(authority, &kernel.public_key().to_hex()))
+        };
         Ok(Self {
             kernel,
             store: registry.store,
+            original_snapshot,
             namespace,
+            enforcement: registry.enforcement,
             routes: Arc::new(BTreeMap::new()),
             launch_receipts: Arc::new(BTreeMap::new()),
             security_profile: None,
             supplemental_route: None,
+            #[cfg(feature = "admission-test-support")]
+            recovery_test_cutpoint: None,
         })
+    }
+
+    #[cfg(feature = "admission-test-support")]
+    #[must_use]
+    pub fn with_recovery_test_cutpoint(
+        mut self,
+        observer: Arc<dyn Fn(RecoveryProcessTestCutpoint) + Send + Sync>,
+    ) -> Self {
+        self.recovery_test_cutpoint = Some(observer);
+        self
     }
 
     /// Install the host's persistent flow identity. Its digest is part of
@@ -139,6 +181,7 @@ impl ProcessRuntime {
         ProcessRegistry {
             store: self.store.clone(),
             namespace: self.namespace.clone(),
+            enforcement: self.enforcement.clone(),
         }
     }
 
@@ -182,7 +225,10 @@ impl ProcessRuntime {
                 "a root process requires a root capability",
             ));
         }
-        self.with_store(|store| store.create_root(id, capability, limits))
+        self.with_public_store(|store| {
+            store.create_root(id, capability, limits)?;
+            store.public_process(id)
+        })
     }
 
     /// Attach a child using a capability already issued by the authority.
@@ -196,11 +242,39 @@ impl ProcessRuntime {
     ) -> Result<ProcessSnapshot, ProcessError> {
         validate_id(child_id)?;
         verify_capability(capability)?;
-        self.with_store(|store| store.spawn(parent_id, child_id, capability, validate_child))
+        let (parent, lineage) =
+            self.with_store(|store| Ok((store.process(parent_id)?, store.lineage(parent_id)?)))?;
+        self.enforcement.verify_confined_attachment(
+            chio_kernel::admission_operation::ConfinedProcessAttachment {
+                runtime: &self.namespace,
+                root_process: &parent.root_id,
+                parent_process: parent_id,
+                child_process: child_id,
+                parent_lineage: &lineage,
+                child_capability: capability,
+            },
+        )?;
+        self.with_public_store(|store| {
+            store.spawn(parent_id, child_id, capability, validate_child)?;
+            store.public_process(child_id)
+        })
     }
 
     pub fn process(&self, id: &str) -> Result<ProcessSnapshot, ProcessError> {
-        self.with_store(|store| store.process(id))
+        self.with_public_store(|store| store.public_process(id))
+    }
+
+    fn with_public_store<T>(
+        &self,
+        read: impl FnOnce(&mut Store) -> Result<T, ProcessError>,
+    ) -> Result<T, ProcessError> {
+        let enforced = self.enforcement.enforced(&self.namespace)?;
+        self.with_store(|store| {
+            if enforced {
+                store.enable_knowledge()?;
+            }
+            read(store)
+        })
     }
 
     /// Store immutable, process-owned bytes. Identical content reuses its quota slot.
@@ -208,7 +282,11 @@ impl ProcessRuntime {
         if bytes.len() > MAX_STATE_BLOB_BYTES {
             return Err(ProcessError::Invalid("state blob is too large"));
         }
-        self.with_store(|store| store.put_blob(id, bytes))
+        self.with_store(|store| {
+            self.require_raw_knowledge()?;
+            store.require_raw_knowledge()?;
+            store.put_blob(id, bytes)
+        })
     }
 
     /// Read only blobs owned by this running process, verifying their content hash.
@@ -220,12 +298,20 @@ impl ProcessRuntime {
         {
             return Err(ProcessError::Invalid("invalid state blob digest"));
         }
-        self.with_store(|store| store.read_blob(id, sha256))
+        self.with_store(|store| {
+            self.require_raw_knowledge()?;
+            store.require_raw_knowledge()?;
+            store.read_blob(id, sha256)
+        })
     }
 
     /// Report immutable state capability, quotas and current process/tree usage.
     pub fn storage(&self, id: &str) -> Result<ProcessStorage, ProcessError> {
-        self.with_store(|store| store.storage(id))
+        self.with_store(|store| {
+            self.require_raw_knowledge()?;
+            store.require_raw_knowledge()?;
+            store.storage(id)
+        })
     }
 
     /// Stable request identity of a logical operation's first dispatch, scoped
@@ -360,33 +446,20 @@ impl ProcessRuntime {
         // under its first attempt's identity: every dispatch attempt of one key
         // carries the same content. Transport-specific refresh/rebinding is
         // deliberately not implicit.
-        let mut binding = request.clone();
-        binding.request_id = self.request_id(process_id, operation_key)?;
-        let request_hash = digest(&binding)?;
-        // Existing callers retain their original binding. A stricter operation
-        // uses a distinct binding so the same key cannot later opt into retries.
-        let recovery_binding = if known_outcome_only {
-            digest(&("chio.process.known-outcome-only.v1", &request_hash))?
-        } else {
-            request_hash.clone()
-        };
+        let binding::ProcessCallBinding {
+            request_hash,
+            binding_hash,
+        } = self.derive_call_binding(process_id, operation_key, request, known_outcome_only)?;
         let route = self.routes.get(&request.server_id);
-        let binding_hash = match route {
-            Some(route) => digest(&("chio.process.host-route.v1", &recovery_binding, route))?,
-            None => recovery_binding,
-        };
-        let binding_hash = match &self.security_profile {
-            Some(profile) => digest(&("chio.process.security-context.v1", binding_hash, profile))?,
-            None => binding_hash,
-        };
         // Validate the persisted process identity and immutable request binding
         // before any kernel receipt attributes this attempt to the process.
         self.with_store(|store| store.admit(process_id, operation_key, request, &binding_hash))?;
         // Restore verified ancestor snapshots and budget-parent registrations
         // root-first. A child can run even if its parent has never invoked a
         // tool, including after the kernel's in-memory registry is recreated.
-        let lineage = self.with_store(|store| store.lineage(process_id))?;
-        let security_context = self
+        let (process, lineage) =
+            self.with_store(|store| Ok((store.process(process_id)?, store.lineage(process_id)?)))?;
+        let ordinary_context = self
             .security_profile
             .as_ref()
             .map(|profile| {
@@ -400,6 +473,10 @@ impl ProcessRuntime {
                 )
             })
             .transpose()?;
+        let security_context = self
+            .enforcement
+            .confined_context(&self.namespace, &process.root_id, &process.id, &lineage)?
+            .or(ordinary_context);
         let mut ancestor_refusal = None;
         for capability in lineage.iter().take(lineage.len().saturating_sub(1)) {
             if let Err(error) = self.kernel.register_delegation_parent(capability) {
@@ -477,11 +554,19 @@ impl ProcessRuntime {
                     .ok_or(ProcessError::Invalid(
                         "strict nonce preflight returned no execution nonce",
                     ))?;
+                #[cfg(feature = "admission-test-support")]
+                if let Some(observer) = &self.recovery_test_cutpoint {
+                    observer(RecoveryProcessTestCutpoint::NativeNonceIssued);
+                }
                 // Save the original issuance before dispatch. A restart can only
                 // re-present this nonce to the original admission authority.
                 self.with_store(|store| {
                     store.retain_nonce(process_id, operation_key, attempt, &binding_hash, &nonce)
                 })?;
+                #[cfg(feature = "admission-test-support")]
+                if let Some(observer) = &self.recovery_test_cutpoint {
+                    observer(RecoveryProcessTestCutpoint::ProcessNonceRetained);
+                }
                 current.execution_nonce = Some(*nonce);
                 continue;
             }
@@ -522,7 +607,11 @@ impl ProcessRuntime {
         if bytes.len() > 1_048_576 {
             return Err(ProcessError::Invalid("checkpoint exceeds one MiB"));
         }
-        self.with_store(|store| store.checkpoint(process_id, expected_revision, value))
+        self.with_store(|store| {
+            self.require_raw_knowledge()?;
+            store.require_raw_knowledge()?;
+            store.checkpoint(process_id, expected_revision, value)
+        })
     }
 
     /// Permanently stop admissions and checkpoints for this process and every
@@ -591,6 +680,9 @@ fn verify_capability(capability: &CapabilityToken) -> Result<(), ProcessError> {
 }
 
 fn validate_child(parent: &CapabilityToken, child: &CapabilityToken) -> Result<(), ProcessError> {
+    if !parent.scope.authorizes_delegation() {
+        return Err(ProcessError::Invalid("parent lacks delegation authority"));
+    }
     validate_attenuation(&parent.scope, &child.scope)?;
     if child.issuer != parent.issuer
         || child.issued_at < parent.issued_at
@@ -622,3 +714,6 @@ fn validate_child(parent: &CapabilityToken, child: &CapabilityToken) -> Result<(
     }
     Ok(())
 }
+
+mod knowledge;
+pub use knowledge::ProcessArtifactBroker;

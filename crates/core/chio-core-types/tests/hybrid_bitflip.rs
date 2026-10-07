@@ -8,7 +8,7 @@ use chio_core_types::{
     Ed25519Backend, HybridBackend, Keypair, MlDsa65Backend, PublicKey, Signature, SigningBackend,
 };
 
-const MESSAGE: &[u8] = b"m03 hybrid bit flip property";
+const MESSAGE: &[u8] = b"hybrid bit flip property";
 
 fn hybrid_fixture() -> Result<(PublicKey, Signature), Box<dyn Error>> {
     let classical = Box::new(Ed25519Backend::new(Keypair::from_seed(&[3u8; 32])));

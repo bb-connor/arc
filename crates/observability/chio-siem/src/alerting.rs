@@ -812,7 +812,7 @@ impl Exporter for AlertingExporter {
                     } else {
                         "error"
                     };
-                    // Record every dispatch outcome and latency so the p1
+                    // Record every dispatch outcome and latency so the
                     // ChioAlertDispatchMetricsMissing backstop and the PagerDuty
                     // dispatch SLO have a real producer.
                     self.metrics.record_alert_dispatch(&route, outcome);

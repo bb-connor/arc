@@ -19,11 +19,44 @@ pub struct NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
     metadata: Option<&'a serde_json::Value>,
     attempted: bool,
     failed: bool,
+    policy_refusal: Option<NativeFlowPolicyRefusal>,
     return_input: Option<DurableToolReturnContextInput<'a>>,
     captured_lifecycle: Option<lifecycle::CapturedLifecycle>,
 }
 
 impl<'a, 'kernel: 'a> NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
+    /// Fixed refusal data belongs to the selected resolver before any capture
+    /// attempt. Recording it grants neither capture nor refund authority.
+    pub fn record_policy_refusal(
+        &mut self,
+        owner: &NativeFlowPolicyRefusalOwner,
+        refusal: NativeFlowPolicyRefusal,
+    ) -> Result<(), KernelError> {
+        let result = (|| {
+            if self.attempted || self.failed || self.policy_refusal.is_some() {
+                return Err(invalid(
+                    "native policy refusal cannot replace attempted capture",
+                ));
+            }
+            let native = self
+                .admission
+                .original_native_security_authority_binding()
+                .ok_or_else(|| invalid("native policy refusal lacks original native selection"))?;
+            let registration = self
+                .kernel
+                .native_flow_policy_witness_registration
+                .as_ref()
+                .ok_or_else(|| invalid("native policy refusal owner is not installed"))?;
+            registration.verify(self.kernel, native, owner)?;
+            self.policy_refusal = Some(refusal);
+            Ok(())
+        })();
+        if result.is_err() {
+            self.failed = true;
+        }
+        result
+    }
+
     pub fn prepare_egress(&self) -> Result<PreparedNativeSecurityEgress<'a>, KernelError> {
         self.kernel.prepare_native_security_egress(
             self.admission.operation().binding().operation_id(),
@@ -62,7 +95,7 @@ impl<'a, 'kernel: 'a> NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
         policy_json: &[u8],
     ) -> Result<crate::receipt_store::AdmissionBudgetCapture, KernelError> {
         let grant_index = self.grant_index()?;
-        if self.attempted {
+        if self.attempted || self.policy_refusal.is_some() {
             return Err(invalid(
                 "native capture authority already attempted capture",
             ));
@@ -108,6 +141,10 @@ impl<'a, 'kernel: 'a> NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
             self.metadata,
         )?;
         let credentials_until = proof.valid_until_unix_ms();
+        #[cfg(feature = "admission-test-support")]
+        if let Some(observer) = &self.kernel.native_capture_observer {
+            observer(false)?;
+        }
         let runtime = self.kernel.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
         let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
@@ -249,9 +286,19 @@ impl<'a, 'kernel: 'a> NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
         }
         self.admission.operation = expected;
         charge.invocation_capture = Some(Box::new(mutation.clone()));
+        #[cfg(feature = "admission-test-support")]
+        {
+            drop(_guard);
+            if let Some(observer) = &self.kernel.native_capture_observer {
+                observer(true)?;
+            }
+        }
         Ok(capture)
     }
 }
+
+#[cfg(feature = "admission-test-support")]
+pub type NativeSecurityCaptureObserver = Arc<dyn Fn(bool) -> Result<(), KernelError> + Send + Sync>;
 
 /// Default-off qualification observer. It always stops before connector use,
 /// including after a successful physical capture.
@@ -274,6 +321,15 @@ pub(crate) struct NativeCaptureCheckpointInput<'a, 'kernel> {
 
 #[cfg(feature = "admission-test-support")]
 impl ChioKernel {
+    /// Test observer may interleave another real writer; it cannot manufacture
+    /// authority or skip any native capture validation. true means committed.
+    pub fn install_native_capture_observer_for_test(
+        &mut self,
+        observer: NativeSecurityCaptureObserver,
+    ) {
+        self.native_capture_observer = Some(observer);
+    }
+
     pub fn install_native_capture_checkpoint_hook(
         &mut self,
         hook: NativeSecurityCaptureCheckpointHook,
@@ -311,6 +367,7 @@ impl ChioKernel {
             metadata,
             attempted: false,
             failed: false,
+            policy_refusal: None,
             return_input: None,
             captured_lifecycle: None,
         };

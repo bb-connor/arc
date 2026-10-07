@@ -49,6 +49,25 @@ impl ChioKernel {
             match failure {
                 DurableDispatchCommitError::RejectedBeforeCommit(_) => self
                     .build_pre_commit_credential_rejection_response(denial, credentials, evidence),
+                DurableDispatchCommitError::RejectedNativePolicyBeforeCommit {
+                    refusal, ..
+                } => {
+                    let operation = denial.durable_operation.ok_or_else(|| {
+                        KernelError::DurableAdmission(
+                            "native policy denial lost its original operation".into(),
+                        )
+                    })?;
+                    let _witness = self.scope_native_policy_refusal_receipt(
+                        denial.request,
+                        operation,
+                        refusal,
+                    )?;
+                    self.build_pre_commit_credential_rejection_response(
+                        denial,
+                        credentials,
+                        evidence,
+                    )
+                }
                 DurableDispatchCommitError::CommitUnconfirmed(_) => {
                     // Do not infer nonexecution from an error returned after
                     // entering the store. Original holds and credentials remain

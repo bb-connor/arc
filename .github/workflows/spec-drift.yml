@@ -61,6 +61,17 @@ jobs:
         with:
           go-version: "1.22"
 
+      - name: Prepare the pinned Go generator cache
+        working-directory: sdks/go/chio-go-http/scripts/tools
+        env:
+          GOTOOLCHAIN: local
+          GOWORK: "off"
+          GOFLAGS: -mod=readonly
+        run: go mod download
+
+      - name: Verify hermetic Go schema bundling
+        run: python3 sdks/go/chio-go-http/scripts/regen-types.test.py
+
       - name: Install Node.js (ts codegen toolchain)
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:

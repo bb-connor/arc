@@ -202,7 +202,7 @@ def main():
         "worker_image": args.worker_image,
         "completed_artifact_sha256": hashlib.sha256(artifact.read_bytes()).hexdigest(),
         "verification": verification,
-        "m5_acceptance_complete": False,
+        "qualification_complete": False,
         "remaining": [
             "contended budget denial",
             "host death with uncertain effect",

@@ -38,6 +38,47 @@ pub(crate) struct ReservedPrepayment {
     pub(crate) payment_reference: Option<String>,
 }
 
+/// Preserve the verifier's typed refusal separately from an unavailable
+/// negotiation, ancestor or backend preparation. Legacy callers still receive
+/// the exact existing reason through their String-facing wrapper.
+pub(crate) enum CapabilityPreAdmissionError {
+    Preparation(String),
+    Verification(chio_kernel_core::CapabilityError),
+}
+
+impl CapabilityPreAdmissionError {
+    /// Only the core verifier's closed policy refusals are public denials.
+    /// Preparation, backend and internal failures remain operational.
+    pub(crate) fn recovery_error(self) -> KernelError {
+        use chio_kernel_core::{BudgetSplitError, CapabilityError};
+        match self {
+            Self::Verification(
+                CapabilityError::UntrustedIssuer
+                | CapabilityError::InvalidSignature
+                | CapabilityError::CryptoFloorRejected(_)
+                | CapabilityError::NotYetValid
+                | CapabilityError::Expired
+                | CapabilityError::AttenuationViolation(_)
+                | CapabilityError::BudgetSplitRejected(
+                    BudgetSplitError::ChildShareExceedsCap { .. }
+                    | BudgetSplitError::OversubscribedSiblings { .. }
+                    | BudgetSplitError::DuplicateChild { .. },
+                ),
+            ) => KernelError::RecoveryAuthorityDenied,
+            _ => KernelError::Internal("recovery capability authentication unavailable".into()),
+        }
+    }
+
+    fn legacy_deny_reason(self) -> String {
+        match self {
+            Self::Preparation(reason) => reason,
+            Self::Verification(error) => {
+                chio_kernel_core::KernelCoreError::InvalidCapability(error).deny_reason()
+            }
+        }
+    }
+}
+
 impl ChioKernel {
     pub(crate) fn resolve_security_invocation_context(
         &self,
@@ -478,13 +519,29 @@ impl ChioKernel {
         remote_kernel_id: Option<&str>,
         now: u64,
     ) -> Result<(), String> {
+        self.verify_capability_full_pre_admit_typed(cap, remote_kernel_id, now)
+            .map_err(CapabilityPreAdmissionError::legacy_deny_reason)
+    }
+
+    pub(crate) fn verify_capability_full_pre_admit_typed(
+        &self,
+        cap: &CapabilityToken,
+        remote_kernel_id: Option<&str>,
+        now: u64,
+    ) -> Result<(), CapabilityPreAdmissionError> {
         let trusted = self.trusted_issuer_keys();
         let clock = chio_kernel_core::FixedClock::new(now);
-        let peer_profile = self.capability_negotiation_for_remote(remote_kernel_id, now)?;
+        let peer_profile = self
+            .capability_negotiation_for_remote(remote_kernel_id, now)
+            .map_err(CapabilityPreAdmissionError::Preparation)?;
         let trust_resolver = self.capability_trust_root_resolver_snapshot();
         let mut budgets = chio_kernel_core::NoopBudgetRegistry;
-        let direct_root = self.negotiated_capability_root(cap, &peer_profile)?;
-        let ancestors = self.signed_capability_ancestors(cap)?;
+        let direct_root = self
+            .negotiated_capability_root(cap, &peer_profile)
+            .map_err(CapabilityPreAdmissionError::Preparation)?;
+        let ancestors = self
+            .signed_capability_ancestors(cap)
+            .map_err(CapabilityPreAdmissionError::Preparation)?;
 
         chio_kernel_core::verify_capability_full_with_evidence(
             cap,
@@ -501,9 +558,7 @@ impl ChioKernel {
             &trust_resolver,
             &mut budgets,
         )
-        .map_err(|error| {
-            chio_kernel_core::KernelCoreError::InvalidCapability(error).deny_reason()
-        })?;
+        .map_err(CapabilityPreAdmissionError::Verification)?;
         Ok(())
     }
 

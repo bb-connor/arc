@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/recovery/grant-binding.schema.json",
+  "title": "Recovery mandatory grant binding V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "authority_domain",
+    "workflow_id",
+    "step_id",
+    "continuation_id",
+    "process_id",
+    "request_id",
+    "isolation_lineage",
+    "approval_intent",
+    "challenge",
+    "request_namespace",
+    "action_intent",
+    "authorization_requirements",
+    "selected_offer",
+    "approved_plan",
+    "policy_digest",
+    "contract_digest",
+    "authority_scope",
+    "output_disposition",
+    "coverage_digest",
+    "isolation_epoch"
+  ],
+  "properties": {
+    "schema": {
+      "const": "chio.recovery.grant-binding.v1"
+    },
+    "version": {
+      "const": 1
+    },
+    "authority_domain": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "workflow_id": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "step_id": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "continuation_id": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "process_id": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "request_id": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "isolation_lineage": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "approval_intent": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "challenge": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "request_namespace": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "action_intent": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "authorization_requirements": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "selected_offer": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "approved_plan": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "policy_digest": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "contract_digest": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "authority_scope": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "output_disposition": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "coverage_digest": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "isolation_epoch": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    }
+  },
+  "$defs": {
+    "opaqueId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "not": { "pattern": "[\\r\\n]" }
+    },
+    "recoveryDigest32": {
+      "type": "array",
+      "minItems": 32,
+      "maxItems": 32,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255,
+        "title": "Recovery digest octet"
+      },
+      "title": "Recovery digest32"
+    },
+    "safeInteger": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority_domain",
+        "tenant_id",
+        "process_id"
+      ],
+      "properties": {
+        "authority_domain": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "tenant_id": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "process_id": {
+          "$ref": "#/$defs/opaqueId"
+        }
+      }
+    }
+  }
+}

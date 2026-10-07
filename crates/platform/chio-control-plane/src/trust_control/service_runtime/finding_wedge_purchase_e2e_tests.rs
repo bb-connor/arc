@@ -4487,7 +4487,7 @@ async fn wedge_purchase_recovery_grant_redelivers_without_charging() -> TestResu
     )?)?;
     assert_eq!(second.verdict, Verdict::Allow, "{:?}", second.reason);
 
-    let intent_id = sha256_hex(b"m6-recovery-retraction-intent");
+    let intent_id = sha256_hex(b"status-recovery-retraction-intent");
     let intent_bytes = canonical_json_bytes(&serde_json::json!({
         "finding_id": finding_id,
         "reason": "recovery_status_gate_regression",

@@ -235,7 +235,7 @@ pub(crate) fn export(state: &Path, plan: &Path, output: &Path) -> Result<(), Cli
     write_secret(&destination, name, &bytes)?;
     println!(
         "{}",
-        json!({"artifact": output, "receipt_id": signed.id, "runtime_id": evidence.runtime_id, "workers": evidence.results.len(), "m5_acceptance_complete": false})
+        json!({"artifact": output, "receipt_id": signed.id, "runtime_id": evidence.runtime_id, "workers": evidence.results.len(), "qualification_complete": false})
     );
     Ok(())
 }

@@ -519,7 +519,11 @@ pub(super) struct Host {
     pub record: Record,
     pub runtime: ProcessRuntime,
     pub kernel: Arc<ChioKernel>,
+    #[cfg(target_os = "linux")]
     pub keyring: Option<super::keyring::HostKeyring>,
+    // Retain signer custody and the same drop order on other platforms.
+    #[cfg(not(target_os = "linux"))]
+    _keyring: Option<super::keyring::HostKeyring>,
     #[cfg(target_os = "linux")]
     pub receipts: Arc<chio_store_sqlite::SqliteReceiptStore>,
     #[cfg(target_os = "linux")]
@@ -657,7 +661,10 @@ impl Host {
             record,
             runtime,
             kernel,
+            #[cfg(target_os = "linux")]
             keyring,
+            #[cfg(not(target_os = "linux"))]
+            _keyring: keyring,
             _broker_service: broker_service,
             #[cfg(target_os = "linux")]
             receipts: _receipts,
