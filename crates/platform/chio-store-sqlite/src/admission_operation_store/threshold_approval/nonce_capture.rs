@@ -239,3 +239,7 @@ pub(in crate::admission_operation_store) fn nonce_verification_time_unix_ms(
     }
     Ok(created_at_unix_ms)
 }
+
+#[cfg(test)]
+#[path = "nonce_capture/witness_tests.rs"]
+mod witness_tests;
