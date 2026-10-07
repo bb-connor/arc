@@ -1,6 +1,6 @@
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
-use std::time::Duration;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use chio_core::{Ed25519Backend, Keypair, SigningBackend};
 use chio_kernel::IndexedSecurityEvidenceStore;
@@ -9,7 +9,8 @@ use chio_security_types::ports::PortError;
 use chio_store_sqlite::SqliteReceiptStore;
 
 use super::{
-    ActiveDefenseTeardownSupervisor, ReservedActiveDefenseCleanup, RetainedActiveDefenseCleanupWork,
+    ActiveDefenseTeardownRetry, ActiveDefenseTeardownSupervisor, ReservedActiveDefenseCleanup,
+    RetainedActiveDefenseCleanupWork,
 };
 use crate::security::orchestration::{
     ProductionDeclassificationReceiptLifecycle, ProductionSecurityStateAuthority,
@@ -22,10 +23,12 @@ use crate::security::{
 
 const PROGRESS_TIMEOUT: Duration = Duration::from_secs(10);
 const INDEPENDENT_PROGRESS_TIMEOUT: Duration = Duration::from_secs(5);
+const PARKED_RETRY_INTERVAL: Duration = Duration::from_millis(1_500);
 
 struct ShutdownGatePort {
     released: AtomicBool,
     shutdown_attempts: AtomicU64,
+    attempt_times: Mutex<Vec<Instant>>,
 }
 
 impl ShutdownGatePort {
@@ -33,6 +36,7 @@ impl ShutdownGatePort {
         Self {
             released: AtomicBool::new(released),
             shutdown_attempts: AtomicU64::new(0),
+            attempt_times: Mutex::new(Vec::new()),
         }
     }
 
@@ -42,6 +46,17 @@ impl ShutdownGatePort {
 
     fn shutdown_attempts(&self) -> u64 {
         self.shutdown_attempts.load(Ordering::Acquire)
+    }
+
+    fn attempt_gaps(&self) -> Vec<Duration> {
+        let times = self
+            .attempt_times
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        times
+            .windows(2)
+            .map(|pair| pair[1].saturating_duration_since(pair[0]))
+            .collect()
     }
 }
 
@@ -55,6 +70,10 @@ impl ResponseWorkerPort for ShutdownGatePort {
     }
 
     fn shutdown(&self) -> Result<(), ResponseWorkerTickError> {
+        self.attempt_times
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .push(Instant::now());
         self.shutdown_attempts.fetch_add(1, Ordering::AcqRel);
         if self.released.load(Ordering::Acquire) {
             Ok(())
@@ -220,4 +239,51 @@ async fn never_ending_reserved_cleanup_does_not_block_an_independent_queued_clea
     assert_eq!(retained_while_stuck, 1);
     assert!(stuck_kept_retrying);
     assert!(stuck_completed);
+}
+
+#[tokio::test]
+async fn parked_cleanup_keeps_its_reservation_and_retries_at_the_parked_interval() {
+    let supervisor = Arc::new(ActiveDefenseTeardownSupervisor::new());
+    let ReservedCleanupFixture {
+        _directory: _parked_directory,
+        registry,
+        port,
+        cleanup,
+    } = reserved_cleanup(false, true).await;
+    supervisor
+        .acquire()
+        .unwrap_or_else(|error| panic!("acquire parked cleanup permit: {error}"))
+        .enqueue_with_retry_for_test(
+            RetainedActiveDefenseCleanupWork::Reserved(cleanup),
+            ActiveDefenseTeardownRetry::bounded_for_test(3, PARKED_RETRY_INTERVAL),
+        );
+
+    wait_for("parked cleanup stopped retrying", || {
+        port.shutdown_attempts() >= 5
+    })
+    .await;
+    let gaps = port.attempt_gaps();
+    let reservation_held = matches!(
+        tokio::time::timeout(Duration::from_millis(200), registry.wait_until_vacant()).await,
+        Err(_)
+    );
+    let retained_while_parked = supervisor.lock_state().retained_owners;
+    port.release();
+    let completed = released(&registry, PROGRESS_TIMEOUT).await;
+    wait_for("teardown permit was not returned", || {
+        supervisor.lock_state().retained_owners == 0
+    })
+    .await;
+
+    assert!(
+        gaps.len() >= 4 && gaps[..2].iter().all(|gap| *gap < PARKED_RETRY_INTERVAL),
+        "bounded attempts were not at the retry interval: {gaps:?}"
+    );
+    assert!(
+        gaps[2..4].iter().all(|gap| *gap >= PARKED_RETRY_INTERVAL),
+        "cleanup was not parked after its bounded attempts: {gaps:?}"
+    );
+    assert!(reservation_held);
+    assert_eq!(retained_while_parked, 1);
+    assert!(completed);
 }
