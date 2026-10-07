@@ -12,7 +12,8 @@ use chio_core::capability::threshold_approval::{
 };
 use chio_kernel::admission_operation::{AdmissionOperationId, NativeSecurityInputJoinRecordV1};
 use chio_kernel::caller_delivery::{
-    CallerDeliveryEvidenceV1, SignedCallerDeliveryReportV1, SignedCallerDispatchAuthorizationV1,
+    CallerDeliveryError, CallerDeliveryEvidenceV1, SignedCallerDeliveryReportV1,
+    SignedCallerDispatchAuthorizationV1,
 };
 use chio_kernel::execution_nonce::SignedExecutionNonce;
 
@@ -49,6 +50,7 @@ struct ParkedApproval {
     issued: SignedExecutionNonce,
     proposal: ThresholdApprovalProposal,
     input_join: NativeSecurityInputJoinRecordV1,
+    parked_operation: chio_kernel::admission_operation::AdmissionOperationV1,
 }
 
 struct Executed {
@@ -208,6 +210,7 @@ impl ParkedApproval {
             issued,
             proposal,
             input_join,
+            parked_operation: retained,
         })
     }
 
@@ -632,9 +635,10 @@ fn assert_retained_horizon_is_exact(
             report: SignedCallerDeliveryReportV1::sign(report, &parked.executor_key)?,
         };
         assert!(
-            resigned
-                .validate_native_original(operation, original, nonce, frame)
-                .is_err(),
+            matches!(
+                resigned.validate_native_original(operation, original, nonce, frame),
+                Err(CallerDeliveryError::Binding)
+            ),
             "authorization interval ending at {shifted} must not verify"
         );
     }
@@ -650,11 +654,14 @@ fn assert_retained_horizon_is_exact(
         serde_json::from_value(persisted)?,
     )?;
     assert!(unbound.threshold_proposal().is_none());
-    assert_eq!(
-        evidence
-            .validate_native_original(&unbound, original, nonce, frame)
-            .is_ok(),
-        window == NonceWindow::Live
+    let unbound = evidence.validate_native_original(&unbound, original, nonce, frame);
+    assert!(
+        match window {
+            NonceWindow::Live => unbound.is_ok(),
+            NonceWindow::Expired => matches!(unbound, Err(CallerDeliveryError::Binding)),
+        },
+        "{window:?}: {:?}",
+        unbound.err()
     );
     Ok(())
 }
@@ -688,6 +695,87 @@ impl SecurityPreDispatchHook for SkippedJoin {
     }
 }
 
+/// The observable refusal: a signed Deny receipt carrying the projected
+/// native reason and any signed rejection code, or the exact native error
+/// variant, detail and registered code when no receipt was produced.
+#[derive(Debug, PartialEq)]
+enum Refusal {
+    Denied {
+        reason: String,
+        rejection_code: Option<String>,
+    },
+    Failed {
+        variant: &'static str,
+        detail: String,
+        code: String,
+    },
+}
+
+impl Refusal {
+    fn denied(reason: impl Into<String>, rejection_code: Option<&str>) -> Self {
+        Self::Denied {
+            reason: reason.into(),
+            rejection_code: rejection_code.map(str::to_owned),
+        }
+    }
+
+    fn failed(variant: &'static str, detail: &str, code: &str) -> Self {
+        Self::Failed {
+            variant,
+            detail: detail.to_owned(),
+            code: code.to_owned(),
+        }
+    }
+
+    fn observed(result: &Result<chio_kernel::ToolCallResponse, KernelError>) -> TestResult<Self> {
+        Ok(match result {
+            Ok(response) => {
+                if !response.receipt.verify_signature()? {
+                    return Err("refusal receipt signature is invalid".into());
+                }
+                Self::Denied {
+                    reason: match (
+                        response.verdict,
+                        &response.output,
+                        &response.execution_nonce,
+                    ) {
+                        (Verdict::Deny, None, None) => response.reason.clone().unwrap_or_default(),
+                        (verdict, output, nonce) => format!(
+                            "not a bare denial: {verdict:?} output={} nonce={}",
+                            output.is_some(),
+                            nonce.is_some()
+                        ),
+                    },
+                    rejection_code: response
+                        .receipt
+                        .metadata
+                        .as_ref()
+                        .and_then(|metadata| metadata.pointer("/chio_kernel/rejection_code"))
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::to_owned),
+                }
+            }
+            Err(error) => {
+                let (variant, detail) = match error {
+                    KernelError::GuardDenied(detail) => ("GuardDenied", detail.clone()),
+                    KernelError::ReceiptSigningFailed(detail) => {
+                        ("ReceiptSigningFailed", detail.clone())
+                    }
+                    other => ("unexpected", format!("{other:?}")),
+                };
+                Self::Failed {
+                    variant,
+                    detail,
+                    code: error.report().code,
+                }
+            }
+        })
+    }
+}
+
+const GOVERNED_DENIED: &str = "CHIO-KERNEL-GOVERNED-TRANSACTION-DENIED";
+const DURABLE_ADMISSION: &str = "CHIO-KERNEL-DURABLE-ADMISSION";
+
 #[derive(Clone, Copy, Debug)]
 enum Substitution {
     Proposal,
@@ -703,8 +791,101 @@ enum Substitution {
     SkippedJoin,
 }
 
+impl Substitution {
+    /// The deciding boundary's exact refusal and the parked operation state it
+    /// leaves. Refusals while the retained operation is selected (identity,
+    /// nonce, authorization extensions and the elapsed approval window) carry
+    /// no signed rejection code; governed threshold verification and native
+    /// preparation refusals during the approved reservation do.
+    fn expected(self, parked: &ParkedApproval) -> (Refusal, AdmissionOperationState) {
+        let durable = |detail: &str, code: Option<&str>| {
+            Refusal::denied(format!("durable admission failed: {detail}"), code)
+        };
+        let conflict = || {
+            durable(
+                &format!(
+                    "request id conflicts with retained operation {}",
+                    parked.operation_id.as_str()
+                ),
+                None,
+            )
+        };
+        let parked_state = AdmissionOperationState::ApprovalRequired;
+        let retired = AdmissionOperationState::CompensatedBeforeDispatch;
+        match self {
+            Self::Proposal => (
+                Refusal::denied(
+                    "governed transaction denied: threshold approval verification denied: threshold proposal signer is not trusted",
+                    Some(GOVERNED_DENIED),
+                ),
+                parked_state,
+            ),
+            Self::MissingProposal => (
+                Refusal::denied(
+                    "canonical JSON error: threshold approval tokens have no signed proposal",
+                    None,
+                ),
+                parked_state,
+            ),
+            Self::Nonce => (
+                durable(
+                    "presented execution nonce does not match its retained issuance",
+                    None,
+                ),
+                parked_state,
+            ),
+            Self::Operation => (
+                durable(
+                    "presented execution nonce was never issued for this request",
+                    None,
+                ),
+                parked_state,
+            ),
+            Self::MissingApproval => (
+                Refusal::failed(
+                    "ReceiptSigningFailed",
+                    "failed to hash threshold approval set for receipt metadata: canonical JSON error: threshold approval proposal has no approval tokens",
+                    "CHIO-KERNEL-RECEIPT-SIGNING-FAILED",
+                ),
+                parked_state,
+            ),
+            Self::ExpiredApproval => (
+                Refusal::denied(
+                    "governed transaction denied: threshold approval verification denied: threshold proposal window is invalid for the active policy",
+                    None,
+                ),
+                retired,
+            ),
+            Self::Executor | Self::Context => (conflict(), parked_state),
+            Self::Grant => (
+                Refusal::failed(
+                    "GuardDenied",
+                    "authoritative security context lineage root does not match the request capability",
+                    "CHIO-KERNEL-GUARD-DENIED",
+                ),
+                parked_state,
+            ),
+            Self::RawJoin => (
+                durable(
+                    "native caller start requires its original classified input custody",
+                    Some(DURABLE_ADMISSION),
+                ),
+                retired,
+            ),
+            Self::SkippedJoin => (
+                durable(
+                    "native preparation returned success without a join",
+                    Some(DURABLE_ADMISSION),
+                ),
+                retired,
+            ),
+        }
+    }
+}
+
 #[test]
 fn native_caller_approval_resume_refuses_substituted_or_missing_original_custody() -> TestResult {
+    let mut mismatches = Vec::new();
     for substitution in [
         Substitution::Proposal,
         Substitution::MissingProposal,
@@ -790,33 +971,48 @@ fn native_caller_approval_resume_refuses_substituted_or_missing_original_custody
             }
             Ok(())
         })?;
-        if let Ok(response) = &result {
-            assert_ne!(
-                response.verdict,
-                Verdict::Allow,
-                "{substitution:?}: {:?}",
-                response.reason
-            );
-            assert!(response
-                .output
-                .as_ref()
-                .is_none_or(|_| response.verdict == Verdict::PendingApproval));
-        }
         let operation = parked
             .fixture
             .authority
             .admission_operation_store()
             .load_by_operation_id(&parked.operation_id)?
             .ok_or("original parked operation")?;
+        let expected = substitution.expected(&parked);
+        let observed = (Refusal::observed(&result)?, operation.state());
+        if observed != expected {
+            mismatches.push(format!(
+                "{substitution:?}: expected {expected:?}, observed {observed:?}"
+            ));
+        }
+        let parked_operation = &parked.parked_operation;
         assert!(operation.dispatch_commit().is_none(), "{substitution:?}");
-        assert!(
-            matches!(
-                operation.state(),
-                AdmissionOperationState::ApprovalRequired
-                    | AdmissionOperationState::CompensatedBeforeDispatch
-            ),
-            "{substitution:?}: {:?}",
-            operation.state()
+        assert_eq!(operation.binding(), parked_operation.binding());
+        assert!(operation.threshold_proposal() == Some(&parked.proposal));
+        assert_eq!(
+            operation.threshold_proposal_hash(),
+            parked_operation.threshold_proposal_hash()
+        );
+        assert_eq!(
+            operation.execution_nonce_issuance_digest(),
+            parked_operation.execution_nonce_issuance_digest()
+        );
+        assert_eq!(operation.execution_nonce_id(), None);
+        assert_eq!(
+            operation.budget_hold_id(),
+            parked_operation.budget_hold_id()
+        );
+        assert_eq!(
+            parked
+                .fixture
+                .authority
+                .budget_store()
+                .get_invocation_quota_usage(&BudgetQuotaKey::grant(
+                    operation.binding().capability_id().as_str(),
+                    0,
+                ))?
+                .map_or(0, |usage| usage.captured_invocations),
+            0,
+            "{substitution:?} captured the parked hold"
         );
         assert!(
             parked
@@ -827,5 +1023,6 @@ fn native_caller_approval_resume_refuses_substituted_or_missing_original_custody
         assert_eq!(parked.fixture.invocations.load(Ordering::SeqCst), 0);
         assert_eq!(parked.legacy.load(Ordering::SeqCst), 0);
     }
+    assert!(mismatches.is_empty(), "{mismatches:#?}");
     Ok(())
 }
