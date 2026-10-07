@@ -199,6 +199,11 @@ read after a hint. No busy `InspectWorkflow` command polling: commands can consu
 permanent quota/settlement reserve and reused IDs can return stale cached results.
 Use the owner's coalescing, rate bounds, subscribe-then-check, audience revalidation,
 retention/restore, terminal delivery and stable subscription acknowledgement rules.
+Approval invalidation must resolve the native owner, original operation and
+proposal/review identity, not task ID plus an owner-local proposal ID alone.
+If a shared hint lacks that precision, invalidate the affected cached actions
+conservatively and re-read their exact owner bindings before re-enabling them;
+never guess which matching review remains valid.
 Gap, stale session or dropped stream forces authoritative refresh, not invented
 state transitions. Bounded slow-consumer disconnect is preferable to silent loss.
 Heartbeat/link liveness never extends a grant or the freshness of an owner fact.
@@ -218,6 +223,7 @@ desktop fixture corpora are review history, not a second conformance authority.
 | Six work axes disagree; result exists but release is refused; payment remains unresolved | W1/recovery/payment owners: faithful separate observations and no unauthorized result bytes. |
 | Changed catalog/snapshot between pages; snapshot expiry; lag, restore, missed terminal and lost ack | Enumeration owner and S5: either consistent authoritative reconstruction or explicit gap; bounded queues and idempotent scoped ack. |
 | Empty readiness profile, stale/wrong-login/future health, absent typed scope, duplicate budgets, unavailable limit | Profile/health owners plus operator: actions remain disabled; native admission independently refuses stale basis. |
+| Two owners reuse a proposal ID and one review is invalidated | S5/approval owner plus operator: resolve the exact operation or disable affected actions pending authoritative refresh; no wrong-review invalidation or stale approval. |
 | SelectOffer uses stale workflow revision, substituted offer or lost reply | Recovery owner: reject a stale/substituted selection; reconcile the original selection command before approval/resume, with no second effect. |
 | Deny retaining approve material; changed proposal, recipient, decision ID or revision; revoked approver | Approval owner: installed verifier rejects each mismatch with zero protected effect. |
 | Per-task closure races dispatch/release; kernel stop reply lost; unsupported tenant/recovery scope | S4/S8/process owners: exact closure coverage, independent exit evidence, retained unknown outcome and no scope escalation. |
