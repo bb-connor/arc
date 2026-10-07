@@ -1795,7 +1795,7 @@ Remaining work is the unrun owning and optional-feature matrix, full benchmarks,
 
 ## Current protocol owner checkpoint (October 7)
 
-[Retained exact source and logs](audits/protocol-owner-checkpoint-20261007.json): default ACP/MCP/OpenAPI owning tests626/0; OpenAI provider feature132/0; ACP OpenTelemetry337/0; dependency-inclusive strict all-targets lint0. Five protocol doctest harnesses declare zero cases and are not counted as behavioral tests. The CI trust-boundary mutation contract and eleven-lockfile unused-patch gate/self-tests pass. Feature runs overlap and are not summed as unique cases. Broader default/PQ/native, full benchmarks, final review/trusted/hosted checks and protected landing remain pending.
+[Retained exact source and logs](audits/protocol-owner-checkpoint-20261007.json): default ACP-Client/MCP/OpenAPI owning tests626/0; OpenAI provider feature132/0; ACP-Client OpenTelemetry337/0; dependency-inclusive strict all-targets lint0. Five protocol doctest harnesses declare zero cases and are not counted as behavioral tests. The CI trust-boundary mutation contract and eleven-lockfile unused-patch gate/self-tests pass. Feature runs overlap and are not summed as unique cases. Broader default/PQ/native, full benchmarks, final review/trusted/hosted checks and protected landing remain pending.
 
 
 ## Latest PR review fixes (October 7)

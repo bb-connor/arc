@@ -240,12 +240,19 @@ EOF
 )" cargo test --locked -p chio-secret-broker --lib service::ipc::prepared::tests::
 
   run_tests "native kernel broker daemon, MCP and TLS provider" yes "$(cat <<'EOF'
+process_boundary_tests::native::cutpoints::native_broker_cutpoint_observers_preserve_proofs_after_delayed_admission
 process_boundary_tests::native::cutpoints::native_broker_death_after_capture_retains_all_quotas_without_effect
 process_boundary_tests::native::cutpoints::native_broker_death_after_provider_effect_retains_capture_and_refuses_replay
 process_boundary_tests::native::cutpoints::native_broker_death_after_registration_has_no_effect_or_capture
+process_boundary_tests::native::cutpoints::no_effect::tests::owned_zero_effect_cancellation_never_emits_success_and_reaps_child
+process_boundary_tests::native::cutpoints::no_effect::tests::owned_zero_effect_completion_cannot_hide_a_real_queued_connection
+process_boundary_tests::native::cutpoints::no_effect::tests::owned_zero_effect_valid_done_retains_the_independent_quiet_scan
 process_boundary_tests::native::native_kernel_broker_daemon_captures_once_and_sends_real_tls_without_secret_crossing
 process_boundary_tests::native::native_kernel_broker_mcp_tool_keeps_capture_on_lost_or_invalid_completion
 process_boundary_tests::native::native_kernel_broker_mcp_tool_preserves_original_capture_and_signed_completion
+process_boundary_tests::native::native_kernel_broker_tls_observer_survives_delayed_valid_admission
+process_boundary_tests::native::upstream::native_upstream_owner_cancellation_joins_without_child_or_effect
+process_boundary_tests::native::upstream::native_upstream_owner_drop_reaps_a_started_real_helper
 EOF
 )" \
     env RUST_TEST_THREADS=1 cargo test --locked -p chio-secret-broker --features native-mcp --lib \

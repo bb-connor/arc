@@ -64,7 +64,7 @@
 
 ## Task 4: Repair unsigned A2A and local diagnostic contracts (PR2/PB2, PB6, GT2, GT4)
 
-**Files:** A2A `auth.rs` and raw HTTP peer tests; ACP compliance and CLI certificate error rendering; OpenAPI local diagnostics and owning tests; Lambda SDK release profile; control-plane guard credential configuration and tests.
+**Files:** A2A `auth.rs` and raw HTTP peer tests; ACP-Client compliance and CLI certificate error rendering; OpenAPI local diagnostics and owning tests; Lambda SDK release profile; control-plane guard credential configuration and tests.
 
 **Interfaces:** Use duplicate-aware `decode_document` for unsigned HTTP envelopes while keeping embedded authoritative verification strict. Compliance failure categories select registered, input-independent codes. Operator-local OpenAPI detail is bounded and escaped; public peer rendering stays redacted. Configured API-key Debug is redacted and secret ownership wipes on drop. Standalone Lambda release builds enable overflow checks.
 
@@ -141,7 +141,7 @@ The exact review source is `5696c4cf04a1a8368ef36dd51618ea1bd5f7fbfc`; its four 
 
 Use `coord/pr1160` in `/home/connor/lanes/pr1160-coord` for current ownership. Codex alone writes and pushes the integration branch. Claude hands off source commits from its own branch. The board assigns72 findings to this landing and43 preserved later obligations; architecture remains a sequential follow-up. All P0/P1, landing blockers and now-scoped P2 must be repaired before the foundation can land. Preserve later valuable work and branch histories.
 
-The required source waves are keyring namespace/key/ACL custody, money compensation and durable recovery, kernel reservation/cancellation/approval lifecycle, bounded native history, authenticated input/clock ownership, provider/ACP/MCP gates and durable reader consistency. Independent review already found further keyring cross-log conflicts, broker Execute cause loss, provider lifecycle/call-set gaps and unbounded ordinary archive coverage; preserve their original failures and require corrected real owning controls.
+The required source waves are keyring namespace/key/ACL custody, money compensation and durable recovery, kernel reservation/cancellation/approval lifecycle, bounded native history, authenticated input/clock ownership, provider/ACP-Client/MCP gates and durable reader consistency. Independent review already found further keyring cross-log conflicts, broker Execute cause loss, provider lifecycle/call-set gaps and unbounded ordinary archive coverage; preserve their original failures and require corrected real owning controls.
 
 Trusted runtime changes need a separate prerequisite based on main `c009aced79d69f01880b5f7c53ed3c1754e3b7da`. The ten-file definition/auditor cut changes prepared main concurrency and authenticated CI run identity without importing the foundation's Rust/Cargo/job workload. Its independent review, protected checks and exact hosted acceptance are prerequisites. Foundation-side checker, nextest separation, seccomp provenance and final source fingerprints stay in the foundation batch. The active landing queue remains at most two PRs.
 

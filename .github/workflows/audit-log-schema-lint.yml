@@ -50,7 +50,12 @@ jobs:
           test -s crates/observability/chio-siem/src/exporters/cef.golden.txt
           grep -q '^CEF:0|' crates/observability/chio-siem/src/exporters/cef.golden.txt
           grep -q 'receipt_id' crates/observability/chio-siem/src/exporters/cef.golden.txt
-          grep -q 'redaction_status' crates/observability/chio-siem/src/exporters/cef.golden.txt
+          grep -Eq '(^| )cs6Label=source_redaction_mode cs6=none( |$)' crates/observability/chio-siem/src/exporters/cef.golden.txt
+          grep -Eq '(^| )signature_scope=original_receipt( |$)' crates/observability/chio-siem/src/exporters/cef.golden.txt
+          grep -Eq '(^| )payload_included=false( |$)' crates/observability/chio-siem/src/exporters/cef.golden.txt
+          grep -Eq '(^| )original_retrieval_required=true( |$)' crates/observability/chio-siem/src/exporters/cef.golden.txt
+          grep -Eq '(^| )projection_signed=false( |$)' crates/observability/chio-siem/src/exporters/cef.golden.txt
+          ! grep -q 'redaction_status' crates/observability/chio-siem/src/exporters/cef.golden.txt
 
       - name: Run CEF emitter test
         shell: bash

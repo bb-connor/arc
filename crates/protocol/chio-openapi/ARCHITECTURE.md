@@ -72,3 +72,14 @@ this crate produces. `chio-http-core` supplies `HttpMethod`, parsed from the
 OpenAPI method string and consulted by `DefaultPolicy`. `serde`/`serde_json`
 back the JSON model; `serde_yaml` backs YAML parsing; `thiserror` derives
 `OpenApiError`. No dependency aliasing.
+
+## Verification focus
+
+The parser tests cover JSON and YAML input, local reference resolution, required
+path parameters, unsupported parameter locations and external-reference rejection.
+Extension tests reject unknown sensitivity values and retain strict Chio flow
+declarations. Generator tests cover deterministic tool construction, merged
+parameters, request and response schemas, publish exclusion, approval annotations
+and flow preservation. Run `cargo test --locked -p chio-openapi --lib` to check
+these owning boundaries. The crate does not establish runtime admission or
+transport enforcement; those remain the kernel and protocol-edge owners' tests.

@@ -173,6 +173,17 @@ jobs:
             kernel::tests::threshold_issuance::session_continuation::session_reports::nested_async_conflict_preserves_threshold_wait \
             kernel::tests::threshold_issuance::session_continuation::session_reports::failure_observation_preserves_pending_operation_and_approval_authority \
             kernel::tests::threshold_issuance::session_continuation::session_reports::wire_and_normalized_approval_shape_checks_agree_for_all_combinations \
+            kernel::tests::threshold_issuance::session_continuation::session_cancellation::dropped_async_retry_restores_the_original_threshold_claim \
+            kernel::tests::threshold_issuance::session_continuation::session_cancellation::dropped_dispatched_retry_cannot_execute_a_second_effect \
+            kernel::tests::threshold_issuance::session_continuation::session_cancellation::dropped_initial_async_request_completes_session_ownership_as_cancelled \
+            kernel::tests::threshold_issuance::session_continuation::session_claim_race::cancellation_at_restore_checkpoint_completes_threshold_ownership \
+            kernel::tests::threshold_issuance::session_continuation::session_boundary::current_thread_bridge::session_sync_bridge_refusal_keeps_approved_threshold_wait \
+            kernel::tests::threshold_issuance::session_continuation::session_boundary::current_thread_bridge::nested_sync_bridge_refusal_keeps_approved_threshold_wait \
+            kernel::tests::threshold_issuance::session_continuation::session_boundary::current_thread_bridge::session_approved_threshold_wait_completes_on_multi_thread_runtime \
+            kernel::tests::threshold_issuance::session_continuation::session_boundary::current_thread_bridge::nested_sync_approved_threshold_wait_completes_on_multi_thread_runtime \
+            kernel::tests::threshold_issuance::session_continuation::session_boundary::pre_dispatch_cancellation::session_host_cancel_before_dispatch_records_cancelled_outcome \
+            kernel::tests::threshold_issuance::session_continuation::session_boundary::pre_dispatch_cancellation::nested_sync_host_cancel_before_dispatch_records_cancelled_outcome \
+            kernel::tests::threshold_issuance::session_continuation::session_boundary::pre_dispatch_cancellation::nested_async_host_cancel_before_dispatch_records_cancelled_outcome \
             -- cargo test --locked -p chio-kernel --features pq --lib threshold_issuance
 
       - name: Exact nonce validation and consumption boundary

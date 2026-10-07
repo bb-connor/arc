@@ -4,7 +4,7 @@
 
 **Goal:** Repair the remaining concrete EV2/EV3/EV4 and certificate EV6/EV8 defects, and make KG12 protection claims match the exposed product paths.
 
-**Architecture:** Reuse the joint admission serving owner, kernel receipt authority, authenticated retained-history reader and existing default guard profile. Add narrowly scoped helpers and version the ACP certificate body where an authenticated receipt-set commitment is necessary. Do not introduce another evidence service or general retention framework.
+**Architecture:** Reuse the joint admission serving owner, kernel receipt authority, authenticated retained-history reader and existing default guard profile. Add narrowly scoped helpers and version the ACP-Client certificate body where an authenticated receipt-set commitment is necessary. Do not introduce another evidence service or general retention framework.
 
 **Tech stack:** Existing Rust kernel/control-plane/protocol/product crates and SQLite. No new external service.
 
@@ -39,7 +39,7 @@ original failures and remaining qualification are reconciled in the
 | EV2 | tool_outcome.rs:526 serializes the complete ToolCallRequest. SqliteToolOutcomeStore::compact_retained_invocation_blobs at tool_outcome_store.rs:144 exists; every located caller is a test. It clears raw-output-owned envelopes only, after all owners are terminal. | Storage writer owns suspension/report work, not these files or maintenance. |
 | EV3 | MCP tool_calls.rs:364 rejects unmatched capabilities using a client logging notification; capabilities.rs:20 discards matcher errors. No durable refusal is produced there. | MCP writer owns ingress accounting/deadlines/inboxes, not refusal evidence. Runtime integration must wait for that handoff. |
 | EV4 | remote http_service.rs:302 returns SessionCredential::validate_message's error before edge processing; session_credentials.rs:498 emits a bare 403 for disallowed tools/methods. | session_credentials.rs is outside that writer's edits; http_service.rs/factory/session input are shared with the ingress writer. |
-| EV6/EV8 | ACP compliance.rs:570 falls back to Lightweight when FullBundle receives None; :592/:603 accept Some([]). Full mode checks individual authority but not count, ordered set commitment, sequence or time coverage. | Diagnostics writer changes compliance.rs error presentation and cert.rs error classification only. Semantics remain unchanged. |
+| EV6/EV8 | ACP-Client compliance.rs:570 falls back to Lightweight when FullBundle receives None; :592/:603 accept Some([]). Full mode checks individual authority but not count, ordered set commitment, sequence or time coverage. | Diagnostics writer changes compliance.rs error presentation and cert.rs error classification only. Semantics remain unchanged. |
 | EV8 collector/claims | cert/session_receipts.rs:83 requires legacy chio_receipts; actual store uses chio_tool_receipts plus claim_receipt_log_entries. cert.rs:43 hardcodes empty guard/scope checks. compliance.rs:395 interprets claimed resource scopes as tool-name prefixes. | Collector and retained_read.rs are untouched. Separate new modules can be developed before the thin shared-file integration hooks. |
 | KG12 | wrap.rs:380 and API Protect mediated.rs:129 build kernels without the shared default profile. Control-plane lib.rs:196 already installs default_runtime_guard_profile, including SanitizerHook. API Protect mediated.rs:589 reserves caller execution rather than observing the external output. | Wrap/mediation files are untouched. Dirty control-plane guard files require root coordination; their secret/diagnostic edits do not install these product pipelines. |
 
@@ -72,12 +72,12 @@ original failures and remaining qualification are reconciled in the
 
 ## Packet 3: Make FullBundle an actual authenticated set check
 
-**Files:** new ACP compliance/bundle.rs and bundle_tests.rs; thin hooks and versioned body fields in compliance.rs after diagnostic edits settle. The separate kernel and Mercury certificate/proof formats are outside this packet.
+**Files:** new ACP-Client compliance/bundle.rs and bundle_tests.rs; thin hooks and versioned body fields in compliance.rs after diagnostic edits settle. The separate kernel and Mercury certificate/proof formats are outside this packet.
 
 **Existing interfaces:** generate_compliance_certificate(session_id, entries, config, keypair, clock) and verify_compliance_certificate(cert, mode, entries, config). Preserve validate_compliance_receipt and independent trusted_kernel_keys.
 
 - [ ] Refuse FullBundle + None and every empty bundle. Require exact positive receipt_count, unique IDs, ordered sequence identities, consistent kernel/session/tenant and valid signed receipt/action IDs.
-- [ ] Version the ACP signed body to commit the ordered receipt set, including each entry's retained sequence and canonical signed receipt bytes. Full verification recomputes this commitment and exact count, first/last timestamps and policy checks. Do not accept a same-count substituted bundle merely because each new receipt is individually valid.
+- [ ] Version the ACP-Client signed body to commit the ordered receipt set, including each entry's retained sequence and canonical signed receipt bytes. Full verification recomputes this commitment and exact count, first/last timestamps and policy checks. Do not accept a same-count substituted bundle merely because each new receipt is individually valid.
 - [ ] Require monotonic timestamps and first <= last <= issued_at. Reuse the complete validation logic used by generation instead of maintaining a weaker second loop. Legacy certificates without the set commitment cannot pass FullBundle; any retained Lightweight support must explicitly describe its limited verification.
 - [ ] Distinguish a session's ordered receipt set from the store's global sequence: interleaved other sessions legitimately create global gaps. Do not renumber rows or interpret adjacency of selected global sequence numbers as a complete-session proof.
 
@@ -89,7 +89,7 @@ original failures and remaining qualification are reconciled in the
 
 **Existing core:** with_retained_snapshot/RetainedSnapshot in retained_read.rs:35, authenticated live/archive projection, decode_verified_chio_receipt, explicit ReceiptReadContext, and claim sequence lookup. These should own the collection, not bespoke CLI SQL over an unsigned session index.
 
-**Proposed interface:** collect_retained_session_receipts_read_only(path: &Path, session_id: &str, read_context: &ReceiptReadContext, trusted_key: &PublicKey) -> Result<RetainedSessionReceipts, ReceiptStoreError>. Return stored receipts plus the exact authenticated snapshot coverage; keep the store independent of ACP types.
+**Proposed interface:** collect_retained_session_receipts_read_only(path: &Path, session_id: &str, read_context: &ReceiptReadContext, trusted_key: &PublicKey) -> Result<RetainedSessionReceipts, ReceiptStoreError>. Return stored receipts plus the exact authenticated snapshot coverage; keep the store independent of ACP-Client types.
 
 - [ ] Collect in one authenticated read-only live/archive snapshot, using signed session membership, bounded original-byte decoding and existing archive/checkpoint validation. Preserve the current 100,000-receipt/128-MiB session limits and 1-MiB selected-receipt bound; refuse overflow instead of truncating. Do not instantiate a serving writer, migrate/create tables, claim another owner or substitute unsigned JSON-extracted membership.
 - [ ] Label coverage as complete retained history through the pinned snapshot boundary. Later receipts require a new certificate. Whole-lifetime session completeness requires a verified session closure boundary; absence of one is not silently terminal completeness.

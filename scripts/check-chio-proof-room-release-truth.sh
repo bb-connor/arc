@@ -21,6 +21,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path.cwd()
+sys.path.insert(0, str(ROOT / "scripts"))
+from proof_room_historical_protocols import typed_historical_protocol
 TRUTH_PATH = Path(
     os.environ.get(
         "CHIO_PROOF_ROOM_RELEASE_TRUTH",
@@ -593,9 +595,22 @@ for path, line_no, line in iter_doc_lines(configured_docs(DEFAULT_CLAIM_DOCS)):
                 f"{relative(path)}:{line_no}: proof-room.release.unavailable: {key}: {guidance}"
             )
 for path, line_no, line in iter_doc_lines(configured_docs(DEFAULT_DOCS)):
+    # Provenance classifies only historical protocol spelling. Even an exact
+    # classified line remains subject to release truth and other stop patterns.
+    if any(typed_historical_protocol(ROOT, path, line, match) is not None
+           for match in COPY_STOP_PATTERNS["bare_acp"][0].finditer(line)):
+        for key, (pattern, guidance) in CLAIM_PATTERNS.items():
+            if not truth[key] and any(not claim_has_allowed_context(line, match)
+                                      for match in pattern.finditer(line)):
+                failures.append(
+                    f"{relative(path)}:{line_no}: proof-room.release.unavailable: {key}: {guidance}"
+                )
     for key, (pattern, guidance) in COPY_STOP_PATTERNS.items():
         if any(
-            not stop_pattern_has_allowed_context(line, match)
+            not (
+                key == "bare_acp"
+                and typed_historical_protocol(ROOT, path, line, match) is not None
+            ) and not stop_pattern_has_allowed_context(line, match)
             for match in pattern.finditer(line)
         ):
             failures.append(

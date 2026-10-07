@@ -632,8 +632,7 @@ struct SecurityStateFileEntry {
 #[allow(
     clippy::as_conversions,
     clippy::unnecessary_cast,
-    reason = "The stat field widths and signedness differ between supported Unix targets; \
-              these are the conversions std's MetadataExt applies to the same fields."
+    reason = "The stat field widths and signedness differ between supported Unix targets; these are the conversions std's MetadataExt applies to the same fields."
 )]
 fn security_state_file_entry(stat: &rustix::fs::Stat) -> SecurityStateFileEntry {
     SecurityStateFileEntry {

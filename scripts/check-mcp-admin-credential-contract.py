@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import re
 import sys
 from collections import Counter
@@ -88,6 +89,30 @@ def _read(path: Path) -> str:
         return path.read_text(encoding="utf-8")
     except FileNotFoundError as error:
         raise ContractError(f"missing credential-contract input: {path}") from error
+
+
+def _conformance_credentials_are_first(source: str) -> bool:
+    # Share the calibrated Rust lexer: a comment, string or conditional call
+    # cannot stand in for the first unconditional executable statement.
+    spec = importlib.util.spec_from_file_location(
+        "mcp_admin_rust_lexer",
+        Path(__file__).resolve().parent / "check-accounting-arithmetic.py",
+    )
+    if spec is None or spec.loader is None:
+        raise ContractError("unable to load credential-ordering Rust lexer")
+    lexer = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = lexer
+    spec.loader.exec_module(lexer)
+    code = lexer.blank_rust_noise(source)
+    if len(re.findall(r"\bfn\s+run_conformance_harness\b", code)) != 1:
+        return False
+    return re.search(
+        r"\bpub\s+fn\s+run_conformance_harness\s*\(\s*"
+        r"options\s*:\s*&\s*ConformanceRunOptions\s*,?\s*\)\s*"
+        r"->\s*Result\s*<\s*ConformanceRunSummary\s*,\s*RunnerError\s*>\s*\{\s*"
+        r"validate_conformance_credentials\s*\(\s*options\s*\)\s*\?\s*;",
+        code,
+    ) is not None
 
 
 def _discover_shell_commands(root: Path) -> list[ShellCommand]:
@@ -412,14 +437,7 @@ def _validate_rust_surface(root: Path) -> None:
             raise ContractError(
                 f"{relative} maps the admin environment to the auth credential"
             )
-        exact_preflight = (
-            "pub fn run_conformance_harness(\n"
-            "    options: &ConformanceRunOptions,\n"
-            ") -> Result<ConformanceRunSummary, RunnerError> {\n"
-            "    validate_conformance_credentials(options)?;\n"
-            "    if options.results_dir.exists() {"
-        )
-        if exact_preflight not in body:
+        if not _conformance_credentials_are_first(body):
             raise ContractError(
                 f"{relative} must validate credentials before every filesystem or process effect"
             )

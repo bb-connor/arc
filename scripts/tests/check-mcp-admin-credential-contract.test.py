@@ -219,6 +219,19 @@ assert_rejected(
     ),
     "must validate credentials before every filesystem or process effect",
 )
+for label, prefix in (
+    ("starts a process before credential preflight", '    let _ = Command::new("probe").status();\n    validate_conformance_credentials(options)?;\n'),
+    ("makes credential preflight conditional", "    if false { validate_conformance_credentials(options)?; }\n"),
+    ("hides credential preflight in a comment", "    // validate_conformance_credentials(options)?;\n"),
+    ("hides credential preflight in a string", '    let _ = "validate_conformance_credentials(options)?;";\n'),
+):
+    assert_rejected(
+        "conformance harness " + label,
+        "crates/tooling/chio-conformance/src/runner.rs",
+        replace_once("    validate_conformance_credentials(options)?;\n", prefix),
+        "must validate credentials before every filesystem or process effect",
+    )
+
 assert_rejected(
     "conformance harness inverts credential separation",
     "crates/tooling/chio-conformance/src/runner.rs",
@@ -350,5 +363,5 @@ with tempfile.TemporaryDirectory(prefix="chio-mcp-admin-contract-") as raw:
 
 print(
     "check-mcp-admin-credential-contract.test.py: "
-    f"{(expected_total - len(CHECKER.ENV_ADMIN_CALLSITES)) * 2 + 19} credential mutations rejected"
+    f"{(expected_total - len(CHECKER.ENV_ADMIN_CALLSITES)) * 2 + 23} credential mutations rejected"
 )

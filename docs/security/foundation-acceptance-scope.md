@@ -60,7 +60,7 @@ and [evidence/product repairs](../superpowers/plans/2026-10-05-evidence-product-
   invalid or unknown credentials remain outside this session-scoped contract.
   A refusal never establishes dispatch, nonce consumption, settlement or a
   successful persistence result after a store failure.
-- ACP FullBundle v2 commits the exact ordered supplied receipt set and the
+- ACP-Client FullBundle v2 commits the exact ordered supplied receipt set and the
   configured profile. Full verification rejects absent or empty bundles and
   validates the set, count, signer, session, sequence and time bounds. Its portable
   retained-snapshot description does not independently prove store completeness.
