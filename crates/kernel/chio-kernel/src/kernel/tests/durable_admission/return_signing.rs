@@ -2,6 +2,8 @@ use super::*;
 
 #[path = "return_signing/callbacks.rs"]
 mod callbacks;
+#[path = "return_signing/recovery_classification.rs"]
+mod recovery_classification;
 
 fn replace_receipt_authority(kernel: &mut ChioKernel) {
     let authority =
