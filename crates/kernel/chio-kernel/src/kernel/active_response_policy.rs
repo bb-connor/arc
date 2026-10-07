@@ -342,7 +342,7 @@ impl ChioKernel {
         self.governed_active_response_plans_enabled = false;
     }
 
-    pub(super) fn require_governed_active_response_plans_enabled(&self) -> Result<(), KernelError> {
+    pub(crate) fn require_governed_active_response_plans_enabled(&self) -> Result<(), KernelError> {
         if !self.governed_active_response_plans_enabled {
             return Err(active_response_policy_denied(
                 "active-response plan support is disabled",

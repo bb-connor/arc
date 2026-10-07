@@ -208,6 +208,10 @@ impl ChioKernel {
             approval_set_hash: approval_set_hash.clone(),
             threshold_replay: Some(verified.replay),
         };
+        // Everything above is read-only verification. A locally disabled
+        // runtime refuses before the first durable operation or replay write,
+        // whatever profile a federation peer negotiated.
+        self.require_governed_active_response_plans_enabled()?;
         let (mut admission, created_by_this_attempt) = self
             .begin_durable_active_response_admission(
                 request,
