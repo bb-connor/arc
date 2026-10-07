@@ -289,6 +289,7 @@
     "crates/platform/chio-store-sqlite/src/receipt_store/support/signed_readback.rs",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs",
     "crates/platform/chio-store-sqlite/src/rollback_generation.rs",
+    "crates/platform/chio-store-sqlite/src/security_state/automatic_preparation.rs",
     "crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs",
     "crates/platform/chio-store-sqlite/src/security_state/codec.rs",
     "crates/platform/chio-store-sqlite/src/security_state/containment.rs",
@@ -990,6 +991,12 @@
       "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts.",
       "runtime_family": "flow"
     },
+    "security_response_automatic_preparations": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "First-artifact pins are keyed by (tenant_id, action_id), with tenant-scoped dispatch uniqueness. Claim validates the plan/binding and uses an Immediate transaction in the same durable store as commit/fence. Pin reads use exact tenant/action predicates and verify mirrored tenant/action/dispatch, canonical bytes/hash, schema and fingerprint; global readiness scanning is an explicit security-runtime contract.",
+      "runtime_family": "automatic-preparation"
+    },
     "security_response_dispatch_fences": {
       "class": "tenant-predicate",
       "principal": "security-runtime",
@@ -1430,6 +1437,8 @@
     "crates/platform/chio-store-sqlite/src/receipt_store/support/signed_readback.rs::decode_signed_json::new",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs::record_checkpoint_publication_trust_anchor_binding::from_wire",
     "crates/platform/chio-store-sqlite/src/rollback_generation.rs::decode_slot::from_wire",
+    "crates/platform/chio-store-sqlite/src/security_state/automatic_preparation.rs::load_preparation::from_wire",
+    "crates/platform/chio-store-sqlite/src/security_state/automatic_preparation.rs::validate_all_automatic_preparations::from_wire",
     "crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::decode_suspension_spec::from_wire",
     "crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::load_command::from_wire",
     "crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::load_command::from_wire",
@@ -2639,6 +2648,9 @@
     ],
     "security_response_dispatches": [
       "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
+    ],
+    "security_response_automatic_preparations": [
+      "crates/platform/chio-store-sqlite/src/security_state/automatic_preparation.rs"
     ],
     "security_response_dispatch_fences": [
       "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
@@ -3967,6 +3979,17 @@
       "sql": "SELECT (SELECT COUNT(*) FROM security_effect_contributions), (SELECT COUNT(*) FROM security_session_throttle_effects), (SELECT COUNT(*) FROM security_capability_set_suspension_effects), (SELECT COUNT(*) FROM security_issuance_freeze_effects), (SELECT COUNT(*) FROM security_egress_restriction_effects)",
       "principal": "security-runtime",
       "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/automatic_preparation.rs",
+      "owner": "validate_all_automatic_preparations",
+      "sha256": "8600a29cd38f0d4b20e730da1ce1df469c814d7b18355db0c0e8f979fab21629",
+      "tables": [
+        "security_response_automatic_preparations"
+      ],
+      "sql": "SELECT tenant_id, action_id, prepared_binding_body FROM security_response_automatic_preparations",
+      "principal": "security-runtime",
+      "contract": "Composition-installed security-runtime readiness scan only: enumerate immutable preparation rows, cap each descriptor at 1 MiB, then require duplicate-aware decoding, exact canonical bytes/hash, mirrored tenant/action/dispatch, schema 2 and fingerprint presence through exact tenant/action pin readback. Point claim/commit/fence operations validate the supplied full plan and binding separately. This global control scan grants no remote or cross-tenant read authority."
     },
     {
       "path": "crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs",
@@ -11444,6 +11467,30 @@
         }
       ]
     },
+    "automatic-preparation": {
+      "entry_points": [
+        "ResponseDispatchStore::claim_automatic_preparation",
+        "ResponseDispatchStore::commit_dispatch",
+        "ResponseDispatchStore::fence_uncommitted_automatic_dispatch",
+        "ResponseDispatchStore::ensure_dispatch_ready"
+      ],
+      "evidence_kind": "exact-tenant-pin-and-replay",
+      "tests": [
+        {
+          "path": "crates/platform/chio-store-sqlite/tests/response_dispatch_tail.inc",
+          "test": "automatic_dispatch_fences_are_tenant_independent"
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/security_state/automatic_preparation/tests.rs",
+          "test": "automatic_claim_reuses_the_first_descriptor_across_reopen"
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/security_state/automatic_preparation/tests.rs",
+          "test": "mismatched_claim_cannot_commit_or_fence_the_original_action"
+        }
+      ],
+      "scope": "The tenant test claims exact pins and fences the same action/dispatch IDs in two tenants; the unit controls retain first descriptor bytes across reopen and reject conflicting artifact commit/fence without state mutation. Inventory references actual named controls; it is not a runtime result or complete boundary proof."
+    },
     "capability_set_suspensions": {
       "entry_points": [
         "load_capability_set_suspension_result",
@@ -12716,6 +12763,28 @@
         ]
       ],
       "retained_typed_conversions": []
+    },
+    "crates/platform/chio-store-sqlite/src/security_state/automatic_preparation.rs": {
+      "kind": "durable-internal-state",
+      "contract": "Two internal immutable descriptor readers use the existing 1 MiB duplicate-aware signed-number JSON boundary and preserve IntegrityFailure mapping. load_preparation re-encodes canonical descriptor bytes, compares the stored digest and mirrored tenant/action/dispatch, requires schema 2 and a present artifact fingerprint. The global readiness reader checks mirrored tenant/action and calls require_exact_automatic_preparation, which reuses that tenant-bound readback. Full plan/approval/nonzero fingerprint validation remains at claim/commit/fence admission; parsing and catalog classification mint no authority.",
+      "migrations": [
+        [
+          "load_preparation",
+          "decode_signed",
+          "1_048_576"
+        ],
+        [
+          "validate_all_automatic_preparations",
+          "decode_signed",
+          "1_048_576"
+        ]
+      ],
+      "retained_typed_conversions": [],
+      "source_invariants": [
+        "load_preparation SELECT requires tenant_id = ?1 AND action_id = ?2",
+        "canonical_prepared_dispatch_binding remains the existing parent dispatch.rs encoder/hash/cap helper",
+        "readiness scans stream rows and use security-runtime principal; no caller-selected tenant bypass"
+      ]
     },
     "crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs": {
       "contract": "Bounded native JSON decoding rejects duplicate keys and lossy numeric lexemes before typed allocation; the owner retains exact canonical equality where required and its existing signature, digest, identity, tenant, operation and mirrored-column checks. Parsing alone grants no authority.",
@@ -16535,6 +16604,8 @@
     "crates/platform/chio-store-sqlite/src/receipt_store/support/signed_readback.rs::decode_signed_json::new#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs::record_checkpoint_publication_trust_anchor_binding::from_wire#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/rollback_generation.rs::decode_slot::from_wire#1::decode_signed",
+    "crates/platform/chio-store-sqlite/src/security_state/automatic_preparation.rs::load_preparation::from_wire#1::decode_signed",
+    "crates/platform/chio-store-sqlite/src/security_state/automatic_preparation.rs::validate_all_automatic_preparations::from_wire#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::decode_suspension_spec::from_wire#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::load_command::from_wire#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::load_command::from_wire#2::decode_signed",
@@ -19503,6 +19574,14 @@
     ],
     "crates/platform/chio-store-sqlite/src/rollback_generation.rs": [
       "decode_slot::original-json-reader::UntrustedJsonText"
+    ],
+    "crates/platform/chio-store-sqlite/src/security_state/automatic_preparation.rs": [
+      "claim_automatic_preparation::shared-reader::crates/platform/chio-store-sqlite/src/security_state/automatic_preparation.rs::load_preparation",
+      "claim_automatic_preparation::shared-reader::crates/platform/chio-store-sqlite/src/security_state/automatic_preparation.rs::load_preparation",
+      "load_preparation::original-json-reader::UntrustedJsonText",
+      "require_exact_automatic_preparation::shared-reader::crates/platform/chio-store-sqlite/src/security_state/automatic_preparation.rs::load_preparation",
+      "validate_all_automatic_preparations::original-json-reader::UntrustedJsonText",
+      "validate_all_automatic_preparations::shared-reader::crates/platform/chio-store-sqlite/src/security_state/automatic_preparation.rs::require_exact_automatic_preparation"
     ],
     "crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs": [
       "apply_capability_set_suspension::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::load_command",
