@@ -14,7 +14,7 @@ struct FederatedLegacyRuntime {
     _directory: tempfile::TempDir,
     databases: Vec<PathBuf>,
     kernel: ChioKernel,
-    _authority: chio_store_sqlite::SqliteAuthorityStore,
+    authority: chio_store_sqlite::SqliteAuthorityStore,
     executor: Arc<RealAdapterRecordingExecutor>,
     effects: Arc<RealAdapterEffects>,
     operator_authority: Keypair,
@@ -123,7 +123,7 @@ impl FederatedLegacyRuntime {
                 paths.receipts,
             ],
             kernel,
-            _authority: authority,
+            authority,
             executor,
             effects,
             operator_authority,
@@ -202,6 +202,18 @@ impl FederatedLegacyRuntime {
         }
         rows
     }
+
+    fn retained_state(
+        &self,
+        admission: &chio_kernel::governed_active_response::GovernedActiveResponseAdmission,
+    ) -> AdmissionOperationState {
+        self.authority
+            .admission_operation_store()
+            .load_by_operation_id(admission.operation().binding().operation_id())
+            .test_unwrap()
+            .test_expect("retained legacy operation")
+            .state()
+    }
 }
 
 fn negotiated_remote_peer(local: &Keypair, now: u64) -> FederationPeer {
@@ -261,6 +273,93 @@ fn disabled_legacy_federated_active_response_admission_has_no_durable_side_effec
                 if reason.contains("active-response plan support is disabled")
         ),
         "{result:?}"
+    );
+    assert_eq!(runtime.executor.calls(), 0);
+    assert_eq!(runtime.effects.executions(), 0);
+}
+
+#[test]
+fn disabled_legacy_local_active_response_admission_still_refuses_without_side_effects() {
+    let mut runtime = FederatedLegacyRuntime::new();
+    runtime.kernel.deactivate_governed_active_response_plans();
+    let request = runtime.request("active-response-local", None);
+    let before = runtime.durable_rows();
+
+    let result = runtime.kernel.admit_governed_active_response(&request);
+    assert!(
+        matches!(
+            &result,
+            Err(KernelError::GovernedTransactionDenied(reason))
+                if reason == "governed active-response plans were not negotiated"
+        ),
+        "{result:?}"
+    );
+    assert_eq!(changed_rows(&before, &runtime.durable_rows()), Vec::new());
+    assert_eq!(runtime.executor.calls(), 0);
+    assert_eq!(runtime.effects.executions(), 0);
+}
+
+#[test]
+fn enabled_legacy_federated_active_response_admission_still_reserves_and_cleans_up() {
+    let mut runtime = FederatedLegacyRuntime::new();
+    runtime.assert_remote_peer_negotiates_governed_plans();
+    let request = runtime.request("active-response-federated-enabled", Some(REMOTE_KERNEL_ID));
+
+    let mut admitted = runtime
+        .kernel
+        .admit_governed_active_response(&request)
+        .test_unwrap();
+    assert_eq!(admitted.state(), AdmissionOperationState::ApprovalReserved);
+    assert_eq!(
+        runtime.retained_state(&admitted),
+        AdmissionOperationState::ApprovalReserved
+    );
+
+    let mut substituted = request.clone();
+    substituted.approval_tokens = substituted
+        .approval_tokens
+        .iter()
+        .zip(&runtime.approvers)
+        .enumerate()
+        .map(|(index, (token, approver))| {
+            let mut body = token.body();
+            body.id = format!("replacement-federated-token-{index}");
+            GovernedApprovalToken::sign(body, approver).test_unwrap()
+        })
+        .collect();
+    assert!(runtime
+        .kernel
+        .admit_governed_active_response(&substituted)
+        .test_unwrap_err()
+        .to_string()
+        .contains("retained approval reservation"));
+    let replayed = runtime
+        .kernel
+        .admit_governed_active_response(&request)
+        .test_unwrap();
+    assert_eq!(replayed.operation_id(), admitted.operation_id());
+    assert_eq!(replayed.approval_set_hash(), admitted.approval_set_hash());
+    assert_eq!(replayed.state(), AdmissionOperationState::ApprovalReserved);
+
+    assert!(matches!(
+        runtime
+            .kernel
+            .commit_governed_active_response_dispatch(&mut admitted),
+        Err(KernelError::GovernedTransactionDenied(_))
+    ));
+    assert_eq!(
+        runtime.retained_state(&admitted),
+        AdmissionOperationState::ApprovalReserved
+    );
+
+    runtime.kernel.deactivate_governed_active_response_plans();
+    runtime
+        .kernel
+        .cancel_governed_active_response(&admitted)
+        .test_unwrap();
+    assert_eq!(
+        runtime.retained_state(&admitted),
+        AdmissionOperationState::CompensatedBeforeDispatch
     );
     assert_eq!(runtime.executor.calls(), 0);
     assert_eq!(runtime.effects.executions(), 0);
