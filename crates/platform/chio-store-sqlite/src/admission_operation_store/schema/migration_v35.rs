@@ -61,7 +61,29 @@ pub(super) fn migrate(transaction: &Transaction<'_>) -> Result<(), AdmissionOper
          DROP TABLE admission_operation_commits_v34;",
         )
         .map_err(sqlite_error)?;
-    create_commit_objects(transaction)
+    restore_exact_lease_trigger(transaction)
+}
+
+/// Restore only the canonical guard deliberately removed for the history copy.
+/// The rebuilt table, index and other guards already exist and remain untouched.
+fn restore_exact_lease_trigger(
+    transaction: &Transaction<'_>,
+) -> Result<(), AdmissionOperationStoreError> {
+    let compiled = Connection::open_in_memory().map_err(sqlite_error)?;
+    compiled
+        .execute_batch(ADMISSION_OPERATION_SCHEMA)
+        .map_err(sqlite_error)?;
+    let sql: String = compiled
+        .query_row(
+            "SELECT sql FROM sqlite_schema
+             WHERE type = 'trigger'
+               AND name = 'admission_operation_commits_exact_lease'
+               AND tbl_name = 'admission_operation_commits'",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)?;
+    transaction.execute_batch(&sql).map_err(sqlite_error)
 }
 
 fn create_commit_objects(

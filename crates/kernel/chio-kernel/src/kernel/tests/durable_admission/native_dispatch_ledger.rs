@@ -3,6 +3,7 @@
 use super::*;
 use crate::admission_operation::{
     AdmissionDigest, NativeSecurityDispatchLedgerContext, NativeSecurityDispatchLedgerRecordV1,
+    NativeSecurityDispatchRequestBindingV1, NATIVE_DISPATCH_LEDGER_SCHEMA,
 };
 use std::sync::Mutex;
 
@@ -51,13 +52,18 @@ impl TestLedger {
         if matches!(fault, Fault::Deny) {
             return Err(invalid("injected ledger denial"));
         }
+        let original_dispatch = NativeSecurityDispatchRequestBindingV1::from_live_request(
+            input.custody.request,
+            input.custody.security_context,
+        )?;
         let mut value = serde_json::json!({
-            "schema": "chio.native-dispatch-preparation-ledger.v1",
+            "schema": NATIVE_DISPATCH_LEDGER_SCHEMA,
+            "original_dispatch_commitment_id": original_dispatch.dispatch_commitment_id(),
             "operation": input.custody.operation.to_persisted(),
             "context": input.custody.security_context,
             "policy": serde_json::from_slice::<serde_json::Value>(input.policy_json).map_err(invalid)?,
             "grant_index": input.grant_index,
-            "live_request_digest": sha256_hex(&canonical_json_bytes(input.custody.request).map_err(invalid)?),
+            "live_request_digest": original_dispatch.live_request_digest().as_str(),
         });
         match fault {
             Fault::WrongPolicy => value["policy"] = serde_json::json!({"other": true}),
