@@ -1318,3 +1318,7 @@ pub(super) fn spawn_detached_active_defense_teardown(
 #[cfg(test)]
 #[path = "teardown_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "teardown_fair_progress_tests.rs"]
+mod fair_progress_tests;
