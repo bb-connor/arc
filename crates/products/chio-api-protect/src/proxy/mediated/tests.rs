@@ -12,6 +12,8 @@ mod authenticated;
 mod authorization;
 #[path = "../tests/mediated_boundary_tests.rs"]
 mod boundary_tests;
+#[path = "tests/reconcile_numbers.rs"]
+mod reconcile_numbers;
 #[path = "../tests/subject_identity.rs"]
 mod subject_identity;
 

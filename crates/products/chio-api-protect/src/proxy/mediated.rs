@@ -722,10 +722,11 @@ pub(crate) async fn sidecar_reconcile_handler(
             return sidecar_bad_request("failed to read reconcile body").into_response();
         }
     };
-    let parsed: SidecarReconcileRequest = match input::decode(&body_bytes, input::MAX_BODY_BYTES) {
-        Ok(parsed) => parsed,
-        Err(error) => return input::rejected(error),
-    };
+    let parsed: SidecarReconcileRequest =
+        match input::decode_arguments(&body_bytes, input::MAX_BODY_BYTES) {
+            Ok(parsed) => parsed,
+            Err(error) => return input::rejected(error),
+        };
     let Some(mediation_kernel) = state.mediation_kernel.as_ref() else {
         return internal_json_error_response(
             "chio_mediation_unavailable",
