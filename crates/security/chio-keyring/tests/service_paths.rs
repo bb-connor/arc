@@ -398,7 +398,22 @@ fn a_trickling_service_cannot_hold_a_client_past_its_exchange_deadline() {
     let result = unreachable_witness_client(&socket).readiness("trickling-service");
     let elapsed = started.elapsed();
     let _ = service.join();
-    assert!(result.is_err());
+    assert!(matches!(
+        result,
+        Err(KeyringError::Io(error)) if match (error.kind(), error.raw_os_error()) {
+            (std::io::ErrorKind::WouldBlock, Some(errno)) => {
+                errno == rustix::io::Errno::AGAIN.raw_os_error()
+                    || errno == rustix::io::Errno::WOULDBLOCK.raw_os_error()
+            }
+            (std::io::ErrorKind::TimedOut, Some(errno)) => {
+                errno == rustix::io::Errno::TIMEDOUT.raw_os_error()
+            }
+            (std::io::ErrorKind::TimedOut, None) => {
+                error.to_string() == "request deadline elapsed"
+            }
+            _ => false,
+        }
+    ));
     assert!(
         elapsed < KEY_LOG_IPC_REQUEST_DEADLINE + Duration::from_secs(2),
         "a trickling service held the client for {elapsed:?}"
