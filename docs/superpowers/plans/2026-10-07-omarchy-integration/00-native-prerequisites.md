@@ -1,5 +1,13 @@
 # Native Prerequisites Implementation Plan
 
+| Boundary scope | `boundary_class` | `planning_status` | Decision and execution gate |
+| --- | --- | --- | --- |
+| `capability_admission` | `prevent` | `blocked_by_adr` | Owner decisions F1/F3 on product/profile and native contract selection; then P0-NATIVE-BUNDLE, P0-OPERATOR-FACADE and exact per-profile artifacts. |
+| `native_observation` | `detect_only` | `ready_after_adr` | Accepted ADR-0011 permits independent probe/evidence planning; unavailable native contracts remain named blockers, and observations grant no authority. |
+| `source_inventory` | `advisory_only` | `ready_after_adr` | Accepted ADR-0011 permits operator-pinned source research; source presence cannot qualify or enable a profile. |
+
+Metadata follows [ADR-0011](../../../adr/ADR-0011-boundary-taxonomy-product-wording.md) and the [plan-set inheritance and owner-decision gate](README.md#boundary-metadata-and-inheritance). Classes describe proposed boundaries, not delivered qualification.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Produce an independently checked compatibility bundle that can truthfully admit one Omarchy profile or report its exact unavailable prerequisite.

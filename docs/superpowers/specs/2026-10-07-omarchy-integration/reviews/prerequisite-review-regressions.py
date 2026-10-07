@@ -83,6 +83,110 @@ def check_defects(evaluator=diagnostic_model, base=None):
                    complete_fixture("project-v1") if base is None else base)
 
 
+BOUNDARY_CLASSES = {"prevent", "detect_only", "advisory_only", "cannot_see"}
+PLANNING_STATUSES = {"ready_after_adr", "blocked_by_adr", "deferred", "hard_skip"}
+METADATA_HEADER = (
+    "| Boundary scope | `boundary_class` | `planning_status` | Decision and execution gate |"
+)
+
+
+def boundary_metadata(document):
+    lines = document.splitlines()
+    if len(lines) < 5 or lines[2] != METADATA_HEADER:
+        raise AssertionError("Missing separate boundary metadata immediately after title")
+    rows = {}
+    for line in lines[4:]:
+        if not line.startswith("|"):
+            break
+        match = re.fullmatch(r"\| `([^`]+)` \| `([^`]+)` \| `([^`]+)` \| (.+) \|", line)
+        if match is None:
+            raise AssertionError("Malformed boundary metadata row")
+        scope, boundary_class, planning_status, gate = match.groups()
+        if scope in rows or boundary_class not in BOUNDARY_CLASSES:
+            raise AssertionError("Duplicate scope or unknown boundary_class")
+        if planning_status not in PLANNING_STATUSES:
+            raise AssertionError("Unknown planning_status")
+        rows[scope] = (boundary_class, planning_status, gate)
+    if not rows:
+        raise AssertionError("No boundary scopes")
+    return rows
+
+
+def index_metadata(document):
+    rows = {}
+    for line in document.splitlines():
+        if not re.match(r"\| \[0[0-7] ", line):
+            continue
+        cells = [cell.strip() for cell in line.strip("|").split("|")]
+        if len(cells) != 5:
+            raise AssertionError("Index must keep separate metadata columns")
+        filename = re.search(r"\]\(([^)]+)\)", cells[0]).group(1)
+        mappings = []
+        for cell in cells[3:]:
+            pairs = re.findall(r"`([a-z_]+)=([a-z_]+)`", cell)
+            if len(dict(pairs)) != len(pairs):
+                raise AssertionError("Duplicate index boundary scope")
+            mappings.append(dict(pairs))
+        if filename in rows:
+            raise AssertionError("Duplicate plan index entry")
+        rows[filename] = mappings
+    return rows
+
+
+def check_boundary_index(document):
+    indexed = index_metadata(document)
+    plans = sorted(PLAN_DIR.glob("0[0-7]-*.md"))
+    if len(plans) != 8 or set(indexed) != {plan.name for plan in plans}:
+        raise AssertionError("Index does not cover all eight plans")
+    for plan in plans:
+        rows = boundary_metadata(plan.read_text())
+        expected = [{scope: values[index] for scope, values in rows.items()}
+                    for index in range(2)]
+        if indexed[plan.name] != expected:
+            raise AssertionError(f"Index metadata drift: {plan.name}")
+
+
+class BoundaryMetadataTests(unittest.TestCase):
+    def test_all_eight_headers_have_valid_separate_fields_and_named_gates(self):
+        plans = sorted(PLAN_DIR.glob("0[0-7]-*.md"))
+        self.assertEqual(len(plans), 8)
+        for plan in plans:
+            with self.subTest(plan=plan.name):
+                rows = boundary_metadata(plan.read_text())
+                self.assertGreaterEqual(len({row[0] for row in rows.values()}), 2)
+                self.assertIn("blocked_by_adr", {row[1] for row in rows.values()})
+                for _, planning_status, gate in rows.values():
+                    if planning_status == "blocked_by_adr":
+                        self.assertRegex(gate, r"Owner decisions? F[1-5]")
+                    elif planning_status == "ready_after_adr":
+                        self.assertIn("Accepted ADR-0011", gate)
+
+    def test_index_matches_each_scope_class_and_status(self):
+        check_boundary_index((PLAN_DIR / "README.md").read_text())
+
+    def test_missing_metadata_field_is_rejected(self):
+        for field in ("boundary_class", "planning_status"):
+            with self.subTest(field=field), self.assertRaises(AssertionError):
+                boundary_metadata(DOCUMENT.replace(f"`{field}`", "`status`", 1))
+
+    def test_unknown_class_and_non_adr_status_are_rejected(self):
+        for old, new in [("`prevent`", "`observation`"),
+                         ("`blocked_by_adr`", "`blocked_semantics`")]:
+            with self.subTest(value=new), self.assertRaises(AssertionError):
+                boundary_metadata(DOCUMENT.replace(old, new, 1))
+
+    def test_omitted_index_scope_is_rejected(self):
+        index = (PLAN_DIR / "README.md").read_text()
+        with self.assertRaises(AssertionError):
+            check_boundary_index(index.replace("`capability_admission=prevent`", "", 1))
+
+    def test_index_cannot_upgrade_observation_to_prevention(self):
+        index = (PLAN_DIR / "README.md").read_text()
+        with self.assertRaises(AssertionError):
+            check_boundary_index(index.replace("native_observation=detect_only",
+                                               "native_observation=prevent", 1))
+
+
 class ProfileInventoryTests(unittest.TestCase):
     def test_inventory_matches_all_release_schema_profiles(self):
         schema = json.loads((SPEC_DIR / "contracts/release-evidence.schema.json").read_text())

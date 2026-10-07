@@ -274,6 +274,32 @@
       "minLength": 1,
       "maxLength": 64,
       "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,63}(?![\\s\\S])"
+    },
+    "enrolled_scope_binding": {
+      "type": "object",
+      "properties": {
+        "reference": {
+          "$ref": "common.schema.json#/$defs/native_operation_ref"
+        },
+        "revision": {
+          "$ref": "common.schema.json#/$defs/safe_integer"
+        },
+        "sha256": {
+          "$ref": "common.schema.json#/$defs/sha256"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        }
+      },
+      "required": [
+        "reference",
+        "revision",
+        "sha256",
+        "label"
+      ],
+      "additionalProperties": false
     }
   }
 }

@@ -29,6 +29,23 @@ than redefining it?
 > ([section 7](#7-decisions-needed-from-the-owner)). Do not address them
 > piecemeal by adding requirements, fixtures or validator checks.
 
+## Governing status while decisions are pending
+
+The numbered specifications and plans in this PR remain the normative
+*proposal* for consistency review. This document is non-normative input. It
+does not supersede them, and it does not authorize the alternatives it
+recommends.
+
+Until the owner records the section 7 decisions in an accepted ADR, and updates
+or supersedes the affected specifications in the same change:
+
+- Product direction, the shared ABI and implementation sequencing have
+  `planning_status: blocked_by_adr`.
+- Only research and correctness repairs to the proposal proceed.
+- Neither implementation program is approved to start.
+- Every existing safety prerequisite in the proposal remains mandatory. This
+  review removes no gate and qualifies no profile.
+
 ## 1. Bottom line
 
 1. **Keep the authority invariants.** Both PRs get these right, and they hold
@@ -144,8 +161,25 @@ problem is that they neither cite it nor reuse it.
 6. **The "governed session" rung is re-scoped.**
    - With native Bash kept inside an OS sandbox, the boundary is `prevent` at
      the edge and `cannot_see` inside.
+   - Only gateway-routed requests and adapter-routed MCP calls can be
+     `prevent`, and only where Chio authorizes them before dispatch.
+   - Writes the sandbox permits inside the workspace never reach a Chio
+     decision point. They are `cannot_see`, with no per-write receipts.
+   - Denying direct routes and confining descendant processes each need their
+     own evidence. Having a gateway does not establish either.
    - Doc 19's protected mode gets `prevent` by removing the shell.
    - These are two distinct profiles (section 5, R3), not one rung.
+7. **The Pi `approval-decide` defect is not "only an issue".** Revision 1 said
+   it was "not a P3 prerequisite". It is both:
+   - File it as an issue now. The Pi wrapper already refuses the action before
+     native invocation, but the bundled bridge binary is unrepaired.
+   - The P3 gate stays. Publication remains blocked until the installed
+     utility checks both the requested decision and the approval ID before
+     retaining a credential, with deny and mismatch regression evidence.
+8. **ES/NE scope is clarified.** `native-descendant-v1` (#1178) keeps its ES/NE
+   restrictions and its independently qualified network containment.
+   - Whether to keep that profile next to the R3 ladder is an owner decision.
+   - Nothing in this review removes those gates.
 
 ## 5. Findings
 
@@ -302,7 +336,10 @@ sessions produce receipts but no acceptance.
     90 to 95 ms for a read.
 - **Kernel mappings.** `task.stop` maps to S4 closure, not `EmergencyControl`.
   NK-09 should cite `chio-process`, not research bets.
-- **ES and NE.** Keep them on the managed-endpoint track.
+- **ES and NE.** Keep the managed-endpoint track separate.
+  `native-descendant-v1` keeps its ES/NE restrictions and its network
+  containment gates for as long as that profile exists. Whether to keep it is
+  an owner decision (section 4, item 8).
 - **Entry points.** Lead with the CLI and the menu bar; Finder Services is
   secondary.
 
@@ -356,6 +393,11 @@ implementation (the workbench) alongside.
 
 1. **Pi `approval-decide`.** A deny can retain a signed approved credential
    (#1177 `research/chio-readiness.md`).
+   - The wrapper refuses the action before native invocation, but the
+     bundled bridge binary is unrepaired.
+   - Track the fix separately. The P3 publication gate stays in place until
+     the installed utility passes the deny and mismatch regressions
+     (section 4, item 7).
 2. **Emergency stop.** It is process-local, its HTTP routes are unmounted, and
    the admin token comparison is not constant-time (#1174 D2, N22, N23).
 3. **#1179 P1.** Read-only `InspectWorkflow` polling can drain the shared

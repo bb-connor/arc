@@ -1,5 +1,13 @@
 # Reviewed Configuration Repair Implementation Plan
 
+| Boundary scope | `boundary_class` | `planning_status` | Decision and execution gate |
+| --- | --- | --- | --- |
+| `file_apply_and_reload` | `prevent` | `blocked_by_adr` | Owner decisions F3/F5 on native contract and whether P5 remains; then P4, native approval, writer exclusion, verified backup and bounded reload closure. |
+| `diagnosis_and_preview` | `advisory_only` | `blocked_by_adr` | Owner decisions F2/F5 on shared product model and repair scope; diagnosis/preview never grants permission to replace a file or reload live configuration. |
+| `repair_observation` | `detect_only` | `ready_after_adr` | Accepted ADR-0011 permits independent file/reload/restoration evidence planning; successful observation cannot substitute for admission or undo unobserved effects. |
+
+Metadata follows [ADR-0011](../../../adr/ADR-0011-boundary-taxonomy-product-wording.md) and the [plan-set inheritance and owner-decision gate](README.md#boundary-metadata-and-inheritance). Classes describe proposed boundaries, not delivered qualification.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Deliver P5 diagnosis and exact review for one Hyprland appearance file, enabling apply only after native approval, safe writer exclusion, backup and bounded reload qualification exist.

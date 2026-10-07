@@ -18,18 +18,26 @@ and [source readiness](../../specs/2026-10-07-omarchy-integration/research/chio-
 before starting. All paths not present in the current tree are explicit future
 delivery targets; a proposed function name is not an existing native API.
 
+## Boundary metadata and inheritance
+
+[ADR-0011](../../../adr/ADR-0011-boundary-taxonomy-product-wording.md) requires separate `boundary_class` and `planning_status` fields. Each plan identifies its individual control, observation and guidance boundaries below its title; the index preserves those scope-to-field mappings. Boundary classes describe the proposed control point, not implementation or runtime qualification. `ready_after_adr` rows rely on accepted ADR-0011 for the stated evidence/research planning only; named missing artifacts still block execution and qualification.
+
+The current numbered specifications remain the normative proposed contract for consistency review. The [architecture review](../../specs/2026-10-07-omarchy-integration/reviews/2026-10-07-architecture-review.md#decisions-needed-from-the-owner) is non-normative and does not supersede them. Its owner decisions on the first product (F1), shared desktop ABI/program (F2), native contract sequencing (F3) and Omarchy scope/ownership (F5) remain unresolved. Product implementation is `blocked_by_adr` pending those decisions; the review's proposed replacement, cuts and delegation transfer are not approved. F4 concerns the macOS isolation direction and is not an additional Omarchy runtime gate. The metadata does not authorize runtime implementation.
+
+Every derived task and implementation ticket touching a trust boundary must inherit the matching scope's `boundary_class`, `planning_status`, owner-decision blocker and execution prerequisites as separate structured fields. A task crossing multiple scopes must retain one pair per boundary. Do not summarize observation or guidance as preventive mediation, or promote a child ticket past an unresolved parent decision. An accepted owner decision must update the relevant metadata and contracts together before implementation status changes. UI/SIEM tasks must preserve `receipt_kind` alongside `boundary_class`, as ADR-0011 requires.
+
 ## Ordered execution
 
-| Plan | Deliverable | Depends on |
-| --- | --- | --- |
-| [00 Native prerequisites](00-native-prerequisites.md) | Exact source/package tuple, native contracts and fail-closed capability inventory | Source research; named native owners |
-| [01 Controller and plugin](01-controller-and-plugin.md) | Shared ABI/store/shim and read-only actual Omarchy surface | P0 read-only tuple |
-| [02 Confined project task](02-confined-project-task.md) | Trusted import, one protected Pi task, fixed tests and review artifact | P1 and all P2 native/Linux/provider gates |
-| [03 Approvals and publication](03-approvals-publication.md) | Native exact decision and enrolled reviewed destination | P2 and native decision fix |
-| [04 Desktop resources](04-desktop-resources.md) | Closed metadata tools and exact workspace effect | P3 and pinned compositor |
-| [05 Configuration repair](05-configuration-repair.md) | Single-file scalar repair with bounded reload | P4, writer exclusion and reload closure |
-| [06 Delegation](06-delegation.md) | Attenuated children, aggregate reservations and recovery | P3 and separate native child contract |
-| [07 Distribution and qualification](07-distribution-qualification.md) | Real Linux evidence and independent install/update/rollback/removal | Only the exact profiles selected for release |
+| Plan | Deliverable | Depends on | `boundary_class` by scope | `planning_status` by scope |
+| --- | --- | --- | --- | --- |
+| [00 Native prerequisites](00-native-prerequisites.md) | Exact source/package tuple, native contracts and fail-closed capability inventory | Source research; named native owners | `capability_admission=prevent`; `native_observation=detect_only`; `source_inventory=advisory_only` | `capability_admission=blocked_by_adr`; `native_observation=ready_after_adr`; `source_inventory=ready_after_adr` |
+| [01 Controller and plugin](01-controller-and-plugin.md) | Shared ABI/store/shim and read-only actual Omarchy surface | P0 read-only tuple | `operator_admission=prevent`; `status_projection=detect_only`; `navigation_guidance=advisory_only` | `operator_admission=blocked_by_adr`; `status_projection=blocked_by_adr`; `navigation_guidance=blocked_by_adr` |
+| [02 Confined project task](02-confined-project-task.md) | Trusted import, one protected Pi task, fixed tests and review artifact | P1 and all P2 native/Linux/provider gates | `guest_admission=prevent`; `provider_observation=detect_only`; `provider_internal_execution=cannot_see`; `review_projection=advisory_only` | `guest_admission=blocked_by_adr`; `provider_observation=ready_after_adr`; `provider_internal_execution=hard_skip`; `review_projection=blocked_by_adr` |
+| [03 Approvals and publication](03-approvals-publication.md) | Native exact decision and enrolled reviewed destination | P2 and native decision fix | `approval_and_publication=prevent`; `review_guidance=advisory_only`; `outcome_observation=detect_only` | `approval_and_publication=blocked_by_adr`; `review_guidance=blocked_by_adr`; `outcome_observation=ready_after_adr` |
+| [04 Desktop resources](04-desktop-resources.md) | Closed metadata tools and exact workspace effect | P3 and pinned compositor | `desktop_admission=prevent`; `compositor_observation=detect_only`; `reserved_window_actions=prevent` | `desktop_admission=blocked_by_adr`; `compositor_observation=ready_after_adr`; `reserved_window_actions=deferred` |
+| [05 Configuration repair](05-configuration-repair.md) | Single-file scalar repair with bounded reload | P4, writer exclusion and reload closure | `file_apply_and_reload=prevent`; `diagnosis_and_preview=advisory_only`; `repair_observation=detect_only` | `file_apply_and_reload=blocked_by_adr`; `diagnosis_and_preview=blocked_by_adr`; `repair_observation=ready_after_adr` |
+| [06 Delegation](06-delegation.md) | Attenuated children, aggregate reservations and recovery | P3 and separate native child contract | `child_admission_and_custody=prevent`; `child_status_projection=detect_only`; `remote_custody=prevent` | `child_admission_and_custody=blocked_by_adr`; `child_status_projection=blocked_by_adr`; `remote_custody=deferred` |
+| [07 Distribution and qualification](07-distribution-qualification.md) | Real Linux evidence and independent install/update/rollback/removal | Only the exact profiles selected for release | `activation_and_profile_gates=prevent`; `independent_observation=detect_only`; `release_claims=advisory_only` | `activation_and_profile_gates=blocked_by_adr`; `independent_observation=ready_after_adr`; `release_claims=blocked_by_adr` |
 
 P7 is a repeated qualification lane, not a promise to complete all optional phases
 before shipping any value. Some Linux harness and packaging work from plan 07

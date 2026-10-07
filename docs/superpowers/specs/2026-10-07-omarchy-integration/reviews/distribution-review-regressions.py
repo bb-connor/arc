@@ -250,6 +250,7 @@ class ReleaseLockExampleTests(unittest.TestCase):
         "source_url": "https://example.invalid/component-fixture.tar.gz",
         "source_sha256": "1" * 64, "public_revision": "2" * 40,
         "runtime_inventory_sha256": "3" * 64, "compatibility_sha256": "4" * 64,
+        "plugin_release_sha256": "6" * 64,
         "profiles": ["observe-v1"], "state_read_abis": [1], "state_write_abi": 1,
         "signer_identity": "synthetic-component-signer",
         "native_prerequisites": {"synthetic-component-prerequisite": "5" * 64},

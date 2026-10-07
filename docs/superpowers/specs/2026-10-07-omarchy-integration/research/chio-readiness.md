@@ -87,8 +87,23 @@ The candidate has a narrowly scoped retry path for declared side-effect-free too
 | Current Pi review validation record | Recorded macOS/hosted source and package checks; explicitly retained skips | A new live provider, native kernel, native knowledge/confinement facade or whole-guest Linux pass |
 | Linux whole-Pi probe records | Recorded arm64 namespace, filesystem, network, syscall, private-relay and supervision observations under a privileged outer container | Native x64 Omarchy, ordinary Docker defaults, native kernel effects or live model egress |
 | Latest confined Linux rerun | An inconclusive rerun with delayed startup and a failed recipe; preserved as inconclusive | A renewed confinement qualification at the reviewed final source |
-| Pi `approval-decide` component reproduction | Bundled utility can retain a signed approved credential despite requested denial because requested decision and approval ID are not compared before retention | A live-kernel exploit claim, or permission to expose desktop approval decisions |
+| Pi `approval-decide` component reproduction | The directly callable bundled `chio-gateway-operator` utility can retain a signed approved credential despite requested denial because requested decision and approval ID are not compared before retention; the current `chio-pi` wrapper already refuses this action before configuration/native work | A live-kernel exploit claim, a claim that the wrapper refusal repairs the bundled utility, or permission to expose desktop approval decisions |
 | Native facade TypeScript tests | Ownership checks, frozen binding data and refusal paths | Native authority, cryptographic verification, committed model release, cross-host custody or running services |
+
+Current-source recheck on 2026-10-07 confirms PI-PUBLIC still resolves to the
+pinned source. The [wrapper parser](https://github.com/backbay-labs/chio-pi-plugin/blob/4214a5a8ddec776a5ff9ec78007442683fd8df03/src/operator-cli.ts#L39)
+refuses decision retention, but its shipped bridge archive still declares the
+separately callable native operator. Archive SHA-256:
+`7d9e34f7408a316e35125982a23faaecfd2f31f4da6b50ca8eab287c2c918f67`.
+Inside it, `package/dist/gateway-operator.js:147-174` reaches artifact retention
+without comparing the signed decision and token ID to the requested values.
+The [retained reproduction and mitigation](https://github.com/backbay-labs/chio-pi-plugin/blob/4214a5a8ddec776a5ff9ec78007442683fd8df03/docs/superpowers/evidence/2026-10-04-task2-operator.md#L108)
+separate those two surfaces. Remediation belongs to the native bridge owner:
+verify both bindings before retention, replace the pinned archive, and test the
+direct binary for denial/ID mismatch with no credential retention or subsequent
+dispatch. P3 remains blocked until the selected installed replacement passes
+that qualification; this research records neither an upstream fix nor a filed
+upstream issue.
 
 NQ-05 cage source currently requires Linux x86_64, Linux 6.7 or newer and Landlock ABI 4 or newer. Its retained-file profile rejects writable directory grants and excludes ordinary socket/process creation. Pi's measured whole-guest arm64 bubblewrap profile and a Node coding-resource owner therefore need distinct qualification; they cannot inherit this cage profile by sharing the word confinement.
 

@@ -12,12 +12,23 @@ execution evidence. The useful desktop product is a native place to launch,
 observe, interrupt, review and recover those tasks. Shared homepage styling is
 not a technical integration point. Omarchy's actual QML plugin model is.
 
-The selected design is a native `computer.chio.desktop` QML plugin, a thin Rust
+The current proposed baseline is a native `computer.chio.desktop` QML plugin, a thin Rust
 controller and existing Chio kernel/authority behind protected host/resource
 adapters. The first execution workflow is one confined Pi project task with a
 fixed recipe and a sealed local review artifact. Exact approved publication,
 bounded desktop tools, configuration repair and delegation are separate phases.
 There is no shell fork, replacement authority or implicit agent CLI wrapper.
+
+## Architecture review status
+
+The [cross-program architecture review](reviews/2026-10-07-architecture-review.md)
+is non-normative and awaits owner decisions. The numbered documents below remain
+the proposed baseline for checking internal consistency; they are not an approved
+implementation direction. Product/ABI/sequence choices have
+`planning_status: blocked_by_adr` until an accepted ADR records the decision
+and updates or supersedes the affected program together. Current work is limited
+to research and correctness repairs. No alternative architecture is selected by
+the review alone, and existing safety prerequisites remain in force.
 
 ## Read in this order
 

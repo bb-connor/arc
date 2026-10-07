@@ -114,7 +114,7 @@ Decision: a post-update hook can invalidate cached compatibility but cannot cert
 
 Plugin add clones a repository, validates manifest/files, then can enable it. It has no package installation hook and does not install a Rust daemon, native authority, confinement backend, Qt module, or credential store. Update fetches origin HEAD, shows a diff in the ordinary interactive path, fast-forwards and validates. Validation rollback is a repository rollback, not transactional coordination with a running controller. [O-08, O-09]
 
-Decision: publish a separate, versioned native package and a plugin repository only after P7. Pin the qualified pair in a release manifest. Treat upstream plugin update as an independently occurring version change and fail closed on protocol mismatch. Provide no invented public install URL in this proposal.
+Decision: publish pinned public qualification candidates for the native package and plugin repository before the P7 clean-host retrieval gate, explicitly marked unqualified. Promote a supported release only after P7 passes for the selected pair. P1 prepares the generated plugin source/export handoff; P7 publishes, pins and installs the candidate through the real plugin lifecycle. Pin the qualified pair in a release manifest. Treat upstream plugin update as an independently occurring version change and fail closed on protocol mismatch. Provide no invented public install URL in this proposal.
 
 ## Existing adjacent work and differentiation
 

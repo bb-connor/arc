@@ -8,12 +8,12 @@ or implemented by this change. All AT-* runtime cases remain proposed.
 
 | Check | Result and scope |
 | --- | --- |
-| Package verifier with self-test | Passed: 17 specs, 209 requirement/acceptance mappings, 6 schemas, 82 fixtures, 180 response substitutions and 29 validator mutants; documents/synthetic shapes only |
+| Package verifier with self-test | Passed: 17 specs, 209 requirement/acceptance mappings, 6 schemas, 153 fixtures, 228 response substitutions and 29 validator mutants; documents/synthetic shapes only |
 | Source research | Omarchy release/development source, public Pi/native source crosswalk, OMCP and Linux/systemd/Arch primary references inspected and pinned where available |
 | Proposed plugin manifest | Passed the inspected upstream structural validator using temporary placeholder entry files; no QML behavior qualified |
 | Independent review | All identified P2 issues addressed and re-reviewed; [finding record](independent-review.md) |
 | Runner example regression | 32 persistent extracted-sample component tests passed on macOS arm64 and Linux aarch64: launch refusal, adopted-descendant reaping, phase parser, package inventory and release-lock controls; no Omarchy runtime conclusion |
-| Python/JSON syntax | 26 Python snippets and retained validator/regression scripts parsed; 5 JSON snippets decoded, 12 Bash snippets passed syntax checks; 93 JSON documents parsed |
+| Python/JSON syntax | 26 Python snippets and retained validator/regression scripts parsed; 5 JSON snippets decoded, 13 Bash snippets passed syntax checks; 164 JSON documents parsed |
 | `cargo fmt --all -- --check` | Passed |
 | `cargo build --workspace` | Failed on pre-existing finding-worker product imports and missing method |
 | `cargo test --workspace` | Failed during compilation on the same finding-worker product surface; no workspace test-pass claim |
@@ -86,7 +86,7 @@ check is independently rejected by a validator mutant.
 /tmp/chio-omarchy-doc-validation/bin/python docs/superpowers/specs/2026-10-07-omarchy-integration/reviews/scope-limit-review-regressions.py
 ```
 
-The prerequisite examples pass 16 retained regression tests, including all 35
+The prerequisite examples pass 22 retained regression tests, including all 35
 profile/artifact-removal cells, missing/extra profile inventories, unknown-profile
 refusals and omission mutants for tuple/classification diagnostics. The synthetic
 control remains unqualified, and removing a specific check now fails its test.
@@ -141,3 +141,21 @@ PYTHON
 The concurrent non-normative architecture review is preserved unchanged. Its
 product/sequence decisions remain review input; these line-level bot repairs do
 not implement or claim resolution of that separate architecture review.
+
+## Concurrent architecture-review round
+
+All eight implementation plans and their index carry separate ADR-0011
+`boundary_class` and `planning_status` metadata per scope. The 22 prerequisite
+regressions include six metadata/index drift cases. Owner decisions remain
+`blocked_by_adr`; the non-normative architecture review does not select a new
+product, ABI or program. Its filesystem, ES/NE and approval-gate wording now
+retains the existing security prerequisites. The readiness research distinguishes
+the current Pi wrapper refusal from the still-affected bundled native utility.
+
+The P1/P7 plans now explicitly deliver a pinned public QML candidate before the
+clean-host gate, then promote a supported release only after qualification.
+The operator scope requires typed owner/authority/policy/provider/account,
+verification, network and local review bindings; display strings cannot replace
+them. The retained scope regression adds 63 duplicate-dimension cases and 88
+error/retry/reference combinations alongside its 189 numeric-limit cases.
+These remain component and contract checks, not installed authority evidence.

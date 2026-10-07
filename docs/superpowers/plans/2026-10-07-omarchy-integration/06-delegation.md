@@ -1,5 +1,13 @@
 # Native Delegated Workers Implementation Plan
 
+| Boundary scope | `boundary_class` | `planning_status` | Decision and execution gate |
+| --- | --- | --- | --- |
+| `child_admission_and_custody` | `prevent` | `blocked_by_adr` | Owner decisions F3/F5 on native contracts and delegation program ownership; then P3, native-delegation-profile.json, signing custody and original child recovery. |
+| `child_status_projection` | `detect_only` | `blocked_by_adr` | Owner decisions F2/F5 on shared events/task model and ownership; projected child settlement is evidence, not a second scheduler or authority. |
+| `remote_custody` | `prevent` | `deferred` | Optional remote/stopped-state relocation requires a separately selected native custody mode and cross-host-custody-profile.json after owner decisions; no default remote qualification. |
+
+Metadata follows [ADR-0011](../../../adr/ADR-0011-boundary-taxonomy-product-wording.md) and the [plan-set inheritance and owner-decision gate](README.md#boundary-metadata-and-inheritance). Classes describe proposed boundaries, not delivered qualification.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a small confined worker tree under one Chio authority, with durable child admission, aggregate limits and original-operation recovery.

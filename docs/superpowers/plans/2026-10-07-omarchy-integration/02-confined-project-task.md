@@ -1,5 +1,14 @@
 # Confined Project Task Implementation Plan
 
+| Boundary scope | `boundary_class` | `planning_status` | Decision and execution gate |
+| --- | --- | --- | --- |
+| `guest_admission` | `prevent` | `blocked_by_adr` | Owner decisions F1/F3/F5 on first execution product and native base; then P1, exact native/Pi tuple, x64 confinement, private input, import and original recovery. |
+| `provider_observation` | `detect_only` | `ready_after_adr` | Accepted ADR-0011 permits bounded usage/effect observation research. Provider-reported usage and uncertain in-flight completion are not pre-effect enforcement. |
+| `provider_internal_execution` | `cannot_see` | `hard_skip` | Provider-internal computation and billing after request egress are outside this caller mediation layer; supported request limits require their own qualified route. |
+| `review_projection` | `advisory_only` | `blocked_by_adr` | Owner decisions F1/F2 on task and review model; the proposed artifact/view cannot authorize publication or alter the original checkout. |
+
+Metadata follows [ADR-0011](../../../adr/ADR-0011-boundary-taxonomy-product-wording.md) and the [plan-set inheritance and owner-decision gate](README.md#boundary-metadata-and-inheritance). Classes describe proposed boundaries, not delivered qualification.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Complete one Pi task over an immutable imported project, run a fixed independent recipe and deliver a verifiable private review artifact without modifying the original checkout.

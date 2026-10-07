@@ -1,5 +1,13 @@
 # Bounded Desktop Resources Implementation Plan
 
+| Boundary scope | `boundary_class` | `planning_status` | Decision and execution gate |
+| --- | --- | --- | --- |
+| `desktop_admission` | `prevent` | `blocked_by_adr` | Owner decision F5 must retain or remove P4; if retained, P3 exact approval, pinned compositor, enrolled session and protected socket custody remain execution gates. |
+| `compositor_observation` | `detect_only` | `ready_after_adr` | Accepted ADR-0011 permits bounded independent compositor observations; postconditions and dispatch counters do not themselves authorize workspace mutation. |
+| `reserved_window_actions` | `prevent` | `deferred` | Window focus/move/close are excluded from desktop-v1. Any future profile needs an owner-approved scope and atomic generation-bound compositor effect contract. |
+
+Metadata follows [ADR-0011](../../../adr/ADR-0011-boundary-taxonomy-product-wording.md) and the [plan-set inheritance and owner-decision gate](README.md#boundary-metadata-and-inheritance). Classes describe proposed boundaries, not delivered qualification.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Deliver the P4 resource profile with four bounded metadata reads and an exactly approved numeric workspace selection, with independently observed outcomes and explicit refusal for unqualified effects.

@@ -1,5 +1,13 @@
 # Exact Approvals and Reviewed Publication Implementation Plan
 
+| Boundary scope | `boundary_class` | `planning_status` | Decision and execution gate |
+| --- | --- | --- | --- |
+| `approval_and_publication` | `prevent` | `blocked_by_adr` | Owner decisions F1/F2/F3 on product, operator ABI and native contract; then completed P2, native-approval-decision-binding.json and exact enrolled destination/recovery. |
+| `review_guidance` | `advisory_only` | `blocked_by_adr` | Owner decisions F1/F2 on task/review model; displayed proposal text conveys no grant and cannot replace the native decision. |
+| `outcome_observation` | `detect_only` | `ready_after_adr` | Accepted ADR-0011 permits independent receipt/destination probes; observed output cannot authorize an effect or manufacture original-operation recovery. |
+
+Metadata follows [ADR-0011](../../../adr/ADR-0011-boundary-taxonomy-product-wording.md) and the [plan-set inheritance and owner-decision gate](README.md#boundary-metadata-and-inheritance). Classes describe proposed boundaries, not delivered qualification.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Enable one exact native operator decision and reviewed delivery of the admitted project artifact to its fixed private local review destination.

@@ -414,6 +414,361 @@
       "file": "examples/response-scope-enforced-maximum.json",
       "schema": "contracts/operator-response.schema.json",
       "valid": true
+    },
+    {
+      "file": "examples/invalid-response-scope-duplicate-limit.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/response-scope-all-dimensions.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/invalid-response-scope-missing-operator-binding.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-unavailable-operator-binding.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-missing-authority-binding.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-unavailable-authority-binding.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-missing-project-binding.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-unavailable-project-binding.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-missing-policy-binding.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-unavailable-policy-binding.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-missing-agent-binding.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-unavailable-agent-binding.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-missing-provider-binding.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-unavailable-provider-binding.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-missing-account-binding.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-unavailable-account-binding.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-missing-credential-binding.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-unavailable-credential-binding.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-missing-trust-root-sha256.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-missing-selection-rules.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-missing-verification-plan.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-unavailable-verification-plan.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-missing-network-scope.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-missing-publication-scope.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-unavailable-publication-scope.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-provider-display-only.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-unknown-trust-root.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-empty-verification.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-empty-command.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-implicit-network-destination.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-unsupported-publication.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-publication-without-destination.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/response-scope-publication-disabled.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/response-scope-native-review-required.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/response-scope-enrolled-network.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/response-error-invalid-request.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/invalid-response-error-invalid-request-retry.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-error-invalid-request-reference.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/response-error-unsupported-version.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/invalid-response-error-unsupported-version-retry.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-error-unsupported-version-reference.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/response-error-prerequisite-unavailable.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/invalid-response-error-prerequisite-unavailable-retry.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/response-error-prerequisite-unavailable-with-reference.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/response-error-revision-conflict.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/invalid-response-error-revision-conflict-retry.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/response-error-revision-conflict-with-reference.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/response-error-idempotency-conflict.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/invalid-response-error-idempotency-conflict-retry.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/response-error-idempotency-conflict-with-reference.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/response-error-capacity.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/invalid-response-error-capacity-retry.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-error-capacity-reference.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/response-error-authority-denied.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/invalid-response-error-authority-denied-retry.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/response-error-authority-denied-with-reference.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/response-error-outcome-unknown.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/invalid-response-error-outcome-unknown-retry.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-error-outcome-unknown-reference.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/response-error-cursor-expired.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/invalid-response-error-cursor-expired-retry.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-error-cursor-expired-reference.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/response-error-storage-unavailable.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/invalid-response-error-storage-unavailable-retry.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-error-storage-unavailable-reference.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/response-error-response-too-large.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/invalid-response-error-response-too-large-retry.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/response-error-response-too-large-with-reference.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/invalid-response-scope-project-review-disabled.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-reviewed-without-approval.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-scope-verification-key.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
     }
   ]
 }

@@ -109,9 +109,50 @@ at admission. A stale UI cannot authorize an unlocked-state assumption.
 ## Reviewed scope and cancellation projection
 
 `scope.get` reads the exact operator-enrolled project/profile configuration. Its
-revision and JCS digest bind project registration and selection rules, profile,
-provider route, governance mode, enforced/unavailable limits, recipes, native policy
-and publication scope. The UI displays that summary before Start. `task.create`
+successful result includes these required, closed fields in addition to the
+project/profile IDs, enrollment epoch, scope revision and reviewed digest:
+
+| Typed field | Reviewed binding |
+| --- | --- |
+| `operator_binding`, `authority_binding`, `trust_root_sha256` | Enrolled principal, issuing authority and pinned trust root. |
+| `project_binding`, `selection_rules` | Enrolled project resource and explicit include/exclude, untracked, ignored, nested-repository and symlink rules. |
+| `policy_binding` | Exact selected native policy identity, revision and digest. |
+| `agent_binding`, `provider_binding`, `account_binding`, `credential_binding` | Selected host/agent configuration, provider route, account requirement and opaque enrolled credential reference. No credential bytes are exposed. |
+| `verification_plan` | Pinned plan plus a bounded UUID-keyed map of required recipes, recipe/runtime digests, literal argument vectors, staged-project/private-scratch working directories and timeouts. These are inspected as data; QML never executes them. |
+| `governance_mode`, `limits`, `network_scope` | Selected disclosure mode, unambiguous resource bounds and no-network/provider-only/exact enrolled-destination behavior. |
+| `publication_scope` | Explicitly disabled publication or the exact private local review destination, pinned destination binding/path and pre-admitted versus exact native approval requirement. No remote, checkout, Git or deployment destination is supported. |
+
+Each `enrolled_scope_binding` contains an owner-scoped native `reference`, safe
+integer `revision`, SHA-256 digest and bounded label. Its reference uses the same
+owner/native-ID wire shape as an operation reference but names an enrolled record,
+not an executed operation or a grant. Display fields `project_label`,
+`provider_label` and `selection_summary` are supplemental; they cannot replace
+the typed fields. A missing, null or unavailable required binding cannot produce
+a successful scope response. Return `prerequisite_unavailable`, keep Start
+disabled and use health/diagnostics to explain the missing prerequisite.
+
+The reviewed digest is the RFC 8785 digest of the complete successful scope
+`value` with only `reviewed_scope_digest` omitted. This commits the typed fields
+and their displayed labels together. The task instruction remains the separate
+`task.create.prompt` binding and is included in the retained mutation digest.
+The recipe map has one entry per recipe ID; duplicate JSON keys fail strict
+decoding. Selection exclusions take precedence over includes. `project-v1`
+requires pre-admitted local review delivery, and `reviewed-publish-v1` requires
+the same destination kind with an exact native approval. Neither profile accepts
+disabled review delivery or an external publication target.
+Native adapters must resolve each reference under the enrolled trust root and
+check its current identity, configuration and readiness before returning a scope
+eligible for Start, then repeat those checks at admission. In particular, an
+account/credential reference describes the enrolled requirement; checking the
+actual credential's account remains private to its native owner after acquisition
+and before provider egress. Schema-valid refs, digests and synthetic fixture labels
+do not prove native identity, credential readiness or profile qualification.
+
+Each limit dimension occurs at most once, even if two entries would have
+different values or enforcement states. Absent dimensions are unclaimed, never
+inferred from another dimension. `enforced` requires a non-null safe integer;
+measured-only or unavailable entries cannot be presented as enforced bounds.
+The UI displays the typed scope before Start. `task.create`
 requires the returned `scope_revision` and `reviewed_scope_digest`; compare them
 atomically with reservation and revalidate before provisioning. Any intervening
 change refuses with `revision_conflict` and requires refreshed explicit consent.
@@ -199,19 +240,30 @@ review/export paths; no arbitrary file reader is added to bypass the limit.
 
 ## Error semantics
 
-| Code | Meaning | Permitted next action |
-| --- | --- | --- |
-| `invalid_request` | Wire or semantic validation failed before submission | Correct input; no inference about unrelated operations |
-| `unsupported_version` | No selected compatible ABI | Install qualified tuple |
-| `prerequisite_unavailable` | Required native contract absent | Operator repair; no execution fallback |
-| `revision_conflict` | View no longer names current task state | Refresh and review again |
-| `idempotency_conflict` | Key reused for different semantic mutation | Investigate client; do not auto-generate another key |
-| `capacity` | New admission bound reached | Recover/archive eligible work; retained lookups continue |
-| `authority_denied` | Native authority rejects the operation | Show native reason; no automatic authority widening |
-| `outcome_unknown` | Dispatch may have occurred without retained completion | Reconcile the original operation |
-| `cursor_expired` | Event history cannot satisfy requested cursor | Obtain full consistent snapshot |
-| `storage_unavailable` | Controller/native durability unavailable | Stop new mutations, show diagnostics |
-| `response_too_large` | A complete typed result cannot fit the frame bound | Use a qualified bounded view/export; no silent truncation |
+| Code | Meaning and permitted next action | Exact `retry` | `operation_ref` |
+| --- | --- | --- | --- |
+| `invalid_request` | Failed validation before submission; correct input. | `never` | null |
+| `unsupported_version` | No compatible selected ABI; install qualified tuple. | `after_operator_repair` | null |
+| `prerequisite_unavailable` | Required native contract/binding absent; repair without execution fallback. | `after_operator_repair` | null or known context |
+| `revision_conflict` | View no longer names current state; refresh and review again. | `refresh` | null or known context |
+| `idempotency_conflict` | Key reused for a different mutation; investigate without generating another key. | `never` | null or known context |
+| `capacity` | New admission bound reached; recover/archive eligible work while retained lookups continue. | `after_operator_repair` | null |
+| `authority_denied` | Native authority refused; show the reason without automatic widening. | `never` | null or known context |
+| `outcome_unknown` | Dispatch may have occurred without retained completion; reconcile the original operation. | `reconcile_original` | required original reference |
+| `cursor_expired` | Event history cannot satisfy cursor; obtain a full consistent snapshot. | `refresh` | null |
+| `storage_unavailable` | Durability unavailable before this request's submission; stop new mutations and repair. | `after_operator_repair` | null |
+| `response_too_large` | Complete result exceeds the frame bound; select a qualified bounded view/export, without silently truncating the result. | `never` | null or known context |
+
+The schema binds these three fields as a unit. `never` prohibits automatically
+repeating that same request; an explicit corrected request or bounded inspection
+route remains possible after the stated action. An optional known-context
+reference identifies an existing original record whose status is known; it does
+not assert submission of the rejected request and never authorizes replay.
+Only `outcome_unknown` carries `reconcile_original`, and its owner-bound original
+reference is mandatory. If a storage, transport or rendering failure leaves a
+possibly dispatched effect unresolved, return `outcome_unknown` with that
+reference instead of describing it as a pre-submission refusal. No error permits
+replacing an uncertain original operation with a fresh effect identity.
 
 ## Normative requirements
 
@@ -286,6 +338,10 @@ external RSS/queue observer and state comparison. Artifact: `operator-backpressu
 Trigger: failure before native submission and response loss after dispatch.
 Expected: different codes and recovery actions, original identity retained.
 Oracle: independent dispatch marker. Artifact: `operator-error-cutpoints.json`.
+Include a valid positive for each error-code row, all forbidden retry substitutions,
+null `outcome_unknown` references and invented references on pre-submission
+refusals. Schema refusal verifies only the projection contract; the independent
+runtime marker must establish whether the claimed submission classification is true.
 
 ### AT-API-009: Shell metacharacters remain data
 Trigger: prompt contains quotes, newlines, backticks and command substitutions.
@@ -299,9 +355,13 @@ exact filtered bundle, original export recovery. Oracle: read-only bundle scanne
 and export ledger. Artifact: `receipt-export.json`.
 
 ### AT-API-011: Enrollment changed after review
-Trigger: change selected paths, provider, limits or recipe after scope.get and
-before reservation/provisioning. Expected: stale creation refuses with no guest
-or model/tool effect; refreshed consent uses the new exact digest. Oracle: native
+Trigger: independently change principal, authority/trust root, project selection,
+policy, host/provider/account/credential reference, verification plan, limits,
+network or local review destination after scope.get and before reservation/provisioning.
+Include duplicate limit dimensions, omitted/null typed bindings and display-label
+substitution fixtures. Expected: malformed scope never enables Start; stale creation
+refuses with no guest or model/tool effect; refreshed consent displays the exact
+new typed values and digest. Oracle: native
 launch/effect counter and enrollment transaction log. Artifact: `reviewed-scope-race.json`.
 
 ### AT-API-012: Lost cancellation result

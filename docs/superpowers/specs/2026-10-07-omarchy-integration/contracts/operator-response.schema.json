@@ -1002,7 +1002,192 @@
             "retry",
             "operation_ref"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "properties": {
+                "code": {
+                  "const": "invalid_request"
+                },
+                "retry": {
+                  "const": "never"
+                },
+                "operation_ref": {
+                  "type": "null"
+                }
+              },
+              "required": [
+                "code",
+                "retry",
+                "operation_ref"
+              ]
+            },
+            {
+              "properties": {
+                "code": {
+                  "const": "unsupported_version"
+                },
+                "retry": {
+                  "const": "after_operator_repair"
+                },
+                "operation_ref": {
+                  "type": "null"
+                }
+              },
+              "required": [
+                "code",
+                "retry",
+                "operation_ref"
+              ]
+            },
+            {
+              "properties": {
+                "code": {
+                  "const": "prerequisite_unavailable"
+                },
+                "retry": {
+                  "const": "after_operator_repair"
+                }
+              },
+              "required": [
+                "code",
+                "retry",
+                "operation_ref"
+              ]
+            },
+            {
+              "properties": {
+                "code": {
+                  "const": "revision_conflict"
+                },
+                "retry": {
+                  "const": "refresh"
+                }
+              },
+              "required": [
+                "code",
+                "retry",
+                "operation_ref"
+              ]
+            },
+            {
+              "properties": {
+                "code": {
+                  "const": "idempotency_conflict"
+                },
+                "retry": {
+                  "const": "never"
+                }
+              },
+              "required": [
+                "code",
+                "retry",
+                "operation_ref"
+              ]
+            },
+            {
+              "properties": {
+                "code": {
+                  "const": "capacity"
+                },
+                "retry": {
+                  "const": "after_operator_repair"
+                },
+                "operation_ref": {
+                  "type": "null"
+                }
+              },
+              "required": [
+                "code",
+                "retry",
+                "operation_ref"
+              ]
+            },
+            {
+              "properties": {
+                "code": {
+                  "const": "authority_denied"
+                },
+                "retry": {
+                  "const": "never"
+                }
+              },
+              "required": [
+                "code",
+                "retry",
+                "operation_ref"
+              ]
+            },
+            {
+              "properties": {
+                "code": {
+                  "const": "outcome_unknown"
+                },
+                "retry": {
+                  "const": "reconcile_original"
+                },
+                "operation_ref": {
+                  "$ref": "common.schema.json#/$defs/native_operation_ref"
+                }
+              },
+              "required": [
+                "code",
+                "retry",
+                "operation_ref"
+              ]
+            },
+            {
+              "properties": {
+                "code": {
+                  "const": "cursor_expired"
+                },
+                "retry": {
+                  "const": "refresh"
+                },
+                "operation_ref": {
+                  "type": "null"
+                }
+              },
+              "required": [
+                "code",
+                "retry",
+                "operation_ref"
+              ]
+            },
+            {
+              "properties": {
+                "code": {
+                  "const": "storage_unavailable"
+                },
+                "retry": {
+                  "const": "after_operator_repair"
+                },
+                "operation_ref": {
+                  "type": "null"
+                }
+              },
+              "required": [
+                "code",
+                "retry",
+                "operation_ref"
+              ]
+            },
+            {
+              "properties": {
+                "code": {
+                  "const": "response_too_large"
+                },
+                "retry": {
+                  "const": "never"
+                }
+              },
+              "required": [
+                "code",
+                "retry",
+                "operation_ref"
+              ]
+            }
+          ]
         }
       },
       "required": [
@@ -1140,14 +1325,373 @@
                       }
                     ]
                   },
-                  "maxItems": 16
+                  "maxItems": 7,
+                  "allOf": [
+                    {
+                      "contains": {
+                        "type": "object",
+                        "properties": {
+                          "dimension": {
+                            "const": "wall_ms"
+                          }
+                        },
+                        "required": [
+                          "dimension"
+                        ]
+                      },
+                      "minContains": 0,
+                      "maxContains": 1
+                    },
+                    {
+                      "contains": {
+                        "type": "object",
+                        "properties": {
+                          "dimension": {
+                            "const": "calls"
+                          }
+                        },
+                        "required": [
+                          "dimension"
+                        ]
+                      },
+                      "minContains": 0,
+                      "maxContains": 1
+                    },
+                    {
+                      "contains": {
+                        "type": "object",
+                        "properties": {
+                          "dimension": {
+                            "const": "input_bytes"
+                          }
+                        },
+                        "required": [
+                          "dimension"
+                        ]
+                      },
+                      "minContains": 0,
+                      "maxContains": 1
+                    },
+                    {
+                      "contains": {
+                        "type": "object",
+                        "properties": {
+                          "dimension": {
+                            "const": "output_bytes"
+                          }
+                        },
+                        "required": [
+                          "dimension"
+                        ]
+                      },
+                      "minContains": 0,
+                      "maxContains": 1
+                    },
+                    {
+                      "contains": {
+                        "type": "object",
+                        "properties": {
+                          "dimension": {
+                            "const": "tokens"
+                          }
+                        },
+                        "required": [
+                          "dimension"
+                        ]
+                      },
+                      "minContains": 0,
+                      "maxContains": 1
+                    },
+                    {
+                      "contains": {
+                        "type": "object",
+                        "properties": {
+                          "dimension": {
+                            "const": "cost_microunits"
+                          }
+                        },
+                        "required": [
+                          "dimension"
+                        ]
+                      },
+                      "minContains": 0,
+                      "maxContains": 1
+                    },
+                    {
+                      "contains": {
+                        "type": "object",
+                        "properties": {
+                          "dimension": {
+                            "const": "memory_bytes"
+                          }
+                        },
+                        "required": [
+                          "dimension"
+                        ]
+                      },
+                      "minContains": 0,
+                      "maxContains": 1
+                    }
+                  ]
                 },
-                "recipe_ids": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "common.schema.json#/$defs/uuid"
+                "operator_binding": {
+                  "$ref": "common.schema.json#/$defs/enrolled_scope_binding"
+                },
+                "authority_binding": {
+                  "$ref": "common.schema.json#/$defs/enrolled_scope_binding"
+                },
+                "project_binding": {
+                  "$ref": "common.schema.json#/$defs/enrolled_scope_binding"
+                },
+                "policy_binding": {
+                  "$ref": "common.schema.json#/$defs/enrolled_scope_binding"
+                },
+                "agent_binding": {
+                  "$ref": "common.schema.json#/$defs/enrolled_scope_binding"
+                },
+                "provider_binding": {
+                  "$ref": "common.schema.json#/$defs/enrolled_scope_binding"
+                },
+                "account_binding": {
+                  "$ref": "common.schema.json#/$defs/enrolled_scope_binding"
+                },
+                "credential_binding": {
+                  "$ref": "common.schema.json#/$defs/enrolled_scope_binding"
+                },
+                "trust_root_sha256": {
+                  "$ref": "common.schema.json#/$defs/sha256"
+                },
+                "selection_rules": {
+                  "type": "object",
+                  "properties": {
+                    "include": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      },
+                      "minItems": 1,
+                      "maxItems": 64
+                    },
+                    "exclude": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      },
+                      "minItems": 0,
+                      "maxItems": 64
+                    },
+                    "untracked": {
+                      "enum": [
+                        "exclude",
+                        "explicit_only"
+                      ]
+                    },
+                    "ignored": {
+                      "const": "exclude"
+                    },
+                    "nested_repositories": {
+                      "enum": [
+                        "exclude",
+                        "explicit_only"
+                      ]
+                    },
+                    "symlinks": {
+                      "enum": [
+                        "reject",
+                        "resolve_within_project"
+                      ]
+                    }
                   },
-                  "maxItems": 32
+                  "required": [
+                    "include",
+                    "exclude",
+                    "untracked",
+                    "ignored",
+                    "nested_repositories",
+                    "symlinks"
+                  ],
+                  "additionalProperties": false
+                },
+                "verification_plan": {
+                  "type": "object",
+                  "properties": {
+                    "binding": {
+                      "$ref": "common.schema.json#/$defs/enrolled_scope_binding"
+                    },
+                    "checks": {
+                      "type": "object",
+                      "propertyNames": {
+                        "$ref": "common.schema.json#/$defs/uuid"
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "recipe_sha256": {
+                            "$ref": "common.schema.json#/$defs/sha256"
+                          },
+                          "runtime_sha256": {
+                            "$ref": "common.schema.json#/$defs/sha256"
+                          },
+                          "argv": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 1024
+                            },
+                            "minItems": 1,
+                            "maxItems": 32
+                          },
+                          "working_directory": {
+                            "enum": [
+                              "staged_project",
+                              "private_scratch"
+                            ]
+                          },
+                          "timeout_ms": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "recipe_sha256",
+                          "runtime_sha256",
+                          "argv",
+                          "working_directory",
+                          "timeout_ms"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "minProperties": 1,
+                      "maxProperties": 32
+                    }
+                  },
+                  "required": [
+                    "binding",
+                    "checks"
+                  ],
+                  "additionalProperties": false
+                },
+                "network_scope": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "enum": [
+                        "none",
+                        "provider_only",
+                        "enrolled_destinations"
+                      ]
+                    },
+                    "destination_refs": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "common.schema.json#/$defs/native_operation_ref"
+                      },
+                      "minItems": 0,
+                      "maxItems": 16,
+                      "uniqueItems": true
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "destination_refs"
+                  ],
+                  "additionalProperties": false,
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": {
+                          "mode": {
+                            "const": "enrolled_destinations"
+                          }
+                        },
+                        "required": [
+                          "mode"
+                        ]
+                      },
+                      "then": {
+                        "properties": {
+                          "destination_refs": {
+                            "minItems": 1
+                          }
+                        }
+                      },
+                      "else": {
+                        "properties": {
+                          "destination_refs": {
+                            "maxItems": 0
+                          }
+                        }
+                      }
+                    }
+                  ]
+                },
+                "publication_scope": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "disabled"
+                        },
+                        "destination": {
+                          "type": "null"
+                        }
+                      },
+                      "required": [
+                        "mode",
+                        "destination"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "local_review"
+                        },
+                        "decision": {
+                          "enum": [
+                            "pre_admitted",
+                            "exact_native_approval"
+                          ]
+                        },
+                        "destination": {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "const": "private_local_review"
+                            },
+                            "binding": {
+                              "$ref": "common.schema.json#/$defs/enrolled_scope_binding"
+                            },
+                            "resolved_path": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 4096
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "binding",
+                            "resolved_path"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "mode",
+                        "decision",
+                        "destination"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
                 }
               },
               "required": [
@@ -1161,9 +1705,83 @@
                 "provider_label",
                 "governance_mode",
                 "limits",
-                "recipe_ids"
+                "operator_binding",
+                "authority_binding",
+                "project_binding",
+                "policy_binding",
+                "agent_binding",
+                "provider_binding",
+                "account_binding",
+                "credential_binding",
+                "trust_root_sha256",
+                "selection_rules",
+                "verification_plan",
+                "network_scope",
+                "publication_scope"
               ],
-              "additionalProperties": false
+              "additionalProperties": false,
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "profile_id": {
+                        "const": "project-v1"
+                      }
+                    },
+                    "required": [
+                      "profile_id"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "publication_scope": {
+                        "properties": {
+                          "mode": {
+                            "const": "local_review"
+                          },
+                          "decision": {
+                            "const": "pre_admitted"
+                          }
+                        },
+                        "required": [
+                          "mode",
+                          "decision"
+                        ]
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "profile_id": {
+                        "const": "reviewed-publish-v1"
+                      }
+                    },
+                    "required": [
+                      "profile_id"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "publication_scope": {
+                        "properties": {
+                          "mode": {
+                            "const": "local_review"
+                          },
+                          "decision": {
+                            "const": "exact_native_approval"
+                          }
+                        },
+                        "required": [
+                          "mode",
+                          "decision"
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
             }
           },
           "required": [
