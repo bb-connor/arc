@@ -252,3 +252,361 @@ fn operator_cancel_cannot_compensate_already_committed_threshold_approval() {
     }
     assert_eq!(total_effects, 1);
 }
+
+/// Reports the exact approval reservation under a different approval set while
+/// armed. The durable reservation is never changed.
+struct SubstitutedApprovalBinding {
+    inner: Arc<SqliteApprovalStore>,
+    substitute: Arc<AtomicBool>,
+}
+
+impl ApprovalStore for SubstitutedApprovalBinding {
+    fn authority_profile(&self) -> ApprovalStoreProfile {
+        self.inner.authority_profile()
+    }
+    fn store_pending(&self, request: &ApprovalRequest) -> Result<(), ApprovalStoreError> {
+        self.inner.store_pending(request)
+    }
+    fn get_pending(&self, id: &str) -> Result<Option<ApprovalRequest>, ApprovalStoreError> {
+        self.inner.get_pending(id)
+    }
+    fn list_pending(
+        &self,
+        filter: &ApprovalFilter,
+    ) -> Result<Vec<ApprovalRequest>, ApprovalStoreError> {
+        self.inner.list_pending(filter)
+    }
+    fn resolve(&self, id: &str, decision: &ApprovalDecision) -> Result<(), ApprovalStoreError> {
+        self.inner.resolve(id, decision)
+    }
+    fn count_approved(&self, subject: &str, policy: &str) -> Result<u64, ApprovalStoreError> {
+        self.inner.count_approved(subject, policy)
+    }
+    fn record_consumed(&self, token: &str, hash: &str, now: u64) -> Result<(), ApprovalStoreError> {
+        self.inner.record_consumed(token, hash, now)
+    }
+    fn is_consumed(&self, token: &str, hash: &str) -> Result<bool, ApprovalStoreError> {
+        self.inner.is_consumed(token, hash)
+    }
+    fn get_resolution(&self, id: &str) -> Result<Option<ResolvedApproval>, ApprovalStoreError> {
+        self.inner.get_resolution(id)
+    }
+    fn commit_approval_reservation(
+        &self,
+        id: &str,
+    ) -> Result<ApprovalReservation, ApprovalStoreError> {
+        self.inner.commit_approval_reservation(id)
+    }
+    fn cancel_approval_reservation(
+        &self,
+        id: &str,
+    ) -> Result<ApprovalReservation, ApprovalStoreError> {
+        self.inner.cancel_approval_reservation(id)
+    }
+    fn reserve_approval_set(
+        &self,
+        id: &str,
+        set: &ApprovalSetReservationInput,
+    ) -> Result<ApprovalReservation, ApprovalStoreError> {
+        self.inner.reserve_approval_set(id, set)
+    }
+    fn get_approval_reservation(
+        &self,
+        id: &str,
+    ) -> Result<Option<ApprovalReservation>, ApprovalStoreError> {
+        let reservation = self.inner.get_approval_reservation(id)?;
+        if !self.substitute.load(Ordering::Acquire) {
+            return Ok(reservation);
+        }
+        reservation
+            .map(|reservation| {
+                let set = reservation.approval_set();
+                let substituted = ApprovalSetReservationInput::new(
+                    "ab".repeat(32),
+                    set.members().to_vec(),
+                    set.proposal_deadline(),
+                )?;
+                ApprovalReservation::from_persisted_parts(
+                    reservation.operation_id().to_owned(),
+                    substituted,
+                    reservation.state(),
+                )
+            })
+            .transpose()
+    }
+}
+
+fn reconciliation_fault_fixture(
+    fail_next: &Arc<AtomicBool>,
+    substitute: &Arc<AtomicBool>,
+) -> RealAdapterFixture {
+    let operations = |inner| {
+        Arc::new(DispatchCommitCasFault {
+            inner,
+            fail_next: fail_next.clone(),
+        }) as Arc<dyn AdmissionOperationStore>
+    };
+    let approvals = |inner| {
+        Arc::new(SubstitutedApprovalBinding {
+            inner,
+            substitute: substitute.clone(),
+        }) as Arc<dyn ApprovalStore>
+    };
+    real_adapter_fixture_with_options(
+        chio_security_types::ResponseExecutionMode::Live,
+        true,
+        RealAdapterFixtureOptions {
+            operations: Some(&operations),
+            approvals: Some(&approvals),
+            ..Default::default()
+        },
+    )
+}
+
+/// Asserts the committed window is unchanged: no compensation, no terminal
+/// receipt outbox and the durable approval still committed.
+fn assert_committed_window_retained(
+    fixture: &RealAdapterFixture,
+    id: &str,
+    operation: &AdmissionOperation,
+    approval: &ApprovalReservation,
+) {
+    assert_eq!(
+        fixture
+            .runtime
+            .admission_operations
+            .load(id)
+            .unwrap()
+            .as_ref(),
+        Some(operation)
+    );
+    assert_eq!(
+        terminal_receipt_actions(&fixture.runtime.admission_operations, id),
+        0
+    );
+    assert_eq!(
+        fixture
+            .runtime
+            .approvals
+            .get_approval_reservation(id)
+            .unwrap()
+            .as_ref(),
+        Some(approval)
+    );
+    assert_eq!(fixture.runtime.executor.calls(), 0);
+    assert_eq!(fixture.runtime.effects.executions(), 0);
+}
+
+fn assert_refused_after_reconciliation(
+    fixture: &RealAdapterFixture,
+    id: &str,
+    cancel: Result<(), chio_kernel::KernelError>,
+) {
+    assert!(
+        matches!(
+            &cancel,
+            Err(chio_kernel::KernelError::Internal(reason))
+                if reason.contains("after active-response dispatch commitment")
+        ),
+        "{cancel:?}"
+    );
+    let operation = fixture
+        .runtime
+        .admission_operations
+        .load(id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        operation.state(),
+        AdmissionOperationState::DispatchCommitted
+    );
+    assert_eq!(
+        operation.dispatch_state(),
+        AdmissionDispatchState::Committed
+    );
+    assert_eq!(
+        terminal_receipt_actions(&fixture.runtime.admission_operations, id),
+        0
+    );
+}
+
+#[test]
+fn operator_cancel_still_compensates_an_uncommitted_reserved_approval() {
+    let fixture = real_adapter_fixture();
+    let prepared = fixture
+        .runtime
+        .kernel
+        .prepare_active_response_admission(fixture.native_request())
+        .unwrap();
+    let id = operation_id(&prepared).to_owned();
+    let chio_kernel::PreparedActiveResponseAdmission::Governed(reservation) = &prepared else {
+        panic!("governed preparation required");
+    };
+    assert_eq!(
+        fixture
+            .runtime
+            .approvals
+            .get_approval_reservation(&id)
+            .unwrap()
+            .unwrap()
+            .state(),
+        ReplayReservationState::Reserved
+    );
+    fixture
+        .runtime
+        .kernel
+        .cancel_prepared_active_response_admission(&prepared, OPERATOR_CANCEL_REASON)
+        .unwrap();
+    let compensated = fixture
+        .runtime
+        .admission_operations
+        .load(&id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        compensated.state(),
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    assert_eq!(
+        terminal_receipt_actions(&fixture.runtime.admission_operations, &id),
+        1
+    );
+    let cancelled = fixture
+        .runtime
+        .approvals
+        .get_approval_reservation(&id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(cancelled.state(), ReplayReservationState::Cancelled);
+
+    fixture
+        .runtime
+        .kernel
+        .cancel_active_response_admission(reservation, OPERATOR_CANCEL_REASON)
+        .unwrap();
+    fixture
+        .runtime
+        .kernel
+        .cancel_prepared_active_response_admission(&prepared, OPERATOR_CANCEL_REASON)
+        .unwrap();
+    assert_eq!(
+        fixture
+            .runtime
+            .admission_operations
+            .load(&id)
+            .unwrap()
+            .as_ref(),
+        Some(&compensated)
+    );
+    assert_eq!(
+        terminal_receipt_actions(&fixture.runtime.admission_operations, &id),
+        1
+    );
+    assert_eq!(
+        fixture
+            .runtime
+            .approvals
+            .get_approval_reservation(&id)
+            .unwrap()
+            .as_ref(),
+        Some(&cancelled)
+    );
+    assert_eq!(fixture.runtime.executor.calls(), 0);
+    assert_eq!(fixture.runtime.effects.executions(), 0);
+}
+
+#[test]
+fn operator_cancel_propagates_a_reconciliation_store_failure_without_compensating() {
+    let fail_next = Arc::new(AtomicBool::new(false));
+    let substitute = Arc::new(AtomicBool::new(false));
+    let fixture = reconciliation_fault_fixture(&fail_next, &substitute);
+    let prepared = committed_approval_window(&fixture, &fail_next);
+    let id = operation_id(&prepared).to_owned();
+    let chio_kernel::PreparedActiveResponseAdmission::Governed(reservation) = &prepared else {
+        panic!("governed preparation required");
+    };
+    let operation = fixture
+        .runtime
+        .admission_operations
+        .load(&id)
+        .unwrap()
+        .unwrap();
+    let approval = fixture
+        .runtime
+        .approvals
+        .get_approval_reservation(&id)
+        .unwrap()
+        .unwrap();
+
+    fail_next.store(true, Ordering::Release);
+    let failed = fixture
+        .runtime
+        .kernel
+        .cancel_prepared_active_response_admission(&prepared, OPERATOR_CANCEL_REASON);
+    assert!(
+        !fail_next.load(Ordering::Acquire),
+        "cancellation did not attempt reconciliation"
+    );
+    assert!(
+        matches!(&failed, Err(chio_kernel::KernelError::Internal(reason))
+            if reason.contains("injected dispatch commitment CAS failure")),
+        "{failed:?}"
+    );
+    assert_committed_window_retained(&fixture, &id, &operation, &approval);
+
+    let refused = fixture
+        .runtime
+        .kernel
+        .cancel_active_response_admission(reservation, OPERATOR_CANCEL_REASON);
+    assert_refused_after_reconciliation(&fixture, &id, refused);
+}
+
+#[test]
+fn operator_cancel_refuses_a_substituted_approval_binding_without_compensating() {
+    let fail_next = Arc::new(AtomicBool::new(false));
+    let substitute = Arc::new(AtomicBool::new(false));
+    let fixture = reconciliation_fault_fixture(&fail_next, &substitute);
+    let prepared = committed_approval_window(&fixture, &fail_next);
+    let id = operation_id(&prepared).to_owned();
+    let chio_kernel::PreparedActiveResponseAdmission::Governed(reservation) = &prepared else {
+        panic!("governed preparation required");
+    };
+    let operation = fixture
+        .runtime
+        .admission_operations
+        .load(&id)
+        .unwrap()
+        .unwrap();
+    let approval = fixture
+        .runtime
+        .approvals
+        .get_approval_reservation(&id)
+        .unwrap()
+        .unwrap();
+
+    substitute.store(true, Ordering::Release);
+    for refused in [
+        fixture
+            .runtime
+            .kernel
+            .cancel_prepared_active_response_admission(&prepared, OPERATOR_CANCEL_REASON),
+        fixture
+            .runtime
+            .kernel
+            .cancel_active_response_admission(reservation, OPERATOR_CANCEL_REASON),
+    ] {
+        assert!(
+            matches!(&refused, Err(chio_kernel::KernelError::Internal(reason))
+                if reason.contains("changed its exact binding")),
+            "{refused:?}"
+        );
+        assert_committed_window_retained(&fixture, &id, &operation, &approval);
+    }
+
+    substitute.store(false, Ordering::Release);
+    let refused = fixture
+        .runtime
+        .kernel
+        .cancel_prepared_active_response_admission(&prepared, OPERATOR_CANCEL_REASON);
+    assert_refused_after_reconciliation(&fixture, &id, refused);
+}
