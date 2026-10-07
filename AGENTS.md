@@ -8,7 +8,7 @@ Chio is a protocol for secure, attested tool access in AI agent systems. It repl
 
 1. **Agent** - untrusted LLM-powered process that consumes tools via capability tokens.
 2. **Runtime Kernel** - trusted mediator (TCB) that validates capabilities, runs the guard pipeline, and signs receipts.
-3. **Tool Servers** - sandboxed processes implementing tools, isolated from each other and from the agent.
+3. **Tool Servers** - untrusted processes or services implementing tools. The selected host/runtime profile owns OS isolation; ordinary stdio launch does not establish sandboxing.
 4. **Capability Authority** - issues, scopes, and revokes time-bounded capability tokens.
 5. **Receipt Log** - append-only Merkle-committed log of signed attestations over every decision and tool call.
 
