@@ -3110,6 +3110,7 @@ dependencies = [
  "chio-security-types",
  "chio-settle",
  "chio-sqlite-file-identity",
+ "chio-store-sqlite",
  "chio-supervisor",
  "chio-swarm-authority",
  "chio-test-support",

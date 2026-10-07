@@ -266,11 +266,22 @@ run_exact_target --label "durable flow state" --expected \
   injected_clock_controls_scheduler_lease_and_overlay_mutations \
   isolation_epoch_must_be_verified_and_preserves_lineage_taint \
   lineage_change_invalidates_every_principal_context \
-  migration_is_idempotent_and_preserves_existing_tables \
+  database_path_inputs::migration_is_idempotent_and_preserves_existing_tables \
   missing_flow_context_generation_fails_closed \
   missing_flow_epoch_or_session_row_fails_closed \
   new_lineage_inherits_existing_epoch_and_cannot_bootstrap_a_new_epoch \
   no_op_shared_label_joins_preserve_sibling_context_integrity \
+  open_path::a_group_writable_parent_is_refused_before_the_store_is_created \
+  open_path::a_hard_linked_legacy_database_is_refused_without_repairing_the_alias \
+  open_path::a_hard_linked_path_is_refused_before_it_is_written \
+  open_path::a_legacy_world_readable_database_is_private_before_sqlite_opens_it \
+  open_path::a_new_store_in_a_world_readable_parent_is_private_with_its_sidecars \
+  open_path::a_new_store_is_private_to_its_owner \
+  open_path::a_private_database_reopens_without_its_mode_or_identity_changing \
+  open_path::a_shared_writable_parent_is_refused_before_the_store_is_created \
+  open_path::a_symlinked_path_is_refused_before_the_target_is_created_or_written \
+  open_path::an_aliased_or_irregular_sidecar_is_refused_before_sqlite_opens_it \
+  open_path::legacy_world_readable_sidecars_are_private_before_sqlite_opens_them \
   overlapping_overlay_contributions_are_removed_independently \
   overlay_effect_identity_cannot_cross_action_boundaries \
   response_effect_generation_migration_preserves_existing_intent \
@@ -279,7 +290,7 @@ run_exact_target --label "durable flow state" --expected \
   scheduler_retry_health_migration_preserves_age_conservatively \
   scheduler_retry_health_outbox_survives_restart_and_ack_is_idempotent \
   scheduler_takeover_fences_stale_overlay_mutations \
-  security_state_rejects_ephemeral_sqlite_paths \
+  database_path_inputs::security_state_rejects_ephemeral_sqlite_paths \
   session_change_invalidates_same_session_fences_across_lineages \
   session_taint_is_shared_across_lineages_within_an_epoch \
   verified_event_capacity_and_rule_index_roll_back_as_one_sqlite_transaction \

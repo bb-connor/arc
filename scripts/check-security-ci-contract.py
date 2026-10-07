@@ -68,7 +68,7 @@ EXPECTED_CA_PACKAGE_SHA256 = (
     "a8ad8f04dfba1a2897388c4b420b698bf1ecd870be10f0127134a567d5e59896"
 )
 EXPECTED_CARGO_LOCK_SHA256 = (
-    "e91fb3ab16ce5979988eeb2367f7d37c1729efffa2e5dd06c05df818112b3b9b"
+    "0e6ae4b7b18a1f12c00e3a616fff12f61cc10d2158fc140032c5aa5bca8193fb"
 )
 EXPECTED_RUST_TOOLCHAIN_SHA256 = (
     "24ef3b9d3edbd850aa386cb0a98e10450b0030991a4537cb359f54d49dbbb33a"
@@ -4832,7 +4832,7 @@ def validate_isolated_execution_job(
 # pinned action and unprivileged job setting. Update only after reviewing the
 # changed inventory; hashing parsed jobs ignores YAML formatting and comments.
 EXPECTED_NONCE_FIPS_JOBS = {
-    "threshold-crypto-floor": "5ae66bc1cb766994b1d568e592acd66b294404bf3dbb1f5ef7ebc9761b07bf19",
+    "threshold-crypto-floor": "471febe9f13915a777a3504d4b0a635fc96170b7c62abb1a494279525532dc5f",
     "session-reports": "16ad2e1401ffc2ea0361cc508047e837d6ee3c09a01fa863e9cb3f35a461defc",
     "fips-smoke": "6530286bad2e0e616421639eccc930cc6f39f2c95538d458257c3562b7bd69a6",
 }
