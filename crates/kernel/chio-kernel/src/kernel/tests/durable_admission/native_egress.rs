@@ -16,6 +16,8 @@ use std::sync::Mutex;
 
 #[path = "native_egress/backend.rs"]
 mod backend;
+#[path = "native_egress/capture_once.rs"]
+mod capture_once;
 pub(super) use backend::TestEgress;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
