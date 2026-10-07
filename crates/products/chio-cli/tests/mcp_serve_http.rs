@@ -2977,6 +2977,14 @@ fn mcp_serve_http_get_stream_owns_session_notifications_when_attached() {
         "POST stream should not duplicate session notifications while GET is attached"
     );
 
+    // A live GET stream opens with a priming event: an event ID and empty data.
+    let priming = read_next_sse_event(&mut get_reader).expect("GET priming event");
+    assert!(
+        priming.id.as_deref().is_some_and(|id| !id.is_empty()),
+        "priming event id: {:?}",
+        priming.id
+    );
+    assert_eq!(priming.message, None);
     let first = read_next_sse_event(&mut get_reader).expect("GET task notification event");
     assert!(first.id.is_some());
     assert_eq!(
