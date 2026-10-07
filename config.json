@@ -1,0 +1,6 @@
+{
+  "active_waves": [1],
+  "base_branch": "integration/beta-next",
+  "ci_max_in_flight": 10,
+  "train_pr": 0
+}
