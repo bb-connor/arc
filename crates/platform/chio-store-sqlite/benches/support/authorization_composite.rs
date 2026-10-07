@@ -198,7 +198,7 @@ impl Stores {
 }
 
 pub(super) fn bench_authorization_composite(c: &mut Criterion) {
-    let directory = require(tempfile::tempdir(), "composite directory");
+    let directory = require(chio_test_support::private_tempdir(), "composite directory");
     let (security, _) = populate_suspensions(&directory.path().join("security.db"));
     let database = directory.path().join("authority.db");
     let locks = directory.path().join("locks");
