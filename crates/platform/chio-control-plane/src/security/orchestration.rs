@@ -1005,3 +1005,6 @@ impl ActiveDefenseServices for ProductionActiveDefenseOrchestrator {
 mod teardown;
 
 pub use teardown::ProductionActiveDefenseHost;
+
+#[cfg(test)]
+mod runtime_lease_tests;
