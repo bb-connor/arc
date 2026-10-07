@@ -101,7 +101,10 @@ pub(in crate::admission_operation_store) fn verify_coverage(
                 return Err(invalid("native family differs from its exact global head"));
             }
             if let Some(checkpoint) = &checkpoint {
-                let sealed = &checkpoint.heads[family];
+                let sealed = checkpoint
+                    .heads
+                    .get(family)
+                    .ok_or_else(|| invalid("native checkpoint family is out of range"))?;
                 if head == sealed.sequence && head > u64::from(family == 0) {
                     let exact: i64 = connection.query_row("SELECT COUNT(*) FROM authority_global_commits WHERE projection_kind = ?1 AND projection_key = ?2 AND projection_sequence = ?3 AND projection_reference_digest = ?4 AND store_uuid = ?5",
                         params![kind,authority,i64::try_from(head).map_err(invalid)?,sealed.digest,record.fence.store_uuid],|row|row.get(0)).map_err(invalid)?;

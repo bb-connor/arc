@@ -124,7 +124,10 @@ pub(in crate::admission_operation_store::security_participant_state) fn family_h
     table: &str,
     family: usize,
 ) -> Result<u64, AdmissionOperationStoreError> {
-    let floor = checkpoint::floors(connection, authority)?[family];
+    let floor = checkpoint::floors(connection, authority)?
+        .get(family)
+        .copied()
+        .ok_or_else(|| invalid("native journal family is out of range"))?;
     let floor_i64 = i64::try_from(floor).map_err(invalid)?;
     let (count,first,last,bytes): (i64,i64,i64,i64) = connection.query_row(&format!(
         "SELECT COUNT(*),COALESCE(MIN(sequence),?2),COALESCE(MAX(sequence),?2),COALESCE(SUM(length(canonical_record)),0)
@@ -265,19 +268,14 @@ pub(in crate::admission_operation_store::security_participant_state) fn visit(
     } else {
         0
     };
-    let previous = |family: usize| {
+    let [mut join_previous, mut egress_previous, mut output_previous, mut nonce_preflight_previous] =
         checkpoint.as_ref().map_or_else(
-            || initialization.digest.clone(),
-            |record| record.heads[family].digest.clone(),
-        )
-    };
+            || std::array::from_fn(|_| initialization.digest.clone()),
+            |record| record.heads.each_ref().map(|head| head.digest.clone()),
+        );
     let mut nonce_preflight_sequence = floors[3];
-    let mut nonce_preflight_previous = previous(3);
     let mut output_sequence = floors[2];
-    let mut output_previous = previous(2);
     let mut egress_sequence = floors[1];
-    let mut join_previous = previous(0);
-    let mut egress_previous = previous(1);
     let mut observed_at = checkpoint
         .as_ref()
         .map_or(initialization.initialized_at, |record| record.observed_at);
