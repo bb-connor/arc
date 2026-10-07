@@ -131,7 +131,7 @@ writes the audit log. Chio is that layer for agents, and each part has a direct 
 
 | In an operating system | In Chio |
 | --- | --- |
-| **[Syscalls](crates/kernel/chio-kernel)** | Every tool call, file read, API request, and payment is dispatched by the kernel. An agent never holds a direct handle to a tool. |
+| **[Syscalls](crates/kernel/chio-kernel)** | Calls routed through Chio enter the kernel's authorization and dispatch path. Removing direct access to the protected tool or resource requires the selected host/runtime profile; native tools outside that path are not mediated. |
 | **[Process isolation](spec/PROTOCOL.md#3-components-and-trust-boundaries)** | Agents and tool servers are untrusted processes or services. The selected host/runtime profile owns OS isolation; ordinary stdio launch does not establish sandboxing. |
 | **[Permissions](spec/PROTOCOL.md#5-capability-contract)** | Capability tokens: signed, expiring, budgeted, and only ever narrowable. |
 | **[Syscall filters](crates/guards)** | A guard pipeline screens every request and every result. Custom guards run as [fuel-metered WASM](crates/guards/chio-wasm-guards) with no host access. |
@@ -243,7 +243,7 @@ receipt.
 
 ## Quickstart
 
-Bond Claude Code to a policy in one line, then verify everything it did.
+Route a coding agent's MCP tool calls through Chio, then inspect the signed receipts for those calls. Host hooks add diagnostics; they do not establish complete session protection.
 
 ### 1. Install
 
@@ -412,7 +412,7 @@ More ways in: [migrate a coding agent from MCP](docs/guides/MIGRATING-FROM-MCP.m
 ## Architecture
 
 Chio is layered around a single trusted core. External ecosystems enter through protocol
-edges that turn them into governed tool servers. The **Runtime Kernel** mediates every call
+edges that turn them into governed tool servers. The **Runtime Kernel** mediates calls routed through those edges
 and is the only trusted component. A **trust plane** (identity, credentials, federation,
 governance) and an **economy plane** (metering, budgets, settlement) draw on the receipts the
 kernel signs, and every decision is committed to the **Receipt Log**.
@@ -428,7 +428,7 @@ Only the Runtime Kernel is trusted (the TCB). The agent and tool servers are unt
 isolated, so a compromised agent or tool server cannot forge authorization or a receipt, and
 any registry or artifact mismatch fails closed.
 
-### Life of a tool call
+### Life of a kernel-routed tool call
 
 <p align="center">
   <picture>
@@ -443,7 +443,7 @@ any registry or artifact mismatch fails closed.
 | **2 &middot; Verify** | The kernel runs the full capability check: signature and expiry, target within granted scope, delegation attenuates (the child scope is a proven subset of its parent), neither the capability nor any ancestor is revoked, and DPoP when the grant requires it. |
 | **3 &middot; Budget** | If the grant carries monetary caps, the kernel places a durable pre-execution hold. An over-budget call is denied before anything runs. |
 | **4 &middot; Guard (in)** | Input guards run in sequence over the parameters (forbidden paths, egress and SSRF, secrets, velocity, data-flow, jailbreak, semantic data checks). Any deny denies the call. |
-| **5 &middot; Dispatch** | Only the kernel dispatches to the tool server. The agent never holds a handle to it. |
+| **5 &middot; Dispatch** | The kernel dispatches the admitted call to its tool server. The selected host/runtime profile must separately remove any direct route to the protected resource. |
 | **6 &middot; Guard (out)** | The result passes back through output and post-invocation guards (PII/PHI sanitization, anomaly and data-transfer checks). |
 | **7 &middot; Meter and sign** | The kernel reconciles the budget hold to actual cost, assembles the receipt (decision, policy hash, guard evidence, economic metadata), recomputes the content hash inside its trust boundary, and signs it. A call it cannot sign is not allowed. |
 | **8 &middot; Commit** | The receipt is written to the content-addressed log and folded into a Merkle checkpoint, where its evidence is available to the trust and economy planes. |
@@ -608,16 +608,16 @@ Each adapter follows a lift to kernel-verdict to lower pipeline over a real HTTP
 ### Ecosystem and plugins
 
 Beyond this repository, the [`backbay-labs`](https://github.com/backbay-labs) org ships
-companion plugins that bond an agent, IDE, or chat platform to a Chio policy. Each is a
+companion plugins that connect an agent, IDE, or chat platform to Chio policy and evidence. Each is a
 separate repo built on the shared `@chio/bridge` library and the `chio` CLI. Calls routed
 through the kernel can be mediated and receipt-signed. Hook-mode native activity is
 `detect_only`; complete host protection requires its separately qualified restricted profile.
 
 | Plugin | Repo | What it does |
 | --- | --- | --- |
-| **Claude Code** | [chio-claude-code-plugin](https://github.com/backbay-labs/chio-claude-code-plugin) | Hook-mode diagnostics and authorization prechecks (`detect_only`); a separate restricted-launcher candidate disables native tools and exposes kernel-controlled tools |
-| **Cursor** | [chio-cursor-plugin](https://github.com/backbay-labs/chio-cursor-plugin) | Bonds Composer, the Agent tab, inline AI, and mounted MCP servers via native Cursor hooks |
-| **Codex** | [chio-codex-plugin](https://github.com/backbay-labs/chio-codex-plugin) | Bonds the OpenAI Codex CLI plan-then-act loop through the guard pipeline, with attested plans |
+| **Claude Code** | [chio-claude-code-plugin](https://github.com/backbay-labs/chio-claude-code-plugin) | Hook diagnostics/prechecks are `detect_only`. A separate restricted-launcher candidate exposes kernel-controlled tools; full I01-I08 acceptance and compatible published delivery remain open. |
+| **Cursor** | [chio-cursor-plugin](https://github.com/backbay-labs/chio-cursor-plugin) | Editor policy prechecks and receipt inspection; hook activity is `detect_only`. The separate macOS discovery launcher is a candidate with protected model execution disabled. |
+| **Codex** | [chio-codex-plugin](https://github.com/backbay-labs/chio-codex-plugin) | Ordinary hooks provide diagnostics and receipt collection (`detect_only`). A separate restricted launcher has bounded file-tool evidence; full I01-I08 acceptance and compatible published delivery remain open. |
 | **OpenCode** | [chio-open-code-plugin](https://github.com/backbay-labs/chio-open-code-plugin) | Native OpenCode TUI plugin: scaffold, wrap, and ship bonded agents |
 | **OpenClaw** | [chio-open-claw-plugin](https://github.com/backbay-labs/chio-open-claw-plugin) | A hosted Chio edge in Slack, Discord, and Telegram: mention to propose a policy, passkey-countersign, then a bonded agent streams receipts to the thread |
 

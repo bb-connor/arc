@@ -33,5 +33,10 @@ Current ADR set:
 19. [ADR-0019 Kernel Delivery Contract](ADR-0019-kernel-delivery-contract.md)
 20. [ADR-0020 Finding Status Feed Governance](ADR-0020-finding-status-feed-governance.md)
 21. [ADR-0021 Hosted Market Storage Authority And Transition-Rule Ownership](ADR-0021-hosted-market-storage-authority.md)
+22. [ADR-0022 Sequencing The Store And Kernel Decomposition](ADR-0022-store-and-kernel-decomposition.md)
+
+Numbers ADR-0023 through ADR-0037 are reserved for the candidate decisions in
+the NVIDIA strategy input (pin N in the [desktop program map](../architecture/PROGRAM-MAP.md)).
+Reservation prevents numbering collisions; it does not accept those proposals.
 
 - [ADR-0038 Desktop Operator Program](ADR-0038-desktop-operator-program.md) - accepted for planning; shared operator surface and platform isolation adapters.
