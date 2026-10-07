@@ -772,6 +772,19 @@ where
     }
 }
 
+/// Whether `error` is [`block_on_async_tool_dispatch`] refusing the calling
+/// thread's current-thread runtime. That refusal returns before the bridged
+/// evaluation is polled, so nothing was admitted or dispatched. The bridge
+/// only polls on a thread where it does not refuse, so the same variant raised
+/// from inside an evaluation that ran never matches on the calling thread.
+fn is_unpolled_sync_bridge_refusal(error: &KernelError) -> bool {
+    matches!(
+        error,
+        KernelError::SyncBridgeIncompatibleWithCurrentThreadRuntime
+    ) && tokio::runtime::Handle::try_current()
+        .is_ok_and(|handle| handle.runtime_flavor() != tokio::runtime::RuntimeFlavor::MultiThread)
+}
+
 fn extract_session_anchor_reference_from_metadata(
     metadata: Option<&serde_json::Value>,
 ) -> Option<chio_core::session::SessionAnchorReference> {

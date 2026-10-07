@@ -892,6 +892,16 @@ impl ChioKernel {
         };
 
         if should_track_inflight {
+            // The sync bridge refused before polling the evaluation, so the
+            // claimed threshold wait is untouched. Dropping the armed claim
+            // restores its original binding for a retry on a supported runtime.
+            if request_claim
+                .as_ref()
+                .is_some_and(|claim| claim.retained().is_some())
+                && matches!(&evaluation, Err(error) if is_unpolled_sync_bridge_refusal(error))
+            {
+                return evaluation;
+            }
             let terminal_state = match &evaluation {
                 Ok(SessionOperationResponse::ToolCall(response)) => response.terminal_state.clone(),
                 _ => OperationTerminalState::Completed,

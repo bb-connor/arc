@@ -82,6 +82,14 @@ impl ChioKernel {
                     security_context.as_ref(),
                 )
             });
+        // The sync bridge refused before polling the evaluation, so the
+        // claimed threshold wait is untouched. Dropping the armed claim
+        // restores its original binding for a retry on a supported runtime.
+        if claim.retained().is_some()
+            && matches!(&result, Err(error) if is_unpolled_sync_bridge_refusal(error))
+        {
+            return result;
+        }
         let terminal_state = match &result {
             Ok(response) => response.terminal_state.clone(),
             Err(KernelError::RequestCancelled { request_id, reason })
