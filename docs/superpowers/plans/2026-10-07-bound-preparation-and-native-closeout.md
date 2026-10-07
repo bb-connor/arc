@@ -16,7 +16,7 @@ The first active-response capture had 12 genuine defect failures and two prefix-
 6. Preserve legacy signed bytes and exact committed recovery. Missing legacy preparation commitments cannot mint fresh authority or cancel another bound preparation. Unsupported ports fail closed.
 7. Refuse foreign schema before DDL and verify canonical bytes, hash, primary/unique keys and readiness. Add same-action alternate-binding, concurrent first-claim, wrong tuple, expiry, revocation, outage and legacy-fence controls.
 
-Run the same 25 actual owner cases after the complete composition, then owning tests and strict Clippy. Preserve all old attempts and exact source/input hashes.
+Run all 27 added Original cases plus the 14 existing controls in the kernel_review selection after the complete composition, then owning tests and strict Clippy. Preserve all old attempts and exact source/input hashes.
 
 ## Other verified repair owners
 
@@ -31,4 +31,4 @@ Run the same 25 actual owner cases after the complete composition, then owning t
 
 Finish all source repairs and independent slices before selecting source S or rotating trusted inputs. Reuse local caches for diagnostics; final cold/native/trusted/hosted evidence must bind the exact accepted candidate. No quota workaround substitutes for review, and neither review bot quota blocks continuing actual independent review.
 
-The preserved F075 APK/source proposal remains local until complete source/notices review and composition. Desktop, workbench, funded-work, research, and Mercury proof development stay separate. F041 delivery is completed on its separate follow-up branch; durable enqueue does not establish operator delivery or pass rollout stage 6. No new requeue API belongs in this foundation cut.
+The preserved F075 APK/source proposal remains local until complete source/notices review and composition. Desktop, workbench, funded-work, research, and Mercury proof development stay separate. F041 delivery remains on its separate follow-up branch, with implementation and qualification pending; durable enqueue does not establish operator delivery or pass rollout stage 6. No new requeue API belongs in this foundation cut.

@@ -6,7 +6,6 @@
   "main_snapshot": "f5566d9a765c21cb36652a99c79de64968a656bf",
   "semantics": "Source claims are historical unless separately qualified. Coverage is bookkeeping, not proof of security. Null repair or PR means not established or not yet assigned; it never means complete.",
   "active_landing_prs": [
-    1176,
     1160
   ],
   "waiting_foundation_pr": null,
@@ -120536,10 +120535,10 @@
         "checkpoint": "5696c4cf04a1a8368ef36dd51618ea1bd5f7fbfc",
         "reviewed_source": "d0496c14d824a327f00b98576132834306ff6694"
       },
-      "scope": "later",
-      "landing_pr": null,
-      "landing_unit": "security-follow-ups",
-      "current_state": "unestablished-current-source-not-qualified",
+      "scope": "now",
+      "landing_pr": 1160,
+      "landing_unit": "foundation",
+      "current_state": "current-original-red-claude-repair-pending",
       "source_repair": null,
       "source_integrated": null,
       "focused_green": null,
@@ -120587,7 +120586,10 @@
         "Codex_required": false,
         "Codex_quota_blocker": false,
         "review_acceptance_established": false
-      }
+      },
+      "current_source_checkpoint": "61b4272bf929f205db2bc3a38130e89c8f8a8ea1",
+      "qualified": false,
+      "current_reconciliation_requirement": "incoming-pr1160-review-20261007:resume:F042-CURRENT"
     },
     "incoming-pr1160-review-20261006:F043": {
       "requirement_id": "incoming-pr1160-review-20261006:F043",
@@ -120601,10 +120603,10 @@
         "checkpoint": "5696c4cf04a1a8368ef36dd51618ea1bd5f7fbfc",
         "reviewed_source": "d0496c14d824a327f00b98576132834306ff6694"
       },
-      "scope": "later",
-      "landing_pr": null,
-      "landing_unit": "security-follow-ups",
-      "current_state": "unestablished-current-source-not-qualified",
+      "scope": "now-control-mutex-and-attributed-native-history; later-broad-audit-split",
+      "landing_pr": 1160,
+      "landing_unit": "foundation",
+      "current_state": "pipeline-mutex-source-ready-composition-and-final-acceptance-pending",
       "source_repair": null,
       "source_integrated": null,
       "focused_green": null,
@@ -120652,7 +120654,10 @@
         "Codex_required": false,
         "Codex_quota_blocker": false,
         "review_acceptance_established": false
-      }
+      },
+      "current_source_checkpoint": "61b4272bf929f205db2bc3a38130e89c8f8a8ea1",
+      "qualified": false,
+      "preserved_followup": "Health caching and broad audit split remain later; the attributed native participant-history deadline is PG-HISTORY now."
     },
     "incoming-pr1160-review-20261006:F044": {
       "requirement_id": "incoming-pr1160-review-20261006:F044",
@@ -120666,10 +120671,10 @@
         "checkpoint": "5696c4cf04a1a8368ef36dd51618ea1bd5f7fbfc",
         "reviewed_source": "d0496c14d824a327f00b98576132834306ff6694"
       },
-      "scope": "later",
-      "landing_pr": null,
-      "landing_unit": "security-follow-ups",
-      "current_state": "unestablished-current-source-not-qualified",
+      "scope": "now",
+      "landing_pr": 1160,
+      "landing_unit": "foundation",
+      "current_state": "current-original-red-claude-repair-pending",
       "source_repair": null,
       "source_integrated": null,
       "focused_green": null,
@@ -120717,7 +120722,10 @@
         "Codex_required": false,
         "Codex_quota_blocker": false,
         "review_acceptance_established": false
-      }
+      },
+      "current_source_checkpoint": "61b4272bf929f205db2bc3a38130e89c8f8a8ea1",
+      "qualified": false,
+      "current_reconciliation_requirement": "incoming-pr1160-review-20261007:resume:F044-CURRENT"
     },
     "incoming-pr1160-review-20261006:F045": {
       "requirement_id": "incoming-pr1160-review-20261006:F045",
