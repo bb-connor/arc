@@ -1,11 +1,12 @@
 use super::{
-    Arc, BTreeMap, BTreeSet, BlastRadiusPort, CapabilitySetSuspensionBackend,
-    CapabilitySetSuspensionStore, Clock, ContainmentOverlayStore, EffectExecutionStatus, EffectId,
-    EffectPort, EffectRequest, EffectResult, EffectResultQuery, EgressRestrictionStore,
-    EscalateAlertBackend, EscalateAlertStore, IssuanceFreezeBackend, IssuanceFreezeStore,
-    LineageFence, LineageFenceMaintenanceOutcome, LineageFenceMaintenanceRequest,
-    MaintainedLineageFence, PortError, PortResult, RecordId, ResponseEffectKind,
-    ResponseSchedulerStore, ResponseTarget, RestrictEgressOverlayBackend,
+    decode_response_record, Arc, BTreeMap, BTreeSet, BlastRadiusPort, CanonicalBody,
+    CapabilitySetSuspensionBackend, CapabilitySetSuspensionStore, Clock, ContainmentOverlayStore,
+    Digest32, EffectExecutionStatus, EffectId, EffectOperation, EffectPort, EffectRequest,
+    EffectResult, EffectResultQuery, EgressRestrictionStore, EscalateAlertBackend,
+    EscalateAlertStore, IssuanceFreezeBackend, IssuanceFreezeStore, LineageFence,
+    LineageFenceMaintenanceOutcome, LineageFenceMaintenanceRequest, MaintainedLineageFence,
+    PortError, PortResult, RecordId, ResponseEffectKind, ResponsePlanKey, ResponseSchedulerStore,
+    ResponseSnapshot, ResponseTarget, RestrictEgressOverlayBackend,
     SessionSuspensionOverlayBackend, SessionThrottleBackend, SessionThrottleStore,
     SqliteSecurityStateStore, SqliteSiemOutbox, SystemClock, TenantId, EFFECT_COMMAND_ID_PREFIX,
     LINEAGE_FENCE_MAX_LEASE_MS,
@@ -65,13 +66,16 @@ impl std::error::Error for ActiveResponseEffectPortConfigError {}
 /// Fail-closed production router for active-response effects.
 ///
 /// Readiness succeeds only when all six closed protocol effects have distinct,
-/// healthy backends. The production tree has exact backends for all six closed
-/// kinds, including the commit-indexed issuance fence. A partial router cannot
-/// advertise global readiness. Additional backends can be injected without
-/// changing the effect request, idempotency key, target, or version
-/// commitments.
+/// healthy backends and the router holds the durable response-plan authority.
+/// With that authority every command and result query is bound to the exact
+/// effect of its durable plan before it reaches a backend. The production tree
+/// has exact backends for all six closed kinds, including the commit-indexed
+/// issuance fence. A partial or unbound router cannot advertise global
+/// readiness. Additional backends can be injected without changing the effect
+/// request, idempotency key, target, or version commitments.
 pub struct ActiveResponseEffectPort {
     backends: BTreeMap<ResponseEffectKind, Arc<dyn ResponseEffectBackend>>,
+    plan_authority: Option<Arc<dyn ResponseSchedulerStore>>,
 }
 
 impl ActiveResponseEffectPort {
@@ -126,12 +130,14 @@ impl ActiveResponseEffectPort {
                 IssuanceFreezeBackend::new_with_scheduler(
                     issuance_freeze_store,
                     blast_radius,
-                    scheduler_store,
+                    Arc::clone(&scheduler_store),
                 )
                 .with_clock(clock),
             ),
         ];
-        let router = Self::from_backends(backends).map_err(|_| PortError::invalid_data())?;
+        let router = Self::from_backends(backends)
+            .map_err(|_| PortError::invalid_data())?
+            .with_plan_authority(scheduler_store);
         router.ensure_effects_ready()?;
         Ok(router)
     }
@@ -148,7 +154,15 @@ impl ActiveResponseEffectPort {
         }
         Ok(Self {
             backends: configured,
+            plan_authority: None,
         })
+    }
+
+    /// Bind every command and result query to the durable response plan.
+    #[must_use]
+    pub fn with_plan_authority(mut self, plan_authority: Arc<dyn ResponseSchedulerStore>) -> Self {
+        self.plan_authority = Some(plan_authority);
+        self
     }
 
     #[must_use]
@@ -156,7 +170,10 @@ impl ActiveResponseEffectPort {
         let mut backends: BTreeMap<ResponseEffectKind, Arc<dyn ResponseEffectBackend>> =
             BTreeMap::new();
         backends.insert(ResponseEffectKind::SuspendSession, backend);
-        Self { backends }
+        Self {
+            backends,
+            plan_authority: None,
+        }
     }
 
     fn backend(&self, kind: ResponseEffectKind) -> PortResult<&Arc<dyn ResponseEffectBackend>> {
@@ -172,6 +189,7 @@ impl EffectPort for ActiveResponseEffectPort {
         if REQUIRED_EFFECT_KINDS
             .iter()
             .any(|kind| !self.backends.contains_key(kind))
+            || self.plan_authority.is_none()
         {
             return Err(PortError::unavailable());
         }
@@ -187,6 +205,12 @@ impl EffectPort for ActiveResponseEffectPort {
             request.scheduler_fencing_token,
             &request.idempotency_key,
         )?;
+        if let Some(plan_authority) = &self.plan_authority {
+            validate_durable_plan_binding(
+                plan_authority.as_ref(),
+                &DurablePlanBinding::from_request(request),
+            )?;
+        }
         self.backend(request.effect_kind)?.execute(request)
     }
 
@@ -199,6 +223,12 @@ impl EffectPort for ActiveResponseEffectPort {
             query.scheduler_fencing_token,
             &query.idempotency_key,
         )?;
+        if let Some(plan_authority) = &self.plan_authority {
+            validate_durable_plan_binding(
+                plan_authority.as_ref(),
+                &DurablePlanBinding::from_query(query),
+            )?;
+        }
         self.backend(query.effect_kind)?.load_result(query)
     }
 
@@ -283,4 +313,90 @@ pub(super) fn validate_request_binding(
         }
     }
     Ok(())
+}
+
+/// The commitments of one effect command or result query that must equal the
+/// exact effect of its durable response plan.
+pub(super) struct DurablePlanBinding<'a> {
+    tenant_id: &'a TenantId,
+    action_id: &'a chio_security_types::ports::ActionId,
+    plan_hash: Digest32,
+    plan_expires_at_unix_ms: u64,
+    effect_id: &'a EffectId,
+    effect_kind: ResponseEffectKind,
+    target: &'a ResponseTarget,
+    contribution_hash: Digest32,
+    canonical_contribution: Option<&'a CanonicalBody>,
+    apply_base_version_hash: Option<Digest32>,
+}
+
+impl<'a> DurablePlanBinding<'a> {
+    pub(super) fn from_request(request: &'a EffectRequest) -> Self {
+        Self {
+            tenant_id: &request.tenant_id,
+            action_id: &request.action_id,
+            plan_hash: request.plan_hash,
+            plan_expires_at_unix_ms: request.plan_expires_at_unix_ms,
+            effect_id: &request.effect_id,
+            effect_kind: request.effect_kind,
+            target: &request.target,
+            contribution_hash: request.contribution_hash,
+            canonical_contribution: Some(&request.canonical_contribution),
+            apply_base_version_hash: (request.operation == EffectOperation::Apply)
+                .then_some(request.expected_version_hash),
+        }
+    }
+
+    pub(super) fn from_query(query: &'a EffectResultQuery) -> Self {
+        Self {
+            tenant_id: &query.tenant_id,
+            action_id: &query.action_id,
+            plan_hash: query.plan_hash,
+            plan_expires_at_unix_ms: query.plan_expires_at_unix_ms,
+            effect_id: &query.effect_id,
+            effect_kind: query.effect_kind,
+            target: &query.target,
+            contribution_hash: query.contribution_hash,
+            canonical_contribution: None,
+            apply_base_version_hash: (query.operation == EffectOperation::Apply)
+                .then_some(query.expected_version_hash),
+        }
+    }
+}
+
+/// Load the durable response plan and require the bound command to name one
+/// of its effects exactly. A missing plan or effect, or any differing
+/// commitment, is an integrity failure.
+pub(super) fn validate_durable_plan_binding(
+    plan_authority: &dyn ResponseSchedulerStore,
+    binding: &DurablePlanBinding<'_>,
+) -> PortResult<ResponseSnapshot> {
+    let record = plan_authority
+        .load_plan(&ResponsePlanKey {
+            tenant_id: binding.tenant_id.clone(),
+            action_id: binding.action_id.clone(),
+        })?
+        .ok_or_else(PortError::integrity_failure)?;
+    let snapshot = decode_response_record(&record).map_err(|_| PortError::integrity_failure())?;
+    let planned_effect = snapshot
+        .plan
+        .effect(binding.effect_id)
+        .ok_or_else(PortError::integrity_failure)?;
+    if snapshot.plan.tenant_id != *binding.tenant_id
+        || snapshot.plan.action_id != *binding.action_id
+        || snapshot.plan.plan_hash != binding.plan_hash
+        || snapshot.plan.expires_at_unix_ms != binding.plan_expires_at_unix_ms
+        || planned_effect.kind != binding.effect_kind
+        || planned_effect.target != *binding.target
+        || planned_effect.contribution_hash != binding.contribution_hash
+        || binding
+            .canonical_contribution
+            .is_some_and(|body| planned_effect.canonical_contribution != *body)
+        || binding
+            .apply_base_version_hash
+            .is_some_and(|base| planned_effect.observed_base_version_hash != base)
+    {
+        return Err(PortError::integrity_failure());
+    }
+    Ok(snapshot)
 }

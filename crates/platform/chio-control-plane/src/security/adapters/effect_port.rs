@@ -51,7 +51,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 mod dispatch;
-use dispatch::validate_request_binding;
+use dispatch::{validate_durable_plan_binding, validate_request_binding, DurablePlanBinding};
 pub use dispatch::{
     ActiveResponseEffectPort, ActiveResponseEffectPortConfigError, LineageFenceMaintenanceResult,
     ResponseEffectBackend,

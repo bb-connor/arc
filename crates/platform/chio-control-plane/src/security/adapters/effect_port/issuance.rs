@@ -1,19 +1,19 @@
 use super::{
     decode_response_record, effect_query_from_request, empty_issuance_freeze_snapshot,
     issuance_freeze_installed_version_hash, issuance_freeze_version_hash,
-    predict_issuance_freeze_apply, predict_issuance_freeze_remove,
+    predict_issuance_freeze_apply, predict_issuance_freeze_remove, validate_durable_plan_binding,
     validate_issuance_freeze_contribution, validate_issuance_freeze_snapshot,
     validate_request_binding, verify_contribution_hash, Arc, BlastRadiusPort, BlastRadiusResult,
-    Clock, Digest32, EffectExecutionStatus, EffectId, EffectOperation, EffectRequest, EffectResult,
-    EffectResultQuery, IssuanceFreezeApplyRequest, IssuanceFreezeCommand,
-    IssuanceFreezeContribution, IssuanceFreezeFenceMaintenanceRequest, IssuanceFreezeKey,
-    IssuanceFreezeOperationStatus, IssuanceFreezePendingRelease, IssuanceFreezeRemoveRequest,
-    IssuanceFreezeSnapshot, IssuanceFreezeSpec, IssuanceFreezeStore, LineageFence,
-    LineageFenceMaintenanceRequest, LineageFenceMaintenanceResult, LineageFenceRelease,
-    LineageFenceRenewal, LineageFenceRequest, LineageFenceTakeover, PortError, PortResult,
-    RecordId, ResponseEffectBackend, ResponseEffectKind, ResponseEffectProgress, ResponsePlanKey,
-    ResponseSchedulerStore, ResponseSnapshot, ResponseState, ResponseTarget, ScheduledWork,
-    SystemClock, TenantId, LINEAGE_FENCE_MAX_LEASE_MS,
+    Clock, Digest32, DurablePlanBinding, EffectExecutionStatus, EffectId, EffectOperation,
+    EffectRequest, EffectResult, EffectResultQuery, IssuanceFreezeApplyRequest,
+    IssuanceFreezeCommand, IssuanceFreezeContribution, IssuanceFreezeFenceMaintenanceRequest,
+    IssuanceFreezeKey, IssuanceFreezeOperationStatus, IssuanceFreezePendingRelease,
+    IssuanceFreezeRemoveRequest, IssuanceFreezeSnapshot, IssuanceFreezeSpec, IssuanceFreezeStore,
+    LineageFence, LineageFenceMaintenanceRequest, LineageFenceMaintenanceResult,
+    LineageFenceRelease, LineageFenceRenewal, LineageFenceRequest, LineageFenceTakeover, PortError,
+    PortResult, RecordId, ResponseEffectBackend, ResponseEffectKind, ResponseEffectProgress,
+    ResponsePlanKey, ResponseSchedulerStore, ResponseSnapshot, ResponseState, ResponseTarget,
+    ScheduledWork, SystemClock, TenantId, LINEAGE_FENCE_MAX_LEASE_MS,
 };
 use chio_quarantine::lineage_fence_lapsed_error;
 use std::cmp::Ordering;
@@ -96,21 +96,10 @@ impl IssuanceFreezeBackend {
         spec: &IssuanceFreezeSpec,
     ) -> PortResult<ResponseSnapshot> {
         let scheduler = self.scheduler.as_ref().ok_or_else(PortError::unavailable)?;
-        let record = scheduler
-            .load_plan(&ResponsePlanKey {
-                tenant_id: request.tenant_id.clone(),
-                action_id: request.action_id.clone(),
-            })?
-            .ok_or_else(PortError::integrity_failure)?;
-        let snapshot =
-            decode_response_record(&record).map_err(|_| PortError::integrity_failure())?;
-        let planned_effect = snapshot
-            .plan
-            .effects
-            .as_slice()
-            .iter()
-            .find(|effect| effect.effect_id == request.effect_id)
-            .ok_or_else(PortError::integrity_failure)?;
+        let snapshot = validate_durable_plan_binding(
+            scheduler.as_ref(),
+            &DurablePlanBinding::from_request(request),
+        )?;
         let BlastRadiusResult::Exact {
             sorted_affected_ids,
             affected_set_hash,
@@ -119,17 +108,7 @@ impl IssuanceFreezeBackend {
         else {
             return Err(PortError::integrity_failure());
         };
-        if snapshot.plan.tenant_id != request.tenant_id
-            || snapshot.plan.action_id != request.action_id
-            || snapshot.plan.plan_hash != request.plan_hash
-            || snapshot.plan.expires_at_unix_ms != request.plan_expires_at_unix_ms
-            || planned_effect.kind != request.effect_kind
-            || planned_effect.target != request.target
-            || planned_effect.canonical_contribution != request.canonical_contribution
-            || planned_effect.contribution_hash != request.contribution_hash
-            || (request.operation == EffectOperation::Apply
-                && planned_effect.observed_base_version_hash != request.expected_version_hash)
-            || sorted_affected_ids != &snapshot.plan.affected_ids
+        if sorted_affected_ids != &snapshot.plan.affected_ids
             || *affected_set_hash != snapshot.plan.affected_set_hash
         {
             return Err(PortError::integrity_failure());
