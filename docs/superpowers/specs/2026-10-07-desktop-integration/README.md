@@ -19,9 +19,9 @@ it does not create another runtime or authority.
 5. [Delivery plan](../../plans/2026-10-07-desktop-integration.md).
 6. [Omarchy annex](../2026-10-07-omarchy-integration/ANNEX.md).
 
-The macOS annex is a dependent review change at
-`docs/superpowers/specs/2026-10-07-macos-integration/ANNEX.md`. It is intentionally
-absent from the shared-program branch until that change is integrated.
+The [macOS annex](../2026-10-07-macos-integration/ANNEX.md) and its
+[implementation plan](../../plans/2026-10-07-macos-integration/IMPLEMENTATION.md)
+are a dependent review change on the shared-program branch.
 
 ## First complete workflow
 
