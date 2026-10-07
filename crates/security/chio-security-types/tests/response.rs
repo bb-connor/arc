@@ -1,6 +1,6 @@
 use chio_security_types::ports::{
-    Digest32, EffectId, LeaseOwnerId, OpaqueReceiptRef, PreparedActiveResponseDispatchBinding,
-    RecordId, ResponseDispatchApproval, TenantId,
+    Digest32, EffectId, LeaseOwnerId, LineageId, OpaqueReceiptRef,
+    PreparedActiveResponseDispatchBinding, RecordId, ResponseDispatchApproval, TenantId,
     PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION,
 };
 use chio_security_types::{
@@ -608,6 +608,66 @@ fn response_plan_rejects_zero_cryptographic_commitments() {
     assert_eq!(
         zero_target.validate_shape(),
         Err(ResponseShapeError::InvalidTargetAffectedSetHash)
+    );
+}
+
+#[test]
+fn response_plan_holds_at_most_one_leading_issuance_fence() {
+    let valid = valid_response_plan();
+    let template = valid
+        .effects
+        .as_slice()
+        .first()
+        .cloned()
+        .unwrap_or_else(|| panic!("fixture plan has no effect"));
+    let effect = |ordinal: u16, kind: ResponseEffectKind| {
+        let mut effect = template.clone();
+        effect.ordinal = ordinal;
+        effect.effect_id = EffectId::new(format!("lineage-effect-{ordinal}"))
+            .unwrap_or_else(|error| panic!("effect id: {error}"));
+        effect.kind = kind;
+        effect.target = match kind {
+            ResponseEffectKind::FreezeIssuance => ResponseTarget::Lineage {
+                lineage_id: LineageId::new(format!("lineage-root-{ordinal}"))
+                    .unwrap_or_else(|error| panic!("lineage id: {error}")),
+            },
+            _ => ResponseTarget::CapabilitySet {
+                affected_set_hash: valid.affected_set_hash,
+            },
+        };
+        effect
+    };
+    let with_effects = |kinds: &[ResponseEffectKind]| {
+        let mut plan = valid.clone();
+        plan.effects = PlannedResponseEffects::new(
+            kinds
+                .iter()
+                .enumerate()
+                .map(|(ordinal, kind)| {
+                    effect(
+                        u16::try_from(ordinal).unwrap_or_else(|error| panic!("ordinal: {error}")),
+                        *kind,
+                    )
+                })
+                .collect(),
+        )
+        .unwrap_or_else(|error| panic!("bounded effects failed: {error}"));
+        plan.validate_shape()
+    };
+    let freeze = ResponseEffectKind::FreezeIssuance;
+    let suspend = ResponseEffectKind::SuspendCapabilitySet;
+    assert_eq!(with_effects(&[freeze, suspend]), Ok(()));
+    assert_eq!(
+        with_effects(&[freeze, freeze]),
+        Err(ResponseShapeError::DuplicateIssuanceFence)
+    );
+    assert_eq!(
+        with_effects(&[freeze, suspend, freeze]),
+        Err(ResponseShapeError::DuplicateIssuanceFence)
+    );
+    assert_eq!(
+        with_effects(&[suspend, freeze]),
+        Err(ResponseShapeError::MissingIssuanceFence)
     );
 }
 

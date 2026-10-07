@@ -225,6 +225,12 @@ fn a_plan_with_two_issuance_freezes_is_refused_before_it_can_share_one_fence() {
         reason_hash: digest(b"duplicate-freeze-reason"),
     };
 
+    assert!(matches!(
+        build_response_plan(input.clone()),
+        Err(chio_quarantine::StateMachineError::Shape(
+            chio_security_types::ResponseShapeError::DuplicateIssuanceFence
+        ))
+    ));
     let blast: Arc<dyn BlastRadiusPort> = resolver;
     let (refusal, consequence) = match build_response_plan(input) {
         Err(error) => (Some(error.to_string()), None),
