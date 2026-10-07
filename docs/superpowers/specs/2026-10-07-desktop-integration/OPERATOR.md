@@ -123,6 +123,18 @@ delivery owners must supply the supported binding; an absent binding disables
 that route. Existing and reconnecting sessions must withstand endpoint takeover,
 and captured material must not authenticate to the genuine restored controller.
 
+Authenticating the controller does not authenticate a browser request. Before any
+protected read, subscription or mutation, the existing native transport/session
+owner MUST require non-ambient request/session proof and bind it to the exact
+intended workbench origin and authenticated session. Validate that origin and
+proof on the supported HTTP request or WebSocket handshake, and retain the
+binding for messages on an admitted connection. A live cookie, permitted Origin,
+CORS policy or loopback address alone is insufficient. Missing, null, substituted
+or unauthorized origins and absent/invalid proof refuse protected bytes and
+native effects; no cookie-only, origin-only or weaker transport fallback is
+allowed. The browser delivery/session owners define and qualify this through
+their existing authentication contract, not a desktop-private proof protocol.
+
 Each connection negotiates the exact operator version and required owner profiles
 before other requests. Reconnect always renegotiates. Unsupported or inconsistent
 versions close the connection with a bounded non-authorizing diagnostic and zero
@@ -170,6 +182,20 @@ current read/audience checks still apply. New mutations compare the reviewed bas
 and expected revision atomically at the owning transition, and recheck mutable
 authority at native commitment. There is no transaction across owners. A missing
 controller/index row is never proof of no native operation.
+
+For each exposed profile, inventory every effecting mutation and its native
+owner, full intent binding and retained-identity interface. This includes work
+creation/preparation, offer selection, approval/denial, recovery resume/cancel,
+support export, artifact release/publication, task closure, emergency restrict/resume and
+installation/update/removal or other lifecycle actions wherever exposed. Each
+owner MUST atomically arbitrate concurrent submissions of the same identity:
+exact intent joins the original operation/result or retained uncertainty, with
+one native operation/outcome and no duplicate downstream effects; changed intent
+conflicts before retention or effect under that identity. Controller-only
+deduplication cannot satisfy this owner obligation.
+Qualify each inventory entry at its native lookup/admission/commit boundary, not
+only work creation or approval. Unexposed mutations stay unavailable and do not
+become prerequisites for a read-only profile.
 
 Consume S9 M20 `IdentityDisposition` and the owner's separate retry guidance.
 `Reusable`, `Retained` and `Terminal` are not desktop classifications. In
@@ -263,17 +289,17 @@ Owners add executable coverage beside their implementation; operator integration
 tests exercise composition. Reuse native vectors and test harnesses. The retired
 desktop fixture corpora are review history, not a second conformance authority.
 Apply the matrix to the exact exposed capabilities, with the mandatory Observe
-cases and conditional W1/recovery cases in QUALIFICATION. Unexposed mutation
+cases and separately selected mutation/W1/recovery cases in QUALIFICATION. Unexposed mutation
 cases remain owner obligations for later capabilities; they do not block a
 read-only freeze or become accepted by that freeze.
 
 | Acceptance case | Responsible owner and decisive evidence |
 | --- | --- |
 | Wrong peer, replaced/symlinked socket, guest access, Darwin unsupported path; reconnect/version mismatch | IPC owner plus operator: real process probes, bounded transcripts and zero unauthorized dispatch. |
-| Enrolled browser meets an impostor at its permitted origin; captured material is replayed with an allowed Origin | Browser delivery/session owners: no private bytes or reusable credentials at the impostor, no replayed admission; genuine authenticated reconnect succeeds. |
+| Enrolled browser meets an impostor at its permitted origin; captured material is replayed with an allowed Origin; a malicious origin targets the genuine controller using a live ambient-cookie session through HTTP or cross-site WebSocket | Browser delivery/session owners: no private bytes or reusable credentials at the impostor, no replayed admission, and no protected read/subscription bytes or effects for cross-site requests. Require exact-origin binding plus non-ambient owner proof; legitimate authenticated requests and reconnect succeed. |
 | Duplicate keys, invalid numeric/Unicode tokens, maximal escaping, one-over aggregate size; wrong method/request/session result | Owner decoders plus operator: original-byte rejection and dispatch counters; no truncated identity. |
-| Same ID with each semantic field changed; exact replay after restart, revision advance and full capacity; barrier-synchronized duplicate work-create and approval submissions | Work/recovery/native owners: atomic full-body lookup/retention with one transition/effect; concurrent changed intent conflicts before retention and current audience rejection still works. |
-| Crash before dispatch, after native effect and before response/index persistence | Owning mutation services: independent effect marker, original-ID lookup before handle, no second invocation. |
+| For every exposed effecting mutation in the profile inventory: same ID with each semantic field changed; exact replay after restart, revision advance and full capacity; barrier-synchronized concurrent exact and changed intent | Each owning native service: atomic full-body lookup/retention with one original operation/outcome or its retained uncertainty and no duplicate downstream effects; no duplicate protected dispatch, concurrent changed intent conflicts before retention, and current audience rejection still works. |
+| Crash before dispatch, after native effect and before response/index persistence | Owning mutation services: independent effect marker, original-ID lookup before handle, no duplicate protected dispatch. |
 | Six work axes disagree; result exists but release is refused; payment remains unresolved | W1/recovery/payment owners: faithful separate observations and no unauthorized result bytes. |
 | Changed catalog/snapshot between pages; snapshot expiry; lag, restore, missed terminal and lost ack | Enumeration owner and S5: either consistent authoritative reconstruction or explicit gap; bounded queues and idempotent scoped ack. |
 | Empty readiness profile, stale/wrong-login/future health, absent typed scope, duplicate budgets, unavailable limit | Profile/health owners plus operator: actions remain disabled; native admission independently refuses stale basis. |
@@ -281,11 +307,21 @@ read-only freeze or become accepted by that freeze.
 | SelectOffer uses stale workflow revision, substituted offer or lost reply | Recovery owner: reject a stale/substituted selection; reconcile the original selection command before approval/resume, with no second effect. |
 | Deny retaining approve material; changed proposal, recipient, decision ID or revision; revoked approver | Approval owner: installed verifier rejects each mismatch with zero protected effect. |
 | Per-task closure races dispatch/release and descendant spawn/exec/reparent; kernel stop reply lost; unsupported tenant/recovery scope | S4/S8/process owners: exact closure coverage, independent exit evidence, retained unknown outcome and no scope escalation. |
+| Leading-dash operands, option aliases and Git pathspec magic/globs reach each exposed native helper | Helper/tool owner: the actual parser rejects them or treats them as bounded literal data, with no unintended file reads, execution or egress; ordinary operands still perform the intended operation. |
 | Long-lived idle/active workbench with recovery hints and redacted errors | S5/recovery/operator: no command-poll quota drain, bounded refresh cost, no secrets in argv, logs, events, crash data or caches. |
 
 Agent text, filenames, tool output, URLs and labels are untrusted presentation.
 Render inertly; trusted controls/review origins are distinct. Native helpers use
-literal argv and bounded stdin, never shell interpolation. Credentials and decision
+a fixed trusted executable/options, literal argv and bounded stdin, never shell
+interpolation. Literal argv alone does not prevent option or pathspec injection.
+Every helper MUST preserve untrusted operands as data under the actual tool
+parser: use a verified end-of-options separator where supported, or the owner
+API's descriptor/stdin/typed-operand interface with qualified literal semantics.
+For Git path operands, `--` alone is insufficient: use the actual Git interface's
+literal-pathspec behavior or reject unsupported operands. Do not infer support
+for a separator or safe stdin from another tool; map and test each invocation.
+Untrusted names/paths cannot select options, configuration, helpers or expanded
+file sets. Missing operand safety disables that helper. Credentials and decision
 tokens stay in native custody; redact before logging/caching, and recheck audience
 on every fetch/export. Artifacts are evidence only after native verification.
 
