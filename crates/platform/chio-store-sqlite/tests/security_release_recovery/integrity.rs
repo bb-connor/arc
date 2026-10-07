@@ -196,6 +196,10 @@ fn checkpoint_survives_authorized_payload_compaction_and_owner_rotation() -> Tes
 
 #[test]
 fn removing_hook_configuration_cannot_erase_a_pending_release() -> TestResult {
+    use chio_kernel::admission_operation::{
+        AdmissionOperationStore, AdmissionRecoveryError, AdmissionRecoveryFailureKind,
+        AdmissionRecoveryPhase,
+    };
     let mut fixture = Fixture::new()?;
     fixture.nonce_enabled = false;
     let runtime = open(
@@ -217,20 +221,48 @@ fn removing_hook_configuration_cannot_erase_a_pending_release() -> TestResult {
     let operation =
         chio_kernel::admission_operation::AdmissionOperationId::from_persisted(original.0.clone())?;
     drop(runtime);
-    let runtime = fixture.open_with_reconcile(false)?;
-    let recovery = runtime.kernel.reconcile_durable_admission_startup();
-    assert!(
-        matches!(
-            &recovery,
-            Err(KernelError::DurableAdmission(reason))
-                if reason == "recovered post-return plan does not match durable admission"
-        ),
-        "changed security profile startup returned {recovery:?}"
+    let expected_failure = KernelError::AdmissionRecovery(Box::new(AdmissionRecoveryError::Item {
+        kind: AdmissionRecoveryFailureKind::ContractChanged,
+        detail: "recovered post-return plan does not match durable admission".into(),
+    }));
+    assert_eq!(
+        expected_failure.report().code,
+        "CHIO-KERNEL-DURABLE-ADMISSION"
     );
-    assert!(runtime
-        .kernel
-        .evaluate_tool_call_blocking(&request)
-        .is_err());
+    let runtime = fixture.open_with_reconcile(false)?;
+    assert_eq!(runtime.kernel.reconcile_durable_admission_startup()?, 0);
+    let store = runtime.authority.admission_operation_store();
+    let status = store
+        .load_recovery_status(
+            &operation,
+            &runtime.authority.mutation_fence(),
+            chio_test_support::clock::unix_millis(),
+        )?
+        .ok_or("changed security profile must retain its fenced deferral")?;
+    status
+        .deferral
+        .validate_for(&store.load_by_operation_id(&operation)?.ok_or("operation")?)?;
+    assert!(status.quarantined);
+    assert_eq!(status.deferral.phase, AdmissionRecoveryPhase::Returned);
+    assert_eq!(
+        status.deferral.failure_kind,
+        AdmissionRecoveryFailureKind::ContractChanged
+    );
+    assert_eq!(status.deferral.attempt_count, 1);
+    assert_eq!(
+        status.deferral.diagnostic_digest.as_str(),
+        chio_core::sha256_hex(expected_failure.to_string().as_bytes())
+    );
+    drop(store);
+    let conflict = runtime.kernel.evaluate_tool_call_blocking(&request)?;
+    assert_eq!(conflict.verdict, chio_kernel::Verdict::Deny);
+    assert_eq!(
+        conflict.reason,
+        Some(format!(
+            "durable admission failed: request id conflicts with retained operation {}",
+            original.0
+        ))
+    );
     assert_eq!(grant_quota(&runtime, &request)?, (0, 1));
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
     assert_eq!(
@@ -245,6 +277,10 @@ fn removing_hook_configuration_cannot_erase_a_pending_release() -> TestResult {
     drop(runtime);
     // Restoring the profile must expose the same unresolved obligation, not
     // consume a fresh, now-permissive owner to manufacture its checkpoint.
+    // Startup retries the quarantined operation only after its deferral.
+    let _retry_clock = chio_test_support::clock::scope_unix_secs(
+        status.deferral.retry_not_before_unix_ms.div_ceil(1_000),
+    );
     let fresh_releases = Arc::new(AtomicUsize::new(0));
     let runtime = open(
         &fixture,
@@ -258,10 +294,16 @@ fn removing_hook_configuration_cannot_erase_a_pending_release() -> TestResult {
         runtime.kernel.reconcile_durable_admission_startup(),
         Err(KernelError::SecurityDispatchOutcomeRecoveryRequired(_))
     ));
-    assert!(runtime
+    let pending = runtime
         .kernel
-        .evaluate_tool_call_blocking_with_security_context(&request, &context(&request)?,)
-        .is_err());
+        .evaluate_tool_call_blocking_with_security_context(&request, &context(&request)?)?;
+    assert_eq!(pending.verdict, chio_kernel::Verdict::Deny);
+    assert_eq!(
+        pending.reason.as_deref(),
+        Some(
+            "durable admission failed: request maps to a retained admission awaiting background recovery"
+        )
+    );
     assert_eq!(
         operation_state(&fixture, &request.request_id)?,
         Some(original)
