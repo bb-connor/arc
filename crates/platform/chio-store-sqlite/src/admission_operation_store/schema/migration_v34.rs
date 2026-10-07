@@ -6,7 +6,10 @@ use super::*;
 mod tests;
 
 pub(super) fn predecessor_schema() -> String {
-    ADMISSION_OPERATION_SCHEMA.replace("'awaiting_caller_report', ", "")
+    // A v33 predecessor cannot contain recovery commit constraints from v35.
+    // Older builders compose this model, including isolated migration tests.
+    super::migration_v35::predecessor_sql(ADMISSION_OPERATION_SCHEMA.to_owned())
+        .replace("'awaiting_caller_report', ", "")
 }
 
 pub(super) fn verify_pre_migration_schema(
