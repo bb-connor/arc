@@ -11,5 +11,12 @@ help: Check that the patched package version and available features are compatib
       with the dependency requirements. If the patch has a different version from
       what is locked in the Cargo.lock file, run `cargo update` to use the new
       version. This may also occur with an optional dependency that is not enabled.
-    Finished `dev` profile [unoptimized] target(s) in 1.24s
+   Compiling chio-kernel v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/kernel/chio-kernel)
+   Compiling chio-finding-verifier v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-finding-verifier)
+   Compiling chio-transaction-passport v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-transaction-passport)
+   Compiling chio-risk-comptroller v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-risk-comptroller)
+   Compiling chio-commerce-order v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-commerce-order)
+   Compiling chio-agent-web-interop v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-agent-web-interop)
+   Compiling chio-store-sqlite v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-store-sqlite)
+    Finished `dev` profile [unoptimized] target(s) in 1m 45s
      Running `/home/connor/chio-pr1173-target/debug/examples/dynamic_delegation`

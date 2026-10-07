@@ -7062,6 +7062,924 @@
       "observed_result": "Actual existing-pipeline Python generation RED/renewal, byte stability, complete SDK216 tests and full generated delta review.",
       "bytes": 443,
       "sha256": "1ea83d47f56d816d9ffe7d03001059d05ef66dba0e08f3102e6d62eb6f5b7bf1"
+    },
+    {
+      "log": "a0447e36ae-additional-job-112589866212.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 5594,
+      "sha256": "73e1d3b48b02aa06ffa42ec34ab78507bc6d7f2f06dbd595fdae12b7ad8e2eec"
+    },
+    {
+      "log": "a0447e36ae-additional-job-112589866212.log.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 141054,
+      "sha256": "f60bc9d5e561fa8c925d6918d2342609119f23bebe4e5df29242af70e111b9b1"
+    },
+    {
+      "log": "a0447e36ae-additional-job-112609251364.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 3211,
+      "sha256": "359ed4dc34bc9bdf4a6156ed871e489db35969f65e3ec657e866f305f01a1ee0"
+    },
+    {
+      "log": "a0447e36ae-additional-job-112609251364.log.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 170191,
+      "sha256": "07f06ceda367b75b7cfa66fe84f950a349e28b17c2be3d46794e7b29120bfca9"
+    },
+    {
+      "log": "a0447e36ae-continuation-snapshot.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 65998,
+      "sha256": "4baacdfbb78ad0f13495680b295aa417f4ec09dc4a95165eb30492ce9155a58d"
+    },
+    {
+      "log": "a0447e36ae-cosigner-conformance-baseline.log.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 14492,
+      "sha256": "540e34caaab5fed44bc784b2f505a357d7a3453626ed9c1814d9faed589fcaa0"
+    },
+    {
+      "log": "a0447e36ae-cosigner-conformance-restored.log.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 7905,
+      "sha256": "55a8ec75e9c16bdecdf9becee9dd08ec8267219330deb17483c11af8b005499b"
+    },
+    {
+      "log": "a0447e36ae-cosigner-conformance-survivor.log.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 8409,
+      "sha256": "a1362c35bcd587d59e8d283b3648913478c7e0e04f4f279ba2ab09bf067712c9"
+    },
+    {
+      "log": "a0447e36ae-cosigner-scope-checkout-removal.log.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "a0447e36ae-cosigner-scope-checkout.log.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 2518,
+      "sha256": "af581cf31a7aa669e0e88936239eb887cf5aa006185edb214720263fd278162f"
+    },
+    {
+      "log": "a0447e36ae-cosigner-scope-retention.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 315,
+      "sha256": "ab177ec7b9d4b74c008a3602697faa18c6d22262ef8d4097276f3edf2025326b"
+    },
+    {
+      "log": "a0447e36ae-cosigner-scope.status.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 2543,
+      "sha256": "3423d055a97ca9c05eb4ab7cf0121cae3868efb752f3b83f823155b6c07e9637"
+    },
+    {
+      "log": "a0447e36ae-cve-artifact-metadata.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 788,
+      "sha256": "8d2e3da9199a02465e6ab3b019bbe7af270e6e6d88d2223a529665f867dc92b6"
+    },
+    {
+      "log": "a0447e36ae-cve-artifact.zip.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 12066,
+      "sha256": "69fb5009079b98e66786e7c9c3954313c257b4971faf505b4b27377ad47a5d8e"
+    },
+    {
+      "log": "a0447e36ae-enterprise-owner-blockers.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 1648,
+      "sha256": "90d7bb05332c477244baaa0e2ef3d764606fa8fc689f907cc1da3ea9901c15e9"
+    },
+    {
+      "log": "a0447e36ae-failed-job-112609251245.log.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 1503891,
+      "sha256": "7377bd77537570ec7777e60816cf98fe0109363c6b4a7dceec70a72af4308a93"
+    },
+    {
+      "log": "a0447e36ae-failed-job-112609251413.log.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 993877,
+      "sha256": "67d782b0fd0fab4bff435e15b7e1b96219e7db486529cf638ad0d6d9e7ad4e1f"
+    },
+    {
+      "log": "a0447e36ae-failed-job-112616605549.log.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 1781448,
+      "sha256": "048fa9672f3ed8443adc908840e2c266cd25d140ce298928b3a35900828671e5"
+    },
+    {
+      "log": "a0447e36ae-failed-job-112616605561.log.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 511426,
+      "sha256": "d7a0a24a2be54b8b5fbb75f6c1d82daa17d707373d730acb1df0088d101a87ba"
+    },
+    {
+      "log": "a0447e36ae-failed-job-112616605600-independent-metadata.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 4119,
+      "sha256": "027dab8abdca586322c2f3cfca3015e191b2c78b3f3efc40da789011eff988a8"
+    },
+    {
+      "log": "a0447e36ae-failed-job-112616605600.log.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 155868,
+      "sha256": "8c47d4f46c54a99ec21d2caddeef8edbf2b39e9fe9bf640ad38baf9d2e849b94"
+    },
+    {
+      "log": "a0447e36ae-failed-job-112616605651-independent-metadata.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 3864,
+      "sha256": "ee6561e7392d4b6928ef8f08b192bf0cb74ebea159ae6d572075f97e41df1d4a"
+    },
+    {
+      "log": "a0447e36ae-failed-job-112616605651.log.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 152782,
+      "sha256": "55abd12e7dd8d526049b42ee0739ba2b78481d1550dba91ea1c6d0b20e43e14c"
+    },
+    {
+      "log": "a0447e36ae-failed-job-112660544051.log.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 3234,
+      "sha256": "5a99f512cae741a0216841304bfef4812989ec455f6b41da0c9b31fef529175f"
+    },
+    {
+      "log": "a0447e36ae-federation-survivor-diff_path.txt.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 944,
+      "sha256": "3ae039131f7aa997597cf60c1173aa32d6074f1f4ac29d35e5ef1dbbe315657b"
+    },
+    {
+      "log": "a0447e36ae-federation-survivor-log_path.txt.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 154110,
+      "sha256": "6c905ed984d56e4b1c19ba8b3d21f3139beb19b31f76ed18915cff2e85fe9cb1"
+    },
+    {
+      "log": "a0447e36ae-formal-kani-complete-verification.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 1571,
+      "sha256": "a78eb4185ff1a3ebf4df00e98c03e4cfef241d1910a662eb419baa5cd97cf078"
+    },
+    {
+      "log": "a0447e36ae-formal-kani-job-112596749947.log.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 9818054,
+      "sha256": "703bc83a184e28de48c4843a8754690bbf92310abc500e73b39ff2011cf7f2d0"
+    },
+    {
+      "log": "a0447e36ae-formal-kani-job-112596749988.log.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 98632233,
+      "sha256": "6bc8113d8c52ed3da1c334bfe69b3228b74a6c386676e65194c588da6f46010f"
+    },
+    {
+      "log": "a0447e36ae-formal-kani-job-inventory.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 19591,
+      "sha256": "82f5920d17efd181adcca3489a3cf4b04bb0f784103692277e94b4444b1d1a6e"
+    },
+    {
+      "log": "a0447e36ae-fuzz-independent-verification.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 661,
+      "sha256": "1f25b003dc54badb5ea3bc2640cf4a413771b27f3d1500c68956976176036456"
+    },
+    {
+      "log": "a0447e36ae-fuzz-verification.log.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 239,
+      "sha256": "987080745b6dc615fd15bfec2d6f080e18755ca8d2641c4900f799a48bf5d5f2"
+    },
+    {
+      "log": "a0447e36ae-hosted-job-112589863602.log.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 417183,
+      "sha256": "d5bb5301fb2c95ff025b30db6b392e5b5e469cf5d693b6eaf4262b33628863ac"
+    },
+    {
+      "log": "a0447e36ae-hosted-job-112589863718.log.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 81587,
+      "sha256": "87764afa8b1a36275571edb35d98bc814fc2c62388f0ed4c532629ce111c4828"
+    },
+    {
+      "log": "a0447e36ae-hosted-job-112598286141.log.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 2617235,
+      "sha256": "d9b81d55a7fa7778c27aaca7fca95a26295ee9fbf142dc167538821af703daf1"
+    },
+    {
+      "log": "a0447e36ae-hosted-job-112598286141.verification.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 2410,
+      "sha256": "08702dafb63940f495dd92cb147b14757119002819adb21c2ca9b20f9951dc76"
+    },
+    {
+      "log": "a0447e36ae-hosted-job-112609251537.log.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 108251277,
+      "sha256": "ca2b7d47a36b932a94b02c06de6c27b7f4cae454f94120b48fe3bcb4b1bb4c91"
+    },
+    {
+      "log": "a0447e36ae-hosted-job-112609251537.verification.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 5430,
+      "sha256": "306f2eb33a2c43c834eec27454974843c2066b721104fd7b6785f9fedb2330d7"
+    },
+    {
+      "log": "a0447e36ae-image-audit-job-112589863707.log.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 157341,
+      "sha256": "3bfaaae164bc5771ce4ea44b6108689202a40cd043865f3fcd18ddc1087c590f"
+    },
+    {
+      "log": "a0447e36ae-image-audit-job-112589863764.log.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 61503,
+      "sha256": "17e240b7f9ac1707ff524c5b99c5cc95cd3848bc5c1139465b36c8922e8abe99"
+    },
+    {
+      "log": "a0447e36ae-image-audit-qualification.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 37546,
+      "sha256": "9b9f1753ced0a2cb64e50453925474fe98088617f8d99d7a3ee6a39d1c807aeb"
+    },
+    {
+      "log": "a0447e36ae-independent-lifetime-inventory.log.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "a0447e36ae-independent-postgres-job-claim-loss-qualification.log.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 62,
+      "sha256": "a26c5cc1349f3e4a67c6e2f0c03f1bb244e0dd812e7238f03e1db1741ebe7f5d"
+    },
+    {
+      "log": "a0447e36ae-independent-postgres-job-process-qualification.log.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 63,
+      "sha256": "f294feb9b2dbfe731c05aa6ca1ae01902b8a7dd6e6554c06d741698cba650f72"
+    },
+    {
+      "log": "a0447e36ae-kani-verification.log.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 156,
+      "sha256": "4f6ad548bf29b1ed73c2256b1bb5fe51fd791603d89787daeb66b076fa3123c9"
+    },
+    {
+      "log": "a0447e36ae-lifetime-review-after.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 45879,
+      "sha256": "72562edf37755336e31632a4a221510e05e76b10a11abe9f4d31c5f2321b7940"
+    },
+    {
+      "log": "a0447e36ae-lifetime-review-before.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 45880,
+      "sha256": "30127793f501675e68b211a1e01800397def5dd53722b32fbd2214c58f276019"
+    },
+    {
+      "log": "a0447e36ae-lifetime-review-resolution.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 709,
+      "sha256": "b8227e03ee20d1cca009f59adb4ed3416c1ca54254284028832e63263a6d2a7e"
+    },
+    {
+      "log": "a0447e36ae-live-refresh.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 49798,
+      "sha256": "43a46a51d0a5cec4b779c12c02dc9e9b99c80ffc4b8a0ba6bb38a458dd6d20f3"
+    },
+    {
+      "log": "a0447e36ae-live-review-current.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 53080,
+      "sha256": "a2e904d93355a4fc9f3b98325d8065278f1a51e1258908245ddedfff80d7bafb"
+    },
+    {
+      "log": "a0447e36ae-mutation-job-112589866179.log.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 140124,
+      "sha256": "1be26e563070340b778a3c1ef3e56382a0fe7dec6810967f5da5f8a012870c59"
+    },
+    {
+      "log": "a0447e36ae-mutation-qualification-inventory.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 7646,
+      "sha256": "065796561c332fd24199e23e7337050995c49125ba6d4e7b2a4af9df165336a4"
+    },
+    {
+      "log": "a0447e36ae-postgres-artifact-index.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 2699,
+      "sha256": "ccb65f6c710509f94d379a9ed533472b5289ada353e7b27adf9b8c9bb31a6f6e"
+    },
+    {
+      "log": "a0447e36ae-postgres-download.log.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 362,
+      "sha256": "0b5cadfbbd9f282cb6f6b2ce843693739f4a80420809aea405044412e665a1da"
+    },
+    {
+      "log": "a0447e36ae-postgres-independent-verification.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 3693,
+      "sha256": "31e10907f49cdac387a9e2c5920769273276c71fdc74740b33208f12184886c4"
+    },
+    {
+      "log": "a0447e36ae-postgres-verification.log.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 321,
+      "sha256": "00a1e17f86be87c1140bd5404a882cfd82aec4438bdfb813eb8d3429a34ebf4f"
+    },
+    {
+      "log": "a0447e36ae-progress-job-112589863602.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 6056,
+      "sha256": "b949018c124fe397b4bd7709fa4c93940a0d9d6ffa007259303b84640eb27b01"
+    },
+    {
+      "log": "a0447e36ae-progress-job-112589866179.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 4425,
+      "sha256": "a3680a292dca7f3dcd0b091038e498b332be5d948ce965d38b75e03cd14785d2"
+    },
+    {
+      "log": "a0447e36ae-progress-job-112598286141.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 5112,
+      "sha256": "d792f4f3158187bbfbba9ffa10779cae057478d433ec75469a6effe0c75714f0"
+    },
+    {
+      "log": "a0447e36ae-progress-job-112609251245.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 11523,
+      "sha256": "f2e37d6bab36426ef60c875de11dffbaaa4e3381531804d19b3caf2f28472299"
+    },
+    {
+      "log": "a0447e36ae-progress-job-112609251364.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 2458,
+      "sha256": "3c5dd34114a1d69dd91bac22aba37ef5aa973b96f98ea69295fcded484e00c1d"
+    },
+    {
+      "log": "a0447e36ae-progress-job-112609251718.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 3639,
+      "sha256": "227df0074fbe99cf23da8c22dee9a1e35ad66d07ed861bdcd126b4c4726a9a03"
+    },
+    {
+      "log": "a0447e36ae-pushed-candidate-verification.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 694,
+      "sha256": "f92d5584a1fdea1add3b9eb16f77dd0be000a29f5684427f503675f08a770b2c"
+    },
+    {
+      "log": "a0447e36ae-skip-conditions-enterprise-failure.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 6912,
+      "sha256": "8d8998cefa80b76aca31a24ee35351a56522f64bea48bfa45abee19061f1a9b5"
+    },
+    {
+      "log": "a0447e36ae-skip-conditions-intermediate-handoff.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 5299,
+      "sha256": "46b4612af96f3964e34783c38b728688427c4d61c6724ab35ba3774dc6d81aa8"
+    },
+    {
+      "log": "a0447e36ae-workflow-inventory-intermediate.json.gz",
+      "observed_result": "Actual preceding-candidate hosted qualification, mutation scopes, existing-consumer GREEN/RED/GREEN, native archives, failures, source-owner blockers and observed pending/terminal snapshots. No result is retagged to the renewed head.",
+      "bytes": 18819,
+      "sha256": "8bd95256b6dbe95305519df7d8baafb074eb1e0e3a3b6bc723771e7f3aa67193"
+    },
+    {
+      "log": "ci-watch-a0447e36ae.latest.json.gz",
+      "observed_result": "Preceding-candidate terminal CI watcher records; watcher completion is collection success, not candidate acceptance.",
+      "bytes": 38108,
+      "sha256": "81bdf17bd8a1ace6b8ad0e609cf121297d442686a7e461d7e1d1fb77bda343db"
+    },
+    {
+      "log": "ci-watch-a0447e36ae.log.gz",
+      "observed_result": "Preceding-candidate terminal CI watcher records; watcher completion is collection success, not candidate acceptance.",
+      "bytes": 22054,
+      "sha256": "0be3e7f6d423b8b3118e2ea37f5b5d17203161a082667f3eed0462f609b6997f"
+    },
+    {
+      "log": "ci-watch-a0447e36ae.status.json.gz",
+      "observed_result": "Preceding-candidate terminal CI watcher records; watcher completion is collection success, not candidate acceptance.",
+      "bytes": 408,
+      "sha256": "e331785fda52f7534db1cfb0c5b09519c5d596c267404dbd21ea4750f6fd0d78"
+    },
+    {
+      "log": "final-inventories-adapter-file-cfg-green.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 5673,
+      "sha256": "f681416501b8ba5190510f4fa9533cbad17e368582b92fdffe8d060003606a7a"
+    },
+    {
+      "log": "final-inventories-adapter-file-cfg-red.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 12377,
+      "sha256": "ecd793762f8fe45a58b61255e7ca2598e638be98e4615f016841defb7f79f164"
+    },
+    {
+      "log": "final-inventories-adapter-source-v3.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 57,
+      "sha256": "b515d6857fd514d0088e71961c58874a58d00b4bbc216d112e0f829c4fe361af"
+    },
+    {
+      "log": "final-inventories-attest-build-context-green.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 102,
+      "sha256": "3a1904f81986496829b65f7099da2f89fd68d6ca6fcbd9dfb4d742e42004c703"
+    },
+    {
+      "log": "final-inventories-attest-build-context-qualification.json.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 461,
+      "sha256": "a1a9a0e3358dd2b5f3a8926ad6f631c8b516dac85d9315c188936a6608686b06"
+    },
+    {
+      "log": "final-inventories-attest-build-context-red.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 3021,
+      "sha256": "6a82ef1f0733db55892dd9ac0e27402e58c758be326ea22344a75004ef4a1699"
+    },
+    {
+      "log": "final-inventories-authority-before-push.json.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 447,
+      "sha256": "30cc74477d92a53b1ed7e9d13f992103a82acb068922ebc859ab7779d1d6b1e0"
+    },
+    {
+      "log": "final-inventories-baseline-adapter-source.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 3226,
+      "sha256": "1ad9d5b4ed90fd2e72608705e2ed454d247e3a21b73546a33ee9200f69ffc0e4"
+    },
+    {
+      "log": "final-inventories-baseline-codegen-go.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 444,
+      "sha256": "776a1967094e45b5a63d998704a784bf4d9abd81aadd36eb6dbdad3f61364a9f"
+    },
+    {
+      "log": "final-inventories-baseline-codegen-python.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 156,
+      "sha256": "cbb63fc36ab603e114655b18f12a633d8cf6600f642debf1581c3580258804f2"
+    },
+    {
+      "log": "final-inventories-baseline-codegen-rust.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 276,
+      "sha256": "a5b7eb10580ea25dc1e674c622e657d398248934145dd07769b6bf9a81127c6b"
+    },
+    {
+      "log": "final-inventories-baseline-codegen-ts.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 221,
+      "sha256": "5c7ad5c40408fa7b5d6869a6461ed1542d9ebaf8eb9db7bd25c956e85eef8a54"
+    },
+    {
+      "log": "final-inventories-baseline-frost-quorum.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 2690,
+      "sha256": "d1be4552c9e5726bc0aaa3e1d7f2e266305b69350484e5590a65cf1974767d06"
+    },
+    {
+      "log": "final-inventories-baseline-market-denial.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 3621,
+      "sha256": "6820c1d6d1dbfa9098a20ba50fef22412e19d05f1481a742fbc229a513ef8247"
+    },
+    {
+      "log": "final-inventories-baseline-market-profile.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 2577,
+      "sha256": "9c3e860af377c167856adb56225677481b9588a13d5a39210bab97d0a7e964e5"
+    },
+    {
+      "log": "final-inventories-baseline-supervisor.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 129,
+      "sha256": "bd047c3041fda158af4f5c6eeb5e0b5cc26b0654d98b9193d444a4eede78b97f"
+    },
+    {
+      "log": "final-inventories-baseline.status.json.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 3765,
+      "sha256": "3b56f52cd22b060fc7a247fc112ccc63d4c43a3e0c332be164c12f89b40d6001"
+    },
+    {
+      "log": "final-inventories-boundaries-adapter-source.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 201,
+      "sha256": "cc59f8e805d3a8ec6b64f911ef9f061a4c331b3ddb387fd5b2675d781803a480"
+    },
+    {
+      "log": "final-inventories-boundaries-frost-quorum.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 7096,
+      "sha256": "79f200095d3fa4a5bfcf57e4e5c7d5dbb919855b41ff5f9991626254672897b5"
+    },
+    {
+      "log": "final-inventories-boundaries-market-profile.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 1979,
+      "sha256": "5573989d2c3bc37e8ee6b01506967e5bea97d35354a16a41e891db7b69a4b61e"
+    },
+    {
+      "log": "final-inventories-boundaries-market-wedge.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 12242,
+      "sha256": "d61f70410c8a0b64b282f8ac7e91d2b9a63534b6878c3703b3f2f7b5d267aab5"
+    },
+    {
+      "log": "final-inventories-boundaries-sealed-ceremony.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 6081,
+      "sha256": "043e6d1a2411a295c7f74410428ff390ad67001a9624e5b1c836a736d0056e97"
+    },
+    {
+      "log": "final-inventories-boundaries-supervisor.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 349,
+      "sha256": "7a36dca0bf9c70ce18e30c3f838d2f0cfcd422f5b37b09b947097364897daccb"
+    },
+    {
+      "log": "final-inventories-boundaries.status.json.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 2446,
+      "sha256": "649a337d25a503c3bd1eda8b04c21473888a028ad5f8d89db44beffaeff3f89f"
+    },
+    {
+      "log": "final-inventories-check-go-1.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 321,
+      "sha256": "0d7a3593e9e9137be88cbf4ce53bd1b17f77310cc406c063b91f080007806105"
+    },
+    {
+      "log": "final-inventories-check-go-2.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 321,
+      "sha256": "0d7a3593e9e9137be88cbf4ce53bd1b17f77310cc406c063b91f080007806105"
+    },
+    {
+      "log": "final-inventories-check-ts-1.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 181,
+      "sha256": "420d95bf1470562cfec63a91dc832f102f095bfab3199c9b6e21ac041e05197f"
+    },
+    {
+      "log": "final-inventories-check-ts-2.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 181,
+      "sha256": "420d95bf1470562cfec63a91dc832f102f095bfab3199c9b6e21ac041e05197f"
+    },
+    {
+      "log": "final-inventories-ci-contract-complete.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 168,
+      "sha256": "5bb69584e111947b6fcbfbec2b493cbb005ebd2bca838af7f698939db0491744"
+    },
+    {
+      "log": "final-inventories-ci-contract-complete.status.json.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 521,
+      "sha256": "8f86a6a00880048e282ec2d3360ca115f8e541b873d36ce6540b41e2d3eba6bd"
+    },
+    {
+      "log": "final-inventories-final-checks-attest-build-clippy.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 3663,
+      "sha256": "6cd139c3923c17c1e23fa0934c6737afbddd7862a1faee7153d6bca725578ba7"
+    },
+    {
+      "log": "final-inventories-final-checks-attest-build-context.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 102,
+      "sha256": "8cb18497e866ffdec11093c7a366796761949eba1fc5f45b3f704094964bb4a9"
+    },
+    {
+      "log": "final-inventories-final-checks-constructor-controls.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 5673,
+      "sha256": "4233224ac0016ce64a47ae89bf6907f14a53a5669e24d7c7adb6fe4b168dd423"
+    },
+    {
+      "log": "final-inventories-final-checks-control-plane-clippy.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 9081,
+      "sha256": "a62a815eed95799cf8f02558c15b41534b9a10d27afa3b1d54c4ff15eec2775e"
+    },
+    {
+      "log": "final-inventories-final-checks-control-plane-complete.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 176573,
+      "sha256": "e9692f5aef807fdd12876f4acaa84efc824a3bf8da318cf96f82ac5aebda925d"
+    },
+    {
+      "log": "final-inventories-final-checks-diff-hygiene.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "final-inventories-final-checks-format.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "final-inventories-final-checks-supervisor.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 155,
+      "sha256": "555deb1378d4b46dce88a4362bdc33652ea78c348aa9c6ff97fc1fda864ed8cb"
+    },
+    {
+      "log": "final-inventories-final-checks-xtask-clippy.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 8339,
+      "sha256": "cedcba17ecb685d1878cf97b5b68cb915a63312c484374e328835de529f8e393"
+    },
+    {
+      "log": "final-inventories-final-checks.status.json.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 3452,
+      "sha256": "ff978fcc4d356b3098dcb96530d786b6e0c88d40e65e4697f71b30b0ddf5eaf5"
+    },
+    {
+      "log": "final-inventories-finish-v2-adapter-source.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 105,
+      "sha256": "15644ca87a46dfc54ef4c233a8a4a0f253d25bdd17126fa9a2db89827250c83b"
+    },
+    {
+      "log": "final-inventories-finish-v2.status.json.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 622,
+      "sha256": "46f03926c9548176af8c5a674b457090264de1a59056921f6504de455bd054a5"
+    },
+    {
+      "log": "final-inventories-go-sdk-tests.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 62,
+      "sha256": "2d7ee28b32bdc8899e558fd4967252b9bfd8fc62b567cac607f60e8f4c7c8e3f"
+    },
+    {
+      "log": "final-inventories-inline-review-before-source-freeze.json.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 3016,
+      "sha256": "28e5a3e638c7e3671e880fa571e3d66e74b3c92b5a5abe727b76cb5d8d616853"
+    },
+    {
+      "log": "final-inventories-market-denial-red.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 8231,
+      "sha256": "ca2b6fcfbb6857a4802c0a4198dc906ed5c3f68647692cb050bc99eed7418d1e"
+    },
+    {
+      "log": "final-inventories-market-profile-red.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 2306,
+      "sha256": "1942552990e7d97f11e5656719ecd1d3d677233c68599e73aa7c46b1a488ecf3"
+    },
+    {
+      "log": "final-inventories-native-renewal-supervisor.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 81,
+      "sha256": "347c6881a9d06e26211836e2e107dfdddc2a15a9bedad1617b34749821af6256"
+    },
+    {
+      "log": "final-inventories-paper-freeze-supervisor.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "final-inventories-payment-fixtures-green.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 3310,
+      "sha256": "1ec3f126e940992821835091a2aab90d9518298d03a343ca2203115a787680fb"
+    },
+    {
+      "log": "final-inventories-payment-fixtures-red-v2.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 6671,
+      "sha256": "ba4e466161aafef6fbbf3d500c67f4a5aa49ba4207ba85ec97fc73785d5891eb"
+    },
+    {
+      "log": "final-inventories-payment-fixtures-red.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 2503,
+      "sha256": "48a8bdbc5b8305241b584b7b66cc19088752cdcd171c76283c0f4f9fc58f15ab"
+    },
+    {
+      "log": "final-inventories-payment-terminal-controls-green.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 3799,
+      "sha256": "9d021d2cc28a8f1d44f97e16f8110d812e132f910599de55dc26755bcf4aab44"
+    },
+    {
+      "log": "final-inventories-payment-terminal-controls-red.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 5447,
+      "sha256": "e53d94e3ff159bd998baa3467005ff8ad94b1e6ce2c1fecef2ca22ea28dde9aa"
+    },
+    {
+      "log": "final-inventories-regenerate-go.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 404,
+      "sha256": "5aa536819363776e6c0145a22f79ce0582704cef8610e9ebd5e022ebfcc2b0a9"
+    },
+    {
+      "log": "final-inventories-regenerate-ts.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 179,
+      "sha256": "acdd6faf9876affe291f899c9340605c2c7cdf495b25c78e260518646455f425"
+    },
+    {
+      "log": "final-inventories-regeneration.status.json.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 3577,
+      "sha256": "1bb088281b4ad92f711fcce0af1e9cf09a63b48f52219d61633c27f93ce6bccf"
+    },
+    {
+      "log": "final-inventories-rust-hygiene.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 52024,
+      "sha256": "340164107fd7dfd4e7a421a908d0697e98afb2502f9abe6d322d9aa2b2ebf105"
+    },
+    {
+      "log": "final-inventories-sdk-review-go.diff.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 7251,
+      "sha256": "c6d58546f4a00ee34d3197d0e484d2ba631b74366a5cd76083391447da76d7a2"
+    },
+    {
+      "log": "final-inventories-sdk-review-ts.diff.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 40351,
+      "sha256": "5bbdf52bfd87114dd5ef0ec51b9393a2be888b09d97ece70b1e67f8a5dd04664"
+    },
+    {
+      "log": "final-inventories-source-checkpoint.json.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 2504,
+      "sha256": "d336c52ab95e257d07988ec82ef8274de3cafbe88186945fca0fa31fc925d844"
+    },
+    {
+      "log": "final-inventories-source-commit.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 599,
+      "sha256": "aa2259dc4218eee7627ee399e08ce42b0f9ca5f14d1bfb836bc8584a0b280aa6"
+    },
+    {
+      "log": "final-inventories-source-freeze-review.json.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 2389,
+      "sha256": "258b3c3860dfda1197c7c5a92f175e0946a5664fc73ecc195eeb017d547f652c"
+    },
+    {
+      "log": "final-inventories-source-frozen-during-renewal.json.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 299,
+      "sha256": "68bad1bcb736e8f8ac0d3b4c7c2930b15739c3706465fb716852792f6cb8aa4d"
+    },
+    {
+      "log": "final-inventories-source-integration-inputs.json.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 6561764,
+      "sha256": "a7f858b2a4dae4371970df6c710d2b01cb1fdd9c54c84bd9fb106ef5dae21892"
+    },
+    {
+      "log": "final-inventories-ts-codegen-install.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 140,
+      "sha256": "1fd512e3db8a385c64c32d0b4c11266dfac0bf9b4c2fb24c1931a278f0e8c191"
+    },
+    {
+      "log": "final-inventories-ts-conformance-install.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 144,
+      "sha256": "f1c9c1f4d28efdb9176c74f543c8f79e51f30d3a4bfe97689fa5b4a853ae0942"
+    },
+    {
+      "log": "final-inventories-ts-conformance-lint-verified.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 57,
+      "sha256": "46511c90fdb4039d123c28f667f776602e4072945c8fa709de0de5d6f387649e"
+    },
+    {
+      "log": "final-inventories-ts-conformance-lint.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 57,
+      "sha256": "46511c90fdb4039d123c28f667f776602e4072945c8fa709de0de5d6f387649e"
+    },
+    {
+      "log": "final-inventories-ts-conformance-tests.log.gz",
+      "observed_result": "Actual current-source SDK/catalog/fixture/build-context/scanner REDs and repairs, original compile failures, local integration and review. Every individual outcome retains its recorded scope.",
+      "bytes": 325,
+      "sha256": "5c154da6026206767d4298f557090ead416c06eafa36ff09cf70304ff71f817c"
+    },
+    {
+      "log": "hosted-qualification-a0447e36ae.status.json.gz",
+      "observed_result": "Preceding-candidate collector: genuine verified boundaries and seven failed jobs remain separate.",
+      "bytes": 144018,
+      "sha256": "9406bb53ed7578ed7a7cd01642de4a947b2ee9bacd99d975d83b7b872cd86d96"
+    },
+    {
+      "log": "mutants-pr-chio-federation-a0447e36ae-outcomes.json.gz",
+      "observed_result": "Authenticated preceding-candidate federation artifacts: one original package-only survivor remains missed; the existing consumer detects its exact fault.",
+      "bytes": 66837,
+      "sha256": "46d5011209890979e8c8f3ffdab0ec15539eee793ba4c576977de9eca1309da9"
+    },
+    {
+      "log": "mutants-pr-chio-federation-a0447e36ae.zip.gz",
+      "observed_result": "Authenticated preceding-candidate federation artifacts: one original package-only survivor remains missed; the existing consumer detects its exact fault.",
+      "bytes": 788720,
+      "sha256": "9cb4bd138bff0abdbbf193e4690b2e2c1baa2d2a052ff75c447f1e0a36dfabba"
+    },
+    {
+      "log": "mutants-pr-chio-runtime-core-a0447e36ae-outcomes.json.gz",
+      "observed_result": "Authenticated preceding-candidate runtime mutation artifacts: 71 caught, eight unviable, zero missed.",
+      "bytes": 146483,
+      "sha256": "8b5cb860a5eca5d805f53e504d08a9ddc1817bede7df61314d58a0ff9f3d7962"
+    },
+    {
+      "log": "mutants-pr-chio-runtime-core-a0447e36ae.zip.gz",
+      "observed_result": "Authenticated preceding-candidate runtime mutation artifacts: 71 caught, eight unviable, zero missed.",
+      "bytes": 1807145,
+      "sha256": "8daec205b007633ce06077735b63c11785cca05fd76b253416d7b66e2aec5339"
+    },
+    {
+      "log": "postgres-broker-preparation-lifetime-a0447e36ae.zip.gz",
+      "observed_result": "Authenticated preceding-candidate actual unignored lifetime archive.",
+      "bytes": 564,
+      "sha256": "5c1de53756b875bfc7523b9d5d9471992278c9cb4caf414a907a82d374702e86"
+    },
+    {
+      "log": "postgres-job-claim-loss-qualification-a0447e36ae.zip.gz",
+      "observed_result": "Authenticated preceding-candidate PostgreSQL claim-loss archive; signed receipts remain in its original scope.",
+      "bytes": 30274,
+      "sha256": "2fa714cb5a8fcf4c1b9ac2a090643ce3a55ed432f1de1d6b9def098a10649b4b"
+    },
+    {
+      "log": "postgres-job-process-qualification-a0447e36ae.zip.gz",
+      "observed_result": "Authenticated preceding-candidate PostgreSQL ownership archive; signed receipts remain in its original scope.",
+      "bytes": 44211,
+      "sha256": "a15964870aa553475349676307c5a7fd6ddcbf05164acb306afc9d479ed60fb6"
+    },
+    {
+      "log": "production-security-owner-handoff-a0447e36ae-accepted-boundaries.json.gz",
+      "observed_result": "Prepared preceding-source hash/evidence handoff with absent package/policy and actual native image failures; no authorization or completion claim.",
+      "bytes": 10590,
+      "sha256": "f1f561d43ab6d31d0dc0fc494a9ffc5f3866068bf3907caa6a9f870470dc45f7"
+    },
+    {
+      "log": "production-security-owner-handoff-a0447e36ae-final.json.gz",
+      "observed_result": "Prepared preceding-source hash/evidence handoff with absent package/policy and actual native image failures; no authorization or completion claim.",
+      "bytes": 13913,
+      "sha256": "31e711fe3cb3828b92e7740bc92660bb1472d2473f1c3dd1301f6a5f2c1c9865"
+    },
+    {
+      "log": "production-security-owner-handoff-a0447e36ae.json.gz",
+      "observed_result": "Prepared preceding-source hash/evidence handoff with absent package/policy and actual native image failures; no authorization or completion claim.",
+      "bytes": 9246,
+      "sha256": "b5c5cca2e78897ea38a0590bae10f32a4a4788f9784982448e92b22d36ddc6bf"
+    },
+    {
+      "log": "qualification-9cd794a987.status.json.gz",
+      "observed_result": "Actual terminal renewed source-bound native21 inventory.",
+      "bytes": 554,
+      "sha256": "b2c2624ae627634cd009ed39e32bd8605f34a9944c1084fe63181ef2648a62e3"
+    },
+    {
+      "log": "receipt-verifier-9cd794a987.log.gz",
+      "observed_result": "Actual renewed-source offline receipt verifier and authenticated binary commitment.",
+      "bytes": 10773,
+      "sha256": "7c42ec5b5dd3cd83f2c1c00bae6ab162e891914678d8f14a7092a8a5667af379"
+    },
+    {
+      "log": "receipt-verifier-9cd794a987.status.json.gz",
+      "observed_result": "Actual renewed-source offline receipt verifier and authenticated binary commitment.",
+      "bytes": 721,
+      "sha256": "3e950ed7a0d1e518d0771a0e6d21eff4a0127e74e9f096c10e2e7a8396491515"
+    },
+    {
+      "log": "review-native-qualification-9cd794a987.log.gz",
+      "observed_result": "Actual renewed-source native output; physical x86 acceptance remains separate.",
+      "bytes": 539,
+      "sha256": "84f61b1ead0c2b6b5d544d443178540eaa9df0dd78f58b27796e852b821bda76"
     }
   ]
 }
