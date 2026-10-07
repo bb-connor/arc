@@ -5,7 +5,7 @@ use super::*;
 #[cfg(target_os = "linux")]
 #[test]
 fn active_resume_writer_accepts_exact_bound_and_refuses_overflow_before_replacement() {
-    let directory = tempfile::tempdir().unwrap();
+    let directory = chio_test_support::private_tempdir().unwrap();
     let path = directory.path().join("sessions.sqlite3");
     let _lease = acquire_test_session_store(&path);
     let keyring = test_resume_hmac_keyring();
@@ -46,7 +46,7 @@ fn active_resume_writer_accepts_exact_bound_and_refuses_overflow_before_replacem
 #[cfg(target_os = "linux")]
 #[test]
 fn active_resume_writer_preserves_decoded_decimal_and_native_integer_reopen() {
-    let directory = tempfile::tempdir().unwrap();
+    let directory = chio_test_support::private_tempdir().unwrap();
     let path = directory.path().join("sessions.sqlite3");
     let _lease = acquire_test_session_store(&path);
     let keyring = test_resume_hmac_keyring();
