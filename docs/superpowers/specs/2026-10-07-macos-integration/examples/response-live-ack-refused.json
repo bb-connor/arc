@@ -1,0 +1,12 @@
+{
+  "version": "chio.desktop.operator.v1",
+  "request_id": "synthetic-request-events-ack",
+  "method": "events.ack",
+  "ok": false,
+  "error": {
+    "code": "conflict",
+    "retry": "reread",
+    "message_key": "subscription-still-live",
+    "operation_ref": null
+  }
+}

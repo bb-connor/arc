@@ -1,0 +1,90 @@
+{
+  "protocol": "chio.desktop.operator.v1",
+  "proposed": true,
+  "methods": [
+    {
+      "name": "hello",
+      "mutation": false,
+      "native_authority_required": false,
+      "request_example": "request-hello.json",
+      "response_example": "response-hello.json"
+    },
+    {
+      "name": "health.get",
+      "mutation": false,
+      "native_authority_required": false,
+      "request_example": "request-health-get.json",
+      "response_example": "response-health-get.json"
+    },
+    {
+      "name": "tasks.list",
+      "mutation": false,
+      "native_authority_required": true,
+      "request_example": "request-tasks-list.json",
+      "response_example": "response-tasks-list.json"
+    },
+    {
+      "name": "task.get",
+      "mutation": false,
+      "native_authority_required": true,
+      "request_example": "request-task-get.json",
+      "response_example": "response-task-get.json"
+    },
+    {
+      "name": "task.create",
+      "mutation": true,
+      "native_authority_required": true,
+      "request_example": "request-task-create.json",
+      "response_example": "response-task-create.json"
+    },
+    {
+      "name": "operation.get",
+      "mutation": false,
+      "native_authority_required": true,
+      "request_example": "request-operation-get.json",
+      "response_example": "response-operation-get.json"
+    },
+    {
+      "name": "task.stop",
+      "mutation": true,
+      "native_authority_required": true,
+      "request_example": "request-task-stop.json",
+      "response_example": "response-task-stop.json"
+    },
+    {
+      "name": "review.open",
+      "mutation": false,
+      "native_authority_required": true,
+      "request_example": "request-review-open.json",
+      "response_example": "response-review-open.json"
+    },
+    {
+      "name": "approval.submit",
+      "mutation": true,
+      "native_authority_required": true,
+      "request_example": "request-approval-submit.json",
+      "response_example": "response-approval-submit.json"
+    },
+    {
+      "name": "events.subscribe",
+      "mutation": false,
+      "native_authority_required": true,
+      "request_example": "request-events-subscribe.json",
+      "response_example": "response-events-subscribe.json"
+    },
+    {
+      "name": "events.ack",
+      "mutation": false,
+      "native_authority_required": true,
+      "request_example": "request-events-ack.json",
+      "response_example": "response-events-ack.json"
+    },
+    {
+      "name": "evidence.export",
+      "mutation": true,
+      "native_authority_required": true,
+      "request_example": "request-evidence-export.json",
+      "response_example": "response-evidence-export.json"
+    }
+  ]
+}

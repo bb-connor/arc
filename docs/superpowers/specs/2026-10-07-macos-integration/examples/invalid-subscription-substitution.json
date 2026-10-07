@@ -1,0 +1,10 @@
+{
+  "version": "chio.desktop.operator.v1",
+  "request_id": "synthetic-request-events-ack",
+  "method": "events.ack",
+  "ok": true,
+  "result": {
+    "subscription_id": "different-subscription",
+    "disposition": "acknowledged"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "version": "chio.desktop.operator.v1",
+  "request_id": "synthetic-request-health-get",
+  "method": "shell.exec",
+  "params": {}
+}

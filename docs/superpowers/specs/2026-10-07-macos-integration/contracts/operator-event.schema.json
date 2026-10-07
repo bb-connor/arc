@@ -1,0 +1,283 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "operator-event.schema.json",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "subscription_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "cursor": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "hint_only": {
+          "const": true
+        },
+        "kind": {
+          "const": "task.changed"
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "task_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            },
+            "revision": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,19})$",
+              "format": "uint64-decimal"
+            }
+          },
+          "required": [
+            "task_id",
+            "revision"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "subscription_id",
+        "cursor",
+        "hint_only",
+        "kind",
+        "data"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "subscription_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "cursor": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "hint_only": {
+          "const": true
+        },
+        "kind": {
+          "const": "coverage.changed"
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "enum": [
+                "kernel",
+                "endpoint_security",
+                "network_extension",
+                "worker"
+              ]
+            },
+            "state": {
+              "enum": [
+                "healthy",
+                "gap",
+                "unavailable"
+              ]
+            },
+            "generation": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,19})$",
+              "format": "uint64-decimal"
+            }
+          },
+          "required": [
+            "provider",
+            "state",
+            "generation"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "subscription_id",
+        "cursor",
+        "hint_only",
+        "kind",
+        "data"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "subscription_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "cursor": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "hint_only": {
+          "const": true
+        },
+        "kind": {
+          "const": "review.invalidated"
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "review_ref": {
+              "allOf": [
+                {
+                  "$ref": "common.schema.json#/$defs/native_ref"
+                },
+                {
+                  "properties": {
+                    "kind": {
+                      "const": "review"
+                    }
+                  }
+                }
+              ]
+            },
+            "reason": {
+              "enum": [
+                "influence_changed",
+                "policy_changed",
+                "expired",
+                "operation_changed",
+                "session_changed"
+              ]
+            }
+          },
+          "required": [
+            "review_ref",
+            "reason"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "subscription_id",
+        "cursor",
+        "hint_only",
+        "kind",
+        "data"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "subscription_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "cursor": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "hint_only": {
+          "const": true
+        },
+        "kind": {
+          "const": "stream.gap"
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "resume_cursor": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            },
+            "reason": {
+              "enum": [
+                "retention",
+                "overflow",
+                "restart"
+              ]
+            }
+          },
+          "required": [
+            "resume_cursor",
+            "reason"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "subscription_id",
+        "cursor",
+        "hint_only",
+        "kind",
+        "data"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "subscription_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "cursor": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "hint_only": {
+          "const": true
+        },
+        "kind": {
+          "const": "subscription.ended"
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "reason": {
+              "enum": [
+                "revoked",
+                "expired",
+                "authority_time_unavailable",
+                "auth_rotated",
+                "subject_gone"
+              ]
+            }
+          },
+          "required": [
+            "reason"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "subscription_id",
+        "cursor",
+        "hint_only",
+        "kind",
+        "data"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}

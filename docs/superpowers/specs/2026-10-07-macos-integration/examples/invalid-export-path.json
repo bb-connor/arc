@@ -1,0 +1,25 @@
+{
+  "version": "chio.desktop.operator.v1",
+  "request_id": "synthetic-request-evidence-export",
+  "method": "evidence.export",
+  "params": {
+    "intent_id": "synthetic-export-intent",
+    "task_id": "synthetic-task",
+    "format": "redacted-bundle-v1",
+    "destination_ref": {
+      "kind": "resource",
+      "issuer": "synthetic-authority",
+      "native_id": "synthetic-resource-2",
+      "generation": "1",
+      "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "grant_ref": {
+      "kind": "grant",
+      "issuer": "synthetic-authority",
+      "native_id": "synthetic-grant-1",
+      "generation": "1",
+      "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "path": "/tmp/out"
+  }
+}

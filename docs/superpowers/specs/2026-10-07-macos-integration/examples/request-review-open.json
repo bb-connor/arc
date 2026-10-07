@@ -1,0 +1,14 @@
+{
+  "version": "chio.desktop.operator.v1",
+  "request_id": "synthetic-request-review-open",
+  "method": "review.open",
+  "params": {
+    "operation_ref": {
+      "kind": "operation",
+      "issuer": "synthetic-authority",
+      "native_id": "synthetic-operation-1",
+      "generation": "1",
+      "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  }
+}

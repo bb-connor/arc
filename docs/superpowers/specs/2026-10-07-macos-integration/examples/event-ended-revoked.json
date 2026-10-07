@@ -1,0 +1,10 @@
+{
+  "version": "chio.desktop.operator.v1",
+  "subscription_id": "synthetic-subscription",
+  "cursor": "synthetic-end-cursor",
+  "hint_only": true,
+  "kind": "subscription.ended",
+  "data": {
+    "reason": "revoked"
+  }
+}

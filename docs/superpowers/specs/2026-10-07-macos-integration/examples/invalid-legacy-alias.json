@@ -1,0 +1,11 @@
+{
+  "version": "chio.omarchy.operator.v1",
+  "request_id": "synthetic-request-hello",
+  "method": "hello",
+  "params": {
+    "supported_versions": [
+      "chio.desktop.operator.v1"
+    ],
+    "client_nonce": "synthetic-client"
+  }
+}

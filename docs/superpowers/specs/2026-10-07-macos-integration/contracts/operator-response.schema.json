@@ -1,0 +1,1675 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "operator-response.schema.json",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "hello"
+        },
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "selected_version": {
+              "const": "chio.desktop.operator.v1"
+            },
+            "session_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            },
+            "server_nonce": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            },
+            "capability_state": {
+              "enum": [
+                "read_only",
+                "prerequisites_missing",
+                "qualified_profile_available"
+              ]
+            }
+          },
+          "required": [
+            "selected_version",
+            "session_id",
+            "server_nonce",
+            "capability_state"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "hello"
+        },
+        "ok": {
+          "const": false
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "enum": [
+                "invalid_request",
+                "unauthenticated",
+                "unauthorized",
+                "prerequisite_unavailable",
+                "conflict",
+                "stale_reference",
+                "rate_limited",
+                "outcome_unknown",
+                "internal_unavailable"
+              ]
+            },
+            "retry": {
+              "enum": [
+                "never",
+                "same_intent",
+                "reread"
+              ]
+            },
+            "message_key": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            },
+            "operation_ref": {
+              "oneOf": [
+                {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/native_ref"
+                    },
+                    {
+                      "properties": {
+                        "kind": {
+                          "const": "operation"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "code",
+            "retry",
+            "message_key",
+            "operation_ref"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "ok",
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "health.get"
+        },
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "state": {
+              "enum": [
+                "ready",
+                "degraded",
+                "unavailable"
+              ]
+            },
+            "available_profiles": {
+              "type": "array",
+              "items": {
+                "$ref": "common.schema.json#/$defs/profile"
+              },
+              "minItems": 0,
+              "maxItems": 6
+            },
+            "missing_prerequisites": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+              },
+              "minItems": 0,
+              "maxItems": 64
+            },
+            "policy_generation": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,19})$",
+                  "format": "uint64-decimal"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "state",
+            "available_profiles",
+            "missing_prerequisites",
+            "policy_generation"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "health.get"
+        },
+        "ok": {
+          "const": false
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "enum": [
+                "invalid_request",
+                "unauthenticated",
+                "unauthorized",
+                "prerequisite_unavailable",
+                "conflict",
+                "stale_reference",
+                "rate_limited",
+                "outcome_unknown",
+                "internal_unavailable"
+              ]
+            },
+            "retry": {
+              "enum": [
+                "never",
+                "same_intent",
+                "reread"
+              ]
+            },
+            "message_key": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            },
+            "operation_ref": {
+              "oneOf": [
+                {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/native_ref"
+                    },
+                    {
+                      "properties": {
+                        "kind": {
+                          "const": "operation"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "code",
+            "retry",
+            "message_key",
+            "operation_ref"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "ok",
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "tasks.list"
+        },
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "tasks": {
+              "type": "array",
+              "items": {
+                "$ref": "common.schema.json#/$defs/task"
+              },
+              "minItems": 0,
+              "maxItems": 100
+            },
+            "next_cursor": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "tasks",
+            "next_cursor"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "tasks.list"
+        },
+        "ok": {
+          "const": false
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "enum": [
+                "invalid_request",
+                "unauthenticated",
+                "unauthorized",
+                "prerequisite_unavailable",
+                "conflict",
+                "stale_reference",
+                "rate_limited",
+                "outcome_unknown",
+                "internal_unavailable"
+              ]
+            },
+            "retry": {
+              "enum": [
+                "never",
+                "same_intent",
+                "reread"
+              ]
+            },
+            "message_key": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            },
+            "operation_ref": {
+              "oneOf": [
+                {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/native_ref"
+                    },
+                    {
+                      "properties": {
+                        "kind": {
+                          "const": "operation"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "code",
+            "retry",
+            "message_key",
+            "operation_ref"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "ok",
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "task.get"
+        },
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "$ref": "common.schema.json#/$defs/task"
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "task.get"
+        },
+        "ok": {
+          "const": false
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "enum": [
+                "invalid_request",
+                "unauthenticated",
+                "unauthorized",
+                "prerequisite_unavailable",
+                "conflict",
+                "stale_reference",
+                "rate_limited",
+                "outcome_unknown",
+                "internal_unavailable"
+              ]
+            },
+            "retry": {
+              "enum": [
+                "never",
+                "same_intent",
+                "reread"
+              ]
+            },
+            "message_key": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            },
+            "operation_ref": {
+              "oneOf": [
+                {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/native_ref"
+                    },
+                    {
+                      "properties": {
+                        "kind": {
+                          "const": "operation"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "code",
+            "retry",
+            "message_key",
+            "operation_ref"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "ok",
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "task.create"
+        },
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "task_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            },
+            "operation_ref": {
+              "allOf": [
+                {
+                  "$ref": "common.schema.json#/$defs/native_ref"
+                },
+                {
+                  "properties": {
+                    "kind": {
+                      "const": "operation"
+                    }
+                  }
+                }
+              ]
+            },
+            "disposition": {
+              "enum": [
+                "accepted",
+                "original_operation"
+              ]
+            }
+          },
+          "required": [
+            "task_id",
+            "operation_ref",
+            "disposition"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "task.create"
+        },
+        "ok": {
+          "const": false
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "enum": [
+                "invalid_request",
+                "unauthenticated",
+                "unauthorized",
+                "prerequisite_unavailable",
+                "conflict",
+                "stale_reference",
+                "rate_limited",
+                "outcome_unknown",
+                "internal_unavailable"
+              ]
+            },
+            "retry": {
+              "enum": [
+                "never",
+                "same_intent",
+                "reread"
+              ]
+            },
+            "message_key": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            },
+            "operation_ref": {
+              "oneOf": [
+                {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/native_ref"
+                    },
+                    {
+                      "properties": {
+                        "kind": {
+                          "const": "operation"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "code",
+            "retry",
+            "message_key",
+            "operation_ref"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "ok",
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "operation.get"
+        },
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "operation_ref": {
+              "allOf": [
+                {
+                  "$ref": "common.schema.json#/$defs/native_ref"
+                },
+                {
+                  "properties": {
+                    "kind": {
+                      "const": "operation"
+                    }
+                  }
+                }
+              ]
+            },
+            "state": {
+              "enum": [
+                "pending",
+                "dispatched",
+                "returned",
+                "completed",
+                "unresolved",
+                "denied"
+              ]
+            },
+            "evidence_ref": {
+              "oneOf": [
+                {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/native_ref"
+                    },
+                    {
+                      "properties": {
+                        "kind": {
+                          "const": "evidence"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "operation_ref",
+            "state",
+            "evidence_ref"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "operation.get"
+        },
+        "ok": {
+          "const": false
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "enum": [
+                "invalid_request",
+                "unauthenticated",
+                "unauthorized",
+                "prerequisite_unavailable",
+                "conflict",
+                "stale_reference",
+                "rate_limited",
+                "outcome_unknown",
+                "internal_unavailable"
+              ]
+            },
+            "retry": {
+              "enum": [
+                "never",
+                "same_intent",
+                "reread"
+              ]
+            },
+            "message_key": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            },
+            "operation_ref": {
+              "oneOf": [
+                {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/native_ref"
+                    },
+                    {
+                      "properties": {
+                        "kind": {
+                          "const": "operation"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "code",
+            "retry",
+            "message_key",
+            "operation_ref"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "ok",
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "task.stop"
+        },
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "$ref": "common.schema.json#/$defs/stop_state"
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "task.stop"
+        },
+        "ok": {
+          "const": false
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "enum": [
+                "invalid_request",
+                "unauthenticated",
+                "unauthorized",
+                "prerequisite_unavailable",
+                "conflict",
+                "stale_reference",
+                "rate_limited",
+                "outcome_unknown",
+                "internal_unavailable"
+              ]
+            },
+            "retry": {
+              "enum": [
+                "never",
+                "same_intent",
+                "reread"
+              ]
+            },
+            "message_key": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            },
+            "operation_ref": {
+              "oneOf": [
+                {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/native_ref"
+                    },
+                    {
+                      "properties": {
+                        "kind": {
+                          "const": "operation"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "code",
+            "retry",
+            "message_key",
+            "operation_ref"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "ok",
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "review.open"
+        },
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "review_ref": {
+              "allOf": [
+                {
+                  "$ref": "common.schema.json#/$defs/native_ref"
+                },
+                {
+                  "properties": {
+                    "kind": {
+                      "const": "review"
+                    }
+                  }
+                }
+              ]
+            },
+            "presentation": {
+              "const": "trusted_native_review"
+            },
+            "expires_in_seconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300
+            }
+          },
+          "required": [
+            "review_ref",
+            "presentation",
+            "expires_in_seconds"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "review.open"
+        },
+        "ok": {
+          "const": false
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "enum": [
+                "invalid_request",
+                "unauthenticated",
+                "unauthorized",
+                "prerequisite_unavailable",
+                "conflict",
+                "stale_reference",
+                "rate_limited",
+                "outcome_unknown",
+                "internal_unavailable"
+              ]
+            },
+            "retry": {
+              "enum": [
+                "never",
+                "same_intent",
+                "reread"
+              ]
+            },
+            "message_key": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            },
+            "operation_ref": {
+              "oneOf": [
+                {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/native_ref"
+                    },
+                    {
+                      "properties": {
+                        "kind": {
+                          "const": "operation"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "code",
+            "retry",
+            "message_key",
+            "operation_ref"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "ok",
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "approval.submit"
+        },
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "operation_ref": {
+              "allOf": [
+                {
+                  "$ref": "common.schema.json#/$defs/native_ref"
+                },
+                {
+                  "properties": {
+                    "kind": {
+                      "const": "operation"
+                    }
+                  }
+                }
+              ]
+            },
+            "decision": {
+              "enum": [
+                "approve",
+                "deny"
+              ]
+            },
+            "disposition": {
+              "enum": [
+                "recorded",
+                "original_operation"
+              ]
+            }
+          },
+          "required": [
+            "operation_ref",
+            "decision",
+            "disposition"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "approval.submit"
+        },
+        "ok": {
+          "const": false
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "enum": [
+                "invalid_request",
+                "unauthenticated",
+                "unauthorized",
+                "prerequisite_unavailable",
+                "conflict",
+                "stale_reference",
+                "rate_limited",
+                "outcome_unknown",
+                "internal_unavailable"
+              ]
+            },
+            "retry": {
+              "enum": [
+                "never",
+                "same_intent",
+                "reread"
+              ]
+            },
+            "message_key": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            },
+            "operation_ref": {
+              "oneOf": [
+                {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/native_ref"
+                    },
+                    {
+                      "properties": {
+                        "kind": {
+                          "const": "operation"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "code",
+            "retry",
+            "message_key",
+            "operation_ref"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "ok",
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "events.subscribe"
+        },
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "subscription_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            },
+            "cursor": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            },
+            "rebase_required": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "subscription_id",
+            "cursor",
+            "rebase_required"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "events.subscribe"
+        },
+        "ok": {
+          "const": false
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "enum": [
+                "invalid_request",
+                "unauthenticated",
+                "unauthorized",
+                "prerequisite_unavailable",
+                "conflict",
+                "stale_reference",
+                "rate_limited",
+                "outcome_unknown",
+                "internal_unavailable"
+              ]
+            },
+            "retry": {
+              "enum": [
+                "never",
+                "same_intent",
+                "reread"
+              ]
+            },
+            "message_key": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            },
+            "operation_ref": {
+              "oneOf": [
+                {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/native_ref"
+                    },
+                    {
+                      "properties": {
+                        "kind": {
+                          "const": "operation"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "code",
+            "retry",
+            "message_key",
+            "operation_ref"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "ok",
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "events.ack"
+        },
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "subscription_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            },
+            "disposition": {
+              "enum": [
+                "acknowledged",
+                "already_acknowledged"
+              ]
+            }
+          },
+          "required": [
+            "subscription_id",
+            "disposition"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "events.ack"
+        },
+        "ok": {
+          "const": false
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "enum": [
+                "invalid_request",
+                "unauthenticated",
+                "unauthorized",
+                "prerequisite_unavailable",
+                "conflict",
+                "stale_reference",
+                "rate_limited",
+                "outcome_unknown",
+                "internal_unavailable"
+              ]
+            },
+            "retry": {
+              "enum": [
+                "never",
+                "same_intent",
+                "reread"
+              ]
+            },
+            "message_key": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            },
+            "operation_ref": {
+              "oneOf": [
+                {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/native_ref"
+                    },
+                    {
+                      "properties": {
+                        "kind": {
+                          "const": "operation"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "code",
+            "retry",
+            "message_key",
+            "operation_ref"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "ok",
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "evidence.export"
+        },
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "operation_ref": {
+              "allOf": [
+                {
+                  "$ref": "common.schema.json#/$defs/native_ref"
+                },
+                {
+                  "properties": {
+                    "kind": {
+                      "const": "operation"
+                    }
+                  }
+                }
+              ]
+            },
+            "evidence_ref": {
+              "allOf": [
+                {
+                  "$ref": "common.schema.json#/$defs/native_ref"
+                },
+                {
+                  "properties": {
+                    "kind": {
+                      "const": "evidence"
+                    }
+                  }
+                }
+              ]
+            },
+            "disposition": {
+              "enum": [
+                "completed",
+                "original_operation"
+              ]
+            }
+          },
+          "required": [
+            "operation_ref",
+            "evidence_ref",
+            "disposition"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "evidence.export"
+        },
+        "ok": {
+          "const": false
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "enum": [
+                "invalid_request",
+                "unauthenticated",
+                "unauthorized",
+                "prerequisite_unavailable",
+                "conflict",
+                "stale_reference",
+                "rate_limited",
+                "outcome_unknown",
+                "internal_unavailable"
+              ]
+            },
+            "retry": {
+              "enum": [
+                "never",
+                "same_intent",
+                "reread"
+              ]
+            },
+            "message_key": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            },
+            "operation_ref": {
+              "oneOf": [
+                {
+                  "allOf": [
+                    {
+                      "$ref": "common.schema.json#/$defs/native_ref"
+                    },
+                    {
+                      "properties": {
+                        "kind": {
+                          "const": "operation"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "code",
+            "retry",
+            "message_key",
+            "operation_ref"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "ok",
+        "error"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "version": "chio.desktop.operator.v1",
+  "request_id": "synthetic-request-task-stop",
+  "method": "task.stop",
+  "ok": true,
+  "result": {
+    "admission": "requested",
+    "worker": "unknown",
+    "network": "unknown",
+    "cleanup": "pending",
+    "external_outcome": "unresolved",
+    "stop_ref": null,
+    "durability": "unknown"
+  }
+}

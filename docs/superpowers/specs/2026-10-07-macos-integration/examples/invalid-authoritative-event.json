@@ -1,0 +1,11 @@
+{
+  "version": "chio.desktop.operator.v1",
+  "subscription_id": "synthetic-subscription",
+  "cursor": "synthetic-cursor-2",
+  "hint_only": false,
+  "kind": "task.changed",
+  "data": {
+    "task_id": "synthetic-task",
+    "revision": "2"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "version": "chio.desktop.operator.v1",
+  "request_id": "synthetic-request-health-get",
+  "method": "health.get",
+  "ok": true,
+  "result": {
+    "state": "unavailable",
+    "available_profiles": [],
+    "missing_prerequisites": [
+      "native-crossing"
+    ],
+    "policy_generation": null
+  }
+}

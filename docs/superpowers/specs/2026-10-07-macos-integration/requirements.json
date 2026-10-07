@@ -1,0 +1,2912 @@
+{
+  "status": "specified_not_executed",
+  "requirements": [
+    {
+      "id": "MAC-PRD-001",
+      "spec": "01-product-scope.md",
+      "line": 51,
+      "requirement": "The product MUST lead with bounded useful agent work and offer the same task model from Finder, the app, and an authenticated CLI.",
+      "acceptance": "AT-MAC-PRD-001",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-PRD-002",
+      "spec": "01-product-scope.md",
+      "line": 52,
+      "requirement": "The first runnable template MUST use one immutable committed Git tree, a declared edit allowlist, pinned portable toolchain, and fixed tests whose data-only oracle runs outside the candidate worker/guest and evaluates attributable outputs of the exact sealed artifact.",
+      "acceptance": "AT-MAC-PRD-002",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-PRD-003",
+      "spec": "01-product-scope.md",
+      "line": 53,
+      "requirement": "Task configuration MUST disclose input generation, sealed user objective, profile/location, model export, limits, resources, and required review before admission.",
+      "acceptance": "AT-MAC-PRD-003",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-PRD-004",
+      "spec": "01-product-scope.md",
+      "line": 54,
+      "requirement": "Every execution profile MUST remain unavailable until its own exact installed-runtime qualification record passes.",
+      "acceptance": "AT-MAC-PRD-004",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-PRD-005",
+      "spec": "01-product-scope.md",
+      "line": 55,
+      "requirement": "The first workflow MUST keep host credentials, unrelated user files, host service sockets, and unrestricted networking outside worker authority.",
+      "acceptance": "AT-MAC-PRD-005",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-PRD-006",
+      "spec": "01-product-scope.md",
+      "line": 56,
+      "requirement": "Local result creation MUST produce a sealed review artifact, with publication separately gated and no automatic live-checkout overwrite.",
+      "acceptance": "AT-MAC-PRD-006",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-PRD-007",
+      "spec": "01-product-scope.md",
+      "line": 57,
+      "requirement": "OS consent, Chio resource grant, and exact endorsement MUST remain separately explained, represented, and enforced.",
+      "acceptance": "AT-MAC-PRD-007",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-PRD-008",
+      "spec": "01-product-scope.md",
+      "line": 58,
+      "requirement": "The operator and native integrations MUST consume the kernel's positive authority and MUST NOT introduce a Swift approval signer or second authority ledger.",
+      "acceptance": "AT-MAC-PRD-008",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-PRD-009",
+      "spec": "01-product-scope.md",
+      "line": 59,
+      "requirement": "Task state MUST distinguish work, review, blocked permissions, degraded coverage, stop progress, and unresolved external outcome.",
+      "acceptance": "AT-MAC-PRD-009",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-PRD-010",
+      "spec": "01-product-scope.md",
+      "line": 60,
+      "requirement": "Failed, changed, missing, incomplete or unattributable test evidence MUST prevent a verified-result claim; worker PASS text and exit code zero MUST NOT substitute for the trusted external oracle.",
+      "acceptance": "AT-MAC-PRD-010",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-PRD-011",
+      "spec": "01-product-scope.md",
+      "line": 61,
+      "requirement": "Recovery MUST reconcile the original operation and preserve the distinction between admission fenced, worker closed, and remote outcome known.",
+      "acceptance": "AT-MAC-PRD-011",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-PRD-012",
+      "spec": "01-product-scope.md",
+      "line": 62,
+      "requirement": "Scope expansion to dirty imports, native app drafts, GUI actions, or managed deployment MUST require its own resource and qualification gates.",
+      "acceptance": "AT-MAC-PRD-012",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-PRD-013",
+      "spec": "01-product-scope.md",
+      "line": 63,
+      "requirement": "Release copy MUST distinguish source findings, component checks, installed runtime, profile qualification, and public availability.",
+      "acceptance": "AT-MAC-PRD-013",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-PRD-014",
+      "spec": "01-product-scope.md",
+      "line": 64,
+      "requirement": "First-run onboarding MUST request only permissions needed for the selected feature and MUST preserve read-only status/evidence access when optional permissions are declined.",
+      "acceptance": "AT-MAC-PRD-014",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-PRD-015",
+      "spec": "01-product-scope.md",
+      "line": 65,
+      "requirement": "The workflow MUST support keyboard, VoiceOver, privacy-preserving status, localization, and explicit recovery actions before pilot acceptance.",
+      "acceptance": "AT-MAC-PRD-015",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-PRD-016",
+      "spec": "01-product-scope.md",
+      "line": 66,
+      "requirement": "Product acceptance MUST demonstrate useful change completion and blocked malicious effects on the same qualified profile and record actual limits of that evidence.",
+      "acceptance": "AT-MAC-PRD-016",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-UX-001",
+      "spec": "02-native-experience.md",
+      "line": 59,
+      "requirement": "The native operator MUST provide Work, Review, Resources, and Evidence & Recovery views with authoritative-state freshness.",
+      "acceptance": "AT-MAC-UX-001",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-UX-002",
+      "spec": "02-native-experience.md",
+      "line": 60,
+      "requirement": "Menu-bar presence and window/app closure MUST be independent of authority-service task lifetime and MUST expose a distinct stop action.",
+      "acceptance": "AT-MAC-UX-002",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-UX-003",
+      "spec": "02-native-experience.md",
+      "line": 61,
+      "requirement": "Finder Services and Open Project MUST validate bounded selection and open preflight without granting resource or effect authority.",
+      "acceptance": "AT-MAC-UX-003",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-UX-004",
+      "spec": "02-native-experience.md",
+      "line": 62,
+      "requirement": "App Intents MUST use a closed task/status/evidence/stop vocabulary and MUST NOT expose generic shell, approve, or publish actions.",
+      "acceptance": "AT-MAC-UX-004",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-UX-005",
+      "spec": "02-native-experience.md",
+      "line": 63,
+      "requirement": "Permission onboarding MUST distinguish OS access, run grant, and exact endorsement and present refusal-specific recovery.",
+      "acceptance": "AT-MAC-UX-005",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-UX-006",
+      "spec": "02-native-experience.md",
+      "line": 64,
+      "requirement": "Preflight MUST make source generation, profile/location, fixed tests, exports and limits inspectable before admission.",
+      "acceptance": "AT-MAC-UX-006",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-UX-007",
+      "spec": "02-native-experience.md",
+      "line": 65,
+      "requirement": "Exact review MUST display native-verified effect, destination, artifact, meaningful release, cost and binding freshness before the effect-specific submission.",
+      "acceptance": "AT-MAC-UX-007",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-UX-008",
+      "spec": "02-native-experience.md",
+      "line": 66,
+      "requirement": "Changed bindings, duplicate submission and lost replies MUST use native invalidation and original-operation reconciliation without optimistic success.",
+      "acceptance": "AT-MAC-UX-008",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-UX-009",
+      "spec": "02-native-experience.md",
+      "line": 67,
+      "requirement": "Notifications, deep links, restored windows and event hints MUST only route or refresh UI and MUST NOT authorize or disclose another user's data.",
+      "acceptance": "AT-MAC-UX-009",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-UX-010",
+      "spec": "02-native-experience.md",
+      "line": 68,
+      "requirement": "Stop UI MUST separately display admission fence, worker termination, network/resource cleanup and known or unresolved broker outcomes.",
+      "acceptance": "AT-MAC-UX-010",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-UX-011",
+      "spec": "02-native-experience.md",
+      "line": 69,
+      "requirement": "Sensitive review MUST default to redacted presentation and re-redact on inactivity, session/sleep signals and presenter mode; native endorsement MUST independently validate required current conditions.",
+      "acceptance": "AT-MAC-UX-011",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-UX-012",
+      "spec": "02-native-experience.md",
+      "line": 70,
+      "requirement": "Presenter mode MUST remove sensitive rendered text, accessibility content, previews and copy actions without claiming screen-capture prevention.",
+      "acceptance": "AT-MAC-UX-012",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-UX-013",
+      "spec": "02-native-experience.md",
+      "line": 71,
+      "requirement": "All primary flows MUST be operable with keyboard and VoiceOver and support non-color state, increased contrast, reduced motion and larger text.",
+      "acceptance": "AT-MAC-UX-013",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-UX-014",
+      "spec": "02-native-experience.md",
+      "line": 72,
+      "requirement": "Localized UI MUST preserve exact technical identities, full destinations, plural meaning and readable layout under pseudolocalization and right-to-left presentation.",
+      "acceptance": "AT-MAC-UX-014",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-UX-015",
+      "spec": "02-native-experience.md",
+      "line": 73,
+      "requirement": "Logs, paths, diffs and previews MUST render adversarial content inertly, expose ambiguous characters and preserve byte-exact evidence identity.",
+      "acceptance": "AT-MAC-UX-015",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-UX-016",
+      "spec": "02-native-experience.md",
+      "line": 74,
+      "requirement": "Error states MUST preserve recoverable work and name the failed boundary and safe next action without inventing successful closure.",
+      "acceptance": "AT-MAC-UX-016",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-UX-017",
+      "spec": "02-native-experience.md",
+      "line": 75,
+      "requirement": "App UI and diagnostics MUST omit service secrets, minimize resource contents, and require explicit redacted evidence export.",
+      "acceptance": "AT-MAC-UX-017",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-UX-018",
+      "spec": "02-native-experience.md",
+      "line": 76,
+      "requirement": "Endorsement UI MUST be kernel-owned in authority, with no Swift approval key/store and no assumption that local authentication alone endorses an effect.",
+      "acceptance": "AT-MAC-UX-018",
+      "plan": "01-native-operator.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-KER-001",
+      "spec": "03-kernel-contracts.md",
+      "line": 56,
+      "requirement": "Every execution profile MUST pin source, installed native ABI/store compatibility, policy, host adapter and platform identity; missing native prerequisites MUST close affected mutations.",
+      "acceptance": "AT-MAC-KER-001",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-KER-002",
+      "spec": "03-kernel-contracts.md",
+      "line": 57,
+      "requirement": "Every desktop command and native entry point MUST have one closed classification, declared L0 descent and stop disposition; unknown variants MUST refuse.",
+      "acceptance": "AT-MAC-KER-002",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-KER-003",
+      "spec": "03-kernel-contracts.md",
+      "line": 58,
+      "requirement": "Admission, startup, stop drain and recovery MUST use one pure native machine, with deterministic transitions over authenticated facts and IO only in drivers.",
+      "acceptance": "AT-MAC-KER-003",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-KER-004",
+      "spec": "03-kernel-contracts.md",
+      "line": 59,
+      "requirement": "Every release of governed effects or bytes MUST appear in the crossing census with writer, checks, ordering point and retained evidence.",
+      "acceptance": "AT-MAC-KER-004",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-KER-005",
+      "spec": "03-kernel-contracts.md",
+      "line": 60,
+      "requirement": "Authoritative mutable checks MUST occur in the serving writer before crossing mutation; external snapshots MUST be marked early-only and cannot satisfy an atomic profile gate.",
+      "acceptance": "AT-MAC-KER-005",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-KER-006",
+      "spec": "03-kernel-contracts.md",
+      "line": 61,
+      "requirement": "A crossing MUST preserve participant-local gates, expected-version checks, reservation semantics and required durability before acknowledging authority.",
+      "acceptance": "AT-MAC-KER-006",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-KER-007",
+      "spec": "03-kernel-contracts.md",
+      "line": 62,
+      "requirement": "Drivers MUST distinguish refused, retry, known unavailable and unknown commit results; uncertain commit MUST poison serving mutation and reconcile the original operation.",
+      "acceptance": "AT-MAC-KER-007",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-KER-008",
+      "spec": "03-kernel-contracts.md",
+      "line": 63,
+      "requirement": "Native operations MUST bind stable intent to one canonical request and policy; transport retry MUST recover the same operation or return conflict.",
+      "acceptance": "AT-MAC-KER-008",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-KER-009",
+      "spec": "03-kernel-contracts.md",
+      "line": 64,
+      "requirement": "Stop and release MUST use native crossing order; intent committed before stop MAY execute, while a later release MUST apply its own stop disposition.",
+      "acceptance": "AT-MAC-KER-009",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-KER-010",
+      "spec": "03-kernel-contracts.md",
+      "line": 65,
+      "requirement": "The Mac invocation profile MUST require durable coverage and MUST refuse unsupported read optimizations or silently weaker store modes.",
+      "acceptance": "AT-MAC-KER-010",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-KER-011",
+      "spec": "03-kernel-contracts.md",
+      "line": 66,
+      "requirement": "ES, NE, host supervisors and controller caches MUST be restrictive or observational seams and MUST NOT mint positive authority, approval or budget.",
+      "acceptance": "AT-MAC-KER-011",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-KER-012",
+      "spec": "03-kernel-contracts.md",
+      "line": 67,
+      "requirement": "Every reservation MUST identify native owner, parent accounting and release authority; post-effect uncertainty MUST retain irreversible commitments.",
+      "acceptance": "AT-MAC-KER-012",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-KER-013",
+      "spec": "03-kernel-contracts.md",
+      "line": 68,
+      "requirement": "Native authority MUST own capability lineage, child attenuation, key custody and subtree closure; incomplete descendant enumeration MUST refuse a complete-closure claim.",
+      "acceptance": "AT-MAC-KER-013",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-KER-014",
+      "spec": "03-kernel-contracts.md",
+      "line": 69,
+      "requirement": "Event hints MUST trigger authoritative reads and MUST NOT authorize; sensor IDs, subscription IDs and crossing positions MUST remain separately typed.",
+      "acceptance": "AT-MAC-KER-014",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-KER-015",
+      "spec": "03-kernel-contracts.md",
+      "line": 70,
+      "requirement": "Historical export and exact original-operation reconciliation MUST remain available under stop according to native read/control authority, without creating new effects.",
+      "acceptance": "AT-MAC-KER-015",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-KER-016",
+      "spec": "03-kernel-contracts.md",
+      "line": 71,
+      "requirement": "Kernel qualification MUST distinguish source, component, installed-runtime and qualified evidence, with independent negative and positive controls on the exact selected profile.",
+      "acceptance": "AT-MAC-KER-016",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-AUT-001",
+      "spec": "04-authority-integrity.md",
+      "line": 71,
+      "requirement": "Native bindings MUST derive tenant, principal, session, lineage, run and isolation generation from authority-owned state, never from unauthenticated UI or sensor claims.",
+      "acceptance": "AT-MAC-AUT-001",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-AUT-002",
+      "spec": "04-authority-integrity.md",
+      "line": 72,
+      "requirement": "Every input delivery, including bootstrap, restored state and native app content, MUST join classified influence before becoming usable.",
+      "acceptance": "AT-MAC-AUT-002",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-AUT-003",
+      "spec": "04-authority-integrity.md",
+      "line": 73,
+      "requirement": "Influence MUST be monotone and replay-idempotent; missing history or unsupported migration MUST yield unknown or refuse readiness.",
+      "acceptance": "AT-MAC-AUT-003",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-AUT-004",
+      "spec": "04-authority-integrity.md",
+      "line": 74,
+      "requirement": "Gated grants MUST enforce integrity and independent action-selection constraints in the crossing writer; unsupported enforcement MUST reject load and issuance.",
+      "acceptance": "AT-MAC-AUT-004",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-AUT-005",
+      "spec": "04-authority-integrity.md",
+      "line": 75,
+      "requirement": "Exact review MUST bind operation, action, destination, resource generation, policy/deployment, influence, validity and deciding authority to native materialization.",
+      "acceptance": "AT-MAC-AUT-005",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-AUT-006",
+      "spec": "04-authority-integrity.md",
+      "line": 76,
+      "requirement": "Approval submission MUST verify explicit decision before retention and MUST use the native signer/store/consume owner with no app-owned positive authority.",
+      "acceptance": "AT-MAC-AUT-006",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-AUT-007",
+      "spec": "04-authority-integrity.md",
+      "line": 77,
+      "requirement": "Endorsement acceptance MUST use a same-writer verified fact with current roster, native action, current influence commitment and atomic single-use consumption.",
+      "acceptance": "AT-MAC-AUT-007",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-AUT-008",
+      "spec": "04-authority-integrity.md",
+      "line": 78,
+      "requirement": "Every freshness change MUST invalidate a stale review or refuse crossing; native replay MUST return the original outcome without minting replacement authority.",
+      "acceptance": "AT-MAC-AUT-008",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-AUT-009",
+      "spec": "04-authority-integrity.md",
+      "line": 79,
+      "requirement": "Semantic endorsement adaptation MUST preserve digest domains and add every missing integrity binding; unavailable adaptation MUST refuse the automatic endorsement branch.",
+      "acceptance": "AT-MAC-AUT-009",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-AUT-010",
+      "spec": "04-authority-integrity.md",
+      "line": 80,
+      "requirement": "Ordinary children MUST inherit influence and attenuated constraints atomically; reset requires the qualified quarantined-child contract.",
+      "acceptance": "AT-MAC-AUT-010",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-AUT-011",
+      "spec": "04-authority-integrity.md",
+      "line": 81,
+      "requirement": "Quarantine returns MUST use host-recomputed closed types and exact capacity accounting; unknown channels or free text MUST withhold.",
+      "acceptance": "AT-MAC-AUT-011",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-AUT-012",
+      "spec": "04-authority-integrity.md",
+      "line": 82,
+      "requirement": "Action-selection inputs MUST be context-bound, ordered, distinct and consumed once; endorsement MUST NOT bypass the selector or authorized action set.",
+      "acceptance": "AT-MAC-AUT-012",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-AUT-013",
+      "spec": "04-authority-integrity.md",
+      "line": 83,
+      "requirement": "Capability, receipt, endorsement and child key material MUST remain in qualified native custody; unavailable custody MUST close new authority rather than export or substitute keys.",
+      "acceptance": "AT-MAC-AUT-013",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-AUT-014",
+      "spec": "04-authority-integrity.md",
+      "line": 84,
+      "requirement": "Parent/child budgets MUST consume native ancestor accounting with explicit units, ceilings and commitment release authority; unknown outcomes MUST NOT manufacture refunds.",
+      "acceptance": "AT-MAC-AUT-014",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-AUT-015",
+      "spec": "04-authority-integrity.md",
+      "line": 85,
+      "requirement": "Review presentation MUST render security-relevant native fields faithfully and keep agent-controlled markup, filenames and destinations inert.",
+      "acceptance": "AT-MAC-AUT-015",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-AUT-016",
+      "spec": "04-authority-integrity.md",
+      "line": 86,
+      "requirement": "Integrity qualification MUST attack repository, browser, clipboard, app, summary, bootstrap, child and restore routes with independent forbidden-effect observers and useful positive controls.",
+      "acceptance": "AT-MAC-AUT-016",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ARC-001",
+      "spec": "05-host-architecture.md",
+      "line": 53,
+      "requirement": "Each effect path MUST identify its native owner, crossing kind, input influence, stop disposition and evidence disposition before it is enabled. Missing mappings MUST make that operation unavailable.",
+      "acceptance": "AT-MAC-ARC-001",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ARC-002",
+      "spec": "05-host-architecture.md",
+      "line": 54,
+      "requirement": "The controller MUST NOT issue capabilities, mint budgets, sign approvals or receipts, or maintain a competing authority ledger. Native state references MUST be verified by their native owner.",
+      "acceptance": "AT-MAC-ARC-002",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ARC-003",
+      "spec": "05-host-architecture.md",
+      "line": 55,
+      "requirement": "Each user session MUST have isolated controller state and principal binding. A global provider MUST partition restrictions and observations by the authenticated subject and run incarnation.",
+      "acceptance": "AT-MAC-ARC-003",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ARC-004",
+      "spec": "05-host-architecture.md",
+      "line": 56,
+      "requirement": "IPC MUST authenticate both service and caller code identity and bind UID/audit session before exchanging sensitive payloads. A same-team unrelated application MUST NOT gain access merely by sharing Team ID.",
+      "acceptance": "AT-MAC-ARC-004",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ARC-005",
+      "spec": "05-host-architecture.md",
+      "line": 57,
+      "requirement": "A privileged bridge MUST expose only enumerated typed operations with independent native authorization; it MUST reject shell strings, arbitrary environment injection, caller-selected executable paths and forwarded inherited descriptors outside the registered contract.",
+      "acceptance": "AT-MAC-ARC-005",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ARC-006",
+      "spec": "05-host-architecture.md",
+      "line": 58,
+      "requirement": "Brokers MUST retain reusable provider/account credentials outside workers and MUST bind each use to the admitted operation, destination and current resource generation.",
+      "acceptance": "AT-MAC-ARC-006",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ARC-007",
+      "spec": "05-host-architecture.md",
+      "line": 59,
+      "requirement": "Worker creation MUST bind the kernel authority/run generation to the actual launch incarnation and qualified backend. A PID, process name, code signature or UI task ID alone MUST NOT establish this binding.",
+      "acceptance": "AT-MAC-ARC-007",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ARC-008",
+      "spec": "05-host-architecture.md",
+      "line": 60,
+      "requirement": "Provider policy views MUST be derived restrictive state with explicit generation and convergence evidence. An extension allow result MUST NOT create or enlarge Chio authority.",
+      "acceptance": "AT-MAC-ARC-008",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ARC-009",
+      "spec": "05-host-architecture.md",
+      "line": 61,
+      "requirement": "Hints and cached projections MUST NOT authorize mutations. The native owner MUST recheck the authoritative state at every required crossing.",
+      "acceptance": "AT-MAC-ARC-009",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ARC-010",
+      "spec": "05-host-architecture.md",
+      "line": 62,
+      "requirement": "Every enabled feature MUST be associated with an exact installed qualification tuple and current prerequisite observation. Incompatible or withdrawn prerequisites MUST close affected admission without silently switching profile.",
+      "acceptance": "AT-MAC-ARC-010",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ARC-011",
+      "spec": "05-host-architecture.md",
+      "line": 63,
+      "requirement": "The controller MUST bound message size, queue depth, concurrency and memory independently of trusted native store retention; overload MUST not discard native closure obligations.",
+      "acceptance": "AT-MAC-ARC-011",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ARC-012",
+      "spec": "05-host-architecture.md",
+      "line": 64,
+      "requirement": "On controller or app restart, projections MUST rebuild from native retained operations and stable subscriptions. Missing local cache MUST NOT imply missing effects, renewed grants or a fresh authority generation.",
+      "acceptance": "AT-MAC-ARC-012",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ARC-013",
+      "spec": "05-host-architecture.md",
+      "line": 65,
+      "requirement": "A resource adapter MUST separate capture, execution and release crossings, including model input export and post-return artifact release. Trusted code identity MUST NOT promote content integrity.",
+      "acceptance": "AT-MAC-ARC-013",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ARC-014",
+      "spec": "05-host-architecture.md",
+      "line": 66,
+      "requirement": "Cross-platform reuse MUST preserve the existing Omarchy ABI through explicit versioned mapping and conformance vectors. The new proposed shared desktop protocol MUST NOT silently replace an installed Omarchy protocol.",
+      "acceptance": "AT-MAC-ARC-014",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ARC-015",
+      "spec": "05-host-architecture.md",
+      "line": 67,
+      "requirement": "Component crash policy MUST name which new admissions close, which already committed operations may continue, and who retains the original recovery obligation. No component MAY announce universal stop from its own termination alone.",
+      "acceptance": "AT-MAC-ARC-015",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ARC-016",
+      "spec": "05-host-architecture.md",
+      "line": 68,
+      "requirement": "Provider health, qualified capability, current authority and operator presentation MUST remain separately represented. A healthy provider MUST NOT stand in for an admitted operation or complete sensor coverage.",
+      "acceptance": "AT-MAC-ARC-016",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-IPC-001",
+      "spec": "06-operator-protocol.md",
+      "line": 71,
+      "requirement": "The service MUST authenticate the peer and bind principal/session before all non-bootstrap operations; hello MUST precede other methods and MUST NOT grant native authority.",
+      "acceptance": "AT-MAC-IPC-001",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-IPC-002",
+      "spec": "06-operator-protocol.md",
+      "line": 72,
+      "requirement": "Decoding MUST enforce the closed method/field set, strict UTF-8/Unicode, duplicate-key rejection, integer rules, 65,536-byte limit and nesting depth 16.",
+      "acceptance": "AT-MAC-IPC-002",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-IPC-003",
+      "spec": "06-operator-protocol.md",
+      "line": 73,
+      "requirement": "Each response MUST match the initiating version, request ID, method and any echoed native operation, task, subscription or decision binding.",
+      "acceptance": "AT-MAC-IPC-003",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-IPC-004",
+      "spec": "06-operator-protocol.md",
+      "line": 74,
+      "requirement": "Native references MUST resolve only through registered native owners and MUST pass native kind, issuer, subject, generation, digest and freshness verification before use.",
+      "acceptance": "AT-MAC-IPC-004",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-IPC-005",
+      "spec": "06-operator-protocol.md",
+      "line": 75,
+      "requirement": "Mutation retries MUST use native retained principal/method/intent/parameter bindings; equal retries return original disposition and unequal reuse MUST conflict before effect.",
+      "acceptance": "AT-MAC-IPC-005",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-IPC-006",
+      "spec": "06-operator-protocol.md",
+      "line": 76,
+      "requirement": "Task creation MUST select a qualified profile, fixed template, verified workspace and sealed task-input resources and native grant, and MUST attenuate requested limits against current native authority.",
+      "acceptance": "AT-MAC-IPC-006",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-IPC-007",
+      "spec": "06-operator-protocol.md",
+      "line": 77,
+      "requirement": "Approval submission MUST require a native endorsement bound to operation, decision, review and relevant current authority/influence. Local UI events MUST NOT synthesize it.",
+      "acceptance": "AT-MAC-IPC-007",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-IPC-008",
+      "spec": "06-operator-protocol.md",
+      "line": 78,
+      "requirement": "Stop MUST route through the native owner and MUST return native durability plus admission, worker, network, cleanup and external-outcome dimensions; task reads MUST expose those facts after reconnect without another mutation.",
+      "acceptance": "AT-MAC-IPC-008",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-IPC-009",
+      "spec": "06-operator-protocol.md",
+      "line": 79,
+      "requirement": "Events MUST remain hints, use principal-scoped stable subscription identities, and require reread after gaps; acknowledgement MUST NOT use transport event sequence as native identity.",
+      "acceptance": "AT-MAC-IPC-009",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-IPC-010",
+      "spec": "06-operator-protocol.md",
+      "line": 80,
+      "requirement": "Pagination and event subscriptions MUST enforce configured resource bounds and owner-scoped cursors; cursor guessing MUST NOT disclose another principal's state.",
+      "acceptance": "AT-MAC-IPC-010",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-IPC-011",
+      "spec": "06-operator-protocol.md",
+      "line": 81,
+      "requirement": "Timeout, cancellation of the transport and lost reply MUST preserve native recovery obligations and MUST NOT authorize fresh redispatch of an uncertain effect.",
+      "acceptance": "AT-MAC-IPC-011",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-IPC-012",
+      "spec": "06-operator-protocol.md",
+      "line": 82,
+      "requirement": "Errors MUST use closed safe codes and message keys, redact internal paths/secrets, and distinguish unknown outcome from definite denial.",
+      "acceptance": "AT-MAC-IPC-012",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-IPC-013",
+      "spec": "06-operator-protocol.md",
+      "line": 83,
+      "requirement": "Evidence export MUST be an admitted release into a native destination resource under export authority; a caller-provided path MUST be rejected.",
+      "acceptance": "AT-MAC-IPC-013",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-IPC-014",
+      "spec": "06-operator-protocol.md",
+      "line": 84,
+      "requirement": "Version negotiation MUST reject unknown versions and silent Omarchy aliases; migration MUST preserve existing semantics through explicit cross-platform mapping tests.",
+      "acceptance": "AT-MAC-IPC-014",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-IPC-015",
+      "spec": "06-operator-protocol.md",
+      "line": 85,
+      "requirement": "The codec MUST preserve native signed bytes or opaque references and MUST NOT claim schema validation verifies signatures, authority or confinement.",
+      "acceptance": "AT-MAC-IPC-015",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-IPC-016",
+      "spec": "06-operator-protocol.md",
+      "line": 86,
+      "requirement": "Revocation, stop, endorsement consumption, integrity and budget checks MUST occur at their native serialized crossing; request ordering in XPC MUST NOT substitute for it.",
+      "acceptance": "AT-MAC-IPC-016",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-IPC-017",
+      "spec": "06-operator-protocol.md",
+      "line": 87,
+      "requirement": "Successful hello and health observations MUST NOT enable unavailable features; current qualification plus native per-operation authority MUST be required for mutation.",
+      "acceptance": "AT-MAC-IPC-017",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-IPC-018",
+      "spec": "06-operator-protocol.md",
+      "line": 88,
+      "requirement": "Compatibility and release evidence MUST bind the selected profile and installed tuple; synthetic fixtures and source/component evidence MUST NOT qualify runtime.",
+      "acceptance": "AT-MAC-IPC-018",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-IPC-019",
+      "spec": "06-operator-protocol.md",
+      "line": 89,
+      "requirement": "Native subscription terminals MUST be observable and replayed until acknowledged; live acknowledgements MUST refuse. Rebase, end acknowledgement and publication MUST serialize through the stable-subscription owner; stale publication MUST NOT resurrect acknowledged state.",
+      "acceptance": "AT-MAC-IPC-019",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-IPC-020",
+      "spec": "06-operator-protocol.md",
+      "line": 90,
+      "requirement": "Each method MUST have a positive and relevant negative contract fixture, with response-substitution checks outside JSON shape validation.",
+      "acceptance": "AT-MAC-IPC-020",
+      "plan": "02-protocol-controller.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VM-001",
+      "spec": "07-vm-execution.md",
+      "line": 42,
+      "requirement": "Production profile launch MUST require the exact selected profile, OS/architecture, component digests, native prerequisite evidence and verified installed qualification; missing or incompatible evidence MUST refuse before guest or provider start. A dedicated signed lab probe MAY exercise the exact production driver bytes under separate native fixture authority to collect candidate evidence, but MUST NOT enable production or assert qualification, and production MUST reject that fixture authority.",
+      "acceptance": "AT-MAC-VM-001",
+      "plan": "03-vm-project.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VM-002",
+      "spec": "07-vm-execution.md",
+      "line": 43,
+      "requirement": "Local Linux VM, remote worker, native descendant and managed endpoint MUST remain distinct placement and qualification choices; fallback MUST require a new authorized task binding before data export.",
+      "acceptance": "AT-MAC-VM-002",
+      "plan": "03-vm-project.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VM-003",
+      "spec": "07-vm-execution.md",
+      "line": 44,
+      "requirement": "Every launch MUST bind the fresh VM instance and host process incarnation to native-owned run/authority generations; PID, guest identifiers and replayed challenges MUST NOT confer identity.",
+      "acceptance": "AT-MAC-VM-003",
+      "plan": "03-vm-project.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VM-004",
+      "spec": "07-vm-execution.md",
+      "line": 45,
+      "requirement": "The initial local VM MUST have zero network devices and no direct host or Internet route; NAT, bridged networking, DNS, loopback forwarding and guest-controlled proxy settings MUST NOT bypass the resource broker.",
+      "acceptance": "AT-MAC-VM-004",
+      "plan": "03-vm-project.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VM-005",
+      "spec": "07-vm-execution.md",
+      "line": 46,
+      "requirement": "The guest MUST receive only the qualified immutable input generation and ephemeral scratch/output storage; host home, live checkout, keychains, credential files, sockets and ambient devices MUST remain inaccessible.",
+      "acceptance": "AT-MAC-VM-005",
+      "plan": "03-vm-project.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VM-006",
+      "spec": "07-vm-execution.md",
+      "line": 47,
+      "requirement": "Guest transport MUST be versioned, bounded, VM-instance-bound, replay-resistant across launches and separated from operator/control authority; malformed or unauthorized requests MUST fail without effects.",
+      "acceptance": "AT-MAC-VM-006",
+      "plan": "03-vm-project.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VM-007",
+      "spec": "07-vm-execution.md",
+      "line": 48,
+      "requirement": "Every host resource/model/export effect MUST use the original native serving writer, current integrity/approval/budget/fence contract and exact operation reference; guest success messages MUST NOT authorize or prove the effect.",
+      "acceptance": "AT-MAC-VM-007",
+      "plan": "03-vm-project.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VM-008",
+      "spec": "07-vm-execution.md",
+      "line": 49,
+      "requirement": "Launch MUST establish isolation and durable custody before executing untrusted bytes; partial preparation, duplicate start and controller restart MUST reconcile one original launch without a permissive window.",
+      "acceptance": "AT-MAC-VM-008",
+      "plan": "03-vm-project.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VM-009",
+      "spec": "07-vm-execution.md",
+      "line": 50,
+      "requirement": "CPU, memory, disk, channel, wall-time and concurrent-worker limits MUST be fixed in the launch binding and enforced by trusted host owners with bounded failure and cleanup.",
+      "acceptance": "AT-MAC-VM-009",
+      "plan": "03-vm-project.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VM-010",
+      "spec": "07-vm-execution.md",
+      "line": 51,
+      "requirement": "Stop MUST separately report native admission fencing, guest stop request, confirmed termination, broker/resource closure and unresolved external outcomes; a pre-fence committed intent MAY still act, while later release MUST recheck.",
+      "acceptance": "AT-MAC-VM-010",
+      "plan": "03-vm-project.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VM-011",
+      "spec": "07-vm-execution.md",
+      "line": 52,
+      "requirement": "Controller/launcher crash, guest hang, sleep/wake, logout, reboot and disconnected channels MUST fence new effects and reconcile surviving work before resume; guest death MUST NOT imply cancellation of a dispatched broker effect.",
+      "acceptance": "AT-MAC-VM-011",
+      "plan": "03-vm-project.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VM-012",
+      "spec": "07-vm-execution.md",
+      "line": 53,
+      "requirement": "Restored guest disks/snapshots and warm workers MUST NOT reuse old authority, launch challenges, approvals or spent resource state; initial release MUST use a fresh worker authority generation per task.",
+      "acceptance": "AT-MAC-VM-012",
+      "plan": "03-vm-project.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VM-013",
+      "spec": "07-vm-execution.md",
+      "line": 54,
+      "requirement": "Output release MUST cover artifact bytes, stdout/stderr, logs and diagnostics; any content returned from the guest MUST retain provenance/influence and MUST pass the applicable release contract.",
+      "acceptance": "AT-MAC-VM-013",
+      "plan": "03-vm-project.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VM-014",
+      "spec": "07-vm-execution.md",
+      "line": 55,
+      "requirement": "Remote placement MUST pin location/provider, worker identity, secure transport, data-export scope and remote authority before sending task data; network loss MUST preserve original remote operation identity and uncertain outcome.",
+      "acceptance": "AT-MAC-VM-014",
+      "plan": "03-vm-project.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VM-015",
+      "spec": "07-vm-execution.md",
+      "line": 56,
+      "requirement": "Linux execution MUST NOT claim Xcode, Simulator or Darwin-native support; native build/signing alternatives MUST have independent contracts, with signing bound to exact artifact, identity and entitlements and no reusable key export.",
+      "acceptance": "AT-MAC-VM-015",
+      "plan": "03-vm-project.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VM-016",
+      "spec": "07-vm-execution.md",
+      "line": 57,
+      "requirement": "Any helper executing native untrusted build phases MUST independently constrain inherited descriptors, memory mappings, Mach/bootstrap/XPC rights, launchd delegation, Apple Events, Accessibility and service endpoints before launch.",
+      "acceptance": "AT-MAC-VM-016",
+      "plan": "03-vm-project.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VM-017",
+      "spec": "07-vm-execution.md",
+      "line": 58,
+      "requirement": "Confinement evidence MUST name worker and tool-server lanes separately, exact backend/architecture, enforced surfaces and lifetime; VM telemetry and guest self-report MUST NOT masquerade as a signed kernel crossing or cover an unmeasured lane. Verified tests MUST additionally bind exact artifact/invocation and exclusive capture through a qualified supervisory lane; missing or compromised attribution MUST remain Unverified.",
+      "acceptance": "AT-MAC-VM-017",
+      "plan": "03-vm-project.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VM-018",
+      "spec": "07-vm-execution.md",
+      "line": 59,
+      "requirement": "Qualification MUST include hostile guest code, concurrent legitimate workload, an independent resource/network observer, crash cutpoints and positive controls; failed coverage MUST leave the affected profile unavailable.",
+      "acceptance": "AT-MAC-VM-018",
+      "plan": "03-vm-project.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ES-001",
+      "spec": "08-endpoint-security.md",
+      "line": 48,
+      "requirement": "Observation, native-descendant and managed-endpoint profiles MUST declare independent permission, scope, threat and evidence contracts; no observation result MUST be presented as task confinement.",
+      "acceptance": "AT-MAC-ES-001",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ES-002",
+      "spec": "08-endpoint-security.md",
+      "line": 49,
+      "requirement": "macOS 27 descendant/deadline/sync use MUST remain an unqualified research capability until final SDK/OS, entitlement and installed behavior gates pass; documentation metadata MUST preserve provenance and drift.",
+      "acceptance": "AT-MAC-ES-002",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ES-003",
+      "spec": "08-endpoint-security.md",
+      "line": 50,
+      "requirement": "Native launch MUST configure coverage and restrictive state before untrusted execution; the calling process MUST remain a minimal trusted launcher and existing-descendant coverage MUST NOT imply retroactive protection.",
+      "acceptance": "AT-MAC-ES-003",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ES-004",
+      "spec": "08-endpoint-security.md",
+      "line": 51,
+      "requirement": "Launch identity MUST bind audit token/process incarnation, boot/user and native run generation; PID reuse, exec, reparenting and delegated-service attribution MUST NOT enlarge authority.",
+      "acceptance": "AT-MAC-ES-004",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ES-005",
+      "spec": "08-endpoint-security.md",
+      "line": 52,
+      "requirement": "Native containment MUST close inherited FD/socket/mmap/Mach/XPC/bootstrap/launchd and ambient app-automation channels or mark the profile unavailable; process ancestry alone MUST NOT satisfy containment.",
+      "acceptance": "AT-MAC-ES-005",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ES-006",
+      "spec": "08-endpoint-security.md",
+      "line": 53,
+      "requirement": "Each claimed effect MUST have an exact SDK/event/response coverage entry and independent bypass test; NOTIFY writes and denied new opens MUST NOT be represented as revocation of existing write handles.",
+      "acceptance": "AT-MAC-ES-006",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ES-007",
+      "spec": "08-endpoint-security.md",
+      "line": 54,
+      "requirement": "AUTH handling MUST have bounded allocation/queue/work, correct response API, one response and checked response result before a qualified deadline margin; all slow authority work MUST precede dispatch.",
+      "acceptance": "AT-MAC-ES-007",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ES-008",
+      "spec": "08-endpoint-security.md",
+      "line": 55,
+      "requirement": "Deadline misses, queue overflow, client crash/disconnect, deletion, subscription loss and entitlement/permission withdrawal MUST be separate injected cases; unsupported failure closure MUST make native execution unavailable.",
+      "acceptance": "AT-MAC-ES-008",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ES-009",
+      "spec": "08-endpoint-security.md",
+      "line": 56,
+      "requirement": "Initial AUTH replies MUST disable caching; cache invalidation, mute changes and coexisting ES clients MUST be inventoried and tested before any broader coverage claim.",
+      "acceptance": "AT-MAC-ES-009",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ES-010",
+      "spec": "08-endpoint-security.md",
+      "line": 57,
+      "requirement": "Local ES views MUST be authenticated derived restrictions tied to authority/launch/policy generation and expiry; stale, replayed or conflicting views MUST deny selected tasks without minting positive authority.",
+      "acceptance": "AT-MAC-ES-010",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ES-011",
+      "spec": "08-endpoint-security.md",
+      "line": 58,
+      "requirement": "Stop/revocation MUST use native durable authority and independently report ES convergence, surviving handles/workers and unresolved effects; local policy acknowledgement MUST NOT substitute for a crossing fence.",
+      "acceptance": "AT-MAC-ES-011",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ES-012",
+      "spec": "08-endpoint-security.md",
+      "line": 59,
+      "requirement": "Event export MUST preserve version-gated per-type/global sequences, sensor epoch, gaps and response failures; sensor IDs MUST NOT be substituted for authority operation or crossing identifiers.",
+      "acceptance": "AT-MAC-ES-012",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ES-013",
+      "spec": "08-endpoint-security.md",
+      "line": 60,
+      "requirement": "Sync markers MUST be distinguished from client liveness and gap-free delivery; teardown callbacks MUST NOT establish a successful coverage drain.",
+      "acceptance": "AT-MAC-ES-013",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ES-014",
+      "spec": "08-endpoint-security.md",
+      "line": 61,
+      "requirement": "A global managed provider MUST isolate per-user policy, diagnostics and authority; unavailable per-task attribution MUST NOT silently install a global deny rule for unrelated users.",
+      "acceptance": "AT-MAC-ES-014",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ES-015",
+      "spec": "08-endpoint-security.md",
+      "line": 62,
+      "requirement": "Brokered semantics MUST remain native-owner-admitted before platform dispatch; ES allow responses MUST NOT authorize scripts, approvals, budget or new resource scope, and offline permits MUST remain unavailable.",
+      "acceptance": "AT-MAC-ES-015",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ES-016",
+      "spec": "08-endpoint-security.md",
+      "line": 63,
+      "requirement": "Policy updates, provider upgrades and wake/restart MUST establish a fresh converged epoch before native tasks resume; rollback MUST NOT restore spent grants, old allow state or prior stop generations.",
+      "acceptance": "AT-MAC-ES-016",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ES-017",
+      "spec": "08-endpoint-security.md",
+      "line": 64,
+      "requirement": "Qualification MUST prove installed denial and restoration with independent effects and positive controls on every advertised SDK/OS/architecture/profile tuple; build/test success alone MUST remain component evidence.",
+      "acceptance": "AT-MAC-ES-017",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-ES-018",
+      "spec": "08-endpoint-security.md",
+      "line": 65,
+      "requirement": "Sensor retention MUST bound queue/memory/log volume and redact sensitive paths/content under the privacy contract; overload MUST report loss and degrade the affected guarantee explicitly.",
+      "acceptance": "AT-MAC-ES-018",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-NE-001",
+      "spec": "09-network-extension.md",
+      "line": 39,
+      "requirement": "Each profile MUST choose and qualify an exact provider/packaging/OS/entitlement combination; VM no-network containment MUST NOT be inferred from NE installation or replaced by uncontrolled NAT.",
+      "acceptance": "AT-MAC-NE-001",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-NE-002",
+      "spec": "09-network-extension.md",
+      "line": 40,
+      "requirement": "Application effects MUST remain admitted by the native serving writer; a host/port/URL allow result MUST NOT authorize a repository action, upload, message, approval or spend.",
+      "acceptance": "AT-MAC-NE-002",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-NE-003",
+      "spec": "09-network-extension.md",
+      "line": 41,
+      "requirement": "Flow identity MUST preserve both optional source app and process audit tokens, process incarnation, user, provider epoch and native launch mapping; unknown/conflicting/delegated attribution MUST be explicit.",
+      "acceptance": "AT-MAC-NE-003",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-NE-004",
+      "spec": "09-network-extension.md",
+      "line": 42,
+      "requirement": "Per-task protection MUST refuse unsupported or ambiguous attribution and MUST NOT silently apply new global restrictions to unrelated host users; managed-endpoint restrictions MUST have their own scope.",
+      "acceptance": "AT-MAC-NE-004",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-NE-005",
+      "spec": "09-network-extension.md",
+      "line": 43,
+      "requirement": "Provider snapshots MUST be authenticated native-derived restrictions bound to authority, policy, run/launch, generation and expiry; they MUST NOT confer offline positive semantic authority.",
+      "acceptance": "AT-MAC-NE-005",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-NE-006",
+      "spec": "09-network-extension.md",
+      "line": 44,
+      "requirement": "Snapshot installation MUST reject rollback and same-generation digest conflict, be atomic, and intersect concurrent administrator/task restrictions; conflict MUST close affected managed flows.",
+      "acceptance": "AT-MAC-NE-006",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-NE-007",
+      "spec": "09-network-extension.md",
+      "line": 45,
+      "requirement": "TTL expiry, backwards clock, sleep/wake, provider restart and unknown freshness MUST close selected task routes pending native reconciliation; local time MUST NOT renew a restriction or grant.",
+      "acceptance": "AT-MAC-NE-007",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-NE-008",
+      "spec": "09-network-extension.md",
+      "line": 46,
+      "requirement": "Stop/revocation MUST deny new selected flows and revoke existing flows through a qualified retained-handle mechanism; convergence MUST be measured separately from requested policy generation.",
+      "acceptance": "AT-MAC-NE-008",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-NE-009",
+      "spec": "09-network-extension.md",
+      "line": 47,
+      "requirement": "Existing-flow qualification MUST cover TCP reuse, HTTP/2 multiplexing, UDP/QUIC, queued bytes, DNS changes, inbound/listener and both-direction traffic; delivered bytes MUST remain irreversible evidence.",
+      "acceptance": "AT-MAC-NE-009",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-NE-010",
+      "spec": "09-network-extension.md",
+      "line": 48,
+      "requirement": "Broker network custody MUST map native operations to actual connection ownership; shared pools MUST NOT claim per-task closure unless proved, and closing a shared pool MUST reconcile every affected original operation.",
+      "acceptance": "AT-MAC-NE-010",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-NE-011",
+      "spec": "09-network-extension.md",
+      "line": 49,
+      "requirement": "Provider crash, controller disconnection, configuration removal, permission withdrawal and upgrade MUST each have an explicit failure policy; a watchdog without continuous independent containment MUST NOT establish fail-closed native execution.",
+      "acceptance": "AT-MAC-NE-011",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-NE-012",
+      "spec": "09-network-extension.md",
+      "line": 50,
+      "requirement": "Transparent-proxy fallback MUST NOT pass selected managed traffic to the OS; proxy close/error paths MUST close both directions and enforce bounded buffering.",
+      "acceptance": "AT-MAC-NE-012",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-NE-013",
+      "spec": "09-network-extension.md",
+      "line": 51,
+      "requirement": "DNS and URL filter evidence MUST declare its actual stack/protocol coverage; custom networking, encrypted DNS and direct IP bypass MUST NOT be represented as covered without an independent boundary.",
+      "acceptance": "AT-MAC-NE-013",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-NE-014",
+      "spec": "09-network-extension.md",
+      "line": 52,
+      "requirement": "Destination matching MUST use a closed canonical representation for IP/port/protocol and verified DNS provenance where applicable; case, trailing dots, IPv6, aliases, redirects and rebinding MUST NOT expand scope.",
+      "acceptance": "AT-MAC-NE-014",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-NE-015",
+      "spec": "09-network-extension.md",
+      "line": 53,
+      "requirement": "Flow/snapshot events MUST remain separately identified sensor/restriction evidence with gaps, observed generations and response results; they MUST NOT masquerade as kernel crossings or prove remote outcome.",
+      "acceptance": "AT-MAC-NE-015",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-NE-016",
+      "spec": "09-network-extension.md",
+      "line": 54,
+      "requirement": "Provider memory, queue, flow table, parsing and diagnostics MUST be bounded and privacy-preserving; overload MUST close affected task routes and expose degraded coverage rather than silently allow.",
+      "acceptance": "AT-MAC-NE-016",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-NE-017",
+      "spec": "09-network-extension.md",
+      "line": 55,
+      "requirement": "Managed global providers MUST isolate users and survive logout/switch/lock according to declared policy; installation or activation status alone MUST NOT claim effective network protection.",
+      "acceptance": "AT-MAC-NE-017",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-NE-018",
+      "spec": "09-network-extension.md",
+      "line": 56,
+      "requirement": "Release qualification MUST include signed clean-machine deny/restore, live existing-flow revocation, independent remote receiver counts and positive controls for every selected native/managed tuple.",
+      "acceptance": "AT-MAC-NE-018",
+      "plan": "05-native-enforcement.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-RES-001",
+      "spec": "10-project-resources.md",
+      "line": 80,
+      "requirement": "Typed resource use MUST validate native ownership, principal/run, action, generation, expiry, budget and stop/policy state; workers MUST NOT receive ambient host authority, and sealed task-input resources MUST remain distinct from workspace resources.",
+      "acceptance": "AT-MAC-RES-001",
+      "plan": "04-resources-publication.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-RES-002",
+      "spec": "10-project-resources.md",
+      "line": 81,
+      "requirement": "Platform selection and security scope MUST remain separate from native grants and endorsements, with balanced access and stale-bookmark recovery.",
+      "acceptance": "AT-MAC-RES-002",
+      "plan": "04-resources-publication.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-RES-003",
+      "spec": "10-project-resources.md",
+      "line": 82,
+      "requirement": "Initial project import MUST materialize one fully verified committed Git object graph and immutable manifest, never a moving branch or working-tree mixture.",
+      "acceptance": "AT-MAC-RES-003",
+      "plan": "04-resources-publication.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-RES-004",
+      "spec": "10-project-resources.md",
+      "line": 83,
+      "requirement": "Git intake MUST reject unsupported links, gitlinks, external stores, missing objects, LFS-only content and formats without executing repository configuration or fetching content.",
+      "acceptance": "AT-MAC-RES-004",
+      "plan": "04-resources-publication.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-RES-005",
+      "spec": "10-project-resources.md",
+      "line": 84,
+      "requirement": "Path handling MUST preserve exact source bytes and reject traversal, duplicates, protected paths and target case/normalization collisions before materialization.",
+      "acceptance": "AT-MAC-RES-005",
+      "plan": "04-resources-publication.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-RES-006",
+      "spec": "10-project-resources.md",
+      "line": 85,
+      "requirement": "Materialization MUST use bounded regular-file content, explicit executable mode, controlled ownership and no implicit ACL/xattr/resource-fork/hard-link import.",
+      "acceptance": "AT-MAC-RES-006",
+      "plan": "04-resources-publication.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-RES-007",
+      "spec": "10-project-resources.md",
+      "line": 86,
+      "requirement": "Dirty-directory import MUST remain unavailable until coherent generation is proved against open descriptors, mmap, concurrent writers, rename and provider updates.",
+      "acceptance": "AT-MAC-RES-007",
+      "plan": "04-resources-publication.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-RES-008",
+      "spec": "10-project-resources.md",
+      "line": 87,
+      "requirement": "Source generations MUST become usable only after complete durable sealing and MUST abort on corruption, missing content or storage failure.",
+      "acceptance": "AT-MAC-RES-008",
+      "plan": "04-resources-publication.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-RES-009",
+      "spec": "10-project-resources.md",
+      "line": 88,
+      "requirement": "Worker output MUST enter host quarantine with count/size/type/path limits, independent manifest validation and no automatic active-content launch.",
+      "acceptance": "AT-MAC-RES-009",
+      "plan": "04-resources-publication.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-RES-010",
+      "spec": "10-project-resources.md",
+      "line": 89,
+      "requirement": "Fixed-test evidence MUST come from a trusted data-only oracle outside the candidate worker/guest, bind the exact sealed artifact and fixed cases to attributable supervised invocations and complete outputs, and MUST NOT infer pass from worker assertions or exit code zero; unproved attribution MUST remain unverified.",
+      "acceptance": "AT-MAC-RES-010",
+      "plan": "04-resources-publication.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-RES-011",
+      "spec": "10-project-resources.md",
+      "line": 90,
+      "requirement": "Artifact release MUST be a native crossing that preserves joined influence and rechecks current authority separately from worker completion.",
+      "acceptance": "AT-MAC-RES-011",
+      "plan": "04-resources-publication.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-RES-012",
+      "spec": "10-project-resources.md",
+      "line": 91,
+      "requirement": "Local publication MUST bind exact sealed artifact, exact destination identity/name, no-replace semantics and current native endorsement as a separate operation.",
+      "acceptance": "AT-MAC-RES-012",
+      "plan": "04-resources-publication.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-RES-013",
+      "spec": "10-project-resources.md",
+      "line": 92,
+      "requirement": "Filesystem publication MUST prevent symlink/path substitution, unintended overwrite and partial visible output through a qualified bounded atomic install protocol.",
+      "acceptance": "AT-MAC-RES-013",
+      "plan": "04-resources-publication.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-RES-014",
+      "spec": "10-project-resources.md",
+      "line": 93,
+      "requirement": "Publication recovery MUST reconcile the original operation using durable effect association and MUST retain unresolved outcome when proof is unavailable.",
+      "acceptance": "AT-MAC-RES-014",
+      "plan": "04-resources-publication.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-RES-015",
+      "spec": "10-project-resources.md",
+      "line": 94,
+      "requirement": "Git/remote publication MUST remain independently gated on exact destination, expected-old-ref comparison, broker-held credentials and original-effect reconciliation.",
+      "acceptance": "AT-MAC-RES-015",
+      "plan": "04-resources-publication.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-RES-016",
+      "spec": "10-project-resources.md",
+      "line": 95,
+      "requirement": "Model requests MUST be treated as data export and budgeted effects with bounded context, named destination and no worker-held reusable credentials.",
+      "acceptance": "AT-MAC-RES-016",
+      "plan": "04-resources-publication.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-RES-017",
+      "spec": "10-project-resources.md",
+      "line": 96,
+      "requirement": "Browser, clipboard and app captures MUST join source influence before worker consumption and preserve provenance through summaries and transformations.",
+      "acceptance": "AT-MAC-RES-017",
+      "plan": "04-resources-publication.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-RES-018",
+      "spec": "10-project-resources.md",
+      "line": 97,
+      "requirement": "Native app capture, draft, modification and publication MUST have distinct gates and references, including disclosure of draft synchronization effects.",
+      "acceptance": "AT-MAC-RES-018",
+      "plan": "04-resources-publication.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-RES-019",
+      "spec": "10-project-resources.md",
+      "line": 98,
+      "requirement": "GUI effect execution MUST remain unavailable without exact semantic binding and qualified outcome reconciliation; OS automation consent MUST NOT substitute.",
+      "acceptance": "AT-MAC-RES-019",
+      "plan": "04-resources-publication.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-RES-020",
+      "spec": "10-project-resources.md",
+      "line": 99,
+      "requirement": "Retention, deletion and evidence export MUST preserve required commitments/recovery while removing scoped payloads without mutating user-owned source or published files.",
+      "acceptance": "AT-MAC-RES-020",
+      "plan": "04-resources-publication.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-REC-001",
+      "spec": "11-state-recovery.md",
+      "line": 79,
+      "requirement": "Task state MUST derive from native operation facts and independent host observations; completion, admission stop, worker exit, release and external finality MUST remain distinct.",
+      "acceptance": "AT-MAC-REC-001",
+      "plan": "06-recovery-evidence.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-REC-002",
+      "spec": "11-state-recovery.md",
+      "line": 80,
+      "requirement": "Controller restart and mutating retry MUST reconcile stable original intent and native operation before any creation or dispatch.",
+      "acceptance": "AT-MAC-REC-002",
+      "plan": "06-recovery-evidence.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-REC-003",
+      "spec": "11-state-recovery.md",
+      "line": 81,
+      "requirement": "Crash recovery MUST use the native pure admission classifier and exact persisted participant evidence; unknown effects MUST retain commitments and forbid blind redispatch.",
+      "acceptance": "AT-MAC-REC-003",
+      "plan": "06-recovery-evidence.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-REC-004",
+      "spec": "11-state-recovery.md",
+      "line": 82,
+      "requirement": "Stop MUST report actual process-only, journal-only or anchored durability and MUST recover pending native restrictions before readiness.",
+      "acceptance": "AT-MAC-REC-004",
+      "plan": "06-recovery-evidence.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-REC-005",
+      "spec": "11-state-recovery.md",
+      "line": 83,
+      "requirement": "Stop intent retirement and resume MUST verify exact incident, generation, ancestry and current head; pending or unreadable intent MUST block widening.",
+      "acceptance": "AT-MAC-REC-005",
+      "plan": "06-recovery-evidence.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-REC-006",
+      "spec": "11-state-recovery.md",
+      "line": 84,
+      "requirement": "Stop races MUST preserve per-crossing order and subject-before-cut settlement; host teardown MUST NOT substitute for native outcome closure.",
+      "acceptance": "AT-MAC-REC-006",
+      "plan": "06-recovery-evidence.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-REC-007",
+      "spec": "11-state-recovery.md",
+      "line": 85,
+      "requirement": "Sleep, wake, reboot and user-session changes MUST revalidate native time, authority, platform identity and restrictive convergence before affected mutations resume.",
+      "acceptance": "AT-MAC-REC-007",
+      "plan": "06-recovery-evidence.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-REC-008",
+      "spec": "11-state-recovery.md",
+      "line": 86,
+      "requirement": "Authority restoration MUST require a qualified freshness source outside the restored snapshot domain; unsupported whole-host restore MUST remain inspection-only.",
+      "acceptance": "AT-MAC-REC-008",
+      "plan": "06-recovery-evidence.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-REC-009",
+      "spec": "11-state-recovery.md",
+      "line": 87,
+      "requirement": "Accepted restore MUST advance native restore/launch generation and invalidate stale capabilities, approvals, nonces, child handles and guest channels without losing original unknown effects.",
+      "acceptance": "AT-MAC-REC-009",
+      "plan": "06-recovery-evidence.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-REC-010",
+      "spec": "11-state-recovery.md",
+      "line": 88,
+      "requirement": "Store migration and component upgrade MUST be atomic or recoverable and MUST refuse older/incompatible writers rather than reinterpret newer authority.",
+      "acceptance": "AT-MAC-REC-010",
+      "plan": "06-recovery-evidence.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-REC-011",
+      "spec": "11-state-recovery.md",
+      "line": 89,
+      "requirement": "Retained canonical terminal/return evidence MUST repair secondary projections idempotently without reinvoking a resource or silently changing signed bytes.",
+      "acceptance": "AT-MAC-REC-011",
+      "plan": "06-recovery-evidence.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-REC-012",
+      "spec": "11-state-recovery.md",
+      "line": 90,
+      "requirement": "Event end acknowledgement MUST bind stable subscription identity and authenticated owner; dropped/rebased sensor or transport events MUST preserve honest gaps.",
+      "acceptance": "AT-MAC-REC-012",
+      "plan": "06-recovery-evidence.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-REC-013",
+      "spec": "11-state-recovery.md",
+      "line": 91,
+      "requirement": "Evidence export MUST bind exact profile/runtime, native facts, host observations, retention gaps and trust roots while preserving source assurance classes.",
+      "acceptance": "AT-MAC-REC-013",
+      "plan": "06-recovery-evidence.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-REC-014",
+      "spec": "11-state-recovery.md",
+      "line": 92,
+      "requirement": "Independent verification MUST validate signatures, inclusion/ancestry and effect-specific evidence; shape-only or same-operator records MUST NOT claim independent qualification or public witnessing.",
+      "acceptance": "AT-MAC-REC-014",
+      "plan": "06-recovery-evidence.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-REC-015",
+      "spec": "11-state-recovery.md",
+      "line": 93,
+      "requirement": "Retention and export MUST enforce native user/tenant read authority, keep signed originals distinct from redactions, and never store or export signer/credential secrets.",
+      "acceptance": "AT-MAC-REC-015",
+      "plan": "06-recovery-evidence.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-REC-016",
+      "spec": "11-state-recovery.md",
+      "line": 94,
+      "requirement": "Storage exhaustion and queue saturation MUST close new work, preserve bounded recovery routes where feasible, and report failed durability honestly.",
+      "acceptance": "AT-MAC-REC-016",
+      "plan": "06-recovery-evidence.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DST-001",
+      "spec": "12-distribution.md",
+      "line": 19,
+      "requirement": "Every distributed candidate MUST bind immutable public source revisions, dependency locks, vendored patches, build tools, unsigned content digests, final signed artifact digests, licenses, and an SBOM; unpublished revisions MUST NOT appear in public checkout instructions.",
+      "acceptance": "AT-MAC-DST-001",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DST-002",
+      "spec": "12-distribution.md",
+      "line": 20,
+      "requirement": "Every executable and nested bundle MUST pass the selected Developer ID, hardened-runtime, timestamp, entitlement allowlist, and nested-signature checks before submission; development debug entitlements MUST be absent.",
+      "acceptance": "AT-MAC-DST-002",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DST-003",
+      "spec": "12-distribution.md",
+      "line": 21,
+      "requirement": "The final distribution artifact MUST have a successful notarization record and applicable stapled-ticket validation, followed by clean consumer launch with normal platform security settings.",
+      "acceptance": "AT-MAC-DST-003",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DST-004",
+      "spec": "12-distribution.md",
+      "line": 22,
+      "requirement": "Provider packaging MUST use the containing app, allowed embedding location, matching publisher identity, granted capabilities, and exact provisioning profile for each direct-distribution extension type.",
+      "acceptance": "AT-MAC-DST-004",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DST-005",
+      "spec": "12-distribution.md",
+      "line": 23,
+      "requirement": "Installation MUST leave optional execution profiles unavailable until their individual OS permissions, provider activation, configuration, and runtime gates pass; denied permissions MUST preserve useful permitted features.",
+      "acceptance": "AT-MAC-DST-005",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DST-006",
+      "spec": "12-distribution.md",
+      "line": 24,
+      "requirement": "Supported OS, hardware, architecture, guest, provider, protocol, and state-schema combinations MUST be an explicit immutable matrix; missing or changed dimensions MUST invalidate the affected profile.",
+      "acceptance": "AT-MAC-DST-006",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DST-007",
+      "spec": "12-distribution.md",
+      "line": 25,
+      "requirement": "Installed runtime selection MUST use package-owned absolute paths and manifest-pinned code; ambient PATH, user shell files, dynamic library injection, and floating downloads MUST NOT select executable authority components.",
+      "acceptance": "AT-MAC-DST-007",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DST-008",
+      "spec": "12-distribution.md",
+      "line": 26,
+      "requirement": "Updates MUST verify publisher trust, payload digests, signed metadata generation, expiry policy, and compatibility before activation; rejected updates MUST leave the prior compatible custody path available.",
+      "acceptance": "AT-MAC-DST-008",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DST-009",
+      "spec": "12-distribution.md",
+      "line": 27,
+      "requirement": "An update MUST durably fence affected new admission, reconcile original operations, and journal staging, migration, provider replacement, remeasurement, and activation; a mixed generation MUST NOT admit governed work.",
+      "acceptance": "AT-MAC-DST-009",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DST-010",
+      "spec": "12-distribution.md",
+      "line": 28,
+      "requirement": "Provider replacement MUST confirm the active installed code and policy generation, not merely the embedded version; pending approval, restart, rejection, or nonconvergence MUST keep dependent profiles unavailable.",
+      "acceptance": "AT-MAC-DST-010",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DST-011",
+      "spec": "12-distribution.md",
+      "line": 29,
+      "requirement": "Downgrade or rollback MUST satisfy signed security floor and state read/write compatibility without restoring authority state, freshness anchors, spent budgets, approvals, stop generations, or effect custody from an older snapshot.",
+      "acceptance": "AT-MAC-DST-011",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DST-012",
+      "spec": "12-distribution.md",
+      "line": 30,
+      "requirement": "Code-signing or update-key rotation and revocation MUST use independently authenticated publisher policy, bounded offline behavior, and explicit successor trust; a same-named bundle or TLS connection MUST NOT establish successor trust.",
+      "acceptance": "AT-MAC-DST-012",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DST-013",
+      "spec": "12-distribution.md",
+      "line": 31,
+      "requirement": "Disable and uninstall MUST fence admission, reconcile or preserve unknown operations, stop owned workers, request provider deactivation, unregister helpers, and report actual residual components before claiming completion.",
+      "acceptance": "AT-MAC-DST-013",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DST-014",
+      "spec": "12-distribution.md",
+      "line": 32,
+      "requirement": "Uninstall MUST preserve user projects, receipts, unresolved custody, and recovery metadata by default; a separate explicit purge MUST identify retained obligations and MUST NOT rewrite unknown external effects as absent.",
+      "acceptance": "AT-MAC-DST-014",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DST-015",
+      "spec": "12-distribution.md",
+      "line": 33,
+      "requirement": "Managed deployment MUST use separately tested extension, privacy, background-service, and removal policies bound to exact identities; MDM approval MUST NOT grant Chio task or publication authority.",
+      "acceptance": "AT-MAC-DST-015",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DST-016",
+      "spec": "12-distribution.md",
+      "line": 34,
+      "requirement": "Installation, update, and removal MUST fail safely under full disk, read-only storage, signature failure, process death, and restart, retaining a bounded diagnostic recovery route without permission or enforcement downgrades.",
+      "acceptance": "AT-MAC-DST-016",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DST-017",
+      "spec": "12-distribution.md",
+      "line": 35,
+      "requirement": "A release MUST publish only individually qualified profile claims, verify instructed revisions exist in the public repository, and identify unavailable features and the exact evidence scope.",
+      "acceptance": "AT-MAC-DST-017",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DST-018",
+      "spec": "12-distribution.md",
+      "line": 36,
+      "requirement": "Descendant-scoped execution MUST remain a separate macOS 27 investigation until final SDK and OS availability, entitlement access, failure behavior, and profile-specific acceptance are verified; metadata labels alone MUST NOT open the profile.",
+      "acceptance": "AT-MAC-DST-018",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-PRV-001",
+      "spec": "13-privacy-performance.md",
+      "line": 26,
+      "requirement": "Collection and disclosure MUST follow a versioned inventory scoped to the task/profile, with model, app, and support release separately authorized; ambient host collection MUST be off by default.",
+      "acceptance": "AT-MAC-PRV-001",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-PRV-002",
+      "spec": "13-privacy-performance.md",
+      "line": 27,
+      "requirement": "Sensitive content, secrets, raw paths, destinations, decision handles, and stable user identifiers MUST be omitted or explicitly protected before any diagnostic persistence, not merely hidden in the UI.",
+      "acceptance": "AT-MAC-PRV-002",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-PRV-003",
+      "spec": "13-privacy-performance.md",
+      "line": 28,
+      "requirement": "Native signed evidence MUST remain byte-preserving; redacted presentations and exports MUST identify omissions and distinguish verified commitments from omitted or unverifiable payloads.",
+      "acceptance": "AT-MAC-PRV-003",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-PRV-004",
+      "spec": "13-privacy-performance.md",
+      "line": 29,
+      "requirement": "All Chio-owned diagnostic and payload stores MUST enforce the declared retention and size bounds, with explicit custody exceptions and no automatic loss of unresolved authority.",
+      "acceptance": "AT-MAC-PRV-004",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-PRV-005",
+      "spec": "13-privacy-performance.md",
+      "line": 30,
+      "requirement": "Support export MUST preview exact scope, use a bounded safe archive, scan for secrets, require explicit local export, and transmit nothing automatically.",
+      "acceptance": "AT-MAC-PRV-005",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-PRV-006",
+      "spec": "13-privacy-performance.md",
+      "line": 31,
+      "requirement": "Lock or uncertain session ownership MUST clear sensitive views, protect notification content, invalidate review handles, and apply the authority lifecycle fence from the operations contract.",
+      "acceptance": "AT-MAC-PRV-006",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-PRV-007",
+      "spec": "13-privacy-performance.md",
+      "line": 32,
+      "requirement": "Metrics MUST use bounded-cardinality fixed labels and explicit loss/queue/callback counters; metric collection MUST NOT block authority or turn dropped observations into evidence of no effects.",
+      "acceptance": "AT-MAC-PRV-007",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-PRV-008",
+      "spec": "13-privacy-performance.md",
+      "line": 33,
+      "requirement": "Performance evidence MUST bind exact source, installed profile, OS, architecture, hardware, power mode, thermal conditions, workload, measurement tools, sample distribution, and baseline identity.",
+      "acceptance": "AT-MAC-PRV-008",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-PRV-009",
+      "spec": "13-privacy-performance.md",
+      "line": 34,
+      "requirement": "Admission, broker, VM start, user-visible result, stop fencing, process termination, and network closure MUST be measured separately with independent timing and outcome oracles.",
+      "acceptance": "AT-MAC-PRV-009",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-PRV-010",
+      "spec": "13-privacy-performance.md",
+      "line": 35,
+      "requirement": "The implementation MUST meet or explicitly fail the proposed UI, idle-resource, and benchmark budgets; security deadline or coverage failures MUST close the affected profile rather than be waived as performance issues.",
+      "acceptance": "AT-MAC-PRV-010",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-PRV-011",
+      "spec": "13-privacy-performance.md",
+      "line": 36,
+      "requirement": "Battery claims MUST use paired repeatable energy measurements against the same useful workload, account for collection overhead and uncertainty, and remain scoped to the tested machine/profile.",
+      "acceptance": "AT-MAC-PRV-011",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-PRV-012",
+      "spec": "13-privacy-performance.md",
+      "line": 37,
+      "requirement": "Background observation MUST coalesce subscriptions, bound queues, stop unnecessary polling, and respect power/thermal changes without suspending safety-critical fencing or delaying required native callbacks.",
+      "acceptance": "AT-MAC-PRV-012",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-PRV-013",
+      "spec": "13-privacy-performance.md",
+      "line": 38,
+      "requirement": "Overload and disk pressure MUST produce explicit gaps and bounded diagnostic shedding while preserving authority correctness; inability to durably authorize MUST deny new crossing.",
+      "acceptance": "AT-MAC-PRV-013",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-PRV-014",
+      "spec": "13-privacy-performance.md",
+      "line": 39,
+      "requirement": "Deletion and purge MUST enumerate retained authority obligations, protected payloads, caches, exports, and known external copies without claiming universal secure erasure.",
+      "acceptance": "AT-MAC-PRV-014",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-PRV-015",
+      "spec": "13-privacy-performance.md",
+      "line": 40,
+      "requirement": "Public evidence, screenshots, fixtures, and bug reports MUST use synthetic task data and host pseudonyms; public witnessing, if added, MUST have a separately approved metadata-disclosure contract.",
+      "acceptance": "AT-MAC-PRV-015",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-PRV-016",
+      "spec": "13-privacy-performance.md",
+      "line": 41,
+      "requirement": "Dependency telemetry, updater requests, crash handling, and provider SDK behavior MUST be inventoried and observed under normal and failure paths; an unreviewed dependency MUST NOT silently expand collection.",
+      "acceptance": "AT-MAC-PRV-016",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-OPS-001",
+      "spec": "14-operations.md",
+      "line": 17,
+      "requirement": "Per-user controller, native authority, resource brokers, global providers, and managed policy MUST have explicit separate custody and authenticated interfaces; no provider MUST mint grants or user approvals.",
+      "acceptance": "AT-MAC-OPS-001",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-OPS-002",
+      "spec": "14-operations.md",
+      "line": 18,
+      "requirement": "Every connection and routed observation MUST bind its authenticated user/session/process incarnation and native scope; client-supplied identity fields MUST NOT select authority.",
+      "acceptance": "AT-MAC-OPS-002",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-OPS-003",
+      "spec": "14-operations.md",
+      "line": 19,
+      "requirement": "Installation and service registration MUST respect explicit background-service choice and approval state, avoid prompt loops, and permit read-only diagnosis when execution is unavailable.",
+      "acceptance": "AT-MAC-OPS-003",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-OPS-004",
+      "spec": "14-operations.md",
+      "line": 20,
+      "requirement": "Controller and helper restarts MUST be bounded and recover original native operations without replay; multiple app instances MUST converge on one serving writer per native authority scope.",
+      "acceptance": "AT-MAC-OPS-004",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-OPS-005",
+      "spec": "14-operations.md",
+      "line": 21,
+      "requirement": "Session lock, unknown lock state, logout, fast user switching away, and loss of authenticated session custody MUST fence affected new consequential crossings and invalidate open reviews under the native lifecycle contract.",
+      "acceptance": "AT-MAC-OPS-005",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-OPS-006",
+      "spec": "14-operations.md",
+      "line": 22,
+      "requirement": "No-user-logged-in and different-active-user states MUST preserve restrictive global policy without exposing another user's data or borrowing that user's credentials; autonomous logged-out execution MUST remain unavailable in the initial profiles.",
+      "acceptance": "AT-MAC-OPS-006",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-OPS-007",
+      "spec": "14-operations.md",
+      "line": 23,
+      "requirement": "Sleep, wake, reboot, provider restart, and clock discontinuity MUST trigger bounded reconciliation and remeasurement before affected admission, with durable deadlines evaluated by the native owner.",
+      "acceptance": "AT-MAC-OPS-007",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-OPS-008",
+      "spec": "14-operations.md",
+      "line": 24,
+      "requirement": "Secrets MUST remain in a deliberately selected per-user keychain implementation and broker scope, with minimal accessibility, no synchronization by default, and precise failure on locked, missing, denied, or migrated items.",
+      "acceptance": "AT-MAC-OPS-008",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-OPS-009",
+      "spec": "14-operations.md",
+      "line": 25,
+      "requirement": "Secret rotation, removal, and session fencing MUST invalidate broker caches and new uses; already-dispatched external effects MUST retain their known or unknown native outcome.",
+      "acceptance": "AT-MAC-OPS-009",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-OPS-010",
+      "spec": "14-operations.md",
+      "line": 26,
+      "requirement": "Backups MUST distinguish configuration, presentation state, protected payload, native authority, and secret custody, and MUST declare completeness and consistency without treating copied bytes as fresh authority.",
+      "acceptance": "AT-MAC-OPS-010",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-OPS-011",
+      "spec": "14-operations.md",
+      "line": 27,
+      "requirement": "Restore or clone MUST remain quarantined until native freshness and original-operation reconciliation succeed; backup, keychain, database, VM snapshot, or local hash-chain restoration MUST NOT resurrect authority.",
+      "acceptance": "AT-MAC-OPS-011",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-OPS-012",
+      "spec": "14-operations.md",
+      "line": 28,
+      "requirement": "Health MUST expose separate connectivity, authentication, compatibility, permission, activation, convergence, observation coverage, storage, authority, and closure dimensions with bounded age and explicit unknowns.",
+      "acceptance": "AT-MAC-OPS-012",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-OPS-013",
+      "spec": "14-operations.md",
+      "line": 29,
+      "requirement": "Runbooks MUST use specific reason codes, evidence locations, exact recovery actions, and independent closure checks; no recovery action MUST reset authority or broaden permissions to make a warning disappear.",
+      "acceptance": "AT-MAC-OPS-013",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-OPS-014",
+      "spec": "14-operations.md",
+      "line": 30,
+      "requirement": "Stop and uninstall MUST independently track durable admission fence, worker termination, existing-flow closure, resource cleanup, provider removal, and external outcome, without conflating acknowledgments or sensor silence with closure.",
+      "acceptance": "AT-MAC-OPS-014",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-OPS-015",
+      "spec": "14-operations.md",
+      "line": 31,
+      "requirement": "Storage faults, corrupt state, lost keys, and inconsistent provider mappings MUST produce quarantined diagnosis and affected-scope denial; automated repair MUST NOT discard unresolved custody.",
+      "acceptance": "AT-MAC-OPS-015",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-OPS-016",
+      "spec": "14-operations.md",
+      "line": 32,
+      "requirement": "Managed host restrictions and administrator policy MUST be independently attributable and restrictive; changing management state MUST invalidate affected qualification without expanding native authority.",
+      "acceptance": "AT-MAC-OPS-016",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-OPS-017",
+      "spec": "14-operations.md",
+      "line": 33,
+      "requirement": "Cross-user diagnostics, evidence exports, notification delivery, temporary files, and support queries MUST preserve per-user isolation even when tasks have identical labels or UIDs are reused.",
+      "acceptance": "AT-MAC-OPS-017",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-OPS-018",
+      "spec": "14-operations.md",
+      "line": 34,
+      "requirement": "Security incident and compromised-component response MUST fence affected scopes, preserve minimal verifiable evidence, rotate affected trust through its owner, and resume only after exact-profile requalification.",
+      "acceptance": "AT-MAC-OPS-018",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-HST-001",
+      "spec": "15-host-adapters.md",
+      "line": 32,
+      "requirement": "Each selected host MUST match an exact installed qualification tuple before protected launch; package presence or a dependency range MUST NOT enable a profile.",
+      "acceptance": "AT-MAC-HST-001",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-HST-002",
+      "spec": "15-host-adapters.md",
+      "line": 33,
+      "requirement": "Every adapter MUST inventory effects, model traffic, tool transports, discovery, plugins, subprocesses, attachments and persistence; uncontrolled surfaces MUST be disabled or place the host outside the claimed profile.",
+      "acceptance": "AT-MAC-HST-002",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-HST-003",
+      "spec": "15-host-adapters.md",
+      "line": 34,
+      "requirement": "Preparation MUST validate current native authority, profile, policy, owner and installation bindings before credential access or provider egress; required feature mismatch MUST refuse without fallback.",
+      "acceptance": "AT-MAC-HST-003",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-HST-004",
+      "spec": "15-host-adapters.md",
+      "line": 35,
+      "requirement": "Tool admission and effects MUST remain with their native owners; adapters MUST NOT interpret advisory receipts, callbacks, OS permission or local allow bits as execution authority.",
+      "acceptance": "AT-MAC-HST-004",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-HST-005",
+      "spec": "15-host-adapters.md",
+      "line": 36,
+      "requirement": "Tool declarations and canonical argument binding MUST be immutable for the run, and lifecycle replacement or reload MUST preserve the exact registry before further dispatch.",
+      "acceptance": "AT-MAC-HST-005",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-HST-006",
+      "spec": "15-host-adapters.md",
+      "line": 37,
+      "requirement": "Provider, capability-signing and native owner secrets MUST stay in authenticated trusted custody; workers MUST receive only scoped routes or opaque handles with no reusable credential export.",
+      "acceptance": "AT-MAC-HST-006",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-HST-007",
+      "spec": "15-host-adapters.md",
+      "line": 38,
+      "requirement": "Private prompts and task context MUST use bounded authenticated private transfer, with no sensitive bytes in argv, inherited environment, diagnostics or ordinary events.",
+      "acceptance": "AT-MAC-HST-007",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-HST-008",
+      "spec": "15-host-adapters.md",
+      "line": 39,
+      "requirement": "Model disclosure mode MUST be frozen and visible; `required` MUST use a qualified native release owner that commits and submits exact bytes, and MUST refuse if that owner is absent.",
+      "acceptance": "AT-MAC-HST-008",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-HST-009",
+      "spec": "15-host-adapters.md",
+      "line": 40,
+      "requirement": "Model requests MUST bind route, provider, account, model/API contract, credential generation, tool inventory, history, content commitments and resource limits; redirects and undeclared secondary channels MUST refuse.",
+      "acceptance": "AT-MAC-HST-009",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-HST-010",
+      "spec": "15-host-adapters.md",
+      "line": 41,
+      "requirement": "Resource and provider limits MUST distinguish hard enforcement, observation and unavailable dimensions; reservations and absolute deadlines MUST survive resume and aggregate with delegated children.",
+      "acceptance": "AT-MAC-HST-010",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-HST-011",
+      "spec": "15-host-adapters.md",
+      "line": 42,
+      "requirement": "Every returned artifact, tool result and model output MUST follow its admitted release disposition; receipt verification, safe rendering and native delivery custody MUST precede release or ACK.",
+      "acceptance": "AT-MAC-HST-011",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-HST-012",
+      "spec": "15-host-adapters.md",
+      "line": 43,
+      "requirement": "An unresolved original or pending delivery ACK MUST fence dependent effects; retry and resume MUST reconcile the original native identity rather than dispatch a new effect.",
+      "acceptance": "AT-MAC-HST-012",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-HST-013",
+      "spec": "15-host-adapters.md",
+      "line": 44,
+      "requirement": "Compaction, checkpoint restore, branch/switch, import and host replacement MUST preserve influence, disclosure and owner bindings; unsupported transformations MUST refuse.",
+      "acceptance": "AT-MAC-HST-013",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-HST-014",
+      "spec": "15-host-adapters.md",
+      "line": 45,
+      "requirement": "Stop MUST request native fencing and worker termination separately, preserve precommitted effects and withhold later releases as required; host exit MUST NOT prove effect closure.",
+      "acceptance": "AT-MAC-HST-014",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-HST-015",
+      "spec": "15-host-adapters.md",
+      "line": 46,
+      "requirement": "Adapter errors and task summaries MUST preserve authoritative dispatch classification and uncertainty without raw secrets; model prose, zero exit and unsigned host reports MUST NOT establish success.",
+      "acceptance": "AT-MAC-HST-015",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-HST-016",
+      "spec": "15-host-adapters.md",
+      "line": 47,
+      "requirement": "Host or provider changes MUST require a new matching qualification and admission where bindings change; silent account, route, model, registry or version substitution MUST refuse.",
+      "acceptance": "AT-MAC-HST-016",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-HST-017",
+      "spec": "15-host-adapters.md",
+      "line": 48,
+      "requirement": "Protocol adapters MUST mediate reverse calls, sampling, elicitation, resource reads and nested delegation according to typed contracts, and MUST reject unregistered effect/disclosure channels.",
+      "acceptance": "AT-MAC-HST-017",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-HST-018",
+      "spec": "15-host-adapters.md",
+      "line": 49,
+      "requirement": "The implementation MUST maintain the source/component/installed/qualified matrix with explicit unavailable features and independent negative evidence for each advertised tuple.",
+      "acceptance": "AT-MAC-HST-018",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DEL-001",
+      "spec": "16-delegation.md",
+      "line": 23,
+      "requirement": "Child execution MUST remain unavailable until native child admission, sealed tree ledger, ownership, output custody and selected confinement contracts are implemented and qualified together.",
+      "acceptance": "AT-MAC-DEL-001",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DEL-002",
+      "spec": "16-delegation.md",
+      "line": 24,
+      "requirement": "Every child MUST have a verified parent-bound attenuation chain preserving issuer, tenant, budget family, resource constraints, validity and ancestor revocation; no hop may enlarge authority.",
+      "acceptance": "AT-MAC-DEL-002",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DEL-003",
+      "spec": "16-delegation.md",
+      "line": 25,
+      "requirement": "Child admission MUST atomically retain original request, parent, exact input/template/target binding, signer custody and reservations before launch; equal replay MUST reconcile and changed replay MUST conflict.",
+      "acceptance": "AT-MAC-DEL-003",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DEL-004",
+      "spec": "16-delegation.md",
+      "line": 26,
+      "requirement": "Workers MUST launch only operator-installed immutable templates bound to an exact host/profile tuple; guest input MUST NOT select executables, environment, arbitrary sockets, credentials or packages.",
+      "acceptance": "AT-MAC-DEL-004",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DEL-005",
+      "spec": "16-delegation.md",
+      "line": 27,
+      "requirement": "All child and descendant allocations MUST remain within the sealed hierarchical ledger's root and ancestor ceilings; cancellation, restart and partition MUST NOT mint or implicitly refund budget.",
+      "acceptance": "AT-MAC-DEL-005",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DEL-006",
+      "spec": "16-delegation.md",
+      "line": 28,
+      "requirement": "Each live worker and serving writer MUST have one authenticated owner generation and qualified lease/fence; PID, heartbeat or elapsed timeout alone MUST NOT transfer custody.",
+      "acceptance": "AT-MAC-DEL-006",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DEL-007",
+      "spec": "16-delegation.md",
+      "line": 29,
+      "requirement": "Lease issuance and renewal MUST recheck current authority, policy, installation, parent validity and stop generation at the serving writer; stale or partitioned workers MUST NOT begin new crossings.",
+      "acceptance": "AT-MAC-DEL-007",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DEL-008",
+      "spec": "16-delegation.md",
+      "line": 30,
+      "requirement": "Subtree stop and ancestor revocation MUST fence new crossings monotonically while retaining precommitted effects, progress-only return records, withheld output and actual process termination as distinct states.",
+      "acceptance": "AT-MAC-DEL-008",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DEL-009",
+      "spec": "16-delegation.md",
+      "line": 31,
+      "requirement": "Cross-host context and commands MUST authenticate authority, host, worker and owner generation, disclose only admitted exact content, and exclude ambient parent transcripts, secrets and host-control interfaces.",
+      "acceptance": "AT-MAC-DEL-009",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DEL-010",
+      "spec": "16-delegation.md",
+      "line": 32,
+      "requirement": "Each effect MUST retain its original native operation and request binding across retries, worker replacement and host changes; uncertain effects MUST NOT be redispatched with a fresh identity.",
+      "acceptance": "AT-MAC-DEL-010",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DEL-011",
+      "spec": "16-delegation.md",
+      "line": 33,
+      "requirement": "Child results MUST pass native receipt, result, recipient and disclosure verification before parent ingestion, output release or ACK; signed origin MUST NOT erase input influence.",
+      "acceptance": "AT-MAC-DEL-011",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DEL-012",
+      "spec": "16-delegation.md",
+      "line": 34,
+      "requirement": "Dependency waits MUST be acyclic and bounded; root success MUST require declared required child outcomes and artifacts plus explicit resolution of every outstanding effect.",
+      "acceptance": "AT-MAC-DEL-012",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DEL-013",
+      "spec": "16-delegation.md",
+      "line": 35,
+      "requirement": "Stopped-authority relocation MUST transfer or explicitly retain all original custody under a qualified native protocol, fence the source before serving at destination and reconcile interrupted transfer under the same identity.",
+      "acceptance": "AT-MAC-DEL-013",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DEL-014",
+      "spec": "16-delegation.md",
+      "line": 36,
+      "requirement": "Remote effect settlement MUST use the selected resource owner's actual reconciliation contract; disconnection, cancellation, provider idempotency keys or worker death MUST NOT imply exactly-once completion or rollback.",
+      "acceptance": "AT-MAC-DEL-014",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DEL-015",
+      "spec": "16-delegation.md",
+      "line": 37,
+      "requirement": "Task views and evidence MUST separately report authority admission, worker connectivity, restriction convergence, process liveness, effect state and result delivery; external sensor IDs MUST NOT replace native crossing order.",
+      "acceptance": "AT-MAC-DEL-015",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-DEL-016",
+      "spec": "16-delegation.md",
+      "line": 38,
+      "requirement": "Local children, remote workers, stopped relocation and every changed host/runtime/provider tuple MUST pass separate applicable qualification with independent observers and explicit unavailable gates.",
+      "acceptance": "AT-MAC-DEL-016",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VER-001",
+      "spec": "17-qualification.md",
+      "line": 25,
+      "requirement": "Evidence MUST distinguish source, component, installed runtime, and independently qualified conclusions; the candidate schema and document validator MUST NOT issue runtime qualification.",
+      "acceptance": "AT-MAC-VER-001",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VER-002",
+      "spec": "17-qualification.md",
+      "line": 26,
+      "requirement": "Every profile candidate MUST bind `appliedProfileManifestDigest` to an immutable pre-run applicability manifest containing the exact tuple, required case set, observation class, controls, and release gates; omitted required cases MUST fail.",
+      "acceptance": "AT-MAC-VER-002",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VER-003",
+      "spec": "17-qualification.md",
+      "line": 27,
+      "requirement": "Qualification MUST pin source revisions, patches, final installed code, signing and provisioning evidence, active provider versions, host/guest architecture, exact OS build, SDK/toolchain, policy, native generation, and harness/observer identities.",
+      "acceptance": "AT-MAC-VER-003",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VER-004",
+      "spec": "17-qualification.md",
+      "line": 28,
+      "requirement": "Every security-critical installed test MUST include an independent positive control and an intentional negative control proving the oracle can detect the prohibited effect or broken guarantee.",
+      "acceptance": "AT-MAC-VER-004",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VER-005",
+      "spec": "17-qualification.md",
+      "line": 29,
+      "requirement": "Profile and publication claims MUST follow the explicit matrix below; evidence from VM, native, managed, remote, another architecture, or another OS/provider tuple MUST NOT substitute without new applicable acceptance.",
+      "acceptance": "AT-MAC-VER-005",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VER-006",
+      "spec": "17-qualification.md",
+      "line": 30,
+      "requirement": "Native kernel prerequisites MUST verify exact approval, integrity, budgets, stop order, crossing ownership, and original-operation recovery; initial installed evidence MUST use the dedicated signed probe and explicit scoped native fixture authority, while production profile admission MUST require verified qualification with no bypass.",
+      "acceptance": "AT-MAC-VER-006",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VER-007",
+      "spec": "17-qualification.md",
+      "line": 31,
+      "requirement": "Project, VM, broker, and remote qualification MUST attempt real boundary bypasses and observe external effects, including direct egress, inherited handles, resource substitution, credential access, and unknown-outcome replay.",
+      "acceptance": "AT-MAC-VER-007",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VER-008",
+      "spec": "17-qualification.md",
+      "line": 32,
+      "requirement": "ES/NE-dependent profiles MUST separately qualify identity, coverage, queue gaps, deadline misses, provider death, stale policy, cached authorization, existing flows, and unrelated host behavior.",
+      "acceptance": "AT-MAC-VER-008",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VER-009",
+      "spec": "17-qualification.md",
+      "line": 33,
+      "requirement": "Approval, integrity, delegation, and publication qualification MUST include adversarial input and changed-binding races with independently observed destination and payload.",
+      "acceptance": "AT-MAC-VER-009",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VER-010",
+      "spec": "17-qualification.md",
+      "line": 34,
+      "requirement": "Stop, revocation, logout, sleep, restart, backup restore, and downgrade qualification MUST distinguish intent order, actual process/network closure, authoritative freshness, and unresolved external effects.",
+      "acceptance": "AT-MAC-VER-010",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VER-011",
+      "spec": "17-qualification.md",
+      "line": 35,
+      "requirement": "Multi-user and permissions qualification MUST cover standard/admin accounts, lock, fast switching, logout, no logged-in user, denial/revocation, and managed/unmanaged deployment where claimed.",
+      "acceptance": "AT-MAC-VER-011",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VER-012",
+      "spec": "17-qualification.md",
+      "line": 36,
+      "requirement": "Distribution qualification MUST start from a clean consumer installation with normal security settings and test update, rollback, interruption, removal, and retained data using the final signed bytes.",
+      "acceptance": "AT-MAC-VER-012",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VER-013",
+      "spec": "17-qualification.md",
+      "line": 37,
+      "requirement": "Privacy and performance qualification MUST use the same installed profile and exact workload baseline as the release claim, with raw samples, secret canaries, retention tests, and explicit inconclusive energy results.",
+      "acceptance": "AT-MAC-VER-013",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VER-014",
+      "spec": "17-qualification.md",
+      "line": 38,
+      "requirement": "The semantic verifier MUST independently validate artifact hashes, signer trust and native proofs, tuple/order/identity consistency, required coverage, control efficacy, expectation-to-observation predicates, freshness, and missing evidence; candidate booleans MUST NOT suffice.",
+      "acceptance": "AT-MAC-VER-014",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VER-015",
+      "spec": "17-qualification.md",
+      "line": 39,
+      "requirement": "Qualification artifacts MUST be content-addressed, provenance-preserving, bounded, safely parsed, privacy-reviewed, and reproducible from a documented runbook with source and installed evidence kept separate.",
+      "acceptance": "AT-MAC-VER-015",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VER-016",
+      "spec": "17-qualification.md",
+      "line": 40,
+      "requirement": "A failed, skipped, unavailable, gapped, synthetic, or inconclusive required case MUST close the affected release gate; selective reruns MUST retain prior failures and a reasoned invalidation scope.",
+      "acceptance": "AT-MAC-VER-016",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VER-017",
+      "spec": "17-qualification.md",
+      "line": 41,
+      "requirement": "Installed drift, revoked trust, schema change, provider replacement, policy change, and relevant OS updates MUST invalidate affected qualification until the predefined rerun policy passes.",
+      "acceptance": "AT-MAC-VER-017",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VER-018",
+      "spec": "17-qualification.md",
+      "line": 42,
+      "requirement": "Final release review MUST be independent of the implementer, require a passing ordinary production-admission confirmation using the actual verified-qualification artifact, and reconcile user-visible claims with its exact scope, exclusions, and unresolved outcomes.",
+      "acceptance": "AT-MAC-VER-018",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VER-019",
+      "spec": "17-qualification.md",
+      "line": 43,
+      "requirement": "The macOS 27 descendant track MUST resolve documentation/SDK metadata drift and pass final-OS descendant-specific adversarial cases independently; another profile's success MUST NOT open it.",
+      "acceptance": "AT-MAC-VER-019",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-VER-020",
+      "spec": "17-qualification.md",
+      "line": 44,
+      "requirement": "Regression tooling MUST include malformed and semantically fraudulent candidate bundles that pass basic shape checks, demonstrating that structural validation cannot become a release oracle.",
+      "acceptance": "AT-MAC-VER-020",
+      "plan": "08-distribution-qualification.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-CLW-001",
+      "spec": "18-clawdstrike-reuse.md",
+      "line": 29,
+      "requirement": "Every reused component MUST record immutable upstream commit, exact file/artifact hash, license obligations, local changes and evidence class; public availability MUST be reverified before release claims.",
+      "acceptance": "AT-MAC-CLW-001",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-CLW-002",
+      "spec": "18-clawdstrike-reuse.md",
+      "line": 30,
+      "requirement": "Reused mechanisms MUST remain observations or restrictions under the Chio crossing owner; they MUST NOT issue independent positive Chio authority, approvals, budgets or stop generations.",
+      "acceptance": "AT-MAC-CLW-002",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-CLW-003",
+      "spec": "18-clawdstrike-reuse.md",
+      "line": 31,
+      "requirement": "HushSpec import/export MUST declare source and target dialects, compiler versions and supported semantic subset; unrepresentable, unresolved or weakening projections MUST refuse.",
+      "acceptance": "AT-MAC-CLW-003",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-CLW-004",
+      "spec": "18-clawdstrike-reuse.md",
+      "line": 32,
+      "requirement": "Every policy load MUST perform parsing, semantic validation, pinned inheritance resolution and target compilation validation; lower-level compilation or lossy decompilation MUST NOT bypass those gates.",
+      "acceptance": "AT-MAC-CLW-004",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-CLW-005",
+      "spec": "18-clawdstrike-reuse.md",
+      "line": 33,
+      "requirement": "Native exact approval, integrity and authenticated approver-directory requirements MUST survive policy projection; external policy approval or allow results MUST NOT become independent Chio endorsement.",
+      "acceptance": "AT-MAC-CLW-005",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-CLW-006",
+      "spec": "18-clawdstrike-reuse.md",
+      "line": 34,
+      "requirement": "Reused ES code MUST declare its actual subscribed events, handler configuration and enforcement limits, and MUST NOT claim AUTH_EXEC, descendant confinement or installed coverage from AUTH_OPEN observer tests.",
+      "acceptance": "AT-MAC-CLW-006",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-CLW-007",
+      "spec": "18-clawdstrike-reuse.md",
+      "line": 35,
+      "requirement": "Reused NE code MUST identify the actual host/port restriction scope and unknown attribution, and MUST NOT grant semantic, per-task or existing-flow guarantees without their own implementation and proof.",
+      "acceptance": "AT-MAC-CLW-007",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-CLW-008",
+      "spec": "18-clawdstrike-reuse.md",
+      "line": 36,
+      "requirement": "Native process responses MUST validate live process incarnation and qualified targeting immediately around execution; unresolved reuse/race behavior MUST refuse the response or leave the capability unavailable.",
+      "acceptance": "AT-MAC-CLW-008",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-CLW-009",
+      "spec": "18-clawdstrike-reuse.md",
+      "line": 37,
+      "requirement": "Detection findings and provider observations MUST carry provenance, clock/sequence and gap information separately from authoritative receipts; automatic remediation MUST traverse the owning native action contract.",
+      "acceptance": "AT-MAC-CLW-009",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-CLW-010",
+      "spec": "18-clawdstrike-reuse.md",
+      "line": 38,
+      "requirement": "Restriction synchronization, stale policy, provider failure and removal MUST follow the selected profile's fail-closed task semantics without silently imposing an accidental whole-host policy.",
+      "acceptance": "AT-MAC-CLW-010",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-CLW-011",
+      "spec": "18-clawdstrike-reuse.md",
+      "line": 39,
+      "requirement": "Distribution MUST prove reviewed-source-to-signed-extension provenance, required entitlements, activation and actual block/restore on the same qualified host; packaging or component CI alone MUST NOT qualify enforcement.",
+      "acceptance": "AT-MAC-CLW-011",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-CLW-012",
+      "spec": "18-clawdstrike-reuse.md",
+      "line": 40,
+      "requirement": "Coexistence MUST keep product identities, policy stores, signers, approvals and operation histories distinct, with effective permission constrained by all applicable restrictions and no shared-transaction claim.",
+      "acceptance": "AT-MAC-CLW-012",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-CLW-013",
+      "spec": "18-clawdstrike-reuse.md",
+      "line": 41,
+      "requirement": "Coexistence failures, updates, rollback, uninstall and independent external restrictions MUST preserve truthful Chio task/custody state, and MUST NOT remove another product's policy or bypass its enforcement.",
+      "acceptance": "AT-MAC-CLW-013",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-CLW-014",
+      "spec": "18-clawdstrike-reuse.md",
+      "line": 42,
+      "requirement": "Reuse and upstream changes MUST pass exact component conformance plus applicable installed profile regressions before activation; policy or provider version mismatch MUST remain unavailable.",
+      "acceptance": "AT-MAC-CLW-014",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-CLW-015",
+      "spec": "18-clawdstrike-reuse.md",
+      "line": 43,
+      "requirement": "Telemetry and evidence exchange MUST be scoped, bounded and redacted with explicit disclosure authority; neither product's raw events or secrets may be silently copied into the other's model context.",
+      "acceptance": "AT-MAC-CLW-015",
+      "plan": "07-adapters-delegation.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-RDM-001",
+      "spec": "19-roadmap-decisions.md",
+      "line": 93,
+      "requirement": "Each work track MUST have an owner, concrete plan, entry dependencies, unavailable behavior and acceptance artifacts.",
+      "acceptance": "AT-MAC-RDM-001",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-RDM-002",
+      "spec": "19-roadmap-decisions.md",
+      "line": 94,
+      "requirement": "Read-only/component progress MUST remain distinguishable from delivered native contracts and installed execution qualification.",
+      "acceptance": "AT-MAC-RDM-002",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-RDM-003",
+      "spec": "19-roadmap-decisions.md",
+      "line": 95,
+      "requirement": "Missing native contracts MUST be tracked as upstream prerequisites and MUST NOT be replaced with controller-local authority shims.",
+      "acceptance": "AT-MAC-RDM-003",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-RDM-004",
+      "spec": "19-roadmap-decisions.md",
+      "line": 96,
+      "requirement": "Numeric track IDs MUST NOT imply execution order; M6 recovery and applicable M0/M2 gates MUST precede completed M3/M4 execution claims.",
+      "acceptance": "AT-MAC-RDM-004",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-RDM-005",
+      "spec": "19-roadmap-decisions.md",
+      "line": 97,
+      "requirement": "Every profile and optional feature MUST have immutable pre-run applicability and an independent qualification decision; optional unfinished tracks MUST remain unavailable.",
+      "acceptance": "AT-MAC-RDM-005",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-RDM-006",
+      "spec": "19-roadmap-decisions.md",
+      "line": 98,
+      "requirement": "Source and installed artifacts MUST be pinned separately; public installation claims MUST reference revisions and archives verified to exist publicly.",
+      "acceptance": "AT-MAC-RDM-006",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-RDM-007",
+      "spec": "19-roadmap-decisions.md",
+      "line": 99,
+      "requirement": "Changes to selected architecture, protocol, profile scope or security assumptions MUST update the decision, affected specs/plans, schemas and acceptance manifest together.",
+      "acceptance": "AT-MAC-RDM-007",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-RDM-008",
+      "spec": "19-roadmap-decisions.md",
+      "line": 100,
+      "requirement": "The specification package MUST validate local references, requirement/acceptance uniqueness, plan coverage, closed contract shapes, correlation and negative fixture behavior before publication.",
+      "acceptance": "AT-MAC-RDM-008",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-RDM-009",
+      "spec": "19-roadmap-decisions.md",
+      "line": 101,
+      "requirement": "Review findings MUST be evaluated against current source and the current document head; fixes MUST preserve scope and evidence distinctions rather than merely suppressing a finding.",
+      "acceptance": "AT-MAC-RDM-009",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    },
+    {
+      "id": "MAC-RDM-010",
+      "spec": "19-roadmap-decisions.md",
+      "line": 102,
+      "requirement": "A release decision MUST report actual source/component/runtime evidence, unresolved limitations and profile exclusions, without inferring implementation from specification approval.",
+      "acceptance": "AT-MAC-RDM-010",
+      "plan": "00-kernel-prerequisites.md",
+      "acceptance_status": "specified_not_executed"
+    }
+  ]
+}

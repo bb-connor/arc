@@ -1,0 +1,12 @@
+{
+  "version": "chio.desktop.operator.v1",
+  "request_id": "synthetic-request-task-create",
+  "method": "task.create",
+  "ok": false,
+  "error": {
+    "code": "prerequisite_unavailable",
+    "retry": "never",
+    "message_key": "native-crossing-unavailable",
+    "operation_ref": null
+  }
+}

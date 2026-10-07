@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "researched_on": "2026-10-07",
+  "purpose": "Source identity, not installation or runtime qualification",
+  "sources": [
+    {
+      "id": "CHIO-MAIN",
+      "revision": "6573b8980a1e5331028b7e688169f033a39d0384",
+      "visibility": "internal-working-source",
+      "role": "implementation baseline",
+      "runtime_qualified": false
+    },
+    {
+      "id": "CHIO-NORTHSTAR",
+      "revision": "8dffff3da53dfb56da8e60019af5e3ae896f7f5b",
+      "visibility": "internal-design-source",
+      "role": "open documentation-only target, separately fetched source tree",
+      "path": "docs/superpowers/specs/2026-10-04-*-design.md",
+      "runtime_qualified": false
+    },
+    {
+      "id": "OMARCHY-SPEC",
+      "revision": "d092128a18efdf666f4430bf41efd7aff6c16148",
+      "visibility": "internal-design-source",
+      "path": "docs/superpowers/specs/2026-10-07-omarchy-integration",
+      "role": "independent unmerged specification precedent",
+      "runtime_qualified": false
+    },
+    {
+      "id": "CLAWDSTRIKE",
+      "revision": "b9515321f4a20bd676dfef88bdf3ba4d015bc6e9",
+      "visibility": "public",
+      "repository": "https://github.com/backbay-labs/clawdstrike",
+      "role": "inspected reusable components; no complete Mac runtime qualification claimed",
+      "runtime_qualified": false
+    },
+    {
+      "id": "MAC-BASE",
+      "alias_of": "CHIO-MAIN",
+      "revision": "6573b8980a1e5331028b7e688169f033a39d0384"
+    },
+    {
+      "id": "CLW-PUBLIC",
+      "alias_of": "CLAWDSTRIKE",
+      "revision": "b9515321f4a20bd676dfef88bdf3ba4d015bc6e9"
+    },
+    {
+      "id": "CLW-LOCAL",
+      "revision": "c493ad843e1a587168aa818cd8296baeb5ee77b7",
+      "role": "Local comparison source; selected blobs match CLW-PUBLIC"
+    },
+    {
+      "id": "PI-PUBLIC",
+      "revision": "4214a5a8ddec776a5ff9ec78007442683fd8df03",
+      "repository": "https://github.com/backbay-labs/chio-pi-plugin",
+      "role": "Inspected public host adapter; no Mac qualification claim"
+    },
+    {
+      "id": "CHIO-PUBLIC",
+      "revision": "5b8bec41d32f3838b880576fe6123c983ecebf8d",
+      "repository": "https://github.com/backbay-labs/chio",
+      "role": "Public source existence, not current Mac release qualification"
+    },
+    {
+      "id": "MAC-RESEARCH",
+      "role": "User-approved initial local research brief, superseded on current-source details by this package",
+      "researched_on": "2026-10-07",
+      "runtime_qualified": false
+    }
+  ]
+}

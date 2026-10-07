@@ -1,0 +1,653 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "operator-request.schema.json",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "hello"
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "supported_versions": {
+              "type": "array",
+              "items": {
+                "const": "chio.desktop.operator.v1"
+              },
+              "minItems": 1,
+              "maxItems": 1
+            },
+            "client_nonce": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            }
+          },
+          "required": [
+            "supported_versions",
+            "client_nonce"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "health.get"
+        },
+        "params": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "tasks.list"
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "cursor": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          "required": [
+            "cursor",
+            "limit"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "task.get"
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "task_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            }
+          },
+          "required": [
+            "task_id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "task.create"
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "intent_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            },
+            "template_id": {
+              "const": "project-change-v1"
+            },
+            "resource_ref": {
+              "allOf": [
+                {
+                  "$ref": "common.schema.json#/$defs/native_ref"
+                },
+                {
+                  "properties": {
+                    "kind": {
+                      "const": "resource"
+                    }
+                  }
+                }
+              ]
+            },
+            "grant_ref": {
+              "allOf": [
+                {
+                  "$ref": "common.schema.json#/$defs/native_ref"
+                },
+                {
+                  "properties": {
+                    "kind": {
+                      "const": "grant"
+                    }
+                  }
+                }
+              ]
+            },
+            "execution_profile": {
+              "enum": [
+                "vm-project-v1",
+                "remote-project-v1",
+                "native-descendant-v1"
+              ]
+            },
+            "limits": {
+              "type": "object",
+              "properties": {
+                "max_cost_minor": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,19})$",
+                  "format": "uint64-decimal"
+                },
+                "currency": {
+                  "const": "USD"
+                },
+                "max_wall_seconds": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 86400
+                }
+              },
+              "required": [
+                "max_cost_minor",
+                "currency",
+                "max_wall_seconds"
+              ],
+              "additionalProperties": false
+            },
+            "input_ref": {
+              "allOf": [
+                {
+                  "$ref": "common.schema.json#/$defs/native_ref"
+                },
+                {
+                  "properties": {
+                    "kind": {
+                      "const": "resource"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "required": [
+            "intent_id",
+            "template_id",
+            "resource_ref",
+            "grant_ref",
+            "execution_profile",
+            "limits",
+            "input_ref"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "operation.get"
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "operation_ref": {
+              "allOf": [
+                {
+                  "$ref": "common.schema.json#/$defs/native_ref"
+                },
+                {
+                  "properties": {
+                    "kind": {
+                      "const": "operation"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "required": [
+            "operation_ref"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "task.stop"
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "intent_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            },
+            "task_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            },
+            "scope": {
+              "enum": [
+                "task",
+                "task_and_descendants"
+              ]
+            }
+          },
+          "required": [
+            "intent_id",
+            "task_id",
+            "scope"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "review.open"
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "operation_ref": {
+              "allOf": [
+                {
+                  "$ref": "common.schema.json#/$defs/native_ref"
+                },
+                {
+                  "properties": {
+                    "kind": {
+                      "const": "operation"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "required": [
+            "operation_ref"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "approval.submit"
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "intent_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            },
+            "operation_ref": {
+              "allOf": [
+                {
+                  "$ref": "common.schema.json#/$defs/native_ref"
+                },
+                {
+                  "properties": {
+                    "kind": {
+                      "const": "operation"
+                    }
+                  }
+                }
+              ]
+            },
+            "review_ref": {
+              "allOf": [
+                {
+                  "$ref": "common.schema.json#/$defs/native_ref"
+                },
+                {
+                  "properties": {
+                    "kind": {
+                      "const": "review"
+                    }
+                  }
+                }
+              ]
+            },
+            "endorsement_ref": {
+              "allOf": [
+                {
+                  "$ref": "common.schema.json#/$defs/native_ref"
+                },
+                {
+                  "properties": {
+                    "kind": {
+                      "const": "endorsement"
+                    }
+                  }
+                }
+              ]
+            },
+            "decision": {
+              "enum": [
+                "approve",
+                "deny"
+              ]
+            }
+          },
+          "required": [
+            "intent_id",
+            "operation_ref",
+            "review_ref",
+            "endorsement_ref",
+            "decision"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "events.subscribe"
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "after_cursor": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "after_cursor"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "events.ack"
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "subscription_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            }
+          },
+          "required": [
+            "subscription_id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "chio.desktop.operator.v1"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "method": {
+          "const": "evidence.export"
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "intent_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            },
+            "task_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            },
+            "format": {
+              "const": "redacted-bundle-v1"
+            },
+            "destination_ref": {
+              "allOf": [
+                {
+                  "$ref": "common.schema.json#/$defs/native_ref"
+                },
+                {
+                  "properties": {
+                    "kind": {
+                      "const": "resource"
+                    }
+                  }
+                }
+              ]
+            },
+            "grant_ref": {
+              "allOf": [
+                {
+                  "$ref": "common.schema.json#/$defs/native_ref"
+                },
+                {
+                  "properties": {
+                    "kind": {
+                      "const": "grant"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "required": [
+            "intent_id",
+            "task_id",
+            "format",
+            "destination_ref",
+            "grant_ref"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "request_id",
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}

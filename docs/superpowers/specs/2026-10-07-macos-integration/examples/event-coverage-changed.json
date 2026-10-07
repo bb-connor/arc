@@ -1,0 +1,12 @@
+{
+  "version": "chio.desktop.operator.v1",
+  "subscription_id": "synthetic-subscription",
+  "cursor": "synthetic-cursor-2",
+  "hint_only": true,
+  "kind": "coverage.changed",
+  "data": {
+    "provider": "endpoint_security",
+    "state": "gap",
+    "generation": "1"
+  }
+}

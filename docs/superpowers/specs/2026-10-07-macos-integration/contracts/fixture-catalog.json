@@ -1,0 +1,379 @@
+{
+  "synthetic_only": true,
+  "fixtures": [
+    {
+      "file": "request-hello.json",
+      "schema": "operator-request.schema.json",
+      "schema_valid": true
+    },
+    {
+      "file": "response-hello.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-hello.json",
+      "pair_valid": true
+    },
+    {
+      "file": "request-health-get.json",
+      "schema": "operator-request.schema.json",
+      "schema_valid": true
+    },
+    {
+      "file": "response-health-get.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-health-get.json",
+      "pair_valid": true
+    },
+    {
+      "file": "request-tasks-list.json",
+      "schema": "operator-request.schema.json",
+      "schema_valid": true
+    },
+    {
+      "file": "response-tasks-list.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-tasks-list.json",
+      "pair_valid": true
+    },
+    {
+      "file": "request-task-get.json",
+      "schema": "operator-request.schema.json",
+      "schema_valid": true
+    },
+    {
+      "file": "response-task-get.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-task-get.json",
+      "pair_valid": true
+    },
+    {
+      "file": "request-task-create.json",
+      "schema": "operator-request.schema.json",
+      "schema_valid": true
+    },
+    {
+      "file": "response-task-create.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-task-create.json",
+      "pair_valid": true
+    },
+    {
+      "file": "request-operation-get.json",
+      "schema": "operator-request.schema.json",
+      "schema_valid": true
+    },
+    {
+      "file": "response-operation-get.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-operation-get.json",
+      "pair_valid": true
+    },
+    {
+      "file": "request-task-stop.json",
+      "schema": "operator-request.schema.json",
+      "schema_valid": true
+    },
+    {
+      "file": "response-task-stop.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-task-stop.json",
+      "pair_valid": true
+    },
+    {
+      "file": "request-review-open.json",
+      "schema": "operator-request.schema.json",
+      "schema_valid": true
+    },
+    {
+      "file": "response-review-open.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-review-open.json",
+      "pair_valid": true
+    },
+    {
+      "file": "request-approval-submit.json",
+      "schema": "operator-request.schema.json",
+      "schema_valid": true
+    },
+    {
+      "file": "response-approval-submit.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-approval-submit.json",
+      "pair_valid": true
+    },
+    {
+      "file": "request-events-subscribe.json",
+      "schema": "operator-request.schema.json",
+      "schema_valid": true
+    },
+    {
+      "file": "response-events-subscribe.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-events-subscribe.json",
+      "pair_valid": true
+    },
+    {
+      "file": "request-events-ack.json",
+      "schema": "operator-request.schema.json",
+      "schema_valid": true
+    },
+    {
+      "file": "response-events-ack.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-events-ack.json",
+      "pair_valid": true
+    },
+    {
+      "file": "request-evidence-export.json",
+      "schema": "operator-request.schema.json",
+      "schema_valid": true
+    },
+    {
+      "file": "response-evidence-export.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-evidence-export.json",
+      "pair_valid": true
+    },
+    {
+      "file": "response-error.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-task-create.json",
+      "pair_valid": true
+    },
+    {
+      "file": "event-task-changed.json",
+      "schema": "operator-event.schema.json",
+      "schema_valid": true
+    },
+    {
+      "file": "event-coverage-changed.json",
+      "schema": "operator-event.schema.json",
+      "schema_valid": true
+    },
+    {
+      "file": "event-review-invalidated.json",
+      "schema": "operator-event.schema.json",
+      "schema_valid": true
+    },
+    {
+      "file": "event-stream-gap.json",
+      "schema": "operator-event.schema.json",
+      "schema_valid": true
+    },
+    {
+      "file": "release-candidate.json",
+      "schema": "release-evidence.schema.json",
+      "schema_valid": true
+    },
+    {
+      "file": "invalid-shell-field.json",
+      "schema": "operator-request.schema.json",
+      "schema_valid": false
+    },
+    {
+      "file": "invalid-profile.json",
+      "schema": "operator-request.schema.json",
+      "schema_valid": false
+    },
+    {
+      "file": "invalid-number-budget.json",
+      "schema": "operator-request.schema.json",
+      "schema_valid": false
+    },
+    {
+      "file": "invalid-native-kind.json",
+      "schema": "operator-request.schema.json",
+      "schema_valid": false
+    },
+    {
+      "file": "invalid-leading-zero.json",
+      "schema": "operator-request.schema.json",
+      "schema_valid": false
+    },
+    {
+      "file": "invalid-ui-approval.json",
+      "schema": "operator-request.schema.json",
+      "schema_valid": false
+    },
+    {
+      "file": "invalid-transport-ack.json",
+      "schema": "operator-request.schema.json",
+      "schema_valid": false
+    },
+    {
+      "file": "invalid-unknown-method.json",
+      "schema": "operator-request.schema.json",
+      "schema_valid": false
+    },
+    {
+      "file": "invalid-export-path.json",
+      "schema": "operator-request.schema.json",
+      "schema_valid": false
+    },
+    {
+      "file": "invalid-legacy-alias.json",
+      "schema": "operator-request.schema.json",
+      "schema_valid": false
+    },
+    {
+      "file": "invalid-result-substitution.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false
+    },
+    {
+      "file": "invalid-request-correlation.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-task-create.json",
+      "pair_valid": false
+    },
+    {
+      "file": "invalid-operation-substitution.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-operation-get.json",
+      "pair_valid": false
+    },
+    {
+      "file": "invalid-decision-substitution.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-approval-submit.json",
+      "pair_valid": false
+    },
+    {
+      "file": "invalid-subscription-substitution.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-events-ack.json",
+      "pair_valid": false
+    },
+    {
+      "file": "invalid-authoritative-event.json",
+      "schema": "operator-event.schema.json",
+      "schema_valid": false
+    },
+    {
+      "file": "invalid-qualified-status.json",
+      "schema": "release-evidence.schema.json",
+      "schema_valid": false
+    },
+    {
+      "file": "invalid-empty-cases.json",
+      "schema": "release-evidence.schema.json",
+      "schema_valid": false
+    },
+    {
+      "file": "compatibility-unavailable.json",
+      "schema": "compatibility.schema.json",
+      "schema_valid": true
+    },
+    {
+      "file": "invalid-source-promoted.json",
+      "schema": "compatibility.schema.json",
+      "schema_valid": false
+    },
+    {
+      "file": "compatibility-fabricated-reference.json",
+      "schema": "compatibility.schema.json",
+      "schema_valid": true
+    },
+    {
+      "file": "invalid-error-operation-substitution.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-operation-get.json",
+      "pair_valid": false
+    },
+    {
+      "file": "response-task-get-process-only.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-task-get.json",
+      "pair_valid": true
+    },
+    {
+      "file": "response-task-get-latch-only.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-task-get.json",
+      "pair_valid": true
+    },
+    {
+      "file": "response-task-get-durable.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-task-get.json",
+      "pair_valid": true
+    },
+    {
+      "file": "invalid-durable-without-reference.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false
+    },
+    {
+      "file": "invalid-fenced-process-only.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false
+    },
+    {
+      "file": "invalid-missing-reread-stop.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false
+    },
+    {
+      "file": "event-subscription-ended.json",
+      "schema": "operator-event.schema.json",
+      "schema_valid": true
+    },
+    {
+      "file": "invalid-ended-authority.json",
+      "schema": "operator-event.schema.json",
+      "schema_valid": false
+    },
+    {
+      "file": "response-live-ack-refused.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-events-ack.json",
+      "pair_valid": true
+    },
+    {
+      "file": "event-ended-revoked.json",
+      "schema": "operator-event.schema.json",
+      "schema_valid": true
+    },
+    {
+      "file": "event-ended-authority_time_unavailable.json",
+      "schema": "operator-event.schema.json",
+      "schema_valid": true
+    },
+    {
+      "file": "event-ended-auth_rotated.json",
+      "schema": "operator-event.schema.json",
+      "schema_valid": true
+    },
+    {
+      "file": "event-ended-subject_gone.json",
+      "schema": "operator-event.schema.json",
+      "schema_valid": true
+    },
+    {
+      "file": "invalid-transport-terminal-reason.json",
+      "schema": "operator-event.schema.json",
+      "schema_valid": false
+    }
+  ]
+}

@@ -1,0 +1,261 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "common.schema.json",
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "uint": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$",
+      "format": "uint64-decimal"
+    },
+    "native_ref": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "enum": [
+            "operation",
+            "resource",
+            "grant",
+            "review",
+            "endorsement",
+            "evidence",
+            "stop",
+            "restore"
+          ]
+        },
+        "issuer": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "native_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "generation": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$",
+          "format": "uint64-decimal"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "kind",
+        "issuer",
+        "native_id",
+        "generation",
+        "digest"
+      ],
+      "additionalProperties": false
+    },
+    "profile": {
+      "enum": [
+        "observe-v1",
+        "brokered-v1",
+        "vm-project-v1",
+        "remote-project-v1",
+        "native-descendant-v1",
+        "managed-endpoint-v1"
+      ]
+    },
+    "task": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "operation_ref": {
+          "allOf": [
+            {
+              "$ref": "common.schema.json#/$defs/native_ref"
+            },
+            {
+              "properties": {
+                "kind": {
+                  "const": "operation"
+                }
+              }
+            }
+          ]
+        },
+        "profile": {
+          "$ref": "common.schema.json#/$defs/profile"
+        },
+        "state": {
+          "enum": [
+            "created",
+            "running",
+            "awaiting_review",
+            "blocked",
+            "stopping",
+            "completed",
+            "failed",
+            "unresolved",
+            "stopped",
+            "unavailable"
+          ]
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$",
+          "format": "uint64-decimal"
+        },
+        "stop_state": {
+          "oneOf": [
+            {
+              "$ref": "common.schema.json#/$defs/stop_state"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "task_id",
+        "operation_ref",
+        "profile",
+        "state",
+        "revision",
+        "stop_state"
+      ],
+      "additionalProperties": false
+    },
+    "stop_state": {
+      "type": "object",
+      "properties": {
+        "admission": {
+          "enum": [
+            "requested",
+            "fenced",
+            "unavailable",
+            "restricted"
+          ]
+        },
+        "worker": {
+          "enum": [
+            "running",
+            "terminated",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "network": {
+          "enum": [
+            "open",
+            "closed",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "cleanup": {
+          "enum": [
+            "pending",
+            "complete",
+            "unknown"
+          ]
+        },
+        "external_outcome": {
+          "enum": [
+            "known",
+            "unresolved"
+          ]
+        },
+        "stop_ref": {
+          "oneOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "common.schema.json#/$defs/native_ref"
+                },
+                {
+                  "properties": {
+                    "kind": {
+                      "const": "stop"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "durability": {
+          "enum": [
+            "unknown",
+            "process_only",
+            "latch_only",
+            "durable"
+          ]
+        }
+      },
+      "required": [
+        "admission",
+        "worker",
+        "network",
+        "cleanup",
+        "external_outcome",
+        "stop_ref",
+        "durability"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "durability": {
+                "const": "durable"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "stop_ref": {
+                "allOf": [
+                  {
+                    "$ref": "common.schema.json#/$defs/native_ref"
+                  },
+                  {
+                    "properties": {
+                      "kind": {
+                        "const": "stop"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "admission": {
+                "const": "fenced"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "durability": {
+                "const": "durable"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
