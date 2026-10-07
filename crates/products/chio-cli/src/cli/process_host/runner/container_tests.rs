@@ -499,3 +499,257 @@ fn observed_container_states() -> Result<(), Box<dyn std::error::Error>> {
     }
     Ok(())
 }
+
+const ATTACHMENT_MARKER: &str = "chio container still running after attachment ended";
+
+fn running_record() -> Result<Record, serde_json::Error> {
+    serde_json::from_value(serde_json::json!({
+        "id": "a".repeat(64), "name": "/chio-run-test", "labels": {},
+        "running": true, "status": "running", "started_at": "2026-01-01T00:00:00Z",
+        "exit_code": 0, "oom_killed": false,
+    }))
+}
+
+fn client_outcome(reason: &str, stderr: &[u8]) -> Outcome {
+    Outcome {
+        success: reason == "exit_0",
+        reason: reason.into(),
+        usage: Usage::default(),
+        stdout: vec![],
+        stderr: stderr.to_vec(),
+        diagnostic: None,
+    }
+}
+
+#[test]
+fn attachment_loss_keeps_fixed_client_reason_in_private_log(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let private = b"time=\"2026-10-07T18:59:22Z\" level=error msg=\"error waiting for container: unexpected EOF\"\n";
+    for (reason, client) in [
+        ("exit_0", "exit_zero"),
+        ("exit_1", "exit_error"),
+        ("exit_125", "exit_engine"),
+        ("exit_137", "exit_other"),
+        ("exit_255", "exit_other"),
+        ("signal", "signal"),
+        ("worker_io_failed", "killed_bootstrap"),
+        ("runner_interrupted", "killed_interrupt"),
+        ("container_attachment_error", "unobserved"),
+    ] {
+        let mut outcome = client_outcome(reason, private);
+        classify(&running_record()?, &mut outcome);
+        assert_eq!(
+            (
+                outcome.success,
+                outcome.reason.as_str(),
+                outcome.diagnostic.as_deref()
+            ),
+            (false, "container_attachment_lost", None),
+            "{reason}"
+        );
+        let mut expected =
+            format!("{ATTACHMENT_MARKER}: reason {reason}, client {client}\n").into_bytes();
+        expected.extend_from_slice(private);
+        assert_eq!(
+            String::from_utf8_lossy(&outcome.stderr),
+            String::from_utf8_lossy(&expected),
+            "{reason}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn attachment_marker_never_copies_unfixed_reason_or_stream_text(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let credential = "chio-test-credential-7f3a91";
+    let stderr = format!("--env=CHIO_TOKEN={credential} --mount src=/run/chio/private.sock\n");
+    for reason in [
+        format!("exit_1 {credential}"),
+        format!("Error response from daemon: {credential}"),
+        "exit_+1".to_owned(),
+        "exit_007".to_owned(),
+        "exit_256".to_owned(),
+        "exit_-1".to_owned(),
+        "exit_".to_owned(),
+        String::new(),
+    ] {
+        let mut outcome = client_outcome(&reason, stderr.as_bytes());
+        classify(&running_record()?, &mut outcome);
+        assert_eq!(outcome.reason, "container_attachment_lost", "{reason}");
+        let text = String::from_utf8(outcome.stderr)?;
+        let (marker, rest) = text.split_once('\n').ok_or("missing marker line")?;
+        assert_eq!(
+            marker,
+            format!("{ATTACHMENT_MARKER}: reason unclassified, client unclassified"),
+            "{reason}"
+        );
+        assert_eq!(rest, stderr, "{reason}");
+    }
+    Ok(())
+}
+
+#[test]
+fn attachment_marker_is_limited_to_the_attachment_loss_mapping(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let private = b"worker stderr\n";
+    for (status, running, started, reason, diagnostic, expected) in [
+        (
+            "running",
+            true,
+            "2026-01-01T00:00:00Z",
+            "timeout",
+            None,
+            "timeout",
+        ),
+        (
+            "running",
+            true,
+            "2026-01-01T00:00:00Z",
+            "output_ceiling",
+            None,
+            "output_ceiling",
+        ),
+        (
+            "running",
+            true,
+            "2026-01-01T00:00:00Z",
+            "timeout",
+            Some("output_ceiling"),
+            "timeout",
+        ),
+        (
+            "running",
+            true,
+            "2026-01-01T00:00:00Z",
+            "exit_1",
+            Some("output_ceiling"),
+            "output_ceiling",
+        ),
+        (
+            "exited",
+            false,
+            "2026-01-01T00:00:00Z",
+            "exit_1",
+            None,
+            "exit_0",
+        ),
+        (
+            "created",
+            false,
+            "0001-01-01T00:00:00Z",
+            "exit_1",
+            None,
+            "container_never_started",
+        ),
+        (
+            "unknown",
+            false,
+            "2026-01-01T00:00:00Z",
+            "exit_1",
+            None,
+            "container_state_unknown",
+        ),
+    ] {
+        let record: Record = serde_json::from_value(serde_json::json!({
+            "id": "a".repeat(64), "name": "/chio-run-test", "labels": {},
+            "running": running, "status": status, "started_at": started,
+            "exit_code": 0, "oom_killed": false,
+        }))?;
+        let mut outcome = client_outcome(reason, private);
+        outcome.diagnostic = diagnostic.map(str::to_owned);
+        classify(&record, &mut outcome);
+        assert_eq!(outcome.reason, expected, "{status}/{reason}/{diagnostic:?}");
+        assert!(
+            outcome.stderr.starts_with(private),
+            "{status}/{reason}/{diagnostic:?}"
+        );
+        assert_eq!(
+            String::from_utf8(outcome.stderr)?
+                .matches(ATTACHMENT_MARKER)
+                .count(),
+            0,
+            "{status}/{reason}/{diagnostic:?}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn attachment_loss_stays_terminal_and_names_fixed_client_reason(
+) -> Result<(), Box<dyn std::error::Error>> {
+    for (scenario, transport, outcome, marker) in [
+        (
+            serde_json::json!({"worker_status": "running", "attach_exit": 125}),
+            false,
+            "container_attachment_lost",
+            Some("reason exit_125, client exit_engine"),
+        ),
+        (
+            serde_json::json!({"worker_status": "running", "attach_exit": 1}),
+            false,
+            "container_attachment_lost",
+            Some("reason exit_1, client exit_error"),
+        ),
+        (
+            serde_json::json!({"worker_status": "running"}),
+            true,
+            "container_state_unknown",
+            Some("reason container_attachment_error, client unobserved"),
+        ),
+        (serde_json::json!({}), false, "exit_0", None),
+    ] {
+        let engine = EngineDouble::new(scenario.clone())?;
+        if transport {
+            *ATTACHMENT_TRANSPORT
+                .lock()
+                .map_err(|_| "attachment lock poisoned")? = Some(attachment_error_after_request);
+        }
+        let (state, plan) = engine.host()?;
+        assert_eq!(
+            super::super::run(&state, &plan).is_ok(),
+            marker.is_none(),
+            "{scenario}"
+        );
+        let db = rusqlite::Connection::open(state.join("runner.db"))?;
+        let snapshot: (String, u32, String) = db.query_row(
+            "SELECT state,attempts,outcome FROM run_workers",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )?;
+        let finished = if marker.is_some() {
+            "failed"
+        } else {
+            "completed"
+        };
+        assert_eq!(snapshot, (finished.into(), 1, outcome.into()), "{scenario}");
+        assert_eq!(
+            std::fs::read_to_string(engine.root.path().join("starts"))?,
+            "1",
+            "{scenario}"
+        );
+        assert_eq!(
+            db.query_row("SELECT COUNT(*) FROM run_containers", [], |row| row
+                .get::<_, i64>(0))?,
+            0,
+            "{scenario}"
+        );
+        let log = std::fs::read_to_string(state.join("run-logs/root-1.stderr"))?;
+        match marker {
+            Some(fixed) => {
+                let (first, rest) = log.split_once('\n').ok_or("missing marker line")?;
+                assert_eq!(first, format!("{ATTACHMENT_MARKER}: {fixed}"), "{scenario}");
+                if transport {
+                    assert!(
+                        rest.contains("attachment transport failed after request delivery"),
+                        "{scenario}"
+                    );
+                } else {
+                    assert_eq!(rest, "", "{scenario}");
+                }
+            }
+            None => assert_eq!(log, "", "{scenario}"),
+        }
+    }
+    Ok(())
+}
