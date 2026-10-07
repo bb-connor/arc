@@ -22,7 +22,8 @@
       "cleanup": "pending",
       "external_outcome": "unresolved",
       "stop_ref": null,
-      "durability": "latch_only"
+      "durability": "latch_only",
+      "scope": "task_and_descendants"
     }
   }
 }

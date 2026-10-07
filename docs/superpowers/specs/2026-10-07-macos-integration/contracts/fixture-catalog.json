@@ -544,6 +544,944 @@
       "schema_valid": true,
       "request": "request-task-stop.json",
       "pair_valid": true
+    },
+    {
+      "file": "invalid-task-create-binding-missing.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-task-create.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-task-create.json",
+        "path": [
+          "result",
+          "request_binding"
+        ]
+      }
+    },
+    {
+      "file": "invalid-task-create-binding-intent.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-task-create.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-task-create.json",
+        "path": [
+          "result",
+          "request_binding",
+          "intent_id"
+        ]
+      }
+    },
+    {
+      "file": "response-task-create-recovery.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-task-create.json",
+      "pair_valid": true
+    },
+    {
+      "file": "invalid-task-create-error-binding-missing.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-task-create.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-task-create-recovery.json",
+        "path": [
+          "error",
+          "request_binding"
+        ]
+      }
+    },
+    {
+      "file": "invalid-task-create-error-binding-intent.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-task-create.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-task-create-recovery.json",
+        "path": [
+          "error",
+          "request_binding",
+          "intent_id"
+        ]
+      }
+    },
+    {
+      "file": "invalid-task-stop-binding-missing.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-task-stop.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-task-stop.json",
+        "path": [
+          "result",
+          "request_binding"
+        ]
+      }
+    },
+    {
+      "file": "invalid-task-stop-binding-intent.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-task-stop.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-task-stop.json",
+        "path": [
+          "result",
+          "request_binding",
+          "intent_id"
+        ]
+      }
+    },
+    {
+      "file": "response-task-stop-recovery.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-task-stop.json",
+      "pair_valid": true
+    },
+    {
+      "file": "invalid-task-stop-error-binding-missing.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-task-stop.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-task-stop-recovery.json",
+        "path": [
+          "error",
+          "request_binding"
+        ]
+      }
+    },
+    {
+      "file": "invalid-task-stop-error-binding-intent.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-task-stop.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-task-stop-recovery.json",
+        "path": [
+          "error",
+          "request_binding",
+          "intent_id"
+        ]
+      }
+    },
+    {
+      "file": "invalid-approval-submit-binding-missing.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-approval-submit.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-approval-submit.json",
+        "path": [
+          "result",
+          "request_binding"
+        ]
+      }
+    },
+    {
+      "file": "invalid-approval-submit-binding-intent.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-approval-submit.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-approval-submit.json",
+        "path": [
+          "result",
+          "request_binding",
+          "intent_id"
+        ]
+      }
+    },
+    {
+      "file": "response-approval-submit-recovery.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-approval-submit.json",
+      "pair_valid": true
+    },
+    {
+      "file": "invalid-approval-submit-error-binding-missing.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-approval-submit.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-approval-submit-recovery.json",
+        "path": [
+          "error",
+          "request_binding"
+        ]
+      }
+    },
+    {
+      "file": "invalid-approval-submit-error-binding-intent.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-approval-submit.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-approval-submit-recovery.json",
+        "path": [
+          "error",
+          "request_binding",
+          "intent_id"
+        ]
+      }
+    },
+    {
+      "file": "invalid-evidence-export-binding-missing.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-evidence-export.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-evidence-export.json",
+        "path": [
+          "result",
+          "request_binding"
+        ]
+      }
+    },
+    {
+      "file": "invalid-evidence-export-binding-intent.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-evidence-export.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-evidence-export.json",
+        "path": [
+          "result",
+          "request_binding",
+          "intent_id"
+        ]
+      }
+    },
+    {
+      "file": "response-evidence-export-recovery.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-evidence-export.json",
+      "pair_valid": true
+    },
+    {
+      "file": "invalid-evidence-export-error-binding-missing.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-evidence-export.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-evidence-export-recovery.json",
+        "path": [
+          "error",
+          "request_binding"
+        ]
+      }
+    },
+    {
+      "file": "invalid-evidence-export-error-binding-intent.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-evidence-export.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-evidence-export-recovery.json",
+        "path": [
+          "error",
+          "request_binding",
+          "intent_id"
+        ]
+      }
+    },
+    {
+      "file": "invalid-task-create-binding-resource.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-task-create.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-task-create.json",
+        "path": [
+          "result",
+          "request_binding",
+          "resource_ref",
+          "native_id"
+        ]
+      }
+    },
+    {
+      "file": "invalid-task-create-binding-input.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-task-create.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-task-create.json",
+        "path": [
+          "result",
+          "request_binding",
+          "input_ref",
+          "digest"
+        ]
+      }
+    },
+    {
+      "file": "invalid-task-create-binding-grant.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-task-create.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-task-create.json",
+        "path": [
+          "result",
+          "request_binding",
+          "grant_ref",
+          "generation"
+        ]
+      }
+    },
+    {
+      "file": "invalid-task-create-binding-profile.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-task-create.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-task-create.json",
+        "path": [
+          "result",
+          "request_binding",
+          "execution_profile"
+        ]
+      }
+    },
+    {
+      "file": "invalid-task-create-binding-limits.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-task-create.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-task-create.json",
+        "path": [
+          "result",
+          "request_binding",
+          "limits",
+          "max_wall_seconds"
+        ]
+      }
+    },
+    {
+      "file": "invalid-task-stop-binding-task.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-task-stop.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-task-stop.json",
+        "path": [
+          "result",
+          "request_binding",
+          "task_id"
+        ]
+      }
+    },
+    {
+      "file": "invalid-task-stop-binding-scope.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-task-stop.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-task-stop.json",
+        "path": [
+          "result",
+          "request_binding",
+          "scope"
+        ]
+      }
+    },
+    {
+      "file": "invalid-approval-submit-binding-review.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-approval-submit.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-approval-submit.json",
+        "path": [
+          "result",
+          "request_binding",
+          "review_ref",
+          "digest"
+        ]
+      }
+    },
+    {
+      "file": "invalid-approval-submit-binding-endorsement.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-approval-submit.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-approval-submit.json",
+        "path": [
+          "result",
+          "request_binding",
+          "endorsement_ref",
+          "native_id"
+        ]
+      }
+    },
+    {
+      "file": "invalid-approval-submit-binding-decision.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-approval-submit.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-approval-submit.json",
+        "path": [
+          "result",
+          "request_binding",
+          "decision"
+        ]
+      }
+    },
+    {
+      "file": "invalid-evidence-export-binding-task.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-evidence-export.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-evidence-export.json",
+        "path": [
+          "result",
+          "request_binding",
+          "task_id"
+        ]
+      }
+    },
+    {
+      "file": "invalid-evidence-export-binding-destination.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-evidence-export.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-evidence-export.json",
+        "path": [
+          "result",
+          "request_binding",
+          "destination_ref",
+          "native_id"
+        ]
+      }
+    },
+    {
+      "file": "invalid-evidence-export-binding-grant.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-evidence-export.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-evidence-export.json",
+        "path": [
+          "result",
+          "request_binding",
+          "grant_ref",
+          "generation"
+        ]
+      }
+    },
+    {
+      "file": "response-task-get-stopping.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-task-get.json",
+      "pair_valid": true
+    },
+    {
+      "file": "response-task-get-stopped.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-task-get.json",
+      "pair_valid": true
+    },
+    {
+      "file": "response-task-get-completed-with-stop.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-task-get.json",
+      "pair_valid": true
+    },
+    {
+      "file": "response-tasks-list-stopped.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-tasks-list.json",
+      "pair_valid": true
+    },
+    {
+      "file": "invalid-task-get-stopping-null.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-task-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-task-get-stopping.json",
+        "path": [
+          "result",
+          "stop_state"
+        ]
+      }
+    },
+    {
+      "file": "invalid-task-get-stopped-null.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-task-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-task-get-stopped.json",
+        "path": [
+          "result",
+          "stop_state"
+        ]
+      }
+    },
+    {
+      "file": "invalid-task-get-stopped-worker.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-task-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-task-get-stopped.json",
+        "path": [
+          "result",
+          "stop_state",
+          "worker"
+        ]
+      }
+    },
+    {
+      "file": "invalid-task-get-stopped-network.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-task-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-task-get-stopped.json",
+        "path": [
+          "result",
+          "stop_state",
+          "network"
+        ]
+      }
+    },
+    {
+      "file": "invalid-task-get-stopped-admission.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-task-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-task-get-stopped.json",
+        "path": [
+          "result",
+          "stop_state",
+          "admission"
+        ]
+      }
+    },
+    {
+      "file": "invalid-task-get-stopped-scope.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-task-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-task-get-stopped.json",
+        "path": [
+          "result",
+          "stop_state",
+          "scope"
+        ]
+      }
+    },
+    {
+      "file": "invalid-task-get-running-with-stop.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-task-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-task-get-stopping.json",
+        "path": [
+          "result",
+          "state"
+        ]
+      }
+    },
+    {
+      "file": "invalid-task-get-completed-cleanup.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-task-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-task-get-completed-with-stop.json",
+        "path": [
+          "result",
+          "stop_state",
+          "cleanup"
+        ]
+      }
+    },
+    {
+      "file": "invalid-task-get-completed-external_outcome.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-task-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-task-get-completed-with-stop.json",
+        "path": [
+          "result",
+          "stop_state",
+          "external_outcome"
+        ]
+      }
+    },
+    {
+      "file": "invalid-tasks-list-stopped-null.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-tasks-list.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-tasks-list-stopped.json",
+        "path": [
+          "result",
+          "tasks",
+          0,
+          "stop_state"
+        ]
+      }
+    },
+    {
+      "file": "response-task-get-stopping-durable.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-task-get.json",
+      "pair_valid": true
+    },
+    {
+      "file": "response-health-get-ready.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-health-get.json",
+      "pair_valid": true
+    },
+    {
+      "file": "response-health-get-stale.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-health-get.json",
+      "pair_valid": true
+    },
+    {
+      "file": "invalid-health-missing-dimension.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-health-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-health-get-ready.json",
+        "path": [
+          "result",
+          "observations",
+          "compatibility"
+        ]
+      }
+    },
+    {
+      "file": "invalid-health-extra-dimension.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-health-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-health-get-ready.json",
+        "path": [
+          "result",
+          "observations",
+          "invented_dimension"
+        ]
+      }
+    },
+    {
+      "file": "invalid-health-wrong-source.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-health-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-health-get-ready.json",
+        "path": [
+          "result",
+          "observations",
+          "authority",
+          "source"
+        ]
+      }
+    },
+    {
+      "file": "invalid-health-fresh-missing-age.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-health-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-health-get-ready.json",
+        "path": [
+          "result",
+          "observations",
+          "authority",
+          "age_ms"
+        ]
+      }
+    },
+    {
+      "file": "invalid-health-fresh-missing-instance.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-health-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-health-get-ready.json",
+        "path": [
+          "result",
+          "observations",
+          "authority",
+          "source_instance_id"
+        ]
+      }
+    },
+    {
+      "file": "invalid-health-ready-unknown.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-health-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-health-get-ready.json",
+        "path": [
+          "result",
+          "observations",
+          "authority",
+          "state"
+        ]
+      }
+    },
+    {
+      "file": "invalid-health-ready-missing-prerequisite.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-health-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-health-get-ready.json",
+        "path": [
+          "result",
+          "missing_prerequisites"
+        ]
+      }
+    },
+    {
+      "file": "invalid-health-fresh-over-age.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-health-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-health-get-ready.json",
+        "path": [
+          "result",
+          "observations",
+          "authority",
+          "age_ms"
+        ]
+      }
+    },
+    {
+      "file": "invalid-health-stale-satisfied.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-health-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-health-get-stale.json",
+        "path": [
+          "result",
+          "observations",
+          "authority",
+          "state"
+        ]
+      }
+    },
+    {
+      "file": "invalid-health-ready-stale.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-health-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-health-get-stale.json",
+        "path": [
+          "result",
+          "state"
+        ]
+      }
+    },
+    {
+      "file": "invalid-health-unknown-age.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-health-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-health-get.json",
+        "path": [
+          "result",
+          "observations",
+          "authority",
+          "age_ms"
+        ]
+      }
+    },
+    {
+      "file": "request-tasks-list-one.json",
+      "schema": "operator-request.schema.json",
+      "schema_valid": true
+    },
+    {
+      "file": "invalid-tasks-list-request-limit.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-tasks-list-one.json",
+      "pair_valid": false
+    },
+    {
+      "file": "invalid-health-scope-missing.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-health-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-health-get-ready.json",
+        "path": [
+          "result",
+          "observation_scope"
+        ]
+      }
+    },
+    {
+      "file": "invalid-health-scope-duplicate.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-health-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-health-get-ready.json",
+        "path": [
+          "result",
+          "observation_scope",
+          "evaluated_profiles"
+        ]
+      }
+    },
+    {
+      "file": "invalid-health-profile-outside-scope.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-health-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-health-get-ready.json",
+        "path": [
+          "result",
+          "available_profiles"
+        ]
+      }
+    },
+    {
+      "file": "response-health-get-empty-scope.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-health-get.json",
+      "pair_valid": true
+    },
+    {
+      "file": "invalid-health-stale-null-age.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-health-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-health-get-stale.json",
+        "path": [
+          "result",
+          "observations",
+          "authority",
+          "age_ms"
+        ]
+      }
+    },
+    {
+      "file": "invalid-health-stale-null-source.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-health-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-health-get-stale.json",
+        "path": [
+          "result",
+          "observations",
+          "authority",
+          "source_instance_id"
+        ]
+      }
+    },
+    {
+      "file": "invalid-health-ready-null-generation.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-health-get.json",
+      "pair_valid": false,
+      "rejection_repair": {
+        "base": "response-health-get-ready.json",
+        "path": [
+          "result",
+          "policy_generation"
+        ]
+      }
     }
   ]
 }

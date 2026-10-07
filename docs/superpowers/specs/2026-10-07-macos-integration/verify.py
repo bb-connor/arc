@@ -19,6 +19,7 @@ REPO = ROOT.parents[3]
 MAX_BYTES = 65536
 MAX_DEPTH = 16
 SAFE_INTEGER = 9007199254740991
+MUTATION_METHODS = {"task.create", "task.stop", "approval.submit", "evidence.export"}
 REQUIREMENT_PREFIXES = {
     "PRD", "UX", "KER", "AUT", "ARC", "IPC", "VM", "ES", "NE", "RES",
     "REC", "DST", "PRV", "OPS", "HST", "DEL", "VER", "CLW", "RDM",
@@ -89,8 +90,14 @@ def pair_matches(request: dict, response: dict) -> bool:
             return False
         original = request["params"].get("operation_ref")
         echoed = response["error"].get("operation_ref")
+        if request["method"] in MUTATION_METHODS:
+            binding = response["error"].get("request_binding")
+            if (echoed is not None or binding is not None) and binding != request["params"]:
+                return False
         return original is None or echoed is None or original == echoed
     params, result = request["params"], response["result"]
+    if request["method"] in MUTATION_METHODS and result.get("request_binding") != params:
+        return False
     required_bindings = {
         "task.get": ("task_id",), "task.stop": ("task_id", "scope"),
         "operation.get": ("operation_ref",), "review.open": ("operation_ref",),
@@ -100,6 +107,16 @@ def pair_matches(request: dict, response: dict) -> bool:
     for key in required_bindings.get(request["method"], ()):
         if key not in params or key not in result or params[key] != result[key]:
             return False
+    if request["method"] == "health.get":
+        # Shapes/sources are closed by the schema. JSON Schema cannot compare
+        # two fields, so freshness also needs this mandatory semantic check.
+        for observation in result["observations"].values():
+            if observation["freshness"] == "fresh" and observation["age_ms"] > observation["max_age_ms"]:
+                return False
+        if not set(result["available_profiles"]).issubset(result["observation_scope"]["evaluated_profiles"]):
+            return False
+    if request["method"] == "tasks.list" and len(result["tasks"]) > params["limit"]:
+        return False
     if request["method"] == "review.open":
         try:
             artifact = result["projection"]["artifact"]
@@ -347,6 +364,131 @@ def check_fixtures(loaded: dict) -> tuple[int, int]:
     return len(files), correlated
 
 
+def check_rejection_repairs(loaded: dict, entries: dict, values: dict) -> int:
+    """A negative's declared single-field repair must restore its valid control."""
+    checked = 0
+    for name, entry in entries.items():
+        if "rejection_repair" not in entry:
+            continue
+        repair = entry["rejection_repair"]
+        if not isinstance(repair, dict) or set(repair) != {"base", "path"}:
+            raise ValueError(f"Malformed rejection repair: {name}")
+        source, path = repair["base"], repair["path"]
+        control = entries.get(source, {})
+        if (entry.get("pair_valid") is not False or control.get("pair_valid") is not True
+                or control.get("schema_valid") is not True or entry.get("schema") != control.get("schema")
+                or entry.get("request") != control.get("request") or not isinstance(path, list) or not path):
+            raise ValueError(f"Invalid rejection repair control: {name}")
+        repaired, original = copy.deepcopy(values[name]), values[source]
+        target, expected = repaired, original
+        for component in path[:-1]:
+            target, expected = target[component], expected[component]
+        key = path[-1]
+        if isinstance(expected, dict) and key not in expected:
+            del target[key]
+        else:
+            target[key] = copy.deepcopy(expected[key])
+        request = values[entry["request"]]
+        if repaired != original or not loaded[entry["schema"]].is_valid(repaired) or not pair_matches(request, repaired):
+            raise ValueError(f"Rejection fixture has an unrelated defect: {name}")
+        checked += 1
+    return checked
+
+
+def semantic_self_test(loaded: dict, methods: list[dict], entries: dict, values: dict) -> int:
+    """Exercise full authority-tuple correlation and independent state dimensions."""
+    checked = check_rejection_repairs(loaded, entries, values)
+    response_schema = loaded["operator-response.schema.json"]
+
+    def accepts(request: dict, response: dict) -> bool:
+        return response_schema.is_valid(response) and pair_matches(request, response)
+
+    def leaves(value: dict, prefix: tuple = ()):
+        for key, item in value.items():
+            if isinstance(item, dict):
+                yield from leaves(item, prefix + (key,))
+            else:
+                yield prefix + (key,), item
+
+    def substitute(key: str, value: object) -> object:
+        if isinstance(value, int):
+            return value + 1
+        if isinstance(value, str) and value.isdecimal():
+            return str(int(value) + 1)
+        if isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value):
+            return ("c" if value != "c" * 64 else "d") * 64
+        alternatives = {"scope": ("task", "task_and_descendants"), "decision": ("approve", "deny"),
+                        "execution_profile": ("vm-project-v1", "remote-project-v1")}
+        if key in alternatives:
+            left, right = alternatives[key]
+            return right if value == left else left
+        return "synthetic-substitution"
+
+    for method in methods:
+        if not method["mutation"]:
+            continue
+        request = values[method["request_example"]]
+        for location, filename in (("result", method["response_example"]),
+                                   ("error", "response-" + method["name"].replace(".", "-") + "-recovery.json")):
+            response = values[filename]
+            if not accepts(request, response):
+                raise ValueError(f"Invalid mutation binding positive control: {filename}")
+            checked += 1
+            # Change every scalar, including each native reference field, every
+            # resource/endorsement, every limit, the scope and logical intent.
+            for path, value in leaves(request["params"]):
+                mutant = copy.deepcopy(response)
+                node = mutant[location]["request_binding"]
+                for key in path[:-1]:
+                    node = node[key]
+                node[path[-1]] = substitute(path[-1], value)
+                if accepts(request, mutant):
+                    raise ValueError(f"Mutation correlation accepted {method['name']} {location} {path}")
+                checked += 1
+            mutant = copy.deepcopy(response)
+            mutant[location]["request_binding"]["unexpected_authority"] = True
+            if response_schema.is_valid(mutant):
+                raise ValueError(f"Open mutation binding shape: {method['name']} {location}")
+            checked += 1
+        # A refusal without an operation reference can be returned before a
+        # request is valid; it asserts no recoverable operation or authority.
+        refusal = copy.deepcopy(values[filename])
+        refusal["error"]["operation_ref"] = None
+        del refusal["error"]["request_binding"]
+        if not accepts(request, refusal):
+            raise ValueError(f"Unbound no-operation refusal rejected: {method['name']}")
+        checked += 1
+
+    health_request = values["request-health-get.json"]
+    health = values["response-health-get-ready.json"]
+    for dimension in health["result"]["observations"]:
+        for age_delta in (0, 1):
+            mutant = copy.deepcopy(health)
+            observation = mutant["result"]["observations"][dimension]
+            observation["age_ms"] = observation["max_age_ms"] + age_delta
+            if not response_schema.is_valid(mutant) or pair_matches(health_request, mutant) != (age_delta == 0):
+                raise ValueError(f"Health freshness boundary failed: {dimension} +{age_delta}")
+            checked += 1
+        for field, value in (("state", "unknown"), ("source", "synthetic-observer")):
+            mutant = copy.deepcopy(health)
+            mutant["result"]["observations"][dimension][field] = value
+            if response_schema.is_valid(mutant):
+                raise ValueError(f"Health accepted ready unknown/unbounded source: {dimension} {field}")
+            checked += 1
+    for method, filename in (("task.get", "response-task-get-stopped.json"),
+                             ("tasks.list", "response-tasks-list-stopped.json")):
+        request = values["request-" + method.replace(".", "-") + ".json"]
+        for field, value, valid in (("worker", "unknown", False), ("network", "unknown", False),
+                                    ("cleanup", "unknown", True), ("external_outcome", "unresolved", True)):
+            mutant = copy.deepcopy(values[filename])
+            task = mutant["result"] if method == "task.get" else mutant["result"]["tasks"][0]
+            task["stop_state"][field] = value
+            if accepts(request, mutant) != valid:
+                raise ValueError(f"Stop dimension independence failed: {method} {field}")
+            checked += 1
+    return checked
+
+
 def self_test(loaded: dict) -> int:
     malformed = [b'{"a":1,"a":2}', b'{"a":NaN}', b'{"a":1.1}', b'"\\ud800"',
                  b'"\xff"', b'{"a":9007199254740992}', b' ' * (MAX_BYTES + 1),
@@ -487,7 +629,8 @@ def self_test(loaded: dict) -> int:
         if list(loaded["operator-response.schema.json"].iter_errors(response)):
             raise ValueError(f"Retry fixture has an unrelated shape defect: {name}")
         retry_checks += 1
-    return len(malformed) + 7 + 4 + 2 + len(bad_cases) + 2 + len(fence_cases) + len(bad_definitions) + 1 + coverage_checks + retry_checks
+    semantic_checks = semantic_self_test(loaded, methods, entries, values)
+    return len(malformed) + 7 + 4 + 2 + len(bad_cases) + 2 + len(fence_cases) + len(bad_definitions) + 1 + coverage_checks + retry_checks + semantic_checks
 
 
 def main() -> int:

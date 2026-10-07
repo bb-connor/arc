@@ -172,7 +172,8 @@
                 "$ref": "common.schema.json#/$defs/profile"
               },
               "minItems": 0,
-              "maxItems": 6
+              "maxItems": 6,
+              "uniqueItems": true
             },
             "missing_prerequisites": {
               "type": "array",
@@ -194,15 +195,201 @@
                   "type": "null"
                 }
               ]
+            },
+            "observations": {
+              "$ref": "common.schema.json#/$defs/health_observations"
+            },
+            "observation_scope": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "const": "authenticated_session"
+                },
+                "session_id": {
+                  "$ref": "common.schema.json#/$defs/id"
+                },
+                "evaluated_profiles": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "common.schema.json#/$defs/profile"
+                  },
+                  "minItems": 0,
+                  "maxItems": 6,
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "kind",
+                "session_id",
+                "evaluated_profiles"
+              ],
+              "additionalProperties": false
             }
           },
           "required": [
             "state",
             "available_profiles",
             "missing_prerequisites",
-            "policy_generation"
+            "policy_generation",
+            "observations",
+            "observation_scope"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "state": {
+                    "const": "ready"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "missing_prerequisites": {
+                    "maxItems": 0
+                  },
+                  "observations": {
+                    "properties": {
+                      "connectivity": {
+                        "properties": {
+                          "freshness": {
+                            "const": "fresh"
+                          },
+                          "state": {
+                            "enum": [
+                              "satisfied",
+                              "not_applicable"
+                            ]
+                          }
+                        }
+                      },
+                      "authentication": {
+                        "properties": {
+                          "freshness": {
+                            "const": "fresh"
+                          },
+                          "state": {
+                            "enum": [
+                              "satisfied",
+                              "not_applicable"
+                            ]
+                          }
+                        }
+                      },
+                      "compatibility": {
+                        "properties": {
+                          "freshness": {
+                            "const": "fresh"
+                          },
+                          "state": {
+                            "enum": [
+                              "satisfied",
+                              "not_applicable"
+                            ]
+                          }
+                        }
+                      },
+                      "permission": {
+                        "properties": {
+                          "freshness": {
+                            "const": "fresh"
+                          },
+                          "state": {
+                            "enum": [
+                              "satisfied",
+                              "not_applicable"
+                            ]
+                          }
+                        }
+                      },
+                      "activation": {
+                        "properties": {
+                          "freshness": {
+                            "const": "fresh"
+                          },
+                          "state": {
+                            "enum": [
+                              "satisfied",
+                              "not_applicable"
+                            ]
+                          }
+                        }
+                      },
+                      "convergence": {
+                        "properties": {
+                          "freshness": {
+                            "const": "fresh"
+                          },
+                          "state": {
+                            "enum": [
+                              "satisfied",
+                              "not_applicable"
+                            ]
+                          }
+                        }
+                      },
+                      "coverage": {
+                        "properties": {
+                          "freshness": {
+                            "const": "fresh"
+                          },
+                          "state": {
+                            "enum": [
+                              "satisfied",
+                              "not_applicable"
+                            ]
+                          }
+                        }
+                      },
+                      "storage": {
+                        "properties": {
+                          "freshness": {
+                            "const": "fresh"
+                          },
+                          "state": {
+                            "enum": [
+                              "satisfied",
+                              "not_applicable"
+                            ]
+                          }
+                        }
+                      },
+                      "authority": {
+                        "properties": {
+                          "freshness": {
+                            "const": "fresh"
+                          },
+                          "state": {
+                            "enum": [
+                              "satisfied",
+                              "not_applicable"
+                            ]
+                          }
+                        }
+                      },
+                      "closure": {
+                        "properties": {
+                          "freshness": {
+                            "const": "fresh"
+                          },
+                          "state": {
+                            "enum": [
+                              "satisfied",
+                              "not_applicable"
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "policy_generation": {
+                    "$ref": "common.schema.json#/$defs/uint"
+                  }
+                }
+              }
+            }
+          ]
         }
       },
       "required": [
@@ -586,12 +773,16 @@
                 "accepted",
                 "original_operation"
               ]
+            },
+            "request_binding": {
+              "$ref": "operator-request.schema.json#/$defs/task_create_params"
             }
           },
           "required": [
             "task_id",
             "operation_ref",
-            "disposition"
+            "disposition",
+            "request_binding"
           ],
           "additionalProperties": false
         }
@@ -668,6 +859,9 @@
                   "type": "null"
                 }
               ]
+            },
+            "request_binding": {
+              "$ref": "operator-request.schema.json#/$defs/task_create_params"
             }
           },
           "required": [
@@ -676,7 +870,26 @@
             "message_key",
             "operation_ref"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "operation_ref": {
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "operation_ref"
+                ]
+              },
+              "then": {
+                "required": [
+                  "request_binding"
+                ]
+              }
+            }
+          ]
         }
       },
       "required": [
@@ -945,6 +1158,9 @@
                 "task",
                 "task_and_descendants"
               ]
+            },
+            "request_binding": {
+              "$ref": "operator-request.schema.json#/$defs/task_stop_params"
             }
           },
           "required": [
@@ -956,7 +1172,8 @@
             "stop_ref",
             "durability",
             "task_id",
-            "scope"
+            "scope",
+            "request_binding"
           ],
           "additionalProperties": false,
           "allOf": [
@@ -1078,6 +1295,9 @@
                   "type": "null"
                 }
               ]
+            },
+            "request_binding": {
+              "$ref": "operator-request.schema.json#/$defs/task_stop_params"
             }
           },
           "required": [
@@ -1086,7 +1306,26 @@
             "message_key",
             "operation_ref"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "operation_ref": {
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "operation_ref"
+                ]
+              },
+              "then": {
+                "required": [
+                  "request_binding"
+                ]
+              }
+            }
+          ]
         }
       },
       "required": [
@@ -1302,12 +1541,16 @@
                 "recorded",
                 "original_operation"
               ]
+            },
+            "request_binding": {
+              "$ref": "operator-request.schema.json#/$defs/approval_submit_params"
             }
           },
           "required": [
             "operation_ref",
             "decision",
-            "disposition"
+            "disposition",
+            "request_binding"
           ],
           "additionalProperties": false
         }
@@ -1384,6 +1627,9 @@
                   "type": "null"
                 }
               ]
+            },
+            "request_binding": {
+              "$ref": "operator-request.schema.json#/$defs/approval_submit_params"
             }
           },
           "required": [
@@ -1392,7 +1638,26 @@
             "message_key",
             "operation_ref"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "operation_ref": {
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "operation_ref"
+                ]
+              },
+              "then": {
+                "required": [
+                  "request_binding"
+                ]
+              }
+            }
+          ]
         }
       },
       "required": [
@@ -1714,12 +1979,16 @@
                 "completed",
                 "original_operation"
               ]
+            },
+            "request_binding": {
+              "$ref": "operator-request.schema.json#/$defs/evidence_export_params"
             }
           },
           "required": [
             "operation_ref",
             "evidence_ref",
-            "disposition"
+            "disposition",
+            "request_binding"
           ],
           "additionalProperties": false
         }
@@ -1796,6 +2065,9 @@
                   "type": "null"
                 }
               ]
+            },
+            "request_binding": {
+              "$ref": "operator-request.schema.json#/$defs/evidence_export_params"
             }
           },
           "required": [
@@ -1804,7 +2076,26 @@
             "message_key",
             "operation_ref"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "operation_ref": {
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "operation_ref"
+                ]
+              },
+              "then": {
+                "required": [
+                  "request_binding"
+                ]
+              }
+            }
+          ]
         }
       },
       "required": [

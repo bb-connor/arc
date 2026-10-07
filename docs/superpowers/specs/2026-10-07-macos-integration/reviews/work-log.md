@@ -22,3 +22,7 @@ Addressed five additional Codex findings: mandatory per-method negative vectors,
 ## Third hosted review repair
 
 Addressed four further findings: authenticated lab-to-verifier artifact custody, integer-only performance samples, complete Unicode bidirectional-control escaping, and a package-wide acceptance-definition census. The custody plan names its missing native prerequisite and real descriptor handoff; component fixture success cannot establish native or installed qualification. Independent census review also closed Markdown whitespace and fence parsing gaps. Platform review tightened native-registration deadlines and result-reference retrieval, and both required component runners now reject expected-failure results as well as skipped or empty suites. A hosted release-copy lint finding was corrected by naming the publication fields precisely, and the repository release-truth check passed locally.
+
+## Fourth hosted review repair
+
+Addressed task stop-state consistency, complete bounded health observations, and evidence-export request binding. The related correlation audit extends exact retained-request binding across the four mutation methods, while preserving native ownership and verification. Stopped execution can retain an unresolved external outcome; health remains observation rather than authority. Concrete negative fixtures and independent review cover the revised wire shapes before another current-head hosted review.

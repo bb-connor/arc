@@ -1,0 +1,43 @@
+{
+  "version": "chio.desktop.operator.v1",
+  "request_id": "synthetic-request-approval-submit",
+  "method": "approval.submit",
+  "ok": false,
+  "error": {
+    "code": "outcome_unknown",
+    "retry": "same_intent",
+    "message_key": "synthetic-original-operation",
+    "operation_ref": {
+      "kind": "operation",
+      "issuer": "synthetic-authority",
+      "native_id": "synthetic-operation-1",
+      "generation": "1",
+      "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "request_binding": {
+      "intent_id": "synthetic-other-intent",
+      "operation_ref": {
+        "kind": "operation",
+        "issuer": "synthetic-authority",
+        "native_id": "synthetic-operation-1",
+        "generation": "1",
+        "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "review_ref": {
+        "kind": "review",
+        "issuer": "synthetic-authority",
+        "native_id": "synthetic-review-1",
+        "generation": "1",
+        "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "endorsement_ref": {
+        "kind": "endorsement",
+        "issuer": "synthetic-authority",
+        "native_id": "synthetic-endorsement-1",
+        "generation": "1",
+        "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "decision": "approve"
+    }
+  }
+}

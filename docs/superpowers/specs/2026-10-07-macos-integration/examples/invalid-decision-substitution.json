@@ -12,6 +12,31 @@
       "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     },
     "decision": "deny",
-    "disposition": "recorded"
+    "disposition": "recorded",
+    "request_binding": {
+      "intent_id": "synthetic-approve-intent",
+      "operation_ref": {
+        "kind": "operation",
+        "issuer": "synthetic-authority",
+        "native_id": "synthetic-operation-1",
+        "generation": "1",
+        "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "review_ref": {
+        "kind": "review",
+        "issuer": "synthetic-authority",
+        "native_id": "synthetic-review-1",
+        "generation": "1",
+        "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "endorsement_ref": {
+        "kind": "endorsement",
+        "issuer": "synthetic-authority",
+        "native_id": "synthetic-endorsement-1",
+        "generation": "1",
+        "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "decision": "approve"
+    }
   }
 }

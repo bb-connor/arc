@@ -1,0 +1,101 @@
+{
+  "version": "chio.desktop.operator.v1",
+  "request_id": "synthetic-request-health-get",
+  "method": "health.get",
+  "ok": true,
+  "result": {
+    "state": "unavailable",
+    "available_profiles": [],
+    "missing_prerequisites": [
+      "native-crossing"
+    ],
+    "policy_generation": null,
+    "observations": {
+      "connectivity": {
+        "state": "unknown",
+        "freshness": "unknown",
+        "source": "transport",
+        "source_instance_id": null,
+        "age_ms": null,
+        "max_age_ms": 30000
+      },
+      "authentication": {
+        "state": "unknown",
+        "freshness": "unknown",
+        "source": "peer_authenticator",
+        "source_instance_id": null,
+        "age_ms": null,
+        "max_age_ms": 30000
+      },
+      "compatibility": {
+        "state": "unknown",
+        "freshness": "unknown",
+        "source": "compatibility_verifier",
+        "source_instance_id": null,
+        "age_ms": null,
+        "max_age_ms": 30000
+      },
+      "permission": {
+        "state": "unknown",
+        "freshness": "unknown",
+        "source": "platform_permission",
+        "source_instance_id": null,
+        "age_ms": null,
+        "max_age_ms": 30000
+      },
+      "activation": {
+        "state": "unknown",
+        "freshness": "unknown",
+        "source": "platform_activation",
+        "source_instance_id": null,
+        "age_ms": null,
+        "max_age_ms": 30000
+      },
+      "convergence": {
+        "state": "unknown",
+        "freshness": "unknown",
+        "source": "restriction_owner",
+        "source_instance_id": null,
+        "age_ms": null,
+        "max_age_ms": 30000
+      },
+      "coverage": {
+        "state": "unknown",
+        "freshness": "unknown",
+        "source": "coverage_observer",
+        "source_instance_id": null,
+        "age_ms": null,
+        "max_age_ms": 30000
+      },
+      "storage": {
+        "state": "unknown",
+        "freshness": "unknown",
+        "source": "native_store",
+        "source_instance_id": null,
+        "age_ms": null,
+        "max_age_ms": 30000
+      },
+      "authority": {
+        "state": "unknown",
+        "freshness": "unknown",
+        "source": "native_authority",
+        "source_instance_id": null,
+        "age_ms": null,
+        "max_age_ms": 30000
+      },
+      "closure": {
+        "state": "unknown",
+        "freshness": "unknown",
+        "source": "closure_owner",
+        "source_instance_id": null,
+        "age_ms": null,
+        "max_age_ms": 30000
+      }
+    },
+    "observation_scope": {
+      "kind": "authenticated_session",
+      "session_id": "synthetic-session",
+      "evaluated_profiles": []
+    }
+  }
+}

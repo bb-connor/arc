@@ -662,6 +662,16 @@
           "plan": "02-protocol-controller.md",
           "heading": "Task 2: Correlate replies and preserve native references",
           "action": "Add response-substitution tests before implementation. A response must match the request's version, request ID and method; required task, operation, decision and subscription bindings must be present and agree. In particular, `task.stop` must echo the requested `task_id`, and `review.open` must echo the original `operation_ref`; absence is failure, not a skipped comparison."
+        },
+        {
+          "plan": "02-protocol-controller.md",
+          "heading": "Task 2: Correlate replies and preserve native references",
+          "action": "Require `result.request_binding` for all four successful mutation methods, generated from the same closed per-method params definition as the request. Compare the entire typed binding to the initiating validated params, including intent, all native reference fields, profile/template/input/workspace, limits, decision/review/endorsement, stop scope and export task/destination/grant/format. Preserve existing direct result echoes and check them independently."
+        },
+        {
+          "plan": "02-protocol-controller.md",
+          "heading": "Task 2: Correlate replies and preserve native references",
+          "action": "Apply the same full parameter binding to mutation errors that expose a nonnull native operation reference: require `error.request_binding`, compare it with the initiating params and resolve the original operation through its native owner. Test missing binding, same-shape foreign original, changed intent/reference/limit and a truthful unknown outcome for each mutation."
         }
       ]
     },
@@ -727,6 +737,16 @@
           "plan": "06-recovery-evidence.md",
           "heading": "Task 4: Integrate durable stop and lifecycle revalidation",
           "action": "Wire controller stop reconciliation to native stop evidence and separate supervisor/provider observations. The M2 adapter maps typed native response facts without assigning durable status from IPC success. Add component tests that `process_only` cannot become durable when persisted in `desktop_retry_intents`, and that a stopped worker plus unknown publication retains the unresolved fact."
+        },
+        {
+          "plan": "02-protocol-controller.md",
+          "heading": "Task 5: Stable subscriptions, export and migration",
+          "action": "Stopped requires a native durable fence/reference and terminated or natively inapplicable worker plus closed or natively inapplicable network for the retained `stop_state.scope`. Cleanup and external finality remain independent. Completed with stop additionally requires complete cleanup, known outcome and accounted-for releases; no projection may infer descendant closure from task-only evidence."
+        },
+        {
+          "plan": "02-protocol-controller.md",
+          "heading": "Task 5: Stable subscriptions, export and migration",
+          "action": "Add `task_stop_state_consistency` vectors that mutate each required state/scope/fence/worker/network condition independently. Preserve positive pending stopping, fully closed stopped, and stopped with pending cleanup plus unresolved original effect; reject relabeling the latter completed."
         }
       ]
     },
@@ -802,6 +822,11 @@
           "plan": "02-protocol-controller.md",
           "heading": "Task 5: Stable subscriptions, export and migration",
           "action": "Add evidence-export tests with an enrolled native destination, a forged path and a revoked destination. Route export through native release authority; retain unresolved external outcomes. Run the wire, native recovery and export cases together; no arbitrary filesystem destination is accepted by the protocol."
+        },
+        {
+          "plan": "02-protocol-controller.md",
+          "heading": "Task 5: Stable subscriptions, export and migration",
+          "action": "Bind native export completion to the initiating authenticated task, destination resource generation, grant/read boundary, format and stable intent before emitting `request_binding` with the original operation/evidence references. Test native cross-principal/task/resource substitution independently of the wire echo, and count releases at the actual enrolled destination. A correct echo with unrelated native evidence still refuses."
         }
       ]
     },
@@ -857,6 +882,21 @@
           "plan": "07-adapters-delegation.md",
           "heading": "Task 1: Freeze source inventory, exact tuples and prerequisite refusals",
           "action": "Preparation compares the frozen tuple against the authenticated installed native owner and verified qualification registry. Retain opaque M2/M0 references; return the existing typed unavailable outcome on absent native support. Do not introduce an alternate `admit()` implementation."
+        },
+        {
+          "plan": "02-protocol-controller.md",
+          "heading": "Task 4: Connect actual native owners and original-operation lookup",
+          "action": "Implement `operator/health.rs` and `tests/health_projection.rs` using the generated `health.get.observations` contract. Populate all ten closed dimensions from their specified native/platform owners, with fixed source, source incarnation, bounded age and freshness. Calculate age only across a supported same-incarnation clock mapping; reboot/lost mapping yields unknown, over-age yields stale, and neither can remain satisfied. A fresh not-applicable value requires native profile applicability."
+        },
+        {
+          "plan": "02-protocol-controller.md",
+          "heading": "Task 4: Connect actual native owners and original-operation lookup",
+          "action": "Bind health to required `observation_scope` with authenticated-session kind, current hello session ID and unique evaluated profiles; available profiles must be a subset. The native adapter supplies the complete evaluated scope and conservatively aggregates each dimension across it. Not-applicable requires no evaluated profile to require that mechanism."
+        },
+        {
+          "plan": "02-protocol-controller.md",
+          "heading": "Task 4: Connect actual native owners and original-operation lookup",
+          "action": "Age cached health observations using the reported age plus a conservatively qualified reply-transit bound and local monotonic elapsed time. Mark stale when the total exceeds the declared maximum, and unknown on unsupported clock/transit mapping or invalidated sleep/reboot/source incarnation. Add delayed-but-correlated reply, exact-threshold crossing, queue delay, absent sample and disconnected stale-cache tests with injected time."
         }
       ]
     },

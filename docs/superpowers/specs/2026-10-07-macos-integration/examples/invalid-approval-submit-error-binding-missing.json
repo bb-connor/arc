@@ -1,0 +1,18 @@
+{
+  "version": "chio.desktop.operator.v1",
+  "request_id": "synthetic-request-approval-submit",
+  "method": "approval.submit",
+  "ok": false,
+  "error": {
+    "code": "outcome_unknown",
+    "retry": "same_intent",
+    "message_key": "synthetic-original-operation",
+    "operation_ref": {
+      "kind": "operation",
+      "issuer": "synthetic-authority",
+      "native_id": "synthetic-operation-1",
+      "generation": "1",
+      "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  }
+}

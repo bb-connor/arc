@@ -21,7 +21,24 @@
       "response_example": "response-health-get.json",
       "negative_examples": [
         "invalid-health-generation.json",
-        "invalid-retry-health-get.json"
+        "invalid-retry-health-get.json",
+        "invalid-health-missing-dimension.json",
+        "invalid-health-extra-dimension.json",
+        "invalid-health-wrong-source.json",
+        "invalid-health-fresh-missing-age.json",
+        "invalid-health-fresh-missing-instance.json",
+        "invalid-health-ready-unknown.json",
+        "invalid-health-ready-missing-prerequisite.json",
+        "invalid-health-fresh-over-age.json",
+        "invalid-health-stale-satisfied.json",
+        "invalid-health-ready-stale.json",
+        "invalid-health-unknown-age.json",
+        "invalid-health-scope-missing.json",
+        "invalid-health-scope-duplicate.json",
+        "invalid-health-profile-outside-scope.json",
+        "invalid-health-stale-null-age.json",
+        "invalid-health-stale-null-source.json",
+        "invalid-health-ready-null-generation.json"
       ]
     },
     {
@@ -32,7 +49,9 @@
       "response_example": "response-tasks-list.json",
       "negative_examples": [
         "invalid-tasks-page-limit.json",
-        "invalid-retry-tasks-list.json"
+        "invalid-retry-tasks-list.json",
+        "invalid-tasks-list-stopped-null.json",
+        "invalid-tasks-list-request-limit.json"
       ]
     },
     {
@@ -43,7 +62,16 @@
       "response_example": "response-task-get.json",
       "negative_examples": [
         "invalid-missing-reread-stop.json",
-        "invalid-retry-task-get.json"
+        "invalid-retry-task-get.json",
+        "invalid-task-get-stopping-null.json",
+        "invalid-task-get-stopped-null.json",
+        "invalid-task-get-stopped-worker.json",
+        "invalid-task-get-stopped-network.json",
+        "invalid-task-get-stopped-admission.json",
+        "invalid-task-get-stopped-scope.json",
+        "invalid-task-get-running-with-stop.json",
+        "invalid-task-get-completed-cleanup.json",
+        "invalid-task-get-completed-external_outcome.json"
       ]
     },
     {
@@ -53,7 +81,16 @@
       "request_example": "request-task-create.json",
       "response_example": "response-task-create.json",
       "negative_examples": [
-        "invalid-profile.json"
+        "invalid-profile.json",
+        "invalid-task-create-binding-missing.json",
+        "invalid-task-create-binding-intent.json",
+        "invalid-task-create-error-binding-missing.json",
+        "invalid-task-create-error-binding-intent.json",
+        "invalid-task-create-binding-resource.json",
+        "invalid-task-create-binding-input.json",
+        "invalid-task-create-binding-grant.json",
+        "invalid-task-create-binding-profile.json",
+        "invalid-task-create-binding-limits.json"
       ]
     },
     {
@@ -74,7 +111,13 @@
       "request_example": "request-task-stop.json",
       "response_example": "response-task-stop.json",
       "negative_examples": [
-        "invalid-stop-scope-substitution.json"
+        "invalid-stop-scope-substitution.json",
+        "invalid-task-stop-binding-missing.json",
+        "invalid-task-stop-binding-intent.json",
+        "invalid-task-stop-error-binding-missing.json",
+        "invalid-task-stop-error-binding-intent.json",
+        "invalid-task-stop-binding-task.json",
+        "invalid-task-stop-binding-scope.json"
       ]
     },
     {
@@ -95,7 +138,14 @@
       "request_example": "request-approval-submit.json",
       "response_example": "response-approval-submit.json",
       "negative_examples": [
-        "invalid-decision-substitution.json"
+        "invalid-decision-substitution.json",
+        "invalid-approval-submit-binding-missing.json",
+        "invalid-approval-submit-binding-intent.json",
+        "invalid-approval-submit-error-binding-missing.json",
+        "invalid-approval-submit-error-binding-intent.json",
+        "invalid-approval-submit-binding-review.json",
+        "invalid-approval-submit-binding-endorsement.json",
+        "invalid-approval-submit-binding-decision.json"
       ]
     },
     {
@@ -127,7 +177,14 @@
       "request_example": "request-evidence-export.json",
       "response_example": "response-evidence-export.json",
       "negative_examples": [
-        "invalid-export-path.json"
+        "invalid-export-path.json",
+        "invalid-evidence-export-binding-missing.json",
+        "invalid-evidence-export-binding-intent.json",
+        "invalid-evidence-export-error-binding-missing.json",
+        "invalid-evidence-export-error-binding-intent.json",
+        "invalid-evidence-export-binding-task.json",
+        "invalid-evidence-export-binding-destination.json",
+        "invalid-evidence-export-binding-grant.json"
       ]
     }
   ]

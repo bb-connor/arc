@@ -1,0 +1,20 @@
+{
+  "version": "chio.desktop.operator.v1",
+  "request_id": "synthetic-request-task-get",
+  "method": "task.get",
+  "ok": true,
+  "result": {
+    "task_id": "synthetic-task",
+    "operation_ref": {
+      "kind": "operation",
+      "issuer": "synthetic-authority",
+      "native_id": "synthetic-operation-1",
+      "generation": "1",
+      "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "profile": "vm-project-v1",
+    "state": "stopped",
+    "revision": "1",
+    "stop_state": null
+  }
+}

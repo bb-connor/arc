@@ -171,99 +171,7 @@
           "const": "task.create"
         },
         "params": {
-          "type": "object",
-          "properties": {
-            "intent_id": {
-              "type": "string",
-              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
-            },
-            "template_id": {
-              "const": "project-change-v1"
-            },
-            "resource_ref": {
-              "allOf": [
-                {
-                  "$ref": "common.schema.json#/$defs/native_ref"
-                },
-                {
-                  "properties": {
-                    "kind": {
-                      "const": "resource"
-                    }
-                  }
-                }
-              ]
-            },
-            "grant_ref": {
-              "allOf": [
-                {
-                  "$ref": "common.schema.json#/$defs/native_ref"
-                },
-                {
-                  "properties": {
-                    "kind": {
-                      "const": "grant"
-                    }
-                  }
-                }
-              ]
-            },
-            "execution_profile": {
-              "enum": [
-                "vm-project-v1",
-                "remote-project-v1",
-                "native-descendant-v1"
-              ]
-            },
-            "limits": {
-              "type": "object",
-              "properties": {
-                "max_cost_minor": {
-                  "type": "string",
-                  "pattern": "^(0|[1-9][0-9]{0,19})$",
-                  "format": "uint64-decimal"
-                },
-                "currency": {
-                  "const": "USD"
-                },
-                "max_wall_seconds": {
-                  "type": "integer",
-                  "minimum": 1,
-                  "maximum": 86400
-                }
-              },
-              "required": [
-                "max_cost_minor",
-                "currency",
-                "max_wall_seconds"
-              ],
-              "additionalProperties": false
-            },
-            "input_ref": {
-              "allOf": [
-                {
-                  "$ref": "common.schema.json#/$defs/native_ref"
-                },
-                {
-                  "properties": {
-                    "kind": {
-                      "const": "resource"
-                    }
-                  }
-                }
-              ]
-            }
-          },
-          "required": [
-            "intent_id",
-            "template_id",
-            "resource_ref",
-            "grant_ref",
-            "execution_profile",
-            "limits",
-            "input_ref"
-          ],
-          "additionalProperties": false
+          "$ref": "#/$defs/task_create_params"
         }
       },
       "required": [
@@ -333,29 +241,7 @@
           "const": "task.stop"
         },
         "params": {
-          "type": "object",
-          "properties": {
-            "intent_id": {
-              "type": "string",
-              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
-            },
-            "task_id": {
-              "type": "string",
-              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
-            },
-            "scope": {
-              "enum": [
-                "task",
-                "task_and_descendants"
-              ]
-            }
-          },
-          "required": [
-            "intent_id",
-            "task_id",
-            "scope"
-          ],
-          "additionalProperties": false
+          "$ref": "#/$defs/task_stop_params"
         }
       },
       "required": [
@@ -425,69 +311,7 @@
           "const": "approval.submit"
         },
         "params": {
-          "type": "object",
-          "properties": {
-            "intent_id": {
-              "type": "string",
-              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
-            },
-            "operation_ref": {
-              "allOf": [
-                {
-                  "$ref": "common.schema.json#/$defs/native_ref"
-                },
-                {
-                  "properties": {
-                    "kind": {
-                      "const": "operation"
-                    }
-                  }
-                }
-              ]
-            },
-            "review_ref": {
-              "allOf": [
-                {
-                  "$ref": "common.schema.json#/$defs/native_ref"
-                },
-                {
-                  "properties": {
-                    "kind": {
-                      "const": "review"
-                    }
-                  }
-                }
-              ]
-            },
-            "endorsement_ref": {
-              "allOf": [
-                {
-                  "$ref": "common.schema.json#/$defs/native_ref"
-                },
-                {
-                  "properties": {
-                    "kind": {
-                      "const": "endorsement"
-                    }
-                  }
-                }
-              ]
-            },
-            "decision": {
-              "enum": [
-                "approve",
-                "deny"
-              ]
-            }
-          },
-          "required": [
-            "intent_id",
-            "operation_ref",
-            "review_ref",
-            "endorsement_ref",
-            "decision"
-          ],
-          "additionalProperties": false
+          "$ref": "#/$defs/approval_submit_params"
         }
       },
       "required": [
@@ -589,56 +413,7 @@
           "const": "evidence.export"
         },
         "params": {
-          "type": "object",
-          "properties": {
-            "intent_id": {
-              "type": "string",
-              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
-            },
-            "task_id": {
-              "type": "string",
-              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
-            },
-            "format": {
-              "const": "redacted-bundle-v1"
-            },
-            "destination_ref": {
-              "allOf": [
-                {
-                  "$ref": "common.schema.json#/$defs/native_ref"
-                },
-                {
-                  "properties": {
-                    "kind": {
-                      "const": "resource"
-                    }
-                  }
-                }
-              ]
-            },
-            "grant_ref": {
-              "allOf": [
-                {
-                  "$ref": "common.schema.json#/$defs/native_ref"
-                },
-                {
-                  "properties": {
-                    "kind": {
-                      "const": "grant"
-                    }
-                  }
-                }
-              ]
-            }
-          },
-          "required": [
-            "intent_id",
-            "task_id",
-            "format",
-            "destination_ref",
-            "grant_ref"
-          ],
-          "additionalProperties": false
+          "$ref": "#/$defs/evidence_export_params"
         }
       },
       "required": [
@@ -649,5 +424,244 @@
       ],
       "additionalProperties": false
     }
-  ]
+  ],
+  "$defs": {
+    "task_create_params": {
+      "type": "object",
+      "properties": {
+        "intent_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "template_id": {
+          "const": "project-change-v1"
+        },
+        "resource_ref": {
+          "allOf": [
+            {
+              "$ref": "common.schema.json#/$defs/native_ref"
+            },
+            {
+              "properties": {
+                "kind": {
+                  "const": "resource"
+                }
+              }
+            }
+          ]
+        },
+        "grant_ref": {
+          "allOf": [
+            {
+              "$ref": "common.schema.json#/$defs/native_ref"
+            },
+            {
+              "properties": {
+                "kind": {
+                  "const": "grant"
+                }
+              }
+            }
+          ]
+        },
+        "execution_profile": {
+          "enum": [
+            "vm-project-v1",
+            "remote-project-v1",
+            "native-descendant-v1"
+          ]
+        },
+        "limits": {
+          "type": "object",
+          "properties": {
+            "max_cost_minor": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,19})$",
+              "format": "uint64-decimal"
+            },
+            "currency": {
+              "const": "USD"
+            },
+            "max_wall_seconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 86400
+            }
+          },
+          "required": [
+            "max_cost_minor",
+            "currency",
+            "max_wall_seconds"
+          ],
+          "additionalProperties": false
+        },
+        "input_ref": {
+          "allOf": [
+            {
+              "$ref": "common.schema.json#/$defs/native_ref"
+            },
+            {
+              "properties": {
+                "kind": {
+                  "const": "resource"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "required": [
+        "intent_id",
+        "template_id",
+        "resource_ref",
+        "grant_ref",
+        "execution_profile",
+        "limits",
+        "input_ref"
+      ],
+      "additionalProperties": false
+    },
+    "task_stop_params": {
+      "type": "object",
+      "properties": {
+        "intent_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "task_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "scope": {
+          "enum": [
+            "task",
+            "task_and_descendants"
+          ]
+        }
+      },
+      "required": [
+        "intent_id",
+        "task_id",
+        "scope"
+      ],
+      "additionalProperties": false
+    },
+    "approval_submit_params": {
+      "type": "object",
+      "properties": {
+        "intent_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "operation_ref": {
+          "allOf": [
+            {
+              "$ref": "common.schema.json#/$defs/native_ref"
+            },
+            {
+              "properties": {
+                "kind": {
+                  "const": "operation"
+                }
+              }
+            }
+          ]
+        },
+        "review_ref": {
+          "allOf": [
+            {
+              "$ref": "common.schema.json#/$defs/native_ref"
+            },
+            {
+              "properties": {
+                "kind": {
+                  "const": "review"
+                }
+              }
+            }
+          ]
+        },
+        "endorsement_ref": {
+          "allOf": [
+            {
+              "$ref": "common.schema.json#/$defs/native_ref"
+            },
+            {
+              "properties": {
+                "kind": {
+                  "const": "endorsement"
+                }
+              }
+            }
+          ]
+        },
+        "decision": {
+          "enum": [
+            "approve",
+            "deny"
+          ]
+        }
+      },
+      "required": [
+        "intent_id",
+        "operation_ref",
+        "review_ref",
+        "endorsement_ref",
+        "decision"
+      ],
+      "additionalProperties": false
+    },
+    "evidence_export_params": {
+      "type": "object",
+      "properties": {
+        "intent_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "task_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "format": {
+          "const": "redacted-bundle-v1"
+        },
+        "destination_ref": {
+          "allOf": [
+            {
+              "$ref": "common.schema.json#/$defs/native_ref"
+            },
+            {
+              "properties": {
+                "kind": {
+                  "const": "resource"
+                }
+              }
+            }
+          ]
+        },
+        "grant_ref": {
+          "allOf": [
+            {
+              "$ref": "common.schema.json#/$defs/native_ref"
+            },
+            {
+              "properties": {
+                "kind": {
+                  "const": "grant"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "required": [
+        "intent_id",
+        "task_id",
+        "format",
+        "destination_ref",
+        "grant_ref"
+      ],
+      "additionalProperties": false
+    }
+  }
 }

@@ -1,0 +1,23 @@
+{
+  "version": "chio.desktop.operator.v1",
+  "request_id": "synthetic-request-task-stop",
+  "method": "task.stop",
+  "ok": false,
+  "error": {
+    "code": "outcome_unknown",
+    "retry": "same_intent",
+    "message_key": "synthetic-original-operation",
+    "operation_ref": {
+      "kind": "operation",
+      "issuer": "synthetic-authority",
+      "native_id": "synthetic-operation-1",
+      "generation": "1",
+      "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "request_binding": {
+      "intent_id": "synthetic-stop-intent",
+      "task_id": "synthetic-task",
+      "scope": "task_and_descendants"
+    }
+  }
+}

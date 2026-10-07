@@ -129,7 +129,83 @@
         "revision",
         "stop_state"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "stopping",
+                  "stopped"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "stop_state": {
+                "$ref": "#/$defs/stop_state"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "stopped"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "stop_state": {
+                "$ref": "#/$defs/execution_stopped_state"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "created",
+                  "running",
+                  "awaiting_review"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "stop_state": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "completed"
+              },
+              "stop_state": {
+                "type": "object"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "stop_state": {
+                "$ref": "#/$defs/closed_stop_state"
+              }
+            }
+          }
+        }
+      ]
     },
     "stop_state": {
       "type": "object",
@@ -199,6 +275,12 @@
             "latch_only",
             "durable"
           ]
+        },
+        "scope": {
+          "enum": [
+            "task",
+            "task_and_descendants"
+          ]
         }
       },
       "required": [
@@ -208,7 +290,8 @@
         "cleanup",
         "external_outcome",
         "stop_ref",
-        "durability"
+        "durability",
+        "scope"
       ],
       "additionalProperties": false,
       "allOf": [
@@ -420,6 +503,377 @@
         "cost"
       ],
       "additionalProperties": false
+    },
+    "closed_stop_state": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/stop_state"
+        },
+        {
+          "properties": {
+            "admission": {
+              "const": "fenced"
+            },
+            "durability": {
+              "const": "durable"
+            },
+            "worker": {
+              "enum": [
+                "terminated",
+                "not_applicable"
+              ]
+            },
+            "network": {
+              "enum": [
+                "closed",
+                "not_applicable"
+              ]
+            },
+            "cleanup": {
+              "const": "complete"
+            },
+            "external_outcome": {
+              "const": "known"
+            }
+          }
+        }
+      ]
+    },
+    "health_observation": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "enum": [
+            "satisfied",
+            "unsatisfied",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "freshness": {
+          "enum": [
+            "fresh",
+            "stale",
+            "unknown"
+          ]
+        },
+        "source": {
+          "enum": [
+            "transport",
+            "peer_authenticator",
+            "compatibility_verifier",
+            "platform_permission",
+            "platform_activation",
+            "restriction_owner",
+            "coverage_observer",
+            "native_store",
+            "native_authority",
+            "closure_owner"
+          ]
+        },
+        "source_instance_id": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "age_ms": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2147483647
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max_age_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 300000
+        }
+      },
+      "required": [
+        "state",
+        "freshness",
+        "source",
+        "source_instance_id",
+        "age_ms",
+        "max_age_ms"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "freshness": {
+                "const": "fresh"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "source_instance_id": {
+                "$ref": "#/$defs/id"
+              },
+              "age_ms": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 300000
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "freshness": {
+                "enum": [
+                  "stale",
+                  "unknown"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "state": {
+                "const": "unknown"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "freshness": {
+                "const": "unknown"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "age_ms": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "freshness": {
+                "const": "stale"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "source_instance_id": {
+                "$ref": "#/$defs/id"
+              },
+              "age_ms": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2147483647
+              }
+            }
+          }
+        }
+      ]
+    },
+    "health_observations": {
+      "type": "object",
+      "properties": {
+        "connectivity": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/health_observation"
+            },
+            {
+              "properties": {
+                "source": {
+                  "const": "transport"
+                }
+              }
+            }
+          ]
+        },
+        "authentication": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/health_observation"
+            },
+            {
+              "properties": {
+                "source": {
+                  "const": "peer_authenticator"
+                }
+              }
+            }
+          ]
+        },
+        "compatibility": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/health_observation"
+            },
+            {
+              "properties": {
+                "source": {
+                  "const": "compatibility_verifier"
+                }
+              }
+            }
+          ]
+        },
+        "permission": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/health_observation"
+            },
+            {
+              "properties": {
+                "source": {
+                  "const": "platform_permission"
+                }
+              }
+            }
+          ]
+        },
+        "activation": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/health_observation"
+            },
+            {
+              "properties": {
+                "source": {
+                  "const": "platform_activation"
+                }
+              }
+            }
+          ]
+        },
+        "convergence": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/health_observation"
+            },
+            {
+              "properties": {
+                "source": {
+                  "const": "restriction_owner"
+                }
+              }
+            }
+          ]
+        },
+        "coverage": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/health_observation"
+            },
+            {
+              "properties": {
+                "source": {
+                  "const": "coverage_observer"
+                }
+              }
+            }
+          ]
+        },
+        "storage": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/health_observation"
+            },
+            {
+              "properties": {
+                "source": {
+                  "const": "native_store"
+                }
+              }
+            }
+          ]
+        },
+        "authority": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/health_observation"
+            },
+            {
+              "properties": {
+                "source": {
+                  "const": "native_authority"
+                }
+              }
+            }
+          ]
+        },
+        "closure": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/health_observation"
+            },
+            {
+              "properties": {
+                "source": {
+                  "const": "closure_owner"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "required": [
+        "connectivity",
+        "authentication",
+        "compatibility",
+        "permission",
+        "activation",
+        "convergence",
+        "coverage",
+        "storage",
+        "authority",
+        "closure"
+      ],
+      "additionalProperties": false
+    },
+    "execution_stopped_state": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/stop_state"
+        },
+        {
+          "properties": {
+            "admission": {
+              "const": "fenced"
+            },
+            "durability": {
+              "const": "durable"
+            },
+            "worker": {
+              "enum": [
+                "terminated",
+                "not_applicable"
+              ]
+            },
+            "network": {
+              "enum": [
+                "closed",
+                "not_applicable"
+              ]
+            }
+          }
+        }
+      ]
     }
   }
 }

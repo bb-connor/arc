@@ -28,7 +28,8 @@
         "generation": "1",
         "digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
       },
-      "durability": "durable"
+      "durability": "durable",
+      "scope": "task_and_descendants"
     }
   }
 }
