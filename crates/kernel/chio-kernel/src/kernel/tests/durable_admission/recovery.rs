@@ -1,5 +1,8 @@
 use super::*;
 
+#[path = "recovery/returned_output_guard.rs"]
+mod returned_output_guard;
+
 #[test]
 fn top_level_durable_admission_commits_before_dispatch_and_blocks_replay() {
     let (kernel, request, store, invocations) = durable_admission_fixture("durable-top-level");
