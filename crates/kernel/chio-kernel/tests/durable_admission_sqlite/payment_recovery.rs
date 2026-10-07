@@ -1,5 +1,9 @@
 use super::*;
 
+#[cfg(all(feature = "admission-test-support", feature = "delegation"))]
+#[path = "payment_recovery/caller_revocation.rs"]
+mod caller_revocation;
+
 #[path = "payment_recovery/advancing_clock.rs"]
 mod advancing_clock;
 
