@@ -123,8 +123,10 @@ impl SqliteAdmissionOperationStore {
             ));
         }
         verify_trusted_time(transaction, apply_time_unix_ms, &self.serving_owner)?;
-        let stored = load_by_operation_id_tx(transaction, &context.operation_id)?
-            .ok_or(AdmissionOperationStoreError::NotFound)?;
+        let history = CheckedHistoryScope::new(transaction);
+        let stored =
+            load_by_operation_id_tx_with_history(transaction, &context.operation_id, &history)?
+                .ok_or(AdmissionOperationStoreError::NotFound)?;
         crate::tool_outcome_store::require_terminal_release(transaction, &stored.operation)?;
         verify_payment_terminal_source(
             transaction,
@@ -144,7 +146,8 @@ impl SqliteAdmissionOperationStore {
         )?;
 
         if stored.operation.state().is_terminal() {
-            let terminal = verify_exact_signed_terminal_replay(transaction, &stored, verified)?;
+            let terminal =
+                verify_exact_signed_terminal_replay(transaction, &stored, verified, &history)?;
             let manifest =
                 AdmissionProjectionManifestV1::from_canonical_bytes(verified.manifest_json())?;
             apply_credit_exposure_terminal_tx(
@@ -304,8 +307,10 @@ fn verify_anchored_terminal_authority(
     apply_time_unix_ms: u64,
 ) -> Result<(), AdmissionOperationStoreError> {
     let context = verified.context();
-    let stored = load_by_operation_id_tx(transaction, &context.operation_id)?
-        .ok_or(AdmissionOperationStoreError::NotFound)?;
+    let history = CheckedHistoryScope::new(transaction);
+    let stored =
+        load_by_operation_id_tx_with_history(transaction, &context.operation_id, &history)?
+            .ok_or(AdmissionOperationStoreError::NotFound)?;
     crate::tool_outcome_store::require_terminal_release(transaction, &stored.operation)?;
     verify_payment_terminal_source(
         transaction,
@@ -324,7 +329,7 @@ fn verify_anchored_terminal_authority(
         verified.projection_json(),
     )?;
     if stored.operation.state().is_terminal() {
-        verify_exact_signed_terminal_replay(transaction, &stored, verified)?;
+        verify_exact_signed_terminal_replay(transaction, &stored, verified, &history)?;
         return Ok(());
     }
     if stored.operation != *verified.source_operation()

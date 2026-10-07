@@ -2,6 +2,9 @@ use super::obligation::{insert_obligation_projection, verify_obligation_projecti
 use super::*;
 use chio_kernel::admission_operation::MAX_ADMISSION_IDENTIFIER_BYTES;
 
+#[path = "projection/terminal_time.rs"]
+mod terminal_time;
+
 #[path = "projection/terminal_record_read.rs"]
 mod terminal_record_read;
 use terminal_record_read::{
@@ -572,6 +575,7 @@ pub(super) fn verify_exact_signed_terminal_replay(
     transaction: &Transaction<'_>,
     stored_operation: &StoredOperation,
     projection: &VerifiedAdmissionTerminalProjectionV1,
+    history: &CheckedHistoryScope<'_>,
 ) -> Result<AdmissionTerminal, AdmissionOperationStoreError> {
     let recovery_claim = stored_operation
         .recovery_claim
@@ -585,7 +589,7 @@ pub(super) fn verify_exact_signed_terminal_replay(
     {
         return Err(AdmissionOperationError::TerminalProjectionBindingMismatch.into());
     }
-    verify_stored_terminal_projection(transaction, stored_operation)?;
+    verify_stored_terminal_projection_with_history(transaction, stored_operation, history)?;
     let stored = load_terminal_projection_tx(
         transaction,
         stored_operation.operation.binding().operation_id(),
@@ -879,6 +883,16 @@ pub(super) fn verify_stored_terminal_projection(
     connection: &Connection,
     stored_operation: &StoredOperation,
 ) -> Result<(), AdmissionOperationStoreError> {
+    let history = CheckedHistoryScope::new(connection);
+    verify_stored_terminal_projection_with_history(connection, stored_operation, &history)
+}
+
+pub(super) fn verify_stored_terminal_projection_with_history(
+    connection: &Connection,
+    stored_operation: &StoredOperation,
+    history: &CheckedHistoryScope<'_>,
+) -> Result<(), AdmissionOperationStoreError> {
+    history.require_connection(connection)?;
     let operation = &stored_operation.operation;
     let projection = load_terminal_projection_tx(connection, operation.binding().operation_id())?;
     if !operation.state().is_terminal() {
@@ -940,10 +954,6 @@ pub(super) fn verify_stored_terminal_projection(
         || stored_u64(projection.record_count, "terminal_record_count")?
             != u64::try_from(manifest.records().len())
                 .map_err(|_| invariant("terminal record count overflow"))?
-        || stored_u64(
-            projection.committed_at_unix_ms,
-            "projection_committed_at_unix_ms",
-        )? != stored_operation.updated_at_unix_ms
         || exact_lease != 1
     {
         return Err(invariant(
@@ -1031,7 +1041,8 @@ pub(super) fn verify_stored_terminal_projection(
         connection,
         operation,
         Some(&projection_digest),
-    )
+    )?;
+    terminal_time::verify(connection, stored_operation, &projection, history)
 }
 
 fn projection_sidecar_count(
@@ -1425,6 +1436,7 @@ impl SqliteAdmissionOperationStore {
         let transaction = self
             .begin_read(&mut connection)
             .map_err(receipt_projection_error)?;
+        let history = CheckedHistoryScope::new(&transaction);
         let receipts = {
             let mut statement = transaction.prepare(
                 r#"
@@ -1449,13 +1461,14 @@ impl SqliteAdmissionOperationStore {
                 let bytes = read_terminal_record_bytes(row, 2).map_err(receipt_projection_error)?;
                 let operation_id = AdmissionOperationId::from_persisted(operation_id)
                     .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
-                let operation = load_by_operation_id_tx(&transaction, &operation_id)
-                    .map_err(receipt_projection_error)?
-                    .ok_or_else(|| {
-                        ReceiptStoreError::Conflict(
-                            "admission receipt references a missing operation".to_owned(),
-                        )
-                    })?;
+                let operation =
+                    load_by_operation_id_tx_with_history(&transaction, &operation_id, &history)
+                        .map_err(receipt_projection_error)?
+                        .ok_or_else(|| {
+                            ReceiptStoreError::Conflict(
+                                "admission receipt references a missing operation".to_owned(),
+                            )
+                        })?;
                 let receipt = decode_projection_receipt(bytes)?;
                 let replay_matches = matches!(
                     operation.operation.terminal_replay(),

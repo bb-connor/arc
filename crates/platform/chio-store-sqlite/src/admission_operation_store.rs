@@ -46,6 +46,8 @@ pub use budget_custody::{AdmissionBudgetCustodySnapshot, RetainedToolAdmissionCu
 mod caller_dispatch_context;
 mod caller_wait;
 mod commit_chain;
+mod history_scope;
+use history_scope::CheckedHistoryScope;
 mod credit_exposure;
 #[cfg(feature = "admission-test-support")]
 mod dispatch_ledger_test_support;
@@ -1342,6 +1344,15 @@ fn load_by_operation_id_tx(
     transaction: &Transaction<'_>,
     operation_id: &AdmissionOperationId,
 ) -> Result<Option<StoredOperation>, AdmissionOperationStoreError> {
+    let history = CheckedHistoryScope::new(transaction);
+    load_by_operation_id_tx_with_history(transaction, operation_id, &history)
+}
+
+fn load_by_operation_id_tx_with_history(
+    transaction: &Transaction<'_>,
+    operation_id: &AdmissionOperationId,
+    history: &CheckedHistoryScope<'_>,
+) -> Result<Option<StoredOperation>, AdmissionOperationStoreError> {
     let raw = transaction
         .prepare_cached(
             r#"
@@ -1371,7 +1382,7 @@ fn load_by_operation_id_tx(
         runtime_participant::verify_operation(transaction, &stored.operation)?;
         governed_approval_claim::verify_stored_operation(transaction, &stored.operation)?;
         dpop_claim::verify_stored_operation(transaction, &stored.operation)?;
-        verify_stored_terminal_projection(transaction, stored)?;
+        projection::verify_stored_terminal_projection_with_history(transaction, stored, history)?;
     }
     Ok(stored)
 }

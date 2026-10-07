@@ -16,6 +16,7 @@ impl SqliteAdmissionOperationStore {
         let transaction = self.begin_read(&mut connection)?;
         verify_active_owner(&transaction, &self.serving_owner, Some(fence))?;
         verify_trusted_time(&transaction, now, &self.serving_owner)?;
+        let history = CheckedHistoryScope::new(&transaction);
         let mut shares = Vec::new();
         {
             let mut statement = transaction
@@ -30,9 +31,10 @@ impl SqliteAdmissionOperationStore {
                 let id = AdmissionOperationId::from_persisted(
                     row.get::<_, String>(0).map_err(sqlite_error)?,
                 )?;
-                let stored = load_by_operation_id_tx(&transaction, &id)?.ok_or_else(|| {
-                    invariant("caller share operation disappeared in its snapshot")
-                })?;
+                let stored = load_by_operation_id_tx_with_history(&transaction, &id, &history)?
+                    .ok_or_else(|| {
+                        invariant("caller share operation disappeared in its snapshot")
+                    })?;
                 stored.verify_decision_time(now)?;
                 if !AdmissionCallerBudgetShare::is_owned_by(&stored.operation) {
                     continue;

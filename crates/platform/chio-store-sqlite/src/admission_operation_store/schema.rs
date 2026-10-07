@@ -729,7 +729,7 @@ fn expected_admission_operation_schema(
     Ok(expected)
 }
 
-fn verify_admission_operation_data_invariants(
+pub(super) fn verify_admission_commit_chronology(
     connection: &Connection,
 ) -> Result<(), AdmissionOperationStoreError> {
     let (head, high_water, commit_count, max_commit, max_observed_at): (i64, i64, i64, i64, i64) =
@@ -873,7 +873,17 @@ fn verify_admission_operation_data_invariants(
             "admission authority time regresses across commits",
         ));
     }
-    verify_admission_commit_chain(connection)?;
+    Ok(())
+}
+
+fn verify_admission_operation_data_invariants(
+    connection: &Connection,
+) -> Result<(), AdmissionOperationStoreError> {
+    verify_admission_commit_chronology(connection)?;
+    let history = CheckedHistoryScope::from_verified_chain(
+        connection,
+        verify_admission_commit_chain(connection)?,
+    );
 
     let mut statement = connection
         .prepare(
@@ -900,7 +910,9 @@ fn verify_admission_operation_data_invariants(
             connection,
             &stored.operation,
         )?;
-        verify_stored_terminal_projection(connection, &stored)?;
+        super::projection::verify_stored_terminal_projection_with_history(
+            connection, &stored, &history,
+        )?;
     }
     drop(rows);
     drop(statement);
