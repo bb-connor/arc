@@ -33,6 +33,7 @@
   <a href="#architecture">Architecture</a>&nbsp;&nbsp;&middot;&nbsp;&nbsp;
   <a href="#integrations-and-sdks">Integrations</a>&nbsp;&nbsp;&middot;&nbsp;&nbsp;
   <a href="#security-and-trust">Security</a>&nbsp;&nbsp;&middot;&nbsp;&nbsp;
+  <a href="#boundaries-and-current-limits">Boundaries</a>&nbsp;&nbsp;&middot;&nbsp;&nbsp;
   <a href="#formal-verification">Proofs</a>&nbsp;&nbsp;&middot;&nbsp;&nbsp;
   <a href="docs/README.md">Docs</a>&nbsp;&nbsp;&middot;&nbsp;&nbsp;
   <a href="spec/PROTOCOL.md">Spec</a>
@@ -50,23 +51,23 @@ curl -fsSL https://www.chio.computer/install.sh | sh
 > A2A tells agents how to talk to each other.<br>
 > **Chio proves what an agent was allowed to do, what it cost, and what happened.**
 
-Chio is a Rust kernel for agentic operating systems. It provides a shared authority and
-receipt boundary for tool calls, file reads, API requests, and payments routed through its
-adapters. Complete mediation requires a separately qualified host/runtime profile that
-removes alternate access to protected resources; native activity outside those routes is
-not mediated by Chio.
+Chio is a Rust kernel for agentic operating systems. It gives agents a shared foundation for
+permissions, delegation, resource accounting, and verifiable work. Signed capabilities
+control what an agent may do; signed receipts connect its work to policy, cost, and payment.
 
-When an agent calls a tool through Chio, it presents a [signed token](spec/PROTOCOL.md#5-capability-contract) that says who it is, what it
-may call, and how much it may spend. Chio checks the token before dispatch and records the
-outcome in a [signed receipt](spec/PROTOCOL.md#6-receipt-contract) when receipt construction,
-signing, and persistence succeed. **If the token does not check out, the call does not run.**
-Receipt failure after dispatch does not undo tool effects: a missing receipt is not evidence
-of no effect, and retries require the native owner's reconciliation.
+The execution guarantees below apply to calls routed through Chio. See
+[Boundaries and current limits](#boundaries-and-current-limits) for host isolation, hooks,
+and failure handling.
+
+When an agent calls a tool, it presents a [signed token](spec/PROTOCOL.md#5-capability-contract)
+that says who it is, what it may call, and how much it may spend. Chio checks the token before
+dispatch. Its [signed receipts](spec/PROTOCOL.md#6-receipt-contract) record the decision and
+its evidence. **If the token does not check out, the call does not run.**
 
 <p align="center">
   <picture>
     <source media="(max-width: 500px)" srcset="docs/assets/one-call-mobile.svg" />
-    <img src="docs/assets/one-call.svg" alt="Example Chio call with successful receipt signing: a signed token is verified, requests and results are screened, and an admitted call dispatches to a tool server. The expired-token example refuses before dispatch and has a signed deny receipt. Receipt failure after dispatch does not prove no effect. OS isolation depends on the selected runtime profile." width="900" />
+    <img src="docs/assets/one-call.svg" alt="Example Chio call: the kernel verifies a signed token, screens requests and results, dispatches an admitted call, and signs a receipt. The expired-token example refuses before dispatch and produces a signed deny receipt." width="900" />
   </picture>
 </p>
 
@@ -75,11 +76,11 @@ shrink the budget, or shorten the expiry. **It cannot add anything back.** Each 
 [delegation link](crates/core/chio-core-types/src/capability/attenuation.rs) carrying an
 [attenuation proof](spec/PROTOCOL.md#capability-attenuation), a basis-point budget split, and
 [caveats](crates/core/chio-core-types/src/capability/caveat.rs), and the kernel rechecks the whole
-chain against a [Merkle revocation oracle](crates/trust/chio-revocation-oracle) on each routed call. A swarm of
+chain against a [Merkle revocation oracle](crates/trust/chio-revocation-oracle) on each call. A swarm of
 sub-agents cannot gain additional Chio authority through delegation, and
 [one hop is shown in full below](#delegation-and-swarms).
 
-Every receipt records what the call cost and who paid. That is enough to give an agent a
+Receipt cost and payment metadata connect work to spend. That is enough to give an agent a
 balance, [bill it per call](crates/economy/chio-metering), and let agents pay each other for work.
 [Markets, credit, and insurance](crates/economy) in Chio are built on those receipts.
 
@@ -124,23 +125,22 @@ that spawn their own, and the checks do not change.
 ## Why it is a kernel
 
 Like an OS kernel, Chio centralizes permissions, resource accounting, and an audit boundary.
-Chio enforces these contracts for routed agent operations; the selected host/runtime
-profile supplies OS isolation and removes alternate access. The parts have direct
-counterparts:
+Applications build on these shared contracts instead of rebuilding them for each tool,
+model, or protocol. The parts have direct counterparts:
 
 <p align="center">
   <picture>
     <source media="(max-width: 500px)" srcset="docs/assets/kernel-boundary-mobile.svg" />
-    <img src="docs/assets/kernel-boundary.svg" alt="The Chio kernel boundary: agents, sub-agents, and tool servers are untrusted; calls routed through Chio enter the kernel for verification, budgets, guards, dispatch, metering, and signed receipts. Protocol and provider adapters connect native owners. OS isolation depends on the selected runtime profile; native calls outside those routes are not mediated." width="900" />
+    <img src="docs/assets/kernel-boundary.svg" alt="The Chio kernel boundary: untrusted agents and tool servers connect through protocol and provider adapters. The kernel verifies capabilities, applies budgets and guards, dispatches tools, meters cost, and signs receipts." width="900" />
   </picture>
 </p>
 
 | In an operating system | In Chio |
 | --- | --- |
-| **[Syscalls](crates/kernel/chio-kernel)** | Calls routed through Chio enter the kernel's authorization and dispatch path. Removing direct access to the protected tool or resource requires the selected host/runtime profile; native tools outside that path are not mediated. |
-| **[Process isolation](spec/PROTOCOL.md#3-components-and-trust-boundaries)** | Agents and tool servers are untrusted processes or services. The selected host/runtime profile owns OS isolation; ordinary stdio launch does not establish sandboxing. |
+| **[Syscalls](crates/kernel/chio-kernel)** | Tool calls enter a shared authorization and dispatch path. |
+| **[Process isolation](spec/PROTOCOL.md#3-components-and-trust-boundaries)** | Agents and tool servers are untrusted processes or services, with OS isolation supplied by the [host/runtime profile](#boundaries-and-current-limits). |
 | **[Permissions](spec/PROTOCOL.md#5-capability-contract)** | Capability tokens: signed, expiring, budgeted, and only ever narrowable. |
-| **[Syscall filters](crates/guards)** | A guard pipeline screens routed requests and results. Custom guards run as [fuel-metered WASM](crates/guards/chio-wasm-guards) with no host access. |
+| **[Syscall filters](crates/guards)** | A guard pipeline screens requests and results. Custom guards run as [fuel-metered WASM](crates/guards/chio-wasm-guards) with no host access. |
 | **[Drivers](crates/protocol)** | MCP, A2A, ACP-Client, AG-UI, OpenAPI, and eight provider tool-call formats each lift to the same kernel verdict and lower back to their own wire format. |
 | **[Audit log](spec/PROTOCOL.md#6-receipt-contract)** | An append-only, content-addressed receipt log with [Merkle checkpoints](spec/PROTOCOL.md#65-checkpoints). A receipt signed in Rust verifies byte-for-byte in TypeScript, Python, or Go. |
 | **[Resource accounting](crates/economy/chio-metering)** | Per-call metering, with a budget hold taken before the call runs and sealed into the receipt. |
@@ -158,10 +158,10 @@ counterparts:
 
 - **You do not write permissions, delegation, audit, metering, or billing for your agent system.** The kernel does them, and they behave the same over every protocol and provider it speaks.
 - **Delegation cannot expand Chio authority.** A swarm holds at most its delegated Chio scope, because every [delegation proves it is a subset of its parent](spec/PROTOCOL.md#capability-attenuation).
-- **Successfully signed receipts verify offline.** Anyone with the public key can [check what an agent did](examples/hello-receipt-verify) without access to your runtime.
+- **Receipts verify offline.** Anyone with the public key can [check what an agent did](examples/hello-receipt-verify) without access to your runtime.
 - **Agents can pay each other.** [Metering, budgets, markets, credit, and insurance](docs/guides/ECONOMIC-LAYER.md) clear on receipts the kernel already writes, and [two agents procuring a service](examples/agent-commerce-network) is a worked example.
 - **The model, the framework, and the tool servers are all swappable.** The kernel and the receipts do not change when you change any of them. See the [protocol adapters](crates/protocol) and [integrations](#integrations-and-sdks).
-- **Deny is the admission default.** An invalid token or unavailable required budget hold prevents dispatch. Failures after dispatch, including output checks or receipt signing, do not prove that the tool had no effect.
+- **Deny is the admission default.** An invalid token or unavailable required budget hold prevents dispatch.
 
 ## Delegation and swarms
 
@@ -175,12 +175,12 @@ tools, shrink the budget, or shorten the expiry, and nothing can be added back.
   </picture>
 </p>
 
-Each hop is a signed link that the kernel rechecks on each call the child routes through Chio.
+Each hop is a signed link that the kernel rechecks when the child calls a tool.
 
 <p align="center">
   <picture>
     <source media="(max-width: 500px)" srcset="docs/assets/hop-mobile.svg" />
-    <img src="docs/assets/hop.svg" alt="Inside one delegation hop from planner to worker: the signed delegation link, the attenuation proof whose parent scope hash must equal the last chain link, the basis-point budget split checked against siblings, the caveats, and the revocation epoch. The kernel rechecks these bindings on calls routed through Chio." width="900" />
+    <img src="docs/assets/hop.svg" alt="Inside one delegation hop from planner to worker: the signed delegation link, the attenuation proof whose parent scope hash must equal the last chain link, the basis-point budget split checked against siblings, the caveats, and the revocation epoch. The kernel rechecks these bindings at admission." width="900" />
   </picture>
 </p>
 
@@ -209,7 +209,7 @@ For recursive swarms, the [swarm authority](crates/kernel/chio-swarm-authority) 
   </picture>
 </p>
 
-Three layers on one proof spine: signed receipts connect Chio-routed decisions and payments
+Three layers on one proof spine: signed receipts connect decisions and payments
 to the capabilities that authorized them.
 
 ### Proofs
@@ -220,7 +220,7 @@ to the capabilities that authorized them.
 | Primitive | What it does |
 | --- | --- |
 | **[Attenuated capabilities](spec/PROTOCOL.md#capability-attenuation)** | Ed25519-signed, time-bounded, budgeted tokens. Delegation proves it is a subset of its parent, so authority can only narrow, never widen. Post-quantum hybrid (ML-DSA-65) is supported. |
-| **[Forgery-resistant receipts](spec/PROTOCOL.md#wysiwys-signing-invariant)** | Receipt identity is the hash of its own canonical content; the kernel recomputes that hash before signing and refuses on mismatch. Receipt decisions include `allow`, `deny`, `cancelled`, and `incomplete`; a signing failure produces no verified receipt. |
+| **[Forgery-resistant receipts](spec/PROTOCOL.md#wysiwys-signing-invariant)** | Receipt identity is the hash of its own canonical content; the kernel recomputes that hash before signing and refuses on mismatch. Receipt decisions include `allow`, `deny`, `cancelled`, and `incomplete`. |
 | **[A verifiable log](spec/PROTOCOL.md#65-checkpoints)** | A content-addressed receipt DAG committed in RFC 6962 Merkle checkpoints. Canonical JSON (RFC 8785) makes a receipt signed in Rust verify byte-for-byte in TypeScript, Python, or Go. |
 | **[A Lean-4 modeled core](formal/lean4)** | The pure admission core (verify, resolve, evaluate, sign) is mechanically modeled with a published assumption boundary. |
 
@@ -238,7 +238,7 @@ to the capabilities that authorized them.
 
 ### Economic protocol
 
-> Routed tool calls can carry prices and budgets, with metering and settlement recorded in signed receipts.
+> Prices, budgets, metering, and settlement turn tool calls into verifiable transactions.
 
 | Capability | What it does |
 | --- | --- |
@@ -249,7 +249,7 @@ to the capabilities that authorized them.
 
 ## Quickstart
 
-Route a coding agent's MCP tool calls through Chio, then inspect the signed receipts for those calls. Host hooks add diagnostics; they do not establish complete session protection.
+Route a coding agent's MCP tool calls through Chio, then inspect their policy decisions and cost in the receipt log.
 
 ### 1. Install
 
@@ -262,7 +262,7 @@ curl -fsSL https://www.chio.computer/install.sh | sh
 ### 2. Put Claude or Hermes under policy
 
 Route selected file, shell, and git tools through a Chio-wrapped MCP server so
-calls to that server are checked by the kernel, with successfully signed decisions recorded in receipts. The bundled `code-agent`
+calls to that server are checked by the kernel. The bundled `code-agent`
 preset is a safe starting policy: reads are allowed, writes to `.env`, `.git/`, and `.ssh/` are
 denied, and so is `git push --force`.
 
@@ -301,11 +301,8 @@ mcp_servers:
 The `--server-id fs` must stay `fs`: the `code-agent` preset only grants capabilities to the
 `fs`, `shell`, and `git` server ids, so any other id fail-closes every call.
 
-Either way, each tool call the agent routes through that server is checked against policy.
-Successfully signed decisions produce receipts; a missing receipt after dispatch requires
-owner reconciliation rather than assuming that nothing happened.
-
-Host plugins add session diagnostics and authorization prechecks. Hook-mode native tools can bypass those checks when hooks fail or are skipped, so their boundary is `detect_only`. Protection requires a separately qualified restricted profile that removes bypass paths.
+Host plugins add session diagnostics and authorization prechecks. Their
+[hook boundary](#boundaries-and-current-limits) differs from MCP tool routing:
 
 **Claude Code** ([chio-claude-code-plugin](https://github.com/backbay-labs/chio-claude-code-plugin)) installs from the marketplace, then bond a session with `/chio:bond <policy>`:
 
@@ -343,8 +340,8 @@ chio --receipt-db ./chio.db receipt list    --admin-all --limit 20
 chio --receipt-db ./chio.db receipt explain <receipt-id> --admin-all
 ```
 
-Chio records routed-call decisions (allow, deny, cancelled, incomplete) in signed,
-content-addressed receipts you can verify offline.
+Receipts show the decision (`allow`, `deny`, `cancelled`, or `incomplete`) and its evidence
+in a signed, content-addressed record you can verify offline.
 
 ### 4. Dry-run a policy, no agent required
 
@@ -392,7 +389,7 @@ velocity:      { enabled: true, max_spend_per_window: 50000, window_secs: 60 }
 human_in_loop: { enabled: true, approve_above: 15000, approve_above_currency: USD }
 ```
 
-Successfully finalized metered receipts record their call costs. Inspect spend and settlement:
+Economic receipts record call costs. Inspect spend and settlement:
 
 ```sh
 chio --receipt-db ./chio.db receipt list --admin-all --min-cost 1 --cost-currency USD
@@ -418,25 +415,17 @@ More ways in: [migrate a coding agent from MCP](docs/guides/MIGRATING-FROM-MCP.m
 
 ## Architecture
 
-Chio centers authorization and signed receipts in the **Runtime Kernel**. External ecosystems enter through protocol
-edges that turn them into governed tool servers. The kernel and its authority-bearing services form the trusted path for calls routed through those edges.
-A **trust plane** (identity, credentials, federation,
-governance) and an **economy plane** (metering, budgets, settlement) draw on the receipts the
-kernel signs. Successfully signed decisions are submitted to the **Receipt Log**; signing
-or persistence failure must remain explicit rather than being treated as proof of no effect.
+Chio centers authorization and signed receipts in the **Runtime Kernel**. Protocol adapters
+connect external tools and services to the kernel and its authority-bearing services.
+A **trust plane** (identity, credentials, federation, governance) and an **economy plane**
+(metering, budgets, settlement) build on evidence stored in the **Receipt Log**.
 
 <p align="center">
   <picture>
     <source media="(max-width: 500px)" srcset="docs/assets/architecture-mobile.svg" />
-    <img src="docs/assets/architecture.svg" alt="Chio system map: untrusted agents and tool servers around the kernel's authorization and receipt path, with authority and policy services; host isolation depends on the selected runtime profile, and receipts feed the trust and economy planes" width="960" />
+    <img src="docs/assets/architecture.svg" alt="Chio system map: untrusted agents and tool servers surround the kernel's authorization and receipt path. Authority and policy services govern admission; receipts feed the trust and economy planes." width="960" />
   </picture>
 </p>
-
-Agents and tool servers are untrusted. Their OS isolation depends on the selected
-host/runtime profile and its qualified enforcement components; ordinary stdio launch
-creates a child process without establishing sandboxing. The native authority path
-owns authorization and receipt signing, while the selected deployment must prevent
-alternate access to protected resources.
 
 ### Life of a kernel-routed tool call
 
@@ -458,7 +447,7 @@ alternate access to protected resources.
 | **7 &middot; Meter and sign** | The kernel reconciles the budget hold to actual cost, assembles the receipt (decision, policy hash, guard evidence, economic metadata), recomputes the content hash inside its trust boundary, and signs it. Signing failure is an error, not proof that dispatch had no effect. |
 | **8 &middot; Commit** | The receipt is written to the content-addressed log and folded into a Merkle checkpoint, where its evidence is available to the trust and economy planes. |
 
-Signed receipts record routed-call outcomes (`allow`, `deny`, `cancelled`, `incomplete`).
+Receipt decisions distinguish `allow`, `deny`, `cancelled`, and `incomplete` outcomes.
 
 ### The codebase
 
@@ -488,8 +477,7 @@ reverse proxy that protects HTTP APIs with Chio receipts), and the libraries `ch
 One kernel. Every major agent-interop protocol, eight provider tool-call dialects, eight
 language SDKs, and 60+ framework, runtime, and infrastructure integrations. Chio wraps
 existing ecosystems instead of replacing them: MCP, A2A, ACP-Client, AG-UI, OpenAPI, and provider
-tool formats become governed Chio tool servers, while the kernel keeps dispatch and receipt
-authority for the surfaces it mediates.
+tool formats become governed Chio tool servers with shared dispatch and receipt semantics.
 
 | Layer | Surfaces |
 | --- | --- |
@@ -619,9 +607,8 @@ Each adapter follows a lift to kernel-verdict to lower pipeline over a real HTTP
 
 Beyond this repository, the [`backbay-labs`](https://github.com/backbay-labs) org ships
 companion plugins that connect an agent, IDE, or chat platform to Chio policy and evidence. Each is a
-separate repo built on the shared `@chio/bridge` library and the `chio` CLI. Calls routed
-through the kernel can be mediated and receipt-signed. Hook-mode native activity is
-`detect_only`; complete host protection requires its separately qualified restricted profile.
+separate repo built on the shared `@chio/bridge` library and the `chio` CLI. The table
+distinguishes hook diagnostics from restricted execution and records current delivery status.
 
 | Plugin | Repo | What it does |
 | --- | --- | --- |
@@ -643,24 +630,35 @@ receipts).
 <p align="center">
   <picture>
     <source media="(max-width: 500px)" srcset="docs/assets/security-mobile.svg" />
-    <img src="docs/assets/security.svg" alt="Chio defense in depth for routed calls: the kernel and native authority services form the trusted path, with fail-closed admission, guards, active defense, and signed evidence. Host isolation depends on the selected runtime profile." width="900" />
+    <img src="docs/assets/security.svg" alt="Chio defense in depth: the kernel and authority services combine fail-closed admission, guards, active defense, and signed evidence." width="900" />
   </picture>
 </p>
 
-For kernel-routed calls, the following controls define the mediation path. Host isolation and hook coverage must be assessed separately:
+The kernel combines authorization, screening, containment, and verifiable evidence:
 
 - **Trusted core.** The Runtime Kernel and its authority-bearing services form the trusted path.
-  Agents and tool servers are untrusted; their OS isolation depends on the selected runtime profile.
 - **Fail-closed admission.** Admission errors deny access and invalid policy is rejected at load.
-  A receipt-signing failure cannot be presented as verified success; effects after dispatch
-  require separate owner reconciliation.
 - **Guard pipeline.** Native, data-layer, sandboxed WASM, and external guards screen every input
   and output before it crosses a trust boundary.
 - **Active defense.** Information-flow control, deception (canary capabilities and honey-tools),
   and reversible quarantine correlate and contain anomalous behavior.
-- **Signed evidence.** Successfully signed decisions yield canonical-JSON (RFC 8785),
-  post-quantum-ready receipts that verify byte-for-byte across languages. Failed receipt
-  production cannot establish either verified success or the absence of tool effects.
+- **Signed evidence.** Canonical-JSON (RFC 8785), post-quantum-ready receipts bind decisions
+  to their evidence and verify byte-for-byte across languages.
+
+### Boundaries and current limits
+
+- **Host isolation.** Complete mediation requires a separately qualified host/runtime profile
+  that removes alternate access to protected resources. Agents and tool servers are untrusted;
+  ordinary stdio launch creates a child process without sandboxing it. Native activity outside
+  the configured Chio routes is not mediated.
+- **Hook mode.** Host-plugin diagnostics and authorization prechecks are `detect_only`. Native
+  tools can bypass them when hooks fail or are skipped. Restricted execution is a separate
+  profile with its own acceptance and delivery requirements; see the
+  [plugin status table](#ecosystem-and-plugins).
+- **Failures after dispatch.** Output guards can withhold a result after the tool has committed
+  side effects. Receipt construction, signing, or persistence can also fail after dispatch.
+  A missing receipt proves neither success nor the absence of effects. Keep the outcome
+  unresolved until the responsible Chio service reconciles it before retrying.
 
 ### The threat model
 
@@ -671,7 +669,7 @@ required mitigations, and residual risk. Eight of them:
 | --- | --- |
 | [Capability token theft](spec/SECURITY.md#21-capability-token-theft) | Tokens are bound to a subject key, expire, and can require DPoP proof of possession. Revocation is an epoch-rooted Merkle oracle every ancestor is checked against. |
 | [Kernel impersonation](spec/SECURITY.md#22-kernel-impersonation) | Receipts verify against a pinned kernel key, and the kernel recomputes a receipt's content hash inside its trust boundary before signing. |
-| [Tool server escape](spec/SECURITY.md#23-tool-server-escape) | Isolation must be established by the selected runtime profile. Ordinary stdio transport spawns a child process; it does not itself sandbox the server. |
+| [Tool server escape](spec/SECURITY.md#23-tool-server-escape) | The selected runtime profile supplies OS isolation; see [host isolation requirements](#boundaries-and-current-limits). |
 | [Delegation chain abuse](spec/SECURITY.md#26-delegation-chain-abuse) | Scope-hash chain binding, the sibling-sum budget registry, and ancestor revocation checks, covered in [Delegation and swarms](#delegation-and-swarms). |
 | [SSRF via the HTTP substrate](spec/SECURITY.md#27-ssrf-via-http-substrate) | Every outbound target passes a declared [egress contract](crates/protocol/chio-egress-contract). A missing or invalid contract fails closed. |
 | [PII and PHI in responses](spec/SECURITY.md#28-piiphi-exposure-in-responses) | Response sanitization guards redact secrets, PII, and internal data from tool results before they reach the agent. |
@@ -709,7 +707,7 @@ Report vulnerabilities privately per [SECURITY.md](SECURITY.md).
 
 Chio has an implementation-linked verified core, defined in
 [`formal/proof-manifest.toml`](formal/proof-manifest.toml). The admission path the kernel runs
-on each routed call, verify, resolve, evaluate, sign, is modeled in Lean 4, and the model is tied to
+for tool admission, verify, resolve, evaluate, sign, is modeled in Lean 4, and the model is tied to
 the production Rust instead of sitting beside it. Every explicit axiom in the Lean tree is a
 named cryptographic idealization in [`formal/assumptions.toml`](formal/assumptions.toml). No
 serializer, protocol, or kernel behavior is axiomatized.

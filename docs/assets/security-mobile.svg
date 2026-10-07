@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 556" width="480" height="556" role="img" aria-label="Chio defense in depth for routed calls: the kernel and native authority owners enforce admission, selected guards screen inputs and outputs, and signed receipts record decisions. Isolation and additional defenses depend on the qualified host/runtime profile. Native activity outside Chio routes is not mediated.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 556" width="480" height="556" role="img" aria-label="Chio defense in depth for routed calls: the kernel and its trusted services enforce admission, selected guards screen inputs and outputs, and signed receipts record decisions. Isolation and additional defenses depend on the qualified host/runtime profile. Native activity outside Chio routes is not mediated.">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#130d0a"/>
@@ -51,7 +51,7 @@
   </g>
   <!-- one-liners -->
   <g font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" fill="#b3a99b">
-    <text x="118" y="120">kernel + native authority owners</text><text x="118" y="210">admission errors deny routed calls</text><text x="118" y="300">native, data, WASM, and external guards</text><text x="118" y="390">IFC, decoys, reversible quarantine</text><text x="118" y="480">canonical (RFC 8785), post-quantum-ready</text>
+    <text x="118" y="120">kernel + trusted services</text><text x="118" y="210">admission errors deny routed calls</text><text x="118" y="300">native, data, WASM, and external guards</text><text x="118" y="390">IFC, decoys, reversible quarantine</text><text x="118" y="480">canonical (RFC 8785), post-quantum-ready</text>
   </g>
 
   <text x="240" y="513" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-style="italic" font-size="14" fill="#d8cfc0" fill-opacity="0.75">Chio mediates routed calls.</text>

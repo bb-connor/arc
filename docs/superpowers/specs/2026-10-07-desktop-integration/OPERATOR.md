@@ -105,6 +105,14 @@ in that same crate; the choice of Darwin mechanism is still a design gate.
 No unauthenticated local fallback, separate XPC authority or in-guest operator
 endpoint is allowed. Platform annexes define path/launch/session custody.
 
+The browser/workbench route additionally requires browser-enforceable authentication
+of the intended controller before releasing reusable session material or private
+request bytes. A permitted loopback origin, cookie, same UID or successful TCP
+connection is not server identity. The native transport/session and browser
+delivery owners must supply the supported binding; an absent binding disables
+that route. Existing and reconnecting sessions must withstand endpoint takeover,
+and captured material must not authenticate to the genuine restored controller.
+
 Each connection negotiates the exact operator version and required owner profiles
 before other requests. Reconnect always renegotiates. Unsupported or inconsistent
 versions close the connection with a bounded non-authorizing diagnostic and zero
@@ -252,8 +260,9 @@ read-only freeze or become accepted by that freeze.
 | Acceptance case | Responsible owner and decisive evidence |
 | --- | --- |
 | Wrong peer, replaced/symlinked socket, guest access, Darwin unsupported path; reconnect/version mismatch | IPC owner plus operator: real process probes, bounded transcripts and zero unauthorized dispatch. |
+| Enrolled browser meets an impostor at its permitted origin; captured material is replayed with an allowed Origin | Browser delivery/session owners: no private bytes or reusable credentials at the impostor, no replayed admission; genuine authenticated reconnect succeeds. |
 | Duplicate keys, invalid numeric/Unicode tokens, maximal escaping, one-over aggregate size; wrong method/request/session result | Owner decoders plus operator: original-byte rejection and dispatch counters; no truncated identity. |
-| Same ID with each semantic field changed; exact replay after restart, revision advance and full capacity | Work/recovery/native owners: retained full-body binding and one effect; current audience rejection still works. |
+| Same ID with each semantic field changed; exact replay after restart, revision advance and full capacity; barrier-synchronized duplicate approval submissions | Work/recovery/native owners: atomic full-body lookup/retention with one transition/effect; concurrent changed intent conflicts before retention and current audience rejection still works. |
 | Crash before dispatch, after native effect and before response/index persistence | Owning mutation services: independent effect marker, original-ID lookup before handle, no second invocation. |
 | Six work axes disagree; result exists but release is refused; payment remains unresolved | W1/recovery/payment owners: faithful separate observations and no unauthorized result bytes. |
 | Changed catalog/snapshot between pages; snapshot expiry; lag, restore, missed terminal and lost ack | Enumeration owner and S5: either consistent authoritative reconstruction or explicit gap; bounded queues and idempotent scoped ack. |
@@ -261,7 +270,7 @@ read-only freeze or become accepted by that freeze.
 | Two owners reuse a proposal ID and one review is invalidated | S5/approval owner plus operator: resolve the exact operation or disable affected actions pending authoritative refresh; no wrong-review invalidation or stale approval. |
 | SelectOffer uses stale workflow revision, substituted offer or lost reply | Recovery owner: reject a stale/substituted selection; reconcile the original selection command before approval/resume, with no second effect. |
 | Deny retaining approve material; changed proposal, recipient, decision ID or revision; revoked approver | Approval owner: installed verifier rejects each mismatch with zero protected effect. |
-| Per-task closure races dispatch/release; kernel stop reply lost; unsupported tenant/recovery scope | S4/S8/process owners: exact closure coverage, independent exit evidence, retained unknown outcome and no scope escalation. |
+| Per-task closure races dispatch/release and descendant spawn/exec/reparent; kernel stop reply lost; unsupported tenant/recovery scope | S4/S8/process owners: exact closure coverage, independent exit evidence, retained unknown outcome and no scope escalation. |
 | Long-lived idle/active workbench with recovery hints and redacted errors | S5/recovery/operator: no command-poll quota drain, bounded refresh cost, no secrets in argv, logs, events, crash data or caches. |
 
 Agent text, filenames, tool output, URLs and labels are untrusted presentation.

@@ -127,10 +127,19 @@ for review; bot verdicts are documentation-review evidence, not product qualific
 ## Positioning and alternatives
 
 Preserve Chio's positioning as a modern Rust kernel for agentic operating
-systems. "Authority that only narrows. Evidence that travels." may describe the
-desktop benefit, but this task does not enact a product-wide copy migration.
-Onboarding must first explain the specific capability, then show its boundary
-and current availability.
+systems. This change also aligns README, AGENTS and their public diagrams with
+the boundary classes in [ADR-0011](ADR-0011-boundary-taxonomy-product-wording.md).
+The opening leads with capability, scopes the described operations once, and
+links to a consolidated account of boundaries and current limits. Platform
+rows retain their specific qualification status. Public captions explain
+authorization directly rather than using internal program-map vocabulary.
+
+Track a receipt-copy follow-up against [S3 phase 1 in PROGRAM-MAP](../architecture/PROGRAM-MAP.md):
+only after the D1 closure is implemented and its production conformance is
+qualified may the affected paths claim a signed terminal receipt or explicit
+retained uncertainty. Landing a plan or source change alone does not justify
+that stronger claim; current copy preserves possible effects after receipt
+failure. Onboarding follows the same capability-first, evidence-bound rule.
 
 Rejected: two independent controllers and task models; hook-based protection
 claims; a mandatory bespoke VM before evaluating existing runtimes; changing

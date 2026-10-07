@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 780" width="480" height="780" role="img" aria-label="Example Chio call with successful receipt signing: an untrusted agent presents a signed capability token; the Runtime Kernel verifies it, guards the request and result, dispatches to an untrusted tool server, and signs a receipt. Tool isolation depends on the selected runtime profile; native owners retain authority. The expired-token example refuses before dispatch and has a signed deny receipt. Receipt failure after dispatch does not prove no effect.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 780" width="480" height="780" role="img" aria-label="Example Chio call with successful receipt signing: an untrusted agent presents a signed capability token; the Runtime Kernel verifies it, guards the request and result, dispatches to an untrusted tool server, and signs a receipt. Tool isolation depends on the selected runtime profile; the kernel and trusted services authorize calls. The expired-token example refuses before dispatch and has a signed deny receipt. Receipt failure after dispatch does not prove no effect.">
   <defs>
     <linearGradient id="ocmbg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#130d0a"/><stop offset="1" stop-color="#1b140d"/></linearGradient>
     <radialGradient id="ocmglow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#8f7ff2" stop-opacity="0.32"/><stop offset="0.6" stop-color="#8f7ff2" stop-opacity="0.07"/><stop offset="1" stop-color="#8f7ff2" stop-opacity="0"/></radialGradient>
@@ -59,5 +59,5 @@
   <text x="314" y="676" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#d3cabb">expired</text>
   <path d="M90.0 730 H390.0" stroke="#b08d5b" stroke-opacity="0.3" stroke-width="1"/>
   <rect x="234.0" y="724" width="12" height="12" transform="rotate(45 240.0 730)" fill="#1b140d" stroke="#b08d5b" stroke-opacity="0.7"/>
-  <text x="240.0" y="760" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="14.5" font-style="italic" fill="#d8cfc0" fill-opacity="0.75">Missing receipts do not prove no effect.</text>
+  <text x="240.0" y="760" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="14.5" font-style="italic" fill="#d8cfc0" fill-opacity="0.75">Signed evidence for routed calls.</text>
 </svg>
