@@ -53,7 +53,7 @@ The delivery plan covers the handoff and desktop tests after those contracts lan
 | Q09 | S5 Part B: disconnect, duplicate/reorder hints, overflow retention, stale cursor, unauthorized stream | Bounded resync against the non-persisting owner read; no invented authoritative event or paid inspect polling |
 | Q10 | IPC/browser session owners: wrong UID/PID/session, reused PID, stale socket, spoofed server, duplicate controller; malicious-origin HTTP and cross-site WebSocket requests to the genuine controller with a live ambient-cookie session | Native peer/session policy rejects; one controller per scoped session and no TCP fallback; exact browser origin plus non-ambient owner proof precede protected reads/subscriptions/mutations, with zero unauthorized bytes/effects; genuine authenticated requests succeed, no weaker fallback |
 | Q11 | Host owner/doc 19: crash/omit/timeout hooks, enable alternate native tool/shell, change host version | Hook mode stays detect_only; protected mode fails closed and requires I01-I08 for that host tuple |
-| Q12 | S7/backend: unknown kind, stale policy/hash, launcher bypass, inherited FD, direct IP/DNS/IPv6 egress, child escape | No confinement claim without native evidence; fail launch or restrict; no unconfined fallback |
+| Q12 | S7/backend: unknown kind, stale policy/hash, launcher bypass, inherited FD, direct IP/DNS/IPv6 egress, child escape, admitted lifetime across suspend and realtime changes | No confinement claim without native evidence; fail launch or restrict; no unconfined fallback |
 | Q13 | Secret broker/relay: malicious host tries environment/file/process-list/log access or alternate provider route | Raw credentials absent from agent/client; every permitted model route bound to enrolled scope |
 | Q14 | Applicable artifact/evidence export owner: symlink/hardlink replacement or alias, path traversal, descriptor race, oversized/archive/device artifact, changed base, unauthorized staging reads, repository-controlled capture execution/fetch/object indirection | Bounded audience-private staging and descriptor-based export reject unsafe input; result hash/base/review identity bind applicable acceptance and publication, and unrelated alias contents/identity/access policy remain unchanged |
 | Q15 | Budget owner: zero, max, overflow, fraction, missing/unknown units, duplicate dimensions, unavailable observations | Exact typed bounds and unique dimensions; unavailable never interpreted as unlimited; native enforcement independently proven |
@@ -88,6 +88,26 @@ file/credential access, direct egress, inherited-descriptor and unrelated-proces
 effects under independent observers, and must not forge the trusted acceptance
 channel. Failed/unknown evaluation cannot become accepted W1 work. Existing
 unconfined workbench checks and immutable oracle files are insufficient evidence.
+
+Execution lifetime qualification uses the actual native process/backend owner's
+boot/incarnation-bound elapsed deadline and authority-issued absolute expiry.
+The selected elapsed timebase must include host suspend; a guest timer or UI
+refresh cannot establish the host lifetime bound. On each backend, admit useful
+work with a short finite bound, suspend past it, and independently probe native
+dispatch, local continuation/effects and descendant custody after wake. The owner
+must fence expired new authority and prevent untrusted continuation beyond its
+qualified bound, retain closure/unknown outcomes truthfully, and never replenish
+a lifetime on restart. Expire the elapsed deadline and authority-issued absolute expiry in separate
+trials while the other bound remains valid, so one check cannot mask a missing
+second check. Test realtime jumps backward/forward separately and
+combined with suspend, missing clock/freshness and boot changes: rollback cannot
+revive an expired operation, and uncertainty cannot authorize continuation. Keep
+already-dispatched external outcomes distinct from forbidden new dispatch; no
+clock check claims to undo them. Record actual owner time APIs, boot identity,
+expiry semantics and declared closure latency with independent observers and an
+unexpired useful positive control. Q12/Q19 and platform installed acceptance
+consume these cases only for selected execution profiles; basic Observe retains
+its own read-authority/freshness gates without a task-lifetime dependency.
 
 ## Native approval defect handoff
 

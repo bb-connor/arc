@@ -4,7 +4,7 @@
 
 **Goal:** Ship one operator experience over the existing work, recovery and security owners, with sealed single-owner work as its first execution product.
 
-**Architecture:** A new outside-TCB controller projects owner contracts to the existing workbench first. Omarchy and macOS add thin clients and qualified isolation adapters. The owner programs retain authority, durable state, process custody, evidence and runtime qualification.
+**Architecture:** A new outside-TCB controller projects owner contracts to the existing workbench first. The existing Chio CLI adds a terminal consumer; Omarchy and macOS add thin clients and qualified isolation adapters. The owner programs retain authority, durable state, process custody, evidence and runtime qualification.
 
 **Tech Stack:** Rust owner clients and local authenticated IPC; existing workbench browser UI; platform QML and SwiftUI shells; existing restricted launchers and container execution.
 
@@ -37,6 +37,7 @@ the required results. Platform plans cover their remaining lifecycle work.
 | `docs/architecture/PROGRAM-MAP.md` | Source owner register and dependency acceptance |
 | `crates/products/chio-operator/` | Proposed new crate for bounded view composition and owner dispatch; no native authority |
 | `crates/products/chio-workbench/` | Existing first client on the pinned workbench branch; review and worktree UX |
+| `crates/products/chio-cli/` | Existing `chio` binary; packet 4a adds an operator consumer through current CLI parsing/dispatch owners, without a new launcher or authority path |
 | `tests/integration/operator/` | Proposed installed-owner, cross-client acceptance harness; no fake runtime success |
 | `crates/security/chio-secure-ipc/` | Existing native peer authentication; Darwin extension belongs here |
 | `crates/kernel/chio-process/`, `crates/products/chio-cli/PROCESS_HOST.md` | Existing process identity/custody/control; live control delta belongs here |
@@ -77,7 +78,7 @@ handlers and host observation adapters; their owning crates;
 - [ ] Bind the existing trust-control receipt query/analytics/tool/child, lineage, budget-usage and revocation GETs through bounded authenticated read adapters. Preserve native read-principal rules and exclude mutation methods even where paths are shared. Qualify request/filter/pagination correlation (Q04) and explicit feature availability (Q16).
 - [ ] Qualify the host owner's session/capability/receipt joins and hook source attribution (Q11). Host-reported success remains unverified and `detect_only`; trust-control receipt presence is not proof of a live or complete hook session. Expose no session inventory until its bounded authenticated host adapter exists.
 - [ ] Qualify the selected native IPC and non-persisting read adapters, including wrong-session/stale-peer refusal and no quota-draining inspect polling (Q09-Q10/Q21). Missing recovery adapters disable recovery views, not unrelated receipt/hook reads.
-- [ ] Record Observe predecessor acceptance. This independently permits the read-only packet 3 candidate and packet 4 controller/workbench work. Its complete client acceptance is Q04, Q09-Q11, Q16-Q17 and Q21; Q01-Q03 are added only if the build exposes W1 views or recovery capability.
+- [ ] Record Observe predecessor acceptance. This independently permits the read-only packet 3 candidate and packet 4 controller/workbench work. Its complete client acceptance is Q04, Q09-Q11, Q16-Q17 and Q21, plus Q15 for selected budget projections. Q02 applies to each exposed effecting owner, including selected support-export/lifecycle actions without W1/M20; Q01/Q03 add only the relevant W1/recovery view obligations. Pure reads acquire no mutation-race dependency.
 
 ### Selected operator/work/recovery lane
 
@@ -128,8 +129,44 @@ Adapt existing `crates/products/chio-workbench/src/{model.rs,engine.rs,web.rs}`,
 - [ ] Run `cargo test --locked -p chio-operator` once the proposed crate exists; run the existing `cargo test --locked -p chio-workbench --test workbench` and `cargo test --locked -p chio-workbench --test git_tasks` against the reconciled workbench branch. Expected: all targeted owner/client cases pass, no skips masquerading as acceptance.
 - [ ] Execute the browser suite using the workbench's installed dependencies and documented fixture server. Exercise keyboard, screen reader, untrusted artifact content, revoked session and reconnect. Retain screenshots plus the native owner transcripts (Q17).
 - [ ] Measure idle/cold/warm resource use, event pressure and restart recovery. Freeze numeric release bounds and verify overload refuses new work without weakening a gate.
-- [ ] Run the profile-specific protocol-freeze matrix against the implemented workbench client and the independent conformance client from packet 3. An Observe-only freeze requires Q04, Q09-Q11, Q16-Q17 and Q21; exposing W1 views/recovery adds Q01-Q03 and the applicable owner evidence. Freeze `chio.operator.v1` for the exact supported surface only after these cross-client/native results pass, promote it to `spec/OPERATOR.md`, and index it in `spec/README.md`. Unexposed mutation contracts remain proposed; later capability additions return to packet 3 conformance and owning qualification.
+- [ ] Run the profile-specific protocol-freeze matrix against the implemented workbench client and the independent conformance client from packet 3. An Observe-only freeze requires its full selected-surface matrix: Q04, Q09-Q11, Q16-Q17 and Q21, conditional Q15 budget projection, Q02 for any exposed effecting owner, and Q01/Q03 only for relevant W1/recovery views. Each capability carries its own owner evidence without turning absent execution into an observation gate. Freeze `chio.operator.v1` for the exact supported surface only after these cross-client/native results pass, promote it to `spec/OPERATOR.md`, and index it in `spec/README.md`. Unexposed mutation contracts remain proposed; later capability additions return to packet 3 conformance and owning qualification.
 - [ ] Commit `feat(operator): add workbench owner client` after code, security-boundary, final wire-freeze and native acceptance review.
+
+## Packet 4a: Deliver the existing CLI as an operator client
+
+`boundary_class: advisory_only` for terminal presentation;
+`planning_status: ready_after_adr`; not an implemented command surface.
+
+**Depends on:** packet 4's implemented read-only controller and accepted bindings.
+Build Observe first without W1/M20 or platform UI dependencies. Each later action
+requires its packet 2 owner gate, packet 3/4 capability conformance and, for
+sealed execution, packet 5. CLI implementation does not gate candidate assembly
+for those predecessors. Packet 6 release includes the promised CLI acceptance.
+
+**Files:** Extend the existing `crates/products/chio-cli/Cargo.toml`,
+`src/main.rs`, `src/cli/types.rs` and `src/cli/dispatch/mod.rs`;
+create proposed `src/cli/operator.rs` and `tests/operator_client.rs` in that crate,
+and extend `tests/integration/operator/`. `src/bin/chio.rs` already includes
+`src/main.rs`; keep the existing `chio` binary. Reconcile these source locations
+at packet 1 before editing. Update the CLI README/help only after implementation.
+The proposed operator subcommand names and flags are chosen against the landed
+owner API; existing `chio run` retains its native framed-agent meaning.
+
+- [ ] Register the CLI product owner and exact module/test entrypoints in the predecessor record. Enumerate the promised CLI capabilities and their owner dependencies: authenticated receipt/session/health observation first; sealed-work preparation/submission and views, original-operation lookup/recovery, exact native approval/stop and artifact review/delivery only when individually qualified. An absent capability reports unavailable rather than being omitted from completion accounting.
+- [ ] Reuse the generated common client codec and authenticated native controller transport. The operator subcommands do not build an in-process kernel, bootstrap a second controller, load signing/provider secrets, inherit broad admin credentials or call a bypass owner route. An unavailable controller or mismatched profile cannot fall back to existing broad CLI commands. Keep transport limits, audience/session binding and full request/response correlation identical to the other clients.
+- [ ] Design human and machine-readable output from the accepted projection. Preserve six work observations and native uncertainty independently; define and test explicit bounded output/exit behavior for unavailable, refused, unresolved and completed requests without a synthetic all-success state. Escape terminal control sequences and display original security-relevant identifiers without hidden normalization; machine output stays parseable, bounded and credential-free. Secret-bearing inputs use the native owner path and private input channels, never argv, environment, shell history or log output.
+- [ ] Implement only exact capability-bound requests. Navigation opens a fixed owner-approved review route without authority in its URL; a CLI confirmation flag, unattended input or successful process exit cannot replace passkey approval or evaluator acceptance. Mutations preserve the native original operation identity across response loss. CLI interruption/disconnection ends local observation and does not silently cancel, resume or resubmit work; explicit stop invokes only its separately qualified native scope. Reconnection reauthenticates and resolves the original operation through its owner.
+- [ ] Add owner-backed CLI integration cases for wrong peer/session, missing controller/profile, expired/revoked authority, malformed/oversized replies, all Q04 substitutions, event gaps/reconnect, terminal injection and literal operand handling. Exercise exact and changed-intent duplicate races for each exposed mutation (Q02), interrupted stdout/pipe closure, noninteractive input and lost replies/restart. Independent native dispatch, credential-retention and effect observations prove no bypass or duplicate effect. Pair refusals with useful authenticated Observe and each qualified action.
+- [ ] Compare CLI and workbench projections of the same native observations, including disagreeing work axes and retained uncertainty, then submit the same native operation identity from both clients concurrently. Native results and downstream effects must agree; clients cannot create competing identity or recovery models. Run `cargo test --locked -p chio-cli --test operator_client` after the proposed test exists, plus the actual existing CLI parsing/help regressions recorded by its owner and the shared installed-client harness. A test double of CLI output alone cannot qualify native behavior.
+- [ ] Package the CLI with the exact accepted controller/protocol tuple on each shipped platform. The platform candidate inventories name its final executable identity; installed tests invoke that binary under standard-user enrollment, including update, stale CLI/controller combinations, logout and lost-reply recovery. O7 and M9/M10 consume the shared CLI evidence for their selected capabilities. A native platform shell or independent packet 3 conformance probe cannot stand in for the product CLI.
+- [ ] Record candidate-bound CLI acceptance and update help/README with only commands present in that accepted binary. Commit the existing CLI extension in a separate reviewable slice. Shared-program completion and any release claiming CLI support require this packet's actual source and installed results; an unavailable baseline Observe CLI leaves the promised client undelivered.
+
+**Acceptance:** The installed existing `chio` binary is a useful consumer of the
+same accepted operator protocol and native outcomes as the workbench. Its exact
+capabilities have their own cross-client and installed evidence; it owns no
+parallel authority, workflow ledger or task runner. Later profile additions
+repeat the relevant source and installed qualification rather than inheriting
+Observe acceptance.
 
 ## Packet 5: Deliver sealed work using the existing runner
 
@@ -158,6 +195,7 @@ integration; workbench client; S7 owner evidence registration.
 dependent macOS plan at `docs/superpowers/plans/2026-10-07-macos-integration/IMPLEMENTATION.md`.
 
 - [ ] Execute the platform plan after common-client acceptance. Reuse the same controller, work identifiers, recovery and projection tests.
+- [ ] Include packet 4a's existing CLI client in the exact platform package/protocol inventory and repeat its selected-capability cross-client tests against the installed binary. Program completion or claims of CLI support require actual CLI results; the workbench/QML/Swift clients cannot substitute.
 - [ ] Execute the complete installed qualification manifest with explicit reasons for owner-approved exclusions. Missing evidence or tuple substitutions fail qualification.
 - [ ] Publish signed qualification inputs to the candidate channel, install on clean hosts, and run upgrade/crash/rollback/uninstall exercises before promotion.
 - [ ] Record public artifact availability separately from native acceptance. Verify that public checkout instructions use public revisions, not this internal source register.

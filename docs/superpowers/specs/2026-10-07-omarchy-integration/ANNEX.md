@@ -30,7 +30,7 @@ Release order enforces this product choice: O3 supplies the sealed composition, 
 
 ## Architecture and ownership
 
-One C-layer controller serves the workbench, Omarchy QML and macOS clients through proposed `chio.operator.v1`. It runs outside the TCB and owns no signing keys, authority store, approval issuer, trusted fact assertions or independent execution journal. The gateway and process host remain separate processes inside their established trust boundaries. Omarchy supplies deployment and UI adapters for this same controller, not a platform fork.
+One C-layer controller serves the workbench, existing Chio CLI, Omarchy QML and macOS clients through proposed `chio.operator.v1`. It runs outside the TCB and owns no signing keys, authority store, approval issuer, trusted fact assertions or independent execution journal. The gateway and process host remain separate processes inside their established trust boundaries. Omarchy supplies deployment and UI adapters for this same controller, not a platform fork.
 
 The first Linux delivery supports one explicitly enrolled graphical login session per UID. Bind that controller instance to the native-verified UID, boot identity and logind session, and bind each client to that same session through the qualified IPC/browser enrollment owner. A per-user systemd manager or socket is not proof of a login session. Refuse enrollment/connections from a second concurrent session, even for the same UID; no silent reassignment after logout or restart. A lingering manager does not preserve session authority. Lock, logout, unknown liveness and missed observations disable affected disclosures/actions; any requested closure is restricted to native owner references belonging to the bound session, never other sessions' work. Session replacement needs explicit enrollment and reconciliation of the original custody. Multiple independent sessions require a later per-session service design and qualification.
 
@@ -38,7 +38,7 @@ The first Linux delivery supports one explicitly enrolled graphical login sessio
 | --- | --- |
 | Tasks, fixed request, acceptance and projections | W1 `WorkHandleV1`/`WorkViewV1`; workbench task/worktree/review flows. |
 | Original-operation lookup and recovery | Recovery `InspectWorkflow`, `SubmitApproval`, `ResumeWorkflow`, `CancelWorkflow`, plus W1 queries and S9 M20 retry classes. Do not synthesize a replacement operation after an unknown effect. |
-| Event delivery | S5 Part B, triggered by the desktop as a second consumer; Part A transport fixes are a prerequisite, not stable subscriptions. No platform polling loop over `InspectWorkflow`. |
+| Event delivery | S5 Part B, triggered by the desktop as a second consumer; Part A transport fixes are a prerequisite, not stable subscriptions. Basic Observe uses the selected trust-control/hook sources; recovery read/event adapters qualify only when recovery views or hints are exposed. No platform polling loop over `InspectWorkflow`. |
 | One-task stop | S4 phases 1 and 2 closure, rendered with owner result kinds; previously admitted effects can remain unresolved. |
 | Durable emergency stop | S8 phase 1 supplies durable `Kernel` stop and S30 routes/results; `Tenant` and `Recovery` wait for phases 4 and 5. None is an alias for per-task closure. |
 | Identity and approvals | S8 S28 phase 3 production operator roster and production passkey verification. Until qualified, any owner record with `SharedCredential` attribution keeps that label. |
@@ -48,7 +48,7 @@ The first Linux delivery supports one explicitly enrolled graphical login sessio
 | Sealed coding | Reuse `chio-mini-swe` and its networkless workspace/mediated `sandbox/execute`, Pi's restricted session/coding resource, and workbench review. Rootless Docker is the first engine candidate to qualify with the existing runner; rootless compatibility is not established. Extend their owners where needed. |
 | Isolation evidence | S7 and thin backend adapters. Isolation denies access; Chio grants access through its gateway/resources/relay. |
 
-Predecessors may be sequenced as delivered inputs for planning. Implementation binds exact available revisions and acceptance records before consuming their APIs. Basic receipt/hook observation uses the shared Observe lane: S5 and the selected authenticated read/source-attribution adapters. W1 views, recovery actions, approval, stop and execution add only their own mapped prerequisites. Those selected functions consume W1, recovery fixes, S3 phase 1, S4 phases 1 and 2, S7, S8 phase 1/S28, S9 M20 and applicable S10 crossing behavior; their absence cannot block the basic Observe candidate. The desktop does not require the NK-01 to NK-03 keystones. S11 becomes a prerequisite only for a later injection-safety claim.
+Predecessors may be sequenced as delivered inputs for planning. Implementation binds exact available revisions and acceptance records before consuming their APIs. Basic receipt/hook observation uses the shared Observe lane: S5 and the selected authenticated read/source-attribution adapters. W1 views, recovery views/events or actions, approval, stop and execution add only their own mapped prerequisites. Basic Observe must qualify with W1/recovery owners absent: their optional views and hints remain unavailable, and no reads or subscriptions target them. Those selected functions consume W1, recovery fixes, S3 phase 1, S4 phases 1 and 2, S7, S8 phase 1/S28, S9 M20 and applicable S10 crossing behavior; their absence cannot block the basic Observe candidate. The desktop does not require the NK-01 to NK-03 keystones. S11 becomes a prerequisite only for a later injection-safety claim.
 
 ### Linux backend composition
 
@@ -72,7 +72,7 @@ Test harness cleanup belongs to the shared Linux qualification/process tooling. 
 
 ## Omarchy shell contract
 
-The first native shell surface is an optional thin plugin with ID `computer.chio.desktop`, `bar-widget`, `panel` and `service` kinds and `keepLoaded: false`. It shows task/recovery counts, boundary labels, connection state and navigation to the workbench. The workbench owns task creation, project intake, editing and full patch review. Small QML approval/stop affordances may be added only after the shared native paths qualify; they do not replace the browser client or reproduce its task editor.
+The first native shell surface is an optional thin plugin with ID `computer.chio.desktop`, `bar-widget`, `panel` and `service` kinds and `keepLoaded: false`. It shows receipt/hook status, boundary labels, connection state and navigation to the workbench. Task/recovery counts and hints appear only when their separately qualified owner views are exposed. The workbench owns task creation, project intake, editing and full patch review. Small QML approval/stop affordances may be added only after the shared native paths qualify; they do not replace the browser client or reproduce its task editor.
 
 The retained [upstream research](research/omarchy-upstream.md) pins release v4.0.4 at `c668141e9c42b13c80c9ca4ea108e11708c5e8a5` and observed development HEAD at `0f8af9be307d5d4f12cc0f6394892cac651ed5e6`. They are separate compatibility candidates. Neither is qualified by this specification, and a source revision does not freeze installed Arch packages.
 
@@ -111,7 +111,7 @@ Package the shared controller as a systemd user service. Installation places ine
 | Controller crash/restart | Reconnect through shared transport, reload native projections and unresolved originals; no automatic new work or replay. Native custody is owned by `chio-process`. |
 | Lock or unknown lock state | Conceal sensitive UI and disable new operator mutations; admitted work may continue only within its existing expiry/scope and selected qualified policy. |
 | Unlock | Fresh identity/session, compatibility and owner snapshot; no extension of approval/capability expiry. |
-| Suspend/resume or clock uncertainty | Host adapter invalidates stale observations; owners enforce deadlines and revalidate before new effects. Resume is not permission to replay work. |
+| Suspend/resume or clock uncertainty | Host adapter invalidates stale observations; native owners enforce the boot-associated `CLOCK_BOOTTIME` task deadline and authority-issued absolute expiry, then reconcile/revalidate before new effects. Resume, realtime rollback or restart cannot renew authority or replay work. |
 | Logout/session loss | Stop new admission and use S4/process custody for bounded local termination, retaining unresolved effects. Must hold with lingering enabled and missed events. |
 | Per-task stop | Invoke S4 closure, render actual result and independently verify descendant termination where claimed. Do not imply an external effect was undone. |
 | Broad emergency action | Use S8 phase 1 for `Kernel`; later `Tenant`/`Recovery` scopes require phases 4/5. Preserve the distinction from one-task closure and the current unqualified process-local implementation. |
@@ -119,11 +119,38 @@ Package the shared controller as a systemd user service. Installation places ine
 
 Keep controller, trusted relay/launcher and guest/resource units separately scoped where required by their existing owners. Use role-specific tested hardening, bounded restart/stop behavior, restrictive umask, core-dump suppression, measured cgroup resource limits and fixed executable paths. A unit option unsupported in the user manager must not become silent partial protection. Hardening that disables namespaces or required Node threads cannot be fixed by removing all confinement. A systemd analyzer score is supplementary evidence; effective kernel properties and negative probes decide acceptance.
 
+The existing authority/work/runner/process owners must define and qualify the
+actual Linux clock contract before an execution profile is enabled. Bind local
+task lifetime to boot identity and a `CLOCK_BOOTTIME` deadline that includes
+suspend; retain the authority-issued absolute expiry as a separate bound.
+`CLOCK_MONOTONIC` alone does not measure suspended time, and realtime adjustments
+cannot reset or extend the retained task deadline or revive expired authority.
+Record the actual owner clocks, conversion/check points, persistence and restart/
+boot-change reconciliation in O0; do not add a desktop timer or clock protocol.
+Expiry or an unprovable clock/boot basis fences new protected dispatch and
+continuation and invokes the owner's bounded closure/custody policy. On resume,
+the native fence must hold before untrusted continuation until owner revalidation;
+a delayed UI or userspace observation is insufficient. An already dispatched
+external effect may still complete and is reconciled separately, never asserted
+undone by expiry. Missing native
+clock enforcement disables the dependent execution profile, not basic Observe;
+observation still qualifies its own read authority and freshness. This carries
+the [Linux clock research](research/linux-platform.md#upstream-linux-conclusions)
+into a required implementation and installed-qualification contract.
+
 Bound each stop and cleanup phase with an explicit selected-profile deadline. If complete process absence or original outcome cannot be established, render the owner's unresolved state and preserve recovery custody. Neither SIGKILL nor a clean systemd state proves absence of a remote effect.
 
 ## Packaging, compatibility and distribution
 
 Three delivery roles are separate: the shared controller/native dependencies, the Omarchy platform package (shim/opener/units/desktop registration) and the QML Git plugin. Final Arch package names are a packaging decision, not available product commands. Use pacman-compatible signed artifacts with fixed public source inputs, package hashes, dependency/runtime inventory, license/SBOM provenance and build records. Never resolve the protected runtime through `mise`, ambient `PATH` or an unrecorded developer checkout.
+
+The shared native package/dependency inventory includes the existing `chio` CLI
+operator consumer from shared packet 4a, with its exact executable/source identity
+and controller/common-protocol pairing. An unqualified candidate may be assembled
+and published before final CLI acceptance. Program completion and CLI-support
+claims require source and installed-client evidence; a platform opener or protocol
+probe does not deliver the promised CLI. Useful baseline Observe must work without
+absent W1/recovery/execution owners, and selected actions add only their own gates.
 
 The support record binds one explicit profile to the following tuple:
 
@@ -136,6 +163,7 @@ The support record binds one explicit profile to the following tuple:
 - Finite per-task and aggregate writable-byte/inode quotas and output ingress/buffer/retention limits, actual host storage and engine-log sinks, native enforcement identities, admission reservations and independently measured receipt/controller/stop headroom.
 - Provider/model route and account binding, supported enforceable limits and unavailable dimensions; credential custody profile.
 - Session adapter and effective unit definitions/overrides, including graphical-session and lingering behavior.
+- For execution profiles, the actual native clock/deadline implementation, boot-identity binding, suspend-inclusive local lifetime, authority absolute-expiry checks and restart/clock-uncertainty reconciliation evidence.
 
 Source presence, historical tests, a valid manifest and package signatures are separate facts from a supported tuple. The read-only diagnostics path may operate on an unknown tuple if its own transport is compatible; affected execution stays unavailable. Report the changed dimension instead of turning a healthy daemon into an execution-ready claim.
 
@@ -159,7 +187,7 @@ The first candidate uses built-in `omarchy.bar` on actual x86_64 Omarchy. Qualif
 
 ### Upgrade, backup, restore and removal
 
-Package installation and user-state migration are different transactions. Pacman scripts do not mutate user work stores, enroll credentials or resume tasks. Stage verified package code, quiesce admission through the owning stack, inventory originals, perform owner-defined compatible migrations, activate a consistent version tuple, then start with recovery/diagnostics before enabling eligible new work. Keep a verified recovery package available. Fault injection must cover extraction, preflight, migration and activation; partial installation can legitimately leave the program unavailable, but never allowed to execute mixed code or reset uncertain state.
+Package installation and user-state migration are different transactions. Pacman scripts do not mutate user work stores, enroll credentials or resume tasks. Stage verified package code, quiesce admission through the owning stack, inventory originals, perform owner-defined compatible migrations, activate a consistent version tuple, then start with diagnostics and reconciliation of any exposed owner state before enabling eligible new work. Keep a verified recovery package available. Fault injection must cover extraction, preflight, migration and activation; partial installation can legitimately leave the program unavailable, but never allowed to execute mixed code or reset uncertain state.
 
 Use the native owners' backup and migration interfaces. The desktop does not introduce a parallel receipt journal or roll back authority state. A backup records public runtime identities, operator preferences, owner-consistent work/recovery stores, unresolved originals, receipt anchors and required separate secret custody. Do not copy live SQLite files without the owning snapshot contract. Restore stages privately, validates archive paths/hashes/ABIs and reconciles against current authority and external effects before any new execution. An older backup is not proof that later effects never happened.
 
@@ -182,6 +210,9 @@ The shared qualification contract owns evidence format and verdicts. This annex 
 | Shell lifecycle | Late injection, 20 widgets across monitors, reload while a command result is lost, plugin disable and replacement bar; process/socket census proves one client and no duplicate work. |
 | Rendering/privacy | Real keyboard/IME/AT-SPI, themes, large text, lock/unknown-lock, persisted notification clicks and DND; rendered observations plus canary scans verify usable controls and minimal content. |
 | Peer and session boundaries | Wrong UID/process/session, stale socket, guest attempt to reach operator socket, logout with linger, suspend/resume and missed events; owner peer-auth tests and external effect counters verify refusal. |
+| Observe source independence | Qualify receipt/hook observation with W1/recovery owners and their read/event adapters absent; independent request/subscription traces show no access to them, optional views remain unavailable, and useful receipt/hook reads and resynchronization succeed. |
+| Installed CLI consumer | Invoke the packaged `chio` operator client under standard-user enrollment, consuming shared packet 4a's source and installed suites. Useful baseline Observe and cross-client read agreement succeed without execution owners; auth/tuple/reply/terminal-input negatives, interrupted pipes, update/logout and reconnect preserve native authority. For each exposed mutation, CLI/workbench concurrent original-ID and lost-reply tests show one original outcome/uncertainty and no duplicate downstream effects. Bind evidence to the actual CLI/controller/protocol tuple; missing CLI acceptance cannot satisfy program completion or CLI-support claims. |
+| Execution deadline and authority expiry | In actual owner suites and on the installed host, pair useful unexpired execution with suspend past local deadline and absolute expiry in separate cases (the other bound remains valid), realtime forward/backward jumps across expiry, and restart/changed or uncertain boot-clock basis. Independent native dispatch/effect counters and process/cgroup custody observations prove the native fence precedes untrusted continuation on resume, no new protected dispatch/continuation after expiry, no clock-induced renewal, and bounded closure or retained unresolved custody. UI countdown/disabled controls are not an oracle; previously admitted external effects remain separately reconciled. These execution cases do not gate basic Observe. |
 | Backend and custody | Exact Pi/bubblewrap and mini-swe/rootless-engine positive task, filesystem/network/FD/process negatives, engine-socket/group denial, double-fork and detached descendants; S7 owner verification and outside-guest sentinels/census establish effects and absence, including after runner/daemon crash. Any opted-in rootful profile repeats qualification independently. |
 | Engine privilege and limits | Rootless endpoint/config/UID-map drift, substituted rootful socket, missing user namespaces or cgroup delegation, CPU/memory/PID pressure and stop under pressure; independent host credentials, namespace maps, cgroup counters/effective limits and descendant census establish confinement, enforcement and custody. Lost rootless support refuses before work without a rootful retry. |
 | Storage and output limits | Silent volume/layer/temp/cache byte and inode exhaustion, stdout/stderr floods separately and together, stalled consumers, outside-container engine-log growth and concurrent tasks; independently measured host quotas/usage and every output/log sink prove per-task and aggregate bounds, admission refusal and retained receipt/controller/stop headroom. Missing limits refuse before dispatch; cleanup failure retains unresolved custody. |
