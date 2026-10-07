@@ -1,7 +1,7 @@
 {
   "scope": "documents and synthetic schemas only",
   "passed": true,
-  "source_digest_sha256": "912e3420e1b389873a7c850f0147d5c07f81c340147543f45b33935c2f58e500",
+  "source_digest_sha256": "6c186bebf5dec1e411fd8d9ab664d1e33d3c9623ea3d2ad83d80fcbfbfd2b2db",
   "counts": {
     "json_files": 88,
     "schemas": 6,

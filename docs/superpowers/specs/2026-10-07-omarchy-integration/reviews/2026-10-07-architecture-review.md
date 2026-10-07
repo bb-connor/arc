@@ -1,409 +1,443 @@
 # Architecture review: Chio desktop integration (Omarchy and macOS)
 
-Status: review input, 2026-10-07. Not normative. Requested by the program owner;
-written by Claude (Opus 5.5). The same document is committed to both PRs because
-its main finding spans both:
-PR #1177 Omarchy (reviewed at `f2470f0fa`) and PR #1178 macOS (reviewed at
-`715a4475f`). Main baseline: `6573b8980`.
+Status: review input, revision 2, 2026-10-07. Not normative. Requested by the
+program owner; written by Claude (Opus 5.5). Revision 2 supersedes revision 1.
+The corrections are listed in [section 4](#4-corrections-to-revision-1).
 
-Scope: the ideas and the program shape. Line-level contract defects are already
-covered by the Greptile and Codex threads and are not repeated here.
+The same document is committed to both PR #1177 (Omarchy) and PR #1178 (macOS),
+because the main findings apply to both.
 
-> **Agents iterating on this branch:** the findings below need an owner decision
-> (see [Decisions needed](#decisions-needed-from-the-owner)). Do not address them
+Inputs read for revision 2:
+
+- the two desktop PRs;
+- the security and process foundation (#1160);
+- the workbench (#1164);
+- the NVIDIA strategy set (#1170);
+- recovery (#1172, #1179);
+- verifiable work and the agentic kernel roadmap (#1173);
+- the kernel north star and its eleven specs (#1174);
+- the public host plugins and `chio-bridge`;
+- priority-integrations doc 19 (`docs/strategy/chio-direction/19-priority-agent-integrations.md` on #1160);
+- Omarchy upstream at `0f8af9be` and v4.0.4.
+
+Sequencing assumption (owner instruction): a spec may treat its predecessors as
+shipped when the order is right. This review therefore asks two things. Is the
+order right? Does each spec build on what its predecessors will provide, rather
+than redefining it?
+
+> **Agents iterating on this branch:** these findings need owner decisions
+> ([section 7](#7-decisions-needed-from-the-owner)). Do not address them
 > piecemeal by adding requirements, fixtures or validator checks.
 
-## Verdict
+## 1. Bottom line
 
-The authority model is right. The product shape, program structure and
-sequencing are not.
+1. **Keep the authority invariants.** Both PRs get these right, and they hold
+   under every stack scenario in this review.
+2. **The desktop should be an operator surface over the stack, not a new
+   runtime.** The two PRs between them redefine about a dozen concepts that
+   other programs already own: task model, recovery, events, stop, operator
+   identity, IPC peer authentication, process trees, credential custody, the
+   sealed coding runner, the review UI, host qualification gates and
+   confinement evidence. Replace both programs with one shared program that
+   references those owners (section 3).
+3. **A sealed task is the right first execution product. This corrects
+   revision 1.** It must be:
+   - host-generic, following doc 19's six-host program;
+   - expressed as a #1173 single-owner work commitment;
+   - built by reusing `chio-mini-swe`, the Pi restricted session and the
+     workbench rather than a desktop-private runner.
+4. **Interactive agents get honest observation first.**
+   - Hook-mode plugins fail open, so their sessions are `detect_only`.
+   - `prevent` exists only in doc 19's protected mode, which removes the
+     native shell.
+   - Native-shell interactive work is possible only as an OS-boundary profile
+     whose inside is `cannot_see`.
+5. **The biggest open question is a layer decision, and both PRs answer it
+   silently.**
+   - #1170 proposes ADR-0023, "host runtime enforcement is out of layer". It
+     makes OpenShell the Linux reference sandbox and freezes the cage, the
+     secret broker and the host launchers.
+   - #1160, #1174 and both desktop PRs assume Chio owns confinement.
+   - Resolve it with "isolation denies, Chio grants": isolation backends are
+     pluggable adapters that produce #1174 spec-7 confinement evidence (R1).
+6. **The prerequisites are the wrong set.** The desktop needs the bug-fix and
+   operator lanes of #1174, plus recovery and work W1. It does not need the
+   NK-01 to NK-03 keystones (section 6).
+7. **Disposition is unchanged.** Convert both PRs to draft. Consolidate them
+   into one ADR plus two platform annexes that reference the owning specs.
 
-- **Keep.** These invariants are correct and worth carrying forward verbatim:
-  - The controller is never an authority.
-  - Missing prerequisites fail closed, with no fallback to an ordinary agent.
-  - Recovery always targets the original operation.
-  - OS sensors and caches only restrict.
-  - The guest is untrusted and the desktop session is trusted.
-- **Re-center.** Both programs make the first product a sealed, Pi-only,
-  fixed-recipe task runner. They ignore the integrations Chio already ships for
-  Claude Code, Codex, Cursor and OpenCode. On the desktop, Chio should first be
-  the operator surface for those bonded sessions, then the confinement layer
-  underneath them.
-- **Merge.** The two PRs specify one product twice. They use two near-identical
-  operator protocols and two different kernel dependency bases.
-- **Re-sequence.** Both are written against kernel contracts that are not on
-  main. macOS depends on PR #1174, which is design documents only. Omarchy
-  depends on PR #1160 (+1,359,763 lines, open).
-- **Shrink.** The two PRs add about 47k lines, 532 requirements and 268 fixtures,
-  with zero implementation. Five review-fix rounds hardened validators and
-  example snippets. The expensive decisions went unreviewed.
+## 2. The stack the desktop sits on (treated as shipped)
 
-Recommendation: do not merge either PR as-is. Convert both to draft and make the
-decisions listed at the end. Then replace the two programs with one shared ADR
-plus thin platform annexes. Keep the research files; they are good.
+| Program | Owns | State | What the desktop takes from it |
+| --- | --- | --- | --- |
+| #1160 security and process foundation | `chio-process` (durable process trees), `chio-cage` (Linux x86_64 confinement for tool servers), `chio-secure-ipc` (`SO_PEERCRED`, Linux only), `chio-secret-broker`, `chio-keyring`, `chio-security-kernel`, required-agent protected mode, `chio-mini-swe`, receipt dashboard | Open, blocked on qualification; M0 to M4 locally accepted, M5 to M11 open | Process trees, IPC peer authentication, credential custody, sealed runner, protected-mode contract |
+| Doc 19 (on #1160) | The six mandatory hosts (Claude Code, Codex, Cursor, Hermes, Pi, OpenClaw), I01 to I08 gates, "six of six" | 0 of 6 accepted; Pi furthest | Host qualification model; rejects advisory hooks as a boundary |
+| #1164 workbench | Local browser operator surface: investigator, editor and reviewer roles; a worktree per task; patch review with SHA-256 | Draft, "not built or tested since it was written" | The task, worktree and review UX; the first operator client |
+| #1172 / #1179 recovery | Original-operation recovery; `InspectWorkflow`, `SubmitApproval`, `ResumeWorkflow`, `CancelWorkflow`; `recovery_events` table | #1179 "not qualified"; 3 P1, 45 P2, 94 P3 open | Lost-reply lookup, approval and resume flows, recovery states |
+| #1173 verifiable work (W1 to W4) | `WorkHandleV1`, `WorkViewV1` (six independent observations), work commands and queries, `WorkTransport` over local authenticated IPC | W1 to W4 planned, 0 of 198 steps done | The task model and its status projection |
+| #1174 north star and specs | S1 closed ABI (C-layer placement); S3 receipts for non-durable calls; S4 per-task closure; S5 events (Part A transport fixes, Part B stable subscriptions); S7 confinement evidence; S8 durable stop and S28 operator roster; S9 M20 retry classes; S10 crossing performance; S11 integrity gating | Docs; adversarial review partial | Stop, events, identity, retry safety, confinement evidence, controller placement |
+| #1170 NVIDIA strategy set | Positioning ("Authority that only narrows. Evidence that travels."), ADR-0023 to 0037 candidates, founder decisions F-1 to F-17 (all open), OpenShell spike | Docs; all decisions open | Layer decision, positioning, claim cautions |
 
-## What is right and should survive
+The ordering among the branches is consistent:
+
+- #1173 builds on `packet/3-retention-accounting`, which is wholly contained
+  in #1160.
+- #1172 and #1179 build on an earlier #1160 head.
+- #1174 treats #1160, #1173 and #1172 as its baseline. It also treats an
+  uncommitted recovery worktree as baseline, which is the one input nobody else
+  can see.
+
+The desktop PRs sit on top of all of this. That position is legitimate. The
+problem is that they neither cite it nor reuse it.
+
+## 3. Reference, don't redefine
+
+| Desktop concept | Owner in the stack | #1177 | #1178 | Action |
+| --- | --- | --- | --- | --- |
+| Task model and status | #1173 `WorkHandleV1` and `WorkViewV1` (execution, acceptance, result, recovery, settlement and delivery kept separate); #1179 recovery states | Own task states | Own `WorkPhase` enum, which collapses the separate observations | Render from `WorkViewV1` plus recovery states |
+| Lost-reply recovery | #1173 W1.6 command and preparation queries; #1179 recovery commands; S5 section 4.6; S9 M20 `Reusable`/`Retained`/`Terminal` | Re-specified | Re-specified | Reference the owners |
+| Event subscription | S5 Part B, deferred "until a second surface consumes hints on the wire"; #1179 `recovery_events` | `events.subscribe` | `events.subscribe` and `events.ack` | The desktop is that second surface: make it the trigger for S5 Part B and specify the stream once, in the kernel. Do not poll; see #1179's P1 on `InspectWorkflow` polling draining the settlement reserve |
+| Stop | S8 phase 1 (scopes `Kernel`, `Tenant`, `Recovery`), S8 S30 routes and results; S4 closure for one task | `task.cancel`, `task.resume` | `task.stop` mapped to `EmergencyControl` | Per-task stop is S4 closure; reference S8 S30 result kinds |
+| Operator identity and attributable approval | S8 S28 roster (until then every record is `SharedCredential`); approval mechanisms unified under north-star bet 5 | Native decision blocker noted | Assumes native endorsement | Hard prerequisite for an approval UI. Today approvals are signed with the sidecar key and `PasskeyCapabilityVerifier` is test-only |
+| Local IPC peer authentication | `chio-secure-ipc` (Linux `SO_PEERCRED`; refuses on other platforms) | AF_UNIX re-specified | XPC, new | Reuse on Linux; add a Darwin peer-credential path to the same crate |
+| Process trees and child custody | `chio-process`, `ProcessRegistry` | Uses (NQ-01, NQ-02) | Cites north-star bets 4 and 7 as research | Use `chio-process` on both platforms |
+| Credential custody and model egress | `chio-secret-broker`; Pi model relay | Pi-specific relay | Pi-specific relay | Broker plus relay; no new proxy |
+| Sealed coding runner | `chio-mini-swe` (network-less Docker workspace, mediated `sandbox/execute`, verified patch export); Pi coding resource | Re-specified | Re-specified, with an external oracle | Reuse and extend; add the oracle there |
+| Task, worktree and review UI | #1164 workbench | Not referenced | Not referenced | Make the workbench the first operator client; QML and SwiftUI become further clients. #1160 itself says "choose one common runtime path" |
+| Host qualification | Doc 19 I01 to I08, six hosts | Pi only | Pi only; others "no qualified host" | Adopt doc 19; Pi first by evidence, contract host-generic |
+| Confinement evidence | S7: closed set `LinuxCage`, `FirecrackerGuest`, `ProcessContainer`; anything else renders "not confined by Chio" | Own evidence classes | Own VM, ES and NE evidence | Amend S7 with the new backend kinds (section 5, R1) |
+| Boundary wording | ADR-0011 `boundary_class` and `planning_status` | Not used | Not used | Use it in every profile and in onboarding copy |
+| Controller placement | S1: a C-layer component outside the TCB (no keys, no trusted fact assertions); the gateway and process host stay inside the TCB | Implicit | Implicit | State it. The UI never shares a process with the gateway or process host |
+
+## 4. Corrections to revision 1
+
+1. **`chio run` is not the vehicle.** Revision 1 was wrong.
+   - `cmd_run` speaks Chio's framed native protocol.
+   - It intercepts nothing and confines nothing.
+   - It registers no tool server, and no plugin uses it.
+   - It cannot host Claude Code or Codex.
+2. **Hook-mode plugins do not "mediate".** This is `detect_only` or
+   `advisory_only` under ADR-0011.
+   - The plugins' own acceptance records show the tool runs when a hook
+     crashes, times out, is missing or is skipped (Claude Code 2.1.266, Codex
+     real-host table).
+   - The Bash check sees the command string only.
+   - The PRs' "observation only" label for Claude Code and Codex is correct.
+   - The arc README's "mediates Bash/Write/Edit/Read and every MCP server" is
+     an ADR-0011 violation and should be fixed (R6).
+3. **Pi-first follows the evidence.**
+   - Pi is the only host with I01 to I07 executed (plugin 0.1.0 with Pi 0.85.1).
+   - It has an embeddable SDK, restricted sessions and a model relay.
+   - Revision 1's "wrong first product" narrows to two points: Pi *only*, and
+     a desktop-private task model.
+4. **"Stacked on unmerged kernel programs" is withdrawn as a defect,** per the
+   owner. Two concerns stand in its place:
+   - the two PRs assume inconsistent bases: #1177 builds on the #1160 process
+     host, while #1178 builds on #1174 NK-01 to NK-09;
+   - the prerequisite set is wrong (section 6).
+5. **The minimal kernel list is corrected.**
+   - The durable stop is S8 *phase 1*, not phase 0.
+   - Stable subscriptions are S5 *Part B*. Part A fixes hosted transport.
+   - Per-task stop needs S4 closure.
+   - Operator identity is S8 S28.
+   - Add S3 phase 1 (receipts for non-durable calls) and S9 M20 (retry classes).
+6. **The "governed session" rung is re-scoped.**
+   - With native Bash kept inside an OS sandbox, the boundary is `prevent` at
+     the edge and `cannot_see` inside.
+   - Doc 19's protected mode gets `prevent` by removing the shell.
+   - These are two distinct profiles (section 5, R3), not one rung.
+
+## 5. Findings
+
+### R1. The layer decision is open, and both PRs presuppose one answer
+
+#1170 recommends that Chio "does not isolate agents, hold their credentials,
+issue identities or watch the model path". Its ADR-0023 would make OpenShell
+the reference Linux sandbox and freeze `chio-cage`, `chio-secret-broker` and
+the six-host launchers on that path. #1160 has built exactly those components.
+#1177 and #1178 specify their own confinement (a bubblewrap/Landlock agent host
+and a custom VZ VM). Neither desktop PR mentions OpenShell. Founder decision
+F-2 is open.
+
+The evidence cuts both ways:
+
+- **OpenShell** confines unmodified Claude Code and Codex: Landlock, seccomp, a
+  network namespace with a proxy-only exit, and credential placeholders. It
+  runs on macOS through Docker Desktop or a MicroVM on Hypervisor.framework.
+  Against that:
+  - its middleware contract is a research preview;
+  - its macOS MicroVM path is unqualified;
+  - local shell and file effects are invisible to Chio on that path.
+- **`chio-cage`** is a single-process, threadless, socketless profile for tool
+  servers, x86_64 only. It cannot run Pi or any Node agent host.
+- **The restricted launchers that actually confine agent hosts today** are thin
+  OS adapters: `sandbox-exec` on macOS for the Pi, Claude Code and Cursor
+  candidates, and bubblewrap on Linux for Pi. Pi's qualified run used the macOS
+  `sandbox-exec` profile.
+
+**Recommendation.** Decide F-2 with this split: **isolation denies, Chio
+grants.**
+
+1. **Chio does not author a general-purpose agent sandbox.** Accept ADR-0023's
+   principle: do not grow `chio-cage` into an agent host.
+2. **Chio owns the grant path**, the only routes by which a confined agent can
+   reach anything:
+   - the gateway and model relay;
+   - `chio-secret-broker`;
+   - kernel-owned resources (coding resource, file tools, `sandbox/execute`);
+   - approvals, receipts, and work and recovery.
+3. **Isolation backends are thin adapters that produce S7 evidence.** Amend S7
+   with:
+   - `AgentHostBwrap` (Linux; the Pi plugin profile);
+   - `Seatbelt` (macOS; the restricted launchers);
+   - `ProcessContainer` (already present; Docker or Podman, which covers
+     `chio-mini-swe`);
+   - an external-runtime kind for OpenShell, added once its middleware contract
+     stabilizes;
+   - a VM kind (`FirecrackerGuest` exists; add a macOS VM).
+4. **Scope ADR-0023 accordingly.** Thin adapters over OS mechanisms are allowed
+   where no qualified runtime exists. That is the case on macOS without Docker
+   today. Without that scoping, ADR-0023 freezes the only working macOS
+   backend.
+
+### R2. One controller and one protocol, as a client of the stack
+
+The desktop controller is an S1 C-layer component outside the TCB. Its protocol
+is mostly a projection of:
+
+- work views and commands (#1173);
+- recovery commands (#1179);
+- S5 Part B subscriptions;
+- S8 and S4 stop;
+- S28 identity.
+
+Concretely:
+
+- Specify it once, as `chio.operator.v1`, in `spec/` next to `PROTOCOL.md`,
+  after S5 Part B.
+- Retire `chio.omarchy.operator.v1` and `chio.desktop.operator.v1`.
+- Make the #1164 workbench (browser) the first client.
+- Add the Omarchy QML plugin and the macOS menu bar app as thin shells over the
+  same controller.
+- Transports: `chio-secure-ipc` on Linux; an XPC or `getpeereid` path added to
+  the same crate on macOS.
+
+### R3. Product ladder (revised)
+
+| Rung | What the user gets | ADR-0011 class | Hosts | Depends on |
+| --- | --- | --- | --- | --- |
+| Observe | Live sessions (hook-mode, protected and sealed), receipts, budgets, recovery inbox, each with its true boundary class | Per session; hook sessions are `detect_only` | All six | S5 Part B, controller |
+| Approve and stop | Attributable exact approvals; durable per-task stop | `prevent` (pre-effect gate) | Protected and sealed sessions | S28 roster, S4 phases 1 and 2, S8 phase 1, the `approval-decide` fix, a non-test passkey path |
+| Sealed work | Single-owner unpaid work commitment: fixed recipe, kernel-owned tools, review artifact, acceptance contract | `prevent` at kernel-owned tools, plus S7 evidence | Pi first; then doc 19 hosts as they pass | #1173 W1, #1179 P1 fixes, a backend (R1) |
+| Protected interactive | Doc 19 protected mode: gateway file tools, no native shell | `prevent` for mediated tools | Six hosts, as each passes I01 to I08 | Doc 19 gates |
+| Boundary interactive | Native agent with its shell, inside an OS sandbox with gateway-only egress | `prevent` at the edge, `cannot_see` inside | Any | R1 backend decision, S7 kind |
+| Managed endpoint | ES and NE fleet restrictions | Restrictive and `detect_only` | Not applicable | Entitlements, MDM |
+
+The sealed-work rung is where Chio's verifiable-work thesis becomes visible on a
+desktop: a fixed request, an attributable history and acceptance under agreed
+rules. That makes it a better second rung than an interactive one. Interactive
+sessions produce receipts but no acceptance.
+
+### R4. Omarchy (#1177)
+
+**Keep:**
+
+- the QML plugin as presentation only;
+- the controller as a systemd user unit;
+- pacman packaging;
+- the upstream research.
+
+**Upstream facts to design around** (verified at `0f8af9be`):
+
+- `omarchy-agent` (`SUPER+SHIFT+CTRL+A`) and the `cx`/`cy` aliases run most
+  agents in auto-approve modes, for example `claude --permission-mode auto`,
+  `codex --approve-for-me`, `opencode --auto` and `cursor-agent --yolo --trust`.
+- The plugin API shipped in v4.0.0 on 2026-08-14, makes no stability promise,
+  and was narrowed on 2026-09-01.
+- Docker is installed by default.
+- The kernel is `linux-omarchy-bore` 7.2 with Landlock enabled.
+
+**Change:**
+
+- **Confinement.** `chio-cage` cannot run Pi. The agent-host profile is the Pi
+  plugin's bubblewrap profile, which needs its own S7 kind. Docker also makes
+  `chio-mini-swe` available on day one.
+- **Observation.** Unconstrained auto-mode sessions are the local risk, so the
+  observe rung (with hook-mode sessions shown as `detect_only`) has immediate
+  value here.
+- **Launch.** Add a menu or Walker entry, "launch default agent in protected
+  mode", for doc 19 hosts as they qualify. Do not edit upstream files.
+- **Scope.** Cut P4 (compositor tools) and P5 (configuration repair). Move P6
+  (delegation) to the kernel and process programs.
+
+### R5. macOS (#1178)
+
+- **VM.**
+  - The bespoke VZ VM, guest image and guest supervisor are the most expensive
+    new build in either program.
+  - The cage is x86_64 only, while Apple Silicon guests are ARM64.
+  - Before building, evaluate existing runtimes: OpenShell's MicroVM driver
+    (Hypervisor.framework) and Apple's Containerization framework (one
+    lightweight VM per Linux container).
+  - Either way, add an S7 VM kind.
+- **Seatbelt.**
+  - Dismissing `sandbox-exec` in `research/apple-platform.md` contradicts the
+    repo's own evidence. Pi's qualified run and the Claude Code and Cursor
+    restricted candidates all use it.
+  - Keep it as the lower-assurance macOS backend with an S7 kind and an
+    ADR-0011 label. Keep the VM for high assurance.
+  - Reconcile with ADR-0023's scope (R1).
+- **Peer authentication.** `chio-secure-ipc` refuses non-Linux platforms, so
+  Darwin support is new work in that crate, not a separate stack.
+- **Approvals.** Touch ID and passkey approvals need a production
+  `PasskeyCapabilityVerifier` and the S28 roster. Approver-bound approval is
+  also the clearest differentiator against OpenShell, whose approvals do not
+  record the approver.
+- **Durable coverage.** Drop MAC-KER-010 ("MUST require durable coverage" for
+  every invocation).
+  - Use S10 check-only reads in `SideEffecting` mode.
+  - Mediate per tool call or per egress policy, not per HTTP request.
+  - The historical mediated-call costs (roughly 130 to 357 ms) make
+    durable-everything a poor interactive experience. The S10 target is about
+    90 to 95 ms for a read.
+- **Kernel mappings.** `task.stop` maps to S4 closure, not `EmergencyControl`.
+  NK-09 should cite `chio-process`, not research bets.
+- **ES and NE.** Keep them on the managed-endpoint track.
+- **Entry points.** Lead with the CLI and the menu bar; Finder Services is
+  secondary.
+
+### R6. Claims hygiene
+
+ADR-0011 governs every planning artifact that touches a trust boundary. The
+#1170 claim review lists 22 places where the docs disagree with the code. The
+ones that affect desktop copy:
+
+- README: the Claude Code plugin "mediates Bash/Write/Edit/Read and every MCP
+  server". It is hook-level and fails open.
+- README and AGENTS.md: tool servers are "sandboxed processes". They are plain
+  child processes.
+- The hero line, "a Rust kernel for agentic operating systems", is repeated in
+  both desktop PRs. #1170 proposes "Authority that only narrows. Evidence that
+  travels." Decide the positioning before writing onboarding copy.
+- Approvals are signed with the sidecar key, not the approver's.
+- `emergency_stop` is process-local and its HTTP routes are not mounted (#1174
+  D2, N22, N23).
+
+### R7. Program hygiene
+
+Several large, agent-authored programs are running at once: #1160 (+1.37M),
+#1173 (+2.4M), #1179 (+0.94M), #1174, #1170, #1177 and #1178. The two desktop
+PRs contain zero references to:
+
+- #1164;
+- `chio-mini-swe`;
+- `chio-secure-ipc`;
+- `WorkViewV1`;
+- the recovery commands;
+- doc 19;
+- the #1174 specs by name;
+- OpenShell.
+
+That is how one product ends up specified twice, with a third partial
+implementation (the workbench) alongside.
+
+**Recommendation.**
+
+- Add a program map (an ADR or `docs/architecture/PROGRAM-MAP.md`). It names
+  the owner of each shared concept: task or work, recovery, events, stop,
+  identity, confinement evidence, IPC, credentials and host qualification.
+- Adopt a "reference before redefine" rule. A spec that redefines an owned
+  concept fails review.
+- On volume, revision 1's numbers still apply: 532 requirements and about
+  34,000 JSON lines across the two PRs, with requirement catalogs and fixture
+  corpora ahead of any implementation. Bind those to tests once code exists.
+
+### R8. Defects to file now (independent of desktop work)
+
+1. **Pi `approval-decide`.** A deny can retain a signed approved credential
+   (#1177 `research/chio-readiness.md`).
+2. **Emergency stop.** It is process-local, its HTTP routes are unmounted, and
+   the admin token comparison is not constant-time (#1174 D2, N22, N23).
+3. **#1179 P1.** Read-only `InspectWorkflow` polling can drain the shared
+   settlement reserve.
+4. **Process host control.** Revoke and cancel work only while the host is
+   stopped, and `status` is a one-off snapshot (#1160 `PROCESS_HOST.md`).
+5. **README overclaims.** The ADR-0011 violations listed in R6.
+6. **Approval signatures.** Approvals are signed with the sidecar key, and
+   `PasskeyCapabilityVerifier` is test-only.
+
+## 6. Revised sequencing
+
+1. **#1160 lands.** This delivers the security and process foundation.
+2. **#1174 bug-fix lane items the desktop needs.** Some can land against main
+   now:
+   - S8 phase 1 (durable stop);
+   - S5 Part A (transport fixes);
+   - S3 phase 1 (receipts for non-durable calls);
+   - S9 M20 (retry classes).
+3. **Operator-contract delta.**
+   - S4 phases 1 and 2 (per-task closure);
+   - S5 Part B (the desktop is the trigger);
+   - S8 S28 (operator roster);
+   - live cancel and revoke on the process host;
+   - the `approval-decide` fix;
+   - a production passkey verifier.
+4. **#1179 recovery P1 fixes, and #1173 W1** (`WorkClient`, local
+   authenticated IPC).
+5. **ADRs.**
+   - F-2 and ADR-0023 scope (R1);
+   - positioning;
+   - one desktop-integration ADR with the R3 ladder;
+   - the S7 amendment.
+6. **Observe and approve rungs.** Shared controller; workbench client first,
+   then the Omarchy QML shell and the macOS menu bar shell.
+7. **Sealed work rung.**
+   - Pi restricted under the bubblewrap (Linux) and Seatbelt (macOS) S7 kinds;
+   - `chio-mini-swe` on Docker;
+   - a VM backend through an existing runtime.
+8. **Protected and boundary interactive rungs**, gated on doc 19 and R1.
+
+**Not prerequisites for desktop work:**
+
+- the NK-01 to NK-03 keystones (S9 pure admission, S10 crossing, S1 census);
+- S11 integrity gating (needed only for an injection-safety claim; leave it off
+  for Claude Code and Codex sessions);
+- #1173 W2 to W4;
+- #1160 M11;
+- the keyring witness topology.
+
+## 7. Decisions needed from the owner
+
+1. **Layer (F-2, ADR-0023).** Adopt "isolation denies, Chio grants", with thin
+   backend adapters allowed where no qualified runtime exists and every
+   backend producing S7 evidence?
+2. **Positioning.** Keep the hero line, or adopt #1170's sentence for all
+   desktop copy?
+3. **One program.** One desktop-integration program, one controller and one
+   `chio.operator.v1`, with the workbench as the first client?
+4. **First execution rung.** Sealed single-owner work, host-generic, Pi first?
+5. **macOS VM.** Build the bespoke VZ supervisor, or adopt an existing runtime
+   (OpenShell MicroVM or Apple Containerization) behind an S7 VM kind?
+6. **Disposition of #1177 and #1178.** Convert both to draft. Replace them with
+   the ADR from decision 3 plus Omarchy and macOS annexes that reference
+   section 3's owners. Keep the research files.
+
+## Appendix: what revision 1 got right and still stands
 
 | Invariant | Where it is stated |
 | --- | --- |
 | UI, plugin and controller never issue capabilities, sign approvals or receipts, or keep a competing ledger | MAC-ARC-002, MAC-PRD-008, OM-ARC-001 |
-| Missing prerequisites make a feature unavailable; never fall back to an unconfined agent | OM-PRD-002, MAC-PRD-004 |
-| A lost reply is an unknown outcome, recovered through the original native operation, never a fresh one | OM-PRD-006, MAC-PRD-011, MAC-KER-008 |
-| OS sensors and caches (ES, NE, extension allow views) can only restrict and never mint authority | MAC-KER-011, MAC-ARC-008 |
-| OS consent, Chio grant and exact endorsement are three separate facts | MAC-PRD-007 |
-| Trust the desktop user and installed plugin, confine the agent, and say so plainly | Omarchy `research/omarchy-upstream.md`, OM-PRD-008 |
-| Do not shadow `pi` or rewrite user menus; keep notification bodies generic | Omarchy `research/omarchy-upstream.md` |
-| A zero-NIC VM with a narrow vsock broker is a sound high-assurance profile | macOS `07-vm-execution.md` |
-| Source, component, installed and qualified evidence are separate classes | Both |
+| Missing prerequisites make a feature unavailable; there is never an unconfined fallback | OM-PRD-002, MAC-PRD-004 |
+| A lost reply is an unknown outcome, recovered through the original operation | OM-PRD-006, MAC-PRD-011, MAC-KER-008 |
+| ES, NE and caches only restrict | MAC-KER-011, MAC-ARC-008 |
+| OS consent, Chio grant and exact endorsement are separate facts | MAC-PRD-007 |
+| The desktop user and installed plugin are trusted; the agent is confined; say so plainly | OM-PRD-008, Omarchy upstream research |
+| One protocol, not two | Revision 1 F2, now R2 |
+| Cut Omarchy P4 and P5 | Revision 1 F5, now R4 |
 
-Several research files are strong and should be kept whatever happens to the
-rest: Omarchy `research/omarchy-upstream.md`, and macOS
-`research/apple-platform.md`, `research/distribution.md` and
-`research/clawdstrike.md`.
+These research files remain strong and should be kept:
 
-## Findings
-
-### F1. The first product ignores the agents Chio already integrates with (both; highest impact)
-
-Chio main already has three relevant integrations:
-
-- `chio run --policy <p> -- <agent command>`, described as "Spawn an agent
-  subprocess and enforce policy via the kernel"
-  (`crates/products/chio-cli/src/cli/types.rs:342`).
-- `chio mcp wrap`, which gates stdio MCP servers and emits client configs for
-  Cursor, Claude Desktop, Continue and Zed.
-- Public host plugins built on `@chio/bridge`, listed in the README's companion
-  plugins table:
-  - `chio-claude-code-plugin` ("mediates Bash/Write/Edit/Read and every MCP
-    server, metered and receipt-signed").
-  - `chio-cursor-plugin`.
-  - `chio-codex-plugin`.
-  - `chio-open-code-plugin`.
-  - `chio-open-claw-plugin`, which supports passkey countersigning.
-
-Neither PR mentions any of these. Both have zero references to the plugins,
-`@chio/bridge` or `chio run`. Instead, each picks a narrow first workflow:
-
-- **Omarchy.** P2 is "One confined Pi project task". The pilot is "a small pinned
-  Node fixture with a single-process fixed recipe (2 seconds plus 100 ms
-  termination grace, 16 KiB output)" (`01-product-scope.md`).
-- **macOS.** The first candidate host is "Pi's restricted SDK/print entry mode".
-  The row for "General CLI, IDE agent, Claude Code, Codex CLI ..." reads "No
-  qualified Mac host entry ... Protected execution unavailable"
-  (`15-host-adapters.md`). The first task requires all of the following:
-  - a committed tree only, with dirty state excluded;
-  - a portable Linux toolchain;
-  - preprovisioned dependencies;
-  - no live package downloads.
-
-This product asks developers to give up their current agent and workflow. Today
-that means interactive Claude Code, Codex, Cursor or OpenCode in their own
-working tree. What they get instead is a batch runner, a space hosted background
-agents already occupy. Meanwhile, the bonded Chio sessions these same users can
-run today get no desktop surface at all.
-
-The macOS decision record rejects "native process wrapper plus MCP hooks" as
-observation-only, because "direct networking, subprocesses, plugins and
-inherited credentials may bypass hooks" (`research/decision-record.md`). That is
-true of an unsandboxed wrapper. It is not true of a sandboxed launcher whose only
-egress routes are Chio-mediated. The Omarchy program already specifies that
-mechanism for Pi (bubblewrap, Landlock, seccomp and a private relay socket, in
-`08-linux-confinement.md`), and it applies equally to any agent's process tree.
-
-**Recommendation.** Make bonded sessions the center of the first two profiles,
-and move the sealed runner to the third:
-
-1. **Operator surface (read and approve), any host.** Show:
-   - live bonded sessions from every plugin;
-   - pending exact approvals;
-   - receipts, budgets and spend;
-   - a kill switch;
-   - each session's ADR-0011 `boundary_class`, stated honestly. A hook-bonded
-     session is `prevent` for mediated tools and `cannot_see` for raw subprocess
-     effects.
-
-   This is where users need Chio on the desktop first, and it needs no new
-   confinement.
-2. **Governed session (confinement upgrade).** Give `chio run <agent>` a
-   platform sandbox backend:
-   - Filesystem writes are confined to the workspace and the agent's state
-     directories.
-   - The only network route is a Chio egress gateway that serves the model
-     provider and allowlisted hosts. Every request is capability-checked,
-     budgeted and receipted, and the gateway injects credentials where the
-     provider allows it.
-   - MCP servers are reachable only through `chio-mcp-adapter`.
-
-   This moves file and network effects from `cannot_see` to `prevent` for an
-   unmodified agent.
-3. **Sealed task (what these PRs specify today).** Pi's closed registry, a
-   zero-NIC VM or strict cage, and an external test oracle form the
-   high-assurance profile. It suits untrusted repositories and unattended runs.
-   It is valuable, but it is the third rung, not the first.
-
-The ADR should state the trade-off explicitly:
-
-| | Boundary-level (governed session) | Tool-level (sealed task) |
-| --- | --- | --- |
-| Agents | Any, unmodified | Hosts with a closed registry (Pi today) |
-| Workflow | Interactive, working tree | Batch, committed tree, fixed recipe |
-| Receipts | Every mediated effect: egress, MCP, plugin-mediated tools | Every tool call |
-| Blind spot | Computation inside the sandbox; writes inside the workspace | Narrow scope; Darwin toolchains on Mac |
-| Time to useful | Short; mostly existing parts | Long; gated on #1160 and #1174 |
-
-### F2. One product, specified twice, with two protocols
-
-| | #1177 Omarchy | #1178 macOS |
-| --- | --- | --- |
-| Protocol ID | `chio.omarchy.operator.v1` | `chio.desktop.operator.v1` |
-| Methods | 13, including `task.cancel`, `task.resume`, `receipts.export`, `scope.get` | 12, including `task.stop`, `events.ack`, `evidence.export` |
-| Transport | AF_UNIX | XPC |
-| Kernel base | NQ-CANDIDATE (process host from #1160) | CHIO-NORTHSTAR NK-01 to NK-09 (#1174) |
-| First worker | Pi in bubblewrap/Landlock; project copy may include disclosed dirty changes | Pi in a zero-NIC Linux VM; committed tree only; external oracle |
-| Recovery, delegation, qualification | Own specs 14, 13, 15 | Own specs 11, 16, 17 |
-
-The macOS spec then requires preserving "the existing Omarchy ABI through
-explicit versioned mapping and conformance vectors" (MAC-ARC-014, MAC-IPC-014,
-decision D08). That ABI has never shipped. The program is specifying a
-migration layer between two unshipped proposals.
-
-**Recommendation.** Share everything that is not platform-specific:
-
-- **Shared:** one controller crate, one protocol, one task model, one resource
-  import and publication model, and one recovery, delegation and qualification
-  framework.
-- **Per platform:** only the shell UI, IPC transport with peer authentication
-  (`SO_PEERCRED` versus the XPC audit token), the isolation backend and
-  packaging.
-
-Specify the operator protocol once, next to `spec/PROTOCOL.md`, and only when
-the controller crate starts. CLAUDE.md requires wire-level changes to agree
-with that spec. Delete the migration requirements.
-
-### F3. Both programs are stacked on unmerged kernel programs, and on different ones
-
-- **Omarchy** depends on `chio-process`, `chio-cage` and session-credential
-  transport. These exist only on PR #1160 (`integration/process-security-m4`).
-  The research pins "CORE-PUBLIC" to `5b8bec41d`, which is 41 commits behind
-  main, and identifies NQ-CANDIDATE only by file hashes.
-- **macOS** depends on NK-01 to NK-09: pure admission machine, crossing
-  primitive, closed kernel ABI, durable stop epoch, integrity-gated admission,
-  teardown, typed reservations and unified event queue. These are design
-  documents in PR #1174 (`docs/ftl-lessons-specs-20261004`), which
-  `research/chio-readiness.md` cites as a "separate local source checkout"
-  `8dffff3d`.
-- **Some inputs cannot be reviewed at all.** One example: "Approved `research.md`
-  retained beside this report by the package owner".
-
-Writing about 47k lines of desktop contract against an unaccepted kernel
-redesign freezes assumptions that will move. #1174 will be revised. When it is,
-the 323 macOS requirements and their 712 task bindings go stale together, and
-the validators make that drift expensive to correct.
-
-**Recommendation.** Decide the kernel programs first: review #1174 and merge or
-revise it, and land or split #1160. Then define the *minimal* desktop-facing
-kernel contract against main. The readiness research shows the list is short:
-
-| Desktop need | Main today |
-| --- | --- |
-| Look up the original operation after a lost reply | Present: `AdmissionOperationStore::{load_by_operation_id, load_by_replay_key, list_recoverable}` |
-| Exact approval bound to request, subject and expiry | Present: `approval.rs`, `ApprovalToken::verify_against`. The Pi utility has a decision-binding defect (F6) |
-| Stop that survives restart | Missing: `emergency_stopped` is an in-memory `AtomicBool` (`kernel/construction.rs:326`) |
-| Stable event subscription for the UI | Missing |
-| Authenticated local operator principal | Missing |
-
-Three missing items make a tractable kernel ticket set. NK-01 to NK-09 amounts
-to a kernel rewrite and should not gate a desktop surface.
-
-### F4. macOS: VM-only execution is a Linux product on a Mac (#1178)
-
-Decision D04 makes a zero-NIC Linux VM the only local execution profile.
-`research/apple-platform.md` dismisses Seatbelt in one line: "custom sandbox-exec
-profiles are not the supported product foundation". The native path waits on
-macOS 27 descendant-scoped Endpoint Security, which is entitlement-gated and,
-by the spec's own account, has inconsistent beta metadata.
-
-That choice has two consequences:
-
-- **Darwin toolchains are excluded.** Xcode, Swift, iOS and Homebrew-native
-  toolchains fall outside the first Mac product. D06 backfills them with
-  "trusted native build brokers", which the spec itself notes are arbitrary-code
-  runners.
-- **The first Mac experience solves an uncommon problem.** That experience is
-  "run a portable Linux project in a VM", and most Mac developers do not have
-  that problem.
-
-Seatbelt is formally deprecated. It is still the de facto confinement mechanism
-for CLI agents on macOS, used by the Codex CLI and Claude Code sandboxes,
-Chromium and Bazel. Clawdstrike's `nono` already includes Seatbelt capability
-code, and its known defects are recorded in
-`docs/superpowers/plans/2026-07-09-enterprise-hardening.md`.
-
-**Recommendation.** Offer two Mac profiles and adjust the entry points:
-
-- **`darwin-sandbox-v1` (Seatbelt).** Writes go only to the workspace. Network is
-  denied except the loopback Chio gateway. There is no Keychain access and no
-  home reads outside allowlisted agent state. The profile runs native
-  toolchains, uses honest ADR-0011 wording and records the deprecation risk.
-- **`vm-sealed-v1`.** This is the current zero-NIC VZ design, for untrusted
-  repositories and high assurance.
-- **ES/NE.** Keep these on the managed-endpoint track only, as the PR already
-  does.
-- **Entry points.** Lead with the CLI and the menu bar. Developers start agent
-  work from terminals and editors, so Finder Services "Run with Chio" is a
-  secondary affordance.
-
-### F5. Omarchy: right UI hook, wrong target, scope too wide (#1177)
-
-I checked the spec's upstream claims read-only against `omacom/omarchy`
-`0f8af9be` and the v4.0.4 tag. Almost all of them hold. The shape is right for
-Omarchy:
-
-- the QML shell plugin as presentation only;
-- the controller as a systemd user unit;
-- pacman packaging.
-
-`omarchy plugin add` never runs install hooks, so a native controller has to
-arrive as a package anyway. Some facts the program should design around:
-
-- **Agent launch modes.** Omarchy users start agents through `omarchy-agent`
-  (`SUPER+SHIFT+CTRL+A`) and the `cx` and `cy` aliases. That launcher runs every
-  supported agent in an auto-approve mode except Pi and Ori, which get no flag:
-  - `claude --permission-mode auto`
-  - `codex --approve-for-me`
-  - `opencode --auto`
-  - `cursor-agent --yolo --trust`
-  - `grok --permission-mode bypassPermissions`
-  - `agy --dangerously-skip-permissions`
-
-  Omarchy also offers a 15-minute passwordless-sudo toggle aimed at agents
-  (`manual/48-security.md`). The real governance gap on Omarchy is therefore
-  unconstrained auto-mode sessions of the agents the existing Chio plugins
-  already bond. Making a single confined Pi recipe the first product leaves that
-  gap untouched.
-- **Primitives.** The default kernel is `linux-omarchy-bore` 7.2.x with
-  `landlock` in `CONFIG_LSM`. Unprivileged user namespaces are on, seccomp and
-  BPF LSM are enabled, and bubblewrap is present transitively (Chio should still
-  declare it). A governed-session backend is practical on a stock install today.
-  Probe the Landlock ABI at runtime rather than assuming one.
-- **Plugin API stability.** The plugin API shipped in v4.0.0 on 2026-08-14 and
-  makes no stability promise beyond `schemaVersion: 1`. Upstream narrowed
-  third-party plugin capabilities on 2026-09-01 (`1702cf0b`, backported to
-  v4.0.3). v4.0.4 was cut from a patch branch, so it is not an ancestor of
-  HEAD, and the default branch is now `quattro`. Keep the plugin thin and expect
-  churn.
-
-Scope changes:
-
-- **Cut P4 (compositor tools) and P5 (configuration repair).** They are Omarchy
-  feature work unrelated to Chio's authority value: about 520 plan lines plus
-  specs 10 and 11. Keep one paragraph of future work.
-- **Move P6 (delegation) into the kernel program.** Both PRs specify delegation
-  separately, and neither should own it.
-- **Reconsider "never touch `omarchy-agent`".** An opt-in governed launch mode
-  (`omarchy-agent` through `chio run`) is the highest-leverage integration point
-  on this desktop. Contribute it upstream once the governed-session profile
-  qualifies. Until then, a Chio menu entry and keybinding that launch the user's
-  default agent through `chio run` give the same reach without editing upstream
-  files.
-
-### F6. Real defects are buried in research tables
-
-These defects are independent of the desktop programs and should be filed as
-issues now:
-
-1. **Pi `approval-decide` decision confusion.** Omarchy
-   `research/chio-readiness.md` records that the bundled utility "can retain a
-   signed approved credential despite requested denial because requested
-   decision and approval ID are not compared before retention". This is a
-   security defect in a public package (`chio-pi-plugin`), not a P3
-   prerequisite.
-2. **Emergency stop is not durable.** `chio-kernel` holds `emergency_stopped`
-   in memory, so it does not survive a restart. Any operator surface's kill
-   switch inherits this.
-3. **The Pi protected CLI accepts the task through `--prompt`.** That exposes
-   the prompt in argv (P2-PRIVATE-PROMPT).
-4. **`ensure_capability_issuance_supported` returns `Ok(())` unconditionally**
-   (CK-10). Confirm whether this is intended.
-
-### F7. Neither program uses the repository's governance
-
-- **ADR-0011 is not followed.** It requires "every planning artifact and
-  implementation ticket that touches a trust boundary" to carry
-  `boundary_class` and `planning_status`. Neither PR does; each invents its own
-  vocabulary of profiles and evidence classes. Neither program cites a single
-  ADR.
-- **The structure is new to the repo.** Both introduce `requirements.json`,
-  `verify.py`, fixture corpora and `reviews/` directories, which no earlier
-  program in `docs/superpowers/` uses. Earlier programs, at a fraction of this
-  size, are still only partly implemented. For example, the 2026-07-09
-  security-folder spec's `crates/security` is still waiting in #1160.
-
-### F8. Volume has become a liability
-
-| | #1177 | #1178 |
-| --- | --- | --- |
-| Files | 125 | 280 |
-| Spec and plan Markdown lines | 5,556 | 7,150 |
-| JSON lines (schemas, fixtures, coverage) | 6,219 | 27,536 |
-| Requirements | 209 | 323 |
-| Implemented | 0 | 0 |
-
-The review-fix rounds on #1178 fixed real but incidental defects:
-
-- bidi-control escaping in a Swift helper that does not exist yet;
-- FIFO blocking in an example qualification reader;
-- Boolean percentile samples;
-- cursor correlation fixtures.
-
-Each fix is correct, and none of them bears on whether the product is right. The
-requirements restate about a dozen invariants many times over. The validators
-enforce internal consistency, which makes the documents expensive to change at
-exactly the moment the direction should change.
-
-**Recommendation.** Replace both programs with four pieces:
-
-1. One ADR, "Desktop integration architecture" (about 300 lines), containing:
-   - the invariants table above;
-   - the component split;
-   - the profile ladder below, with ADR-0011 classes;
-   - the platform matrix.
-2. An Omarchy annex and a macOS annex (about 300 lines each), covering the shell
-   surface, IPC peer authentication, isolation backend and packaging.
-3. The existing research files, mostly unchanged.
-4. The operator protocol spec and schemas, written alongside the controller
-   crate rather than before it, and placed in `spec/` next to `PROTOCOL.md`.
-
-Requirement catalogs, acceptance IDs, fixture corpora and validators should come
-after implementation and bind to real tests.
-
-## Proposed shape
-
-```text
- Omarchy QML plugin ---+                           +-- Linux: bwrap + Landlock + seccomp + netns
- macOS menu bar app ---+-- chio desktop controller -+-- macOS: Seatbelt, or VZ VM with zero NIC (sealed)
- chio CLI -------------+   (one operator protocol)  +-- egress gateway + chio-mcp-adapter
- host plugins (@chio/bridge) ------------------------> chio kernel: capabilities, approvals, budgets, receipts
-```
-
-| Profile | Adds | Depends on |
-| --- | --- | --- |
-| `observe` | Bonded-session list, receipts, budgets, kill switch | Main plus stable event subscription |
-| `approve` | Exact approvals from the desktop | Operator principal binding; approval decision fix |
-| `governed-session` | OS sandbox plus Chio-only egress for any agent | Per-platform sandbox backend; egress gateway |
-| `sealed-task` | Closed registry, VM or strict cage, external oracle | #1160; Pi qualification |
-| `managed-endpoint` | ES/NE, fleet policy | Entitlements, MDM |
-
-## Decisions needed from the owner
-
-1. **First execution product.** A governed session for existing agents, or a
-   sealed Pi task runner? This review recommends the governed session.
-2. **One program.** Should one shared desktop program, with platform annexes,
-   replace these two?
-3. **Kernel sequencing.** Should #1174 and #1160 be decided first, with the
-   minimal kernel contract list in F3 adopted as the desktop gate?
-4. **macOS.** Should Seatbelt be a first-class, honestly labeled profile next to
-   the VM?
-5. **These PRs.** The recommendation is to convert both to draft and stop the
-   bot-review iteration. Once the decisions above are made, merge only the
-   research files plus the new ADR.
+- Omarchy `research/omarchy-upstream.md`;
+- macOS `research/apple-platform.md`;
+- macOS `research/distribution.md`;
+- macOS `research/clawdstrike.md`.
