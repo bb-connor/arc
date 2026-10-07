@@ -1,4 +1,4 @@
-//! A sweep that spans pages observes authority time for each page.
+//! A recovery sweep observes authority time for each page and each item.
 use super::*;
 use chio_kernel::admission_operation::{
     AdmissionDigest, AdmissionIdentifier, AdmissionOperationBindingInputV1,
@@ -17,11 +17,12 @@ const SETUP_CLAIM_MS: u64 = 30_000;
 
 struct Sweep {
     _directory: tempfile::TempDir,
+    database: std::path::PathBuf,
     clock: Arc<SweepClock>,
     serving: Serving,
     kernel: ChioKernel,
     deferred: Vec<AdmissionOperationV1>,
-    tail: Option<AdmissionOperationV1>,
+    pending: Vec<AdmissionOperationV1>,
 }
 
 fn prepared(fence: &StoreMutationFence, index: usize) -> TestResult<AdmissionOperationV1> {
@@ -53,17 +54,15 @@ fn prepared(fence: &StoreMutationFence, index: usize) -> TestResult<AdmissionOpe
 }
 
 impl Sweep {
-    /// `deferred` retained operations hold not-yet-due deferrals. With a tail,
-    /// one more retained operation sorts after all of them.
-    fn new(deferred: usize, with_tail: bool) -> TestResult<Self> {
+    /// `deferred` retained operations hold not-yet-due deferrals. `pending`
+    /// retained operations without a deferral sort after all of them.
+    fn new(deferred: usize, pending: usize) -> TestResult<Self> {
         let (directory, database, locks) = provision()?;
         let clock = SweepClock::new()?;
         let serving = Serving::open(&database, &locks, &clock)?;
         let kernel = serving.kernel(Keypair::generate(), &clock)?;
         let at = clock.now_ms()?;
-        let count = deferred
-            .checked_add(usize::from(with_tail))
-            .ok_or("operation count")?;
+        let count = deferred.checked_add(pending).ok_or("operation count")?;
         let mut operations = (0..count)
             .map(|index| prepared(&serving.fence, index))
             .collect::<TestResult<Vec<_>>>()?;
@@ -75,7 +74,7 @@ impl Sweep {
         for operation in &operations {
             serving.operations.begin(operation, &serving.fence, at)?;
         }
-        let tail = if with_tail { operations.pop() } else { None };
+        let pending = operations.split_off(deferred);
         let claimant = AdmissionIdentifier::try_new("claimant_id", "sweep-time-setup")?;
         for operation in &operations {
             let lease = serving.operations.claim_recovery(
@@ -110,11 +109,12 @@ impl Sweep {
         clock.advance_ms(SETUP_CLAIM_MS + 1_000)?;
         Ok(Self {
             _directory: directory,
+            database,
             clock,
             serving,
             kernel,
             deferred: operations,
-            tail,
+            pending,
         })
     }
 
@@ -136,7 +136,10 @@ impl Sweep {
     /// Store-level proof that the sweep must visit a skipped full page and
     /// then a second page holding only the tail.
     fn assert_two_pages(&self) -> TestResult<AdmissionOperationV1> {
-        let tail = self.tail.clone().ok_or("tail operation")?;
+        let [tail] = self.pending.as_slice() else {
+            return Err("one tail operation".into());
+        };
+        let tail = tail.clone();
         assert_eq!(self.deferred.len(), PAGE);
         let first = self.page(None)?;
         assert!(first.operations.is_empty());
@@ -164,6 +167,20 @@ impl Sweep {
             .state())
     }
 
+    /// Read-only trusted time of the operation's latest durable mutation.
+    fn updated_at(&self, operation: &AdmissionOperationV1) -> TestResult<u64> {
+        let connection = rusqlite::Connection::open_with_flags(
+            &self.database,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )?;
+        let updated: i64 = connection.query_row(
+            "SELECT updated_at_unix_ms FROM admission_operations WHERE operation_id=?1",
+            [operation.binding().operation_id().as_str()],
+            |row| row.get(0),
+        )?;
+        Ok(u64::try_from(updated)?)
+    }
+
     fn assert_deferred_untouched(&self) -> TestResult {
         for operation in &self.deferred {
             let current = self
@@ -177,9 +194,18 @@ impl Sweep {
     }
 }
 
+fn causes(error: &KernelError) -> String {
+    std::iter::once(format!("{error:?}"))
+        .chain(
+            std::iter::successors(error.source(), |&cause| cause.source()).map(ToString::to_string),
+        )
+        .collect::<Vec<_>>()
+        .join(" <- ")
+}
+
 #[test]
 fn sqlite_two_page_sweep_samples_fresh_authority_time_for_the_second_page() -> TestResult {
-    let sweep = Sweep::new(PAGE, true)?;
+    let sweep = Sweep::new(PAGE, 1)?;
     let tail = sweep.assert_two_pages()?;
     sweep.clock.arm(Some((1, PAGE_DURATION_MS)))?;
     let result = sweep.kernel.reconcile_recoverable_admissions();
@@ -196,12 +222,9 @@ fn sqlite_two_page_sweep_samples_fresh_authority_time_for_the_second_page() -> T
         "the authority clock advanced only after the first page was read"
     );
     let changed = result.map_err(|error| {
-        let causes = std::iter::successors(error.source(), |&cause| cause.source())
-            .map(ToString::to_string)
-            .collect::<Vec<_>>()
-            .join(" <- ");
         format!(
-            "two-page sweep aborted with {error:?} <- {causes}; second-page operation left {tail_after:?}"
+            "two-page sweep aborted with {}; second-page operation left {tail_after:?}",
+            causes(&error)
         )
     })?;
     assert_eq!(changed, 1);
@@ -218,7 +241,7 @@ fn sqlite_two_page_sweep_samples_fresh_authority_time_for_the_second_page() -> T
 
 #[test]
 fn sqlite_two_page_sweep_without_a_clock_advance_recovers_the_second_page() -> TestResult {
-    let sweep = Sweep::new(PAGE, true)?;
+    let sweep = Sweep::new(PAGE, 1)?;
     let tail = sweep.assert_two_pages()?;
     sweep.clock.arm(None)?;
     let result = sweep.kernel.reconcile_recoverable_admissions();
@@ -237,7 +260,7 @@ fn sqlite_two_page_sweep_without_a_clock_advance_recovers_the_second_page() -> T
 
 #[test]
 fn sqlite_single_page_sweep_samples_authority_time_once() -> TestResult {
-    let sweep = Sweep::new(3, false)?;
+    let sweep = Sweep::new(3, 0)?;
     let page = sweep.page(None)?;
     assert!(page.operations.is_empty());
     assert_eq!(page.scanned_candidates, 3);
@@ -253,8 +276,64 @@ fn sqlite_single_page_sweep_samples_authority_time_once() -> TestResult {
     sweep.assert_deferred_untouched()
 }
 
+#[test]
+fn sqlite_slow_first_item_does_not_age_the_next_item_in_one_page() -> TestResult {
+    let sweep = Sweep::new(0, 2)?;
+    let [first, later] = sweep.pending.as_slice() else {
+        return Err("two pending operations".into());
+    };
+    let page = sweep.page(None)?;
+    assert_eq!(page.scanned_candidates, 2);
+    assert_eq!(page.operations, vec![first.clone(), later.clone()]);
+    assert_eq!(page.next_cursor, None);
+    // The authority clock advances while the first item is being recovered,
+    // right after that item's own status read.
+    sweep.clock.arm(Some((2, PAGE_DURATION_MS)))?;
+    let result = sweep.kernel.reconcile_recoverable_admissions();
+    let reads = sweep.clock.disarm()?;
+    let later_after = sweep.state(later)?;
+    let [(Role::Kernel, Some(_)), (Role::Store, Some(page_read)), ..] = reads.as_slice() else {
+        return Err(format!("sweep did not start with its one page read: {reads:?}").into());
+    };
+    assert!(sweep.clock.advanced_after_read()?.is_some());
+    assert_eq!(
+        sweep.state(first)?,
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    assert!(
+        sweep.updated_at(first)? > *page_read + PAGE_DURATION_MS,
+        "the first item finished after the authority clock advanced"
+    );
+    let changed = result.map_err(|error| {
+        format!(
+            "one-page sweep aborted with {}; later operation left {later_after:?}",
+            causes(&error)
+        )
+    })?;
+    assert_eq!(changed, 2);
+    assert_eq!(
+        later_after,
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    assert!(sweep.updated_at(later)? > *page_read + PAGE_DURATION_MS);
+    assert!(
+        matches!(
+            reads.as_slice(),
+            [
+                (Role::Kernel, Some(_)),
+                (Role::Store, Some(_)),
+                (Role::Kernel, Some(_)),
+                (Role::Store, Some(_)),
+                ..
+            ]
+        ),
+        "each item samples authority time before its own status read: {reads:?}"
+    );
+    Ok(())
+}
+
 fn second_page_clock_failure(fault: Fault, expected: ClockError) -> TestResult {
-    let sweep = Sweep::new(PAGE, true)?;
+    let sweep = Sweep::new(PAGE, 1)?;
     let tail = sweep.assert_two_pages()?;
     sweep.clock.arm(None)?;
     sweep.clock.fail_kernel_read(2, fault)?;
