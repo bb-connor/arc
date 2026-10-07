@@ -111765,15 +111765,18 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "source-integrated-prior-outcome-clock2-repairs-nativechronologyOriginal4_1-producer-unrepaired",
+      "current_state": "source-integrated-native-chronology-and-revoked-caller-isolation-scoped-green",
       "source_repair": {
         "commit": "e518ef3256861175f17a665dc6caffa677482ce4",
         "commits": [
-          "e518ef3256861175f17a665dc6caffa677482ce4"
+          "e518ef3256861175f17a665dc6caffa677482ce4",
+          "f23efdf43ad15d981e7a3e20d78a5b73f59acb39",
+          "1225dc4893cf8b8e90b362a67774b1cc9c4b4078",
+          "9d1dc8fcc9b1c6ebc226107d866a95e5f18fcf45"
         ],
         "files": [],
         "current_source_file_hashes": {},
-        "observed_source_head": "b8f061ca578beb9c9a94accde304962a42f7a5c2",
+        "observed_source_head": "e446a408ea69c7cbb5539dc15deb00da7f24d485",
         "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
       },
       "source_integrated": true,
@@ -112098,14 +112101,35 @@
           "sha256": "fcfadce7ac00da602472510d2a63d299d18b7a72a0c09dc68956a5c03d0eb101",
           "category": "genuine-nativeOriginal5-list-or-run",
           "scope": "Exactnative4/1 actual0002/EUID1000; no fullnative/owning acceptance."
+        },
+        {
+          "path": "/home/connor/.cache/chio-security-landing-20261004/sprawl-execution/ci-feedback-20261005/integration-current-native26-1df6-result-packet.json",
+          "sha256": "6107d031b6ab275b0e0ee290af0d03e999c53f56bfa903ae94995a8418f5d1e5",
+          "scope": "Focused native12, paid clock6 and cancellation/retry8 pass; initial strict failure remains separate."
+        },
+        {
+          "path": "/home/connor/.cache/chio-security-landing-20261004/sprawl-execution/ci-feedback-20261005/integration-1df6-alias-strict-pass-result-packet.json",
+          "sha256": "822f88685b9ea5309c9ee40a6d59df789d5946d48cffc8413a56392cc20e3759",
+          "scope": "Three-owner default all-targets strict pass after test-only aliases."
+        },
+        {
+          "path": "/home/connor/.cache/chio-security-landing-20261004/sprawl-execution/ci-feedback-20261005/integration-9d1-caller-deferred-legacy11-strict-result-packet.json",
+          "sha256": "e045e43b75a7d44b46535ede7e3d2228706dcb2792e72d6cdd74487c694dbc20",
+          "scope": "Revocation same3/global5/deferred1 pass; legacy2 ordering failures retained; two strict variants pass."
+        },
+        {
+          "path": "/home/connor/lanes/integration/docs/security/audits/production-repair-checkpoint-20261007.json",
+          "sha256": "60bb17f6a66e89a38603b6cbe7c1e87c7769496494805682fea19fc00e335617",
+          "scope": "Current scoped repair checkpoint, passing/failing/setup outcomes preserved; foundation remains unqualified/unmerged."
         }
       ],
       "remaining_acceptance": [
-        "Chronology producer remainsUNREPAIRED. Obtain independently reviewed minimal complete-native-history/private scope, guarded install and identical genuineOriginal5 plus causal controlledpositive Green/negative/authority/financial controls; authored369 is not accepted source or runtime.",
-        "Preserve actualNative4/1, priorclock5/1/probe0/1/financial17/1 and all oldpartial/cancel/setup/refusal campaigns distinctly.",
-        "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
-        "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
-        "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+        "Native chronology12 and paid-clock6 passed in their retained scope.",
+        "Revoked leaf/ancestor same3 and global5 pass; clock/store/history/view faults remain fatal.",
+        "Complete the remaining combined-source owning suites and optional feature matrix, with exact package/feature/environment scope.",
+        "Complete required native platform, cold mutation, trusted capture/publication and terminal exact-source hosted checks.",
+        "Obtain positive independent review of the exact final source; request Greptile when available and preserve unavailable service attempts without an availability blocker.",
+        "Land only the clean, qualified candidate through protected main checks; component evidence is not whole-roadmap or production activation acceptance."
       ],
       "historical_source_claim": {
         "source": {
@@ -112520,7 +112544,20 @@
         "actual_passed": 4,
         "actual_failed": 1,
         "actual_packet_sha256": "ed285dfdf9cd40cfe106e9ab8093ec994595ced5a80d29d2ce90b582756031b9"
-      }
+      },
+      "current_state_history": [
+        {
+          "recorded_utc": "2026-10-07T12:28:03.056064+00:00",
+          "previous_current_state": "source-integrated-prior-outcome-clock2-repairs-nativechronologyOriginal4_1-producer-unrepaired",
+          "previous_remaining_acceptance": [
+            "Chronology producer remainsUNREPAIRED. Obtain independently reviewed minimal complete-native-history/private scope, guarded install and identical genuineOriginal5 plus causal controlledpositive Green/negative/authority/financial controls; authored369 is not accepted source or runtime.",
+            "Preserve actualNative4/1, priorclock5/1/probe0/1/financial17/1 and all oldpartial/cancel/setup/refusal campaigns distinctly.",
+            "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
+            "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
+            "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+          ]
+        }
+      ]
     },
     "incoming-pr1160-review-20261006:F004": {
       "requirement_id": "incoming-pr1160-review-20261006:F004",
@@ -112537,15 +112574,16 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "source-integrated-PARTIAL-older-focused-evidence-current-financial6_12-open",
+      "current_state": "source-integrated-persisted-disposition-restart-coverage-scoped-green",
       "source_repair": {
         "commit": "de519d7776d8c9ea101d1aec271fd0be54dca632",
         "commits": [
-          "de519d7776d8c9ea101d1aec271fd0be54dca632"
+          "de519d7776d8c9ea101d1aec271fd0be54dca632",
+          "8efb4178461cf112a9ce8ed7d5e784a78b98d9e5"
         ],
         "files": [],
         "current_source_file_hashes": {},
-        "observed_source_head": "b8f061ca578beb9c9a94accde304962a42f7a5c2",
+        "observed_source_head": "e446a408ea69c7cbb5539dc15deb00da7f24d485",
         "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
       },
       "source_integrated": true,
@@ -112632,16 +112670,24 @@
           "sha256": "01c4188eb877d3d686126db744e19b6e52dc632b793277c3f2e1c0436dc93b02",
           "category": "closed-finite20-19_1-current-runtime",
           "scope": "Actual5 scopes:financial17/1+nativeclock1+router1; true trusted-time failure retained. No fullcrate/currentall18Green claim."
+        },
+        {
+          "path": "/home/connor/.cache/chio-security-landing-20261004/sprawl-execution/ci-feedback-20261005/integration-77b9-f030-coverage19-strict-result-packet.json",
+          "sha256": "7000fed4d1f50e171582ed232633e429b50f8580341bc84486d5b8b8687ef8dd",
+          "scope": "19 executions, 15 unique cases across default and admission support; both inclusive strict variants pass."
+        },
+        {
+          "path": "/home/connor/lanes/integration/docs/security/audits/production-repair-checkpoint-20261007.json",
+          "sha256": "60bb17f6a66e89a38603b6cbe7c1e87c7769496494805682fea19fc00e335617",
+          "scope": "Current scoped repair checkpoint, passing/failing/setup outcomes preserved; foundation remains unqualified/unmerged."
         }
       ],
       "remaining_acceptance": [
-        "Retain finite20 financial17/1: true trusted operation time regressed failure in missing-original-adapter recovery isolation. No currentall18Green/fullcrate claim; root/owner diagnoses production clock gap without synthetic clock/effect waiver.",
-        "Resolve actual financial18 current6/12 failures at native error/source and signed metadata locator; preserve original18 and earlier30 failure provenance. No advancing-clock/effect closure inferred.",
-        "Current financial18 and advancing/native-clock residual remain open: actual temporary diagnostic returnedOk(0) but failed unchanged predicate, no production closure inferred.",
-        "Actual amount/FX/refund/overreported/unconvertible controls mapped; no real-funds or full owning/native qualification.",
-        "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
-        "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
-        "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+        "Added actual PostReturnResolved panic/unwind/reopen coverage; this is not SIGKILL/power-loss acceptance.",
+        "Complete the remaining combined-source owning suites and optional feature matrix, with exact package/feature/environment scope.",
+        "Complete required native platform, cold mutation, trusted capture/publication and terminal exact-source hosted checks.",
+        "Obtain positive independent review of the exact final source; request Greptile when available and preserve unavailable service attempts without an availability blocker.",
+        "Land only the clean, qualified candidate through protected main checks; component evidence is not whole-roadmap or production activation acceptance."
       ],
       "historical_source_claim": {
         "source": {
@@ -112674,7 +112720,22 @@
         "Codex_quota_blocker": false,
         "review_acceptance_established": false
       },
-      "current_financial18_runtime": "CLOSED17pass1fail; missing-original-adapter other-request isolation still fails real trusted-time invariant"
+      "current_financial18_runtime": "CLOSED17pass1fail; missing-original-adapter other-request isolation still fails real trusted-time invariant",
+      "current_state_history": [
+        {
+          "recorded_utc": "2026-10-07T12:28:03.056064+00:00",
+          "previous_current_state": "source-integrated-PARTIAL-older-focused-evidence-current-financial6_12-open",
+          "previous_remaining_acceptance": [
+            "Retain finite20 financial17/1: true trusted operation time regressed failure in missing-original-adapter recovery isolation. No currentall18Green/fullcrate claim; root/owner diagnoses production clock gap without synthetic clock/effect waiver.",
+            "Resolve actual financial18 current6/12 failures at native error/source and signed metadata locator; preserve original18 and earlier30 failure provenance. No advancing-clock/effect closure inferred.",
+            "Current financial18 and advancing/native-clock residual remain open: actual temporary diagnostic returnedOk(0) but failed unchanged predicate, no production closure inferred.",
+            "Actual amount/FX/refund/overreported/unconvertible controls mapped; no real-funds or full owning/native qualification.",
+            "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
+            "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
+            "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+          ]
+        }
+      ]
     },
     "incoming-pr1160-review-20261006:F005": {
       "requirement_id": "incoming-pr1160-review-20261006:F005",
@@ -114303,11 +114364,12 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "source-integrated-requirement-focused-acceptance-pending",
+      "current_state": "source-integrated-single-use-capture-coverage-scoped-green",
       "source_repair": {
         "commit": "de519d7776d8c9ea101d1aec271fd0be54dca632",
         "commits": [
-          "de519d7776d8c9ea101d1aec271fd0be54dca632"
+          "de519d7776d8c9ea101d1aec271fd0be54dca632",
+          "c28fd9797d7b3fc8ae175c692e8b38a7f87f9f95"
         ],
         "files": [
           "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/capture.rs",
@@ -114317,11 +114379,11 @@
           "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/capture.rs": "bd1b4ee1475944e0912a48fd4a9494dc8b44bd400c2049f20ff8107010dfb1be",
           "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/lifecycle.rs": "65c54444211fec84424016f26c784fe8bb43c6473e26a68742787abf2315a9b9"
         },
-        "observed_source_head": "b8f061ca578beb9c9a94accde304962a42f7a5c2",
+        "observed_source_head": "e446a408ea69c7cbb5539dc15deb00da7f24d485",
         "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
       },
       "source_integrated": true,
-      "focused_green": false,
+      "focused_green": true,
       "owning_pending": true,
       "native_pending": true,
       "trusted_pending": true,
@@ -114367,14 +114429,24 @@
           "sha256": "ceae58ee21a8ae608d9b5d1450c55d7215bdb85a15481f3c4e729252ad493d94",
           "category": "exact-temporary-diagnostic-restore",
           "scope": "Exact source restore before commit, no diagnostic/assertion/clock/effect waiver."
+        },
+        {
+          "path": "/home/connor/.cache/chio-security-landing-20261004/sprawl-execution/ci-feedback-20261005/integration-77b9-f030-coverage19-strict-result-packet.json",
+          "sha256": "7000fed4d1f50e171582ed232633e429b50f8580341bc84486d5b8b8687ef8dd",
+          "scope": "19 executions, 15 unique cases across default and admission support; both inclusive strict variants pass."
+        },
+        {
+          "path": "/home/connor/lanes/integration/docs/security/audits/production-repair-checkpoint-20261007.json",
+          "sha256": "60bb17f6a66e89a38603b6cbe7c1e87c7769496494805682fea19fc00e335617",
+          "scope": "Current scoped repair checkpoint, passing/failing/setup outcomes preserved; foundation remains unqualified/unmerged."
         }
       ],
       "remaining_acceptance": [
-        "meaningful original native RED retained; focused failed-freeze lifecycle node passed within the mixed CP42 run; integrated qualification pending; exact current focused/owning remains separately established only with matching evidence.",
-        "Establish current exact requirement-focused behavioral qualification; shared/older component evidence is bounded.",
-        "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
-        "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
-        "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+        "Trusted in-memory CapturePending readback coverage does not qualify real native lost-ack/partial-write recovery.",
+        "Complete the remaining combined-source owning suites and optional feature matrix, with exact package/feature/environment scope.",
+        "Complete required native platform, cold mutation, trusted capture/publication and terminal exact-source hosted checks.",
+        "Obtain positive independent review of the exact final source; request Greptile when available and preserve unavailable service attempts without an availability blocker.",
+        "Land only the clean, qualified candidate through protected main checks; component evidence is not whole-roadmap or production activation acceptance."
       ],
       "historical_source_claim": {
         "source": {
@@ -114406,7 +114478,20 @@
         "Codex_required": false,
         "Codex_quota_blocker": false,
         "review_acceptance_established": false
-      }
+      },
+      "current_state_history": [
+        {
+          "recorded_utc": "2026-10-07T12:28:03.056064+00:00",
+          "previous_current_state": "source-integrated-requirement-focused-acceptance-pending",
+          "previous_remaining_acceptance": [
+            "meaningful original native RED retained; focused failed-freeze lifecycle node passed within the mixed CP42 run; integrated qualification pending; exact current focused/owning remains separately established only with matching evidence.",
+            "Establish current exact requirement-focused behavioral qualification; shared/older component evidence is bounded.",
+            "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
+            "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
+            "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+          ]
+        }
+      ]
     },
     "incoming-pr1160-review-20261006:F019": {
       "requirement_id": "incoming-pr1160-review-20261006:F019",
@@ -114622,11 +114707,20 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "source-integrated-prior-nonce-repair-external-native-interim8-propertarget-review-owning-pending",
+      "current_state": "source-integrated-native-approval-resume-and-retained-horizon-scoped-green",
       "source_repair": {
         "commit": "de519d7776d8c9ea101d1aec271fd0be54dca632",
         "commits": [
-          "de519d7776d8c9ea101d1aec271fd0be54dca632"
+          "de519d7776d8c9ea101d1aec271fd0be54dca632",
+          "c84e0872ecaf24e3c4260d7b3c60f03e5c2ba49f",
+          "ceb94a455bfd9071b993f4564f8537b86d373101",
+          "b73e51059fc061353ef344f0a0aaf3425384df16",
+          "695380676f0f3dfcf115a1cc11252d724d5d93ec",
+          "b8cbf63662fd2a61d8cfd34e899ef6f9df445d79",
+          "d49b28f8c2a2f62b810c1a9e42444b9f636c24a2",
+          "d23f31985c7393febab20c64b21cf12d6ff90a14",
+          "6a896f60c64b9aa991e61eac040ffb516f065b9a",
+          "3eca2c155d1092053faf1c3db2669817ce6aa70c"
         ],
         "files": [
           "crates/kernel/chio-kernel/src/kernel/credential_reservation/native_dispatch.rs",
@@ -114644,11 +114738,11 @@
           "crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller.rs": "21dde73812613581c9e3574bd8e9177ea88edd37b87457139188c35c51148cc6",
           "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/capture.rs": "ddc02e666dd6511987acc2a5b983a4d3ce76f70bba668d3615ece696a07f2725"
         },
-        "observed_source_head": "b8f061ca578beb9c9a94accde304962a42f7a5c2",
+        "observed_source_head": "e446a408ea69c7cbb5539dc15deb00da7f24d485",
         "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
       },
       "source_integrated": true,
-      "focused_green": false,
+      "focused_green": true,
       "owning_pending": true,
       "native_pending": true,
       "trusted_pending": true,
@@ -114752,13 +114846,24 @@
           "sha256": "374820cb5d8f482d2b097599b226cdeafb4548f73851e3b483fa85797f999825",
           "category": "native-threshold-capture-exploratory0_2",
           "scope": "Separate uncommitted09/10 variants each0/2; error before physical commit/effect, no pastTTL expiry Original."
+        },
+        {
+          "path": "/home/connor/.cache/chio-security-landing-20261004/sprawl-execution/ci-feedback-20261005/integration-c84e-independent30-result-packet.json",
+          "sha256": "ad5f0a5f3fd427f5c1cc9ea5810ad95549296e0ae2606ee4def42ea463fd574a",
+          "scope": "Caller3, witness/chronology13, migration13 and six-version public control pass; initial range lint failure retained."
+        },
+        {
+          "path": "/home/connor/lanes/integration/docs/security/audits/production-repair-checkpoint-20261007.json",
+          "sha256": "60bb17f6a66e89a38603b6cbe7c1e87c7769496494805682fea19fc00e335617",
+          "scope": "Current scoped repair checkpoint, passing/failing/setup outcomes preserved; foundation remains unqualified/unmerged."
         }
       ],
       "remaining_acceptance": [
-        "Complete exact externalinterim8/proper-target finalsource review and same actualowning/expiry/replay/negative controls before selective guardedintegration; oldlatent target hypotheses/failures remain history and are not currentintegratedacceptance.",
-        "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
-        "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
-        "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+        "Caller3 and witness/chronology13 pass on composed source; old gate/capture/post-effect failures remain preserved.",
+        "Complete the remaining combined-source owning suites and optional feature matrix, with exact package/feature/environment scope.",
+        "Complete required native platform, cold mutation, trusted capture/publication and terminal exact-source hosted checks.",
+        "Obtain positive independent review of the exact final source; request Greptile when available and preserve unavailable service attempts without an availability blocker.",
+        "Land only the clean, qualified candidate through protected main checks; component evidence is not whole-roadmap or production activation acceptance."
       ],
       "historical_source_claim": {
         "source": {
@@ -115349,7 +115454,19 @@
           "current_owning_or_native_Green": false,
           "older_latent_target_and09_10_precommit_failures_retained_as_history": true
         }
-      }
+      },
+      "current_state_history": [
+        {
+          "recorded_utc": "2026-10-07T12:28:03.056064+00:00",
+          "previous_current_state": "source-integrated-prior-nonce-repair-external-native-interim8-propertarget-review-owning-pending",
+          "previous_remaining_acceptance": [
+            "Complete exact externalinterim8/proper-target finalsource review and same actualowning/expiry/replay/negative controls before selective guardedintegration; oldlatent target hypotheses/failures remain history and are not currentintegratedacceptance.",
+            "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
+            "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
+            "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+          ]
+        }
+      ]
     },
     "incoming-pr1160-review-20261006:F022": {
       "requirement_id": "incoming-pr1160-review-20261006:F022",
@@ -115638,11 +115755,12 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "source-integrated-PARTIAL-older-focused-evidence-current-financial6_12-open",
+      "current_state": "source-integrated-return-guard-denial-coverage-scoped-green",
       "source_repair": {
         "commit": "de519d7776d8c9ea101d1aec271fd0be54dca632",
         "commits": [
-          "de519d7776d8c9ea101d1aec271fd0be54dca632"
+          "de519d7776d8c9ea101d1aec271fd0be54dca632",
+          "cd0d2dcb4a1bbecec842c1bcc3f3d629bcb1a9c6"
         ],
         "files": [
           "crates/kernel/chio-kernel/src/kernel/evaluation/return_recording.rs",
@@ -115654,11 +115772,11 @@
           "crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_core.rs": "00648bd2d20b55510a14f2a8c0d10173e969586e7624140b3f15e337b7b5ca1f",
           "crates/kernel/chio-kernel/src/kernel/evaluation/nested_flow_evaluation.rs": "f13115fac6938d0de11cc7524294380d18cacb00be27927001194ceeb946ca80"
         },
-        "observed_source_head": "b8f061ca578beb9c9a94accde304962a42f7a5c2",
+        "observed_source_head": "e446a408ea69c7cbb5539dc15deb00da7f24d485",
         "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
       },
       "source_integrated": true,
-      "focused_green": false,
+      "focused_green": true,
       "owning_pending": true,
       "native_pending": true,
       "trusted_pending": true,
@@ -115732,17 +115850,24 @@
           "sha256": "01c4188eb877d3d686126db744e19b6e52dc632b793277c3f2e1c0436dc93b02",
           "category": "closed-finite20-19_1-current-runtime",
           "scope": "Actual5 scopes:financial17/1+nativeclock1+router1; true trusted-time failure retained. No fullcrate/currentall18Green claim."
+        },
+        {
+          "path": "/home/connor/.cache/chio-security-landing-20261004/sprawl-execution/ci-feedback-20261005/integration-77b9-f030-coverage19-strict-result-packet.json",
+          "sha256": "7000fed4d1f50e171582ed232633e429b50f8580341bc84486d5b8b8687ef8dd",
+          "scope": "19 executions, 15 unique cases across default and admission support; both inclusive strict variants pass."
+        },
+        {
+          "path": "/home/connor/lanes/integration/docs/security/audits/production-repair-checkpoint-20261007.json",
+          "sha256": "60bb17f6a66e89a38603b6cbe7c1e87c7769496494805682fea19fc00e335617",
+          "scope": "Current scoped repair checkpoint, passing/failing/setup outcomes preserved; foundation remains unqualified/unmerged."
         }
       ],
       "remaining_acceptance": [
-        "Retain finite20 financial17/1: true trusted operation time regressed failure in missing-original-adapter recovery isolation. No currentall18Green/fullcrate claim; root/owner diagnoses production clock gap without synthetic clock/effect waiver.",
-        "Resolve actual financial18 current6/12 failures at native error/source and signed metadata locator; preserve original18 and earlier30 failure provenance. No advancing-clock/effect closure inferred.",
-        "Current financial18 and advancing/native-clock residual remain open: actual temporary diagnostic returnedOk(0) but failed unchanged predicate, no production closure inferred.",
-        "genuine behavioral RED retained; coherent bounded implementation applied; focused GREEN requested; exact current focused/owning remains separately established only with matching evidence.",
-        "Establish current exact requirement-focused behavioral qualification; shared/older component evidence is bounded.",
-        "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
-        "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
-        "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+        "Ordinary/nested returned-output guard denial and accepting controls pass; no fresh output authority from denial.",
+        "Complete the remaining combined-source owning suites and optional feature matrix, with exact package/feature/environment scope.",
+        "Complete required native platform, cold mutation, trusted capture/publication and terminal exact-source hosted checks.",
+        "Obtain positive independent review of the exact final source; request Greptile when available and preserve unavailable service attempts without an availability blocker.",
+        "Land only the clean, qualified candidate through protected main checks; component evidence is not whole-roadmap or production activation acceptance."
       ],
       "historical_source_claim": {
         "source": {
@@ -115775,7 +115900,23 @@
         "Codex_quota_blocker": false,
         "review_acceptance_established": false
       },
-      "current_financial18_runtime": "CLOSED17pass1fail; missing-original-adapter other-request isolation still fails real trusted-time invariant"
+      "current_financial18_runtime": "CLOSED17pass1fail; missing-original-adapter other-request isolation still fails real trusted-time invariant",
+      "current_state_history": [
+        {
+          "recorded_utc": "2026-10-07T12:28:03.056064+00:00",
+          "previous_current_state": "source-integrated-PARTIAL-older-focused-evidence-current-financial6_12-open",
+          "previous_remaining_acceptance": [
+            "Retain finite20 financial17/1: true trusted operation time regressed failure in missing-original-adapter recovery isolation. No currentall18Green/fullcrate claim; root/owner diagnoses production clock gap without synthetic clock/effect waiver.",
+            "Resolve actual financial18 current6/12 failures at native error/source and signed metadata locator; preserve original18 and earlier30 failure provenance. No advancing-clock/effect closure inferred.",
+            "Current financial18 and advancing/native-clock residual remain open: actual temporary diagnostic returnedOk(0) but failed unchanged predicate, no production closure inferred.",
+            "genuine behavioral RED retained; coherent bounded implementation applied; focused GREEN requested; exact current focused/owning remains separately established only with matching evidence.",
+            "Establish current exact requirement-focused behavioral qualification; shared/older component evidence is bounded.",
+            "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
+            "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
+            "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+          ]
+        }
+      ]
     },
     "incoming-pr1160-review-20261006:F024": {
       "requirement_id": "incoming-pr1160-review-20261006:F024",
@@ -117311,14 +117452,17 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "source-integrated-scoped-cancellation4PASS-SourceAccepted-publiccommitretry-P2-Original-still-open",
+      "current_state": "source-integrated-cancel-and-expired-plan-retry-reconciliation-scoped-green",
       "source_repair": {
         "commit": "672fb2fd633b0bf36e8f44625ec517c896c70d53",
         "commits": [
           "30dcb256c1dca5b579968edaa43f121b13e80f31",
           "63defbe6dc0535c3b9401aebe3a5bd93bc00c496",
           "5f764c42f6a5e933fefa439383bb70fc45cf8783",
-          "672fb2fd633b0bf36e8f44625ec517c896c70d53"
+          "672fb2fd633b0bf36e8f44625ec517c896c70d53",
+          "c35c1779ac7b1f3dc22acf27c55a7184cb8b73e5",
+          "0736d99bacbb2b3791f9a76a32a0105fed2b1cfa",
+          "4c1f1feb5b422d8b2f154346fffa71ca2b3136f1"
         ],
         "files": [
           "crates/kernel/chio-kernel/src/kernel/active_response_coordinator.rs",
@@ -117330,12 +117474,12 @@
           "crates/platform/chio-control-plane/src/security/event_consumer/tests/real_adapter/kernel_review.rs": "d0950212a2ade43eaec8a47fad4d78a5702376bbb69ee959f86be35d37d3701c",
           "crates/platform/chio-control-plane/src/security/event_consumer/tests/real_adapter/kernel_review/operator_cancel.rs": "a2ff0137c716b819bb7fc76bfc3aad8cacbb9159955a48847576f6d6a7b10643"
         },
-        "observed_source_head": "576f7d4d2f077ea83384ec0ccfdd4e315e7144c8",
+        "observed_source_head": "e446a408ea69c7cbb5539dc15deb00da7f24d485",
         "scope": "Public cancellation exact-bound committed-approval reconciliation only; startup repair retained and publiccommitretry pending.",
         "basis": "Exact accepted component receipt, selective integrated commit/path proof and current bytes; not containing-commit inference."
       },
       "source_integrated": true,
-      "focused_green": false,
+      "focused_green": true,
       "owning_pending": true,
       "native_pending": true,
       "trusted_pending": true,
@@ -117460,14 +117604,24 @@
           "sha256": "6926fe2945ccab8ffb87c292090e110a9696589ff8128ee405c4297f5fd73546",
           "category": "F030-cancellation-only-final-ScopedSourceAccepted",
           "scope": "Demonstrated cancellation repair only; publiccommitretry remains sourceP2 Originalpending."
+        },
+        {
+          "path": "/home/connor/.cache/chio-security-landing-20261004/sprawl-execution/ci-feedback-20261005/integration-77b9-f030-coverage19-strict-result-packet.json",
+          "sha256": "7000fed4d1f50e171582ed232633e429b50f8580341bc84486d5b8b8687ef8dd",
+          "scope": "19 executions, 15 unique cases across default and admission support; both inclusive strict variants pass."
+        },
+        {
+          "path": "/home/connor/lanes/integration/docs/security/audits/production-repair-checkpoint-20261007.json",
+          "sha256": "60bb17f6a66e89a38603b6cbe7c1e87c7769496494805682fea19fc00e335617",
+          "scope": "Current scoped repair checkpoint, passing/failing/setup outcomes preserved; foundation remains unqualified/unmerged."
         }
       ],
       "remaining_acceptance": [
-        "Public commit-prepared retry in same committedapproval/failedCAS window remainsOPEN: genuine same-request retry after originalexpiry with actual owned kernel clock, minimal exact-bound reconciliation repair and identical Green/negative/fatal controls required.",
-        "Retain composed cancellation4PASS/CPstrict0 as scope only; no wholeF030 rowclosure or prediction-as-RED.",
-        "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
-        "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
-        "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+        "Committed approval is reconciled before cancellation and retry compensation; verified trigger is plan expiry, not an independent capability-expiry guarantee.",
+        "Complete the remaining combined-source owning suites and optional feature matrix, with exact package/feature/environment scope.",
+        "Complete required native platform, cold mutation, trusted capture/publication and terminal exact-source hosted checks.",
+        "Obtain positive independent review of the exact final source; request Greptile when available and preserve unavailable service attempts without an availability blocker.",
+        "Land only the clean, qualified candidate through protected main checks; component evidence is not whole-roadmap or production activation acceptance."
       ],
       "historical_source_claim": {
         "source": {
@@ -117907,6 +118061,19 @@
             "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
           },
           "historical_real_repair_preserved": true
+        }
+      ],
+      "current_state_history": [
+        {
+          "recorded_utc": "2026-10-07T12:28:03.056064+00:00",
+          "previous_current_state": "source-integrated-scoped-cancellation4PASS-SourceAccepted-publiccommitretry-P2-Original-still-open",
+          "previous_remaining_acceptance": [
+            "Public commit-prepared retry in same committedapproval/failedCAS window remainsOPEN: genuine same-request retry after originalexpiry with actual owned kernel clock, minimal exact-bound reconciliation repair and identical Green/negative/fatal controls required.",
+            "Retain composed cancellation4PASS/CPstrict0 as scope only; no wholeF030 rowclosure or prediction-as-RED.",
+            "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
+            "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
+            "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+          ]
         }
       ]
     },
@@ -129002,5 +129169,10 @@
     "current77_complete_or_fullqualified": false,
     "foundation_merged": false,
     "fresh_writer_guarded_metadata_install_only": "Rootwriter authorizednowCLOSED; workerdoesnotinstall, exact2pathmanifest afterafterguard/coverage0"
+  },
+  "production_repair_checkpoint_20261007": {
+    "path": "/home/connor/lanes/integration/docs/security/audits/production-repair-checkpoint-20261007.json",
+    "sha256": "60bb17f6a66e89a38603b6cbe7c1e87c7769496494805682fea19fc00e335617",
+    "scope": "Current scoped repair checkpoint, passing/failing/setup outcomes preserved; foundation remains unqualified/unmerged."
   }
 }

@@ -1777,3 +1777,17 @@ Current source is `576f7d4d2f077ea83384ec0ccfdd4e315e7144c8`, with exactly two u
 | Review clarification | Root-authorized [reply4203968226](https://github.com/bb-connor/arc/pull/1160#discussion_r4203968226) retained: existing testpolicy clarified, production unwrap/expect denial intact. | Thread is NOT resolved and no fresh strict qualification inferred. Current final Greptile plus independentinternal review underexplicituseroverride remainsrequired; Codexquota is historicalunavailable, notmandatoryblocker. |
 
 Original1,609 obligations and all review/architecture/deferred tracks remain preserved; current77 is neither fullyaccepted norqualified. Foundation1160 remainsunmerged and no roadmap/M11/operational closure is claimed. Root/writer may install only the guarded twoledgerpaths at this explicitCLOSED boundary after unchangedafterguard and bookkeeping checks; this worker performs no Source/Git/Cargo mutation or metadata installation.
+
+
+## Current repair checkpoint (October 7, 2026)
+
+The JSON current requirement view and [repair checkpoint](audits/production-repair-checkpoint-20261007.json) supersede earlier dated current-state observations. All 1,739 original requirement rows remain unchanged. The foundation remains unmerged and unqualified.
+
+- Native terminal chronology and revoked caller recovery are repaired. The retained native12/clock6 scope passes; the revoked-caller original1/2 becomes3/0, with five global-fault/forged-report controls passing.
+- Native approval resume and retained horizons are integrated with caller3 and composed witness/history13 passing. The external historical gate, capture and post-effect failures remain separate.
+- Cancellation/retry and capture/output/settlement coverage pass19 executions across15 unique cases with both strict variants. Capture readback is an in-memory fixture scope; settlement coverage uses panic/reopen, not SIGKILL.
+- Thirteen canonical migration regressions and a six-version nonempty public upgrade control pass. The unchanged range-equivalent strict retry passes.
+- The deterministic pagination original has two passing old-order controls and one real empty-page failure. The bounded repair passes all six focused cases, all34 recovery-family cases, strict three-crate all-targets lint and unchanged structural gates. Legacy capacity exhaustion returns an explicit refusal, without partial success.
+- Private benchmark-directory creation is repaired after observed0775 refusal and same-directory0700 success. Full benchmark workloads remain pending.
+
+Remaining work is the unrun owning and optional-feature matrix, full benchmarks, final source inventory/codegen/supply-chain checks, exact-source independent review and available Greptile review, required cold/native/trusted evidence, terminal hosted checks and protected landing. Review-service quota or availability does not block execution. No scoped pass establishes main landing, release or activation.
