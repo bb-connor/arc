@@ -11,7 +11,7 @@ help: Check that the patched package version and available features are compatib
       with the dependency requirements. If the patch has a different version from
       what is locked in the Cargo.lock file, run `cargo update` to use the new
       version. This may also occur with an optional dependency that is not enabled.
-    Finished `test` profile [unoptimized] target(s) in 0.98s
+    Finished `test` profile [unoptimized] target(s) in 1.18s
      Running unittests src/lib.rs (/home/connor/chio-pr1173-target/debug/deps/chio_runtime_core-6cf546f9704af923)
      Running tests/lease_boundaries.rs (/home/connor/chio-pr1173-target/debug/deps/lease_boundaries-b99f4d5935b08bf0)
      Running tests/lease_write_fencing.rs (/home/connor/chio-pr1173-target/debug/deps/lease_write_fencing-23629f90f1db80f0)

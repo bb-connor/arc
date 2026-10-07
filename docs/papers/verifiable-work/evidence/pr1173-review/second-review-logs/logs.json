@@ -6522,6 +6522,546 @@
       "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
       "bytes": 346,
       "sha256": "8433b2ccd9212a88fc6dabfc63dad0ee5f8564afe6584654c58c28e583e24e4b"
+    },
+    {
+      "log": "15ffb08fe7-cve-artifact-metadata.json.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. All successes, failures, skips and pending states retain their original source scope.",
+      "bytes": 788,
+      "sha256": "c3e34e97deea31856a2cbce5fd79610fbe70743d2e8af448c84f6c9df01dadcc"
+    },
+    {
+      "log": "15ffb08fe7-cve-artifact.zip.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. All successes, failures, skips and pending states retain their original source scope.",
+      "bytes": 12058,
+      "sha256": "43e961f6a4c486097d391104b886ee74974fe6c70e5273cb9e05f647d62c08f9"
+    },
+    {
+      "log": "15ffb08fe7-failed-job-112543397277.log.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. All successes, failures, skips and pending states retain their original source scope.",
+      "bytes": 153847,
+      "sha256": "29d6e9d58ec3d7fa0e4fd351ba2c99868897ff322695a84bd43316cbf16a054b"
+    },
+    {
+      "log": "15ffb08fe7-failed-job-112543397323.log.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. All successes, failures, skips and pending states retain their original source scope.",
+      "bytes": 1469077,
+      "sha256": "84ce5ecbf7a8c3c2ee3faa6b7a59ddc56dbc85b2ce47bf229ed28de95f682328"
+    },
+    {
+      "log": "15ffb08fe7-failed-job-112543397377.log.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. All successes, failures, skips and pending states retain their original source scope.",
+      "bytes": 152834,
+      "sha256": "91e0b37bfd85d1c68f4fb0b1e502bedb6af9919237e7882bd1be1cde4b4f82ee"
+    },
+    {
+      "log": "15ffb08fe7-failed-job-112543397420.log.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. All successes, failures, skips and pending states retain their original source scope.",
+      "bytes": 509061,
+      "sha256": "f60de42a4fd7212a26bc51c45c254bf395e4771523a47c5fcba5c20b62b8a29e"
+    },
+    {
+      "log": "15ffb08fe7-fuzz-verification.log.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. All successes, failures, skips and pending states retain their original source scope.",
+      "bytes": 239,
+      "sha256": "94067b4f8cedab357fc370606a3a87742a15f9ac39dde6088dabe17622579485"
+    },
+    {
+      "log": "15ffb08fe7-hosted-collector-stop-for-renewal.json.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. All successes, failures, skips and pending states retain their original source scope.",
+      "bytes": 842,
+      "sha256": "f3908288bb38bdea9c8d4ad5ca1907585d7fbc8df5d3d97770ebf870d32c4f3c"
+    },
+    {
+      "log": "15ffb08fe7-hosted-job-112538118584.log.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. All successes, failures, skips and pending states retain their original source scope.",
+      "bytes": 417061,
+      "sha256": "7a0d56b34bcb5ed2617f697c6131b58ed1e7b2b6e4a6d1d4f8ba227833087962"
+    },
+    {
+      "log": "15ffb08fe7-hosted-job-112538118895.log.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. All successes, failures, skips and pending states retain their original source scope.",
+      "bytes": 81369,
+      "sha256": "1cd4fd910f0e9c67188342e9f79de87b19c8c4bd0a566cb4bd567431614c4f20"
+    },
+    {
+      "log": "15ffb08fe7-hosted-job-112539936001.log.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. All successes, failures, skips and pending states retain their original source scope.",
+      "bytes": 2539814,
+      "sha256": "0dfb302ecc17499467e33d56867fe0f15360dea6f204478a8688aa1ea5f157ed"
+    },
+    {
+      "log": "15ffb08fe7-hosted-job-112539936001.verification.json.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. All successes, failures, skips and pending states retain their original source scope.",
+      "bytes": 2410,
+      "sha256": "d4b55137968651486d8eb37c997e57f163de3ba3a1ececd77893acbc170405f5"
+    },
+    {
+      "log": "15ffb08fe7-hosted-job-112540202173.log.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. All successes, failures, skips and pending states retain their original source scope.",
+      "bytes": 108251723,
+      "sha256": "d223f63c5f5d379e7b5539bf27818f61b5b013d7c2e2bfcefb6c752546e85a94"
+    },
+    {
+      "log": "15ffb08fe7-hosted-job-112540202173.verification.json.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. All successes, failures, skips and pending states retain their original source scope.",
+      "bytes": 5430,
+      "sha256": "230cc940c1b0814075c33c49774025787a553d5b86b707e4af13566aadaecd44"
+    },
+    {
+      "log": "15ffb08fe7-image-audit-job-112538117709.log.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. All successes, failures, skips and pending states retain their original source scope.",
+      "bytes": 60958,
+      "sha256": "44197e23d92cf1055870f4ef969fbcbfbd12540d68c1a3eca3dfe637cae2f876"
+    },
+    {
+      "log": "15ffb08fe7-image-audit-job-112538118237.log.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. All successes, failures, skips and pending states retain their original source scope.",
+      "bytes": 157283,
+      "sha256": "8ac9a3c7e86e07da20e246ee887f8df3b1b10691c036dbfbe97505555453f7c8"
+    },
+    {
+      "log": "15ffb08fe7-image-audit-qualification.json.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. All successes, failures, skips and pending states retain their original source scope.",
+      "bytes": 37530,
+      "sha256": "49cc025c880434a318f32bc01078e4aaf069ab8a15a5a47a33bb6477d1b57046"
+    },
+    {
+      "log": "15ffb08fe7-kani-verification.log.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. All successes, failures, skips and pending states retain their original source scope.",
+      "bytes": 156,
+      "sha256": "9f301137e08bfc4350c2051ed34f0918901eb00479815dc4487fa8ca3799995f"
+    },
+    {
+      "log": "15ffb08fe7-postgres-artifact-index.json.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. All successes, failures, skips and pending states retain their original source scope.",
+      "bytes": 2699,
+      "sha256": "56bdccada0bc536ff1cd0d871355651bdcf395316e2ffdd7e18ba9a739bc73a6"
+    },
+    {
+      "log": "15ffb08fe7-postgres-download.log.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. All successes, failures, skips and pending states retain their original source scope.",
+      "bytes": 362,
+      "sha256": "32ee6ffb967af02b4ba6413f345d088e2e32e80839a29e6d3ed78e2d6d69448d"
+    },
+    {
+      "log": "15ffb08fe7-postgres-verification.log.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. All successes, failures, skips and pending states retain their original source scope.",
+      "bytes": 321,
+      "sha256": "00a1e17f86be87c1140bd5404a882cfd82aec4438bdfb813eb8d3429a34ebf4f"
+    },
+    {
+      "log": "15ffb08fe7-pushed-candidate-verification.json.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. All successes, failures, skips and pending states retain their original source scope.",
+      "bytes": 694,
+      "sha256": "a4bf5756f92ecf6830f2eb822279614818399586b97d56c017953905dd0dd8db"
+    },
+    {
+      "log": "15ffb08fe7-skip-conditions-initial.json.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. All successes, failures, skips and pending states retain their original source scope.",
+      "bytes": 3663,
+      "sha256": "5f512b7058f0666167a26409d679fbc6cc7d937bce0351784dc147e304d7a13d"
+    },
+    {
+      "log": "15ffb08fe7-skip-conditions-preceding-final.json.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. All successes, failures, skips and pending states retain their original source scope.",
+      "bytes": 6912,
+      "sha256": "e3ef3205ecf5bceaee7182fefc0f0107d40faaffc42a3f061ec58fe6a82b6bc1"
+    },
+    {
+      "log": "hosted-qualification-15ffb08fe7.status.json.gz",
+      "observed_result": "Frozen preceding-candidate collector state, including authenticated results and explicit supervisor interruption; not new-head acceptance.",
+      "bytes": 118528,
+      "sha256": "1f7a1dcdd47c858b799a5e4c0cba16a0fb984ffcd673257c5f740b43e2235c9d"
+    },
+    {
+      "log": "postgres-broker-preparation-lifetime-15ffb08fe7.zip.gz",
+      "observed_result": "Authenticated preceding-candidate actual unignored runtime-retirement archive.",
+      "bytes": 565,
+      "sha256": "c6ebe0860ab54026cfc884549bd630821907d42c32006de031ec0d43756bb586"
+    },
+    {
+      "log": "postgres-job-claim-loss-qualification-15ffb08fe7.zip.gz",
+      "observed_result": "Authenticated preceding-candidate native archive with GitHub digest and signed receipts.",
+      "bytes": 30259,
+      "sha256": "06fa9c1774fee48d5be41aa97050f34f89140944be430837ac1795cae7ea04c1"
+    },
+    {
+      "log": "postgres-job-process-qualification-15ffb08fe7.zip.gz",
+      "observed_result": "Authenticated preceding-candidate native archive with GitHub digest and signed receipts.",
+      "bytes": 44251,
+      "sha256": "8fb45e1bff0368ed76e23636d9887dea1f96c5ae0ecb06132e0ceb7598f91626"
+    },
+    {
+      "log": "production-security-owner-handoff-15ffb08fe7.json.gz",
+      "observed_result": "Source-hash handoff at its original source checkpoint; no handoff completion or new authorization claim.",
+      "bytes": 5748,
+      "sha256": "a35aabd4f7d7f5b99e4f35e269fce2ed68d4bc525c1f33cbce4b0530111920ea"
+    },
+    {
+      "log": "qualification-2bec7eb980.status.json.gz",
+      "observed_result": "Actual terminal current-source native21; complete canonical inventory authoritative.",
+      "bytes": 267,
+      "sha256": "9676138e6e5a680fb4f7dadf934a29df3b310313bef962c4c58ed185503e4eb8"
+    },
+    {
+      "log": "receipt-verifier-2bec7eb980-build.log.gz",
+      "observed_result": "Actual current-source offline receipt verifier build and binary hash; no new native acceptance.",
+      "bytes": 1660,
+      "sha256": "962f359afa527d40ce3efbffd46509adbd20e0b326dc9530b59ecd5e29e4b5d0"
+    },
+    {
+      "log": "receipt-verifier-2bec7eb980.status.json.gz",
+      "observed_result": "Actual current-source offline receipt verifier build and binary hash; no new native acceptance.",
+      "bytes": 565,
+      "sha256": "88f42f918fa982028a9984cc175c974465880fa97c38b2ccea2161e242b9323f"
+    },
+    {
+      "log": "review-native-qualification-2bec7eb980.log.gz",
+      "observed_result": "Actual current-source native output; no physical x86 acceptance claim.",
+      "bytes": 539,
+      "sha256": "2f9ae3054dab218365355243d1ab3075d4f152a77b722adfd4ce3b7757a7199f"
+    },
+    {
+      "log": "security-active-conformance-namespace-green.log.gz",
+      "observed_result": "Actual namespace gate RED/GREEN and real ten-case Rust execution. All counts, identities and zero ignore/filter requirements retained.",
+      "bytes": 64,
+      "sha256": "49e0b289b6a16d1d8593ca663e5438b00c832014974e6c45abdcdbe300aeff15"
+    },
+    {
+      "log": "security-active-conformance-namespace-green.status.json.gz",
+      "observed_result": "Actual namespace gate RED/GREEN and real ten-case Rust execution. All counts, identities and zero ignore/filter requirements retained.",
+      "bytes": 338,
+      "sha256": "ef23b5d140164941728dadfab436444d887cdaccc2d6f9b6a16e5539c622daeb"
+    },
+    {
+      "log": "security-active-conformance-namespace-red.log.gz",
+      "observed_result": "Actual namespace gate RED/GREEN and real ten-case Rust execution. All counts, identities and zero ignore/filter requirements retained.",
+      "bytes": 82,
+      "sha256": "4dd80a152d8e7280028b5895d5eddd0f2d13afdc2670813ea0e95a6d79bd6f47"
+    },
+    {
+      "log": "security-active-conformance-namespace-red.status.json.gz",
+      "observed_result": "Actual namespace gate RED/GREEN and real ten-case Rust execution. All counts, identities and zero ignore/filter requirements retained.",
+      "bytes": 336,
+      "sha256": "c43f8c9d287e3e5e39b6c7c6e46a2451a32215cbea416855be2173509fce545c"
+    },
+    {
+      "log": "security-active-conformance-real-cargo.log.gz",
+      "observed_result": "Actual namespace gate RED/GREEN and real ten-case Rust execution. All counts, identities and zero ignore/filter requirements retained.",
+      "bytes": 2471,
+      "sha256": "dd7fd2ab08a0694128a85b703bd7a19c09f1716d4ffe136f3414d1cb5280ae2c"
+    },
+    {
+      "log": "security-active-conformance-real-cargo.status.json.gz",
+      "observed_result": "Actual namespace gate RED/GREEN and real ten-case Rust execution. All counts, identities and zero ignore/filter requirements retained.",
+      "bytes": 467,
+      "sha256": "2a32432453c69c45fc4a395915eb522beda62550c7cca0cffba33a6b999a644a"
+    },
+    {
+      "log": "security-git-lazy-fetch-reproduction.json.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 378,
+      "sha256": "ddc68cabeae0a9fccb5c258aaf7838da32a1ccdd89739b2827531c7834087011"
+    },
+    {
+      "log": "security-git-offline-authority-20261007T010206Z.json.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 523,
+      "sha256": "6213e52dacdb8aa6561a3f1b58372f5ef573b853cb2e037a5fc319d9ba5af056"
+    },
+    {
+      "log": "security-git-offline-boundary-green-v2.log.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 2156,
+      "sha256": "1c371989402a31327be5bc070d5e0dad8811cc60dc754e6e09a0a27c7ed0704c"
+    },
+    {
+      "log": "security-git-offline-boundary-green-v2.status.json.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 338,
+      "sha256": "85b94201c7f7e1585d972621c9ddc746cae2ba8b5f325c7d170c10e98051f25b"
+    },
+    {
+      "log": "security-git-offline-boundary-green.log.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 1989,
+      "sha256": "28f2fa023369fb9bffb9f1b4068ad2ca937431acc3a4ab32391872c6cbc506c4"
+    },
+    {
+      "log": "security-git-offline-boundary-green.status.json.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 399,
+      "sha256": "2c9025832e4aa15ada96c0ef0451b59d1dd815769edb6883ea30418ed6408e9a"
+    },
+    {
+      "log": "security-git-offline-boundary-red.log.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 6461,
+      "sha256": "9595a3c37bfd0d2d187564f311805bbde3ca0aebbbeb5432ca9509c2cb788992"
+    },
+    {
+      "log": "security-git-offline-boundary-red.status.json.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 397,
+      "sha256": "36b7fdbfb580400104b6482058db9bffc75e87690c23af27599cd515a8bff24f"
+    },
+    {
+      "log": "security-git-offline-ci-complete-ci-contract.log.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 1393,
+      "sha256": "2eb23d7869b870667653c5a47f4d79618b9cd080d46b49ac7364b4b51e911f23"
+    },
+    {
+      "log": "security-git-offline-ci-final-complete-ci-contract.log.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 168,
+      "sha256": "c362b28e2f7ab19c9ce24128d98227c7dbbcadec26f477ee57ac8db32b106d32"
+    },
+    {
+      "log": "security-git-offline-ci-final-supervisor.log.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 23,
+      "sha256": "cd7c25b5a2c3c683c4b04ed46b6625ec04ecbda124a1aac05ba5b313d0b23416"
+    },
+    {
+      "log": "security-git-offline-ci-final.status.json.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 6561450,
+      "sha256": "e4c602efbec9d0d5c1c291bb7efa05702256334159a27cde42af32166901b273"
+    },
+    {
+      "log": "security-git-offline-ci-supervisor.log.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 590,
+      "sha256": "b91f7f553fb147e1ade217e1761b8cbaf26932cac1bb099948a72ffba8646803"
+    },
+    {
+      "log": "security-git-offline-ci-v2-complete-ci-contract.log.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 168,
+      "sha256": "c362b28e2f7ab19c9ce24128d98227c7dbbcadec26f477ee57ac8db32b106d32"
+    },
+    {
+      "log": "security-git-offline-ci-v2-supervisor.log.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 23,
+      "sha256": "cd7c25b5a2c3c683c4b04ed46b6625ec04ecbda124a1aac05ba5b313d0b23416"
+    },
+    {
+      "log": "security-git-offline-ci-v2.status.json.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 6561292,
+      "sha256": "ad0ba9edc392cbec827cb772d04ca5d37f47c4085ec7cf8aecaf6fdfd1dcebd4"
+    },
+    {
+      "log": "security-git-offline-ci.status.json.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 6561643,
+      "sha256": "24c333ac572ba73b18436656e764dde99acd9a9e90adf5356703c87e36e91ab4"
+    },
+    {
+      "log": "security-git-offline-controls-execution-container.log.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 622,
+      "sha256": "3fea7791ca3711898b2fde0cb99046d0ff4abf7adf392ad70f4aac63dd7bd77e"
+    },
+    {
+      "log": "security-git-offline-controls-final-active-conformance-inventory.log.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 64,
+      "sha256": "49e0b289b6a16d1d8593ca663e5438b00c832014974e6c45abdcdbe300aeff15"
+    },
+    {
+      "log": "security-git-offline-controls-final-diff-hygiene.log.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "security-git-offline-controls-final-execution-container.log.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 198,
+      "sha256": "1d3d7e123cfb602ca813555b2a85ba9754d5852c0fcb1aba25b0d012dce31c35"
+    },
+    {
+      "log": "security-git-offline-controls-final-git-source-identity.log.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 2156,
+      "sha256": "283233e944ab3b30ef0d78eb18151d03237e58874fe99ed8352267cd3ca360a5"
+    },
+    {
+      "log": "security-git-offline-controls-final-live-ci-contract.log.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 49,
+      "sha256": "42e0bda87f001b3984f23ebc31c9b16dec657cc2e0a06bcf46b613e8b026fd92"
+    },
+    {
+      "log": "security-git-offline-controls-final-python-syntax.log.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "security-git-offline-controls-final-shard-aggregation.log.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 113,
+      "sha256": "c62c4d4a3a9c37dd476370307438e96a7cb56aede14986b73f7fb5234ca70e41"
+    },
+    {
+      "log": "security-git-offline-controls-final-shell-syntax.log.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "security-git-offline-controls-final-supervisor.log.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 160,
+      "sha256": "9e46f4079f5e36088e46118bbc9faad6bfae904853f3399819f1e68dc7ba41a6"
+    },
+    {
+      "log": "security-git-offline-controls-final.status.json.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 6564507,
+      "sha256": "e187ada7870c4d8b42d527271a2cfd54eeab264a2fce696c0f85e9b945aa4525"
+    },
+    {
+      "log": "security-git-offline-controls-git-source-identity.log.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 2156,
+      "sha256": "05c5498fba0bcef2a17e6a588f69bef6977eec2b72ac1935a4bb5afeaec4ce5e"
+    },
+    {
+      "log": "security-git-offline-controls-supervisor.log.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 621,
+      "sha256": "0c7ae37203f1da932702c034eb5ff4cd5b00587b3686608f7705653164c427d1"
+    },
+    {
+      "log": "security-git-offline-controls-v2-diff-hygiene.log.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "security-git-offline-controls-v2-execution-container.log.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 198,
+      "sha256": "1d3d7e123cfb602ca813555b2a85ba9754d5852c0fcb1aba25b0d012dce31c35"
+    },
+    {
+      "log": "security-git-offline-controls-v2-git-source-identity.log.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 2156,
+      "sha256": "27b5c7919f4d4e0c0039547335b38ba2ed3b5b804c1a6b10dcf1b49b83638d64"
+    },
+    {
+      "log": "security-git-offline-controls-v2-live-ci-contract.log.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 49,
+      "sha256": "42e0bda87f001b3984f23ebc31c9b16dec657cc2e0a06bcf46b613e8b026fd92"
+    },
+    {
+      "log": "security-git-offline-controls-v2-python-syntax.log.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "security-git-offline-controls-v2-shard-aggregation.log.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 113,
+      "sha256": "7d629a91e712ceaab307ca8b8b81b4b3360bca8d85a72d2fe5da9ce810df2ef4"
+    },
+    {
+      "log": "security-git-offline-controls-v2-supervisor.log.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 114,
+      "sha256": "5c148e1a31b594ef3642d0d27de2518b68fb1d46520f6460aa643ff7d8fb3269"
+    },
+    {
+      "log": "security-git-offline-controls-v2.status.json.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 6563404,
+      "sha256": "66ca95c67016c1526f248d655aba46eb33bdeaedec77ac70246fc731c71c69ad"
+    },
+    {
+      "log": "security-git-offline-controls.status.json.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 6562095,
+      "sha256": "7c4e3ecc27bf5345fb4cbc14edccc151e64d4f11156c44124dee4c382a50ee6e"
+    },
+    {
+      "log": "security-git-offline-final-inline-review.json.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 28357,
+      "sha256": "0b9c715fb9597693aa215aee5b3faf914f23151cbbbc821839bd2c76c9b87f0e"
+    },
+    {
+      "log": "security-git-offline-source-checkpoint.json.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 115,
+      "sha256": "682d161066b5477b613fe4031cbeefa2e05253b8656127aca158e67af1194c78"
+    },
+    {
+      "log": "security-git-offline-source-commit.log.gz",
+      "observed_result": "Actual Git source/transport REDs, complete local boundary/CI controls and retained initial failures. Ordinary temporary fixtures only; no external attack or authority changes.",
+      "bytes": 355,
+      "sha256": "58aec2666c5d5767755bd0777ffd8224cc7b2153ab727a1a36985d82b466456a"
+    },
+    {
+      "log": "security-python-codegen-current-check-red.log.gz",
+      "observed_result": "Actual existing-pipeline Python generation RED/renewal, byte stability, complete SDK216 tests and full generated delta review.",
+      "bytes": 1256,
+      "sha256": "92b8be6b70954e99c5b117ed9befef66e774c2ece3d10a208f5dcef63345ed62"
+    },
+    {
+      "log": "security-python-codegen-current-check-red.status.json.gz",
+      "observed_result": "Actual existing-pipeline Python generation RED/renewal, byte stability, complete SDK216 tests and full generated delta review.",
+      "bytes": 518,
+      "sha256": "4e8026dbb2ffaf2be940e41857ff962e64727b5e5ddf6ec0b7199238d140cbbf"
+    },
+    {
+      "log": "security-python-codegen-inline-review-v2.json.gz",
+      "observed_result": "Actual existing-pipeline Python generation RED/renewal, byte stability, complete SDK216 tests and full generated delta review.",
+      "bytes": 1462,
+      "sha256": "0202cd8c9647aeabb776f835c18c0e7ce440004dda3ab4a1d48617c0fe468b93"
+    },
+    {
+      "log": "security-python-codegen-renewal-check.log.gz",
+      "observed_result": "Actual existing-pipeline Python generation RED/renewal, byte stability, complete SDK216 tests and full generated delta review.",
+      "bytes": 156,
+      "sha256": "cbb63fc36ab603e114655b18f12a633d8cf6600f642debf1581c3580258804f2"
+    },
+    {
+      "log": "security-python-codegen-renewal-regenerate.log.gz",
+      "observed_result": "Actual existing-pipeline Python generation RED/renewal, byte stability, complete SDK216 tests and full generated delta review.",
+      "bytes": 227,
+      "sha256": "38a675756c8b11ccbaab6d56a8422c6867a44e54c5f132a3baf2713196bf636a"
+    },
+    {
+      "log": "security-python-codegen-renewal-repeat-check.log.gz",
+      "observed_result": "Actual existing-pipeline Python generation RED/renewal, byte stability, complete SDK216 tests and full generated delta review.",
+      "bytes": 156,
+      "sha256": "cbb63fc36ab603e114655b18f12a633d8cf6600f642debf1581c3580258804f2"
+    },
+    {
+      "log": "security-python-codegen-renewal.status.json.gz",
+      "observed_result": "Actual existing-pipeline Python generation RED/renewal, byte stability, complete SDK216 tests and full generated delta review.",
+      "bytes": 38815,
+      "sha256": "b04b663ee4ec9edcdd109cee8759e8b75405d30684ca75213d72e9addc44ae09"
+    },
+    {
+      "log": "security-python-sdk-tests.log.gz",
+      "observed_result": "Actual existing-pipeline Python generation RED/renewal, byte stability, complete SDK216 tests and full generated delta review.",
+      "bytes": 260,
+      "sha256": "e35811a04d703287ba6808a939f2b94c9585f397de440322243271a224c41e4b"
+    },
+    {
+      "log": "security-python-sdk-tests.status.json.gz",
+      "observed_result": "Actual existing-pipeline Python generation RED/renewal, byte stability, complete SDK216 tests and full generated delta review.",
+      "bytes": 443,
+      "sha256": "1ea83d47f56d816d9ffe7d03001059d05ef66dba0e08f3102e6d62eb6f5b7bf1"
     }
   ]
 }
