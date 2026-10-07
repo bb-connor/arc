@@ -748,6 +748,8 @@ mod worker_crash_marks_health_failed_and_restart_can_take_over;
 
 mod terminated_primary_reuses_its_durable_port_without_concurrent_ticks;
 
+mod recovery_readiness_starts_the_worker_while_admission_stays_closed;
+
 pub(super) struct TestServices {
     pub(super) ready: Mutex<bool>,
 }
