@@ -47,6 +47,7 @@ impl ChioKernel {
                 ),
             ));
         }
+        let mut item_now = now;
         for operation in page.operations {
             let Some(_live_owner) = runtime
                 .mutation_sequencer
@@ -55,16 +56,19 @@ impl ChioKernel {
             else {
                 continue;
             };
+            // Page eligibility keeps the page time. Each item is validated
+            // against the authority clock, so it samples time of its own.
+            item_now = runtime.refresh_trusted_time(item_now)?;
             let previous = runtime
                 .store
-                .load_recovery_status(operation.binding().operation_id(), &runtime.fence, now)
+                .load_recovery_status(operation.binding().operation_id(), &runtime.fence, item_now)
                 .map_err(failure::port_error)?;
             if previous.as_ref().is_some_and(|previous| {
-                previous.quarantined && previous.deferral.retry_not_before_unix_ms > now
+                previous.quarantined && previous.deferral.retry_not_before_unix_ms > item_now
             }) {
                 continue;
             }
-            match self.recover_one_admission(&operation, now) {
+            match self.recover_one_admission(&operation, item_now) {
                 Ok(changed) => {
                     if let Some(previous) = previous.as_ref() {
                         let current = runtime
@@ -74,7 +78,7 @@ impl ChioKernel {
                             .ok_or_else(|| {
                                 durable_store_error(AdmissionOperationStoreError::NotFound)
                             })?;
-                        self.clear_admission_recovery_deferral(&current, previous, now)?;
+                        self.clear_admission_recovery_deferral(&current, previous, item_now)?;
                     }
                     if changed {
                         reconciled = reconciled.checked_add(1).ok_or_else(|| {
@@ -85,7 +89,7 @@ impl ChioKernel {
                     }
                 }
                 Err(error) if failure::classify(&error).is_some() => {
-                    self.defer_admission_recovery(&operation, previous.as_ref(), &error, now)?;
+                    self.defer_admission_recovery(&operation, previous.as_ref(), &error, item_now)?;
                 }
                 Err(error) => return Err(error),
             }

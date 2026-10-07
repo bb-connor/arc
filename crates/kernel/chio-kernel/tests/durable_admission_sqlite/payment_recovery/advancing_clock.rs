@@ -484,11 +484,12 @@ fn sqlite_review_advancing_recovery_clock_regression_preserves_original_pending_
     clock_refusal(Fault::Regress, ClockError::WallClockRegression)
 }
 
-// Read1 selects the page; read2 refreshes the original-profile recovery read.
-// Terminal replay reads3+4 and persists the native claim. Read5 is the new
-// deferral mutation-time sample. Native claim evidence below rejects an earlier
-// fault, and the absent marker rejects a fault after deferral.
-const DEFERRAL_REFRESH_KERNEL_READ: u32 = 5;
+// Read1 selects the page; read2 is the item's own authority sample; read3
+// refreshes the original-profile recovery read. Terminal replay reads4+5 and
+// persists the native claim. Read6 is the new deferral mutation-time sample.
+// Native claim evidence below rejects an earlier fault, and the absent marker
+// rejects a fault after deferral.
+const DEFERRAL_REFRESH_KERNEL_READ: u32 = 6;
 
 fn clock_refusal_after_claim(fault: Fault, expected: ClockError) -> TestResult {
     let pending = Pending::new()?;
