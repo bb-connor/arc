@@ -1484,3 +1484,83 @@ fn unbound_effect_router_never_reports_ready() {
         .ensure_effects_ready()
         .unwrap_or_else(|error| panic!("bound router readiness: {error}"));
 }
+
+#[test]
+fn session_suspension_composition_keeps_its_refusals() {
+    let fixture = ProductionEffectsFixture::new();
+    let shared_session = session("production-effects-suspension-controls-session");
+    let first_spec = fixture.ranked_session_suspension_spec(&shared_session, 3);
+    let second_spec = fixture.ranked_session_suspension_spec(&shared_session, 8);
+    let (first_plan, first_work) = fixture.dispatch(
+        "production-effects-suspension-controls-first",
+        vec![record(shared_session.as_str())],
+        vec![first_spec],
+    );
+    let (second_plan, second_work) = fixture.dispatch(
+        "production-effects-suspension-controls-second",
+        vec![record(shared_session.as_str())],
+        vec![second_spec],
+    );
+    let effects = fixture.effects();
+    let first_effect = first_plan
+        .effects
+        .as_slice()
+        .first()
+        .unwrap_or_else(|| panic!("first suspension missing"));
+    let second_effect = second_plan
+        .effects
+        .as_slice()
+        .first()
+        .unwrap_or_else(|| panic!("second suspension missing"));
+
+    let first_applied = effects
+        .execute(&effect_request(
+            &first_plan,
+            first_effect,
+            &first_work,
+            "suspension-controls-first",
+        ))
+        .unwrap_or_else(|error| panic!("healthy single suspension: {error}"));
+    assert!(first_applied.applied);
+    assert_eq!(effective_posture_rank(&fixture.store, &shared_session), 3);
+
+    let reissued = effects
+        .execute(&effect_request(
+            &first_plan,
+            first_effect,
+            &first_work,
+            "suspension-controls-first-reissued",
+        ))
+        .err()
+        .unwrap_or_else(|| panic!("an installed suspension accepted a second command"));
+    assert_eq!(reissued.kind(), PortErrorKind::Conflict);
+
+    let tamper =
+        rusqlite::Connection::open(fixture._directory.path().join("production-effects.db"))
+            .unwrap_or_else(|error| panic!("open tamper connection: {error}"));
+    let tampered = tamper
+        .execute(
+            "UPDATE security_effect_contributions SET posture_rank = 7 WHERE effect_id = ?1",
+            rusqlite::params![first_effect.effect_id.as_str()],
+        )
+        .unwrap_or_else(|error| panic!("tamper first contribution: {error}"));
+    assert_eq!(tampered, 1);
+    let refused = effects
+        .execute(&effect_request(
+            &second_plan,
+            second_effect,
+            &second_work,
+            "suspension-controls-second",
+        ))
+        .err()
+        .unwrap_or_else(|| panic!("a suspension composed onto a tampered overlay"));
+    assert_eq!(refused.kind(), PortErrorKind::IntegrityFailure);
+    let restored = tamper
+        .execute(
+            "UPDATE security_effect_contributions SET posture_rank = 3 WHERE effect_id = ?1",
+            rusqlite::params![first_effect.effect_id.as_str()],
+        )
+        .unwrap_or_else(|error| panic!("restore first contribution: {error}"));
+    assert_eq!(restored, 1);
+    assert_eq!(effective_posture_rank(&fixture.store, &shared_session), 3);
+}
