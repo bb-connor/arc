@@ -2,6 +2,7 @@ fn build_governed_active_response_operation(
     bindings: &VerifiedActiveResponseBindings,
     requirement: &VerifiedActiveResponseRequirement,
     verified_approvals: &VerifiedThresholdApprovalSet,
+    admission_artifact_fingerprint: Digest32,
 ) -> Result<(AdmissionOperation, ApprovalSetReservationInput), KernelError> {
     let approval_set_hash = verified_approvals
         .approval_set_hash()
@@ -16,6 +17,9 @@ fn build_governed_active_response_operation(
         requirement.policy_hash(),
     )
     .map_err(|error| active_response_denied(error.to_string()))?;
+    let request_binding_hash = super::active_response_operation_binding::bind_active_response_operation_request_hash_to_artifact(
+        &request_binding_hash, Some(admission_artifact_fingerprint),
+    )?;
     let operation = AdmissionOperation::prepared(PreparedAdmissionOperation {
         kind: AdmissionOperationKind::GovernedActiveResponse,
         coordinator_authority_id: requirement.executor_authority().authority_id().to_string(),
@@ -69,8 +73,10 @@ pub(super) fn build_active_response_execution_request(
                 "active-response governed intent hashing failed: {error}"
             ))
         })?;
+    let admission_artifact_fingerprint =
+        super::active_response_artifact::active_response_admission_artifact_fingerprint(request)?;
     let plan_body_hash = digest_hex(&response_plan.plan_hash);
-    let dispatch_id = derive_active_response_dispatch_id(
+    let legacy_dispatch_id = derive_active_response_dispatch_id(
         response_plan,
         &executor_authority,
         &authorization_capability_hash,
@@ -80,6 +86,12 @@ pub(super) fn build_active_response_execution_request(
         &approval,
     )
     .map_err(|error| active_response_denied(error.to_string()))?;
+    let dispatch_id =
+        super::active_response_executor::bind_active_response_dispatch_id_to_artifact(
+            &legacy_dispatch_id,
+            &admission_artifact_fingerprint,
+        )
+        .map_err(|error| active_response_denied(error.to_string()))?;
     ActiveResponseExecutionRequest::from_fresh(
         request.fresh_live_admission(),
         ActiveResponseExecutionRequestParts {
@@ -91,6 +103,7 @@ pub(super) fn build_active_response_execution_request(
             authorization_capability_hash,
             governed_intent_hash,
             policy_decision_hash: policy_decision_hash.to_string(),
+            admission_artifact_fingerprint: Some(admission_artifact_fingerprint),
             approval,
             authorized_at_unix_ms,
             expires_at_unix_ms: response_plan.expires_at_unix_ms,
@@ -602,6 +615,23 @@ pub(super) fn validate_active_response_terminal_executor_receipt(
             && *admission_operation_version == expected_dispatch_version
             && digest_hex(approval_set_hash) == persisted_approval_set_hash
     );
+    let expected_dispatch_schema = if anchor.admission_artifact_fingerprint.is_some() {
+        chio_security_types::ports::RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION
+    } else {
+        1
+    };
+    let expected_dispatch_id =
+        super::active_response_executor::derive_active_response_terminal_dispatch_id(
+            execution_dispatch,
+            anchor,
+            operation,
+            expected_dispatch_version,
+        )
+        .map_err(|error| {
+            active_response_internal(format!(
+                "active-response terminal dispatch ID derivation failed: {error}"
+            ))
+        })?;
     let dispatch_binding_valid = execution_dispatch
         .validate_for_response(
             &active_body.header().tenant_id,
@@ -611,6 +641,10 @@ pub(super) fn validate_active_response_terminal_executor_receipt(
         )
         .is_ok();
     if !signature_valid
+        || execution_dispatch.schema_version != expected_dispatch_schema
+        || execution_dispatch.admission_artifact_fingerprint
+            != anchor.admission_artifact_fingerprint
+        || execution_dispatch.dispatch_id != expected_dispatch_id
         || executor_identity.authority_id() != operation.coordinator_authority_id()
         || executor_identity.authority_id() != anchor.executor_authority_id.as_str()
         || execution_dispatch.executor_authority_id.as_str() != operation.coordinator_authority_id()

@@ -149,6 +149,15 @@ impl ActiveResponseExecutorAuthority for RealAdapterRecordingExecutor {
         self.inner.ensure_ready()
     }
 
+    fn claim_automatic_preparation(
+        &self,
+        response_plan: &chio_security_types::ResponsePlan,
+        binding: &PreparedActiveResponseDispatchBinding,
+    ) -> Result<PreparedActiveResponseDispatchBinding, ActiveResponseExecutorError> {
+        self.inner
+            .claim_automatic_preparation(response_plan, binding)
+    }
+
     fn load_committed_active_response_dispatch(
         &self,
         tenant_id: &TenantId,
@@ -293,9 +302,22 @@ type OperationStoreDecorator<'a> =
     &'a dyn Fn(Arc<SqliteSecurityAdmissionOperationStore>) -> Arc<dyn AdmissionOperationStore>;
 type ApprovalStoreDecorator<'a> = &'a dyn Fn(Arc<SqliteApprovalStore>) -> Arc<dyn ApprovalStore>;
 
+type FindingAuthorityDecorator<'a> =
+    &'a dyn Fn(Arc<dyn ActiveResponseFindingAuthority>) -> Arc<dyn ActiveResponseFindingAuthority>;
+type RequirementResolverDecorator<'a> =
+    &'a dyn Fn(
+        Arc<dyn chio_kernel::ActiveResponseRequirementResolver>,
+    ) -> Arc<dyn chio_kernel::ActiveResponseRequirementResolver>;
+type ExecutorAuthorityDecorator<'a> = &'a dyn Fn(
+    Arc<dyn ActiveResponseExecutorAuthority>,
+) -> Arc<dyn ActiveResponseExecutorAuthority>;
+
 struct RealAdapterFixtureOptions<'a> {
     operations: Option<OperationStoreDecorator<'a>>,
     approvals: Option<ApprovalStoreDecorator<'a>>,
+    finding_authority: Option<FindingAuthorityDecorator<'a>>,
+    requirement_resolver: Option<RequirementResolverDecorator<'a>>,
+    executor_authority: Option<ExecutorAuthorityDecorator<'a>>,
     publish_runtime: bool,
 }
 
@@ -304,6 +326,9 @@ impl Default for RealAdapterFixtureOptions<'_> {
         Self {
             operations: None,
             approvals: None,
+            finding_authority: None,
+            requirement_resolver: None,
+            executor_authority: None,
             publish_runtime: true,
         }
     }
@@ -503,8 +528,11 @@ fn build_real_adapter_runtime_with_options(
             .unwrap_or_else(|error| panic!("open real adapter budget store: {error}")),
     );
     let responses = Arc::new(
-        SqliteSecurityStateStore::open(&paths.responses)
-            .unwrap_or_else(|error| panic!("open real adapter response store: {error}")),
+        SqliteSecurityStateStore::open_with_trusted_clock(
+            &paths.responses,
+            chio_test_support::clock::clock(),
+        )
+        .unwrap_or_else(|error| panic!("open real adapter response store: {error}")),
     );
     let receipt_store = Arc::new(
         SqliteReceiptStore::open(&paths.receipts)
@@ -579,6 +607,12 @@ fn build_real_adapter_runtime_with_options(
             ))
         },
     );
+    let active_response_requirement: Arc<dyn chio_kernel::ActiveResponseRequirementResolver> =
+        active_response_requirement;
+    let active_response_requirement = options.requirement_resolver.map_or_else(
+        || Arc::clone(&active_response_requirement),
+        |decorate| decorate(Arc::clone(&active_response_requirement)),
+    );
     let threshold_requirement = threshold_requirement.clone();
     let threshold_resolver = Arc::new(move |received: &str, _: &str, _: &str| {
         if received != threshold_requirement.policy_hash {
@@ -625,6 +659,16 @@ fn build_real_adapter_runtime_with_options(
         |decorate| decorate(admission_operations.clone()),
     );
     let executor_authority: Arc<dyn ActiveResponseExecutorAuthority> = executor.clone();
+    let executor_authority = options.executor_authority.map_or_else(
+        || Arc::clone(&executor_authority),
+        |decorate| decorate(Arc::clone(&executor_authority)),
+    );
+    let finding_authority: Arc<dyn ActiveResponseFindingAuthority> =
+        Arc::new(TestFindingAuthority::new(std::slice::from_ref(finding)));
+    let finding_authority = options.finding_authority.map_or_else(
+        || Arc::clone(&finding_authority),
+        |decorate| decorate(Arc::clone(&finding_authority)),
+    );
     if options.publish_runtime {
         kernel
             .publish_governed_security_runtime(GovernedSecurityRuntimePublication {
@@ -633,9 +677,7 @@ fn build_real_adapter_runtime_with_options(
                 admission_operation_store: operation_authority,
                 approval_store: approval_authority,
                 budget_store: budget_authority,
-                finding_authority: Arc::new(TestFindingAuthority::new(std::slice::from_ref(
-                    finding,
-                ))),
+                finding_authority,
                 executor_authority,
                 capability_issuance_admission_authority: Arc::new(RealAdapterIssuanceAuthority),
                 threshold_policy_authorities: vec![threshold_policy_authority.public_key()],
@@ -649,9 +691,7 @@ fn build_real_adapter_runtime_with_options(
             .set_active_response_requirement_resolver(active_response_requirement)
             .unwrap_or_else(|error| panic!("install disabled policy: {error}"));
         kernel
-            .set_active_response_finding_authority(Arc::new(TestFindingAuthority::new(
-                std::slice::from_ref(finding),
-            )))
+            .set_active_response_finding_authority(finding_authority)
             .unwrap_or_else(|error| panic!("install disabled finding authority: {error}"));
         kernel
             .set_active_response_executor_authority(executor_authority)

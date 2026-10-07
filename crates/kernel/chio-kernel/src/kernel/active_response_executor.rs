@@ -1,3 +1,5 @@
+mod dispatch_identity;
+
 #[cfg(feature = "admission-test-support")]
 #[path = "active_response_executor/test_support.rs"]
 pub mod test_support;
@@ -137,41 +139,7 @@ pub fn derive_active_response_dispatch_id(
     {
         return Err(ActiveResponseDispatchIdError::AuthorizationTimeOutsidePlan);
     }
-    #[derive(Serialize)]
-    #[serde(rename_all = "camelCase")]
-    struct DispatchBody<'a> {
-        schema: &'static str,
-        tenant_id: &'a TenantId,
-        action_id: &'a ActionId,
-        plan_hash: &'a Digest32,
-        executor_authority_id: &'a str,
-        executor_authority_generation: u64,
-        authorization_capability_hash: &'a str,
-        governed_intent_hash: &'a str,
-        policy_decision_hash: &'a str,
-        authorized_at_unix_ms: u64,
-        approval_mode: &'static str,
-        admission_operation_id: Option<&'a str>,
-        admission_operation_version: Option<u64>,
-        approval_set_hash: Option<&'a str>,
-    }
-
-    let (approval_mode, admission_operation_id, admission_operation_version, approval_set_hash) =
-        match approval {
-            ActiveResponseExecutionApproval::Automatic => ("automatic", None, None, None),
-            ActiveResponseExecutionApproval::Governed {
-                admission_operation_id,
-                admission_operation_version,
-                approval_set_hash,
-            } => (
-                "governed",
-                Some(admission_operation_id.as_str()),
-                Some(*admission_operation_version),
-                Some(approval_set_hash.as_str()),
-            ),
-        };
-    let canonical = canonical_json_bytes(&DispatchBody {
-        schema: ACTIVE_RESPONSE_DISPATCH_SCHEMA,
+    dispatch_identity::derive_legacy_dispatch_id(dispatch_identity::DispatchIdentity {
         tenant_id: &response_plan.tenant_id,
         action_id: &response_plan.action_id,
         plan_hash: &response_plan.plan_hash,
@@ -181,20 +149,59 @@ pub fn derive_active_response_dispatch_id(
         governed_intent_hash,
         policy_decision_hash,
         authorized_at_unix_ms,
-        approval_mode,
-        admission_operation_id,
-        admission_operation_version,
-        approval_set_hash,
+        approval,
     })
-    .map_err(|error| ActiveResponseDispatchIdError::Canonicalization(error.to_string()))?;
-    let mut preimage = Vec::with_capacity(ACTIVE_RESPONSE_DISPATCH_DOMAIN.len() + canonical.len());
-    preimage.extend_from_slice(ACTIVE_RESPONSE_DISPATCH_DOMAIN);
-    preimage.extend_from_slice(&canonical);
-    RecordId::new(format!(
-        "active_response_dispatch_{}",
-        sha256_hex(&preimage)
-    ))
-    .map_err(|error| ActiveResponseDispatchIdError::InvalidIdentifier(error.to_string()))
+}
+
+/// Bind the existing immutable dispatch identity to its exact original artifact.
+/// This pure commitment grants no admission authority.
+pub fn bind_active_response_dispatch_id_to_artifact(
+    legacy_dispatch_id: &RecordId,
+    fingerprint: &Digest32,
+) -> Result<RecordId, ActiveResponseDispatchIdError> {
+    if fingerprint.is_zero() {
+        return Err(ActiveResponseDispatchIdError::InvalidIdentifier(
+            "admission artifact fingerprint is zero".to_string(),
+        ));
+    }
+    let canonical = canonical_json_bytes(&(legacy_dispatch_id, fingerprint))
+        .map_err(|error| ActiveResponseDispatchIdError::Canonicalization(error.to_string()))?;
+    let mut bytes = b"chio.active-response-artifact-dispatch.v2\0".to_vec();
+    bytes.extend_from_slice(&canonical);
+    RecordId::new(format!("active_response_dispatch_{}", sha256_hex(&bytes)))
+        .map_err(|error| ActiveResponseDispatchIdError::InvalidIdentifier(error.to_string()))
+}
+
+/// Derive the original governed identity from durable anchor and compact evidence.
+/// The terminal caller independently validates the signed response window/shape.
+pub(in crate::kernel) fn derive_active_response_terminal_dispatch_id(
+    binding: &chio_security_types::ResponseExecutionDispatchBinding,
+    anchor: &super::active_response_operation_binding::ActiveResponseOperationAnchor,
+    operation: &crate::security_admission_operation::AdmissionOperation,
+    original_dispatch_version: u64,
+) -> Result<RecordId, ActiveResponseDispatchIdError> {
+    let approval = ActiveResponseExecutionApproval::Governed {
+        admission_operation_id: operation.operation_id().to_owned(),
+        admission_operation_version: original_dispatch_version,
+        approval_set_hash: anchor.approval_set_hash.clone(),
+    };
+    let legacy =
+        dispatch_identity::derive_legacy_dispatch_id(dispatch_identity::DispatchIdentity {
+            tenant_id: &binding.tenant_id,
+            action_id: &binding.action_id,
+            plan_hash: &binding.plan_hash,
+            executor_authority_id: &anchor.executor_authority_id,
+            executor_authority_generation: anchor.executor_authority_generation,
+            authorization_capability_hash: &anchor.authorization_capability_hash,
+            governed_intent_hash: &anchor.governed_intent_hash,
+            policy_decision_hash: &anchor.policy_decision_hash,
+            authorized_at_unix_ms: anchor.authorized_at_unix_ms,
+            approval: &approval,
+        })?;
+    match anchor.admission_artifact_fingerprint {
+        Some(fingerprint) => bind_active_response_dispatch_id_to_artifact(&legacy, &fingerprint),
+        None => Ok(legacy),
+    }
 }
 
 /// Closed durable result of one committed active-response dispatch.
@@ -234,6 +241,7 @@ pub struct ActiveResponseExecutionRequest {
     authorization_capability_hash: String,
     governed_intent_hash: String,
     policy_decision_hash: String,
+    admission_artifact_fingerprint: Option<Digest32>,
     approval: ActiveResponseExecutionApproval,
     authorized_at_unix_ms: u64,
     expires_at_unix_ms: u64,
@@ -250,6 +258,7 @@ pub(crate) struct ActiveResponseExecutionRequestParts {
     pub(crate) authorization_capability_hash: String,
     pub(crate) governed_intent_hash: String,
     pub(crate) policy_decision_hash: String,
+    pub(crate) admission_artifact_fingerprint: Option<Digest32>,
     pub(crate) approval: ActiveResponseExecutionApproval,
     pub(crate) authorized_at_unix_ms: u64,
     pub(crate) expires_at_unix_ms: u64,
@@ -274,6 +283,11 @@ impl ActiveResponseExecutionRequest {
         admission: &FreshLiveAdmission,
         parts: ActiveResponseExecutionRequestParts,
     ) -> Result<Self, super::KernelError> {
+        if parts.admission_artifact_fingerprint.is_none() {
+            return Err(super::KernelError::ResponseDispatchRejected(
+                chio_security_types::DispatchRejection::UnboundArtifactPreparation,
+            ));
+        }
         if &parts.response_plan != admission.plan() {
             return Err(super::active_response_coordinator::active_response_denied(
                 "fresh admission plan differs from the execution commitment",
@@ -312,6 +326,7 @@ impl ActiveResponseExecutionRequest {
             authorization_capability_hash,
             governed_intent_hash,
             policy_decision_hash,
+            admission_artifact_fingerprint,
             approval,
             authorized_at_unix_ms,
             expires_at_unix_ms,
@@ -325,6 +340,7 @@ impl ActiveResponseExecutionRequest {
             authorization_capability_hash,
             governed_intent_hash,
             policy_decision_hash,
+            admission_artifact_fingerprint,
             approval,
             authorized_at_unix_ms,
             expires_at_unix_ms,
@@ -380,6 +396,11 @@ impl ActiveResponseExecutionRequest {
     #[must_use]
     pub fn governed_intent_hash(&self) -> &str {
         &self.governed_intent_hash
+    }
+
+    #[must_use]
+    pub const fn admission_artifact_fingerprint(&self) -> Option<Digest32> {
+        self.admission_artifact_fingerprint
     }
 
     #[must_use]
@@ -773,6 +794,21 @@ pub trait ActiveResponseExecutorAuthority: Send + Sync {
 
     /// Verify that dispatch, effects, receipts, and recovery are live.
     fn ensure_ready(&self) -> Result<(), ActiveResponseExecutorError>;
+
+    /// Atomically pin the first verified automatic preparation for the action.
+    /// Unsupported authorities fail closed before a fresh permit is returned.
+    fn claim_automatic_preparation(
+        &self,
+        _response_plan: &ResponsePlan,
+        _candidate: &chio_security_types::ports::PreparedActiveResponseDispatchBinding,
+    ) -> Result<
+        chio_security_types::ports::PreparedActiveResponseDispatchBinding,
+        ActiveResponseExecutorError,
+    > {
+        Err(ActiveResponseExecutorError::NotReady(
+            "canonical automatic preparation claims are unsupported".to_string(),
+        ))
+    }
 
     /// Load the exact immutable authorization and response record retained at
     /// the durable commit boundary for one tenant-scoped dispatch identifier.

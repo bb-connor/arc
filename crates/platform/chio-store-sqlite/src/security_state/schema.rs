@@ -74,6 +74,7 @@ const SECURITY_STATE_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &[
 // tenant-read-contract: security_verified_events; class=tenant-predicate; principal=security-runtime
 // Contracts: docs/security/trust-boundary-inventory.json
 pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
+    super::dispatch::preflight_automatic_preparation_schema(connection)?;
     connection
         .execute_batch(
             r#"
@@ -1110,6 +1111,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
             )
             .map_err(sqlite_error)?;
         ensure_attested_finding_batch_tenant_keys(connection)?;
+        super::dispatch::ensure_automatic_preparation_schema(connection)?;
         ensure_attested_finding_response_outbox_schema(connection)?;
         upgrade_correlation_ingress_pending_index(connection)?;
         validate_correlation_durable_schema(connection)?;

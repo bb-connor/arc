@@ -15,7 +15,7 @@ use serde::Serialize;
 use super::active_response_admission::VerifiedActiveResponseBindings;
 use super::active_response_executor::{
     ActiveResponseExecutorAuthority, ActiveResponseExecutorAuthorityIdentity,
-    InstalledActiveResponseExecutor,
+    ActiveResponseExecutorError, InstalledActiveResponseExecutor,
 };
 use super::{ChioKernel, KernelError};
 
@@ -380,11 +380,10 @@ impl ChioKernel {
         let installed = self.active_response_executor.as_ref().ok_or_else(|| {
             KernelError::Internal("active-response executor authority is not installed".to_string())
         })?;
-        installed.authority.ensure_ready().map_err(|error| {
-            KernelError::Internal(format!(
-                "active-response executor authority is not ready: {error}"
-            ))
-        })?;
+        installed
+            .authority
+            .ensure_ready()
+            .map_err(map_active_response_executor_readiness_error)?;
         let live_identity = installed.authority.identity();
         if live_identity != installed.identity {
             return Err(KernelError::Internal(
@@ -426,13 +425,11 @@ impl ChioKernel {
             .active_response_requirement_resolver
             .as_deref()
             .ok_or_else(|| {
-                active_response_policy_denied(
-                    "active-response requirement resolver is not configured",
+                KernelError::Internal(
+                    "active-response requirement resolver is not configured".to_string(),
                 )
             })?;
-        let executor_authority = self
-            .active_response_executor_identity()
-            .map_err(|error| active_response_policy_denied(error.to_string()))?;
+        let executor_authority = self.active_response_executor_identity()?;
         if executor_authority.subject() != bindings.executor_subject() {
             return Err(active_response_policy_denied(
                 "operator capability subject does not match the configured active-response executor",
@@ -441,7 +438,12 @@ impl ChioKernel {
         let request = ActiveResponsePolicyRequest::from_verified(bindings);
         let requirement = resolver
             .resolve_active_response_requirement(&request, &self.config.policy_hash)
-            .map_err(|error| active_response_policy_denied(error.to_string()))?;
+            .map_err(|error| match error {
+                ActiveResponsePolicyResolutionError::Unavailable(reason) => KernelError::Internal(
+                    format!("active-response policy is unavailable: {reason}"),
+                ),
+                error => active_response_policy_denied(error.to_string()),
+            })?;
 
         if requirement.policy_hash() != self.config.policy_hash {
             return Err(active_response_policy_denied(
@@ -523,6 +525,23 @@ impl ChioKernel {
             policy_decision_hash,
             executor_authority,
         })
+    }
+}
+
+pub(super) fn map_active_response_executor_readiness_error(
+    error: ActiveResponseExecutorError,
+) -> KernelError {
+    match error {
+        ActiveResponseExecutorError::NotReady(_)
+        | ActiveResponseExecutorError::OutcomeUnknown(_) => KernelError::Internal(format!(
+            "active-response executor authority is not ready: {error}"
+        )),
+        ActiveResponseExecutorError::RejectedBeforeCommit(_) => {
+            active_response_policy_denied(error.to_string())
+        }
+        ActiveResponseExecutorError::DispatchRejectedBeforeCommit(rejection) => {
+            KernelError::ResponseDispatchRejected(rejection)
+        }
     }
 }
 

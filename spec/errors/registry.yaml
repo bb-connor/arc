@@ -1570,6 +1570,19 @@ codes:
       - chio-quarantine
       - chio-control-plane
 
+  - urn: "urn:chio:error:kernel:response-dispatch-unbound-artifact-preparation"
+    domain: kernel
+    severity: error
+    summary: "Response refused: unbound historical preparation cannot mint fresh dispatch authority."
+    help: "Use a verified bound preparation for fresh work or exact durable committed evidence for recovery."
+    string_code: "CHIO-KERNEL-RESPONSE-DISPATCH-UNBOUND-ARTIFACT-PREPARATION"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
   - urn: "urn:chio:error:kernel:response-dispatch-zero-admission-operation-version"
     domain: kernel
     severity: error

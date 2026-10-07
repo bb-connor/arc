@@ -2,7 +2,9 @@ use chio_kernel::{
     ActiveResponseExecutionApproval, ActiveResponseExecutionOrigin, ActiveResponseExecutionRequest,
     ActiveResponseExecutorAuthorityIdentity, ActiveResponseExecutorError,
 };
-use chio_security_types::ports::{RecordId, ResponseDispatchCommitRequest, ResponseDispatchLease};
+use chio_security_types::ports::{
+    Digest32, RecordId, ResponseDispatchCommitRequest, ResponseDispatchLease,
+};
 use chio_security_types::ResponsePlan;
 
 #[derive(Clone)]
@@ -15,6 +17,7 @@ pub(super) struct RawActiveResponseExecutionRequest {
     pub(super) authorization_capability_hash: String,
     pub(super) governed_intent_hash: String,
     pub(super) policy_decision_hash: String,
+    pub(super) admission_artifact_fingerprint: Option<Digest32>,
     pub(super) approval: ActiveResponseExecutionApproval,
     pub(super) expires_at_unix_ms: u64,
     pub(super) authorized_at_unix_ms: u64,
@@ -48,6 +51,7 @@ impl ActiveResponseRequestSource for ActiveResponseExecutionRequest {
             authorization_capability_hash: self.authorization_capability_hash().to_string(),
             governed_intent_hash: self.governed_intent_hash().to_string(),
             policy_decision_hash: self.policy_decision_hash().to_string(),
+            admission_artifact_fingerprint: self.admission_artifact_fingerprint(),
             approval: self.approval().clone(),
             expires_at_unix_ms: self.expires_at_unix_ms(),
             authorized_at_unix_ms: self.authorized_at_unix_ms(),
@@ -75,6 +79,7 @@ impl ActiveResponseRequestSource for RawActiveResponseExecutionRequest {
             authorization_capability_hash: self.authorization_capability_hash.clone(),
             governed_intent_hash: self.governed_intent_hash.clone(),
             policy_decision_hash: self.policy_decision_hash.clone(),
+            admission_artifact_fingerprint: self.admission_artifact_fingerprint,
             approval: self.approval.clone(),
             authorized_at_unix_ms: self.authorized_at_unix_ms,
             expires_at_unix_ms: self.expires_at_unix_ms,

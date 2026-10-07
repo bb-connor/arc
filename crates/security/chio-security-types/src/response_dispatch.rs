@@ -16,6 +16,8 @@ pub enum DispatchRejection {
     ExecutionBinding(ResponseExecutionBindingError),
     /// The authorization was issued for a different operator capability.
     CapabilityDigestMismatch,
+    /// Unbound historical preparations cannot mint fresh dispatch authority.
+    UnboundArtifactPreparation,
     /// Generation zero is the unassigned executor authority.
     ZeroExecutorGeneration,
     /// The authorization time lies outside `[created_at, expires_at)`.
@@ -64,6 +66,7 @@ impl fmt::Display for DispatchRejection {
             Self::CapabilityDigestMismatch => formatter.write_str(
                 "authorization capability digest does not match the plan operator capability",
             ),
+            Self::UnboundArtifactPreparation => formatter.write_str("unbound legacy preparation cannot mint fresh dispatch authority"),
             Self::ZeroExecutorGeneration => formatter
                 .write_str("executor authority generation zero cannot authorize a dispatch"),
             Self::AuthorizationOutsideWindow {
@@ -106,6 +109,7 @@ impl core::error::Error for DispatchRejection {
             Self::ExecutionBinding(error) => Some(error),
             Self::ExecutionMode { .. }
             | Self::CapabilityDigestMismatch
+            | Self::UnboundArtifactPreparation
             | Self::ZeroExecutorGeneration
             | Self::AuthorizationOutsideWindow { .. }
             | Self::LeaseOutsideWindow { .. }
@@ -134,6 +138,9 @@ impl DispatchRejection {
             }
             Self::CapabilityDigestMismatch => {
                 "urn:chio:error:kernel:response-dispatch-capability-digest-mismatch"
+            }
+            Self::UnboundArtifactPreparation => {
+                "urn:chio:error:kernel:response-dispatch-unbound-artifact-preparation"
             }
             Self::ZeroExecutorGeneration => {
                 "urn:chio:error:kernel:response-dispatch-zero-executor-generation"

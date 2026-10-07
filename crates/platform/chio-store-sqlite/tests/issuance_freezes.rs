@@ -290,6 +290,7 @@ fn commit_applying_plan(
         dispatch_id: record(dispatch_id),
         governed_intent_hash: digest(format!("intent:{dispatch_id}").as_bytes()),
         policy_decision_hash: digest(format!("decision:{dispatch_id}").as_bytes()),
+        admission_artifact_fingerprint: Some(digest(b"synthetic-preparation-artifact")),
         executor_authority_id: record("issuance-freeze-horizon-authority"),
         executor_authority_generation: 1,
         approval: ResponseDispatchApproval::Automatic,
@@ -301,6 +302,50 @@ fn commit_applying_plan(
         },
     })
     .unwrap_or_else(|error| panic!("prepare response dispatch: {error}"));
+    {
+        let authorization = &request.authorization.body;
+        let outcome = store
+            .claim_automatic_preparation(
+                &chio_security_types::ports::AutomaticResponsePreparationClaimRequest {
+                    response_plan: chio_quarantine::decode_response_record(&request.response_plan)
+                        .unwrap_or_else(|error| panic!("fixture plan decode: {error}"))
+                        .plan,
+                    prepared_dispatch_binding:
+                        chio_security_types::ports::PreparedActiveResponseDispatchBinding {
+                            schema_version: authorization.schema_version,
+                            tenant_id: authorization.key.tenant_id.clone(),
+                            action_id: authorization.action_id.clone(),
+                            plan_hash: authorization.plan_hash,
+                            dispatch_id: authorization.key.dispatch_id.clone(),
+                            executor_authority_id: authorization.executor_authority_id.clone(),
+                            executor_authority_generation: authorization
+                                .executor_authority_generation,
+                            authorized_at_unix_ms: authorization.authorized_at_unix_ms,
+                            authorization_capability_hash: authorization
+                                .authorization_capability_hash,
+                            governed_intent_hash: authorization.governed_intent_hash,
+                            policy_decision_hash: authorization.policy_decision_hash,
+                            admission_artifact_fingerprint: authorization
+                                .admission_artifact_fingerprint,
+                            approval: authorization.approval.clone(),
+                        },
+                },
+            )
+            .unwrap_or_else(|error| panic!("claim current automatic fixture: {error}"));
+        let binding = match outcome {
+            chio_security_types::ports::AutomaticResponsePreparationClaimOutcome::Created(
+                binding,
+            )
+            | chio_security_types::ports::AutomaticResponsePreparationClaimOutcome::Existing(
+                binding,
+            ) => binding,
+        };
+        assert_eq!(binding.dispatch_id, authorization.key.dispatch_id);
+        assert_eq!(
+            binding.admission_artifact_fingerprint,
+            authorization.admission_artifact_fingerprint
+        );
+    }
     let outcome = store
         .commit_dispatch(&request)
         .unwrap_or_else(|error| panic!("commit response dispatch: {error}"));

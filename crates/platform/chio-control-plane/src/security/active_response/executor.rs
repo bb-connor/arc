@@ -1,12 +1,15 @@
 #[cfg(test)]
 use super::tests;
+#[cfg(test)]
+use super::PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION;
 use super::{
-    committed_readback, decode_lower_hex_digest, decode_response_record,
-    derive_active_response_dispatch_id, digest_is_zero, has_durable_execution_proof, readiness,
-    recovery_id, valid_prefixed_digest_id, validate_lease_duration,
-    ActiveResponseCommittedDispatch, ActiveResponseEffectEvidence, ActiveResponseExecutionApproval,
-    ActiveResponseExecutionEvidence, ActiveResponseExecutionEvidenceParts,
-    ActiveResponseExecutionOrigin, ActiveResponseExecutionOutcome, ActiveResponseExecutionRequest,
+    bind_active_response_dispatch_id_to_artifact, committed_readback, decode_lower_hex_digest,
+    decode_response_record, derive_active_response_dispatch_id, digest_is_zero,
+    has_durable_execution_proof, readiness, recovery_id, valid_prefixed_digest_id,
+    validate_lease_duration, ActiveResponseCommittedDispatch, ActiveResponseEffectEvidence,
+    ActiveResponseExecutionApproval, ActiveResponseExecutionEvidence,
+    ActiveResponseExecutionEvidenceParts, ActiveResponseExecutionOrigin,
+    ActiveResponseExecutionOutcome, ActiveResponseExecutionRequest,
     ActiveResponseExecutorAuthority, ActiveResponseExecutorAuthorityIdentity,
     ActiveResponseExecutorError, ActiveResponseFailedEffectEvidence, ActiveResponseFailureEvidence,
     ActiveResponseReceiptProofSource, ActiveResponseRequestSource, Arc,
@@ -20,7 +23,6 @@ use super::{
     ResponseDispatchRecoveryOutcome, ResponseDispatchRecoveryRequest, ResponseDispatchStore,
     ResponseExecutor, ResponsePlan, ResponsePlanKey, ResponsePlanRecord, ResponseState,
     ScheduledWork, SchedulerWorkKey, SecurityAlertPort, SecurityReceiptSink,
-    PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION,
 };
 
 const DISPATCH_ID_PREFIX: &str = "active_response_dispatch_";
@@ -90,6 +92,7 @@ impl<
         );
         let governed_intent_hash = hex::encode(governed_intent_hash.as_bytes());
         let policy_decision_hash = hex::encode(policy_decision_hash.as_bytes());
+        let artifact_fingerprint = Digest32::new([0x73; 32]);
         let approval = ActiveResponseExecutionApproval::Automatic;
         let dispatch_id = derive_active_response_dispatch_id(
             &response_plan,
@@ -105,6 +108,11 @@ impl<
                 "automatic test dispatch identifier is invalid: {error}"
             ))
         })?;
+        let dispatch_id =
+            bind_active_response_dispatch_id_to_artifact(&dispatch_id, &artifact_fingerprint)
+                .map_err(|error| {
+                    ActiveResponseExecutorError::RejectedBeforeCommit(error.to_string())
+                })?;
         let request = RawActiveResponseExecutionRequest {
             dispatch_id,
             request_id: response_plan.action_id.as_str().to_string(),
@@ -112,6 +120,7 @@ impl<
             authorization_capability_hash,
             governed_intent_hash,
             policy_decision_hash,
+            admission_artifact_fingerprint: Some(artifact_fingerprint),
             expires_at_unix_ms: response_plan.expires_at_unix_ms,
             authorized_at_unix_ms,
             origin: ActiveResponseExecutionOrigin::Fresh,
@@ -119,6 +128,37 @@ impl<
             executor_authority: self.identity.clone(),
             approval,
         };
+        let binding = PreparedActiveResponseDispatchBinding {
+            schema_version: PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION,
+            tenant_id: request.response_plan.tenant_id.clone(),
+            action_id: request.response_plan.action_id.clone(),
+            plan_hash: request.response_plan.plan_hash,
+            dispatch_id: request.dispatch_id.clone(),
+            executor_authority_id: RecordId::new(self.identity.authority_id()).map_err(
+                |error| ActiveResponseExecutorError::RejectedBeforeCommit(error.to_string()),
+            )?,
+            executor_authority_generation: self.identity.generation(),
+            authorized_at_unix_ms,
+            authorization_capability_hash: request
+                .response_plan
+                .operator_capability
+                .capability_digest,
+            governed_intent_hash: decode_lower_hex_digest(&request.governed_intent_hash)
+                .ok_or_else(|| {
+                    ActiveResponseExecutorError::RejectedBeforeCommit(
+                        "fixture intent digest".to_owned(),
+                    )
+                })?,
+            policy_decision_hash: decode_lower_hex_digest(&request.policy_decision_hash)
+                .ok_or_else(|| {
+                    ActiveResponseExecutorError::RejectedBeforeCommit(
+                        "fixture policy digest".to_owned(),
+                    )
+                })?,
+            admission_artifact_fingerprint: Some(artifact_fingerprint),
+            approval: ResponseDispatchApproval::Automatic,
+        };
+        self.claim_automatic_preparation(&request.response_plan, &binding)?;
         self.execute_source(&request)
     }
 }
@@ -259,6 +299,18 @@ impl<
             &raw.approval,
         )
         .map_err(|_| reject("active-response dispatch identifier derivation failed"))?;
+        let expected_dispatch_id = match raw.admission_artifact_fingerprint {
+            Some(fingerprint) => {
+                bind_active_response_dispatch_id_to_artifact(&expected_dispatch_id, &fingerprint)
+                    .map_err(|_| reject("bound dispatch identifier derivation failed"))?
+            }
+            None if raw.origin != ActiveResponseExecutionOrigin::Fresh => expected_dispatch_id,
+            None => {
+                return Err(ActiveResponseExecutorError::DispatchRejectedBeforeCommit(
+                    chio_security_types::DispatchRejection::UnboundArtifactPreparation,
+                ))
+            }
+        };
         if expected_dispatch_id != raw.dispatch_id {
             return Err(reject(
                 "active-response dispatch identifier is not canonical for the request",
@@ -378,13 +430,20 @@ impl<
                     "stored response dispatch authorization is invalid: {error}"
                 ))
             })?;
-        let exact = body.key.tenant_id == request.raw.response_plan.tenant_id
+        let exact = body.schema_version
+            == if request.raw.admission_artifact_fingerprint.is_some() {
+                chio_security_types::ports::RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION
+            } else {
+                1
+            }
+            && body.key.tenant_id == request.raw.response_plan.tenant_id
             && body.key.dispatch_id == request.raw.dispatch_id
             && body.action_id == request.raw.response_plan.action_id
             && body.plan_hash == request.raw.response_plan.plan_hash
             && body.authorization_capability_hash == request.authorization_capability_hash
             && body.governed_intent_hash == request.governed_intent_hash
             && body.policy_decision_hash == request.policy_decision_hash
+            && body.admission_artifact_fingerprint == request.raw.admission_artifact_fingerprint
             && body.executor_authority_id.as_str() == self.identity.authority_id()
             && body.executor_authority_generation == self.identity.generation()
             && body.approval == request.approval
@@ -400,6 +459,7 @@ impl<
                     && binding.authorization_capability_hash == body.authorization_capability_hash
                     && binding.governed_intent_hash == body.governed_intent_hash
                     && binding.policy_decision_hash == body.policy_decision_hash
+                    && binding.admission_artifact_fingerprint == body.admission_artifact_fingerprint
                     && binding.approval == body.approval
                     && binding.authorized_at_unix_ms == body.authorized_at_unix_ms
             })
@@ -748,6 +808,13 @@ impl<
             &ActiveResponseExecutionApproval::Automatic,
         )
         .map_err(|_| reject("automatic active-response dispatch fence id derivation failed"))?;
+        let expected_dispatch_id = match binding.admission_artifact_fingerprint {
+            Some(fingerprint) => {
+                bind_active_response_dispatch_id_to_artifact(&expected_dispatch_id, &fingerprint)
+                    .map_err(|_| reject("bound fence identifier derivation failed"))?
+            }
+            None => expected_dispatch_id,
+        };
         if expected_dispatch_id != binding.dispatch_id {
             return Err(reject(
                 "automatic active-response dispatch fence id is not canonical for the binding",
@@ -831,6 +898,42 @@ impl<
         DurableActiveResponseExecutor::ensure_ready(self)
     }
 
+    fn claim_automatic_preparation(
+        &self,
+        response_plan: &ResponsePlan,
+        candidate: &PreparedActiveResponseDispatchBinding,
+    ) -> Result<PreparedActiveResponseDispatchBinding, ActiveResponseExecutorError> {
+        self.ensure_ready()?;
+        self.validate_automatic_dispatch_fence_request(response_plan, candidate)?;
+        let outcome = self
+            .store
+            .claim_automatic_preparation(
+                &chio_security_types::ports::AutomaticResponsePreparationClaimRequest {
+                    response_plan: response_plan.clone(),
+                    prepared_dispatch_binding: candidate.clone(),
+                },
+            )
+            .map_err(|error| match error.kind() {
+                PortErrorKind::Unavailable => ActiveResponseExecutorError::NotReady(format!(
+                    "canonical automatic preparation is unavailable: {error}"
+                )),
+                PortErrorKind::IntegrityFailure => ActiveResponseExecutorError::OutcomeUnknown(
+                    format!("canonical automatic preparation integrity failure: {error}"),
+                ),
+                _ => ActiveResponseExecutorError::RejectedBeforeCommit(format!(
+                    "canonical automatic preparation conflicts with its action: {error}"
+                )),
+            })?;
+        match outcome {
+            chio_security_types::ports::AutomaticResponsePreparationClaimOutcome::Created(
+                binding,
+            )
+            | chio_security_types::ports::AutomaticResponsePreparationClaimOutcome::Existing(
+                binding,
+            ) => Ok(*binding),
+        }
+    }
+
     fn load_committed_active_response_dispatch(
         &self,
         tenant_id: &chio_security_types::ports::TenantId,
@@ -894,7 +997,7 @@ fn prepared_binding_from_dispatch_record(
 ) -> PreparedActiveResponseDispatchBinding {
     let authorization = &record.authorization.body;
     PreparedActiveResponseDispatchBinding {
-        schema_version: PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION,
+        schema_version: authorization.schema_version,
         tenant_id: authorization.key.tenant_id.clone(),
         action_id: authorization.action_id.clone(),
         plan_hash: authorization.plan_hash,
@@ -905,9 +1008,14 @@ fn prepared_binding_from_dispatch_record(
         authorization_capability_hash: authorization.authorization_capability_hash,
         governed_intent_hash: authorization.governed_intent_hash,
         policy_decision_hash: authorization.policy_decision_hash,
+        admission_artifact_fingerprint: authorization.admission_artifact_fingerprint,
         approval: authorization.approval.clone(),
     }
 }
 
 #[path = "expired_resume.rs"]
 mod expired_resume;
+
+#[cfg(test)]
+#[path = "executor/cross_binding_tests.rs"]
+mod cross_binding_tests;

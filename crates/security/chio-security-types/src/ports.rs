@@ -109,11 +109,13 @@ mod dispatch;
 pub use dispatch::ResponseDispatchStore;
 pub use dispatch::{
     AutomaticResponseDispatchFenceOutcome, AutomaticResponseDispatchFenceRecord,
-    AutomaticResponseDispatchFenceRequest, ResponseDispatchApproval, ResponseDispatchAuthorization,
-    ResponseDispatchAuthorizationBody, ResponseDispatchCommitMode, ResponseDispatchCommitOutcome,
-    ResponseDispatchCommitRequest, ResponseDispatchKey, ResponseDispatchLease,
-    ResponseDispatchLoadOutcome, ResponseDispatchRecord, ResponseDispatchRecoveryOutcome,
-    ResponseDispatchRecoveryRequest, RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION,
+    AutomaticResponseDispatchFenceRequest, AutomaticResponsePreparationClaimOutcome,
+    AutomaticResponsePreparationClaimRequest, ResponseDispatchApproval,
+    ResponseDispatchAuthorization, ResponseDispatchAuthorizationBody, ResponseDispatchCommitMode,
+    ResponseDispatchCommitOutcome, ResponseDispatchCommitRequest, ResponseDispatchKey,
+    ResponseDispatchLease, ResponseDispatchLoadOutcome, ResponseDispatchRecord,
+    ResponseDispatchRecoveryOutcome, ResponseDispatchRecoveryRequest,
+    RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION,
 };
 
 mod effects;

@@ -515,11 +515,35 @@ impl Harness {
             ResponseApprovalRequirement::Automatic,
             false,
         );
-        raw_request(
+        let request = raw_request(
             plan,
             self.identity.clone(),
             ActiveResponseExecutionApproval::Automatic,
-        )
+        );
+        let binding = PreparedActiveResponseDispatchBinding {
+            schema_version: PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION,
+            tenant_id: request.response_plan.tenant_id.clone(),
+            action_id: request.response_plan.action_id.clone(),
+            plan_hash: request.response_plan.plan_hash,
+            dispatch_id: request.dispatch_id.clone(),
+            executor_authority_id: record_id(self.identity.authority_id()),
+            executor_authority_generation: self.identity.generation(),
+            authorized_at_unix_ms: request.authorized_at_unix_ms,
+            authorization_capability_hash: digest(30),
+            governed_intent_hash: digest(32),
+            policy_decision_hash: digest(33),
+            admission_artifact_fingerprint: request.admission_artifact_fingerprint,
+            approval: ResponseDispatchApproval::Automatic,
+        };
+        assert_eq!(
+            require_success(
+                self.executor
+                    .claim_automatic_preparation(&request.response_plan, &binding),
+                "claim real automatic preparation",
+            ),
+            binding
+        );
+        request
     }
 
     pub(super) fn governed_request(&self) -> RawActiveResponseExecutionRequest {
@@ -739,6 +763,7 @@ fn raw_request(
     let authorization_capability_hash = digest_hex(&plan.operator_capability.capability_digest);
     let governed_intent_hash = digest_hex(&digest(32));
     let policy_decision_hash = digest_hex(&digest(33));
+    let admission_artifact_fingerprint = Some(digest(35));
     let authorized_at_unix_ms = plan.created_at_unix_ms;
     let dispatch_id = derive_active_response_dispatch_id(
         &plan,
@@ -750,6 +775,9 @@ fn raw_request(
         &approval,
     )
     .unwrap_or_else(|error| panic!("derive active-response dispatch id: {error}"));
+    let dispatch_id =
+        super::bind_active_response_dispatch_id_to_artifact(&dispatch_id, &digest(35))
+            .unwrap_or_else(|error| panic!("bind active-response artifact: {error}"));
     RawActiveResponseExecutionRequest {
         dispatch_id,
         request_id: plan.action_id.as_str().to_string(),
@@ -757,6 +785,7 @@ fn raw_request(
         authorization_capability_hash,
         governed_intent_hash,
         policy_decision_hash,
+        admission_artifact_fingerprint,
         expires_at_unix_ms: plan.expires_at_unix_ms,
         authorized_at_unix_ms,
         origin: ActiveResponseExecutionOrigin::Fresh,
@@ -1790,6 +1819,7 @@ mod automatic_fence_boundary {
             authorization_capability_hash: digest(30),
             governed_intent_hash: digest(32),
             policy_decision_hash: digest(33),
+            admission_artifact_fingerprint: request.admission_artifact_fingerprint,
             approval: ResponseDispatchApproval::Automatic,
         };
         (identity, plan, binding)

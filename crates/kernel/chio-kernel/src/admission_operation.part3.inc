@@ -122,10 +122,14 @@ mod tests {
             left.derive_hash().unwrap(),
             changed_digest.derive_hash().unwrap()
         );
-        let mut changed_budget = left.clone();
-        changed_budget.budget_hold_reference = Some("budget-hold-2".to_string());
-        let mut changed_policy = left.clone();
-        changed_policy.policy_hash = "88".repeat(32);
+        let mut changed_budget_parts = request_binding_parts();
+        changed_budget_parts.budget_hold_reference = Some("budget-hold-2".to_string());
+        let changed_budget = AdmissionRequestBindingInput::new(changed_budget_parts)
+            .unwrap_or_else(|error| panic!("valid budget binding fixture: {error}"));
+        let mut changed_policy_parts = request_binding_parts();
+        changed_policy_parts.policy_hash = "88".repeat(32);
+        let changed_policy = AdmissionRequestBindingInput::new(changed_policy_parts)
+            .unwrap_or_else(|error| panic!("valid policy binding fixture: {error}"));
         assert_ne!(
             left.derive_hash().unwrap(),
             changed_budget.derive_hash().unwrap()

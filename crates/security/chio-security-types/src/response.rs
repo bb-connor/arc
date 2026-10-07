@@ -515,6 +515,8 @@ pub struct ResponseExecutionDispatchBinding {
     pub authorization_capability_hash: Digest32,
     pub governed_intent_hash: Digest32,
     pub policy_decision_hash: Digest32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub admission_artifact_fingerprint: Option<Digest32>,
     pub approval: ResponseDispatchApproval,
     pub authorized_at_unix_ms: u64,
 }
@@ -527,9 +529,17 @@ impl ResponseExecutionDispatchBinding {
         plan_hash: &Digest32,
         plan_expires_at_unix_ms: u64,
     ) -> Result<(), ResponseExecutionDispatchBindingError> {
-        if self.schema_version != RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION {
+        let artifact_schema_valid = match (self.schema_version, self.admission_artifact_fingerprint)
+        {
+            (1, None) => true,
+            (RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION, Some(fingerprint)) => {
+                !fingerprint.is_zero()
+            }
+            _ => false,
+        };
+        if !artifact_schema_valid {
             return Err(ResponseExecutionDispatchBindingError::Invalid(
-                "unsupported schema version",
+                "unsupported or unbound artifact schema",
             ));
         }
         if &self.tenant_id != tenant_id

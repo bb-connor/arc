@@ -261,6 +261,25 @@ pub fn active_response_submission_proof_digest(
     ))
 }
 
+pub(super) fn active_response_admission_artifact_fingerprint(
+    request: &(impl ActiveResponseApprovalInputs + ?Sized),
+) -> Result<Digest32, KernelError> {
+    let payload_digest = active_response_admission_artifact_payload_digest(
+        request.authorization().plan_body(),
+        request.authorization().operator_capability(),
+        request.authorization().governed_intent(),
+        request.authorization().submission_proof(),
+        request.threshold_proposal_option(),
+        request.approval_tokens(),
+    )
+    .map_err(|error| denied(&error.to_string()))?;
+    let canonical = canonical_json_bytes(&(request.admission_artifact_ref(), payload_digest))
+        .map_err(|error| denied(&error.to_string()))?;
+    let mut bytes = b"chio.active-response-artifact-fingerprint.v1\0".to_vec();
+    bytes.extend_from_slice(&canonical);
+    Ok(Digest32::new(*sha256(&bytes).as_bytes()))
+}
+
 impl ChioKernel {
     pub fn set_active_response_submission_authority(
         &mut self,
@@ -320,7 +339,11 @@ impl ChioKernel {
         let expected_authority = self
             .active_response_submission_authority
             .as_ref()
-            .ok_or_else(|| denied("active-response submission authority is not installed"))?;
+            .ok_or_else(|| {
+                KernelError::Internal(
+                    "active-response submission authority is not installed".to_string(),
+                )
+            })?;
         let proof = request.authorization().submission_proof();
         let attestation = request.artifact_authority_attestation();
         let body = &attestation.body;

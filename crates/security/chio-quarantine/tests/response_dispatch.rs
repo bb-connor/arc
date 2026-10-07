@@ -106,6 +106,7 @@ fn preparation(
         authorization_capability_hash: digest(30),
         governed_intent_hash: digest(32),
         policy_decision_hash: digest(33),
+        admission_artifact_fingerprint: Some(digest(35)),
         executor_authority_id: record_id("executor-authority"),
         executor_authority_generation: 4,
         approval,
@@ -694,5 +695,20 @@ fn dispatch_preparation_rejects_authorization_or_approval_mismatch() {
             governed_approval(2),
         ))),
         DispatchRejection::ApprovalRequirementMismatch
+    );
+}
+
+#[test]
+fn unbound_legacy_preparation_cannot_mint_fresh_dispatch_authority() {
+    let mut request = preparation(
+        plan(ResponseApprovalRequirement::Automatic),
+        ResponseDispatchApproval::Automatic,
+    );
+    request.admission_artifact_fingerprint = None;
+    let rejection = dispatch_rejection(prepare_response_dispatch(request));
+    assert_eq!(rejection, DispatchRejection::UnboundArtifactPreparation);
+    assert_eq!(
+        rejection.code(),
+        "urn:chio:error:kernel:response-dispatch-unbound-artifact-preparation"
     );
 }

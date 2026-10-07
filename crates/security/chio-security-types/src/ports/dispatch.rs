@@ -8,7 +8,7 @@ use super::{
 #[cfg(feature = "std")]
 use super::{PortError, PortResult, SchedulerWorkKey};
 
-pub const RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION: u8 = 1;
+pub const RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION: u8 = 2;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -28,6 +28,19 @@ pub enum ResponseDispatchApproval {
     },
 }
 
+/// First immutable automatic preparation for one tenant-scoped action.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AutomaticResponsePreparationClaimRequest {
+    pub response_plan: crate::ResponsePlan,
+    pub prepared_dispatch_binding: PreparedActiveResponseDispatchBinding,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum AutomaticResponsePreparationClaimOutcome {
+    Created(Box<PreparedActiveResponseDispatchBinding>),
+    Existing(Box<PreparedActiveResponseDispatchBinding>),
+}
+
 /// Canonical immutable authorization for one deterministic response dispatch.
 ///
 /// `response_body_hash` binds the complete `Applying` response record. The
@@ -44,6 +57,8 @@ pub struct ResponseDispatchAuthorizationBody {
     pub authorization_capability_hash: Digest32,
     pub governed_intent_hash: Digest32,
     pub policy_decision_hash: Digest32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub admission_artifact_fingerprint: Option<Digest32>,
     pub executor_authority_id: RecordId,
     pub executor_authority_generation: u64,
     pub approval: ResponseDispatchApproval,
@@ -161,6 +176,16 @@ pub enum AutomaticResponseDispatchFenceOutcome {
 /// mismatch on retry or load.
 #[cfg(feature = "std")]
 pub trait ResponseDispatchStore: ResponseSchedulerStore {
+    /// Pin the first verified artifact and immutable preparation for the action.
+    /// Same-artifact retries return the original timestamp and dispatch ID.
+    /// Implementations serialize this claim with action-wide commit and fence.
+    fn claim_automatic_preparation(
+        &self,
+        _request: &AutomaticResponsePreparationClaimRequest,
+    ) -> PortResult<AutomaticResponsePreparationClaimOutcome> {
+        Err(PortError::unavailable())
+    }
+
     fn ensure_dispatch_ready(&self) -> PortResult<()>;
 
     /// Load the exact scheduler lease currently guarding a committed dispatch.

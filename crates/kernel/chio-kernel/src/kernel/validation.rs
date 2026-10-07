@@ -26,6 +26,8 @@ use crate::budget_store::{
 mod aggregate;
 #[path = "validation/caller_budget.rs"]
 mod caller_budget;
+#[path = "validation/capability_evidence.rs"]
+mod capability_evidence;
 #[path = "validation/cumulative.rs"]
 mod cumulative;
 #[path = "validation/issuance.rs"]
@@ -327,43 +329,35 @@ impl ChioKernel {
         remote_kernel_id: Option<&str>,
         now: u64,
     ) -> Result<(), String> {
-        self.check_capability_issuer_lifecycle(cap, now)?;
-        let trusted = self.trusted_issuer_keys();
-        let peer_profile = self.capability_negotiation_for_remote(remote_kernel_id, now)?;
-        let trust_resolver = self.capability_trust_root_resolver_snapshot();
-        let mut budgets = chio_kernel_core::NoopBudgetRegistry;
-        let direct_root = self.negotiated_capability_root(cap, &peer_profile)?;
-        let ancestors = self.signed_capability_ancestors(cap)?;
-        // Authority and signed-lineage lookups may block past token expiry.
-        // Observe the owned fence only after those lookups, never below the
-        // caller's admission floor, and retain a clock refusal's exact cause.
-        let fresh_now = self
-            .read_authority_time()
-            .map_err(|error| KernelError::Clock(error).to_string())?
-            .as_secs();
-        let clock = chio_kernel_core::FixedClock::new(now.max(fresh_now));
+        self.verify_capability_full_pre_admit_with_clock(cap, remote_kernel_id, now, |kernel| {
+            // Sample after authority/lineage lookups, retaining the fresh
+            // caller's admission floor and its owned clock refusal.
+            let fresh_now = kernel
+                .read_authority_time()
+                .map_err(|error| KernelError::Clock(error).to_string())?
+                .as_secs();
+            Ok(chio_kernel_core::FixedClock::new(now.max(fresh_now)))
+        })
+    }
 
-        chio_kernel_core::verify_capability_full_with_evidence(
+    pub(super) fn verify_active_response_immutable_capability_pre_admit(
+        &self,
+        cap: &CapabilityToken,
+        recorded_at_unix_secs: u64,
+    ) -> Result<(), KernelError> {
+        let authority_now = self
+            .read_authority_time()
+            .map_err(KernelError::Clock)?
+            .as_secs();
+        self.verify_capability_full_pre_admit_with_clock(
             cap,
-            &trusted,
-            &clock,
-            capability_crypto_floor(self.capability_crypto_floor),
-            chio_kernel_core::CapabilityEvidenceContext {
-                features: chio_kernel_core::CapabilityFeatureContext {
-                    peer: &peer_profile,
-                    direct_root: direct_root.as_ref(),
-                },
-                ancestors: &ancestors,
-            },
-            &trust_resolver,
-            &mut budgets,
+            None,
+            authority_now,
+            |_| Ok(chio_kernel_core::FixedClock::new(recorded_at_unix_secs)),
         )
-        .map_err(|error| {
-            chio_kernel_core::KernelCoreError::InvalidCapability(error).deny_reason()
-        })?;
-        crate::ensure_capability_issuance_supported(&cap.scope)
-            .map_err(|error| error.to_string())?;
-        Ok(())
+        .map_err(|reason| KernelError::GovernedTransactionDenied(format!(
+            "active-response authorization denied: operator capability verification failed: {reason}"
+        )))
     }
 
     /// The hosted `evaluate_tool_call_*` paths route the full chain

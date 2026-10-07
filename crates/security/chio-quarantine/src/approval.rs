@@ -771,6 +771,7 @@ mod tests {
                 authorization_capability_hash: request.operator_capability_digest,
                 governed_intent_hash: request.governed_intent_hash,
                 policy_decision_hash: digest(12),
+                admission_artifact_fingerprint: Some(Digest32::new([96_u8; 32])),
                 approval: ResponseDispatchApproval::Governed {
                     admission_operation_id: required!(RecordId::new("admission-operation-1")),
                     admission_operation_version: 1,

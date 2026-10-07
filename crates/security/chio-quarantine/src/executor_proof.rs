@@ -110,6 +110,7 @@ pub(super) fn validate_dispatch_authorization(
         authorization_capability_hash: authorization.body.authorization_capability_hash,
         governed_intent_hash: authorization.body.governed_intent_hash,
         policy_decision_hash: authorization.body.policy_decision_hash,
+        admission_artifact_fingerprint: authorization.body.admission_artifact_fingerprint,
         approval: authorization.body.approval.clone(),
         authorized_at_unix_ms: authorization.body.authorized_at_unix_ms,
     };
@@ -255,6 +256,7 @@ mod tests {
             authorization_capability_hash: digest(24),
             governed_intent_hash: digest(26),
             policy_decision_hash: digest(27),
+            admission_artifact_fingerprint: Some(digest(28)),
             executor_authority_id: record_id("executor-authority-proof"),
             executor_authority_generation: 4,
             approval: ResponseDispatchApproval::Automatic,

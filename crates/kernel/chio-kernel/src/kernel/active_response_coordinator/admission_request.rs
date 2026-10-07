@@ -6,8 +6,8 @@ use chio_security_types::FreshLiveAdmission;
 use super::{
     active_response_denied, ActiveResponseArtifactAuthorityAttestation,
     ActiveResponseAuthorizationRequest, AdmissionArtifactRef, AdmissionOperation,
-    ApprovalSetReservationInput, GovernedApprovalToken, KernelError, RecordId, ResponsePlan,
-    ThresholdApprovalProposal,
+    ApprovalSetReservationInput, Digest32, GovernedApprovalToken, KernelError, RecordId,
+    ResponsePlan, ThresholdApprovalProposal,
 };
 
 /// Complete immutable envelope presented to the active-response admission seam.
@@ -96,6 +96,7 @@ pub struct AutomaticActiveResponsePermit {
     pub(in crate::kernel) authorization_capability_hash: String,
     pub(in crate::kernel) governed_intent_hash: String,
     pub(in crate::kernel) policy_decision_hash: String,
+    pub(in crate::kernel) admission_artifact_fingerprint: Option<Digest32>,
     pub(in crate::kernel) executor_authority_id: String,
     pub(in crate::kernel) executor_authority_generation: u64,
     pub(in crate::kernel) authorized_at_unix_ms: u64,
@@ -154,6 +155,7 @@ pub struct GovernedActiveResponseReservation {
     pub(in crate::kernel) operation: Box<AdmissionOperation>,
     pub(in crate::kernel) approval_set: Box<ApprovalSetReservationInput>,
     pub(in crate::kernel) policy_decision_hash: String,
+    pub(in crate::kernel) admission_artifact_fingerprint: Option<Digest32>,
     pub(in crate::kernel) authorization_capability_hash: String,
     pub(in crate::kernel) governed_intent_hash: String,
     pub(in crate::kernel) executor_authority_id: String,

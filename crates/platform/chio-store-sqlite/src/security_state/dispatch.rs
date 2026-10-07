@@ -20,7 +20,20 @@ use super::{
     RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION,
 };
 
+#[path = "automatic_preparation.rs"]
+mod automatic_preparation;
+pub(super) use automatic_preparation::{
+    ensure_automatic_preparation_schema, preflight_automatic_preparation_schema,
+};
+
 impl ResponseDispatchStore for SqliteSecurityStateStore {
+    fn claim_automatic_preparation(
+        &self,
+        request: &chio_security_types::ports::AutomaticResponsePreparationClaimRequest,
+    ) -> PortResult<chio_security_types::ports::AutomaticResponsePreparationClaimOutcome> {
+        automatic_preparation::claim_automatic_preparation(self, request)
+    }
+
     fn ensure_dispatch_ready(&self) -> PortResult<()> {
         let mut connection = self.connection()?;
         let transaction = connection
@@ -95,6 +108,7 @@ impl ResponseDispatchStore for SqliteSecurityStateStore {
             .map_err(|_| PortError::integrity_failure())?;
         drop(fence_statement);
         validate_all_automatic_response_dispatch_fences(&transaction)?;
+        automatic_preparation::validate_all_automatic_preparations(&transaction)?;
         let overlapping_identity = transaction
             .query_row(
                 r#"
@@ -194,6 +208,10 @@ impl ResponseDispatchStore for SqliteSecurityStateStore {
                 existing,
             ));
         }
+        automatic_preparation::require_exact_automatic_preparation(
+            &transaction,
+            &request.prepared_dispatch_binding,
+        )?;
         let work_key = SchedulerWorkKey {
             tenant_id: request.prepared_dispatch_binding.tenant_id.clone(),
             action_id: request.prepared_dispatch_binding.action_id.clone(),
@@ -285,6 +303,24 @@ impl ResponseDispatchStore for SqliteSecurityStateStore {
             }
             transaction.commit().map_err(sqlite_error)?;
             return Ok(ResponseDispatchCommitOutcome::Existing(existing));
+        }
+        if request.mode == ResponseDispatchCommitMode::Fresh
+            && prepared_dispatch_binding
+                .admission_artifact_fingerprint
+                .is_none()
+        {
+            return Err(PortError::invalid_data());
+        }
+        if request.mode == ResponseDispatchCommitMode::Fresh
+            && matches!(
+                prepared_dispatch_binding.approval,
+                ResponseDispatchApproval::Automatic
+            )
+        {
+            automatic_preparation::require_exact_automatic_preparation(
+                &transaction,
+                &prepared_dispatch_binding,
+            )?;
         }
         let trusted_now = self.trusted_now_in_transaction(&transaction)?;
         let invalid_commit_time = match request.mode {
@@ -709,7 +745,13 @@ fn validate_response_dispatch_request(
         .and_then(|input| input.decode_signed())
         .map_err(|_| PortError::invalid_data())?;
     if decoded_authorization != request.authorization.body
-        || decoded_authorization.schema_version != RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION
+        || !matches!(
+            (
+                decoded_authorization.schema_version,
+                decoded_authorization.admission_artifact_fingerprint
+            ),
+            (1, None) | (RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION, Some(_))
+        )
         || decoded_authorization.key.tenant_id != request.response_plan.tenant_id
         || decoded_authorization.action_id != request.response_plan.action_id
         || decoded_authorization.executor_authority_generation == 0
@@ -744,6 +786,7 @@ fn validate_response_dispatch_request(
         || request.initial_lease.lease_expires_at_unix_ms
             <= decoded_authorization.authorized_at_unix_ms
         || request.initial_lease.lease_expires_at_unix_ms > snapshot.plan.expires_at_unix_ms
+        || execution_dispatch.schema_version != decoded_authorization.schema_version
         || execution_dispatch.dispatch_id != decoded_authorization.key.dispatch_id
         || execution_dispatch.executor_authority_id != decoded_authorization.executor_authority_id
         || execution_dispatch.executor_authority_generation
@@ -752,6 +795,8 @@ fn validate_response_dispatch_request(
             != decoded_authorization.authorization_capability_hash
         || execution_dispatch.governed_intent_hash != decoded_authorization.governed_intent_hash
         || execution_dispatch.policy_decision_hash != decoded_authorization.policy_decision_hash
+        || execution_dispatch.admission_artifact_fingerprint
+            != decoded_authorization.admission_artifact_fingerprint
         || execution_dispatch.approval != decoded_authorization.approval
         || execution_dispatch.authorized_at_unix_ms != decoded_authorization.authorized_at_unix_ms
     {
@@ -939,7 +984,7 @@ fn prepared_binding_from_response_authorization(
     authorization: &ResponseDispatchAuthorizationBody,
 ) -> PreparedActiveResponseDispatchBinding {
     PreparedActiveResponseDispatchBinding {
-        schema_version: PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION,
+        schema_version: authorization.schema_version,
         tenant_id: authorization.key.tenant_id.clone(),
         action_id: authorization.action_id.clone(),
         plan_hash: authorization.plan_hash,
@@ -950,6 +995,7 @@ fn prepared_binding_from_response_authorization(
         authorization_capability_hash: authorization.authorization_capability_hash,
         governed_intent_hash: authorization.governed_intent_hash,
         policy_decision_hash: authorization.policy_decision_hash,
+        admission_artifact_fingerprint: authorization.admission_artifact_fingerprint,
         approval: authorization.approval.clone(),
     }
 }
@@ -1076,7 +1122,19 @@ fn load_automatic_response_dispatch_fence(
 fn validate_automatic_response_dispatch_fence_binding_shape(
     binding: &PreparedActiveResponseDispatchBinding,
 ) -> PortResult<()> {
-    if binding.schema_version != PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION
+    if !matches!(
+        (
+            binding.schema_version,
+            binding.admission_artifact_fingerprint
+        ),
+        (1, None)
+            | (
+                PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION,
+                Some(_)
+            )
+    ) || binding
+        .admission_artifact_fingerprint
+        .is_some_and(|value| value.is_zero())
         || binding.executor_authority_generation == 0
         || binding.authorized_at_unix_ms == 0
         || binding.plan_hash.is_zero()

@@ -19,6 +19,13 @@ fn committed_live_admission_prepares_and_recovers_its_dispatch() {
         &request.approval,
     )
     .unwrap_or_else(|error| panic!("live dispatch identity: {error}"));
+    request.dispatch_id = super::bind_active_response_dispatch_id_to_artifact(
+        &request.dispatch_id,
+        &request
+            .admission_artifact_fingerprint
+            .unwrap_or_else(|| panic!("bound fixture artifact")),
+    )
+    .unwrap_or_else(|error| panic!("live bound dispatch identity: {error}"));
 
     let first = require_success(
         harness.executor.execute_source(&request),

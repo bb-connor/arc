@@ -32,6 +32,9 @@ mod scheduler_lease;
 #[path = "response_dispatch/tenant_isolation.rs"]
 mod tenant_isolation;
 
+#[path = "response_dispatch/dispatch_lease_readback.rs"]
+mod dispatch_lease_readback;
+
 fn now_unix_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -421,6 +424,7 @@ fn dispatch_request_for_tenant(
         authorization_capability_hash: digest(30),
         governed_intent_hash: digest(32),
         policy_decision_hash: digest(33),
+        admission_artifact_fingerprint: Some(digest(35)),
         executor_authority_id: record_id("executor-authority"),
         executor_authority_generation: 4,
         approval: ResponseDispatchApproval::Automatic,
@@ -460,9 +464,36 @@ fn automatic_fence_request(
                     .authorization_capability_hash,
                 governed_intent_hash: request.authorization.body.governed_intent_hash,
                 policy_decision_hash: request.authorization.body.policy_decision_hash,
+                admission_artifact_fingerprint: request
+                    .authorization
+                    .body
+                    .admission_artifact_fingerprint,
                 approval: request.authorization.body.approval.clone(),
             },
     }
+}
+
+fn pin_automatic_fixture(
+    store: &SqliteSecurityStateStore,
+    request: &chio_security_types::ports::ResponseDispatchCommitRequest,
+) {
+    let fence = automatic_fence_request(request);
+    let expected = fence.prepared_dispatch_binding.clone();
+    let outcome = store
+        .claim_automatic_preparation(
+            &chio_security_types::ports::AutomaticResponsePreparationClaimRequest {
+                response_plan: fence.response_plan,
+                prepared_dispatch_binding: expected.clone(),
+            },
+        )
+        .unwrap_or_else(|error| panic!("claim automatic store fixture: {error}"));
+    let actual = match outcome {
+        chio_security_types::ports::AutomaticResponsePreparationClaimOutcome::Created(binding)
+        | chio_security_types::ports::AutomaticResponsePreparationClaimOutcome::Existing(binding) => {
+            *binding
+        }
+    };
+    assert_eq!(actual, expected);
 }
 
 fn race_dispatch_commit_and_fence(
@@ -562,6 +593,7 @@ fn atomic_dispatch_is_idempotent_bound_and_recoverable_after_crash() {
     store
         .ensure_dispatch_ready()
         .unwrap_or_else(|error| panic!("dispatch store is not ready: {error}"));
+    pin_automatic_fixture(&store, &request);
     let committed = store
         .commit_dispatch(&request)
         .unwrap_or_else(|error| panic!("dispatch commit failed: {error}"));
@@ -693,6 +725,7 @@ fn scheduled_response_cas_sequences_one_fence_and_rejects_forged_mutation_fences
         created_at_unix_ms,
         created_at_unix_ms.saturating_add(5_000),
     );
+    pin_automatic_fixture(&store, &request);
     let committed = store
         .commit_dispatch(&request)
         .unwrap_or_else(|error| panic!("dispatch commit failed: {error}"));

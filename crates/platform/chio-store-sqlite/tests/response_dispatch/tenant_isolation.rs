@@ -10,6 +10,7 @@ fn exact_dispatch_id_cannot_cross_tenants_after_restart() {
     let request = dispatch_request("exact-action", "exact-dispatch", now, now, now + 10_000);
     let store =
         SqliteSecurityStateStore::open(&path).unwrap_or_else(|error| panic!("store: {error}"));
+    pin_automatic_fixture(&store, &request);
     let committed = match store
         .commit_dispatch(&request)
         .unwrap_or_else(|error| panic!("commit: {error}"))

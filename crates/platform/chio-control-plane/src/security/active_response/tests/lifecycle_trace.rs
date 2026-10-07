@@ -322,6 +322,44 @@ fn durable_lifecycle_trace_links_commits_effects_and_signed_receipts() {
         );
         {
             let owners = Owners::open(root.path(), &clock, scenario, &capture);
+            let preparation = require_success(
+                request.prepare_dispatch(
+                    chio_security_types::ports::ResponseDispatchLease {
+                        lease_owner_id: require_success(
+                            LeaseOwnerId::new(TEST_ACTIVE_RESPONSE_LEASE_OWNER_ID),
+                            "original preparation lease owner",
+                        ),
+                        lease_expires_at_unix_ms: now + 30_000,
+                    },
+                    now,
+                ),
+                "original automatic preparation",
+            );
+            let authorization = &preparation.authorization.body;
+            let binding = PreparedActiveResponseDispatchBinding {
+                schema_version: authorization.schema_version,
+                tenant_id: authorization.key.tenant_id.clone(),
+                action_id: authorization.action_id.clone(),
+                plan_hash: authorization.plan_hash,
+                dispatch_id: authorization.key.dispatch_id.clone(),
+                executor_authority_id: authorization.executor_authority_id.clone(),
+                executor_authority_generation: authorization.executor_authority_generation,
+                authorized_at_unix_ms: authorization.authorized_at_unix_ms,
+                authorization_capability_hash: authorization.authorization_capability_hash,
+                governed_intent_hash: authorization.governed_intent_hash,
+                policy_decision_hash: authorization.policy_decision_hash,
+                admission_artifact_fingerprint: authorization.admission_artifact_fingerprint,
+                approval: authorization.approval.clone(),
+            };
+            require_success(
+                owners.store.claim_automatic_preparation(
+                    &chio_security_types::ports::AutomaticResponsePreparationClaimRequest {
+                        response_plan: request.response_plan.clone(),
+                        prepared_dispatch_binding: binding,
+                    },
+                ),
+                "claim original automatic preparation",
+            );
             let first = owners.executor(&clock).execute_source(&request);
             if scenario == "happy" {
                 require_success(first, "activate");

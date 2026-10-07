@@ -659,9 +659,9 @@ pub(crate) use kernel::{MatchingGrant, ReceiptContent};
 pub use kernel::{
     active_response_admission_artifact_payload_digest,
     active_response_artifact_authority_signing_bytes, active_response_submission_proof_digest,
-    derive_active_response_dispatch_id, prepare_response_dispatch, AcquiredNativeSecurityEgress,
-    ActiveResponseAdmissionRequest, ActiveResponseArtifactAuthorityAttestation,
-    ActiveResponseArtifactAuthorityAttestationBody,
+    bind_active_response_dispatch_id_to_artifact, derive_active_response_dispatch_id,
+    prepare_response_dispatch, AcquiredNativeSecurityEgress, ActiveResponseAdmissionRequest,
+    ActiveResponseArtifactAuthorityAttestation, ActiveResponseArtifactAuthorityAttestationBody,
     ActiveResponseArtifactAuthorityAttestationError,
     ActiveResponseArtifactAuthorityAttestationInput, ActiveResponseAuthorizationRequest,
     ActiveResponseCommittedDispatch, ActiveResponseDispatchIdError, ActiveResponseEffectEvidence,

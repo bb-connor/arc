@@ -211,6 +211,7 @@ fn partial_rollback_truth() {
         dispatch_id: record("partial-rollback-dispatch"),
         governed_intent_hash: digest(b"partial-rollback-intent"),
         policy_decision_hash: digest(b"partial-rollback-decision"),
+        admission_artifact_fingerprint: Some(digest(b"synthetic-preparation-artifact")),
         executor_authority_id: record("partial-rollback-authority"),
         executor_authority_generation: 1,
         approval: ResponseDispatchApproval::Automatic,
@@ -222,6 +223,50 @@ fn partial_rollback_truth() {
         },
     })
     .test_expect("prepare partial rollback dispatch");
+    {
+        let authorization = &dispatch.authorization.body;
+        let outcome = store
+            .claim_automatic_preparation(
+                &chio_security_types::ports::AutomaticResponsePreparationClaimRequest {
+                    response_plan: chio_quarantine::decode_response_record(&dispatch.response_plan)
+                        .unwrap_or_else(|error| panic!("fixture plan decode: {error}"))
+                        .plan,
+                    prepared_dispatch_binding:
+                        chio_security_types::ports::PreparedActiveResponseDispatchBinding {
+                            schema_version: authorization.schema_version,
+                            tenant_id: authorization.key.tenant_id.clone(),
+                            action_id: authorization.action_id.clone(),
+                            plan_hash: authorization.plan_hash,
+                            dispatch_id: authorization.key.dispatch_id.clone(),
+                            executor_authority_id: authorization.executor_authority_id.clone(),
+                            executor_authority_generation: authorization
+                                .executor_authority_generation,
+                            authorized_at_unix_ms: authorization.authorized_at_unix_ms,
+                            authorization_capability_hash: authorization
+                                .authorization_capability_hash,
+                            governed_intent_hash: authorization.governed_intent_hash,
+                            policy_decision_hash: authorization.policy_decision_hash,
+                            admission_artifact_fingerprint: authorization
+                                .admission_artifact_fingerprint,
+                            approval: authorization.approval.clone(),
+                        },
+                },
+            )
+            .unwrap_or_else(|error| panic!("claim current automatic fixture: {error}"));
+        let binding = match outcome {
+            chio_security_types::ports::AutomaticResponsePreparationClaimOutcome::Created(
+                binding,
+            )
+            | chio_security_types::ports::AutomaticResponsePreparationClaimOutcome::Existing(
+                binding,
+            ) => binding,
+        };
+        assert_eq!(binding.dispatch_id, authorization.key.dispatch_id);
+        assert_eq!(
+            binding.admission_artifact_fingerprint,
+            authorization.admission_artifact_fingerprint
+        );
+    }
     let committed = match store
         .commit_dispatch(&dispatch)
         .test_expect("commit partial rollback dispatch")

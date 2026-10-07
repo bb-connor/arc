@@ -89,6 +89,7 @@ pub(super) fn prepare_kernel_dispatch(
         authorization_capability_hash: digest(request.authorization_capability_hash())?,
         governed_intent_hash: digest(request.governed_intent_hash())?,
         policy_decision_hash: digest(request.policy_decision_hash())?,
+        admission_artifact_fingerprint: request.admission_artifact_fingerprint(),
         executor_authority_id: RecordId::new(request.executor_authority_id())
             .map_err(|_| reject("active-response executor authority id is invalid"))?,
         executor_authority_generation: request.executor_authority_generation(),
@@ -131,6 +132,7 @@ pub struct ResponseDispatchPreparationRequest {
     pub authorization_capability_hash: Digest32,
     pub governed_intent_hash: Digest32,
     pub policy_decision_hash: Digest32,
+    pub admission_artifact_fingerprint: Option<Digest32>,
     pub executor_authority_id: RecordId,
     pub executor_authority_generation: u64,
     pub approval: ResponseDispatchApproval,
@@ -154,6 +156,7 @@ pub fn prepare_response_dispatch(
         authorization_capability_hash: request.authorization_capability_hash,
         governed_intent_hash: request.governed_intent_hash,
         policy_decision_hash: request.policy_decision_hash,
+        admission_artifact_fingerprint: request.admission_artifact_fingerprint,
         executor_authority_id: request.executor_authority_id,
         executor_authority_generation: request.executor_authority_generation,
         approval: request.approval,
@@ -169,6 +172,7 @@ struct DispatchPreparation {
     authorization_capability_hash: Digest32,
     governed_intent_hash: Digest32,
     policy_decision_hash: Digest32,
+    admission_artifact_fingerprint: Option<Digest32>,
     executor_authority_id: RecordId,
     executor_authority_generation: u64,
     approval: ResponseDispatchApproval,
@@ -186,6 +190,7 @@ fn prepare_dispatch(
         authorization_capability_hash,
         governed_intent_hash,
         policy_decision_hash,
+        admission_artifact_fingerprint,
         executor_authority_id,
         executor_authority_generation,
         approval,
@@ -193,6 +198,15 @@ fn prepare_dispatch(
         initial_lease,
         commit_mode,
     } = request;
+    if commit_mode == ResponseDispatchCommitMode::Fresh && admission_artifact_fingerprint.is_none()
+    {
+        return Err(DispatchRejection::UnboundArtifactPreparation.into());
+    }
+    let dispatch_schema = if admission_artifact_fingerprint.is_some() {
+        RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION
+    } else {
+        1
+    };
     let mut snapshot = initial_response_snapshot(plan)?;
     let plan = &snapshot.plan;
     if authorization_capability_hash != plan.operator_capability.capability_digest {
@@ -249,7 +263,7 @@ fn prepare_dispatch(
     }
 
     let execution_dispatch = ResponseExecutionDispatchBinding {
-        schema_version: RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION,
+        schema_version: dispatch_schema,
         tenant_id: plan.tenant_id.clone(),
         dispatch_id: dispatch_id.clone(),
         action_id: plan.action_id.clone(),
@@ -259,6 +273,7 @@ fn prepare_dispatch(
         authorization_capability_hash,
         governed_intent_hash,
         policy_decision_hash,
+        admission_artifact_fingerprint,
         approval: approval.clone(),
         authorized_at_unix_ms,
     };
@@ -280,7 +295,7 @@ fn prepare_dispatch(
     )?;
     let normalized_response_plan = encode_normalized_dispatch_response_record(&snapshot)?;
     let authorization_body = ResponseDispatchAuthorizationBody {
-        schema_version: RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION,
+        schema_version: dispatch_schema,
         key: ResponseDispatchKey {
             tenant_id: normalized_response_plan.tenant_id.clone(),
             dispatch_id,
@@ -291,6 +306,7 @@ fn prepare_dispatch(
         authorization_capability_hash,
         governed_intent_hash,
         policy_decision_hash,
+        admission_artifact_fingerprint,
         executor_authority_id,
         executor_authority_generation,
         approval,

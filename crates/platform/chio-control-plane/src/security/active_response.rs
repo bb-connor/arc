@@ -11,16 +11,18 @@ use super::active_response_validation::{
     valid_prefixed_digest_id,
 };
 use chio_kernel::{
-    derive_active_response_dispatch_id, ActiveResponseCommittedDispatch,
-    ActiveResponseEffectEvidence, ActiveResponseExecutionApproval, ActiveResponseExecutionEvidence,
-    ActiveResponseExecutionEvidenceParts, ActiveResponseExecutionOrigin,
-    ActiveResponseExecutionOutcome, ActiveResponseExecutionRequest,
+    bind_active_response_dispatch_id_to_artifact, derive_active_response_dispatch_id,
+    ActiveResponseCommittedDispatch, ActiveResponseEffectEvidence, ActiveResponseExecutionApproval,
+    ActiveResponseExecutionEvidence, ActiveResponseExecutionEvidenceParts,
+    ActiveResponseExecutionOrigin, ActiveResponseExecutionOutcome, ActiveResponseExecutionRequest,
     ActiveResponseExecutorAuthority, ActiveResponseExecutorAuthorityIdentity,
     ActiveResponseExecutorError, ActiveResponseFailedEffectEvidence, ActiveResponseFailureEvidence,
     ActiveResponseReceiptProofSource, AutomaticActiveResponseDispatchFenceOutcome,
 };
 use chio_quarantine::{decode_response_record, DurableActiveResponseOutcome, ResponseExecutor};
 use chio_security_kernel::Clock;
+#[cfg(test)]
+use chio_security_types::ports::PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION;
 use chio_security_types::ports::{
     AutomaticResponseDispatchFenceOutcome, AutomaticResponseDispatchFenceRequest, Digest32,
     EffectPort, LeaseOwnerId, PortErrorKind, PreparedActiveResponseDispatchBinding, RecordId,
@@ -28,7 +30,7 @@ use chio_security_types::ports::{
     ResponseDispatchLease, ResponseDispatchLoadOutcome, ResponseDispatchRecord,
     ResponseDispatchRecoveryOutcome, ResponseDispatchRecoveryRequest, ResponseDispatchStore,
     ResponsePlanKey, ResponsePlanRecord, ScheduledWork, SchedulerWorkKey, SecurityAlertPort,
-    SecurityReceiptSink, PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION,
+    SecurityReceiptSink,
 };
 use chio_security_types::{ResponseApprovalRequirement, ResponsePlan, ResponseState};
 use std::sync::Arc;

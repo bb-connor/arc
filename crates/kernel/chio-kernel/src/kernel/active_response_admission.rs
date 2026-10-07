@@ -486,6 +486,34 @@ impl ChioKernel {
             ));
         }
         self.validate_delegation_admission(capability)?;
+        self.verify_active_response_plan_bindings_at(request, now_unix_ms)
+    }
+
+    /// Authenticate immutable evidence at a recorded authorization time.
+    /// Current revocation remains mandatory in the live admission wrapper.
+    pub(super) fn verify_active_response_immutable_authorization_at(
+        &self,
+        request: &ActiveResponseAuthorizationRequest,
+        now_unix_ms: u64,
+    ) -> Result<VerifiedActiveResponseBindings, KernelError> {
+        self.verify_active_response_immutable_capability_pre_admit(
+            request.operator_capability(),
+            now_unix_ms / 1_000,
+        )?;
+        self.verify_active_response_plan_bindings_at(request, now_unix_ms)
+    }
+
+    fn verify_active_response_plan_bindings_at(
+        &self,
+        request: &ActiveResponseAuthorizationRequest,
+        now_unix_ms: u64,
+    ) -> Result<VerifiedActiveResponseBindings, KernelError> {
+        let capability = request.operator_capability();
+        if !capability.delegation_chain.is_empty() {
+            return Err(denied(
+                "delegated operator capabilities are unsupported because active-response admission has no sibling-budget participant",
+            ));
+        }
 
         if capability.aggregate_invocation_budget.is_some() {
             return Err(denied(
@@ -606,13 +634,15 @@ impl ChioKernel {
         let authority = self
             .active_response_finding_authority
             .as_deref()
-            .ok_or_else(|| denied("correlated-finding authority is not installed"))?;
+            .ok_or_else(|| {
+                KernelError::Internal("correlated-finding authority is not installed".to_string())
+            })?;
         authority
             .ensure_ready()
-            .map_err(|error| denied(&error.to_string()))?;
+            .map_err(map_active_response_finding_authority_error)?;
         let evidence = authority
             .load_correlated_finding(&plan.trigger_finding_receipt_id)
-            .map_err(|error| denied(&error.to_string()))?
+            .map_err(map_active_response_finding_authority_error)?
             .ok_or_else(|| denied("trigger correlated-finding receipt is missing"))?;
         let closed = ActiveDefenseReceiptBody::CorrelatedFinding(evidence.body().clone());
         closed.validate().map_err(|error| {
@@ -982,6 +1012,19 @@ fn parse_canonical_public_key(value: &str, label: &str) -> Result<PublicKey, Ker
         return Err(denied(&format!("{label} is not canonically encoded")));
     }
     Ok(key)
+}
+
+fn map_active_response_finding_authority_error(
+    error: ActiveResponseFindingAuthorityError,
+) -> KernelError {
+    match error {
+        ActiveResponseFindingAuthorityError::Unavailable(reason) => KernelError::Internal(format!(
+            "correlated-finding authority is unavailable: {reason}"
+        )),
+        ActiveResponseFindingAuthorityError::Integrity(reason) => denied(&format!(
+            "correlated-finding authority integrity failure: {reason}"
+        )),
+    }
 }
 
 fn denied(reason: &str) -> KernelError {

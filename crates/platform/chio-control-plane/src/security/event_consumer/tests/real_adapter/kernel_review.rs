@@ -434,3 +434,15 @@ fn deactivation_blocks_signed_simulation() {
 
 #[path = "kernel_review/operator_cancel.rs"]
 mod operator_cancel;
+
+#[path = "kernel_review/commit_retry.rs"]
+mod commit_retry;
+
+#[path = "kernel_review/termination_binding.rs"]
+mod termination_binding;
+
+#[path = "kernel_review/authority_outages.rs"]
+mod authority_outages;
+
+#[path = "kernel_review/active_response_residual.rs"]
+mod active_response_residual;

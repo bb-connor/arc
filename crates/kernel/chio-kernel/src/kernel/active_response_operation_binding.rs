@@ -24,6 +24,8 @@ pub(super) struct ActiveResponseOperationAnchor {
     pub(super) authorization_capability_hash: String,
     pub(super) governed_intent_hash: String,
     pub(super) policy_decision_hash: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) admission_artifact_fingerprint: Option<chio_security_types::ports::Digest32>,
     pub(super) approval_set_hash: String,
 }
 
@@ -35,6 +37,7 @@ impl ActiveResponseOperationAnchor {
             && self.authorization_capability_hash == other.authorization_capability_hash
             && self.governed_intent_hash == other.governed_intent_hash
             && self.policy_decision_hash == other.policy_decision_hash
+            && self.admission_artifact_fingerprint == other.admission_artifact_fingerprint
             && self.approval_set_hash == other.approval_set_hash
     }
 
@@ -104,6 +107,7 @@ pub(super) fn build_active_response_operation_anchor(
         authorization_capability_hash: authorization_capability_hash.to_string(),
         governed_intent_hash: governed_intent_hash.to_string(),
         policy_decision_hash: policy_decision_hash.to_string(),
+        admission_artifact_fingerprint: None,
         approval_set_hash: approval_set_hash.to_string(),
     })
 }
@@ -160,4 +164,23 @@ pub(super) fn derive_active_response_operation_request_binding_hash(
     })
     .and_then(|binding| binding.derive_hash())
     .map_err(|error| active_response_denied(format!("request binding failed: {error}")))
+}
+
+pub(super) fn bind_active_response_operation_request_hash_to_artifact(
+    legacy_hash: &str,
+    fingerprint: Option<chio_security_types::ports::Digest32>,
+) -> Result<String, KernelError> {
+    let Some(fingerprint) = fingerprint else {
+        return Ok(legacy_hash.to_string());
+    };
+    if fingerprint.is_zero() {
+        return Err(active_response_denied(
+            "admission artifact fingerprint is zero",
+        ));
+    }
+    let canonical = canonical_json_bytes(&(legacy_hash, fingerprint))
+        .map_err(|error| active_response_denied(error.to_string()))?;
+    let mut bytes = b"chio.active-response-artifact-operation.v2\0".to_vec();
+    bytes.extend_from_slice(&canonical);
+    Ok(sha256_hex(&bytes))
 }

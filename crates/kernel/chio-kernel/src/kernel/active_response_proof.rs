@@ -31,7 +31,11 @@ pub(super) fn active_response_execution_dispatch_binding(
         },
     };
     let binding = ResponseExecutionDispatchBinding {
-        schema_version: chio_security_types::ports::RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION,
+        schema_version: if request.admission_artifact_fingerprint().is_some() {
+            chio_security_types::ports::RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION
+        } else {
+            1
+        },
         tenant_id: request.response_plan().tenant_id.clone(),
         dispatch_id: request.dispatch_id().clone(),
         action_id: request.response_plan().action_id.clone(),
@@ -54,6 +58,7 @@ pub(super) fn active_response_execution_dispatch_binding(
             request.policy_decision_hash(),
             "policy decision",
         )?,
+        admission_artifact_fingerprint: request.admission_artifact_fingerprint(),
         approval,
         authorized_at_unix_ms,
     };
@@ -91,6 +96,7 @@ pub(super) fn verify_active_response_dispatch_authorization(
         || body.authorization_capability_hash != expected.authorization_capability_hash
         || body.governed_intent_hash != expected.governed_intent_hash
         || body.policy_decision_hash != expected.policy_decision_hash
+        || body.admission_artifact_fingerprint != expected.admission_artifact_fingerprint
         || body.executor_authority_id != expected.executor_authority_id
         || body.executor_authority_generation != expected.executor_authority_generation
         || body.approval != expected.approval
@@ -270,3 +276,7 @@ fn active_response_internal(reason: impl Into<String>) -> KernelError {
         reason.into()
     ))
 }
+
+#[cfg(all(test, feature = "admission-test-support"))]
+#[path = "active_response_proof/cross_binding_tests.rs"]
+mod cross_binding_tests;

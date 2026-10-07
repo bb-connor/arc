@@ -53,14 +53,17 @@ struct RacingAutomaticExecutorAuthority {
     identity: ActiveResponseExecutorAuthorityIdentity,
     expected_plan: ResponsePlan,
     expected_binding: PreparedActiveResponseDispatchBinding,
-    state: Mutex<DurableDispatchState>,
+    state: Mutex<(
+        DurableDispatchState,
+        Option<PreparedActiveResponseDispatchBinding>,
+    )>,
     before_commit: Option<Pause>,
     before_fence: Option<Pause>,
 }
 
 impl RacingAutomaticExecutorAuthority {
     fn state(&self) -> DurableDispatchState {
-        *self.state.lock().expect("durable dispatch state lock")
+        self.state.lock().expect("durable dispatch state lock").0
     }
 }
 
@@ -71,6 +74,48 @@ impl ActiveResponseExecutorAuthority for RacingAutomaticExecutorAuthority {
 
     fn ensure_ready(&self) -> Result<(), ActiveResponseExecutorError> {
         Ok(())
+    }
+
+    fn claim_automatic_preparation(
+        &self,
+        response_plan: &ResponsePlan,
+        binding: &PreparedActiveResponseDispatchBinding,
+    ) -> Result<PreparedActiveResponseDispatchBinding, ActiveResponseExecutorError> {
+        binding.validate_for_plan(response_plan).map_err(|_| {
+            ActiveResponseExecutorError::RejectedBeforeCommit("invalid preparation".to_owned())
+        })?;
+        if response_plan != &self.expected_plan
+            || binding.admission_artifact_fingerprint.is_none()
+            || binding.executor_authority_id.as_str() != self.identity.authority_id()
+            || binding.executor_authority_generation != self.identity.generation()
+        {
+            return Err(ActiveResponseExecutorError::RejectedBeforeCommit(
+                "automatic preparation binding mismatch".to_owned(),
+            ));
+        }
+        let mut state = self.state.lock().map_err(|_| {
+            ActiveResponseExecutorError::OutcomeUnknown("preparation lock is poisoned".to_owned())
+        })?;
+        if state.0 != DurableDispatchState::Open {
+            return Err(ActiveResponseExecutorError::RejectedBeforeCommit(
+                "automatic action is already closed".to_owned(),
+            ));
+        }
+        if let Some(original) = &state.1 {
+            let mut normalized = binding.clone();
+            normalized.authorized_at_unix_ms = original.authorized_at_unix_ms;
+            normalized.dispatch_id = original.dispatch_id.clone();
+            if &normalized != original
+                || binding.authorized_at_unix_ms < original.authorized_at_unix_ms
+            {
+                return Err(ActiveResponseExecutorError::RejectedBeforeCommit(
+                    "automatic action has a different original preparation".to_owned(),
+                ));
+            }
+            return Ok(original.clone());
+        }
+        state.1 = Some(binding.clone());
+        Ok(binding.clone())
     }
 
     fn fence_uncommitted_automatic_dispatch(
@@ -91,9 +136,14 @@ impl ActiveResponseExecutorAuthority for RacingAutomaticExecutorAuthority {
                 "durable dispatch state lock is poisoned".to_string(),
             )
         })?;
-        match *state {
+        if state.1.as_ref() != Some(&self.expected_binding) {
+            return Err(ActiveResponseExecutorError::RejectedBeforeCommit(
+                "exact preparation is not pinned".to_owned(),
+            ));
+        }
+        match state.0 {
             DurableDispatchState::Open => {
-                *state = DurableDispatchState::Fenced;
+                state.0 = DurableDispatchState::Fenced;
                 Ok(AutomaticActiveResponseDispatchFenceOutcome::Fenced)
             }
             DurableDispatchState::Fenced => Ok(AutomaticActiveResponseDispatchFenceOutcome::Fenced),
@@ -123,9 +173,14 @@ impl ActiveResponseExecutorAuthority for RacingAutomaticExecutorAuthority {
                 "durable dispatch state lock is poisoned".to_string(),
             )
         })?;
-        match *state {
+        if state.1.as_ref() != Some(&self.expected_binding) {
+            return Err(ActiveResponseExecutorError::RejectedBeforeCommit(
+                "exact preparation is not pinned".to_owned(),
+            ));
+        }
+        match state.0 {
             DurableDispatchState::Open => {
-                *state = DurableDispatchState::Committed;
+                state.0 = DurableDispatchState::Committed;
                 Err(ActiveResponseExecutorError::OutcomeUnknown(
                     "dispatch commit persisted before result delivery".to_string(),
                 ))
@@ -161,6 +216,7 @@ fn two_kernel_fixture(
     let authorization_capability_hash = response_plan.operator_capability.capability_digest;
     let governed_intent_hash = Digest32::new([0x61; 32]);
     let policy_decision_hash = Digest32::new([0x62; 32]);
+    let admission_artifact_fingerprint = Digest32::new([0x63; 32]);
     let execution_approval = ActiveResponseExecutionApproval::Automatic;
     let dispatch_id = crate::derive_active_response_dispatch_id(
         &response_plan,
@@ -172,6 +228,11 @@ fn two_kernel_fixture(
         &execution_approval,
     )
     .expect("automatic dispatch id");
+    let dispatch_id = crate::bind_active_response_dispatch_id_to_artifact(
+        &dispatch_id,
+        &admission_artifact_fingerprint,
+    )
+    .expect("artifact-bound dispatch id");
     let binding = PreparedActiveResponseDispatchBinding {
         schema_version: PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION,
         tenant_id: response_plan.tenant_id.clone(),
@@ -185,6 +246,7 @@ fn two_kernel_fixture(
         authorization_capability_hash,
         governed_intent_hash,
         policy_decision_hash,
+        admission_artifact_fingerprint: Some(admission_artifact_fingerprint),
         approval: ResponseDispatchApproval::Automatic,
     };
     let fresh = chio_security_types::FreshLiveAdmission::new(response_plan.clone())
@@ -200,6 +262,7 @@ fn two_kernel_fixture(
             authorization_capability_hash: digest_hex(&authorization_capability_hash),
             governed_intent_hash: digest_hex(&governed_intent_hash),
             policy_decision_hash: digest_hex(&policy_decision_hash),
+            admission_artifact_fingerprint: Some(admission_artifact_fingerprint),
             approval: execution_approval,
             authorized_at_unix_ms,
             expires_at_unix_ms: response_plan.expires_at_unix_ms,
@@ -210,10 +273,16 @@ fn two_kernel_fixture(
         identity,
         expected_plan: response_plan.clone(),
         expected_binding: binding.clone(),
-        state: Mutex::new(DurableDispatchState::Open),
+        state: Mutex::new((DurableDispatchState::Open, None)),
         before_commit,
         before_fence,
     });
+    assert_eq!(
+        authority
+            .claim_automatic_preparation(&response_plan, &binding)
+            .expect("canonical pin"),
+        binding,
+    );
     let mut termination_kernel = make_kernel(make_config());
     termination_kernel
         .set_active_response_executor_authority(authority.clone())
@@ -293,6 +362,28 @@ impl ActiveResponseExecutorAuthority for PreparingExecutorAuthority {
         Ok(())
     }
 
+    fn claim_automatic_preparation(
+        &self,
+        response_plan: &ResponsePlan,
+        binding: &PreparedActiveResponseDispatchBinding,
+    ) -> Result<PreparedActiveResponseDispatchBinding, ActiveResponseExecutorError> {
+        use chio_security_types::ports::{
+            AutomaticResponsePreparationClaimOutcome, AutomaticResponsePreparationClaimRequest,
+            ResponseDispatchStore,
+        };
+        match self
+            .store
+            .claim_automatic_preparation(&AutomaticResponsePreparationClaimRequest {
+                response_plan: response_plan.clone(),
+                prepared_dispatch_binding: binding.clone(),
+            })
+            .map_err(|error| ActiveResponseExecutorError::NotReady(error.to_string()))?
+        {
+            AutomaticResponsePreparationClaimOutcome::Created(binding)
+            | AutomaticResponsePreparationClaimOutcome::Existing(binding) => Ok(*binding),
+        }
+    }
+
     fn load_committed_active_response_dispatch(
         &self,
         _: &TenantId,
@@ -367,6 +458,7 @@ fn response_dispatch_refusals_preserve_registered_codes_without_durable_commit()
                 authorization_capability_hash: digest_hex(&capability_hash),
                 governed_intent_hash: fixture.execution.governed_intent_hash().to_owned(),
                 policy_decision_hash: fixture.execution.policy_decision_hash().to_owned(),
+                admission_artifact_fingerprint: fixture.execution.admission_artifact_fingerprint(),
                 approval: ActiveResponseExecutionApproval::Automatic,
                 authorized_at_unix_ms: authorized_at,
                 expires_at_unix_ms: plan.expires_at_unix_ms,

@@ -117,6 +117,7 @@ pub(super) fn synthetic_prepared_dispatch_binding(
         authorization_capability_hash: response_plan.operator_capability.capability_digest,
         governed_intent_hash: Digest32::new([94_u8; 32]),
         policy_decision_hash: Digest32::new([95_u8; 32]),
+        admission_artifact_fingerprint: Some(Digest32::new([96_u8; 32])),
         approval,
     };
     binding
@@ -420,7 +421,7 @@ impl ApprovalVerifierPort for KernelActiveResponseApprovalVerifier<'_> {
             .map_err(map_active_response_kernel_error)?
         {
             PreDispatchActiveResponseReconstruction::NotPrepared => return Ok(None),
-            PreDispatchActiveResponseReconstruction::Prepared(prepared) => prepared,
+            PreDispatchActiveResponseReconstruction::Prepared(prepared) => *prepared,
         };
         let reconstructed = self.reservation_for(&prepared)?;
         if &reconstructed != retained {
@@ -677,7 +678,7 @@ impl AttestedFindingResponseCoordinator for KernelAttestedFindingResponseCoordin
                 PreDispatchActiveResponseReconstruction::NotPrepared => {
                     return Ok(AttestedFindingPreDispatchReconstruction::NotPrepared);
                 }
-                PreDispatchActiveResponseReconstruction::Prepared(prepared) => (prepared, None),
+                PreDispatchActiveResponseReconstruction::Prepared(prepared) => (*prepared, None),
             },
             Some(governed_request) => {
                 let retained = GovernedApprovalReservation {

@@ -65,10 +65,11 @@ pub use active_response_coordinator::{
 };
 pub(crate) use active_response_executor::ActiveResponseExecutionRequestParts;
 pub use active_response_executor::{
-    derive_active_response_dispatch_id, ActiveResponseCommittedDispatch,
-    ActiveResponseDispatchIdError, ActiveResponseEffectEvidence, ActiveResponseExecutionApproval,
-    ActiveResponseExecutionEvidence, ActiveResponseExecutionEvidenceParts,
-    ActiveResponseExecutionOrigin, ActiveResponseExecutionOutcome, ActiveResponseExecutionRequest,
+    bind_active_response_dispatch_id_to_artifact, derive_active_response_dispatch_id,
+    ActiveResponseCommittedDispatch, ActiveResponseDispatchIdError, ActiveResponseEffectEvidence,
+    ActiveResponseExecutionApproval, ActiveResponseExecutionEvidence,
+    ActiveResponseExecutionEvidenceParts, ActiveResponseExecutionOrigin,
+    ActiveResponseExecutionOutcome, ActiveResponseExecutionRequest,
     ActiveResponseExecutorAuthority, ActiveResponseExecutorAuthorityIdentity,
     ActiveResponseExecutorError, ActiveResponseExecutorIdentityError,
     ActiveResponseFailedEffectEvidence, ActiveResponseFailureEvidence,

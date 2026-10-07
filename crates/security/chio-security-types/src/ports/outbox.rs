@@ -8,7 +8,7 @@ use super::{
 use super::{CreateOutcome, PortResult, Vec};
 
 pub const ATTESTED_FINDING_RESPONSE_PLAN_SCHEMA_VERSION: u8 = 1;
-pub const PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION: u8 = 1;
+pub const PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION: u8 = 2;
 pub const MAX_ATTESTED_FINDING_RESPONSE_OUTBOX_SCAN: u32 = 4_096;
 pub const ATTESTED_FINDING_RESPONSE_INITIAL_RETRY_MS: u64 = 1_000;
 pub const ATTESTED_FINDING_RESPONSE_MAX_RETRY_MS: u64 = 3_600_000;
@@ -29,6 +29,8 @@ pub struct PreparedActiveResponseDispatchBinding {
     pub authorization_capability_hash: Digest32,
     pub governed_intent_hash: Digest32,
     pub policy_decision_hash: Digest32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub admission_artifact_fingerprint: Option<Digest32>,
     pub approval: ResponseDispatchApproval,
 }
 
@@ -37,7 +39,15 @@ impl PreparedActiveResponseDispatchBinding {
         &self,
         plan: &crate::ResponsePlan,
     ) -> Result<(), PreparedActiveResponseDispatchBindingError> {
-        if self.schema_version != PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION
+        let artifact_schema_valid = match (self.schema_version, self.admission_artifact_fingerprint)
+        {
+            (1, None) => true,
+            (PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION, Some(fingerprint)) => {
+                !fingerprint.is_zero()
+            }
+            _ => false,
+        };
+        if !artifact_schema_valid
             || plan.validate_shape().is_err()
             || self.tenant_id != plan.tenant_id
             || self.action_id != plan.action_id

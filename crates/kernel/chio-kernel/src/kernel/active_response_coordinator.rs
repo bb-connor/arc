@@ -11,8 +11,8 @@ use chio_core::receipt::security::{
 };
 use chio_core::{canonical_json_bytes, sha256, Hash};
 use chio_security_types::ports::{
-    AdmissionArtifactRef, Digest32, EffectId, RecordId, ResponseDispatchApproval,
-    RESPONSE_AFFECTED_SET_DOMAIN, RESPONSE_EFFECT_ID_DOMAIN,
+    AdmissionArtifactRef, Digest32, EffectId, PreparedActiveResponseDispatchBinding, RecordId,
+    ResponseDispatchApproval, RESPONSE_AFFECTED_SET_DOMAIN, RESPONSE_EFFECT_ID_DOMAIN,
 };
 use chio_security_types::{
     PlannedResponseEffect, ResponseApprovalRequirement, ResponseEffectSpec, ResponseMutationRecord,
@@ -34,7 +34,7 @@ use crate::threshold_approval::{
 use super::active_response_admission::{
     ActiveResponseAuthorizationRequest, VerifiedActiveResponseBindings,
 };
-use super::active_response_artifact::ActiveResponseArtifactAuthorityAttestation;
+use super::active_response_artifact::{self, ActiveResponseArtifactAuthorityAttestation};
 use super::active_response_operation_binding::{
     active_response_dispatch_operation_version, build_active_response_operation_anchor,
     derive_active_response_operation_request_binding_hash, ActiveResponseOperationAnchor,
@@ -57,6 +57,7 @@ use super::{ChioKernel, KernelError};
 mod admission_request;
 mod cancellation;
 mod executor_error;
+mod prepared_binding;
 
 pub use admission_request::{
     ActiveResponseAdmissionRequest, AutomaticActiveResponsePermit,
@@ -76,6 +77,7 @@ pub(super) struct VerifiedGovernedActiveResponse {
     pub(super) operation: Box<AdmissionOperation>,
     pub(super) approval_set: Box<ApprovalSetReservationInput>,
     pub(super) policy_decision_hash: String,
+    pub(super) admission_artifact_fingerprint: Option<Digest32>,
     pub(super) authorized_at_unix_ms: u64,
 }
 
@@ -108,15 +110,48 @@ impl ChioKernel {
         self.require_governed_active_response_plans_enabled()?;
         match verified_admission {
             VerifiedActiveResponseAdmission::Automatic(permit) => {
-                Ok(PreparedActiveResponseAdmission::Automatic(permit))
+                let candidate = PreparedActiveResponseAdmission::Automatic(permit)
+                    .durable_dispatch_binding(request.response_plan())?;
+                let installed = self.active_response_executor.as_ref().ok_or_else(|| {
+                    active_response_internal("active-response executor authority is not installed")
+                })?;
+                let claimed = installed
+                    .authority
+                    .claim_automatic_preparation(request.response_plan(), &candidate)
+                    .map_err(
+                        super::active_response_policy::map_active_response_executor_readiness_error,
+                    )?;
+                if installed.authority.identity() != installed.identity {
+                    return Err(active_response_internal(
+                        "executor identity changed during automatic preparation claim",
+                    ));
+                }
+                let now = self.read_authority_time()?.get();
+                let expected = match self.verify_active_response_admission_with_authorized_at(
+                    request,
+                    now,
+                    claimed.authorized_at_unix_ms,
+                )? {
+                    VerifiedActiveResponseAdmission::Automatic(expected) => expected,
+                    VerifiedActiveResponseAdmission::Governed(_) => {
+                        return Err(active_response_denied(
+                            "canonical automatic preparation now requires governed approval",
+                        ))
+                    }
+                };
+                let prepared = PreparedActiveResponseAdmission::Automatic(expected);
+                if prepared.durable_dispatch_binding(request.response_plan())? != claimed {
+                    return Err(active_response_internal(
+                        "canonical automatic preparation changed immutable identity",
+                    ));
+                }
+                Ok(prepared)
             }
             VerifiedActiveResponseAdmission::Governed(mut verified) => {
                 self.validate_active_response_coordinator_profiles()?;
                 let (mut operation, created_by_this_attempt) =
                     self.create_active_response_operation(&verified.operation)?;
-                let executor_authority = self
-                    .active_response_executor_identity()
-                    .map_err(|error| active_response_denied(error.to_string()))?;
+                let executor_authority = self.active_response_executor_identity()?;
                 if operation.coordinator_authority_id() != executor_authority.authority_id() {
                     return Err(active_response_denied(
                         "persisted active-response executor authority no longer matches",
@@ -131,7 +166,7 @@ impl ChioKernel {
                             "active-response governed intent hashing failed: {error}"
                         ))
                     })?;
-                let anchor = build_active_response_operation_anchor(
+                let mut anchor = build_active_response_operation_anchor(
                     request.response_plan(),
                     &executor_authority,
                     verified.authorized_at_unix_ms,
@@ -140,6 +175,7 @@ impl ChioKernel {
                     &verified.policy_decision_hash,
                     verified.approval_set.approval_set_hash(),
                 )?;
+                anchor.admission_artifact_fingerprint = verified.admission_artifact_fingerprint;
                 let retained_anchor = match self.journal_active_response_operation_anchor(
                     &operation,
                     anchor,
@@ -278,6 +314,7 @@ impl ChioKernel {
                         operation: Box::new(operation),
                         approval_set: verified.approval_set,
                         policy_decision_hash: verified.policy_decision_hash,
+                        admission_artifact_fingerprint: verified.admission_artifact_fingerprint,
                         authorization_capability_hash: execution
                             .authorization_capability_hash()
                             .to_string(),
@@ -377,6 +414,14 @@ impl ChioKernel {
         );
         if !committed_recovery {
             let now_unix_ms = self.read_authority_time()?.get();
+            let binding = PreparedActiveResponseAdmission::Governed(reservation.clone())
+                .durable_dispatch_binding(request.response_plan())?;
+            let authenticated_expires_at_unix_ms = self
+                .verify_active_response_prepared_request_binding_at(
+                    request,
+                    &binding,
+                    now_unix_ms,
+                )?;
             let verified = match self.verify_active_response_admission_with_authorized_at(
                 request,
                 now_unix_ms,
@@ -394,10 +439,17 @@ impl ChioKernel {
                     return Err(error);
                 }
                 Err(error) => {
-                    self.compensate_active_response_before_dispatch(
-                        reservation,
-                        &error.to_string(),
-                    )?;
+                    if matches!(
+                        &error,
+                        KernelError::CapabilityRevoked(_) | KernelError::DelegationChainRevoked(_)
+                    ) || (now_unix_ms >= authenticated_expires_at_unix_ms
+                        && matches!(&error, KernelError::GovernedTransactionDenied(_)))
+                    {
+                        self.compensate_active_response_before_dispatch(
+                            reservation,
+                            &error.to_string(),
+                        )?;
+                    }
                     return Err(error);
                 }
             };
@@ -415,10 +467,8 @@ impl ChioKernel {
                 return Err(error);
             }
         }
-        let executor_authority = self
-            .active_response_executor_identity()
-            .map_err(|error| active_response_internal(error.to_string()))?;
-        let expected_anchor = build_active_response_operation_anchor(
+        let executor_authority = self.active_response_executor_identity()?;
+        let mut expected_anchor = build_active_response_operation_anchor(
             request.response_plan(),
             &executor_authority,
             reservation.authorized_at_unix_ms,
@@ -427,6 +477,7 @@ impl ChioKernel {
             &reservation.policy_decision_hash,
             reservation.approval_set.approval_set_hash(),
         )?;
+        expected_anchor.admission_artifact_fingerprint = reservation.admission_artifact_fingerprint;
         if self.load_active_response_operation_anchor(&operation)? != expected_anchor {
             return Err(active_response_internal(
                 "persisted active-response operation anchor changed before dispatch",
@@ -574,9 +625,7 @@ impl ChioKernel {
                         ));
                     }
                 };
-                let executor_authority = self
-                    .active_response_executor_identity()
-                    .map_err(|error| active_response_denied(error.to_string()))?;
+                let executor_authority = self.active_response_executor_identity()?;
                 if &fresh != expected {
                     return Err(active_response_denied(
                         "automatic active-response permit is stale",
@@ -605,26 +654,32 @@ impl ChioKernel {
             }
             PreparedActiveResponseAdmission::Governed(reservation) => {
                 let permit = self.commit_active_response_dispatch(request, reservation)?;
-                let executor_authority = self
-                    .active_response_executor_identity()
-                    .map_err(|error| active_response_denied(error.to_string()))?;
+                let executor_authority = self.active_response_executor_identity()?;
                 if permit.operation.coordinator_authority_id() != executor_authority.authority_id()
                 {
                     return Err(active_response_denied(
                         "governed active-response executor authority changed after commitment",
                     ));
                 }
-                let execution = build_active_response_execution_request(
-                    request,
-                    executor_authority,
-                    &reservation.policy_decision_hash,
-                    reservation.authorized_at_unix_ms,
-                    ActiveResponseExecutionApproval::Governed {
-                        admission_operation_id: permit.operation.operation_id().to_string(),
-                        admission_operation_version: reservation.dispatch_operation_version,
-                        approval_set_hash: reservation.approval_set_hash().to_string(),
-                    },
-                )?;
+                let execution =
+                    if permit.recovery || reservation.admission_artifact_fingerprint.is_none() {
+                        self.execution_request_for_committed_preparation(
+                            request.response_plan(),
+                            reservation,
+                        )?
+                    } else {
+                        build_active_response_execution_request(
+                            request,
+                            executor_authority,
+                            &reservation.policy_decision_hash,
+                            reservation.authorized_at_unix_ms,
+                            ActiveResponseExecutionApproval::Governed {
+                                admission_operation_id: permit.operation.operation_id().to_string(),
+                                admission_operation_version: reservation.dispatch_operation_version,
+                                approval_set_hash: reservation.approval_set_hash().to_string(),
+                            },
+                        )?
+                    };
                 if execution.dispatch_id() != reservation.dispatch_id() {
                     return Err(active_response_internal(
                         "governed active-response dispatch identifier changed",
@@ -649,81 +704,6 @@ impl ChioKernel {
             active_response_internal("active-response executor dispatch gate is poisoned")
         })?;
         self.cancel_active_response_before_dispatch(reservation, reason)
-    }
-
-    pub(super) fn require_definitive_active_response_denial(
-        &self,
-        request: &ActiveResponseAdmissionRequest,
-    ) -> Result<(), KernelError> {
-        let now_unix_ms = self.read_authority_time()?.get();
-        let denial = match self.verify_active_response_admission_at(request, now_unix_ms) {
-            Ok(_) => {
-                return Err(active_response_denied(
-                    "current live admission remains valid and cannot be terminated",
-                ))
-            }
-            Err(error) => error,
-        };
-        if matches!(
-            &denial,
-            KernelError::CapabilityRevoked(_) | KernelError::DelegationChainRevoked(_)
-        ) {
-            return Ok(());
-        }
-        let proposal_window_expired = request
-            .threshold_proposal()
-            .map(|proposal| {
-                proposal
-                    .body()
-                    .proposal_deadline
-                    .checked_mul(1_000)
-                    .ok_or_else(|| {
-                        active_response_internal(
-                            "active-response threshold proposal deadline overflowed milliseconds",
-                        )
-                    })
-                    .map(|deadline_unix_ms| now_unix_ms >= deadline_unix_ms)
-            })
-            .transpose()?
-            .unwrap_or(false);
-        let mut approval_token_window_expired = false;
-        for token in request.approval_tokens() {
-            let expires_at_unix_ms = token.expires_at.checked_mul(1_000).ok_or_else(|| {
-                active_response_internal(
-                    "active-response approval token expiry overflowed milliseconds",
-                )
-            })?;
-            if now_unix_ms >= expires_at_unix_ms {
-                approval_token_window_expired = true;
-                break;
-            }
-        }
-        let immutable_window_expired = now_unix_ms >= request.response_plan().expires_at_unix_ms
-            || now_unix_ms
-                >= request
-                    .response_plan()
-                    .operator_capability
-                    .expires_at_unix_ms
-            || now_unix_ms
-                >= request
-                    .authorization()
-                    .submission_proof()
-                    .body
-                    .expires_at_unix_ms
-            || now_unix_ms
-                >= request
-                    .artifact_authority_attestation()
-                    .body
-                    .expires_at_unix_ms
-            || proposal_window_expired
-            || approval_token_window_expired;
-        if immutable_window_expired && matches!(&denial, KernelError::GovernedTransactionDenied(_))
-        {
-            return Ok(());
-        }
-        Err(active_response_internal(format!(
-            "current live admission denial is not definitive: {denial}"
-        )))
     }
 
     pub(super) fn complete_active_response_dispatch(
@@ -769,11 +749,10 @@ impl ChioKernel {
         let installed = self.active_response_executor.as_ref().ok_or_else(|| {
             active_response_internal("active-response executor authority is not installed")
         })?;
-        installed.authority.ensure_ready().map_err(|error| {
-            active_response_internal(format!(
-                "active-response executor authority is not ready: {error}"
-            ))
-        })?;
+        installed
+            .authority
+            .ensure_ready()
+            .map_err(super::active_response_policy::map_active_response_executor_readiness_error)?;
         if installed.identity != *execution.executor_authority()
             || installed.authority.identity() != installed.identity
         {
@@ -823,6 +802,10 @@ impl ChioKernel {
             &bindings,
             validation_now_unix_ms,
         )?;
+        let admission_artifact_fingerprint =
+            super::active_response_artifact::active_response_admission_artifact_fingerprint(
+                request,
+            )?;
         let requirement = self.resolve_active_response_requirement(&bindings)?;
         match requirement.approval_requirement() {
             ResponseApprovalRequirement::Automatic => {
@@ -849,6 +832,7 @@ impl ChioKernel {
                             .to_string(),
                         governed_intent_hash: bindings.governed_intent_hash().to_string(),
                         policy_decision_hash,
+                        admission_artifact_fingerprint: Some(admission_artifact_fingerprint),
                         executor_authority_id: requirement
                             .executor_authority()
                             .authority_id()
@@ -872,12 +856,14 @@ impl ChioKernel {
                     &bindings,
                     &requirement,
                     &verified_approvals,
+                    admission_artifact_fingerprint,
                 )?;
                 Ok(VerifiedActiveResponseAdmission::Governed(
                     VerifiedGovernedActiveResponse {
                         operation: Box::new(operation),
                         approval_set: Box::new(approval_set),
                         policy_decision_hash: requirement.policy_decision_hash().to_string(),
+                        admission_artifact_fingerprint: Some(admission_artifact_fingerprint),
                         authorized_at_unix_ms: stable_authorized_at_unix_ms,
                     },
                 ))

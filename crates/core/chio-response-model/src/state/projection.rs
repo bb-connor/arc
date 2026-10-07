@@ -159,6 +159,7 @@ mod tests {
             authorization_capability_hash: Digest32::new([1; 32]),
             governed_intent_hash: Digest32::new([2; 32]),
             policy_decision_hash: Digest32::new([3; 32]),
+            admission_artifact_fingerprint: Some(Digest32::new([5; 32])),
             approval: ResponseDispatchApproval::Automatic,
             authorized_at_unix_ms: 1,
         });

@@ -1081,6 +1081,7 @@ fn response_plan_record(plan: &ResponsePlan, work: &ScheduledWork) -> ResponsePl
         authorization_capability_hash: plan.operator_capability.capability_digest,
         governed_intent_hash: digest(b"freeze-backend-governed-intent"),
         policy_decision_hash: digest(b"freeze-backend-policy-decision"),
+        admission_artifact_fingerprint: Some(digest(b"synthetic-preparation-artifact")),
         executor_authority_id: record("freeze-backend-executor-authority"),
         executor_authority_generation: 1,
         approval: ResponseDispatchApproval::Automatic,

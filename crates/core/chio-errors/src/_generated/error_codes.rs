@@ -1723,6 +1723,19 @@ pub const KERNEL_RESPONSE_DISPATCH_SNAPSHOT_WITHOUT_EXECUTION_DISPATCH: ErrorCod
     consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
 };
 
+pub const KERNEL_RESPONSE_DISPATCH_UNBOUND_ARTIFACT_PREPARATION: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-dispatch-unbound-artifact-preparation",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: unbound historical preparation cannot mint fresh dispatch authority.",
+    help: "Use a verified bound preparation for fresh work or exact durable committed evidence for recovery.",
+    string_code: "CHIO-KERNEL-RESPONSE-DISPATCH-UNBOUND-ARTIFACT-PREPARATION",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
 pub const KERNEL_RESPONSE_DISPATCH_ZERO_ADMISSION_OPERATION_VERSION: ErrorCodeSpec = ErrorCodeSpec {
     urn: "urn:chio:error:kernel:response-dispatch-zero-admission-operation-version",
     domain: Domain::Kernel,
@@ -3782,6 +3795,7 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     KERNEL_RESPONSE_DISPATCH_RESUME_REQUIRES_GOVERNED_APPROVAL,
     KERNEL_RESPONSE_DISPATCH_SNAPSHOT_ALREADY_AUTHORIZED,
     KERNEL_RESPONSE_DISPATCH_SNAPSHOT_WITHOUT_EXECUTION_DISPATCH,
+    KERNEL_RESPONSE_DISPATCH_UNBOUND_ARTIFACT_PREPARATION,
     KERNEL_RESPONSE_DISPATCH_ZERO_ADMISSION_OPERATION_VERSION,
     KERNEL_RESPONSE_DISPATCH_ZERO_EXECUTOR_GENERATION,
     KERNEL_RESPONSE_EXECUTOR_ACTIVE_EVIDENCE_BINDING,
