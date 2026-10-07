@@ -96,6 +96,7 @@ impl crate::approval::ApprovalStore for CommittedApproval {
 }
 
 struct FailOnceClock {
+    inner: Arc<dyn chio_security_types::clock::Clock>,
     unavailable: std::sync::atomic::AtomicBool,
 }
 
@@ -107,7 +108,7 @@ impl chio_security_types::clock::Clock for FailOnceClock {
         if self.unavailable.swap(false, Ordering::SeqCst) {
             Err(chio_security_types::clock::ClockError::Unavailable)
         } else {
-            chio_security_types::clock::Clock::read(&chio_security_types::clock::SystemClock)
+            self.inner.read()
         }
     }
 }
@@ -174,6 +175,7 @@ fn pre_dispatch_cleanup_runs_when_its_deny_timestamp_clock_sample_fails() -> Tes
         let (mut kernel, mut request, store, invocations) =
             durable_admission_fixture_with_grants("review-clock-cleanup", vec![grant]);
         let clock = Arc::new(FailOnceClock {
+            inner: chio_test_support::clock::clock(),
             unavailable: std::sync::atomic::AtomicBool::new(false),
         });
         kernel.clock = clock.clone();

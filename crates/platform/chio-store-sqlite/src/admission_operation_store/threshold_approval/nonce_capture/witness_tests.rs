@@ -30,11 +30,7 @@ fn digest(field: &'static str, byte: char) -> TestResult<AdmissionDigest> {
 }
 
 fn now_ms() -> TestResult<u64> {
-    Ok(u64::try_from(
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)?
-            .as_millis(),
-    )?)
+    Ok(chio_test_support::clock::clock().unix_millis()?.get())
 }
 
 fn open(database: &Path, locks: &Path) -> TestResult<crate::SqliteAuthorityStore> {

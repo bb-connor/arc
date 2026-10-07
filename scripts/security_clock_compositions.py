@@ -5,6 +5,7 @@ adapter without remaining-debt classification. These are lexical contracts.
 """
 
 COMPOSITION_CONTRACTS = {
+    'crates/guards/chio-guards/src/external/cache.rs::default::native-adapter': 'e7feb30104f1093ac5b75fb21c962b9fef6b318db38aefd1a3f449a018cdaf8d',
     "crates/kernel/chio-kernel/src/checkpoint/builders.rs::build_checkpoint_with_chain_frontier::native-adapter": "7d478f8a1f489f8c6a58737efbab40628d518c38a5c95f28e6d6160bb7063511",
     "crates/kernel/chio-kernel/src/checkpoint/builders.rs::build_checkpoint_with_previous::native-adapter": "d943af11f845f9ec634827077318a461ccea2fa2d6ed1dc21a3158fa87abc8d4",
     "crates/kernel/chio-kernel/src/federation_artifact_store.rs::with_capacity::native-adapter": "17f9d4795ceda383de82d58e24111070d06dd17a0ca70eb34d15c1300b20f04b",
@@ -13,7 +14,7 @@ COMPOSITION_CONTRACTS = {
     "crates/platform/chio-control-plane/src/issuance/authority.rs::wrap_capability_authority_with_deferred_lineage::native-adapter": "f4ff593f5633185e7b27abe78f0777498faccca5ea38d2884e82d24f01569763",
     "crates/platform/chio-control-plane/src/keyring_runtime.rs::load_keyring_runtime_composition::native-adapter": "fb2297361f38289ff750f087b2b5a1f3c83a7595cea2816db57e4ee24dd83ee6",
     "crates/platform/chio-control-plane/src/keyring_runtime.rs::load_keyring_runtime_from_authority_seed::native-adapter": "7f74d9863edc030f990380b8b9d3125eeb9fec751d68523a0e8e148897efb396",
-    "crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_authority.rs::build_pinned_remote_capability_authority::native-adapter": "0ef9757d98481fd3270b7da006e0cfd30a2aa56b941a4f77f4fce707635f74bf",
+    "crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_authority.rs::build_pinned_remote_capability_authority::native-adapter": "77ed579583f750b932cb00694b8f06349589a0943005a0eeb751b5da46fd7b25",
     "crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_authority.rs::build_remote_capability_authority::native-adapter": "3185cd4f6e23da2be83957f30e52d7d21e580f12735d49e3d72c36b305d2a9fb",
     "crates/platform/chio-store-sqlite/src/encrypted_blob.rs::open::native-adapter": "f5802e7240e63a3b431febc6a25d549695ef73d56e8e2ff4c500a4a7326462d1",
     "crates/platform/chio-store-sqlite/src/encrypted_blob.rs::open_in_memory::native-adapter": "8e769c19d2fffff93f620917483bd93a91219c8c53c4f30434c9bbd26959bd9d",

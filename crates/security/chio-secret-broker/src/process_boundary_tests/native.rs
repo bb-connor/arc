@@ -97,6 +97,7 @@ fn run_native_delivery_with_observer_delay(
     crash: Option<cutpoints::Point>,
     observer_delay: Option<Duration>,
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let observer_clock = chio_test_support::clock::clock();
     let mcp_route = route != DeliveryRoute::Direct;
     let directory = crate::private_tempdir()?;
     let kernel_directory = crate::private_tempdir()?;
@@ -339,10 +340,7 @@ fn run_native_delivery_with_observer_delay(
             .load_unambiguous_retained_tool_request(
                 &AdmissionIdentifier::try_new("request", &host.request.request_id)?,
                 &host.authority.mutation_fence(),
-                SystemTime::now()
-                    .duration_since(UNIX_EPOCH)?
-                    .as_millis()
-                    .try_into()?,
+                observer_clock.unix_millis()?.get(),
             )?;
         eprintln!(
             "native broker final state: {:?}",
@@ -418,10 +416,7 @@ fn run_native_delivery_with_observer_delay(
     let store = host.authority.admission_operation_store();
     let fence = host.authority.mutation_fence();
     let now_ms = || -> std::result::Result<u64, Box<dyn std::error::Error>> {
-        Ok(SystemTime::now()
-            .duration_since(UNIX_EPOCH)?
-            .as_millis()
-            .try_into()?)
+        Ok(observer_clock.unix_millis()?.get())
     };
     let (operation, _) = store
         .load_unambiguous_retained_tool_request(

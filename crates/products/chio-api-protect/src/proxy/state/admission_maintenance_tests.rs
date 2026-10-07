@@ -223,7 +223,7 @@ impl Fixture {
             fs::set_permissions(&locks, fs::Permissions::from_mode(0o700))?;
         }
         let source = Arc::new(ControlledClock {
-            initial_ms: chio_security_types::clock::SystemClock.unix_millis()?.get(),
+            initial_ms: chio_test_support::clock::clock().unix_millis()?.get(),
             elapsed_ms: AtomicU64::new(0),
             rejected: AtomicBool::new(false),
         });

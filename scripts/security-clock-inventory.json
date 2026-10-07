@@ -1108,7 +1108,6 @@
     "crates/economy/chio-settle/tests/web3_e2e_qualification.rs::unique_runtime_devnet_deployment_path": 1,
     "crates/guards/chio-data-guards/src/sql_parser.rs::parses_postgres_dialect::sql-clock": 1,
     "crates/guards/chio-data-guards/tests/sql_guard.rs::parses_postgres_dialect_when_configured::sql-clock": 1,
-    "crates/guards/chio-guards/src/external/cache.rs::read::native-adapter": 1,
     "crates/kernel/chio-kernel-mobile/src/clock.rs::read::native-adapter": 1,
     "crates/kernel/chio-kernel/src/authority.rs::new::native-adapter": 1,
     "crates/kernel/chio-kernel/src/authority/aggregate.rs::backend_aggregate_root_retains_governed_signing_custody::native-adapter": 1,
@@ -1364,6 +1363,7 @@
     "crates/trust/chio-tee/src/main.rs::default_run_id": 1
   },
   "composition_sites": [
+    "crates/guards/chio-guards/src/external/cache.rs::default::native-adapter",
     "crates/kernel/chio-kernel/src/checkpoint/builders.rs::build_checkpoint_with_chain_frontier::native-adapter",
     "crates/kernel/chio-kernel/src/checkpoint/builders.rs::build_checkpoint_with_previous::native-adapter",
     "crates/kernel/chio-kernel/src/federation_artifact_store.rs::with_capacity::native-adapter",
