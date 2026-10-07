@@ -450,7 +450,6 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
     }
 
     let request_id = message.get("id").cloned().unwrap_or(Value::Null);
-    let mut event_rx = session.subscribe();
     let Some(stream_lock) = session_worker::acquire_request_owner(&session).await else {
         session_worker::close(&state, &session).await;
         return plain_http_error(
@@ -496,6 +495,10 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
     } else {
         None
     };
+    // The stream subscribes only once it owns the request stream and has passed
+    // final authentication, immediately before enqueue, so events published for
+    // a previous owner while this POST waited are never delivered on it.
+    let mut event_rx = session.subscribe();
     if let Err(error) = session.send_accounted(message) {
         drop(stream_lock);
         return remote_session_send_error(error);

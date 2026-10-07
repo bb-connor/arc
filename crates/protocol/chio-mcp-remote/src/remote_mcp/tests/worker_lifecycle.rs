@@ -431,10 +431,11 @@ async fn waiting_post_owner_observes_actual_worker_death_before_enqueue() {
         Poll::Ready(())
     })
     .await;
+    // A POST waiting for the stream lock holds no session event subscription.
     assert_eq!(
         session.event_tx.receiver_count(),
-        2,
-        "second POST did not reach the active owner wait"
+        1,
+        "second POST subscribed to session events before it owned the stream"
     );
     *gate.0.lock().unwrap() = true;
     gate.1.notify_all();
