@@ -10,7 +10,7 @@ use chio_core::capability::scope::{Constraint, MonetaryAmount};
 use chio_core::capability::threshold_approval::{
     ThresholdApprovalRequirement, ThresholdApproverIdentity,
 };
-use chio_kernel::admission_operation::AdmissionOperationId;
+use chio_kernel::admission_operation::{AdmissionOperationId, NativeSecurityInputJoinRecordV1};
 use chio_kernel::caller_delivery::{
     CallerDeliveryEvidenceV1, SignedCallerDeliveryReportV1, SignedCallerDispatchAuthorizationV1,
 };
@@ -48,6 +48,7 @@ struct ParkedApproval {
     operation_id: AdmissionOperationId,
     issued: SignedExecutionNonce,
     proposal: ThresholdApprovalProposal,
+    input_join: NativeSecurityInputJoinRecordV1,
 }
 
 struct Executed {
@@ -184,6 +185,17 @@ impl ParkedApproval {
             .ok_or("parked operation")?;
         assert_eq!(retained.state(), AdmissionOperationState::ApprovalRequired);
         assert!(retained.threshold_proposal() == Some(&proposal));
+        let input_join = fixture
+            .authority
+            .admission_operation_store()
+            .load_native_security_input_join(
+                &operation_id,
+                &fixture.authority.mutation_fence(),
+                fixture.clock.snapshot(),
+            )?
+            .ok_or("parked input operation")?
+            .1
+            .ok_or("parked original input join")?;
         Ok(Self {
             fixture,
             legacy,
@@ -195,7 +207,22 @@ impl ParkedApproval {
             operation_id,
             issued,
             proposal,
+            input_join,
         })
+    }
+
+    fn current_input_join(&self) -> TestResult<Option<NativeSecurityInputJoinRecordV1>> {
+        Ok(self
+            .fixture
+            .authority
+            .admission_operation_store()
+            .load_native_security_input_join(
+                &self.operation_id,
+                &self.fixture.authority.mutation_fence(),
+                self.fixture.clock.snapshot(),
+            )?
+            .ok_or("current input operation")?
+            .1)
     }
 
     fn approval_deadline_ms(&self) -> TestResult<u64> {
@@ -225,19 +252,29 @@ impl ParkedApproval {
     /// Present the original approval at `resolved_at` with refreshed native
     /// host context. Only the original parked operation may resume.
     fn reserve_approved(&mut self, resolved_at: u64) -> TestResult<chio_kernel::ToolCallResponse> {
+        Ok(self.try_reserve_approved(resolved_at, |_| Ok(()))??)
+    }
+
+    /// As `reserve_approved`, after `alter` changes the presentation or host.
+    fn try_reserve_approved(
+        &mut self,
+        resolved_at: u64,
+        alter: impl FnOnce(&mut Self) -> TestResult,
+    ) -> TestResult<Result<chio_kernel::ToolCallResponse, KernelError>> {
         self.approve()?;
         self.fixture.clock.advance_to(resolved_at)?;
         self.fixture.context = self
             .fixture
             .kernel
             .refresh_native_security_context(&self.fixture.context)?;
+        alter(self)?;
         Ok(self
             .fixture
             .kernel
             .reserve_caller_execution_blocking_with_security_context(
                 &self.fixture.request,
                 &self.fixture.context,
-            )?)
+            ))
     }
 
     /// Reserve and start through the actual native capture, then run the
@@ -245,6 +282,10 @@ impl ParkedApproval {
     fn execute_at(&mut self, resolved_at: u64, effects: &AtomicUsize) -> TestResult<Executed> {
         let reserved = self.reserve_approved(resolved_at)?;
         assert_eq!(reserved.verdict, Verdict::Allow, "{:?}", reserved.reason);
+        assert!(
+            self.current_input_join()?.as_ref() == Some(&self.input_join),
+            "approved resume must reuse its original input join"
+        );
         assert!(reserved.output.is_none());
         let nonce = *reserved.execution_nonce.ok_or("reserved nonce")?;
         assert!(nonce == self.issued);
@@ -440,6 +481,9 @@ fn deliver_approved(window: NonceWindow) -> TestResult {
     );
     assert!(completed.receipt.verify_signature()?);
     assert!(completed.execution_nonce.is_none());
+    assert_retained_horizon_is_exact(
+        &parked, window, &evidence, &operation, &original, &nonce, &frame,
+    )?;
     assert_eq!(
         parked
             .fixture
@@ -555,4 +599,233 @@ fn native_caller_approval_within_nonce_ttl_resumes_original_native_custody() -> 
 #[test]
 fn native_caller_approval_wait_past_nonce_ttl_releases_output_and_reopens() -> TestResult {
     deliver_approved(NonceWindow::Expired)
+}
+
+/// The historical verifier accepts only the exact signed horizon. Without the
+/// operation's authenticated threshold proposal the original nonce expiry
+/// still caps it, so a nonce that expired before approval no longer verifies.
+fn assert_retained_horizon_is_exact(
+    parked: &ParkedApproval,
+    window: NonceWindow,
+    evidence: &CallerDeliveryEvidenceV1,
+    operation: &chio_kernel::admission_operation::AdmissionOperationV1,
+    original: &chio_kernel::admission_operation::RetainedToolAdmissionRequestV1,
+    nonce: &chio_kernel::admission_operation::AdmissionExecutionNonceReservationV1,
+    frame: &chio_kernel::admission_operation::AdmissionCallerDispatchContextV1,
+) -> TestResult {
+    for shifted in [
+        evidence.authorization.authorization.expires_at_unix_ms - 1,
+        evidence.authorization.authorization.expires_at_unix_ms + 1,
+    ] {
+        let mut body = evidence.authorization.authorization.clone();
+        body.expires_at_unix_ms = shifted;
+        let authorization =
+            SignedCallerDispatchAuthorizationV1::sign(body, &parked.fixture.signer)?;
+        let mut report = evidence.report.report.clone();
+        report.authorization_digest = authorization.verify_historical(
+            &parked.fixture.signer.public_key(),
+            &authorization.authorization.executor,
+            &authorization.authorization.invocation,
+        )?;
+        let resigned = CallerDeliveryEvidenceV1 {
+            authorization,
+            report: SignedCallerDeliveryReportV1::sign(report, &parked.executor_key)?,
+        };
+        assert!(
+            resigned
+                .validate_native_original(operation, original, nonce, frame)
+                .is_err(),
+            "authorization interval ending at {shifted} must not verify"
+        );
+    }
+    let mut persisted = serde_json::to_value(operation.to_persisted())?;
+    persisted["attachments"]
+        .as_array_mut()
+        .ok_or("operation attachments")?
+        .retain(|attachment| {
+            attachment.get("ThresholdProposal").is_none()
+                && attachment.get("ThresholdProposalHash").is_none()
+        });
+    let unbound = chio_kernel::admission_operation::AdmissionOperationV1::from_persisted(
+        serde_json::from_value(persisted)?,
+    )?;
+    assert!(unbound.threshold_proposal().is_none());
+    assert_eq!(
+        evidence
+            .validate_native_original(&unbound, original, nonce, frame)
+            .is_ok(),
+        window == NonceWindow::Live
+    );
+    Ok(())
+}
+
+/// A hook that returns success without presenting the original input join.
+struct SkippedJoin(NativeSecurityAuthorityBindingV1);
+
+impl SecurityPreDispatchHook for SkippedJoin {
+    fn name(&self) -> &str {
+        "native-approval-skipped-join"
+    }
+    fn native_authority_binding(
+        &self,
+    ) -> Result<Option<NativeSecurityAuthorityBindingV1>, KernelError> {
+        Ok(Some(self.0.clone()))
+    }
+    fn prepare_native_admission(
+        &self,
+        _: &NativeSecurityAdmissionContext<'_>,
+        _: &NativeSecurityFlowJoinAuthority<'_>,
+    ) -> Result<(), KernelError> {
+        Ok(())
+    }
+    fn commit(
+        &self,
+        _: &SecurityPreDispatchContext<'_>,
+    ) -> Result<Option<SecurityDispatchOutcomeHandle>, KernelError> {
+        Err(KernelError::GuardDenied(
+            "legacy dispatch is forbidden".into(),
+        ))
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum Substitution {
+    Proposal,
+    MissingProposal,
+    Nonce,
+    Operation,
+    MissingApproval,
+    ExpiredApproval,
+    Executor,
+    Grant,
+    Context,
+    RawJoin,
+    SkippedJoin,
+}
+
+#[test]
+fn native_caller_approval_resume_refuses_substituted_or_missing_original_custody() -> TestResult {
+    for substitution in [
+        Substitution::Proposal,
+        Substitution::MissingProposal,
+        Substitution::Nonce,
+        Substitution::Operation,
+        Substitution::MissingApproval,
+        Substitution::ExpiredApproval,
+        Substitution::Executor,
+        Substitution::Grant,
+        Substitution::Context,
+        Substitution::RawJoin,
+        Substitution::SkippedJoin,
+    ] {
+        let mut parked = ParkedApproval::new(LONG_NONCE_TTL_SECS)?;
+        let resolved_at = match substitution {
+            Substitution::ExpiredApproval => parked.approval_deadline_ms()?,
+            _ => parked.fixture.clock.snapshot() + 1_000,
+        };
+        let result = parked.try_reserve_approved(resolved_at, |parked| {
+            let request = &mut parked.fixture.request;
+            match substitution {
+                Substitution::Proposal => {
+                    request
+                        .threshold_approval_proposal
+                        .as_mut()
+                        .ok_or("presented proposal")?
+                        .body
+                        .proposal_deadline += 1;
+                }
+                Substitution::MissingProposal => request.threshold_approval_proposal = None,
+                Substitution::Nonce => request
+                    .execution_nonce
+                    .as_mut()
+                    .ok_or("presented nonce")?
+                    .nonce
+                    .nonce_id
+                    .push_str("-substituted"),
+                Substitution::Operation => request.request_id.push_str("-substituted"),
+                Substitution::MissingApproval => request.approval_tokens.clear(),
+                Substitution::ExpiredApproval => {}
+                Substitution::Executor => {
+                    let foreign = Keypair::generate();
+                    parked
+                        .fixture
+                        .kernel
+                        .set_caller_executor(CallerExecutorIdentityV1 {
+                            executor_id: AdmissionIdentifier::try_new(
+                                "executor_id",
+                                "native-approval-executor",
+                            )?,
+                            public_key: foreign.public_key(),
+                            key_epoch: 43,
+                        })?;
+                }
+                Substitution::Grant => {
+                    let scope = request.capability.body().scope;
+                    request.capability = parked.fixture.kernel.issue_capability(
+                        &parked.fixture.agent.public_key(),
+                        scope,
+                        600,
+                    )?;
+                }
+                Substitution::Context => {
+                    let context = parked.fixture.context.as_v1();
+                    parked.fixture.context =
+                        SecurityInvocationContext::v1(SecurityInvocationContextV1::new(
+                            context.tenant_id().clone(),
+                            SessionId::new("foreign-native-session")?,
+                            context.principal_id().clone(),
+                            context.isolation_epoch_id().clone(),
+                            context.lineage_root_id().clone(),
+                            1,
+                        ));
+                }
+                Substitution::RawJoin => {
+                    let hook = parked.fixture.hook.clone();
+                    parked.fixture.kernel.set_security_pre_dispatch_hook(hook);
+                }
+                Substitution::SkippedJoin => {
+                    let hook = Arc::new(SkippedJoin(parked.fixture.binding.clone()));
+                    parked.fixture.kernel.set_security_pre_dispatch_hook(hook);
+                }
+            }
+            Ok(())
+        })?;
+        if let Ok(response) = &result {
+            assert_ne!(
+                response.verdict,
+                Verdict::Allow,
+                "{substitution:?}: {:?}",
+                response.reason
+            );
+            assert!(response
+                .output
+                .as_ref()
+                .is_none_or(|_| response.verdict == Verdict::PendingApproval));
+        }
+        let operation = parked
+            .fixture
+            .authority
+            .admission_operation_store()
+            .load_by_operation_id(&parked.operation_id)?
+            .ok_or("original parked operation")?;
+        assert!(operation.dispatch_commit().is_none(), "{substitution:?}");
+        assert!(
+            matches!(
+                operation.state(),
+                AdmissionOperationState::ApprovalRequired
+                    | AdmissionOperationState::CompensatedBeforeDispatch
+            ),
+            "{substitution:?}: {:?}",
+            operation.state()
+        );
+        assert!(
+            parked
+                .current_input_join()?
+                .is_none_or(|join| join == parked.input_join),
+            "{substitution:?} replaced the original input join"
+        );
+        assert_eq!(parked.fixture.invocations.load(Ordering::SeqCst), 0);
+        assert_eq!(parked.legacy.load(Ordering::SeqCst), 0);
+    }
+    Ok(())
 }
