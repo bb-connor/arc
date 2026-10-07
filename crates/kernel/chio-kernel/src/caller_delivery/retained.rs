@@ -41,10 +41,9 @@ impl CallerDeliveryEvidenceV1 {
             .authority_profile()
             .caller_executor()
             .ok_or(CallerDeliveryError::Binding)?;
-        let expires_at_unix_ms = u64::try_from(nonce.signed_nonce().expires_at())
-            .ok()
-            .map(|until| until.min(request.capability.expires_at))
-            .and_then(|until| until.checked_mul(1000))
+        let expires_at_unix_ms = original_nonce_horizon(operation, nonce)?
+            .min(request.capability.expires_at)
+            .checked_mul(1000)
             .ok_or(CallerDeliveryError::Binding)?
             .min(custody.valid_until_unix_ms());
         let digest = |field, bytes: &[u8]| {
@@ -100,4 +99,29 @@ impl CallerDeliveryEvidenceV1 {
         )?;
         Ok(custody)
     }
+}
+
+/// Exclusive dispatch horizon, in seconds, that the original nonce imposed.
+/// An operation retaining its own threshold proposal bound that nonce when the
+/// proposal was created, so native capture froze the approval deadline in its
+/// place. Every other nonce still caps delivery at its own expiry.
+fn original_nonce_horizon(
+    operation: &AdmissionOperationV1,
+    nonce: &AdmissionExecutionNonceReservationV1,
+) -> Result<u64, CallerDeliveryError> {
+    let signed = nonce.signed_nonce();
+    let Some(proposal) = operation.threshold_proposal() else {
+        return u64::try_from(signed.expires_at()).map_err(|_| CallerDeliveryError::Binding);
+    };
+    let bound_at = i64::try_from(proposal.body.proposal_created_at)
+        .map_err(|_| CallerDeliveryError::Binding)?;
+    if !operation.binding().participant_requirements().approval
+        || proposal.body.proposal_id != operation.binding().operation_id().as_str()
+        || operation.execution_nonce_id() != Some(nonce.nonce_id())
+        || bound_at < signed.nonce.issued_at
+        || bound_at >= signed.expires_at()
+    {
+        return Err(CallerDeliveryError::Binding);
+    }
+    Ok(proposal.body.proposal_deadline)
 }
