@@ -6,6 +6,10 @@ mod deferred_pages;
 mod deferred_status;
 #[path = "recovery/fused_security.rs"]
 mod fused_security;
+#[path = "recovery/legacy_continuation.rs"]
+mod legacy_continuation;
+#[path = "recovery/legacy_selection.rs"]
+mod legacy_selection;
 #[path = "recovery/terminal_chronology.rs"]
 mod terminal_chronology;
 

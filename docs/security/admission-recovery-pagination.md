@@ -1,0 +1,11 @@
+# Admission recovery pagination
+
+The legacy admission `ListRecoverable` method returns up to its requested number of usable operations. Parked approvals, live nonce issuances and not-due recovery deferrals do not consume that usable limit. The SQLite adapter performs this selection in one authenticated transaction with the current serving fence, independently checked owner clock and unchanged integrity checks before skipping a candidate.
+
+A legacy call verifies at most256 physical candidates in total. That maximum is shared across its internal cursor pages. If it fills the requested usable result or proves the candidate stream ended, it returns the completed vector. At the exact256 boundary, one operation-ID index existence check may prove there is no physical tail without decoding a257th operation. Any unresolved tail returns the existing `Unavailable` category with the fixed message `legacy recovery selection exceeds the bounded scan; use cursor recovery`. The adapter does not return a partial vector or an empty result that conceals continuation.
+
+The control-plane `AdmissionAuthorityAction::ListRecoverable` consumer receives this refusal through its existing operation-store error mapping; a refused selection is not a successful empty response. Operator clients that need to advance through a long dormant prefix should use the existing `RecoveryPage` API and preserve its next cursor. No new endpoint, credential or authority is introduced.
+
+`RecoveryPage` retains its separate physical contract: a page verifies at most its candidate limit, including skipped candidates, and an empty page with a next cursor means progress. Its maximum remains256 per page. Immutable operation IDs order the sweep. Clients must preserve the cursor and current authority/fence; reads mint no recovery claim, operation version, global commit or anchor.
+
+Snapshot, fence, clock, status/global-reference or canonical-data failures refuse selection. They are not skipped candidates or bounded-capacity success. Integrity restoration and owner reopen follow the existing authenticated authority lifecycle.

@@ -14,9 +14,15 @@ fn live_issuance_does_not_occupy_a_recovery_page() -> TestResult {
         "later-capability",
     );
     store.begin(&later, &fixture.fixture.fence, now_ms())?;
-    assert_eq!(store.list_recoverable(now_ms(), 1)?, vec![later]);
+    assert_eq!(store.list_recoverable(now_ms(), 1)?, vec![later.clone()]);
     let expires = u64::try_from(fixture.reservation.signed_nonce().expires_at())? * 1_000;
-    assert_eq!(store.list_recoverable(expires, 1)?, vec![fixture.operation]);
+    let mut expected = vec![later, fixture.operation];
+    expected.sort_by(|left, right| {
+        left.binding()
+            .operation_id()
+            .cmp(right.binding().operation_id())
+    });
+    assert_eq!(store.list_recoverable(expires, 2)?, expected);
     Ok(())
 }
 

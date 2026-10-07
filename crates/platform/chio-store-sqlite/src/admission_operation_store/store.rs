@@ -788,18 +788,7 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         not_after_unix_ms: u64,
         limit: usize,
     ) -> Result<Vec<AdmissionOperationV1>, AdmissionOperationStoreError> {
-        if limit == 0 {
-            return Ok(Vec::new());
-        }
-        self.read_recovery_page(
-            chio_kernel::admission_operation::AdmissionRecoveryPageQuery {
-                not_after_unix_ms,
-                candidate_limit: limit,
-                after_operation_id: None,
-                fence: &self.serving_owner.fence,
-            },
-        )
-        .map(|page| page.operations)
+        self.read_legacy_recoverable(not_after_unix_ms, limit)
     }
 
     fn recovery_page(

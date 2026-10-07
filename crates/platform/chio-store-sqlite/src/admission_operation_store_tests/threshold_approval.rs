@@ -445,11 +445,17 @@ fn approval_required_operations_join_recovery_pages_only_after_their_deadline() 
             .expect("live parked operation stays excluded"),
         vec![later.clone()]
     );
+    let mut expected = vec![later, advanced];
+    expected.sort_by(|left, right| {
+        left.binding()
+            .operation_id()
+            .cmp(right.binding().operation_id())
+    });
     assert_eq!(
         fixture
             .store
             .list_recoverable(deadline_unix_ms, 2)
             .expect("expired parked operation joins the page"),
-        vec![later, advanced]
+        expected
     );
 }

@@ -131,6 +131,14 @@ impl SqliteAdmissionOperationStore {
     ) -> Result<AdmissionRecoveryPageV1, AdmissionOperationStoreError> {
         page::read(self, query)
     }
+
+    pub(super) fn read_legacy_recoverable(
+        &self,
+        not_after_unix_ms: u64,
+        limit: usize,
+    ) -> Result<Vec<AdmissionOperationV1>, AdmissionOperationStoreError> {
+        page::read_legacy(self, not_after_unix_ms, limit)
+    }
 }
 
 fn verify_snapshot(

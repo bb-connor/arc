@@ -2,6 +2,9 @@
 
 use super::*;
 
+const LEGACY_CAPACITY_MESSAGE: &str =
+    "legacy recovery selection exceeds the bounded scan; use cursor recovery";
+
 pub(super) fn read(
     store: &SqliteAdmissionOperationStore,
     query: AdmissionRecoveryPageQuery<'_>,
@@ -15,6 +18,90 @@ pub(super) fn read(
     let transaction = store.begin_read(&mut connection)?;
     verify_active_owner(&transaction, &store.serving_owner, Some(query.fence))?;
     schema::authority_validation_time(&transaction, query.not_after_unix_ms, &store.serving_owner)?;
+    let page = read_snapshot(&transaction, query)?;
+    transaction.commit().map_err(sqlite_error)?;
+    Ok(page)
+}
+
+pub(super) fn read_legacy(
+    store: &SqliteAdmissionOperationStore,
+    not_after_unix_ms: u64,
+    limit: usize,
+) -> Result<Vec<AdmissionOperationV1>, AdmissionOperationStoreError> {
+    if limit == 0 {
+        return Ok(Vec::new());
+    }
+    if limit > MAX_RECOVERY_BATCH {
+        return Err(invariant(
+            "recovery candidate limit must be between 1 and 256",
+        ));
+    }
+    let mut connection = store.connection()?;
+    let transaction = store.begin_read(&mut connection)?;
+    let fence = &store.serving_owner.fence;
+    verify_active_owner(&transaction, &store.serving_owner, Some(fence))?;
+    schema::authority_validation_time(&transaction, not_after_unix_ms, &store.serving_owner)?;
+    let mut remaining = MAX_RECOVERY_BATCH;
+    let mut cursor = None;
+    let mut operations = Vec::with_capacity(limit);
+    let mut unresolved_tail = false;
+    loop {
+        let candidate_limit = (limit - operations.len()).min(remaining);
+        let page = read_snapshot(
+            &transaction,
+            AdmissionRecoveryPageQuery {
+                not_after_unix_ms,
+                candidate_limit,
+                after_operation_id: cursor.as_ref(),
+                fence,
+            },
+        )?;
+        remaining = remaining
+            .checked_sub(page.scanned_candidates)
+            .ok_or_else(|| invariant("legacy recovery candidate budget exceeded"))?;
+        operations.extend(page.operations);
+        if operations.len() == limit || page.next_cursor.is_none() {
+            break;
+        }
+        cursor = page.next_cursor;
+        if remaining == 0 {
+            // One primary-key existence probe allocates/decodes no candidate.
+            // Absence proves the stream ended; any raw tail remains unresolved.
+            let has_tail: bool = transaction.query_row(
+                "SELECT EXISTS(SELECT 1 FROM admission_operations WHERE operation_id > ?1 LIMIT 1)",
+                [cursor.as_ref().map_or("", AdmissionOperationId::as_str)],
+                |row| row.get(0),
+            ).map_err(sqlite_error)?;
+            if has_tail {
+                unresolved_tail = true;
+            }
+            break;
+        }
+    }
+    store
+        .serving_owner
+        .verify_authority_anchor(&transaction)
+        .map_err(map_owner_error)?;
+    transaction.commit().map_err(sqlite_error)?;
+    store
+        .serving_owner
+        .verify_authority_anchor(&connection)
+        .map_err(map_owner_error)?;
+    if unresolved_tail {
+        Err(AdmissionOperationStoreError::Unavailable(
+            LEGACY_CAPACITY_MESSAGE.to_owned(),
+        ))
+    } else {
+        Ok(operations)
+    }
+}
+
+/// Both entry points supply one already fenced and clock-validated snapshot.
+/// Selection, exact row validation and validation-before-skip stay shared.
+fn read_snapshot(
+    transaction: &Transaction<'_>,
+    query: AdmissionRecoveryPageQuery<'_>,
+) -> Result<AdmissionRecoveryPageV1, AdmissionOperationStoreError> {
     let mut statement = transaction
         .prepare(
             "SELECT operation_id, request_namespace_digest, request_id,
@@ -54,12 +141,12 @@ pub(super) fn read(
             .ok_or_else(|| invariant("recovery page count overflow"))?;
         let stored = decode_row(read_raw_row(row).map_err(sqlite_error)?)?;
         last = Some(stored.operation.binding().operation_id().clone());
-        verify_latest_commit(&transaction, &stored)?;
-        caller_dispatch_context::load(&transaction, &stored.operation)?;
-        runtime_participant::verify_operation(&transaction, &stored.operation)?;
-        governed_approval_claim::verify_stored_operation(&transaction, &stored.operation)?;
-        dpop_claim::verify_stored_operation(&transaction, &stored.operation)?;
-        let recovery = status::load(&transaction, &stored.operation)?;
+        verify_latest_commit(transaction, &stored)?;
+        caller_dispatch_context::load(transaction, &stored.operation)?;
+        runtime_participant::verify_operation(transaction, &stored.operation)?;
+        governed_approval_claim::verify_stored_operation(transaction, &stored.operation)?;
+        dpop_claim::verify_stored_operation(transaction, &stored.operation)?;
+        let recovery = status::load(transaction, &stored.operation)?;
         if recovery.as_ref().is_some_and(|status| {
             status.quarantined && status.deferral.retry_not_before_unix_ms > query.not_after_unix_ms
         }) {
@@ -79,7 +166,7 @@ pub(super) fn read(
             continue;
         }
         if super::super::store::waits_for_live_nonce(
-            &transaction,
+            transaction,
             &stored.operation,
             query.not_after_unix_ms,
         )? {
@@ -89,7 +176,6 @@ pub(super) fn read(
     }
     drop(rows);
     drop(statement);
-    transaction.commit().map_err(sqlite_error)?;
     Ok(AdmissionRecoveryPageV1 {
         operations,
         scanned_candidates,
