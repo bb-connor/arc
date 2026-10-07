@@ -156,9 +156,11 @@ fn a_nonce_of_an_unreserved_operation_cannot_reconcile() -> TestResult {
         report(),
     );
     assert!(
-        refused.as_ref().is_err_and(|error| error
-            .to_string()
-            .contains("not reserved for caller execution")),
+        matches!(
+            &refused,
+            Err(chio_kernel::KernelError::DurableAdmission(reason))
+                if reason == "original caller nonce reservation is absent"
+        ),
         "{refused:?}"
     );
     assert_state(&fixture, &other, "prepared")?;
