@@ -1,5 +1,7 @@
 use super::*;
 
+mod receipt_backed_producer_cannot_select_a_detector_pinned_policy;
+
 #[test]
 fn trusted_producer_signature_from_an_unconfigured_policy_is_rejected() {
     let keypair = Keypair::from_seed(&[72_u8; 32]);
