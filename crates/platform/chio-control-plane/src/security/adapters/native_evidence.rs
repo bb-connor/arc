@@ -26,7 +26,7 @@ use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBe
 use serde_json::json;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use tokio::sync::Mutex as AsyncMutex;
 
 const RECEIPT_READINESS_DOMAIN: &[u8] = b"chio.native-security-receipt-readiness.v1\0";
@@ -724,36 +724,9 @@ impl SqliteSiemOutbox {
         connection
             .busy_timeout(std::time::Duration::from_secs(5))
             .map_err(|_| PortError::unavailable())?;
+        verify_backend_table(&connection)?;
         connection
-            .execute_batch(&format!(
-                "PRAGMA foreign_keys = ON;
-                 PRAGMA journal_mode = WAL;
-                 CREATE TABLE IF NOT EXISTS {OUTBOX_TABLE} (
-                    idempotency_key TEXT PRIMARY KEY NOT NULL,
-                    command_json BLOB NOT NULL,
-                    command_hash BLOB NOT NULL CHECK(length(command_hash) = 32),
-                    status TEXT NOT NULL CHECK(status IN ('pending', 'delivered')),
-                    attempts INTEGER NOT NULL CHECK(attempts >= 0),
-                    next_attempt_at_unix_ms INTEGER NOT NULL CHECK(next_attempt_at_unix_ms >= 0),
-                    delivered_at_unix_ms INTEGER,
-                    CHECK((status = 'pending' AND delivered_at_unix_ms IS NULL)
-                       OR (status = 'delivered' AND delivered_at_unix_ms IS NOT NULL))
-                 );
-                 CREATE INDEX IF NOT EXISTS idx_chio_security_alert_outbox_due
-                 ON {OUTBOX_TABLE}(status, next_attempt_at_unix_ms, idempotency_key);
-                 CREATE TABLE IF NOT EXISTS {BACKEND_DELIVERY_TABLE} (
-                    idempotency_key TEXT NOT NULL
-                        REFERENCES {OUTBOX_TABLE}(idempotency_key),
-                    backend_name TEXT NOT NULL CHECK(length(backend_name) > 0),
-                    command_hash BLOB NOT NULL CHECK(length(command_hash) = 32),
-                    status TEXT NOT NULL CHECK(status IN ('pending', 'delivered')),
-                    attempts INTEGER NOT NULL CHECK(attempts > 0),
-                    delivered_at_unix_ms INTEGER,
-                    PRIMARY KEY (idempotency_key, backend_name),
-                    CHECK((status = 'pending' AND delivered_at_unix_ms IS NULL)
-                       OR (status = 'delivered' AND delivered_at_unix_ms IS NOT NULL))
-                 );"
-            ))
+            .execute_batch(&outbox_schema_sql())
             .map_err(|_| PortError::unavailable())?;
         Ok(Self {
             connection: Mutex::new(connection),
@@ -778,12 +751,12 @@ impl SqliteSiemOutbox {
         }
         let exists: i64 = connection
             .query_row(
-                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN (?1, ?2)",
-                [OUTBOX_TABLE, BACKEND_DELIVERY_TABLE],
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?1",
+                [OUTBOX_TABLE],
                 |row| row.get(0),
             )
             .map_err(|_| PortError::unavailable())?;
-        if exists != 2 {
+        if !verify_backend_table(&connection)? || exists != 1 {
             return Err(PortError::unavailable());
         }
         Ok(())
@@ -1348,15 +1321,108 @@ fn load_backend_records(
             }
             _ => return Err(PortError::integrity_failure()),
         };
-        records.insert(
-            backend,
-            BackendRecord {
-                attempts,
-                delivered_at_unix_ms,
-            },
-        );
+        if records
+            .insert(
+                backend,
+                BackendRecord {
+                    attempts,
+                    delivered_at_unix_ms,
+                },
+            )
+            .is_some()
+        {
+            return Err(PortError::integrity_failure());
+        }
     }
     Ok(records)
+}
+
+type CatalogEntry = (String, String, String, Option<String>);
+
+fn outbox_schema_sql() -> String {
+    format!(
+        "PRAGMA foreign_keys = ON;
+                 PRAGMA journal_mode = WAL;
+                 CREATE TABLE IF NOT EXISTS {OUTBOX_TABLE} (
+                    idempotency_key TEXT PRIMARY KEY NOT NULL,
+                    command_json BLOB NOT NULL,
+                    command_hash BLOB NOT NULL CHECK(length(command_hash) = 32),
+                    status TEXT NOT NULL CHECK(status IN ('pending', 'delivered')),
+                    attempts INTEGER NOT NULL CHECK(attempts >= 0),
+                    next_attempt_at_unix_ms INTEGER NOT NULL CHECK(next_attempt_at_unix_ms >= 0),
+                    delivered_at_unix_ms INTEGER,
+                    CHECK((status = 'pending' AND delivered_at_unix_ms IS NULL)
+                       OR (status = 'delivered' AND delivered_at_unix_ms IS NOT NULL))
+                 );
+                 CREATE INDEX IF NOT EXISTS idx_chio_security_alert_outbox_due
+                 ON {OUTBOX_TABLE}(status, next_attempt_at_unix_ms, idempotency_key);
+                 CREATE TABLE IF NOT EXISTS {BACKEND_DELIVERY_TABLE} (
+                    idempotency_key TEXT NOT NULL
+                        REFERENCES {OUTBOX_TABLE}(idempotency_key),
+                    backend_name TEXT NOT NULL CHECK(length(backend_name) > 0),
+                    command_hash BLOB NOT NULL CHECK(length(command_hash) = 32),
+                    status TEXT NOT NULL CHECK(status IN ('pending', 'delivered')),
+                    attempts INTEGER NOT NULL CHECK(attempts > 0),
+                    delivered_at_unix_ms INTEGER,
+                    PRIMARY KEY (idempotency_key, backend_name),
+                    CHECK((status = 'pending' AND delivered_at_unix_ms IS NULL)
+                       OR (status = 'delivered' AND delivered_at_unix_ms IS NOT NULL))
+                 );"
+    )
+}
+
+/// Reports whether the backend outcome table exists. Any schema object under
+/// its name must match the declared table exactly (columns, composite key,
+/// foreign key, checks and indexes), so a foreign table is refused before it
+/// can hold confirmations.
+fn verify_backend_table(connection: &Connection) -> PortResult<bool> {
+    let catalog = backend_table_catalog(connection)?;
+    if catalog.is_empty() {
+        return Ok(false);
+    }
+    if catalog != expected_backend_table_catalog()? {
+        return Err(PortError::integrity_failure());
+    }
+    Ok(true)
+}
+
+fn expected_backend_table_catalog() -> PortResult<&'static [CatalogEntry]> {
+    static EXPECTED: OnceLock<PortResult<Vec<CatalogEntry>>> = OnceLock::new();
+    EXPECTED
+        .get_or_init(|| {
+            let reference = Connection::open_in_memory().map_err(|_| PortError::unavailable())?;
+            reference
+                .execute_batch(&outbox_schema_sql())
+                .map_err(|_| PortError::unavailable())?;
+            backend_table_catalog(&reference)
+        })
+        .as_ref()
+        .map(Vec::as_slice)
+        .map_err(Clone::clone)
+}
+
+fn backend_table_catalog(connection: &Connection) -> PortResult<Vec<CatalogEntry>> {
+    let mut statement = connection
+        .prepare(
+            "SELECT type, name, tbl_name, sql FROM sqlite_master
+             WHERE lower(name) = ?1 OR lower(tbl_name) = ?1
+             ORDER BY type, name, tbl_name
+             LIMIT 8",
+        )
+        .map_err(|_| PortError::unavailable())?;
+    let mut rows = statement
+        .query([BACKEND_DELIVERY_TABLE])
+        .map_err(|_| PortError::unavailable())?;
+    let mut catalog = Vec::new();
+    while let Some(row) = rows.next().map_err(|_| PortError::unavailable())? {
+        catalog.push((
+            row.get(0).map_err(|_| PortError::invalid_data())?,
+            row.get(1).map_err(|_| PortError::invalid_data())?,
+            row.get(2).map_err(|_| PortError::invalid_data())?,
+            row.get(3).map_err(|_| PortError::invalid_data())?,
+        ));
+    }
+    Ok(catalog)
 }
 
 fn parked_at_unix_ms() -> PortResult<u64> {
