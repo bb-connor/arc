@@ -90,6 +90,83 @@ class GitSourceIdentityTests(unittest.TestCase):
         self.assertEqual((destination / "source.rs").read_bytes(), REVIEWED)
         self.assertEqual(identity.tree, self.approved_tree)
 
+    def configure_transport_callback(self) -> Path:
+        marker = self.directory / "untrusted-transport-executed"
+        callback = self.directory / "transport-program"
+        callback.write_text(
+            f"#!{sys.executable}\nfrom pathlib import Path\n"
+            f"Path({str(marker)!r}).write_text('executed')\n"
+            "raise SystemExit(1)\n"
+        )
+        callback.chmod(0o700)
+        git(self.root, "config", "core.sshCommand", str(callback))
+        git(self.root, "config", "protocol.ssh.allow", "always")
+        return marker
+
+    def configure_promisor_source(self) -> Path:
+        git(self.root, "checkout", "--quiet", "--detach", self.approved)
+        marker = self.configure_transport_callback()
+        for name, value in (
+            ("extensions.partialClone", "fixture"),
+            ("remote.fixture.promisor", "true"),
+            ("remote.fixture.partialCloneFilter", "blob:none"),
+            ("remote.fixture.url", "ssh://example.invalid/approved-source"),
+        ):
+            git(self.root, "config", name, value)
+        return marker
+
+    def remove_promised_blob(self) -> Path:
+        marker = self.configure_promisor_source()
+        (self.root / ".git/objects" / self.approved_blob[:2] / self.approved_blob[2:]).unlink()
+        return marker
+
+    def test_fully_present_promisor_source_copies_local_approved_bytes(self) -> None:
+        marker = self.configure_promisor_source()
+        identity = BOUNDARY.repository_identity(self.root, self.approved, None)
+        destination = self.directory / "projected"
+        BOUNDARY.materialize_private_copy(identity, destination)
+        self.assertEqual((destination / "source.rs").read_bytes(), REVIEWED)
+        self.assertEqual(identity.tree, self.approved_tree)
+        self.assertFalse(marker.exists())
+
+    def test_missing_source_blob_cannot_execute_a_promisor_transport(self) -> None:
+        marker = self.remove_promised_blob()
+        with self.assertRaises(BOUNDARY.BoundaryError):
+            identity = BOUNDARY.repository_identity(self.root, self.approved, None)
+            BOUNDARY.materialize_private_copy(identity, self.directory / "projected")
+        self.assertFalse(marker.exists(), "source projection executed a host transport")
+
+    def test_batch_reader_cannot_fetch_a_missing_blob_after_preflight(self) -> None:
+        git(self.root, "checkout", "--quiet", "--detach", self.approved)
+        identity = BOUNDARY.repository_identity(self.root, self.approved, None)
+        entries = BOUNDARY.parse_tree(identity.root, identity.head)
+        marker = self.remove_promised_blob()
+        with self.assertRaises(BOUNDARY.BoundaryError):
+            BOUNDARY.read_git_blobs(identity.root, entries)
+        self.assertFalse(marker.exists(), "batch source reader executed a host transport")
+
+    def test_aggregate_reader_cannot_fetch_a_missing_promised_blob(self) -> None:
+        marker = self.remove_promised_blob()
+        with self.assertRaises(AGGREGATE.AggregationError):
+            AGGREGATE.git(self.root, "cat-file", "blob", self.approved_blob)
+        self.assertFalse(marker.exists(), "aggregate source reader executed a host transport")
+
+    def test_repository_transport_permission_cannot_override_host_boundary(self) -> None:
+        marker = self.configure_transport_callback()
+        for label, read, error in (
+            ("private source", lambda: BOUNDARY.git_command(
+                self.root, ["ls-remote", "ssh://example.invalid/approved-source"]
+            ), BOUNDARY.BoundaryError),
+            ("aggregate", lambda: AGGREGATE.git(
+                self.root, "ls-remote", "ssh://example.invalid/approved-source"
+            ), AGGREGATE.AggregationError),
+        ):
+            with self.subTest(reader=label):
+                with self.assertRaises(error):
+                    read()
+                self.assertFalse(marker.exists(), "repository transport permission executed a host program")
+            marker.unlink(missing_ok=True)
+
     def test_source_configuration_cannot_execute_a_clean_filter(self) -> None:
         callback = self.directory / "clean-filter"
         marker = self.directory / "untrusted-filter-executed"

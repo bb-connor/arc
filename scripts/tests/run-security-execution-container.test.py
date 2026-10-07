@@ -198,7 +198,6 @@ def static_contract_tests() -> None:
             "security image base is not pinned to the reviewed Rust 1.95.0 digest"
         )
     for marker in (
-        "bash=5.2.37-r0",
         "security-evidence-apk.lock",
         "ea53828c0ee81c614f79cd107fcc7af06b29abb7ecc7484423d094fe70328e8e",
         "c55a7b5604fe2e0400911c488b320922066fe23646235793cec7c8e5c03e7a61",
@@ -2506,6 +2505,7 @@ def main() -> int:
     candidate_helper_environment_tests()
     run([sys.executable, os.fspath(ROOT / "scripts/tests/check-broker-helper-lifetime.test.py")], cwd=ROOT)
     run([sys.executable, "-W", "error", os.fspath(ROOT / "scripts/tests/check-security-git-source-identity.test.py")], cwd=ROOT)
+    run([sys.executable, os.fspath(ROOT / "scripts/tests/check-security-apk-closure.test.py")], cwd=ROOT)
     static_contract_tests()
     copy_and_output_tests()
     refresh_inventory_tests()

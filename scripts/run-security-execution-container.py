@@ -261,8 +261,12 @@ def validate_seccomp_profile(path: Path) -> tuple[dict[str, object], str]:
 
 def clean_host_env(extra: dict[str, str] | None = None) -> dict[str, str]:
     environment = {
+        # Source inspection is offline. This empty allowlist also overrides
+        # repository transport permissions on older Git versions.
+        "GIT_ALLOW_PROTOCOL": "",
         "GIT_CONFIG_GLOBAL": "/dev/null",
         "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_NO_LAZY_FETCH": "1",
         "GIT_NO_REPLACE_OBJECTS": "1",
         "GIT_OPTIONAL_LOCKS": "0",
         "GIT_TERMINAL_PROMPT": "0",
