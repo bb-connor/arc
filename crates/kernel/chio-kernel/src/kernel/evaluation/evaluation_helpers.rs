@@ -114,6 +114,12 @@ struct CleanupReleaseOutcome {
     confirmed: bool,
 }
 
+#[derive(Clone, Copy)]
+enum PreDispatchCleanupOutcome {
+    Denied,
+    Cancelled,
+}
+
 /// True when a grant carries a delivery carrier constraint: a committed
 /// output digest or a purchase marker.
 fn grant_is_delivery_marked(grant: &chio_core::capability::scope::ToolGrant) -> bool {
@@ -484,6 +490,41 @@ impl ChioKernel {
         denial: PreDispatchCleanupDeny<'_>,
         credential_disposition: PaymentCredentialDisposition,
     ) -> Result<ToolCallResponse, KernelError> {
+        self.build_pre_dispatch_cleanup_response(
+            denial,
+            credential_disposition,
+            PreDispatchCleanupOutcome::Denied,
+        )
+    }
+
+    /// Runs the same pre-dispatch cleanup as a denial, then signs the host
+    /// cancellation that won the dispatch-start boundary as a cancelled outcome.
+    pub(super) fn build_pre_dispatch_cleanup_cancelled_response_with_credentials(
+        &self,
+        cancellation: PreDispatchCleanupDeny<'_>,
+        credential_disposition: PaymentCredentialDisposition,
+    ) -> Result<ToolCallResponse, KernelError> {
+        self.build_pre_dispatch_cleanup_response(
+            cancellation,
+            credential_disposition,
+            PreDispatchCleanupOutcome::Cancelled,
+        )
+    }
+
+    fn build_pre_dispatch_cleanup_response(
+        &self,
+        denial: PreDispatchCleanupDeny<'_>,
+        credential_disposition: PaymentCredentialDisposition,
+        outcome: PreDispatchCleanupOutcome,
+    ) -> Result<ToolCallResponse, KernelError> {
+        let build_outcome_response = match outcome {
+            PreDispatchCleanupOutcome::Denied => {
+                Self::build_deny_response_with_metadata_and_payee_binding
+            }
+            PreDispatchCleanupOutcome::Cancelled => {
+                Self::build_cancelled_response_with_metadata_and_payee_binding
+            }
+        };
         let runtime_admission_metadata = self.merge_dispatch_credential_disposition_metadata(
             denial.runtime_admission_metadata,
             credential_disposition,
@@ -585,7 +626,8 @@ impl ChioKernel {
                         None => metadata,
                     },
                 };
-                return self.build_deny_response_with_metadata_and_payee_binding(
+                return build_outcome_response(
+                    self,
                     denial.request,
                     &format!(
                         "{}; pre-dispatch cleanup could not be confirmed: {}",
@@ -621,27 +663,43 @@ impl ChioKernel {
         if let (Some(charge), Some(reverse)) =
             (denial.budget_mutation.charge_result(), reverse.as_ref())
         {
-            return self
-                .build_pre_execution_monetary_deny_response_with_metadata_and_payee_binding(
-                    denial.request,
-                    denial.reason,
-                    denial.timestamp,
-                    charge,
-                    reverse.committed_cost_units_after,
-                    denial.cap,
-                    self.merge_budget_receipt_metadata(
-                        runtime_admission_metadata,
-                        self.budget_execution_receipt_metadata(
-                            charge,
-                            Some(("reversed", reverse)),
-                            None,
-                        ),
+            let metadata = self.merge_budget_receipt_metadata(
+                runtime_admission_metadata,
+                self.budget_execution_receipt_metadata(charge, Some(("reversed", reverse)), None),
+            );
+            return match outcome {
+                PreDispatchCleanupOutcome::Denied => self
+                    .build_pre_execution_monetary_deny_response_with_metadata_and_payee_binding(
+                        denial.request,
+                        denial.reason,
+                        denial.timestamp,
+                        charge,
+                        reverse.committed_cost_units_after,
+                        denial.cap,
+                        metadata,
+                        denial.verified_payee_binding,
                     ),
-                    denial.verified_payee_binding,
-                );
+                PreDispatchCleanupOutcome::Cancelled => self
+                    .build_cancelled_response_with_metadata_and_payee_binding(
+                        denial.request,
+                        denial.reason,
+                        denial.timestamp,
+                        Some(charge.grant_index),
+                        merge_metadata_objects(
+                            Self::pre_execution_financial_metadata(
+                                charge,
+                                reverse.committed_cost_units_after,
+                                denial.cap,
+                            )?,
+                            metadata,
+                        ),
+                        denial.verified_payee_binding,
+                    ),
+            };
         }
 
-        self.build_deny_response_with_metadata_and_payee_binding(
+        build_outcome_response(
+            self,
             denial.request,
             denial.reason,
             denial.timestamp,

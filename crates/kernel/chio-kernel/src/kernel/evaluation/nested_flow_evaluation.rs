@@ -1190,38 +1190,47 @@ impl ChioKernel {
             }
         }
 
-        if let Err(error) = self.mark_session_request_dispatch_started(
+        if let Err(refusal) = self.start_session_request_dispatch(
             Some(&parent_context.session_id),
             parent_context.request_id.as_str(),
         ) {
-            let reason = error.to_string();
+            let reason = refusal.error.to_string();
             warn!(request_id = %request.request_id, reason = %redacted!(&reason), "parent session cancellation won the nested pre-dispatch boundary");
             return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-                self.build_pre_dispatch_cleanup_deny_response_with_credentials(
-                    PreDispatchCleanupDeny {
-                        request,
-                        reason: &reason,
-                        timestamp: self
-                            .read_authority_time()
-                            .map(|time| time.as_secs())
-                            .unwrap_or(now),
-                        matched_grant_index,
-                        cap,
-                        budget_mutation: &budget_mutation,
-                        payment_authorization: payment_authorization.as_ref(),
-                        durable_operation: durable_admission
-                            .as_ref()
-                            .map(DurableToolAdmission::operation),
-                        runtime_admission_metadata: runtime_admission_metadata.clone(),
-                        verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                        budget_lease_acquired,
-                    },
-                    if payment_authorization.is_some() {
-                        PaymentCredentialDisposition::RetainedAfterAuthorization
-                    } else {
-                        PaymentCredentialDisposition::NonePresent
-                    },
-                )
+                let cleanup = PreDispatchCleanupDeny {
+                    request,
+                    reason: refusal.cancellation.as_deref().unwrap_or(&reason),
+                    timestamp: self
+                        .read_authority_time()
+                        .map(|time| time.as_secs())
+                        .unwrap_or(now),
+                    matched_grant_index,
+                    cap,
+                    budget_mutation: &budget_mutation,
+                    payment_authorization: payment_authorization.as_ref(),
+                    durable_operation: durable_admission
+                        .as_ref()
+                        .map(DurableToolAdmission::operation),
+                    runtime_admission_metadata: runtime_admission_metadata.clone(),
+                    verified_payee_binding: verified_governed_payee_binding.as_ref(),
+                    budget_lease_acquired,
+                };
+                let credential_disposition = if payment_authorization.is_some() {
+                    PaymentCredentialDisposition::RetainedAfterAuthorization
+                } else {
+                    PaymentCredentialDisposition::NonePresent
+                };
+                if refusal.cancellation.is_some() {
+                    self.build_pre_dispatch_cleanup_cancelled_response_with_credentials(
+                        cleanup,
+                        credential_disposition,
+                    )
+                } else {
+                    self.build_pre_dispatch_cleanup_deny_response_with_credentials(
+                        cleanup,
+                        credential_disposition,
+                    )
+                }
             });
         }
 

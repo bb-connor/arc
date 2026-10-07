@@ -147,22 +147,13 @@ impl ChioKernel {
         )
     }
 
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-    )]
-    fn build_pre_execution_monetary_deny_response_with_recording(
-        &self,
-        request: &ToolCallRequest,
-        reason: &str,
-        timestamp: u64,
+    /// Financial receipt metadata for a pre-execution budget hold that never
+    /// reached dispatch: nothing is charged and the attempted cost is recorded.
+    pub(crate) fn pre_execution_financial_metadata(
         charge: &BudgetChargeResult,
         committed_cost_after_release: u64,
         cap: &CapabilityToken,
-        extra_metadata: Option<serde_json::Value>,
-        verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
-        record_mode: ReceiptRecordMode,
-    ) -> Result<ToolCallResponse, KernelError> {
+    ) -> Result<Option<serde_json::Value>, KernelError> {
         let delegation_depth = crate::receipt_support::checked_receipt_count(
             cap.delegation_chain.len(),
             "delegation depth",
@@ -190,7 +181,27 @@ impl ChioKernel {
             oracle_evidence: None,
             attempted_cost: Some(charge.cost_charged),
         };
-        let financial_metadata = Some(serde_json::json!({ "financial": financial_meta }));
+        Ok(Some(serde_json::json!({ "financial": financial_meta })))
+    }
+
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
+    fn build_pre_execution_monetary_deny_response_with_recording(
+        &self,
+        request: &ToolCallRequest,
+        reason: &str,
+        timestamp: u64,
+        charge: &BudgetChargeResult,
+        committed_cost_after_release: u64,
+        cap: &CapabilityToken,
+        extra_metadata: Option<serde_json::Value>,
+        verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
+        record_mode: ReceiptRecordMode,
+    ) -> Result<ToolCallResponse, KernelError> {
+        let financial_metadata =
+            Self::pre_execution_financial_metadata(charge, committed_cost_after_release, cap)?;
         let deny_extra_metadata =
             merge_metadata_objects(financial_metadata.clone(), extra_metadata.clone());
         let request_metadata = request_receipt_metadata_with_payee_binding(

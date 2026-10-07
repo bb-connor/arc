@@ -354,6 +354,15 @@ impl From<KernelError> for PreDispatchMonetaryUnwindFailure {
     }
 }
 
+/// A session refusal at the dispatch-start boundary. `cancellation` holds the
+/// host cancellation reason only when that cancellation won the boundary, not
+/// when the request already finished, its session anchor changed or its
+/// session is unavailable.
+pub(crate) struct SessionDispatchStartRefusal {
+    pub(crate) error: KernelError,
+    pub(crate) cancellation: Option<String>,
+}
+
 impl Drop for RuntimeAdmissionReadinessRegistration<'_> {
     fn drop(&mut self) {
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -1566,15 +1575,26 @@ impl ChioKernel {
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn mark_session_request_dispatch_started(
         &self,
         session_id: Option<&SessionId>,
         request_id: &str,
     ) -> Result<(), KernelError> {
+        self.start_session_request_dispatch(session_id, request_id)
+            .map_err(|refusal| refusal.error)
+    }
+
+    pub(crate) fn start_session_request_dispatch(
+        &self,
+        session_id: Option<&SessionId>,
+        request_id: &str,
+    ) -> Result<(), SessionDispatchStartRefusal> {
         let Some(session_id) = session_id else {
             return Ok(());
         };
         let request_id = RequestId::new(request_id.to_string());
+        let mut cancellation = None;
         self.with_session(session_id, |session| {
             session
                 .try_mark_request_dispatch_started(&request_id)
@@ -1585,15 +1605,21 @@ impl ChioKernel {
                             "session request completed before dispatch".to_string()
                         }
                         crate::session::DispatchStartFailure::CancellationRequested { reason } => {
-                            reason.unwrap_or_else(|| {
+                            let reason = reason.unwrap_or_else(|| {
                                 "session request cancelled before dispatch".to_string()
-                            })
+                            });
+                            cancellation = Some(reason.clone());
+                            reason
                         }
                         crate::session::DispatchStartFailure::SessionAnchorChanged => {
                             "session authorization changed before dispatch".to_string()
                         }
                     },
                 })
+        })
+        .map_err(|error| SessionDispatchStartRefusal {
+            error,
+            cancellation,
         })
     }
 
