@@ -10,14 +10,14 @@ These schemas describe proposed message and evidence shapes. They do not impleme
 | `operator-event.schema.json` | Bounded hint-only events, including replayable native subscription terminals, with stable subscription identity |
 | `compatibility.schema.json` | Installed tuple and per-profile prerequisite/qualification reference shape |
 | `release-evidence.schema.json` | Candidate-only evidence envelope consumed by a separate semantic qualification verifier |
-| `method-catalog.json` | All proposed methods and their positive paired examples |
+| `method-catalog.json` | All proposed methods, positive paired examples and mandatory method-specific negative examples |
 | `fixture-catalog.json` | Expected schema and response-correlation results for every synthetic example |
 
 The protocol name `chio.desktop.operator.v1` requires explicit negotiation and a versioned Omarchy compatibility map. Native references are opaque locators verified by their registered owner. A digest-shaped field, matching issuer string or successful schema check proves neither possession nor authority. Destination/resource types, generations, current policy, grants, influence, signatures and stop state are checked by native owners.
 
 The custom JSON Schema format `uint64-decimal` is mandatory for every unsigned decimal field. Validators must check canonical spelling and the inclusive range 0 through 18446744073709551615. Merely applying the regex without format validation is insufficient. JSON numbers are safe integers only; money and native generations use these decimal strings. Unknown fields are rejected. Compatibility records also require at most one row per profile identity, including identical duplicates; six per-profile `contains`/`maxContains` constraints enforce this before any status is exposed.
 
-Example files use pretty-printed JSON for review. They represent payload values, not signed or canonical wire bytes. Runtime commitments and hashes use RFC 8785 through the registered codec. The document checker does not certify an RFC 8785 implementation; it checks strict parsing, shapes and response correlation. Native signed objects keep their own registered encoding and verifier.
+Example files use pretty-printed JSON for review. They represent payload values, not signed or canonical wire bytes. Runtime commitments and hashes use RFC 8785 through the registered codec. The document checker does not certify an RFC 8785 implementation; it checks strict parsing, shapes and response correlation. Each catalog method must retain both its positive request/response pair and explicit relevant negative fixtures; deleting a method's negative list or any named vector fails validation. Synthesized unknown-field mutations are extra controls, not substitutes for those reviewed examples. Native signed objects keep their own registered encoding and verifier.
 
 ## Run document validation
 

@@ -1,0 +1,9 @@
+{
+  "version": "chio.desktop.operator.v1",
+  "request_id": "synthetic-request-hello",
+  "method": "hello",
+  "params": {
+    "supported_versions": [],
+    "client_nonce": "synthetic-client"
+  }
+}

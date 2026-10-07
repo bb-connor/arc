@@ -93,7 +93,6 @@
             "retry": {
               "enum": [
                 "never",
-                "same_intent",
                 "reread"
               ]
             },
@@ -250,7 +249,6 @@
             "retry": {
               "enum": [
                 "never",
-                "same_intent",
                 "reread"
               ]
             },
@@ -388,7 +386,6 @@
             "retry": {
               "enum": [
                 "never",
-                "same_intent",
                 "reread"
               ]
             },
@@ -500,7 +497,6 @@
             "retry": {
               "enum": [
                 "never",
-                "same_intent",
                 "reread"
               ]
             },
@@ -809,7 +805,6 @@
             "retry": {
               "enum": [
                 "never",
-                "same_intent",
                 "reread"
               ]
             },
@@ -944,6 +939,12 @@
             },
             "task_id": {
               "$ref": "common.schema.json#/$defs/id"
+            },
+            "scope": {
+              "enum": [
+                "task",
+                "task_and_descendants"
+              ]
             }
           },
           "required": [
@@ -954,7 +955,8 @@
             "external_outcome",
             "stop_ref",
             "durability",
-            "task_id"
+            "task_id",
+            "scope"
           ],
           "additionalProperties": false,
           "allOf": [
@@ -1209,7 +1211,6 @@
             "retry": {
               "enum": [
                 "never",
-                "same_intent",
                 "reread"
               ]
             },
@@ -1486,7 +1487,6 @@
             "retry": {
               "enum": [
                 "never",
-                "same_intent",
                 "reread"
               ]
             },
@@ -1615,7 +1615,6 @@
             "retry": {
               "enum": [
                 "never",
-                "same_intent",
                 "reread"
               ]
             },

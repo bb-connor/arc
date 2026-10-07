@@ -85,12 +85,14 @@ def pair_matches(request: dict, response: dict) -> bool:
     if any(request.get(k) != response.get(k) for k in ("version", "request_id", "method")):
         return False
     if not response.get("ok"):
+        if response["error"].get("retry") == "same_intent" and "intent_id" not in request["params"]:
+            return False
         original = request["params"].get("operation_ref")
         echoed = response["error"].get("operation_ref")
         return original is None or echoed is None or original == echoed
     params, result = request["params"], response["result"]
     required_bindings = {
-        "task.get": ("task_id",), "task.stop": ("task_id",),
+        "task.get": ("task_id",), "task.stop": ("task_id", "scope"),
         "operation.get": ("operation_ref",), "review.open": ("operation_ref",),
         "approval.submit": ("operation_ref", "decision"),
         "events.ack": ("subscription_id",),
@@ -229,29 +231,69 @@ def check_documents() -> int:
     return len(paths)
 
 
+def check_method_fixture_coverage(methods: list[dict], entries: dict, values: dict) -> None:
+    for method in methods:
+        name = method["name"]
+        for role, schema in (("request_example", "operator-request.schema.json"),
+                             ("response_example", "operator-response.schema.json")):
+            fixture = method[role]
+            entry, value = entries.get(fixture, {}), values.get(fixture)
+            if entry.get("schema") != schema or entry.get("schema_valid") is not True or not isinstance(value, dict) or value.get("method") != name:
+                raise ValueError(f"Missing positive {role} coverage: {name}")
+            if role == "response_example" and (entry.get("request") != method["request_example"] or entry.get("pair_valid") is not True):
+                raise ValueError(f"Missing positive response pairing: {name}")
+        negatives = method.get("negative_examples", [])
+        if not negatives or len(set(negatives)) != len(negatives):
+            raise ValueError(f"Missing or duplicate negative coverage: {name}")
+        for fixture in negatives:
+            entry, value = entries.get(fixture, {}), values.get(fixture)
+            if entry.get("schema") not in ("operator-request.schema.json", "operator-response.schema.json") or not isinstance(value, dict):
+                raise ValueError(f"Missing negative fixture: {name}: {fixture}")
+            if value.get("method") != name and entry.get("request") != method["request_example"]:
+                raise ValueError(f"Foreign method negative fixture: {name}: {fixture}")
+            if entry.get("schema_valid") is not False:
+                paired = entry.get("request")
+                request_entry, request_value = entries.get(paired, {}), values.get(paired)
+                if (entry.get("schema") != "operator-response.schema.json" or entry.get("pair_valid") is not False
+                        or request_entry.get("schema") != "operator-request.schema.json"
+                        or request_entry.get("schema_valid") is not True
+                        or not isinstance(request_value, dict) or request_value.get("method") != name):
+                    raise ValueError(f"Negative fixture has no executable rejection oracle: {name}: {fixture}")
+
+
 def check_fixtures(loaded: dict) -> tuple[int, int]:
     catalog = read_json(ROOT / "contracts/fixture-catalog.json")
     if catalog.get("synthetic_only") is not True:
         raise ValueError("Examples must remain synthetic")
     files, coverage, correlated = set(), set(), 0
+    entries, values = {}, {}
     for entry in catalog["fixtures"]:
         name = entry["file"]
         if name in files or Path(name).name != name:
             raise ValueError(f"Duplicate/unsafe fixture path: {name}")
         files.add(name)
+        if not isinstance(entry.get("schema_valid"), bool):
+            raise ValueError(f"Invalid schema expectation: {name}")
+        if ("request" in entry) != ("pair_valid" in entry):
+            raise ValueError(f"Incomplete pair oracle: {name}")
+        if "request" in entry and (entry["schema"] != "operator-response.schema.json" or not isinstance(entry["pair_valid"], bool)):
+            raise ValueError(f"Invalid pair oracle: {name}")
         data = (ROOT / "examples" / name).read_bytes()
         try:
             value = wire_decode(data)
             valid = not list(loaded[entry["schema"]].iter_errors(value))
         except (ValueError, UnicodeError):
             value, valid = None, False
+        entries[name], values[name] = entry, value
         if valid != entry["schema_valid"]:
             raise ValueError(f"Unexpected schema result for {name}: {valid}")
         if valid and entry["schema"] == "operator-request.schema.json":
             coverage.add(value["method"])
         if "request" in entry:
             request = wire_decode((ROOT / "examples" / entry["request"]).read_bytes())
-            if not valid or pair_matches(request, value) != entry["pair_valid"]:
+            if list(loaded["operator-request.schema.json"].iter_errors(request)):
+                raise ValueError(f"Pair uses invalid request: {name}")
+            if (valid and pair_matches(request, value)) != entry["pair_valid"]:
                 raise ValueError(f"Unexpected response correlation result: {name}")
             correlated += 1
         if entry["schema"] == "release-evidence.schema.json" and valid:
@@ -264,9 +306,12 @@ def check_fixtures(loaded: dict) -> tuple[int, int]:
     expected = {entry["name"] for entry in methods["methods"]}
     if coverage != expected or len(expected) != len(methods["methods"]):
         raise ValueError("Missing method request coverage or duplicate catalog method")
+    check_method_fixture_coverage(methods["methods"], entries, values)
     for method in methods["methods"]:
         request = wire_decode((ROOT / "examples" / method["request_example"]).read_bytes())
         response = wire_decode((ROOT / "examples" / method["response_example"]).read_bytes())
+        if method["mutation"] != ("intent_id" in request["params"]):
+            raise ValueError(f"Method intent classification drift: {method['name']}")
         if request["method"] != method["name"] or not pair_matches(request, response):
             raise ValueError(f"Method catalog substitution: {method['name']}")
         # Every method must reject unexpected parameters, independently of hand-written vectors.
@@ -336,7 +381,60 @@ def self_test(loaded: dict) -> int:
         except ValueError:
             continue
         raise ValueError("Plan coverage accepted removed, unbound or duplicate implementation work")
-    return len(malformed) + 7 + 4 + 2 + len(bad_cases)
+    request = wire_decode((ROOT / "examples/request-task-stop.json").read_bytes())
+    response = wire_decode((ROOT / "examples/response-task-stop.json").read_bytes())
+    response["result"]["scope"] = "task"
+    if pair_matches(request, response):
+        raise ValueError("Correlation accepted parent-only result for descendant stop")
+    catalog = read_json(ROOT / "contracts/fixture-catalog.json")
+    entries = {entry["file"]: entry for entry in catalog["fixtures"]}
+    values = {}
+    for name in entries:
+        try:
+            values[name] = wire_decode((ROOT / "examples" / name).read_bytes())
+        except (ValueError, UnicodeError):
+            values[name] = None
+    methods = read_json(ROOT / "contracts/method-catalog.json")["methods"]
+    coverage_checks = 0
+    for method in methods:
+        mutant = copy.deepcopy(method)
+        mutant["negative_examples"] = []
+        try:
+            check_method_fixture_coverage([mutant], entries, values)
+        except ValueError:
+            coverage_checks += 1
+        else:
+            raise ValueError(f"Missing negative coverage accepted: {method['name']}")
+        missing = dict(entries)
+        del missing[method["negative_examples"][0]]
+        try:
+            check_method_fixture_coverage([method], missing, values)
+        except ValueError:
+            coverage_checks += 1
+        else:
+            raise ValueError(f"Deleted negative fixture accepted: {method['name']}")
+    for method in methods:
+        for name in method["negative_examples"]:
+            if entries[name].get("schema_valid") is True:
+                unpaired = copy.deepcopy(entries)
+                del unpaired[name]["request"]
+                try:
+                    check_method_fixture_coverage([method], unpaired, values)
+                except ValueError:
+                    coverage_checks += 1
+                else:
+                    raise ValueError(f"Negative correlation oracle accepted without request: {name}")
+    retry_checks = 0
+    for method in methods:
+        if method["mutation"]:
+            continue
+        name = "invalid-retry-" + method["name"].replace(".", "-") + ".json"
+        response = copy.deepcopy(values[name])
+        response["error"]["retry"] = "never"
+        if list(loaded["operator-response.schema.json"].iter_errors(response)):
+            raise ValueError(f"Retry fixture has an unrelated shape defect: {name}")
+        retry_checks += 1
+    return len(malformed) + 7 + 4 + 2 + len(bad_cases) + 1 + coverage_checks + retry_checks
 
 
 def main() -> int:

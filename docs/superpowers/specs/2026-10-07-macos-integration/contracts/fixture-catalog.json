@@ -447,6 +447,103 @@
       "file": "compatibility-distinct-profiles.json",
       "schema": "compatibility.schema.json",
       "schema_valid": true
+    },
+    {
+      "file": "invalid-stop-scope-substitution.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-task-stop.json",
+      "pair_valid": false
+    },
+    {
+      "file": "invalid-stop-scope-missing.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false
+    },
+    {
+      "file": "invalid-hello-negotiation.json",
+      "schema": "operator-request.schema.json",
+      "schema_valid": false
+    },
+    {
+      "file": "invalid-health-generation.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-health-get.json",
+      "pair_valid": false
+    },
+    {
+      "file": "invalid-tasks-page-limit.json",
+      "schema": "operator-request.schema.json",
+      "schema_valid": false
+    },
+    {
+      "file": "invalid-subscribe-cursor.json",
+      "schema": "operator-request.schema.json",
+      "schema_valid": false
+    },
+    {
+      "file": "invalid-retry-hello.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-hello.json",
+      "pair_valid": false
+    },
+    {
+      "file": "invalid-retry-health-get.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-health-get.json",
+      "pair_valid": false
+    },
+    {
+      "file": "invalid-retry-tasks-list.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-tasks-list.json",
+      "pair_valid": false
+    },
+    {
+      "file": "invalid-retry-task-get.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-task-get.json",
+      "pair_valid": false
+    },
+    {
+      "file": "invalid-retry-operation-get.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-operation-get.json",
+      "pair_valid": false
+    },
+    {
+      "file": "invalid-retry-review-open.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-review-open.json",
+      "pair_valid": false
+    },
+    {
+      "file": "invalid-retry-events-subscribe.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-events-subscribe.json",
+      "pair_valid": false
+    },
+    {
+      "file": "invalid-retry-events-ack.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": false,
+      "request": "request-events-ack.json",
+      "pair_valid": false
+    },
+    {
+      "file": "response-stop-same-intent.json",
+      "schema": "operator-response.schema.json",
+      "schema_valid": true,
+      "request": "request-task-stop.json",
+      "pair_valid": true
     }
   ]
 }

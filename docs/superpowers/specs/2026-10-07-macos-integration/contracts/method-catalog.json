@@ -7,84 +7,128 @@
       "mutation": false,
       "native_authority_required": false,
       "request_example": "request-hello.json",
-      "response_example": "response-hello.json"
+      "response_example": "response-hello.json",
+      "negative_examples": [
+        "invalid-hello-negotiation.json",
+        "invalid-retry-hello.json"
+      ]
     },
     {
       "name": "health.get",
       "mutation": false,
       "native_authority_required": false,
       "request_example": "request-health-get.json",
-      "response_example": "response-health-get.json"
+      "response_example": "response-health-get.json",
+      "negative_examples": [
+        "invalid-health-generation.json",
+        "invalid-retry-health-get.json"
+      ]
     },
     {
       "name": "tasks.list",
       "mutation": false,
       "native_authority_required": true,
       "request_example": "request-tasks-list.json",
-      "response_example": "response-tasks-list.json"
+      "response_example": "response-tasks-list.json",
+      "negative_examples": [
+        "invalid-tasks-page-limit.json",
+        "invalid-retry-tasks-list.json"
+      ]
     },
     {
       "name": "task.get",
       "mutation": false,
       "native_authority_required": true,
       "request_example": "request-task-get.json",
-      "response_example": "response-task-get.json"
+      "response_example": "response-task-get.json",
+      "negative_examples": [
+        "invalid-missing-reread-stop.json",
+        "invalid-retry-task-get.json"
+      ]
     },
     {
       "name": "task.create",
       "mutation": true,
       "native_authority_required": true,
       "request_example": "request-task-create.json",
-      "response_example": "response-task-create.json"
+      "response_example": "response-task-create.json",
+      "negative_examples": [
+        "invalid-profile.json"
+      ]
     },
     {
       "name": "operation.get",
       "mutation": false,
       "native_authority_required": true,
       "request_example": "request-operation-get.json",
-      "response_example": "response-operation-get.json"
+      "response_example": "response-operation-get.json",
+      "negative_examples": [
+        "invalid-operation-substitution.json",
+        "invalid-retry-operation-get.json"
+      ]
     },
     {
       "name": "task.stop",
       "mutation": true,
       "native_authority_required": true,
       "request_example": "request-task-stop.json",
-      "response_example": "response-task-stop.json"
+      "response_example": "response-task-stop.json",
+      "negative_examples": [
+        "invalid-stop-scope-substitution.json"
+      ]
     },
     {
       "name": "review.open",
       "mutation": false,
       "native_authority_required": true,
       "request_example": "request-review-open.json",
-      "response_example": "response-review-open.json"
+      "response_example": "response-review-open.json",
+      "negative_examples": [
+        "invalid-review-content-digest.json",
+        "invalid-retry-review-open.json"
+      ]
     },
     {
       "name": "approval.submit",
       "mutation": true,
       "native_authority_required": true,
       "request_example": "request-approval-submit.json",
-      "response_example": "response-approval-submit.json"
+      "response_example": "response-approval-submit.json",
+      "negative_examples": [
+        "invalid-decision-substitution.json"
+      ]
     },
     {
       "name": "events.subscribe",
       "mutation": false,
       "native_authority_required": true,
       "request_example": "request-events-subscribe.json",
-      "response_example": "response-events-subscribe.json"
+      "response_example": "response-events-subscribe.json",
+      "negative_examples": [
+        "invalid-subscribe-cursor.json",
+        "invalid-retry-events-subscribe.json"
+      ]
     },
     {
       "name": "events.ack",
       "mutation": false,
       "native_authority_required": true,
       "request_example": "request-events-ack.json",
-      "response_example": "response-events-ack.json"
+      "response_example": "response-events-ack.json",
+      "negative_examples": [
+        "invalid-subscription-substitution.json",
+        "invalid-retry-events-ack.json"
+      ]
     },
     {
       "name": "evidence.export",
       "mutation": true,
       "native_authority_required": true,
       "request_example": "request-evidence-export.json",
-      "response_example": "response-evidence-export.json"
+      "response_example": "response-evidence-export.json",
+      "negative_examples": [
+        "invalid-export-path.json"
+      ]
     }
   ]
 }

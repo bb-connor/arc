@@ -14,3 +14,7 @@ The user explicitly authorized specification, planning, commit, push, PR publica
 ## First hosted review repair
 
 Addressed nine distinct findings reported in ten comments across both hosted bots: stop/review reply binding, exact review-content delivery, retained-action plan coverage, a packed-only Git success control, nonblocking special-file evidence handling, reproducible internal-source locators, consistent virtualenv regeneration, a complete lifecycle matrix and profile-identity uniqueness. The coverage audit closed additional concrete implementation omissions in the owning plans. Each hosted comment receives its own disposition after the repair is pushed; final bot approval remains a live current-head PR fact.
+
+## Second hosted review repair
+
+Addressed five additional Codex findings: mandatory per-method negative vectors, intent-compatible retry hints, exact stop scope, descriptor-safe evidence indexing and bounded qualification-object parsing. Both evidence consumers now use the same held-root reader. Local wire review also caught and closed a missing correlation-oracle binding in the validator. The assembled checks and exact extracted helper regressions pass; approval remains tied to the next live hosted review of the pushed commit.

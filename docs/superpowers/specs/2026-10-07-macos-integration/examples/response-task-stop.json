@@ -11,6 +11,7 @@
     "external_outcome": "unresolved",
     "stop_ref": null,
     "durability": "unknown",
-    "task_id": "synthetic-task"
+    "task_id": "synthetic-task",
+    "scope": "task_and_descendants"
   }
 }

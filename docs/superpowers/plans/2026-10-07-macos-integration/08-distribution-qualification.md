@@ -87,7 +87,7 @@ def check_case_set(manifest, cases):
 
 ## Task 2: Safe content-addressed artifact loading and fraud fixtures
 
-**Files:** Create `integrations/macos/qualification/verifier/artifacts.py`, `integrations/macos/qualification/tests/test_artifacts.py`, and `integrations/macos/qualification/tests/fixtures/fraud/`.
+**Files:** Create `integrations/macos/qualification/verifier/artifacts.py`, `integrations/macos/qualification/tests/test_artifacts.py`, and `integrations/macos/qualification/tests/fixtures/fraud/`. Reuse M6's `integrations/macos/qualification/evidence_index.py` reader; do not add a second pathname-based artifact loader.
 
 - [ ] **Step 1: Add failures for random digest-shaped references, traversal, symlinks, duplicate JSON keys, and overlarge inputs.** Use temporary directories and `hashlib.sha256` over actual bytes. Tests must verify the artifact root's outside sentinel is unchanged.
 
@@ -99,8 +99,20 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
+from unittest.mock import patch
 from verifier.artifacts import load_artifact, parse_object
+
+@contextmanager
+def fixture_root(path):
+    # Only a controlled temporary fixture: production custody comes from M6.
+    fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    try:
+        info = os.fstat(fd)
+        yield fd, (info.st_dev, info.st_ino)
+    finally:
+        os.close(fd)
 
 class ArtifactTests(unittest.TestCase):
     def test_bytes_not_digest_shape_establish_integrity(self):
@@ -108,61 +120,362 @@ class ArtifactTests(unittest.TestCase):
             root = Path(directory)
             digest = hashlib.sha256(b"valid").hexdigest()
             (root / digest).write_bytes(b"tampered")
-            with self.assertRaisesRegex(ValueError, "digest_mismatch"):
-                load_artifact(root, digest)
+            with fixture_root(root) as custody:
+                with self.assertRaisesRegex(ValueError, "invalid_artifact"):
+                    load_artifact(*custody, digest)
 
-    def test_duplicate_keys_fail(self):
-        with self.assertRaisesRegex(ValueError, "duplicate_key"):
-            parse_object(b'{"result":"fail","result":"pass"}')
+    def test_root_replacement_cannot_select_new_artifacts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory)
+            root = parent / 'artifacts'
+            root.mkdir()
+            payload = b'{"synthetic":true,"status":"candidate"}'
+            digest = hashlib.sha256(payload).hexdigest()
+            (root / digest).write_bytes(payload)
+            with fixture_root(root) as custody:
+                root.rename(parent / 'held-root')
+                root.mkdir()
+                (root / digest).write_bytes(b'tampered replacement')
+                self.assertEqual(load_artifact(*custody, digest, json_object=True),
+                                 {"synthetic": True, "status": "candidate"})
+                (root / digest).write_bytes(payload)
+                with fixture_root(root) as substituted:
+                    with self.assertRaisesRegex(ValueError, 'invalid_artifact'):
+                        load_artifact(substituted[0], custody[1], digest)
+
+    def test_reference_shape_empty_artifact_and_absent_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            digest = hashlib.sha256(b'').hexdigest()
+            (root / digest).write_bytes(b'')
+            with fixture_root(root) as custody:
+                self.assertEqual(load_artifact(*custody, digest), b'')
+                for invalid in ('../outside', 'a' * 63, None):
+                    with self.assertRaisesRegex(ValueError, 'invalid_digest'):
+                        load_artifact(*custody, invalid)
+                with self.assertRaisesRegex(ValueError, 'invalid_artifact'):
+                    load_artifact(*custody, '0' * 64)
+
+    def assert_rejected_before_decoder(self, payload, reason):
+        with patch('verifier.artifacts.json.loads',
+                   side_effect=AssertionError('full_decoder_was_called')) as decoder:
+            with self.assertRaisesRegex(ValueError, reason):
+                parse_object(payload)
+            decoder.assert_not_called()
+
+    def test_duplicate_decoded_keys_fail_before_decoder(self):
+        for payload in (b'{"result":0,"result":1}',
+                        b'{"key":0,"\\u006bey":1}',
+                        '{"😀":0,"\\ud83d\\ude00":1}'.encode('utf-8')):
+            self.assert_rejected_before_decoder(payload, 'duplicate_key')
+
+    def test_depth_is_bounded_before_decoder(self):
+        payload = b'{"x":' + b'[' * 33 + b'0' + b']' * 33 + b'}'
+        self.assert_rejected_before_decoder(payload, 'depth_budget')
+
+    def test_container_fanout_is_bounded_before_decoder(self):
+        payload = b'{"x":[' + b'[],' * 4096 + b'[]]}'
+        self.assert_rejected_before_decoder(payload, 'container_budget')
+
+    def test_token_and_scalar_budgets_precede_decoder(self):
+        payload = b'{"x":[0,1,2,3,4,5,6,7,8,9]}'
+        with patch('verifier.artifacts.MAX_JSON_TOKENS', 12):
+            self.assert_rejected_before_decoder(payload, 'token_budget')
+        with patch('verifier.artifacts.MAX_JSON_SCALARS', 4):
+            self.assert_rejected_before_decoder(payload, 'scalar_budget')
+        wide = b'{"x":[' + b'0,' * 32768 + b'0]}'
+        self.assert_rejected_before_decoder(wide, '(token|scalar)_budget')
+
+    def test_escaped_string_and_key_budgets_precede_decoder(self):
+        escaped = b'{"x":"' + b'\\u0061' * 11000 + b'"}'
+        self.assert_rejected_before_decoder(escaped, 'string_budget')
+        key = b'{"' + b'a' * 257 + b'":0}'
+        self.assert_rejected_before_decoder(key, 'key_budget')
+
+    def test_invalid_unicode_escapes_and_utf8_precede_decoder(self):
+        for payload in (b'{"x":"\\ud800"}', b'{"x":"\\udc00"}',
+                        b'{"x":"\\ud800\\u0041"}'):
+            self.assert_rejected_before_decoder(payload, 'unpaired_surrogate')
+        self.assert_rejected_before_decoder(b'{"x":"\\u12xz"}', 'invalid_unicode_escape')
+        self.assert_rejected_before_decoder(b'{"x":"\\q"}', 'invalid_escape')
+        self.assert_rejected_before_decoder(b'{"x":"\xed\xa0\x80"}', 'invalid_utf8')
+
+    def test_unsafe_numbers_precede_decoder(self):
+        for number in (b'9007199254740992', b'-9007199254740992', b'1.0',
+                       b'1e3', b'-0', b'01', b'9' * 10000):
+            self.assert_rejected_before_decoder(b'{"n":' + number + b'}', 'unsafe_number')
+        for number in (b'NaN', b'Infinity', b'-Infinity'):
+            self.assert_rejected_before_decoder(b'{"n":' + number + b'}',
+                                                '(unsafe_number|invalid_json_token)')
+
+    def test_byte_budget_and_invalid_grammar_precede_decoder(self):
+        self.assert_rejected_before_decoder(b' ' * (1024 * 1024 + 1), 'json_byte_budget')
+        for payload in (b'{"a":}', b'{"a":1,}', b'{"a":[0,]}',
+                        b'{"a":1}{}', b'{"a":truex}', b'{"a" 1}'):
+            self.assert_rejected_before_decoder(payload,
+                '(invalid_json_token|object_key_required|trailing_json|comma_or_end_required|colon_required)')
+
+    def test_valid_escaped_control_materializes_once(self):
+        expected = {"text": '[]{}:"\\\n', "emoji": '😀',
+                    "nested": [{"enabled": True, "empty": None}],
+                    "safe": 9007199254740991, "minimum": -9007199254740991}
+        payload = json.dumps(expected, ensure_ascii=True).encode('utf-8')
+        with patch('verifier.artifacts.json.loads', wraps=json.loads) as decoder:
+            self.assertEqual(parse_object(payload), expected)
+            decoder.assert_called_once()
+
+    def test_artifact_json_budget_is_distinct_from_wire_limit(self):
+        expected = {"first": "x" * 40000, "second": "y" * 40000}
+        payload = json.dumps(expected).encode('utf-8')
+        self.assertGreater(len(payload), 65536)
+        self.assertEqual(parse_object(payload), expected)
+
+    def test_real_candidate_fixture_is_bounded_and_decoded_once(self):
+        source = Path('docs/superpowers/specs/2026-10-07-macos-integration/examples/release-candidate.json')
+        with source.open('rb') as stream:
+            payload = stream.read(1024 * 1024 + 1)
+        expected = json.loads(payload)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            digest = hashlib.sha256(payload).hexdigest()
+            (root / digest).write_bytes(payload)
+            with fixture_root(root) as custody:
+                with patch('verifier.artifacts.json.loads', wraps=json.loads) as decoder:
+                    self.assertEqual(load_artifact(*custody, digest, json_object=True), expected)
+                    decoder.assert_called_once()
+
+    def test_json_artifact_byte_limit_applies_before_read_or_decode(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            payload = b' ' * (1024 * 1024 + 1)
+            digest = hashlib.sha256(payload).hexdigest()
+            (root / digest).write_bytes(payload)
+            with fixture_root(root) as custody:
+                with patch('evidence_index.os.read', side_effect=AssertionError('read oversized object')):
+                    with patch('verifier.artifacts.json.loads', side_effect=AssertionError('decoder called')):
+                        with self.assertRaisesRegex(ValueError, 'invalid_artifact'):
+                            load_artifact(*custody, digest, json_object=True)
 
     def test_fifo_is_rejected_without_waiting_for_a_writer(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             digest = hashlib.sha256(b"fifo-fixture").hexdigest()
             os.mkfifo(root / digest)
-            result = subprocess.run(
-                [sys.executable, "-c",
-                 "import sys; from pathlib import Path; "
-                 "from verifier.artifacts import load_artifact; "
-                 "load_artifact(Path(sys.argv[1]), sys.argv[2])",
-                 str(root), digest],
-                capture_output=True, text=True, timeout=1,
-            )
+            with fixture_root(root) as (fd, identity):
+                result = subprocess.run(
+                    [sys.executable, "-c",
+                     "import sys; from verifier.artifacts import load_artifact; "
+                     "load_artifact(int(sys.argv[1]), (int(sys.argv[2]), int(sys.argv[3])), sys.argv[4])",
+                     str(fd), str(identity[0]), str(identity[1]), digest],
+                    pass_fds=(fd,), capture_output=True, text=True, timeout=1,
+                )
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("invalid_artifact_size_or_type", result.stderr)
+            self.assertIn("invalid_artifact", result.stderr)
 ```
 
 - [ ] **Step 2: Run** `PYTHONPATH=integrations/macos/qualification python3 -m unittest discover -s integrations/macos/qualification/tests -p test_artifacts.py -v`. Expected: missing-module failure.
-- [ ] **Step 3: Implement bounded loading with no symbolic-link following.** Artifact names are SHA-256 hex, not relative paths supplied by test data. Open with `O_NONBLOCK` before inspecting type so a FIFO cannot block the verifier before `fstat`. Reject every nonregular node before reading. Add bounded actual FIFO-without-writer, directory, Unix-socket, symlink, and disposable character-device fixtures; each must refuse within one second with no read attempted. Keep the artifact directory immutable during verification; later signed observer transport writes to staging before atomically publishing objects.
+- [ ] **Step 3: Implement bounded loading with no symbolic-link following.** Artifact names are SHA-256 hex, not relative paths supplied by test data. Open with `O_NONBLOCK` before inspecting type so a FIFO cannot block the verifier before `fstat`. Reject every nonregular node before reading. Add bounded actual FIFO-without-writer, directory, Unix-socket, symlink, and disposable character-device fixtures; each must refuse within one second with no read attempted. Reuse M6 `read_verified_file(root_fd, root_identity, relative, expected_digest, max_bytes)` and parse exactly its returned bytes; no pathname reopen is permitted. The authenticated artifact owner supplies a held immutable-root descriptor and separately pinned `(st_dev, st_ino)`, never a candidate-selected root identity. Retain custody through validation/export, with the same M6 private local-root, no untrusted writer/writable alias/hard-link ingress/mount substitution preconditions and fail-closed platform support. A CLI path is only a locator checked against that custody; opening an untrusted path and trusting the identity just observed cannot establish it. Stage signed observer objects separately, then freeze the published root before verification. Prove held-root pathname replacement preserves the original bytes and a byte-identical replacement root with the old identity refuses.
 
 ```python
-import hashlib
 import json
-import os
 import re
-import stat
+from evidence_index import read_verified_file
 
 LIMIT = 16 * 1024 * 1024
+MAX_JSON_BYTES = 1024 * 1024
+MAX_JSON_DEPTH = 32
+MAX_JSON_CONTAINERS = 4096
+MAX_JSON_TOKENS = 65536
+MAX_JSON_SCALARS = 32768
+MAX_STRING_TOKEN_CHARS = 65536
+MAX_KEY_CHARS = 256
+MAX_SAFE_INTEGER = (1 << 53) - 1
 
-def load_artifact(root, digest):
-    if re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+
+def load_artifact(root_fd, root_identity, digest, *, json_object=False):
+    if type(digest) is not str or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
         raise ValueError("invalid_digest")
-    fd = os.open(root / digest, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    limit = MAX_JSON_BYTES if json_object else LIMIT
+    data = read_verified_file(root_fd, root_identity, digest, digest, limit)
+    if data is None:
+        raise ValueError("invalid_artifact")
+    return parse_object(data) if json_object else data
+
+
+def _string(text, start):
+    index = start + 1
+    output = []
+    escapes = {'"': '"', '\\': '\\', '/': '/', 'b': '\b',
+               'f': '\f', 'n': '\n', 'r': '\r', 't': '\t'}
+    while index < len(text):
+        if index - start > MAX_STRING_TOKEN_CHARS:
+            raise ValueError("string_budget")
+        char = text[index]
+        index += 1
+        if index - start > MAX_STRING_TOKEN_CHARS:
+            raise ValueError("string_budget")
+        if char == '"':
+            return ''.join(output), index
+        if ord(char) < 0x20:
+            raise ValueError("string_control_character")
+        if char != '\\':
+            output.append(char)
+            continue
+        if index >= len(text):
+            raise ValueError("invalid_escape")
+        escape = text[index]
+        index += 1
+        if escape in escapes:
+            output.append(escapes[escape])
+        elif escape == 'u':
+            digits = text[index:index + 4]
+            if len(digits) != 4 or re.fullmatch(r"[0-9a-fA-F]{4}", digits) is None:
+                raise ValueError("invalid_unicode_escape")
+            code = int(digits, 16)
+            index += 4
+            if 0xD800 <= code <= 0xDBFF:
+                if text[index:index + 2] != '\\u':
+                    raise ValueError("unpaired_surrogate")
+                low_digits = text[index + 2:index + 6]
+                if len(low_digits) != 4 or re.fullmatch(r"[0-9a-fA-F]{4}", low_digits) is None:
+                    raise ValueError("invalid_unicode_escape")
+                low = int(low_digits, 16)
+                if not 0xDC00 <= low <= 0xDFFF:
+                    raise ValueError("unpaired_surrogate")
+                code = 0x10000 + ((code - 0xD800) << 10) + low - 0xDC00
+                index += 6
+            elif 0xDC00 <= code <= 0xDFFF:
+                raise ValueError("unpaired_surrogate")
+            output.append(chr(code))
+        else:
+            raise ValueError("invalid_escape")
+        if index - start > MAX_STRING_TOKEN_CHARS:
+            raise ValueError("string_budget")
+    raise ValueError("unterminated_string")
+
+
+def _safe_integer(token):
+    if len(token) > 17 or re.fullmatch(r"(?:0|[1-9][0-9]*|-[1-9][0-9]*)", token) is None:
+        raise ValueError("unsafe_number")
+    value = int(token)
+    if abs(value) > MAX_SAFE_INTEGER:
+        raise ValueError("unsafe_number")
+    return value
+
+
+def preflight_object(data):
+    if not isinstance(data, bytes) or len(data) > MAX_JSON_BYTES:
+        raise ValueError("json_byte_budget")
     try:
-        info = os.fstat(fd)
-        if not stat.S_ISREG(info.st_mode) or info.st_size > LIMIT:
-            raise ValueError("invalid_artifact_size_or_type")
-        with os.fdopen(fd, "rb", closefd=False) as stream:
-            data = stream.read(LIMIT + 1)
-        if len(data) > LIMIT:
-            raise ValueError("oversized_artifact")
-    finally:
-        os.close(fd)
-    if hashlib.sha256(data).hexdigest() != digest:
-        raise ValueError("digest_mismatch")
-    return data
+        text = data.decode('utf-8', errors='strict')
+    except UnicodeDecodeError as error:
+        raise ValueError("invalid_utf8") from error
+    stack = []
+    index = 0
+    done = False
+    containers = tokens = scalars = 0
+
+    def token(scalar=False):
+        nonlocal tokens, scalars
+        tokens += 1
+        scalars += int(scalar)
+        if tokens > MAX_JSON_TOKENS:
+            raise ValueError("token_budget")
+        if scalars > MAX_JSON_SCALARS:
+            raise ValueError("scalar_budget")
+
+    while True:
+        while index < len(text) and text[index] in ' \t\r\n':
+            index += 1
+        if index == len(text):
+            if stack or not done:
+                raise ValueError("incomplete_json")
+            return text
+        char = text[index]
+        if not stack:
+            if done:
+                raise ValueError("trailing_json")
+            if char != '{':
+                raise ValueError("object_required")
+        else:
+            frame = stack[-1]
+            state = frame['state']
+            closing = '}' if frame['kind'] == '{' else ']'
+            if state in ('key_or_end', 'first_or_end') and char == closing:
+                token()
+                stack.pop()
+                index += 1
+                continue
+            if state in ('key_or_end', 'key'):
+                if char != '"':
+                    raise ValueError("object_key_required")
+                token(scalar=True)
+                key, index = _string(text, index)
+                if len(key) > MAX_KEY_CHARS:
+                    raise ValueError("key_budget")
+                if key in frame['keys']:
+                    raise ValueError("duplicate_key")
+                frame['keys'].add(key)
+                frame['state'] = 'colon'
+                continue
+            if state == 'colon':
+                if char != ':':
+                    raise ValueError("colon_required")
+                token()
+                index += 1
+                frame['state'] = 'value'
+                continue
+            if state == 'comma_or_end':
+                if char == closing:
+                    token()
+                    stack.pop()
+                    index += 1
+                    continue
+                if char != ',':
+                    raise ValueError("comma_or_end_required")
+                token()
+                index += 1
+                frame['state'] = 'key' if frame['kind'] == '{' else 'value'
+                continue
+
+        if char in '{[':
+            token()
+            containers += 1
+            if len(stack) + 1 > MAX_JSON_DEPTH:
+                raise ValueError("depth_budget")
+            if containers > MAX_JSON_CONTAINERS:
+                raise ValueError("container_budget")
+            if stack:
+                stack[-1]['state'] = 'comma_or_end'
+            else:
+                done = True
+            stack.append({'kind': char,
+                          'state': 'key_or_end' if char == '{' else 'first_or_end',
+                          'keys': set() if char == '{' else None})
+            index += 1
+            continue
+
+        token(scalar=True)
+        if char == '"':
+            _, index = _string(text, index)
+        elif any(text.startswith(word, index) for word in ('true', 'false', 'null')):
+            word = next(word for word in ('true', 'false', 'null') if text.startswith(word, index))
+            index += len(word)
+        elif char in '-0123456789':
+            start = index
+            while index < len(text) and text[index] not in ' \t\r\n,]}':
+                index += 1
+                if index - start > 17:
+                    raise ValueError("unsafe_number")
+            _safe_integer(text[start:index])
+        else:
+            raise ValueError("invalid_json_token")
+        stack[-1]['state'] = 'comma_or_end'
+
 
 def parse_object(data):
+    text = preflight_object(data)
+
     def pairs(items):
         result = {}
         for key, value in items:
@@ -170,13 +483,20 @@ def parse_object(data):
                 raise ValueError("duplicate_key")
             result[key] = value
         return result
-    def invalid_constant(value):
-        raise ValueError("nonfinite_json_constant")
-    value = json.loads(data, object_pairs_hook=pairs, parse_constant=invalid_constant)
+
+    def invalid_number(value):
+        raise ValueError("unsafe_number")
+
+    value = json.loads(text, object_pairs_hook=pairs, parse_int=_safe_integer,
+                       parse_float=invalid_number, parse_constant=invalid_number)
     if not isinstance(value, dict):
         raise ValueError("object_required")
     return value
 ```
+
+- [ ] **Step 3a: Apply a bounded lexical preflight before JSON materialization.** Enforce 1 MiB of UTF-8 bytes, 32 container levels, 4,096 total containers, 65,536 lexical tokens including punctuation, 32,768 scalars including keys, 65,536 source characters per quoted string token including escapes/delimiters, and 256 decoded characters per key. The iterative preflight rejects invalid grammar, decoded duplicate keys, invalid UTF-8, unpaired surrogates, and unsafe numbers before `json.loads`; its string decoder and key sets have those same fixed bounds. Materialize only after preflight succeeds. These structured-evidence limits are separate from the 16 MiB opaque artifact ceiling and the operator wire's 64 KiB envelope ceiling; neither evidence limit expands IPC. Call `load_artifact(..., json_object=True)` for candidates, manifests, observer objects, and other structured inputs so the 1 MiB bound applies before reading, then parse the exact digest-verified bytes. Do not use unbounded `read_bytes()` followed by a length check. Large raw traces stay bounded opaque digest references or use schema-defined chunks.
+- [ ] **Step 3b: Publish the evidence number contract to producers and consumers.** Evidence JSON accepts only canonical integers in `[-9007199254740991, 9007199254740991]`; reject floating-point/exponent tokens, negative zero, oversized integers, NaN, and Infinity before materialization. Encode durations, sizes, counts, and energy in declared fixed integer units such as nanoseconds, bytes, and microjoules; represent values that require more precision only as schema-defined bounded decimal strings with explicit units/scale and independently validated grammar/range. Do not silently round, coerce strings to floats, or accept arbitrary numeric strings. Update observer schemas, serializers, and verifier predicates together, including performance/uncertainty fields and native generations that already use decimal strings. This evidence format does not alter the separately specified wire numeric profile.
+- [ ] **Step 3c: Prove refusal occurs before the full decoder.** Patch `json.loads` with a failing sentinel for over-depth, over-container, token/scalar fanout, escape-heavy string/key, duplicate decoded key, invalid Unicode, unsafe number, and oversize inputs; assert it was never called. Retain positive escaped/nested controls and the actual synthetic `release-candidate.json` fixture, proving one materialization of digest-verified bytes. Run the test process with a 20-second outer deadline, retain the one-second actual FIFO regression, and fail the implementation gate on timeout or unexpected decoder entry. These are parser/custody component tests and issue no installed qualification.
 
 - [ ] **Step 4: Add schema-valid fraud candidates.** Create separate complete fixtures for absent artifacts, wrong source/installed correspondence, duplicated cases, untrusted manifest, synthetic release attempt, wrong observer, and stale restore reference. Preserve `status=candidate`; never create a fixture falsely presented as an installed qualification report. Tests assert shape acceptance where expected and semantic rejection independently.
 - [ ] **Step 5: Run the artifact tests and all applicability tests.** Expected: each negative names a specific failure; no fixture ever causes a qualification artifact to be emitted.
@@ -470,7 +790,7 @@ def derive_case_result(case, trusted_expected, authenticated_observed):
     )
 ```
 
-- [ ] **Step 4: Define CLI arguments `--candidate`, `--artifact-root`, `--trusted-release-policy`, `--mode component|release`, and `--output`.** External trusted policy pins accepted verifier/native proof contract, approved manifest, trust roots, observer contracts, and freshness. The candidate's `verifier` entry is compared with that policy; it cannot select policy. Safe loading and schema validation precede semantics; release mode refuses fabricated/synthetic-envelope evidence and missing native API. Output the separate verified qualification report only after every required candidate-evidence gate passes; the manifest's distinct final production-confirmation gate remains necessary for release approval.
+- [ ] **Step 4: Define CLI arguments `--candidate`, `--artifact-root`, `--trusted-release-policy`, `--mode component|release`, and `--output`.** External trusted policy pins accepted verifier/native proof contract, approved manifest, trust roots, observer contracts, and freshness. The candidate's `verifier` entry is compared with that policy; it cannot select policy. Safe loading and schema validation precede semantics; release mode refuses fabricated/synthetic-envelope evidence and missing native API. The authenticated lab wrapper supplies M6 root custody separately from `--artifact-root`; require that locator to match the held root and use Task 2's shared descriptor reader and preflight for candidate, manifest, policy, and observer JSON. The trusted policy itself is provisioned by the external authority, not selected by the candidate; every input acquisition has a byte bound before materialization. Output the separate verified qualification report only after every required candidate-evidence gate passes; the manifest's distinct final production-confirmation gate remains necessary for release approval.
 - [ ] **Step 5: Bind native compatibility to a verified report reference.** Use the M2/M6 native evidence import/verification path to derive `qualified_for_tuple`; do not let the app set it from a local report Boolean. The report binds candidate/manifest digests, exact tuple, verifier/trust identities, case verdicts, claim exclusions, and invalidation rules. Missing required native import contract remains a prerequisite, not a new app signer. Initial probe execution never sets this state. Retain the immutable report for the ordinary production-admission confirmation in Task 12.
 - [ ] **Step 6: Run** `PYTHONPATH=integrations/macos/qualification python3 -m unittest discover -s integrations/macos/qualification/tests -p test_semantic_verifier.py -v`. Then run `python3 -m verifier.main --candidate output/macos-qualification/candidate.json --artifact-root output/macos-qualification/artifacts --trusted-release-policy integrations/macos/qualification/manifests/trusted-release-policy.json --mode release --output output/macos-qualification/verified.json` with `PYTHONPATH=integrations/macos/qualification` set by the lab command wrapper. Expected: release rejection until authentic installed evidence and externally provisioned trust policy exist. Commit with `feat(macos): independently verify profile qualification`.
 

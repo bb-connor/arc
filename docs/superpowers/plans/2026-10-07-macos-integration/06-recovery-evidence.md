@@ -298,75 +298,298 @@ privacy: authenticated read boundary, separate redaction manifest,
          digest of each retained original and each redacted derivative
 ```
 
-- [ ] Create `evidence_index.py` with this complete file integrity helper. It checks package shape/content hashes only; native cryptographic and effect verifiers remain mandatory.
+- [ ] Create `evidence_index.py` with this complete descriptor-relative file integrity helper. It checks package shape/content hashes only; native cryptographic and effect verifiers remain mandatory. The authenticated artifact owner supplies a held root-directory descriptor and its separately pinned `(st_dev, st_ino)` identity from trusted enrollment. Keep that descriptor alive for the whole validation; neither the bundle nor a newly resolved pathname chooses the identity. Reject unavailable no-follow/descriptor-relative primitives rather than weakening traversal.
+
+The caller owns a private, immutable local artifact store with no untrusted writers, writable aliases, hard-link ingress or mount substitution. If this custody cannot be established, refuse verification. The helper duplicates the enrolled descriptor, opens every path component relative to a held descriptor without following symlinks, refuses other filesystems and non-regular leaves, and hashes the same bounded opened leaf. Renaming an already opened directory preserves its object identity; it does not enroll a replacement at the old pathname. Metadata rechecks detect ordinary mutation but do not prove a coherent snapshot of maliciously mutable files. Qualification must retain the artifact-store custody evidence separately. `read_verified_file` returns those exact verified bytes or `None`; M8 must parse the returned bytes, never verify then reopen a pathname. `verify_file` is only its Boolean convenience wrapper.
 
 ```python
 import hashlib
-from pathlib import Path
+import os
+import stat
+from contextlib import ExitStack
 
-def verify_file(root, relative, expected_digest, max_bytes):
-    if type(max_bytes) is not int or max_bytes < 1:
-        return False
-    root = Path(root).resolve(strict=True)
-    candidate = root / relative
-    if candidate.is_symlink():
-        return False
+_REQUIRED_FLAGS = ("O_DIRECTORY", "O_NOFOLLOW", "O_NONBLOCK", "O_CLOEXEC")
+_SUPPORTED = (all(hasattr(os, flag) for flag in _REQUIRED_FLAGS)
+              and os.open in os.supports_dir_fd)
+
+def read_verified_file(root_fd, root_identity, relative, expected_digest, max_bytes):
+    if (not _SUPPORTED or type(root_fd) is not int or root_fd < 0
+            or type(max_bytes) is not int or max_bytes < 1
+            or type(root_identity) is not tuple or len(root_identity) != 2
+            or any(type(part) is not int or part < 0 for part in root_identity)
+            or type(relative) is not str or "\0" in relative
+            or type(expected_digest) is not str or len(expected_digest) != 64
+            or any(char not in "0123456789abcdef" for char in expected_digest)):
+        return None
+    parts = relative.split("/")
+    if len(parts) > 32 or any(part in ("", ".", "..") for part in parts):
+        return None
     try:
-        path = candidate.resolve(strict=True)
-        path.relative_to(root)
-        if not path.is_file():
-            return False
-        hasher = hashlib.sha256()
-        size = 0
-        with path.open("rb") as stream:
-            while chunk := stream.read(min(65536, max_bytes - size + 1)):
+        if len(relative.encode("utf-8")) > 4096:
+            return None
+        flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC
+        with ExitStack() as opened:
+            # Borrow caller-held custody; never reopen a root pathname.
+            directory_fd = os.dup(root_fd)
+            opened.callback(os.close, directory_fd)
+            root_stat = os.fstat(directory_fd)
+            if (not stat.S_ISDIR(root_stat.st_mode)
+                    or (root_stat.st_dev, root_stat.st_ino) != root_identity):
+                return None
+            for part in parts[:-1]:
+                directory_fd = os.open(part, flags | os.O_DIRECTORY,
+                                       dir_fd=directory_fd)
+                opened.callback(os.close, directory_fd)
+                directory_stat = os.fstat(directory_fd)
+                if (not stat.S_ISDIR(directory_stat.st_mode)
+                        or directory_stat.st_dev != root_identity[0]):
+                    return None
+            artifact_fd = os.open(parts[-1], flags, dir_fd=directory_fd)
+            opened.callback(os.close, artifact_fd)
+            before = os.fstat(artifact_fd)
+            if (not stat.S_ISREG(before.st_mode)
+                    or before.st_dev != root_identity[0]
+                    or before.st_size < 0 or before.st_size > max_bytes):
+                return None
+            hasher = hashlib.sha256()
+            size = 0
+            chunks = []
+            while True:
+                chunk = os.read(artifact_fd, min(65536, max_bytes - size + 1))
+                if not chunk:
+                    break
                 size += len(chunk)
                 if size > max_bytes:
-                    return False
+                    return None
                 hasher.update(chunk)
-        digest = hasher.hexdigest()
-    except (OSError, ValueError):
-        return False
-    return digest == expected_digest
+                chunks.append(chunk)
+            after = os.fstat(artifact_fd)
+            fields = ("st_dev", "st_ino", "st_size", "st_mtime_ns", "st_ctime_ns")
+            if (size != before.st_size
+                    or any(getattr(before, field) != getattr(after, field)
+                           for field in fields)):
+                return None
+            if hasher.hexdigest() != expected_digest:
+                return None
+            return b"".join(chunks)
+    except (OSError, ValueError, UnicodeError):
+        return None
+
+def verify_file(root_fd, root_identity, relative, expected_digest, max_bytes):
+    return read_verified_file(root_fd, root_identity, relative,
+                              expected_digest, max_bytes) is not None
 ```
 
-- [ ] Create `test_evidence_index.py` with the following complete test. The production `max_bytes` argument is the selected M8/privacy artifact bound; the test uses 32 bytes to exercise the same refusal cheaply.
+- [ ] Create `test_evidence_index.py` with these complete regressions. The production `max_bytes` is the selected M8/privacy artifact bound; tests use 32 bytes. Inject actual final/directory swaps at open/read boundaries, retain an outside-file identity guard at the read syscall, substitute a FIFO with no writer, reject `/dev/null` before any read, and replace the root pathname while retaining its original descriptor. A separately opened replacement root must fail even if its regular-file bytes match.
 
 ```python
 import hashlib
 import importlib.util
+import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 MODULE = Path(__file__).parents[1] / "qualification/evidence_index.py"
 spec = importlib.util.spec_from_file_location("evidence_index", MODULE)
 index = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(index)
 
+def identity(fd):
+    value = os.fstat(fd)
+    return value.st_dev, value.st_ino
+
 class EvidenceIndexTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.base = Path(temporary.name)
+        self.root = self.base / "root"
+        self.root.mkdir()
+        self.content = b"native-original"
+        self.digest = hashlib.sha256(self.content).hexdigest()
+        self.original = self.root / "receipt.json"
+        self.original.write_bytes(self.content)
+        self.outside = self.base / "outside"
+        self.outside.mkdir()
+        self.canary = self.outside / "receipt.json"
+        self.canary.write_bytes(b"outside-canary-secret")
+        canary_stat = self.canary.stat()
+        self.canary_identity = canary_stat.st_dev, canary_stat.st_ino
+        self.root_fd = os.open(self.root, os.O_RDONLY | os.O_DIRECTORY
+                               | os.O_NOFOLLOW | os.O_CLOEXEC)
+        self.addCleanup(os.close, self.root_fd)
+        self.root_identity = identity(self.root_fd)
+        self.read_bytes = 0
+        actual_read = os.read
+        def guarded_read(fd, count):
+            self.assertNotEqual(identity(fd), self.canary_identity,
+                                "outside canary reached the read syscall")
+            result = actual_read(fd, count)
+            self.read_bytes += len(result)
+            return result
+        guard = patch.object(index.os, "read", side_effect=guarded_read)
+        guard.start()
+        self.addCleanup(guard.stop)
+
+    def verify(self, relative="receipt.json", digest=None):
+        return index.verify_file(self.root_fd, self.root_identity, relative,
+                                 self.digest if digest is None else digest, 32)
+
     def test_original_tamper_path_and_bound(self):
-        content = b"native-original"
-        digest = hashlib.sha256(content).hexdigest()
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            original = root / "receipt.json"
-            original.write_bytes(content)
-            self.assertTrue(index.verify_file(root, "receipt.json", digest, 32))
-            (root / "link.json").symlink_to(original)
-            self.assertFalse(index.verify_file(root, "link.json", digest, 32))
-            self.assertFalse(index.verify_file(root, "../outside", digest, 32))
-            original.write_bytes(b"changed")
-            self.assertFalse(index.verify_file(root, "receipt.json", digest, 32))
-            original.write_bytes(b"x" * 33)
-            large_digest = hashlib.sha256(b"x" * 33).hexdigest()
-            self.assertFalse(index.verify_file(root, "receipt.json", large_digest, 32))
+        self.assertTrue(self.verify())
+        self.assertEqual(index.read_verified_file(self.root_fd, self.root_identity,
+                         "receipt.json", self.digest, 32), self.content)
+        (self.root / "empty.json").write_bytes(b"")
+        self.assertEqual(index.read_verified_file(self.root_fd, self.root_identity,
+                         "empty.json", hashlib.sha256(b"").hexdigest(), 32), b"")
+        (self.root / "nested").mkdir()
+        (self.root / "nested/receipt.json").write_bytes(self.content)
+        self.assertTrue(self.verify("nested/receipt.json"))
+        for relative in ("", "/receipt.json", "../outside/receipt.json",
+                         "nested/../receipt.json", "nested//receipt.json",
+                         "./receipt.json", "receipt.json\0"):
+            self.assertFalse(self.verify(relative))
+        self.original.write_bytes(b"changed")
+        self.assertFalse(self.verify())
+        self.original.write_bytes(b"x" * 33)
+        self.read_bytes = 0
+        self.assertFalse(self.verify(digest=hashlib.sha256(b"x" * 33).hexdigest()))
+        self.assertEqual(self.read_bytes, 0)
+        self.assertFalse(index.verify_file(self.root_fd, self.root_identity,
+                                          "receipt.json", self.digest, True))
+
+    def test_final_component_swap_before_open_refuses_without_canary_read(self):
+        actual_open = os.open
+        def racing_open(name, flags, *args, **kwargs):
+            if name == "receipt.json":
+                self.original.unlink()
+                self.original.symlink_to(self.canary)
+            return actual_open(name, flags, *args, **kwargs)
+        with patch.object(index.os, "open", side_effect=racing_open):
+            self.assertFalse(self.verify())
+        self.assertEqual(self.read_bytes, 0)
+
+    def test_directory_swap_before_open_refuses_without_canary_read(self):
+        nested = self.root / "nested"
+        nested.mkdir()
+        (nested / "receipt.json").write_bytes(self.content)
+        actual_open = os.open
+        def racing_open(name, flags, *args, **kwargs):
+            if name == "nested":
+                nested.rename(self.root / "retained")
+                nested.symlink_to(self.outside, target_is_directory=True)
+            return actual_open(name, flags, *args, **kwargs)
+        with patch.object(index.os, "open", side_effect=racing_open):
+            self.assertFalse(self.verify("nested/receipt.json"))
+        self.assertEqual(self.read_bytes, 0)
+
+    def test_directory_swap_after_open_retains_pinned_directory(self):
+        nested = self.root / "nested"
+        nested.mkdir()
+        (nested / "receipt.json").write_bytes(self.content)
+        actual_open = os.open
+        def racing_open(name, flags, *args, **kwargs):
+            fd = actual_open(name, flags, *args, **kwargs)
+            if name == "nested":
+                nested.rename(self.root / "retained")
+                nested.symlink_to(self.outside, target_is_directory=True)
+            return fd
+        with patch.object(index.os, "open", side_effect=racing_open):
+            self.assertTrue(self.verify("nested/receipt.json"))
+        self.assertEqual(self.read_bytes, len(self.content))
+
+    def test_final_swap_after_open_never_reopens_path(self):
+        guarded_read = index.os.read
+        swapped = False
+        def racing_read(fd, count):
+            nonlocal swapped
+            if not swapped:
+                swapped = True
+                self.original.unlink()
+                self.original.symlink_to(self.canary)
+            return guarded_read(fd, count)
+        canary_digest = hashlib.sha256(b"outside-canary-secret").hexdigest()
+        with patch.object(index.os, "read", side_effect=racing_read):
+            self.assertFalse(self.verify(digest=canary_digest))
+        self.assertTrue(swapped)
+        self.assertEqual(self.read_bytes, len(self.content))
+
+    def test_fifo_swap_before_open_never_blocks_or_reads(self):
+        actual_open = os.open
+        def racing_open(name, flags, *args, **kwargs):
+            if name == "receipt.json":
+                self.original.unlink()
+                os.mkfifo(self.original)
+            return actual_open(name, flags, *args, **kwargs)
+        with patch.object(index.os, "open", side_effect=racing_open):
+            self.assertFalse(self.verify())
+        self.assertEqual(self.read_bytes, 0)
+
+    def test_device_refuses_before_read(self):
+        fd = os.open("/dev", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try:
+            with patch.object(index.os, "read",
+                              side_effect=AssertionError("device was read")):
+                self.assertFalse(index.verify_file(fd, identity(fd), "null",
+                                                  hashlib.sha256(b"").hexdigest(), 32))
+        finally:
+            os.close(fd)
+
+    def test_root_path_swap_cannot_change_authenticated_descriptor(self):
+        self.root.rename(self.base / "retained-root")
+        self.root.mkdir()
+        (self.root / "receipt.json").symlink_to(self.canary)
+        self.assertTrue(self.verify())
+        (self.root / "receipt.json").unlink()
+        (self.root / "receipt.json").write_bytes(self.content)
+        replacement = os.open(self.root, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            self.assertFalse(index.verify_file(replacement, self.root_identity,
+                                              "receipt.json", self.digest, 32))
+        finally:
+            os.close(replacement)
+        self.assertEqual(self.read_bytes, len(self.content))
+
+    def test_growth_during_read_is_bounded(self):
+        guarded_read = index.os.read
+        changed = False
+        def racing_read(fd, count):
+            nonlocal changed
+            if not changed:
+                changed = True
+                with self.original.open("ab") as writer:
+                    writer.write(b"x" * 64)
+            return guarded_read(fd, count)
+        with patch.object(index.os, "read", side_effect=racing_read):
+            self.assertFalse(self.verify())
+        self.assertEqual(self.read_bytes, 33)
 
 if __name__ == "__main__":
     unittest.main()
 ```
 
-- [ ] Run `python3 -m unittest discover -s integrations/macos/tests -p test_evidence_index.py -v` red before helper creation then green. Expected: exact content accepts within bound; tamper, escape, symlink and oversized artifact refuse.
+- [ ] Run the following supervised command red before helper creation then green after creation. Expected: all nine tests run, exact retained bytes accept within the bound, outside-canary reads never occur, and tamper/escape/symlink/oversize/FIFO/device/root-substitution inputs refuse. The supervising process requires exactly nine tests with no skips, kills a hung FIFO case after 10 seconds and exits unsuccessfully; empty discovery or a hang cannot count as a completed test.
+
+```bash
+python3 - <<'PY'
+import subprocess
+import sys
+runner = """import unittest
+suite = unittest.defaultTestLoader.discover(
+    "integrations/macos/tests", pattern="test_evidence_index.py")
+if suite.countTestCases() != 9:
+    raise SystemExit("expected exactly nine evidence-index regressions")
+result = unittest.TextTestRunner(verbosity=2).run(suite)
+raise SystemExit(0 if result.wasSuccessful() and not result.skipped else 1)
+"""
+result = subprocess.run([sys.executable, "-c", runner], timeout=10, check=False)
+raise SystemExit(result.returncode)
+PY
+```
+
+- [ ] Prove the race controls are meaningful in disposable copies: remove `O_NOFOLLOW` only from the helper's open flags and require a failing outside-canary read assertion; remove `O_NONBLOCK` and require the supervised FIFO case to time out unsuccessfully; remove the root identity comparison and require the byte-identical replacement-root case to fail; remove the leaf regular-file predicate and require the device-read assertion to fail. Restore the helper and rerun green. These are component regressions, not native receipt/effect verification. The descriptor APIs and flag behavior are documented by [Python `os.open`](https://docs.python.org/3/library/os.html#os.open) and [Apple `open(2)`](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/open.2.html).
 - [ ] Run the actual native receipt/checkpoint verifier selected in M0 on exported originals, and the independent resource-finality verifier for external effects. The invocation and executable hash come from the delivered native manifest; if no verifier exists for a required claim, export it as unverified and keep qualification open. A schema-valid manifest never substitutes.
 - [ ] Run `cargo test -p chio-desktop --test evidence_export`. Expected: own-scope exports preserve signed bytes, named missing evidence and unresolved effects; tampered/foreign-scope inputs fail. Commit only export implementation/tests with `feat: preserve native evidence and explicit Mac observation gaps`.
 

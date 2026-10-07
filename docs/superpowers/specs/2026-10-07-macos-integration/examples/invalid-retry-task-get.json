@@ -1,0 +1,12 @@
+{
+  "version": "chio.desktop.operator.v1",
+  "request_id": "synthetic-request-task-get",
+  "method": "task.get",
+  "ok": false,
+  "error": {
+    "code": "internal_unavailable",
+    "retry": "same_intent",
+    "message_key": "synthetic.retry",
+    "operation_ref": null
+  }
+}
