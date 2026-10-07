@@ -5,6 +5,9 @@
 use super::*;
 use crate::budget_store::BudgetHoldDispositionView;
 
+#[path = "capture_once/retained.rs"]
+mod retained;
+
 type CaptureResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 const POLICY_SCHEMA: &str = "chio.native-flow-dispatch-policy.v1";
