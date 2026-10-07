@@ -7,8 +7,6 @@ members = ["crates/products/chio-proof-room"]
 
 [patch.crates-io]
 aws-lc-rs = { path = "third_party/aws-lc-rs-chio" }
-enumflags2_derive = { path = "third_party/enumflags2-derive-chio" }
-seccompiler = { path = "third_party/seccompiler-chio" }
 
 [workspace.package]
 version = "0.1.0"

@@ -50,6 +50,28 @@ ln -s "${repo_root}/wit" "${tmp_dir}/wit"
 (
   cd "${tmp_dir}"
   cargo metadata --format-version 1 >/dev/null
+)
+
+# Keep only the root [patch.crates-io] replacements this member's graph selects.
+unused="$(awk '/^\[\[patch\.unused\]\]$/ { entry = 1; next }
+               entry && /^name = "/ { sub(/^name = "/, ""); sub(/"$/, ""); print; entry = 0 }' \
+  "${tmp_dir}/Cargo.lock")"
+if [[ -n "${unused}" ]]; then
+  unused="${unused}" awk 'BEGIN { count = split(ENVIRON["unused"], names, "\n"); for (i = 1; i <= count; i++) drop[names[i]] = 1 }
+       /^\[patch\.crates-io\]/ { patch = 1; print; next }
+       patch && /^\[/ { patch = 0 }
+       patch && ($1 in drop) { next }
+       { print }' \
+    "${tmp_dir}/Cargo.toml.generated" >"${tmp_dir}/Cargo.toml"
+  cp "${tmp_dir}/Cargo.toml" "${tmp_dir}/Cargo.toml.generated"
+  (
+    cd "${tmp_dir}"
+    cargo metadata --format-version 1 >/dev/null
+  )
+fi
+
+(
+  cd "${tmp_dir}"
   cargo metadata --format-version 1 --locked >/dev/null
 )
 
