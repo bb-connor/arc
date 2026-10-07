@@ -79,6 +79,7 @@ impl SqliteAdmissionOperationStore {
                 "#,
             )
             .map_err(sqlite_error)?;
+        table_shape::require_owned_table_shapes(&connection)?;
         connection
             .execute_batch(
                 r#"
