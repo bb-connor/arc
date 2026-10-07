@@ -1,0 +1,97 @@
+[
+  {
+    "label": "verdict-matrix",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "chio-conformance",
+      "--test",
+      "verdict_matrix_rust_driver",
+      "--test",
+      "diff_oracle_self_test",
+      "--test",
+      "verdict_matrix_cross_language"
+    ],
+    "log": "/tmp/chio-pr1173-hosted-repair-verdict-matrix.log",
+    "started": 1791091428.216612,
+    "status": "complete",
+    "exit_code": 0,
+    "finished": 1791091697.2104046
+  },
+  {
+    "label": "verdict-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "-p",
+      "chio-conformance",
+      "--test",
+      "verdict_matrix_rust_driver",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "log": "/tmp/chio-pr1173-hosted-repair-verdict-clippy.log",
+    "started": 1791091697.2110124,
+    "status": "complete",
+    "exit_code": 0,
+    "finished": 1791091910.8660727
+  },
+  {
+    "label": "drogon",
+    "command": [
+      "bash",
+      "scripts/check-chio-drogon.sh"
+    ],
+    "log": "/tmp/chio-pr1173-hosted-repair-drogon.log",
+    "started": 1791091910.8664374,
+    "status": "complete",
+    "exit_code": 1,
+    "finished": 1791092503.9724312
+  },
+  {
+    "label": "proof-package",
+    "command": [
+      "bash",
+      "scripts/check-chio-proof-package.sh"
+    ],
+    "log": "/tmp/chio-pr1173-hosted-repair-proof-package.log",
+    "started": 1791092503.9735267,
+    "status": "complete",
+    "exit_code": 0,
+    "finished": 1791092931.5312302
+  },
+  {
+    "label": "runtime-policy",
+    "command": [
+      "cargo",
+      "xtask",
+      "check",
+      "fixtures",
+      "runtime-policy"
+    ],
+    "log": "/tmp/chio-pr1173-hosted-repair-runtime-policy.log",
+    "started": 1791092931.5316432,
+    "status": "complete",
+    "exit_code": 0,
+    "finished": 1791093852.5906904
+  },
+  {
+    "label": "fuzz-corpus",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--manifest-path",
+      "fuzz/Cargo.toml"
+    ],
+    "log": "/tmp/chio-pr1173-hosted-repair-fuzz-corpus.log",
+    "started": 1791093852.5914772,
+    "status": "complete",
+    "exit_code": 101,
+    "finished": 1791094188.6797004
+  }
+]

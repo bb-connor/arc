@@ -1,0 +1,1636 @@
+{
+  "schema": "chio.experimental.funded-lifecycle-execution.v1",
+  "capturedUtc": "2026-09-14T14:41:56.949238+00:00",
+  "baseCommit": "2262a87911d95d9f69441256275b44ece4ac43e7",
+  "implementationCommit": "331bd1bf8cd347c3b2cc70aaee459894bc5218df",
+  "branch": "research/funded-work-baseline",
+  "environment": {
+    "python": "Python 3.12.3",
+    "node": "v24.16.0",
+    "rust": "rustc 1.94.1 (e408947bf 2026-03-25)",
+    "host": "Linux-6.17.0-1020-oracle-aarch64-with-glibc2.39",
+    "machine": "aarch64",
+    "solc": "0.8.30",
+    "ethers": "6.16.0",
+    "ganache": "7.9.2",
+    "chainId": "31337",
+    "runtime": "Shanghai",
+    "compilerEvm": "Paris",
+    "optimizerRuns": 200,
+    "nativeAccelerators": "unavailable on this Node/aarch64 host; supported JavaScript fallback executed"
+  },
+  "runs": [
+    {
+      "command": "/tmp/chio-funding-execution-mfkbfx6y/python-env/bin/python -B -m unittest discover -s examples/funded-work -v",
+      "exitCode": 0,
+      "result": "38 passed, zero skips; Python source unchanged after this baseline",
+      "log": "lifecycle-evidence/python-baseline.log",
+      "sha256": "cbe211f6526744584c2b5649aed90621e27307fcc7b695e03a5a4139cf15a87e"
+    },
+    {
+      "command": "CHIO_W0_PYTHON=/tmp/chio-funding-execution-mfkbfx6y/python-env/bin/python CHIO_LIFECYCLE_EVIDENCE=/tmp/chio-lifecycle-execution/runs node --test contracts/scripts/work-claim-lifecycle.test.mjs contracts/scripts/work-claim-recovery.test.mjs contracts/scripts/work-claim-w0.test.mjs contracts/scripts/work-claim-recovery-core.test.mjs contracts/scripts/work-claim-escrow.test.mjs contracts/scripts/funded-work-fit.test.mjs",
+      "exitCode": 0,
+      "result": "53 passed, zero skips",
+      "log": "lifecycle-evidence/node-final.log",
+      "sha256": "165ade40a47ccdbdc9886d466c281138a486a9e796a25af8dbea92e82a7814f4"
+    },
+    {
+      "command": "node --test contracts/scripts/work-claim-recovery-actions.test.mjs",
+      "exitCode": 0,
+      "result": "3 passed, zero skips",
+      "log": "lifecycle-evidence/actions-final.log",
+      "sha256": "9a5d5433e97e8b2ada1f5a51449b341bc90bfd50b34b293bc2576fed55c39816"
+    },
+    {
+      "command": "mkdir -m 700 /tmp/chio-lifecycle-execution/retained-child\nCHIO_W0_PYTHON=/tmp/chio-funding-execution-mfkbfx6y/python-env/bin/python node contracts/scripts/work-claim-lifecycle.mjs child after_broadcast /tmp/chio-lifecycle-execution/retained-child --output /tmp/chio-lifecycle-execution/standalone-child.json",
+      "exitCode": 0,
+      "result": "Four actual SIGKILLs; 160 funded, 60 paid, 100 refunded",
+      "log": "lifecycle-evidence/standalone.log",
+      "sha256": "ef60b0b70d30c13c2f6ffba825ffad21d598469a33bc27aabd42c6ea5cf0408d"
+    },
+    {
+      "command": "/tmp/chio-funding-execution-mfkbfx6y/python-env/bin/python -B /tmp/chio-lifecycle-execution/reopen-lifecycle.py /tmp/chio-lifecycle-execution/retained-child /tmp/chio-lifecycle-execution/standalone-child.json",
+      "exitCode": 0,
+      "result": "Signed work and four original signed transactions reopened across two actor journals",
+      "log": "lifecycle-evidence/reopen.log",
+      "sha256": "6eee3e397d7b6ac52212910890cfa5fbf16114b69cdbeca7dfa785fc7c01df45"
+    },
+    {
+      "command": "python3 /tmp/chio-lifecycle-execution/action-mutation.py decision",
+      "exitCode": 1,
+      "result": "Expected failure: Missing expected rejection: verdict",
+      "log": "lifecycle-evidence/decision-mutation.log",
+      "sha256": "7a6ba14c57804d09de30315247e36ed46c8f03e80b4c51fd93395eb11c08e018",
+      "expectedFailure": true
+    },
+    {
+      "command": "python3 /tmp/chio-lifecycle-execution/action-mutation.py refund",
+      "exitCode": 1,
+      "result": "Expected failure: Missing expected rejection: amount",
+      "log": "lifecycle-evidence/refund-mutation.log",
+      "sha256": "72c4e9ab34123227ace93d139035f8d3df737f8207d0c5efa672c468794a0d2d",
+      "expectedFailure": true
+    }
+  ],
+  "initialRed": {
+    "log": "lifecycle-evidence/lifecycle-red.log",
+    "exitCode": 1,
+    "reason": "Existing W0 flow bypassed all requested durable lifecycle actions."
+  },
+  "sourceInventory": [
+    {
+      "path": "contracts/package.json",
+      "sha256": "64efeb00225f14767812ce75d78d52002fbc6faa999a4ee43887a31d8357a773"
+    },
+    {
+      "path": "contracts/pnpm-lock.yaml",
+      "sha256": "07cee51275b05dc9c4fea16f42e256bc5707c75a17794425c0c5c64695e23ce8"
+    },
+    {
+      "path": "contracts/scripts/fixtures/WorkClaimTestToken.sol",
+      "sha256": "eadb8d1455095e2d238e0c751139429f489d7febb0841d7b1073ec854c3444dd"
+    },
+    {
+      "path": "contracts/scripts/fixtures/work-claim-vectors.json",
+      "sha256": "43e40c4b99c9f15d5e0afe67a8aac9276fd7843251a52b65f9cc42aa3ffcbd80"
+    },
+    {
+      "path": "contracts/scripts/funded-work-fit.test.mjs",
+      "sha256": "83864ed61cea1136ec5a5b919d675f5394638329fef3caa99173949687dfb593"
+    },
+    {
+      "path": "contracts/scripts/work-claim-demo.mjs",
+      "sha256": "a12a80fb15290f54aa909138e2510a2b71ceabbcb35545852ce656a20865e8e7"
+    },
+    {
+      "path": "contracts/scripts/work-claim-escrow.test.mjs",
+      "sha256": "66ca63196e940331b4525be1badbab9bdd67b2c2e91e89440400c27c991ab8e9"
+    },
+    {
+      "path": "contracts/scripts/work-claim-fixture.mjs",
+      "sha256": "bc645069d0c8225b9b43591d2d5fbb3bb2f80bdd47afce4d191a441d9bb532e2"
+    },
+    {
+      "path": "contracts/scripts/work-claim-journal.mjs",
+      "sha256": "12ff3dd9f27b7dbc15e07e3fe3c4fbbb12397a458a96d7adc2fd04557a9c922c"
+    },
+    {
+      "path": "contracts/scripts/work-claim-lifecycle.mjs",
+      "sha256": "a6a312208a8dd99e3fc6f7d98d34e0d792bfda1712183d030228579731d4c45a"
+    },
+    {
+      "path": "contracts/scripts/work-claim-lifecycle.test.mjs",
+      "sha256": "e341531b5a0d14109e01b4d4aa3408b1b6377a2e5522ccc96c2654fad92d50ca"
+    },
+    {
+      "path": "contracts/scripts/work-claim-model.test.mjs",
+      "sha256": "fb970b03925ebd5de4ce46cf552b9d01751ce9d9b8a8361d716d15fb09934068"
+    },
+    {
+      "path": "contracts/scripts/work-claim-recovery-actions.test.mjs",
+      "sha256": "6d585a16c0266edad5b754326416e0c4420ef883230fac36cd134de59cc6f7be"
+    },
+    {
+      "path": "contracts/scripts/work-claim-recovery-core.test.mjs",
+      "sha256": "443fa5cebfdf98c6d95d62d5103e4279cde659c452dcd2034168fb6f3d9aa578"
+    },
+    {
+      "path": "contracts/scripts/work-claim-recovery-demo.mjs",
+      "sha256": "852c94b551afd89f4552ba69e1d992e76bb87f707a50d21988bf3c4a153faa67"
+    },
+    {
+      "path": "contracts/scripts/work-claim-recovery-harness.mjs",
+      "sha256": "6b070f26e8dbecd0f777de5163d5634002d91a8623f1163bb7210a41717f0fb9"
+    },
+    {
+      "path": "contracts/scripts/work-claim-recovery-worker.mjs",
+      "sha256": "1fa72c9610b3e3cc26b8caed68e83e0852a3173a8d8d34442d966d2259b7414c"
+    },
+    {
+      "path": "contracts/scripts/work-claim-recovery.mjs",
+      "sha256": "af84cf015d039f466bb5296e36cb9f2ab46ee7ab7ff214f2d0f75404a8f0262c"
+    },
+    {
+      "path": "contracts/scripts/work-claim-recovery.test.mjs",
+      "sha256": "e2b5e42dbbc16ac517d76446c37eaf89884d8996c5b2c420c2062642c6c66e45"
+    },
+    {
+      "path": "contracts/scripts/work-claim-w0.mjs",
+      "sha256": "0040286bfcb805b5f7593e8871341048791666a3b62132f64acda31cdb65a15d"
+    },
+    {
+      "path": "contracts/scripts/work-claim-w0.test.mjs",
+      "sha256": "8bf277b8c4ee4618794ee00ace0d83f3a7228d40a40c88b118bc5ac3118bcf74"
+    },
+    {
+      "path": "contracts/src/ChioBondVault.sol",
+      "sha256": "c425add7c32c8617cbcaeba99ca4dffb3dee74cc16c6e539a77cffd9a0b38cd7"
+    },
+    {
+      "path": "contracts/src/ChioEscrow.sol",
+      "sha256": "0ee3d055c3696e0e4847b413838ee9d3e064c64018964d02c03b242dbe089e7f"
+    },
+    {
+      "path": "contracts/src/ChioIdentityRegistry.sol",
+      "sha256": "34feea40aeff3ffc36eec325dbb65aad0fbbe6ac4fe294efa50f47a8e746f1b7"
+    },
+    {
+      "path": "contracts/src/ChioPriceResolver.sol",
+      "sha256": "84fc5f6d020fda58faf09cdae27082703b617ba7afc473651efec1ea00d91146"
+    },
+    {
+      "path": "contracts/src/ChioRootRegistry.sol",
+      "sha256": "0a4d9e48cf4e902bcc641b8be4f44eddf0a2fada0b857abcfb875885ac7c112b"
+    },
+    {
+      "path": "contracts/src/experimental/ChioWorkClaimEscrow.sol",
+      "sha256": "b1def783516523cf58c2e60f9d541cdcc47ec07f80e9662e01f88c8cb77e1df9"
+    },
+    {
+      "path": "contracts/src/interfaces/IAggregatorV3.sol",
+      "sha256": "c9549e5a36ef15792f83547703d429fa0a3c88ef14b2b1b0a01916bc717ebefa"
+    },
+    {
+      "path": "contracts/src/interfaces/IChioBondVault.sol",
+      "sha256": "62d2b34a235a8e9543e7dc49869075beec79894636054d40f0cca98c8b45bccf"
+    },
+    {
+      "path": "contracts/src/interfaces/IChioEscrow.sol",
+      "sha256": "edccfaecb712daba527a68ecbb4092ae7adf91fdc7e0a9b13f1117430b69f9c9"
+    },
+    {
+      "path": "contracts/src/interfaces/IChioIdentityRegistry.sol",
+      "sha256": "dddea33a1506a26546ebbe52d258b227270dba284cc5138b4334740f479840be"
+    },
+    {
+      "path": "contracts/src/interfaces/IChioPriceResolver.sol",
+      "sha256": "412e5fcce50330e28ed4ead8479b3236b8b8765501fb5307c55171bf020d74de"
+    },
+    {
+      "path": "contracts/src/interfaces/IChioRootRegistry.sol",
+      "sha256": "1e8ddedfbf56ef3ca9c9c06e837db431078687f5c9c0b00bf8c55ce8ea7a5d01"
+    },
+    {
+      "path": "contracts/src/interfaces/IERC20.sol",
+      "sha256": "acd7d465fcd0264e92b038a0671f1b90e003325d2c48c211de23fcc09a7f3ec3"
+    },
+    {
+      "path": "contracts/src/interfaces/IERC20Permit.sol",
+      "sha256": "4751af7647654a4891bde119b9ba4662e3e09ef5fe2729fb13d6ea266f7cfb4e"
+    },
+    {
+      "path": "contracts/src/lib/ChioMerkle.sol",
+      "sha256": "4cf0734a1cbd8981a1e64ee3905a878bac2cb2c323168025b6464be65b701c17"
+    },
+    {
+      "path": "contracts/src/mocks/ChioCreate2Factory.sol",
+      "sha256": "e6e0010de71cb2e476ca09bbb1bec35bfacd4cf040c2549a694558a2ee4cb52b"
+    },
+    {
+      "path": "contracts/src/mocks/FeeOnTransferERC20.sol",
+      "sha256": "2b4a08527ce6b41979afe9b8f66c5cf35e6726ca2082374fe308cb74676dc6e8"
+    },
+    {
+      "path": "contracts/src/mocks/Mock1271Admin.sol",
+      "sha256": "f9f5adfc23ad42219a7c8a7a384fb24f6f7518e20e9943eb475a75ce852be3ca"
+    },
+    {
+      "path": "contracts/src/mocks/MockAggregatorV3.sol",
+      "sha256": "b22a0f951b8ab103a3804bd281ab25e02b46bd197f825fe2ce279146e92d74ca"
+    },
+    {
+      "path": "contracts/src/mocks/MockERC20.sol",
+      "sha256": "8a780f5a771b541061aeceb752652d446c52848d9a681835a2e496e5e4821a1d"
+    },
+    {
+      "path": "contracts/src/mocks/NoReturnERC20.sol",
+      "sha256": "3d2e72701c4fadc58ae398fa4c748d9602512bcb17fdaaa49231e9813efb7d20"
+    },
+    {
+      "path": "contracts/src/mocks/ReentrantBondToken.sol",
+      "sha256": "e8c3e32e3fd7280141853c3215db37db9372d10059fd8f7402c451ce82ee6ca9"
+    },
+    {
+      "path": "examples/federated-work/Cargo.lock",
+      "sha256": "324f2b8461ed53bad6771398691e8d71f34bcd98778a52314d217b316dad6165"
+    },
+    {
+      "path": "examples/federated-work/Cargo.toml",
+      "sha256": "5eb5b9fd20aea6e3f8f556bf839eb4164fbcca2d6aaf66ad6f7f0041b36a1708"
+    },
+    {
+      "path": "examples/federated-work/fixtures/openapi.json",
+      "sha256": "952c8a7286a67c8d9d67735bf05d3d083f70ad2d8d744346692de6c92d7ebeb6"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/client.py",
+      "sha256": "0e43b152c0ae5b50564567c131a5ed65315a8b209a5b86b6e39a0d5e55eacdf0"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/incident.py",
+      "sha256": "6ed05e38626deee623794eabf3aee1f6b9dfbfc4fc748777de00b17bfdcf4d91"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/incident_fixture.py",
+      "sha256": "d5451503f25d1f43273b7d6a1eaddae65e06871d0ce961d182f3a0b6286011fa"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/protocol.py",
+      "sha256": "5891d6d04e4f329f24078df332269e319a8e5f3cac031af5e0af93ef82523907"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/requirements.txt",
+      "sha256": "e28d708278727dc498f6d0d417418ba99a389f69547a6d4b1ef318a3a8508689"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/resolution.py",
+      "sha256": "522aaea1c25a55539fa0037ca07c15ce997f0ed85f0823b035f4f514d3a1b31d"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/resolution_fixture.py",
+      "sha256": "ee28d4d69d9aa304b66398575776552e9ff3d24fb1a7c4e7e99300dc1a703f8d"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/review.py",
+      "sha256": "3293712bc70c426462ceae97551b9efd3936fdab722960577a7b7b2afce74ef9"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/subcontract.py",
+      "sha256": "440a808d2e3ad548e9d5c8257156ba75aab77dd7524968042c2f0a5ca5d7726d"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/subcontract_fixture.py",
+      "sha256": "41621f8aef3582a7dffa4262ac951cdbd1a422ac0f7b6d51ccb87eac953101b1"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/subcontract_hostile_worker.py",
+      "sha256": "f2d54208897a32ebb8745e862d00b9c47e80bf3a8881f72af8c05e70be63f967"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/subcontract_probe.py",
+      "sha256": "660f7b3333ec93827e0e8180cd16413e0fc02b31c90138fc241271bee16b47f3"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/test_enrollment.py",
+      "sha256": "a03256175cf6fa5acf94e7c43135b864f38139470ad5ecee7152d3e48cc9e784"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/test_incident.py",
+      "sha256": "7628183eb43012dfbbd320b0a0d0de5dbbe662b16cf07c92ec908b067feeedd3"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/test_protocol.py",
+      "sha256": "a902f486d3a9fc90d2b7c00adc771de3c3a1fce14f2f3110c63cc4e39c006945"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/test_resolution.py",
+      "sha256": "bb005e152ee878ce45a0f1defe825786d1e434c1b9aadf1a64054a9c3f4e5fee"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/test_subcontract.py",
+      "sha256": "d8ac3b9b9d5d15b3b9cf05baaf1c6e1fda7f9ce9f3fb6b6d222e33927398d20a"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/tls_fixture.py",
+      "sha256": "816d7bf8174a34219173fee8f157ffb771c6bb3e72734939f4b42c3aef3cbe7d"
+    },
+    {
+      "path": "examples/federated-work/src/main.rs",
+      "sha256": "2187bd88ed29cce420db9d7b77dde7ac111f7dbed26e3f74de2e92cbfd7eb279"
+    },
+    {
+      "path": "examples/federated-work/src/review.rs",
+      "sha256": "bc491412dd649ba4fbd49c5409c39740acd30bbfa6618ef81c40188235828919"
+    },
+    {
+      "path": "examples/funded-work-model/claim-traces.json",
+      "sha256": "0b8984fe29ed929450b72d8fa3ac35bbc4938888a5378f6e015bf7d02daf1cdc"
+    },
+    {
+      "path": "examples/funded-work/PROFILE.md",
+      "sha256": "6c080365471cb6a5c06d36aae0233bfd15758fc8d0c969893ebf594f0017ea27"
+    },
+    {
+      "path": "examples/funded-work/README.md",
+      "sha256": "4a925d7719208634e01efc48789b5333797479709ac6ddf987eda68058683056"
+    },
+    {
+      "path": "examples/funded-work/RECOVERY.md",
+      "sha256": "b1199761036f4e44bb354c08b7f63bad008f23016535f8a10cddfc99cedb3e16"
+    },
+    {
+      "path": "examples/funded-work/artifacts.py",
+      "sha256": "96628b382b1c163fd650a216d79fff21a4a5f1186dcc95409f0a32bad8a7437b"
+    },
+    {
+      "path": "examples/funded-work/checker-profile.json",
+      "sha256": "dbb11df4e9402024bd330cb39dc7fc484f062e278ca593986636d86d3101ad78"
+    },
+    {
+      "path": "examples/funded-work/custody.py",
+      "sha256": "50a1db49dafdb3516099acafab364918d3e4f462ffa3d5428bbdea6cadb74a86"
+    },
+    {
+      "path": "examples/funded-work/fixture.py",
+      "sha256": "dc6dec97aeb1487248b931c1a9b7ea8cd28449fecb28afdc11b2f5b1381ad549"
+    },
+    {
+      "path": "examples/funded-work/owned_sqlite.py",
+      "sha256": "edbabf63062ced382582aa89056312b287d278e5ae7e687d6be2b8c666a3dad9"
+    },
+    {
+      "path": "examples/funded-work/parser-vectors.json",
+      "sha256": "13730196269f3785efa1133320cd0dc378ae60e71c3fb333dbc4730e531253ea"
+    },
+    {
+      "path": "examples/funded-work/rail_journal.py",
+      "sha256": "6f1a9658207d17cc3196ea6839861b9b90f4b4922fe82bdfb15b5b59299ae8cb"
+    },
+    {
+      "path": "examples/funded-work/reference_checker.py",
+      "sha256": "ee9ede7d02655b0b926fc75dc5e4180aa7790ca1cbf22f63a53997da9bf6e1fd"
+    },
+    {
+      "path": "examples/funded-work/test_checker_command.py",
+      "sha256": "9b4a4f49b19e255477f7655ebaf9129dfb492ba25bc693ecd0c8649232132fbd"
+    },
+    {
+      "path": "examples/funded-work/test_custody.py",
+      "sha256": "7a1ba60db880dc56bcdad205be99acaabc1bd2e5e53d01e20b9fc9cb23ac50a0"
+    },
+    {
+      "path": "examples/funded-work/test_protocol.py",
+      "sha256": "51ff2b53f86bc3ef755856a03570bcaf9cbd00c7e683b92f95c64f7072676564"
+    },
+    {
+      "path": "examples/funded-work/test_rail_journal.py",
+      "sha256": "b3e5b7f2a8dfe2ade6f7e30d3b3ea04e0183efcc3360de7582a0794aab3ffa77"
+    },
+    {
+      "path": "examples/funded-work/test_verifier.py",
+      "sha256": "939a885a482ff620f30af7cd167f241c05b5bd05b04868ef2f75efe287f4a1ba"
+    },
+    {
+      "path": "examples/funded-work/verifier.py",
+      "sha256": "db4cd50b25be57b127e11fd4857dc64d761e507c3b0a668c563457422b9003f9"
+    }
+  ],
+  "sourceInventoryScope": "Direct example and reused checker/contract inputs; native Rust and Solidity sources unchanged this slice. Full dependency source remains bound by the implementation commit and locked manifests.",
+  "checkerBinary": {
+    "path": "target/debug/chio-federated-work",
+    "sha256": "d463a6fcea329ccc2eda6f7770e73ee37996610668b2ce6001b69bef2818d454"
+  },
+  "artifacts": [
+    {
+      "path": "lifecycle-evidence/accepted-after_broadcast.json",
+      "sha256": "98b43dd312f4cb7c823527ad70335dc152d54dabc4b676a34c181001a1be4938",
+      "bytes": 81382
+    },
+    {
+      "path": "lifecycle-evidence/accepted-after_observation.json",
+      "sha256": "bc4bbd13091b76ef0138fdfefd6f1702d7c3396ca5cfc8e49a780d9164524ebc",
+      "bytes": 81403
+    },
+    {
+      "path": "lifecycle-evidence/accepted-after_recorded.json",
+      "sha256": "7a7575807e5bf04f7dfe9c8ca0ddc2ffe5a93aad41f24f0b3ec0b6175a949597",
+      "bytes": 82345
+    },
+    {
+      "path": "lifecycle-evidence/accepted-before_broadcast.json",
+      "sha256": "8f90a734b6c868d195ec73eb8f7b273801ce96ba0ae7c903c9dee2796759052a",
+      "bytes": 81393
+    },
+    {
+      "path": "lifecycle-evidence/action-mutation.py",
+      "sha256": "564c63f541796fc1f1b37497748402b0f42cb0fd2977147ba828a28eb1bcb35c",
+      "bytes": 1158
+    },
+    {
+      "path": "lifecycle-evidence/actions-final.log",
+      "sha256": "9a5d5433e97e8b2ada1f5a51449b341bc90bfd50b34b293bc2576fed55c39816",
+      "bytes": 971
+    },
+    {
+      "path": "lifecycle-evidence/child-after_broadcast.json",
+      "sha256": "db93b107f75ddf0b94dc5f388bf2b6c81e8343bdaead84c0c3682d1923d843fe",
+      "bytes": 117690
+    },
+    {
+      "path": "lifecycle-evidence/child-after_observation.json",
+      "sha256": "1495a35363bce7801de966343ef663e3c3de3eb0d31e14954e62a22696e006be",
+      "bytes": 117715
+    },
+    {
+      "path": "lifecycle-evidence/child-after_recorded.json",
+      "sha256": "07969e9b49bb46de38d800660605bebe4a525aef6516fa96f3800b120a6d2745",
+      "bytes": 118972
+    },
+    {
+      "path": "lifecycle-evidence/child-before_broadcast.json",
+      "sha256": "c5f812d0ed95a7b21c6aaa48da881262a47bbfc19c8fc0894923c5769aaec904",
+      "bytes": 117703
+    },
+    {
+      "path": "lifecycle-evidence/decision-mutation.log",
+      "sha256": "7a6ba14c57804d09de30315247e36ed46c8f03e80b4c51fd93395eb11c08e018",
+      "bytes": 1460
+    },
+    {
+      "path": "lifecycle-evidence/integration-merge-tree.txt",
+      "sha256": "26f77b9eebde22db52954ff5d68e2b97bead95ccb158e04551edd090efae9a81",
+      "bytes": 634
+    },
+    {
+      "path": "lifecycle-evidence/integration-rehearsal.json",
+      "sha256": "615a70e2083166c2d20aae0e44f1c5c24ac94e71b5e16cc07169d21d36710407",
+      "bytes": 2412
+    },
+    {
+      "path": "lifecycle-evidence/lifecycle-green.log",
+      "sha256": "c3322f12910c440794cdd2cdbed77dc81a6574bcbb1a2d7b8f0455db051ea1c8",
+      "bytes": 786
+    },
+    {
+      "path": "lifecycle-evidence/lifecycle-red.log",
+      "sha256": "3849087ea7927398a28ce5337d6f140c49853f07cb683ba988c818c8cb9dd0c3",
+      "bytes": 1561,
+      "normalization": "Trailing log whitespace removed; content and failure preserved.",
+      "originalSha256": "a3f09bb9de932e9b6950bf6fa3db89c72ac27c843d28b6486b1957e9e79eb25f"
+    },
+    {
+      "path": "lifecycle-evidence/missing-custody-after_broadcast.json",
+      "sha256": "79f20785794713feee4296ebda68a5624bd784edafef62c010d8d4c397de2991",
+      "bytes": 53608
+    },
+    {
+      "path": "lifecycle-evidence/missing-custody-after_observation.json",
+      "sha256": "f4586dfaabe53c75da52619df82e8ad2fbf9904e874921ed88cb73cc5a7ba72d",
+      "bytes": 53623
+    },
+    {
+      "path": "lifecycle-evidence/missing-custody-after_recorded.json",
+      "sha256": "0ddc19c4ed324cad0a33d122bf99e006e9c463dd65e9dc757bc97f837538b005",
+      "bytes": 54250
+    },
+    {
+      "path": "lifecycle-evidence/missing-custody-before_broadcast.json",
+      "sha256": "ae54b1ecd5bb50ac61e1038f067fa81d2591f94328ca7109101105a92563b68c",
+      "bytes": 53616
+    },
+    {
+      "path": "lifecycle-evidence/node-final.log",
+      "sha256": "165ade40a47ccdbdc9886d466c281138a486a9e796a25af8dbea92e82a7814f4",
+      "bytes": 8469
+    },
+    {
+      "path": "lifecycle-evidence/python-baseline.log",
+      "sha256": "cbe211f6526744584c2b5649aed90621e27307fcc7b695e03a5a4139cf15a87e",
+      "bytes": 5976
+    },
+    {
+      "path": "lifecycle-evidence/refund-mutation.log",
+      "sha256": "72c4e9ab34123227ace93d139035f8d3df737f8207d0c5efa672c468794a0d2d",
+      "bytes": 1455
+    },
+    {
+      "path": "lifecycle-evidence/rejected-after_broadcast.json",
+      "sha256": "fbd943f634a3186a0959656af8fccecc81caf5e40b5d43e281ff927f01087f9f",
+      "bytes": 81383
+    },
+    {
+      "path": "lifecycle-evidence/rejected-after_observation.json",
+      "sha256": "916a075655244cf7a052cb89b0f2214eabe7014fad4149b7202e6bd9dbd88ccf",
+      "bytes": 81403
+    },
+    {
+      "path": "lifecycle-evidence/rejected-after_recorded.json",
+      "sha256": "17513fc94ea03377a9bbe7cfccf957067b3cb5e3f01d51d5439c698d1c1206f4",
+      "bytes": 82345
+    },
+    {
+      "path": "lifecycle-evidence/rejected-before_broadcast.json",
+      "sha256": "8734c686c6115964240464433a8b5cf3eebc0e08d033acbe8c4e42a564f14652",
+      "bytes": 81393
+    },
+    {
+      "path": "lifecycle-evidence/reopen-lifecycle.py",
+      "sha256": "f3c156b18b320e0873db45a89367cecb45818b920ce07646ec55361f050154ad",
+      "bytes": 1612
+    },
+    {
+      "path": "lifecycle-evidence/reopen.log",
+      "sha256": "6eee3e397d7b6ac52212910890cfa5fbf16114b69cdbeca7dfa785fc7c01df45",
+      "bytes": 160
+    },
+    {
+      "path": "lifecycle-evidence/security-gate.json",
+      "sha256": "9a2b217918125cae437ff400df730c1795f3c46d22b23bec96f95406b12abfa9",
+      "bytes": 1779
+    },
+    {
+      "path": "lifecycle-evidence/security-pr.json",
+      "sha256": "2dc3aea129dc78df8d53215f8619d921196beb599285841415dec0dc6380b69c",
+      "bytes": 238
+    },
+    {
+      "path": "lifecycle-evidence/source-preservation.json",
+      "sha256": "249d87d81406d51273a403d756094bf5cea33caa6a7f40c291cc6d068f41eb3b",
+      "bytes": 186
+    },
+    {
+      "path": "lifecycle-evidence/standalone-child.json",
+      "sha256": "cd5d4dd408270e53259ec4a558111fab6f3e5cea8cebeb0e99bff7bb5321ff7b",
+      "bytes": 117690
+    },
+    {
+      "path": "lifecycle-evidence/standalone.log",
+      "sha256": "ef60b0b70d30c13c2f6ffba825ffad21d598469a33bc27aabd42c6ea5cf0408d",
+      "bytes": 992
+    }
+  ],
+  "outcomes": [
+    {
+      "artifact": "lifecycle-evidence/accepted-after_broadcast.json",
+      "scenario": "accepted",
+      "killPoint": "after_broadcast",
+      "accounting": {
+        "escrowFunded": "100",
+        "paid": "100",
+        "refunded": "0",
+        "remaining": "0"
+      },
+      "balances": {
+        "A": "900",
+        "B": "1100",
+        "C": "0",
+        "escrow": "0"
+      },
+      "reobservations": 6,
+      "operations": [
+        {
+          "action": "submit",
+          "operationId": "0xc9d1049d0bcf477b87e9078b25d3c98a927fb6b57ac611db12c3538ee5adb0a2",
+          "actor": "0x22d491bde2303f2f43325b2108d26f1eaba1e32b",
+          "nonce": "1",
+          "transactionHash": "0x84edeb3bf7cca7e31c5e373935ddc1f2b1a788fb50c589c430c3443de8b372c3",
+          "killPid": 1091633,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        },
+        {
+          "action": "decision",
+          "operationId": "0x784c124fd2ffaa46e5ebb4e1c360d7878b20a469dc8ef1986cd5e4bd6ebaf8be",
+          "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+          "nonce": "0",
+          "transactionHash": "0x1e09ffe109bb2b3e748c92d81cf9f844b3d9bfd445a6f11256eda273d9008393",
+          "killPid": 1091734,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        },
+        {
+          "action": "pay",
+          "operationId": "0x0cc109f180a5c4170bf1e05f1a3a4bdebc486e8d0767eda0cee7bfca673f9235",
+          "actor": "0x22d491bde2303f2f43325b2108d26f1eaba1e32b",
+          "nonce": "2",
+          "transactionHash": "0xa6ae26e49fcd6944665a2efdd7dd35a8410c5eb967284f8f942e8a036dbab732",
+          "killPid": 1091815,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        }
+      ]
+    },
+    {
+      "artifact": "lifecycle-evidence/accepted-after_observation.json",
+      "scenario": "accepted",
+      "killPoint": "after_observation",
+      "accounting": {
+        "escrowFunded": "100",
+        "paid": "100",
+        "refunded": "0",
+        "remaining": "0"
+      },
+      "balances": {
+        "A": "900",
+        "B": "1100",
+        "C": "0",
+        "escrow": "0"
+      },
+      "reobservations": 6,
+      "operations": [
+        {
+          "action": "submit",
+          "operationId": "0x3549ab17b89f18c5a7d6fd18defd605082c424609823c6a865205a90c6863148",
+          "actor": "0x22d491bde2303f2f43325b2108d26f1eaba1e32b",
+          "nonce": "1",
+          "transactionHash": "0xb0f4539de959752bdedac01853f785400dab5e4b08e4074cb3d02e8962b39aa2",
+          "killPid": 1091985,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        },
+        {
+          "action": "decision",
+          "operationId": "0xaa00bc81f7c53356c44117ef16d9737840aa72ea4117a09ccc85fc057f4c2b26",
+          "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+          "nonce": "0",
+          "transactionHash": "0xed6f441cd6f9bcdb525afa4516d796b56fc03f5dd9f2a5a797f1db562811883b",
+          "killPid": 1092066,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        },
+        {
+          "action": "pay",
+          "operationId": "0x1b88df17afd51147d5b935d0fdeab1ad9155b2d14e20d8dbb3483cb4399e2e27",
+          "actor": "0x22d491bde2303f2f43325b2108d26f1eaba1e32b",
+          "nonce": "2",
+          "transactionHash": "0xb9c71550db3a444102c25fc95cb7d6d0841c8770692808ca1afd0106fd9f6e9e",
+          "killPid": 1092177,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        }
+      ]
+    },
+    {
+      "artifact": "lifecycle-evidence/accepted-after_recorded.json",
+      "scenario": "accepted",
+      "killPoint": "after_recorded",
+      "accounting": {
+        "escrowFunded": "100",
+        "paid": "100",
+        "refunded": "0",
+        "remaining": "0"
+      },
+      "balances": {
+        "A": "900",
+        "B": "1100",
+        "C": "0",
+        "escrow": "0"
+      },
+      "reobservations": 6,
+      "operations": [
+        {
+          "action": "submit",
+          "operationId": "0x8f5a0de29bd588c1dca5b4d7a0e07532b66f2b4e9826c235736345d77bff3508",
+          "actor": "0x22d491bde2303f2f43325b2108d26f1eaba1e32b",
+          "nonce": "1",
+          "transactionHash": "0xae931a450ef8246c1100c3fb6a06c52c615885047047b209b247e79cd9a79a0f",
+          "killPid": 1092367,
+          "signal": "SIGKILL",
+          "afterLoss": "Included",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        },
+        {
+          "action": "decision",
+          "operationId": "0x645e63b0f759dc1683141d8b0a58e23cc358b832663dddd1642a46c9ed57bff4",
+          "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+          "nonce": "0",
+          "transactionHash": "0x72e1aa27eaea3f3e919a58cce49fa30f682779d1ff700a018264a279c41a9b8f",
+          "killPid": 1092486,
+          "signal": "SIGKILL",
+          "afterLoss": "Included",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        },
+        {
+          "action": "pay",
+          "operationId": "0x83e6259a9312293b8e3364dac62b212c50c58867bfac9d94bb345f6155ab84b5",
+          "actor": "0x22d491bde2303f2f43325b2108d26f1eaba1e32b",
+          "nonce": "2",
+          "transactionHash": "0x1ecb7297d5e11c6cdcb3165e31479aa5eb45ef3843f87acb30ad10a6212a1644",
+          "killPid": 1092553,
+          "signal": "SIGKILL",
+          "afterLoss": "Included",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        }
+      ]
+    },
+    {
+      "artifact": "lifecycle-evidence/accepted-before_broadcast.json",
+      "scenario": "accepted",
+      "killPoint": "before_broadcast",
+      "accounting": {
+        "escrowFunded": "100",
+        "paid": "100",
+        "refunded": "0",
+        "remaining": "0"
+      },
+      "balances": {
+        "A": "900",
+        "B": "1100",
+        "C": "0",
+        "escrow": "0"
+      },
+      "reobservations": 6,
+      "operations": [
+        {
+          "action": "submit",
+          "operationId": "0xce3495237802a9bb2d279df0de95b7dd907f9d1efcc0de3b85b9ad5d7140a7c2",
+          "actor": "0x22d491bde2303f2f43325b2108d26f1eaba1e32b",
+          "nonce": "1",
+          "transactionHash": "0x59f240ebd2167dbe9425f6aeecc5f46299680178fb9cde39aac20dfbf04044f2",
+          "killPid": 1091122,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        },
+        {
+          "action": "decision",
+          "operationId": "0xe6dc514818ca0874ad5d0afcc7128217dbfcb215cf93fc6e30446f20ec5f4ad0",
+          "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+          "nonce": "0",
+          "transactionHash": "0xe37ea7397553660d83b3cb838b24f2b005cc752ed983e751657c3f85ab6a9296",
+          "killPid": 1091227,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        },
+        {
+          "action": "pay",
+          "operationId": "0xacd41bae7148eb08b83ad8c4cc18f898ae1702e8fb96a13b92b69313b8b26879",
+          "actor": "0x22d491bde2303f2f43325b2108d26f1eaba1e32b",
+          "nonce": "2",
+          "transactionHash": "0x61a727a5a40c8f59b77263e81856bfb23250d20f9da626d0e232986423ea4954",
+          "killPid": 1091371,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        }
+      ]
+    },
+    {
+      "artifact": "lifecycle-evidence/child-after_broadcast.json",
+      "scenario": "child",
+      "killPoint": "after_broadcast",
+      "accounting": {
+        "escrowFunded": "160",
+        "paid": "60",
+        "refunded": "100",
+        "remaining": "0"
+      },
+      "balances": {
+        "A": "1000",
+        "B": "940",
+        "C": "60",
+        "escrow": "0"
+      },
+      "reobservations": 10,
+      "operations": [
+        {
+          "action": "submit",
+          "operationId": "0xa21ff04a6e4f458487fd4c7b21199e8cd3c62ed66701b1bc8810690441401659",
+          "actor": "0xd03ea8624c8c5987235048901fb614fdca89b117",
+          "nonce": "0",
+          "transactionHash": "0xee23a15c77e8a2d4594dc94a85f96fc60dc5ad68cfc3fd8768bb3a9359a46ad2",
+          "killPid": 1095690,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        },
+        {
+          "action": "decision",
+          "operationId": "0x51f4a367ffac13b3575fbae63af4a476cd67601d1c2593bb3e9c2d2281cd11ee",
+          "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+          "nonce": "0",
+          "transactionHash": "0xf0fac9e6c64997b5d4a80628780db33a76c518f0255483f05ac267db1a6d5071",
+          "killPid": 1095796,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        },
+        {
+          "action": "refund",
+          "operationId": "0xc49b1612b070b935768c0a9a61eb7e7c4d2ed2f012a02f96cb0b4533aba2bd2c",
+          "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+          "nonce": "1",
+          "transactionHash": "0x9e7cad71069223d9bc339ce3461187332788b2cf1b95c67b4af01ff60eaa1894",
+          "killPid": 1095870,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        },
+        {
+          "action": "pay",
+          "operationId": "0x7c4e8c0094da5bb2de0293c1f721eebc292c87ad8e751ff74f0ec1f4904b30f8",
+          "actor": "0xd03ea8624c8c5987235048901fb614fdca89b117",
+          "nonce": "1",
+          "transactionHash": "0xd4ac4350f2c224764e4904139a1ecba6c7daa835656772b3e3b274c902aac88c",
+          "killPid": 1095960,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        }
+      ]
+    },
+    {
+      "artifact": "lifecycle-evidence/child-after_observation.json",
+      "scenario": "child",
+      "killPoint": "after_observation",
+      "accounting": {
+        "escrowFunded": "160",
+        "paid": "60",
+        "refunded": "100",
+        "remaining": "0"
+      },
+      "balances": {
+        "A": "1000",
+        "B": "940",
+        "C": "60",
+        "escrow": "0"
+      },
+      "reobservations": 10,
+      "operations": [
+        {
+          "action": "submit",
+          "operationId": "0x41a71afb491ab7c24bf731fc3aa2ee8fb67f7f31f267d9db3a86d18b195456f7",
+          "actor": "0xd03ea8624c8c5987235048901fb614fdca89b117",
+          "nonce": "0",
+          "transactionHash": "0x6f370d796d75bcd7b8d4b26f21dab14d96ba0cd2cc5b4f35af9cc6b781661e52",
+          "killPid": 1096152,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        },
+        {
+          "action": "decision",
+          "operationId": "0x8e0bd452179f96878f766266e9466b2d4414b52231d32cc756099e4ef2ff734d",
+          "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+          "nonce": "0",
+          "transactionHash": "0xdd6f3edb567993c3fd32c6ac1a5ff5309976751b3f69584366a05801cb38cfff",
+          "killPid": 1096247,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        },
+        {
+          "action": "refund",
+          "operationId": "0x9acd1ca70bc6cda21f772f7d2feca2d5e86f3dd8c4d0407b97d34f766c07e794",
+          "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+          "nonce": "1",
+          "transactionHash": "0x8d70efa10ee9fd0353b06fef6c8b8683b84f0a57072b4cc2ab88604c6e637a2b",
+          "killPid": 1096402,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        },
+        {
+          "action": "pay",
+          "operationId": "0x331eb233b576831b543a1335eecc656b93b07f0ce9fb66d3dfdef28c8a14b931",
+          "actor": "0xd03ea8624c8c5987235048901fb614fdca89b117",
+          "nonce": "1",
+          "transactionHash": "0x539668c12190f0499c50f9c55032f10c55e7141ba79511d0802f0ebe3c9d09f1",
+          "killPid": 1096485,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        }
+      ]
+    },
+    {
+      "artifact": "lifecycle-evidence/child-after_recorded.json",
+      "scenario": "child",
+      "killPoint": "after_recorded",
+      "accounting": {
+        "escrowFunded": "160",
+        "paid": "60",
+        "refunded": "100",
+        "remaining": "0"
+      },
+      "balances": {
+        "A": "1000",
+        "B": "940",
+        "C": "60",
+        "escrow": "0"
+      },
+      "reobservations": 10,
+      "operations": [
+        {
+          "action": "submit",
+          "operationId": "0x746b6aa6446d7b06950a37e0f7ff4c3663034f8ef2e76633ac7360d5ab478e7b",
+          "actor": "0xd03ea8624c8c5987235048901fb614fdca89b117",
+          "nonce": "0",
+          "transactionHash": "0x68e2ef7e77c448fda537b89daca6ed5a9cc965dcf81f37edb75d1d18419bfb52",
+          "killPid": 1096709,
+          "signal": "SIGKILL",
+          "afterLoss": "Included",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        },
+        {
+          "action": "decision",
+          "operationId": "0x39666cba9e8fe30a64f5462ab171f0e20bef0691651d91268f9b05b9f20571b3",
+          "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+          "nonce": "0",
+          "transactionHash": "0x0eac469f964d7f3bf84029a07b2b69d21360e320a83b56d4047d90d469e9d3bd",
+          "killPid": 1096824,
+          "signal": "SIGKILL",
+          "afterLoss": "Included",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        },
+        {
+          "action": "refund",
+          "operationId": "0xd7bb50937105905460a522280ad4509e56ca1327e1817c1b8352e94480880bea",
+          "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+          "nonce": "1",
+          "transactionHash": "0xb3136508076684a81b51df41652dd3eda9f74b69b667db00c00aeb5fe8cf641e",
+          "killPid": 1096921,
+          "signal": "SIGKILL",
+          "afterLoss": "Included",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        },
+        {
+          "action": "pay",
+          "operationId": "0xb8890d35b63a3271f5846abf3aa427124a4a2d6a75cf59285b7e09cd1ab956ab",
+          "actor": "0xd03ea8624c8c5987235048901fb614fdca89b117",
+          "nonce": "1",
+          "transactionHash": "0xa30753031cff49b9efc54d5322097bbe1cba69a194dff9cd2b1ce2b52dd9e778",
+          "killPid": 1097009,
+          "signal": "SIGKILL",
+          "afterLoss": "Included",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        }
+      ]
+    },
+    {
+      "artifact": "lifecycle-evidence/child-before_broadcast.json",
+      "scenario": "child",
+      "killPoint": "before_broadcast",
+      "accounting": {
+        "escrowFunded": "160",
+        "paid": "60",
+        "refunded": "100",
+        "remaining": "0"
+      },
+      "balances": {
+        "A": "1000",
+        "B": "940",
+        "C": "60",
+        "escrow": "0"
+      },
+      "reobservations": 10,
+      "operations": [
+        {
+          "action": "submit",
+          "operationId": "0xf4da0e51567178bfcb68c1857e0b7cd3a62265746dbae3bee2be604de250e15d",
+          "actor": "0xd03ea8624c8c5987235048901fb614fdca89b117",
+          "nonce": "0",
+          "transactionHash": "0xe99ed2a40fd222f3ae71d806621f54d462c821da5486c69188a833d040d10b59",
+          "killPid": 1095217,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        },
+        {
+          "action": "decision",
+          "operationId": "0xa7a60b3429934074f509b7512b1b1644dbb4cc7cfc174889d91ba8b4fc999bb9",
+          "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+          "nonce": "0",
+          "transactionHash": "0xada4b5d60edd1ce38929ce6873c2c0ad7af172f503f6dd819ffc8e439e7ea860",
+          "killPid": 1095300,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        },
+        {
+          "action": "refund",
+          "operationId": "0x9a4b50e76b72e9c6093388ca32ff96ffbcd2ae5c5a9bb2bf925ff25d0e06555b",
+          "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+          "nonce": "1",
+          "transactionHash": "0x067d0e01f77400a562128acbe036d9b49551c66a4c57881e9b7e6276b52fb9ce",
+          "killPid": 1095420,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        },
+        {
+          "action": "pay",
+          "operationId": "0x89c0d8f119b4c372270314446b87e32ccd215a2c3f8bd495cda4fac1de5aed83",
+          "actor": "0xd03ea8624c8c5987235048901fb614fdca89b117",
+          "nonce": "1",
+          "transactionHash": "0x09e2a88ea263162bbaa73ea9e35d9b5df6668f79d3c5f1e5be11c7fa209d7a81",
+          "killPid": 1095494,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        }
+      ]
+    },
+    {
+      "artifact": "lifecycle-evidence/missing-custody-after_broadcast.json",
+      "scenario": "missing-custody",
+      "killPoint": "after_broadcast",
+      "accounting": {
+        "escrowFunded": "100",
+        "paid": "0",
+        "refunded": "100",
+        "remaining": "0"
+      },
+      "balances": {
+        "A": "1000",
+        "B": "1000",
+        "C": "0",
+        "escrow": "0"
+      },
+      "reobservations": 3,
+      "operations": [
+        {
+          "action": "submit",
+          "operationId": "0x71003e604da0660ab710c6163687711850db6f4cfa798a769507d354f16ad922",
+          "actor": "0x22d491bde2303f2f43325b2108d26f1eaba1e32b",
+          "nonce": "1",
+          "transactionHash": "0xaa7eb8efe7b11d48b7aadbabb7ce1f1f9e2e824d478a4701483484eccf18bc6d",
+          "killPid": 1094276,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        },
+        {
+          "action": "refund",
+          "operationId": "0x300a53ff821bf072c4da1c52ce88932ae3e01c548c7b2ac4d0af19598bda9642",
+          "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+          "nonce": "0",
+          "transactionHash": "0x417c190887ecba0a7be5b8f76875c7e579c6ea80691186f58a08352112bfed3b",
+          "killPid": 1094407,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        }
+      ]
+    },
+    {
+      "artifact": "lifecycle-evidence/missing-custody-after_observation.json",
+      "scenario": "missing-custody",
+      "killPoint": "after_observation",
+      "accounting": {
+        "escrowFunded": "100",
+        "paid": "0",
+        "refunded": "100",
+        "remaining": "0"
+      },
+      "balances": {
+        "A": "1000",
+        "B": "1000",
+        "C": "0",
+        "escrow": "0"
+      },
+      "reobservations": 3,
+      "operations": [
+        {
+          "action": "submit",
+          "operationId": "0xe35846e731ceeeebeffaa534e9aec37ac11a4d44bd84b0a9d5a7a56cc26819c4",
+          "actor": "0x22d491bde2303f2f43325b2108d26f1eaba1e32b",
+          "nonce": "1",
+          "transactionHash": "0xaf24a12d72fc057b3ac44543f4520b4c1f99b95acce067a8bceef57114da36e8",
+          "killPid": 1094643,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        },
+        {
+          "action": "refund",
+          "operationId": "0xb41879f4aed578304cc978e9a194a419d43bbffb110fb195e1b8a5719fe44dfd",
+          "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+          "nonce": "0",
+          "transactionHash": "0x9a747e49dc54d90a34bb552387fd6cd7b1cbddae2207e3d7835ee6f8a9dfe161",
+          "killPid": 1094781,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        }
+      ]
+    },
+    {
+      "artifact": "lifecycle-evidence/missing-custody-after_recorded.json",
+      "scenario": "missing-custody",
+      "killPoint": "after_recorded",
+      "accounting": {
+        "escrowFunded": "100",
+        "paid": "0",
+        "refunded": "100",
+        "remaining": "0"
+      },
+      "balances": {
+        "A": "1000",
+        "B": "1000",
+        "C": "0",
+        "escrow": "0"
+      },
+      "reobservations": 3,
+      "operations": [
+        {
+          "action": "submit",
+          "operationId": "0x23ab24ed29311fcda76a369ba61a6784fb22349ad46aa4aeabd3ef3e431cae98",
+          "actor": "0x22d491bde2303f2f43325b2108d26f1eaba1e32b",
+          "nonce": "1",
+          "transactionHash": "0x09297476c1619cf6c24a65cd935b474e675fbd5c6ce0677390b60159f0d22423",
+          "killPid": 1095026,
+          "signal": "SIGKILL",
+          "afterLoss": "Included",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        },
+        {
+          "action": "refund",
+          "operationId": "0x732f01c5523d95a853d016065135f3f640626e997673bd4ca919d3f8d737ec22",
+          "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+          "nonce": "0",
+          "transactionHash": "0x57095302cef43c5a4e5b3fee16b9ca11f7348bf716f2e157c5c5ad8fd75a3ace",
+          "killPid": 1095113,
+          "signal": "SIGKILL",
+          "afterLoss": "Included",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        }
+      ]
+    },
+    {
+      "artifact": "lifecycle-evidence/missing-custody-before_broadcast.json",
+      "scenario": "missing-custody",
+      "killPoint": "before_broadcast",
+      "accounting": {
+        "escrowFunded": "100",
+        "paid": "0",
+        "refunded": "100",
+        "remaining": "0"
+      },
+      "balances": {
+        "A": "1000",
+        "B": "1000",
+        "C": "0",
+        "escrow": "0"
+      },
+      "reobservations": 3,
+      "operations": [
+        {
+          "action": "submit",
+          "operationId": "0xee7149c206186d5c52054fb46c640678c59894e6d32d3cdcbb246cb90739aefc",
+          "actor": "0x22d491bde2303f2f43325b2108d26f1eaba1e32b",
+          "nonce": "1",
+          "transactionHash": "0xd1ffc77891ea9cc69ff663fba647dd8f3ef41a3ff251cad20d006b0abdfb4be6",
+          "killPid": 1094108,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        },
+        {
+          "action": "refund",
+          "operationId": "0x64bf028a1eb730ffdcdb42e8b8b1ed794f16df5a4264b65780f88d309da14d53",
+          "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+          "nonce": "0",
+          "transactionHash": "0xa37d06162add98d3d65eed935f4f226ed9d836cf941989ce5bafb4d284ebe4d7",
+          "killPid": 1094191,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        }
+      ]
+    },
+    {
+      "artifact": "lifecycle-evidence/rejected-after_broadcast.json",
+      "scenario": "rejected",
+      "killPoint": "after_broadcast",
+      "accounting": {
+        "escrowFunded": "100",
+        "paid": "0",
+        "refunded": "100",
+        "remaining": "0"
+      },
+      "balances": {
+        "A": "1000",
+        "B": "1000",
+        "C": "0",
+        "escrow": "0"
+      },
+      "reobservations": 6,
+      "operations": [
+        {
+          "action": "submit",
+          "operationId": "0xb5af0358c2c0aa6a6f5bb9102ca7294ca0b1bd57fcc99a9f5196254a4be55db9",
+          "actor": "0x22d491bde2303f2f43325b2108d26f1eaba1e32b",
+          "nonce": "1",
+          "transactionHash": "0xc46097453c25c710e90543d2e0525f76a514d4b91ed6f469fba4dfaf3ac47251",
+          "killPid": 1092999,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        },
+        {
+          "action": "decision",
+          "operationId": "0xd4ef80010bae4582b348ef80075b0479bfa7de41196ab0d052500041190b2330",
+          "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+          "nonce": "0",
+          "transactionHash": "0xdf58f590cb04ad7c53ccebdf43718f16a8aab67ab8cdf2412b4f6da3784d4f4e",
+          "killPid": 1093166,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        },
+        {
+          "action": "refund",
+          "operationId": "0xfd536b1ecff73a216e17c38f0251d3059c661a785ff0afd5df366e69c36cc701",
+          "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+          "nonce": "1",
+          "transactionHash": "0xc18f07d02e15db673f3697c47fc9859274dfe96c0e07d9fa6cdbb99985354944",
+          "killPid": 1093244,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        }
+      ]
+    },
+    {
+      "artifact": "lifecycle-evidence/rejected-after_observation.json",
+      "scenario": "rejected",
+      "killPoint": "after_observation",
+      "accounting": {
+        "escrowFunded": "100",
+        "paid": "0",
+        "refunded": "100",
+        "remaining": "0"
+      },
+      "balances": {
+        "A": "1000",
+        "B": "1000",
+        "C": "0",
+        "escrow": "0"
+      },
+      "reobservations": 6,
+      "operations": [
+        {
+          "action": "submit",
+          "operationId": "0x2b3e9c62e4395b24396d97a3a9cb564a9247794ebb2af382e7727fc8521fdf98",
+          "actor": "0x22d491bde2303f2f43325b2108d26f1eaba1e32b",
+          "nonce": "1",
+          "transactionHash": "0x325bbef57c3b6e3f170c5e1bff9b55c4add0540d2b51a69182fc0a9dd4eb08dd",
+          "killPid": 1093371,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        },
+        {
+          "action": "decision",
+          "operationId": "0x1ea8ae83d0a3ba6a427f599f5e94e554d5f4c2447c38a205d3726225a9e59452",
+          "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+          "nonce": "0",
+          "transactionHash": "0x07662c6dda234969981788e678a314205145e5f6d37b792303fd13fe19f7f5dc",
+          "killPid": 1093440,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        },
+        {
+          "action": "refund",
+          "operationId": "0xdf5f350f673baf2dc6c8f84a3fb274c58eecf1005d30eee46eed6d893b3e89c6",
+          "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+          "nonce": "1",
+          "transactionHash": "0x3c94e350a02d79f8df384433c9b67c94793ec9238ea69d021ee50ee36e434964",
+          "killPid": 1093549,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        }
+      ]
+    },
+    {
+      "artifact": "lifecycle-evidence/rejected-after_recorded.json",
+      "scenario": "rejected",
+      "killPoint": "after_recorded",
+      "accounting": {
+        "escrowFunded": "100",
+        "paid": "0",
+        "refunded": "100",
+        "remaining": "0"
+      },
+      "balances": {
+        "A": "1000",
+        "B": "1000",
+        "C": "0",
+        "escrow": "0"
+      },
+      "reobservations": 6,
+      "operations": [
+        {
+          "action": "submit",
+          "operationId": "0xb5a2d36fe117ab0f162c0335f2669469d2063eba7cacbad6fbe1e6a4d1248aee",
+          "actor": "0x22d491bde2303f2f43325b2108d26f1eaba1e32b",
+          "nonce": "1",
+          "transactionHash": "0x8a1018057b1ec6e60f05ebd67c5028e11d5a1a0f8c1460489c1c567ed0cc78c1",
+          "killPid": 1093733,
+          "signal": "SIGKILL",
+          "afterLoss": "Included",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        },
+        {
+          "action": "decision",
+          "operationId": "0xd75c5b5f4ea1b7238bddddd129a97af525c10f54e33c3c33a07917b2bb0d6f5f",
+          "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+          "nonce": "0",
+          "transactionHash": "0x0b424653c2ff280518e3f4700ba6227dc89226d4a9844eaf71c819db4419df26",
+          "killPid": 1093790,
+          "signal": "SIGKILL",
+          "afterLoss": "Included",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        },
+        {
+          "action": "refund",
+          "operationId": "0x7daaf5fb87b75b470eecad2c9d11ae82df1ba8b37cf8552e18ef25a77ba05396",
+          "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+          "nonce": "1",
+          "transactionHash": "0x40c1a7cbe39be9e62f8aa526ddb39e067b4f5304964ea5012cb076b600899304",
+          "killPid": 1093900,
+          "signal": "SIGKILL",
+          "afterLoss": "Included",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        }
+      ]
+    },
+    {
+      "artifact": "lifecycle-evidence/rejected-before_broadcast.json",
+      "scenario": "rejected",
+      "killPoint": "before_broadcast",
+      "accounting": {
+        "escrowFunded": "100",
+        "paid": "0",
+        "refunded": "100",
+        "remaining": "0"
+      },
+      "balances": {
+        "A": "1000",
+        "B": "1000",
+        "C": "0",
+        "escrow": "0"
+      },
+      "reobservations": 6,
+      "operations": [
+        {
+          "action": "submit",
+          "operationId": "0x03c78aaed0e905e97c687c151c9cf77ad32a036668103159dc7f67f65146059d",
+          "actor": "0x22d491bde2303f2f43325b2108d26f1eaba1e32b",
+          "nonce": "1",
+          "transactionHash": "0x5e4e3355354ca0fd914b6a4b59e5deceac16ae6df7830da32fc2b3aa41f5d5cb",
+          "killPid": 1092706,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        },
+        {
+          "action": "decision",
+          "operationId": "0xf7f9931ca43dbaf85d1f7cb62020b2911d4a811b2bc18f673c718f0c0dc7a0c9",
+          "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+          "nonce": "0",
+          "transactionHash": "0xb284768dda88a0018118b6eaeee3deb2ae29aecebc528da831b7817147287032",
+          "killPid": 1092755,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        },
+        {
+          "action": "refund",
+          "operationId": "0x5aa62b79567f683b914bdb38a598882f85d94d3bbbe2fb5afa28fcf55c6b7b6d",
+          "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+          "nonce": "1",
+          "transactionHash": "0xce7ec945f61e2df5ee8cbbcc0a50db09bcca677cd7544ab22bb6a673f480079b",
+          "killPid": 1092850,
+          "signal": "SIGKILL",
+          "afterLoss": "Unknown",
+          "finalState": "Included",
+          "broadcasts": 1,
+          "inclusions": 1
+        }
+      ]
+    }
+  ],
+  "totals": {
+    "nodeChecks": 56,
+    "pythonChecks": 38,
+    "lifecycleRuns": 16,
+    "lifecycleKills": 48,
+    "laterReobservations": 100
+  },
+  "preservation": {
+    "capturedUtc": "2026-09-14T14:35:41.444135+00:00",
+    "files_checked": 3688,
+    "changed_files": [],
+    "head_unchanged": true,
+    "branch_unchanged": true,
+    "status_unchanged": true
+  },
+  "priorPublishedArtifactsUnchanged": true,
+  "securityGate": {
+    "capturedUtc": "2026-09-14T14:36:10.443905+00:00",
+    "head": "f1b88451527b2dec7314114b3b1e91cf101312cf",
+    "worktreeStatus": "M docs/security/consumer-support.md\n M docs/security/launch-execution-plan.md\n M docs/security/launch-status.md\n M docs/security/m4-consumer-qualification.md\n M docs/security/m4-local-acceptance.md",
+    "acceptanceOpening": "# M4 local consumer-boundary acceptance\n\nStatus: all required local execution gates, final documentation review and source\ngraph refresh passed on 2026-09-14 UTC. Commit/push closeout remains in progress. The\nhosted MSRV serial-profile job is still running; its previously observed failure\nis not yet resolved. Local acceptance is not all-PR success, merge approval or\nrelease authorization.\n\nThe repaired Rust/SDK/schema/dependency source is\n`8738bdfd7be8c43a0543ca0ce468541529c47add`. Later CI and proof-report repairs\nchange verification inputs only; their separate qualification is recorded below.\nCurrent results include 45 exact M4 cases, 61 exact M3 cases, all 69 flow\ninventories, 17,187 workspace tests, normal build, strict all-target Clippy,\nsupported compatibility/portable profiles, four-language consumers and explicit\nC++/FFI/live/Drogon acceptance. The 48 existing workspace ignores are unchanged;\nno required M4 test is ignored. Earlier failed runs and their repairs remain\nrecorded below, but do not replace these current passing gates.",
+    "acceptanceSha256": "69a17e6df095e349cd2638be11ce3c6cfe41e0f23d4eb7f4b45aa177a3a61a0b",
+    "selectedForIntegration": false,
+    "reason": "Local acceptance now reports all required local gates passed, but closeout documentation remains uncommitted and hosted MSRV qualification is in progress. No exact-head hosted/review qualification inferred."
+  },
+  "securityPr": {
+    "baseRefOid": "f5566d9a765c21cb36652a99c79de64968a656bf",
+    "headRefOid": "6bb648b613b44ff5aaf1853768f2747bff166077",
+    "isDraft": true,
+    "mergeStateStatus": "BLOCKED",
+    "number": 1117,
+    "state": "OPEN",
+    "url": "https://github.com/bb-connor/arc/pull/1117"
+  },
+  "integrationRehearsal": {
+    "capturedUtc": "2026-09-14T14:38:08.169460+00:00",
+    "researchHead": "331bd1bf8cd347c3b2cc70aaee459894bc5218df",
+    "securityHead": "f1b88451527b2dec7314114b3b1e91cf101312cf",
+    "mergeBase": "f5566d9a765c21cb36652a99c79de64968a656bf",
+    "shallow": false,
+    "command": "git merge-tree --write-tree --name-only --no-messages f1b88451527b2dec7314114b3b1e91cf101312cf 331bd1bf8c",
+    "exitCode": 1,
+    "resultTree": "490e19f6e3447ac66cc907dd5aae01b5bcf3407f",
+    "conflictPaths": [
+      "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal.rs",
+      "crates/kernel/chio-kernel/src/kernel/tests/durable_admission.rs",
+      "crates/kernel/chio-kernel/tests/durable_admission_sqlite.rs",
+      "crates/kernel/chio-runtime-core/src/store/sqlite.rs",
+      "crates/kernel/chio-runtime-core/tests/runtime_admission.rs",
+      "crates/platform/chio-store-sqlite/src/admission_operation_store.rs",
+      "crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs",
+      "crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain.rs",
+      "crates/protocol/chio-a2a-edge/src/tests/all.rs",
+      "docs/formal/COVERAGE.md"
+    ],
+    "codeConflicts": 9,
+    "generatedConflicts": [
+      "docs/formal/COVERAGE.md"
+    ],
+    "nativeAdmissionSchemaVersions": {
+      "research": 10,
+      "security": 34
+    },
+    "inputs": [
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store.rs",
+        "researchSha256": "6772a78fc6b0f982cc6c51efb0c57c5803e422ecbd80ffed063c05bb42a9c3d4",
+        "securitySha256": "e45c0f8192c50a3efaca4bfd03f395a8b12e379acbc4cbf1f51e4033fca9852a"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs",
+        "researchSha256": "e59ffc7a7181d6ff669c0d1470761e498de1edfd8504f806af8826190a19a951",
+        "securitySha256": "798ede3608aab494b4a1142dcb0b8b34d5beafb935404961ec2e066e5b32ba2e"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain.rs",
+        "researchSha256": "c9b877d9ce760bc6845f27354cd75e23cc9932e3d6ca2d6cda7426b4a52286fe",
+        "securitySha256": "e99b7cfa8cad2b2f04e77992a4a47274faffcd780f3a12c27d254062cf88c5a4"
+      }
+    ],
+    "scope": "Read-only merge-tree rehearsal of two committed inputs. Security closeout documentation remains dirty and is excluded. No merge, conflict resolution, populated native store migration or integration build performed."
+  },
+  "retainedPrivateState": "/tmp/chio-lifecycle-execution/retained-child",
+  "publicEvidenceSecretScan": {
+    "retainedFixturePrivateKeysChecked": 5,
+    "matches": 0
+  },
+  "limits": [
+    "Actual post-funding rail-worker loss; the workflow parent, signer and private chain stay alive.",
+    "Funding/deployment/setup and full orchestration-parent restart remain outside this slice.",
+    "Trusted single host, local journals, verifier and one private RPC; all synthetic keys share administration.",
+    "Included is private-chain observation, not public finality or independent proof verification.",
+    "No native funding admission/original hold, Finding facets, native confinement or killed parent tool process.",
+    "No distributed nonce coordination, malicious-owner rollback resistance, fee replacement or mined-revert successor.",
+    "64 permanent journal slots with logical byte bounds; no sustained availability or trial-capacity claim.",
+    "Native integration requires committed qualified M4 closeout and semantic/schema/manifest reconciliation.",
+    "Prior native workspace and model/buyer suites were not rerun by this Node-only implementation."
+  ]
+}

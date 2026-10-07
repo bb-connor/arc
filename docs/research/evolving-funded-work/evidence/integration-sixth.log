@@ -1,0 +1,26 @@
+test_growth_preserves_original_work_and_earned_child_after_parent_loss (__main__.EvolvingWork.test_growth_preserves_original_work_and_earned_child_after_parent_loss) ... FAIL
+
+======================================================================
+FAIL: test_growth_preserves_original_work_and_earned_child_after_parent_loss (__main__.EvolvingWork.test_growth_preserves_original_work_and_earned_child_after_parent_loss)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/examples/federated-work/test_evolving_work.py", line 19, in test_growth_preserves_original_work_and_earned_child_after_parent_loss
+    self.assertEqual(result.returncode, 0, result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /tmp/chio-verifiable-work-paper/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /tmp/chio-verifiable-work-paper/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+scout stopped before tool dispatch: {"allocationId":"0x13dfe726ded8813fd9a478de5ce866dd1baae3a707aaf06aee5eb972ed7f4692","authorityUuid":"01a0ffe1-3050-7452-8624-cfbce8272ff3","authorizationId":null,"executions":0,"externalFundsTransferred":false,"fundingCorrelation":"not_authorized","holdId":"admission-budget:06d3116c31bed36d39032bcb9b3a9fc90fffeeda1779b73d2e726310cf6b318c:0","nativeAuthorizationId":null,"nativeEvaluationError":"internal error: federation cosigner missing for request scout bound to origin kernel did:chio:74fc291a8c639304704b6aba9a2b6e1ba4cc4be155d518c4fa295faa9756ddae","nativePaymentAction":null,"nativePaymentState":"Closed","nativeState":"CompensatedBeforeDispatch","operationId":"06d3116c31bed36d39032bcb9b3a9fc90fffeeda1779b73d2e726310cf6b318c","paymentState":"not_authorized","profile":"chio.experimental.local-confirmed-funding.v1","requestId":"scout","settlementObservationError":null,"settlementTransaction":null,"startupReconciliationError":null}
+
+
+----------------------------------------------------------------------
+Ran 1 test in 23.262s
+
+FAILED (failures=1)

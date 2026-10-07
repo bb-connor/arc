@@ -284,7 +284,8 @@ fn spine_run_positive(
     let profile = copy("profile.json")?;
     let request = copy("request.json")?;
     let bundle = copy("bundle.json")?;
-    let seed = copy("verifier.seed")?;
+    let seed = scratch.join("verifier.seed");
+    stage_signing_fixture(&fixture_dir.join("verifier.seed"), &seed)?;
     let trust_body = copy("runtime-trust-body.json")?;
     let query_report = copy("pheromone-query-report.json")?;
     let peer_weights_body = copy("runtime-peer-weights-body.json")?;

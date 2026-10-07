@@ -1,0 +1,972 @@
+{
+  "schema": "chio.local-native-successor-evidence.v1",
+  "createdAtUTC": "2026-09-15T01:27:35.787403+00:00",
+  "baseCommit": "5257f963d869d89c7a54384ea88628cf727c32c8",
+  "branch": "feat/funded-native-admission",
+  "status": "qualified locally; committed source candidate, no hosted or release qualification",
+  "scope": "Original positive-capture contractual waiver plus separately funded earned child surviving native parent SIGKILL",
+  "profile": "chio.experimental.local-confirmed-funding.v1",
+  "sourceObjects": {
+    "crates": "d1ea990b7fda83da71e1e6b0f3c24b6a00e3ec61",
+    "examples/federated-work": "c24ff84305445231ad978b3433c5c9088d6cd2dc",
+    "examples/funded-work": "0d1dabaa87d2d799ff41bfb88b31d90903cef3b1",
+    "contracts": "6dca21f5dd982c73699162d79057d2360b9cd4e0",
+    "fuzz": "5fc396a603eccfd406026bbbdf02d769729f09bd",
+    "spec": "3667a614f205f4abf3bff40d07e920535822630b",
+    "formal": "fa7e1f4be462a208596071d5ad5bbf3773cf830f",
+    "Cargo.toml": "f622b684573a9e01d2807f6eb95a8f74bfdb6b23",
+    "Cargo.lock": "3beee23ddc1b00265130dc87b135da0b1cc2a0a3",
+    "rust-toolchain.toml": "b1dd491cdce6f8b98cfe02f6807980c0dfe48784",
+    "scripts": "df402aa28a82819d63fdc7d8bf055519b700c382",
+    "xtask": "82dde61cbe5b4c77858cc05e7d4ad859da151203",
+    "docs/formal": "ce17c9909053ca63de31cfa8fa93d742e20f5abb"
+  },
+  "sourceBinding": "Source tree objects identify runtime and qualification inputs without a self-referential commit hash. Compare against the containing commit. Changed implementation/test hashes are retained separately.",
+  "binarySha256": "d5f1fc4dd103370f7a3b865278008d2c56a284eb720c4684b9467354154d0185",
+  "environment": {
+    "rust": "1.94.1 aarch64-unknown-linux-gnu",
+    "node": "24.16.0",
+    "ganacheBackend": "JavaScript fallback; optional native uWS and bigint bindings unavailable on this Node/architecture",
+    "python": "3.13.13",
+    "pythonDependencies": "examples/federated-work/python_buyer/requirements.txt installed with --require-hashes",
+    "chainId": "31337",
+    "token": "private mock ERC20",
+    "confirmations": "two descendant blocks",
+    "fundingUnitsPerAllocation": 100,
+    "CARGO_TARGET_DIR": "target",
+    "CARGO_BUILD_JOBS": "3",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "RUST_TEST_THREADS": "1",
+    "umask": "022",
+    "coreDumps": "disabled"
+  },
+  "counts": {
+    "resolutionScenarios": 7,
+    "resolutionSIGKILL": 3,
+    "earnedChildScenarios": 4,
+    "parentSIGKILL": 4,
+    "childCollectorSIGKILL": 3,
+    "lifecycleRegressionScenarios": 27,
+    "lifecycleRegressionSIGKILL": 22,
+    "admissionRegressionScenarios": 5,
+    "admissionRegressionSIGKILL": 4,
+    "totalOwnedProcessScenarios": 43,
+    "totalSIGKILL": 36,
+    "standaloneRustTests": 37,
+    "nativeDurableUniqueTests": 22,
+    "kernelUnitTests": 1445,
+    "selectedSqliteTests": 48,
+    "pythonRegressionTests": 68,
+    "contractAndInventoryTests": 19
+  },
+  "artifacts": [
+    {
+      "path": "native-successor-evidence/absent-complete.json",
+      "sha256": "3981b2ae1816f0d05c6be7c8dc7e649b794191f647220d53c2816c78299fc59e",
+      "bytes": 3246
+    },
+    {
+      "path": "native-successor-evidence/absent-refund-after-broadcast.json",
+      "sha256": "fc85ec82ce094f5e1f73c407488d381176188b06fb9d2be15cb31fb4f168c96c",
+      "bytes": 3863
+    },
+    {
+      "path": "native-successor-evidence/admission.log",
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_smoke.py"
+      ],
+      "startedAt": "2026-09-15T01:17:09.007856+00:00",
+      "completedAt": "2026-09-15T01:18:54.835957+00:00",
+      "elapsedSeconds": 105.828,
+      "exitCode": 0,
+      "sha256": "37e42fd87e872459cda123d427cb341262f8cddc5673b78843de1224a506d3ab",
+      "rawSha256": "37e42fd87e872459cda123d427cb341262f8cddc5673b78843de1224a506d3ab",
+      "bytes": 410,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "binarySha256": "d5f1fc4dd103370f7a3b865278008d2c56a284eb720c4684b9467354154d0185"
+    },
+    {
+      "path": "native-successor-evidence/after-hold.json",
+      "sha256": "ca5766d82b2491e65bc09d7c527e7dc5b9567244f8220e9663890028ba0c542d",
+      "bytes": 2246
+    },
+    {
+      "path": "native-successor-evidence/after-stage.json",
+      "sha256": "1e1aaa1863edb307d760a295edfefca90edb36c69e3acdecdfca903b1b39594a",
+      "bytes": 2009
+    },
+    {
+      "path": "native-successor-evidence/after-tool.json",
+      "sha256": "c1939f6c1dbc8a8b19e0ed87c924320dcf1f67a8e434912b840520bfd4c92cc7",
+      "bytes": 2161
+    },
+    {
+      "path": "native-successor-evidence/before-bind.json",
+      "sha256": "abd6ccc23371d951c5db820f15973c1a10379ab4cab3755cb471e64ae32a0426",
+      "bytes": 2038
+    },
+    {
+      "path": "native-successor-evidence/build.log",
+      "command": [
+        "cargo",
+        "build",
+        "--locked",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml"
+      ],
+      "startedAt": "2026-09-15T01:15:17.900470+00:00",
+      "completedAt": "2026-09-15T01:15:37.884495+00:00",
+      "elapsedSeconds": 19.984,
+      "exitCode": 0,
+      "sha256": "c401ad3cdd815c37ce45ab67b918ab35653c0f01b2cbda052f4e065a2dd0114d",
+      "rawSha256": "c401ad3cdd815c37ce45ab67b918ab35653c0f01b2cbda052f4e065a2dd0114d",
+      "bytes": 171,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-successor-evidence/child.log",
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_child.py"
+      ],
+      "startedAt": "2026-09-15T01:17:08.702938+00:00",
+      "completedAt": "2026-09-15T01:19:46.838318+00:00",
+      "elapsedSeconds": 158.135,
+      "exitCode": 0,
+      "sha256": "31bf2db4eeb6bca12d39248ae8a1df88819001182f5817e196227eef6a179a87",
+      "rawSha256": "31bf2db4eeb6bca12d39248ae8a1df88819001182f5817e196227eef6a179a87",
+      "bytes": 233,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "binarySha256": "d5f1fc4dd103370f7a3b865278008d2c56a284eb720c4684b9467354154d0185"
+    },
+    {
+      "path": "native-successor-evidence/contract.log",
+      "command": [
+        "node",
+        "--test",
+        "contracts/scripts/work-claim-escrow.test.mjs",
+        "contracts/scripts/work-claim-native-inventory.test.mjs"
+      ],
+      "startedAt": "2026-09-15T00:32:21.481362+00:00",
+      "completedAt": "2026-09-15T00:33:37.135626+00:00",
+      "elapsedSeconds": 75.654,
+      "exitCode": 0,
+      "sha256": "61d72e03342202a1297eed55929c4a7c76c3516ae52b3068544df8e1d2f6f750",
+      "rawSha256": "61d72e03342202a1297eed55929c4a7c76c3516ae52b3068544df8e1d2f6f750",
+      "bytes": 3174,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-successor-evidence/diff-check.log",
+      "command": [
+        "git",
+        "diff",
+        "--cached",
+        "--check"
+      ],
+      "startedAt": "2026-09-15T01:27:34.711352+00:00",
+      "completedAt": "2026-09-15T01:27:34.738728+00:00",
+      "elapsedSeconds": 0.027,
+      "exitCode": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-successor-evidence/earned-child-none.json",
+      "sha256": "0043c6066adf244c4dd50fcebb9c2f82569ac56dbd0b561dabd786764c424bb7",
+      "bytes": 9076
+    },
+    {
+      "path": "native-successor-evidence/earned-child-pay-after-broadcast.json",
+      "sha256": "48e0d52bbb044fab03da2eb8eae83fa5e86c339308cc292a21edb046eb76aeb7",
+      "bytes": 9073
+    },
+    {
+      "path": "native-successor-evidence/earned-child-pay-after-observation.json",
+      "sha256": "48eccb9dae15f590f0fcc1ba535034f6890ddc2f7ea38f04081f411c20e3a307",
+      "bytes": 9073
+    },
+    {
+      "path": "native-successor-evidence/earned-child-pay-after-prepare.json",
+      "sha256": "404b84ee580d7512b5dd883a37da8a19b912da174293b150700d974f7b2c3654",
+      "bytes": 9073
+    },
+    {
+      "path": "native-successor-evidence/formal-mirrors.log",
+      "command": [
+        "target/debug/xtask",
+        "check",
+        "formal-mirrors"
+      ],
+      "startedAt": "2026-09-15T01:21:06.985749+00:00",
+      "completedAt": "2026-09-15T01:21:10.992618+00:00",
+      "elapsedSeconds": 4.007,
+      "exitCode": 0,
+      "sha256": "039c435a81d3345f94a044979165f19c28dda441658640c4061aa8126df0af86",
+      "rawSha256": "039c435a81d3345f94a044979165f19c28dda441658640c4061aa8126df0af86",
+      "bytes": 41,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-successor-evidence/formal-update.log",
+      "command": [
+        "target/debug/xtask",
+        "check",
+        "formal-mirrors",
+        "--bless"
+      ],
+      "startedAt": "2026-09-15T00:40:00.603597+00:00",
+      "completedAt": "2026-09-15T00:40:04.700575+00:00",
+      "elapsedSeconds": 4.097,
+      "exitCode": 0,
+      "sha256": "e5de584e9ea2746f5780dc099a0e953188da8659fad3127c1f14cdd634d4e6f4",
+      "rawSha256": "e5de584e9ea2746f5780dc099a0e953188da8659fad3127c1f14cdd634d4e6f4",
+      "bytes": 48,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-successor-evidence/fuzz-check.log",
+      "command": [
+        "cargo",
+        "check",
+        "--manifest-path",
+        "fuzz/Cargo.toml",
+        "--bins",
+        "--locked",
+        "--offline"
+      ],
+      "startedAt": "2026-09-15T01:11:53.091967+00:00",
+      "completedAt": "2026-09-15T01:12:33.026785+00:00",
+      "elapsedSeconds": 39.935,
+      "exitCode": 0,
+      "sha256": "97dc31455fa7589623ff3aadc54dff11adf65683cfa876fa698f63a622320840",
+      "rawSha256": "97dc31455fa7589623ff3aadc54dff11adf65683cfa876fa698f63a622320840",
+      "bytes": 2053,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-successor-evidence/happy.json",
+      "sha256": "2538c3e573b15b61268d80079577a66fd861ec5366e188b332769a661712baee",
+      "bytes": 2806
+    },
+    {
+      "path": "native-successor-evidence/hygiene.log",
+      "command": [
+        "python3",
+        "scripts/check-rust-file-hygiene.py"
+      ],
+      "startedAt": "2026-09-15T01:21:06.925747+00:00",
+      "completedAt": "2026-09-15T01:21:08.141402+00:00",
+      "elapsedSeconds": 1.216,
+      "exitCode": 0,
+      "sha256": "260b337ba90d4eb0a43e2cd29ea39be5ff3b9724e734c03f3386db51255f59c0",
+      "rawSha256": "260b337ba90d4eb0a43e2cd29ea39be5ff3b9724e734c03f3386db51255f59c0",
+      "bytes": 43411,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-successor-evidence/kernel-lib.log",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-kernel",
+        "--lib",
+        "--",
+        "--test-threads=1"
+      ],
+      "startedAt": "2026-09-15T00:58:14.363811+00:00",
+      "completedAt": "2026-09-15T01:00:35.715211+00:00",
+      "elapsedSeconds": 141.351,
+      "exitCode": 0,
+      "sha256": "e64e5e127b3292a8aca27300a5bb8c17b94f19da79c601f2b8413a3d06905d74",
+      "rawSha256": "d9fd005adec0711392e9580ba2130d87ad0e4db1e7be2163fe33d2fc483f8e8c",
+      "bytes": 140673,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "passedTests": 1445
+    },
+    {
+      "path": "native-successor-evidence/lifecycle-crashes.log",
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_lifecycle.py",
+        "FundedLifecycle.test_sigkill_around_original_claim_decision_and_money"
+      ],
+      "startedAt": "2026-09-15T01:17:08.942675+00:00",
+      "completedAt": "2026-09-15T01:22:55.813262+00:00",
+      "elapsedSeconds": 346.871,
+      "exitCode": 0,
+      "sha256": "a696349cc1df1771558366d3b78cdea4a04de8e48696dda560ea01a2721e6ca9",
+      "rawSha256": "a696349cc1df1771558366d3b78cdea4a04de8e48696dda560ea01a2721e6ca9",
+      "bytes": 241,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "binarySha256": "d5f1fc4dd103370f7a3b865278008d2c56a284eb720c4684b9467354154d0185"
+    },
+    {
+      "path": "native-successor-evidence/lifecycle-deadlines.log",
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_lifecycle.py",
+        "FundedLifecycle.test_deadline_loss_refunds_even_with_retained_unrecorded_artifacts"
+      ],
+      "startedAt": "2026-09-15T01:17:08.809627+00:00",
+      "completedAt": "2026-09-15T01:19:11.183628+00:00",
+      "elapsedSeconds": 122.374,
+      "exitCode": 0,
+      "sha256": "b21aad897ceafff2bbcf5c3ac3624a3c9564d701c46155c3fc743ef0404e27c9",
+      "rawSha256": "b21aad897ceafff2bbcf5c3ac3624a3c9564d701c46155c3fc743ef0404e27c9",
+      "bytes": 267,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "binarySha256": "d5f1fc4dd103370f7a3b865278008d2c56a284eb720c4684b9467354154d0185"
+    },
+    {
+      "path": "native-successor-evidence/lifecycle-nominal.log",
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_lifecycle.py",
+        "FundedLifecycle.test_payout_rejection_and_missing_work_timeouts"
+      ],
+      "startedAt": "2026-09-15T01:17:08.890903+00:00",
+      "completedAt": "2026-09-15T01:18:59.639858+00:00",
+      "elapsedSeconds": 110.749,
+      "exitCode": 0,
+      "sha256": "52549bec0b16b5482cc838a2ade9b5fa1cd32627f763a63b5bc5801e9dfc29d2",
+      "rawSha256": "52549bec0b16b5482cc838a2ade9b5fa1cd32627f763a63b5bc5801e9dfc29d2",
+      "bytes": 229,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "binarySha256": "d5f1fc4dd103370f7a3b865278008d2c56a284eb720c4684b9467354154d0185"
+    },
+    {
+      "path": "native-successor-evidence/lint-rebuild.json",
+      "sha256": "8c9255043bb6f3cb2b740f4eec34fe5d8e3e8de2aa657a5aa10ee9d753a8d7bc",
+      "bytes": 400
+    },
+    {
+      "path": "native-successor-evidence/native-cleanup-regression.log",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "refund_substitution_cannot_authorize_a_native_waiver",
+        "--",
+        "--ignored",
+        "--test-threads=1"
+      ],
+      "startedAt": "2026-09-15T01:13:15.609527+00:00",
+      "completedAt": "2026-09-15T01:15:17.857136+00:00",
+      "elapsedSeconds": 122.248,
+      "exitCode": 0,
+      "sha256": "195718a1621dd0be7cd2f49692f9d69afc23632a8931b7c9cf2ebecf34d63344",
+      "rawSha256": "7232873adf435e4beec8f30850a44fa4dada70774d75ae594f62715f872b61a4",
+      "bytes": 2511,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "passedTests": 1
+    },
+    {
+      "path": "native-successor-evidence/native-durable-sqlite-final.log",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "chio-kernel",
+        "--test",
+        "durable_admission_sqlite"
+      ],
+      "startedAt": "2026-09-15T00:39:40.226581+00:00",
+      "completedAt": "2026-09-15T00:42:54.569172+00:00",
+      "elapsedSeconds": 194.343,
+      "exitCode": 0,
+      "sha256": "61d6e84d598773cc6a578079a0d195e194ea8b5142e651ea5f3c86d1d77db748",
+      "rawSha256": "193f1e2efe39b07fd4fe669fb75eecc9608b50942a051b6c39f89cdd45713171",
+      "bytes": 3048,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "passedTests": 22
+    },
+    {
+      "path": "native-successor-evidence/native-final-tests.log",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-kernel",
+        "--lib",
+        "--test",
+        "durable_admission_sqlite",
+        "--",
+        "--test-threads=1"
+      ],
+      "startedAt": "2026-09-15T01:17:55.584042+00:00",
+      "completedAt": "2026-09-15T01:23:17.433063+00:00",
+      "elapsedSeconds": 321.849,
+      "exitCode": 0,
+      "sha256": "4717557aa01a1b48bab6d132adf0d997f0dab7ef87a3a26766f5c57f2dc7b20a",
+      "rawSha256": "b69bca21eb89d4cea9847062c08ccef04451d7d1e597718bf9e669d83ebbf485",
+      "bytes": 143556,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "passedTests": 1467
+    },
+    {
+      "path": "native-successor-evidence/native-refunds.log",
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_lifecycle.py",
+        "FundedLifecycle.test_refund_preserves_unknown_execution_and_unwinds_undispatched_hold"
+      ],
+      "startedAt": "2026-09-15T01:17:09.089022+00:00",
+      "completedAt": "2026-09-15T01:17:54.981227+00:00",
+      "elapsedSeconds": 45.892,
+      "exitCode": 0,
+      "sha256": "632328947ccb3fd6301de7b3c38de24b1cfd3a072c07ecf5b49788597347328e",
+      "rawSha256": "632328947ccb3fd6301de7b3c38de24b1cfd3a072c07ecf5b49788597347328e",
+      "bytes": 272,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "binarySha256": "d5f1fc4dd103370f7a3b865278008d2c56a284eb720c4684b9467354154d0185"
+    },
+    {
+      "path": "native-successor-evidence/native-sqlite-global-final.log",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "chio-store-sqlite",
+        "--lib",
+        "serving_owner::global_commit_chain"
+      ],
+      "startedAt": "2026-09-15T00:47:28.406866+00:00",
+      "completedAt": "2026-09-15T00:47:29.656113+00:00",
+      "elapsedSeconds": 1.249,
+      "exitCode": 0,
+      "sha256": "fbbeece457731d0ada21bf64028b08b5eefca61669af9081e7e3b0b9a1234bff",
+      "rawSha256": "ec86bd4b735850b77bb1f9fe2d612bf122c4a5157c7db03f7736c0e7528f83b8",
+      "bytes": 1603,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "passedTests": 11
+    },
+    {
+      "path": "native-successor-evidence/native-sqlite-payment-final.log",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "chio-store-sqlite",
+        "--lib",
+        "payment"
+      ],
+      "startedAt": "2026-09-15T00:47:22.991521+00:00",
+      "completedAt": "2026-09-15T00:47:28.362842+00:00",
+      "elapsedSeconds": 5.371,
+      "exitCode": 0,
+      "sha256": "14552c7b5b5d2b8bf3e48239f4df1cd48407be11203669e209a174c449af7081",
+      "rawSha256": "10ec5150eb2cc9e19d683c170d04fedd43abc57235a661e0a74484dab9a21a92",
+      "bytes": 2000,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "passedTests": 17
+    },
+    {
+      "path": "native-successor-evidence/native-sqlite-schema-final.log",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "chio-store-sqlite",
+        "--lib",
+        "admission_operation_store::tests::schema"
+      ],
+      "startedAt": "2026-09-15T00:43:11.976170+00:00",
+      "completedAt": "2026-09-15T00:46:30.518920+00:00",
+      "elapsedSeconds": 198.543,
+      "exitCode": 0,
+      "sha256": "d5c2b157ca882975e8b962cf9c5a670c617c15243c7e1848ffb457b727bb58f1",
+      "rawSha256": "c5705fd2a75ad45294586b08034217821dd305db4afc5105b190fac3ecff3ac6",
+      "bytes": 3492,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "passedTests": 20
+    },
+    {
+      "path": "native-successor-evidence/native-waiver-race-final.log",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "chio-kernel",
+        "--test",
+        "durable_admission_sqlite",
+        "contractual_resolution"
+      ],
+      "startedAt": "2026-09-15T00:47:29.699629+00:00",
+      "completedAt": "2026-09-15T00:47:50.599593+00:00",
+      "elapsedSeconds": 20.9,
+      "exitCode": 0,
+      "sha256": "a679f4c98e7e5e73b383044463db4c1093bdf7f3cde60d38f7d7810795c83d69",
+      "rawSha256": "fcca2aad9c63d71e2d78f78d594dc07fe9398817bba1f790d8ad91a2ae7b464c",
+      "bytes": 586,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "passedTests": 2
+    },
+    {
+      "path": "native-successor-evidence/pay-after-claim.json",
+      "sha256": "36a10d5bb1484851446989a32972444db2141e04b0fda29c9b5457ab13198ff2",
+      "bytes": 4764
+    },
+    {
+      "path": "native-successor-evidence/pay-after-decision.json",
+      "sha256": "5f17bb7e370fda0da695cc16a6ab541dc8345efcdb7731d5d4b3499450e324b5",
+      "bytes": 4767
+    },
+    {
+      "path": "native-successor-evidence/pay-after-recorded-decision.json",
+      "sha256": "a00aa60edc8e1bfaa03c6e79c8483cdd6a002b94d48247a258136d5e6379ff76",
+      "bytes": 4776
+    },
+    {
+      "path": "native-successor-evidence/pay-after-submission.json",
+      "sha256": "6b05d5590f2ac492e8a1d7b4dd62cb71156bc4e9c0b258abe10a2a74339fc1c8",
+      "bytes": 4769
+    },
+    {
+      "path": "native-successor-evidence/pay-claim-after-broadcast.json",
+      "sha256": "01e9b84e055519fde1056215fad3923840bbe9ea0b234d441e73be8587697866",
+      "bytes": 4774
+    },
+    {
+      "path": "native-successor-evidence/pay-claim-after-prepare.json",
+      "sha256": "bc2f93777437a8281914b73d5c141d62752c68aa7f81df139580b166a4986616",
+      "bytes": 4772
+    },
+    {
+      "path": "native-successor-evidence/pay-complete.json",
+      "sha256": "d1fca2ebdb42387eeeae76ffca34d4e304895836d37ea7ad397abe2f9143e694",
+      "bytes": 4137
+    },
+    {
+      "path": "native-successor-evidence/pay-decision-after-broadcast.json",
+      "sha256": "90c90e8a2b6fd19519aa8f4e0d60fc620e80f21976323bb99303b6ecfe344f5b",
+      "bytes": 4777
+    },
+    {
+      "path": "native-successor-evidence/pay-decision-after-prepare.json",
+      "sha256": "d0833c1e70ccbf28e546691ef227508ce0d5cfee18f66396c585d0dde0725199",
+      "bytes": 4775
+    },
+    {
+      "path": "native-successor-evidence/pay-expired-after-decision.json",
+      "sha256": "22d64d7df20a1ff044b99967bcd63e01ff0c277559a27d572af1c49e40d0f3e7",
+      "bytes": 4110
+    },
+    {
+      "path": "native-successor-evidence/pay-expired-after-submission.json",
+      "sha256": "e3034aa84a1a5603a11ce2d3b356a2839c92faeb467736a112398dcd87f20ecf",
+      "bytes": 3869
+    },
+    {
+      "path": "native-successor-evidence/pay-expired-claim-after-prepare.json",
+      "sha256": "39c021706331545d27da06780c1acca082a92047d4f4c2348ded284b3278d184",
+      "bytes": 3956
+    },
+    {
+      "path": "native-successor-evidence/pay-expired-decision-after-prepare.json",
+      "sha256": "75c530cf197bc1b4fb82255840cd907ef5bf831af3bc0f0dd420cdeda4de2cc3",
+      "bytes": 4202
+    },
+    {
+      "path": "native-successor-evidence/pay-pay-after-broadcast.json",
+      "sha256": "b2153ab0aeaa14edc7a1ecf4d3e61a588fe5fb1fe5c655b85cf2da1e0d2c8402",
+      "bytes": 4772
+    },
+    {
+      "path": "native-successor-evidence/pay-pay-after-observation.json",
+      "sha256": "8187d54dbfd7477ce106050a3ce2f16be156e633d2dfd4a2f1782d2028f720ae",
+      "bytes": 4774
+    },
+    {
+      "path": "native-successor-evidence/pay-pay-after-prepare.json",
+      "sha256": "db7ad68307cfebbe1eab1161adc59a378b4ea4c0fcfe89da29cdfbd05001bd31",
+      "bytes": 4770
+    },
+    {
+      "path": "native-successor-evidence/preexpired-complete.json",
+      "sha256": "f7856f8c126acab5e03394bbc21a638a22dd79756a6a8f05037a534cfe38d9b0",
+      "bytes": 3225
+    },
+    {
+      "path": "native-successor-evidence/proof-coverage.log",
+      "command": [
+        "target/debug/xtask",
+        "gen",
+        "proof-coverage",
+        "--check"
+      ],
+      "startedAt": "2026-09-15T01:21:07.051986+00:00",
+      "completedAt": "2026-09-15T01:21:12.867991+00:00",
+      "elapsedSeconds": 5.816,
+      "exitCode": 0,
+      "sha256": "f6f7e4ae12d9b3e0a3a8053be9604fdeebda525034915e4aecdd99f11c985c60",
+      "rawSha256": "f6f7e4ae12d9b3e0a3a8053be9604fdeebda525034915e4aecdd99f11c985c60",
+      "bytes": 48,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-successor-evidence/proof-update.log",
+      "command": [
+        "target/debug/xtask",
+        "gen",
+        "proof-coverage"
+      ],
+      "startedAt": "2026-09-15T01:17:56.992586+00:00",
+      "completedAt": "2026-09-15T01:18:03.490358+00:00",
+      "elapsedSeconds": 6.498,
+      "exitCode": 0,
+      "sha256": "caa1f58a0fb4b5dce3569e0273bf4a472ae9f8e893b562b8938738597877d446",
+      "rawSha256": "caa1f58a0fb4b5dce3569e0273bf4a472ae9f8e893b562b8938738597877d446",
+      "bytes": 103,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-successor-evidence/python-buyer.log",
+      "command": [
+        "/tmp/chio-python31-locked-venv/bin/python",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "examples/federated-work/python_buyer",
+        "-v"
+      ],
+      "startedAt": "2026-09-15T00:32:20.290695+00:00",
+      "completedAt": "2026-09-15T00:32:21.567963+00:00",
+      "elapsedSeconds": 1.277,
+      "exitCode": 0,
+      "sha256": "03a0ba3755ac7fbde445cc2d236864399221c58b72a7c78a85fadc0fb7992c46",
+      "rawSha256": "03a0ba3755ac7fbde445cc2d236864399221c58b72a7c78a85fadc0fb7992c46",
+      "bytes": 4637,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-successor-evidence/python-funded.log",
+      "command": [
+        "/tmp/chio-python31-locked-venv/bin/python",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "examples/funded-work",
+        "-v"
+      ],
+      "startedAt": "2026-09-15T00:32:22.718456+00:00",
+      "completedAt": "2026-09-15T00:32:32.205253+00:00",
+      "elapsedSeconds": 9.487,
+      "exitCode": 0,
+      "sha256": "7a525ac8c95f9cb831418e3db8631ccfbe03252500601e8c0725705318d73fe0",
+      "rawSha256": "7a525ac8c95f9cb831418e3db8631ccfbe03252500601e8c0725705318d73fe0",
+      "bytes": 5976,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-successor-evidence/reject-complete.json",
+      "sha256": "f512454bf7fec7ad246dac8b4715fca8686cce89ca6c19b8b6bda0d180e744af",
+      "bytes": 4265
+    },
+    {
+      "path": "native-successor-evidence/reject-expired-after-decision.json",
+      "sha256": "5e17d98fa80c2d835efbdb143d4374653f217e888b21dd33a5c99d298c1f7019",
+      "bytes": 4110
+    },
+    {
+      "path": "native-successor-evidence/reject-refund-after-broadcast.json",
+      "sha256": "fd9ce2e2bf9a61609106dc6c7c301743de3eecc972ce69e735a73d8dd6aa8065",
+      "bytes": 4361
+    },
+    {
+      "path": "native-successor-evidence/reject-refund-after-observation.json",
+      "sha256": "0a859f8fa9382b550a84ac568ef928099efc5ba7aff8f6d8f4d3c574ba507c6b",
+      "bytes": 4363
+    },
+    {
+      "path": "native-successor-evidence/reject-refund-after-prepare.json",
+      "sha256": "65362cd4eed9ff68acaae317e1bb899c33c507036427fcf951f5093bf1554f3c",
+      "bytes": 4901
+    },
+    {
+      "path": "native-successor-evidence/resolution-absent-none.json",
+      "sha256": "271c2a77782c3dd7640526f063cfffb28b1ddbdf12deacd98163d06a0186cc22",
+      "bytes": 5191
+    },
+    {
+      "path": "native-successor-evidence/resolution-preexpired-none.json",
+      "sha256": "45ad531341b6d6e91bdd03305ec6e0bd4de494f6232074b6e5b3cb7d8e155856",
+      "bytes": 5191
+    },
+    {
+      "path": "native-successor-evidence/resolution-reject-after-resolution-accepted.json",
+      "sha256": "b668da1f3c8df69ba70cc3af8c7906d89fc6e70278c729eecd3cc82e02b579c9",
+      "bytes": 5506
+    },
+    {
+      "path": "native-successor-evidence/resolution-reject-after-resolution-completed.json",
+      "sha256": "d0aa539c6a24574ea3ff870b661be5987bf68de81acebd9ce5d9f1615727009c",
+      "bytes": 5506
+    },
+    {
+      "path": "native-successor-evidence/resolution-reject-after-resolution-retained.json",
+      "sha256": "504e584f711c6af7c376be2c344a3c01f76638e7f84c6f73501b6e41be3509d0",
+      "bytes": 5506
+    },
+    {
+      "path": "native-successor-evidence/resolution-reject-none.json",
+      "sha256": "ac541ee8923d023fa211a8e23fa6d08dcebdb8af8585bcd7ec2008432ded42e4",
+      "bytes": 5509
+    },
+    {
+      "path": "native-successor-evidence/resolution-unavailable-none.json",
+      "sha256": "2ef09c9360bb6f8532883e1f445f55e6b8b44f2e210a10e21406b2fc61c4d3ba",
+      "bytes": 5350
+    },
+    {
+      "path": "native-successor-evidence/resolution.log",
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_resolution.py"
+      ],
+      "startedAt": "2026-09-15T01:17:08.756592+00:00",
+      "completedAt": "2026-09-15T01:20:29.984552+00:00",
+      "elapsedSeconds": 201.228,
+      "exitCode": 0,
+      "sha256": "4610805a6f7b8dc6f08d26c596763b52fa6e4f521ed1e12d3cc2aa1b74350e9c",
+      "rawSha256": "4610805a6f7b8dc6f08d26c596763b52fa6e4f521ed1e12d3cc2aa1b74350e9c",
+      "bytes": 418,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "binarySha256": "d5f1fc4dd103370f7a3b865278008d2c56a284eb720c4684b9467354154d0185"
+    },
+    {
+      "path": "native-successor-evidence/review.json",
+      "sha256": "2c893b215b3eaf47cfd0c70ed4d68f813964d0061eaaeed692b4aa5ed0b6307f",
+      "bytes": 1612
+    },
+    {
+      "path": "native-successor-evidence/rust-chain-adversarial.log",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "funded_work::tests",
+        "--",
+        "--ignored",
+        "--test-threads=1"
+      ],
+      "startedAt": "2026-09-15T00:57:10.783658+00:00",
+      "completedAt": "2026-09-15T00:58:14.306707+00:00",
+      "elapsedSeconds": 63.523,
+      "exitCode": 0,
+      "sha256": "be7b37471f80c5322a53d00cde857ae7dc0ee3e9c36ee77d1964f908afbba592",
+      "rawSha256": "c3921f80346022e93c922108936f499d322d50cfa3fd25276277b2d9878ec6c5",
+      "bytes": 2376,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "passedTests": 3
+    },
+    {
+      "path": "native-successor-evidence/rust-tests.log",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--",
+        "--test-threads=1"
+      ],
+      "startedAt": "2026-09-15T00:55:11.806946+00:00",
+      "completedAt": "2026-09-15T00:57:10.712985+00:00",
+      "elapsedSeconds": 118.906,
+      "exitCode": 0,
+      "sha256": "8c7db01535f666ffc9b69bb3aad117ecc14c383be941ad0463301c4da3b8d571",
+      "rawSha256": "3c99de462b2582315041dac22d146bd17ab1cde99953f216f18f40de3db61003",
+      "bytes": 4222,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "passedTests": 34
+    },
+    {
+      "path": "native-successor-evidence/schema-registry.log",
+      "command": [
+        "bash",
+        "scripts/check-chio-schema-registry.sh"
+      ],
+      "startedAt": "2026-09-15T00:43:39.700072+00:00",
+      "completedAt": "2026-09-15T00:43:39.909842+00:00",
+      "elapsedSeconds": 0.21,
+      "exitCode": 0,
+      "sha256": "f08ca40211ee4cf16919c55a0c548472ee01a0ff6808eadb1e60a66f4aa43553",
+      "rawSha256": "f08ca40211ee4cf16919c55a0c548472ee01a0ff6808eadb1e60a66f4aa43553",
+      "bytes": 33,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-successor-evidence/security-sync.json",
+      "sha256": "81cf66d7990579abcd39806e2a54a826fd7ab035aa397b2d11fa4c73d4f8e63c",
+      "bytes": 1029
+    },
+    {
+      "path": "native-successor-evidence/source-at-qualification.json",
+      "sha256": "22748b9efd034e49f9ccb50a598d70895f94ccc0e8f342835221dcf6153e06b6",
+      "bytes": 7048
+    },
+    {
+      "path": "native-successor-evidence/source-preservation.json",
+      "sha256": "073a1f6c651b030494f80b8bfc5c68723f7818d67485319d81f7756b61e56f79",
+      "bytes": 222
+    },
+    {
+      "path": "native-successor-evidence/standalone-clippy.log",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "startedAt": "2026-09-15T00:53:35.754684+00:00",
+      "completedAt": "2026-09-15T00:53:41.108207+00:00",
+      "elapsedSeconds": 5.354,
+      "exitCode": 0,
+      "sha256": "8f59f3254f67a3e8642d71b294db2322587dfbe8ad3b8ec88d2346f381d8100b",
+      "rawSha256": "8f59f3254f67a3e8642d71b294db2322587dfbe8ad3b8ec88d2346f381d8100b",
+      "bytes": 170,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-successor-evidence/standalone-fmt.log",
+      "command": [
+        "cargo",
+        "fmt",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--",
+        "--check"
+      ],
+      "startedAt": "2026-09-15T01:05:21.140820+00:00",
+      "completedAt": "2026-09-15T01:05:21.462488+00:00",
+      "elapsedSeconds": 0.322,
+      "exitCode": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-successor-evidence/unavailable-complete.json",
+      "sha256": "a04e764e775f5fabc68efd4ca446a2b7fc1f164defcc2fb8023b5f5b8e3ab684",
+      "bytes": 3558
+    },
+    {
+      "path": "native-successor-evidence/undispatched-complete.json",
+      "sha256": "86dbd42ddbe923995f30894e1bf6bc0cd93f65e891ec8fb11d4afc7aea320523",
+      "bytes": 3712
+    },
+    {
+      "path": "native-successor-evidence/unknown-complete.json",
+      "sha256": "4a4017a9540f940c00e213b3ee5c5e85ac2ddd3447365c657c0799937203344e",
+      "bytes": 3623
+    },
+    {
+      "path": "native-successor-evidence/workspace-check.log",
+      "command": [
+        "cargo",
+        "check",
+        "--workspace",
+        "--all-targets",
+        "--locked",
+        "--offline"
+      ],
+      "startedAt": "2026-09-15T01:00:35.762882+00:00",
+      "completedAt": "2026-09-15T01:04:54.429873+00:00",
+      "elapsedSeconds": 258.667,
+      "exitCode": 0,
+      "sha256": "942ca32deac4086ac12e94ad8a87d3dbbc0a98275d00394a7993b207601c84e1",
+      "rawSha256": "942ca32deac4086ac12e94ad8a87d3dbbc0a98275d00394a7993b207601c84e1",
+      "bytes": 8640,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-successor-evidence/workspace-clippy.log",
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--locked",
+        "--offline",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "startedAt": "2026-09-15T01:06:49.047982+00:00",
+      "completedAt": "2026-09-15T01:11:53.041661+00:00",
+      "elapsedSeconds": 303.994,
+      "exitCode": 0,
+      "sha256": "17ac2dee2c09ebd37389d42903ce9aa40e33f53d7a60c8c8bf2ccca6beb47a0d",
+      "rawSha256": "17ac2dee2c09ebd37389d42903ce9aa40e33f53d7a60c8c8bf2ccca6beb47a0d",
+      "bytes": 8640,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-successor-evidence/workspace-fmt.log",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "startedAt": "2026-09-15T01:21:06.864326+00:00",
+      "completedAt": "2026-09-15T01:21:29.452931+00:00",
+      "elapsedSeconds": 22.589,
+      "exitCode": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    }
+  ],
+  "notes": [
+    "Original positive capture rows, budget events and native raw outcome hashes match before and after waiver.",
+    "One original operation and hold per role; child collection retains original transaction bytes.",
+    "Actual chain inventory and balances independently reconcile reported native outcomes.",
+    "Formal mirror and coverage updates are source references, not new waiver or child protocol proofs.",
+    "Fuzz binaries are checked; no new fuzz campaign or full workspace test run is claimed.",
+    "The selected committed security prerequisite is bounded trusted-time recovery; broader process and relocation integration remain deferred.",
+    "Original paper checkout preserved across all 3688 snapshotted files.",
+    "Public artifacts exclude fixture keys, full capabilities and authority databases."
+  ],
+  "remaining": [
+    "Registered general work, dependency and decision formats",
+    "Complete Finding facet qualification",
+    "Disclosure, signing/rotation and manifest adversaries",
+    "Sustained capacity beyond the bounded retention profile",
+    "Independent implementation and independently administered cross-company operators",
+    "Public-chain finality, external activation and real funds"
+  ]
+}

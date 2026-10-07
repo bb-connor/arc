@@ -1,0 +1,46 @@
+   Compiling chio-kernel v0.1.0 (/tmp/chio-verifiable-work-paper/crates/kernel/chio-kernel)
+   Compiling chio-finding-verifier v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-finding-verifier)
+   Compiling chio-transaction-passport v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-transaction-passport)
+   Compiling chio-risk-comptroller v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-risk-comptroller)
+   Compiling chio-commerce-order v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-commerce-order)
+   Compiling chio-edge-metrics v0.1.0 (/tmp/chio-verifiable-work-paper/crates/protocol/chio-edge-metrics)
+   Compiling chio-cross-protocol v0.1.0 (/tmp/chio-verifiable-work-paper/crates/protocol/chio-cross-protocol)
+   Compiling chio-agent-web-interop v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-agent-web-interop)
+   Compiling chio-mcp-edge v0.1.0 (/tmp/chio-verifiable-work-paper/crates/protocol/chio-mcp-edge)
+   Compiling chio-store-sqlite v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-store-sqlite)
+   Compiling chio-a2a-edge v0.1.0 (/tmp/chio-verifiable-work-paper/crates/protocol/chio-a2a-edge)
+   Compiling chio-a2a-adapter v0.1.0 (/tmp/chio-verifiable-work-paper/crates/protocol/chio-a2a-adapter)
+   Compiling chio-runtime-core v0.1.0 (/tmp/chio-verifiable-work-paper/crates/kernel/chio-runtime-core)
+   Compiling chio-federated-work v0.1.0 (/tmp/chio-verifiable-work-paper/examples/federated-work)
+warning: unused variable: `receiver`
+   --> src/funded_work/composition.rs:210:9
+    |
+210 |     let receiver = config
+    |         ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_receiver`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `chio-federated-work` (bin "chio-federated-work" test) generated 1 warning (run `cargo fix --bin "chio-federated-work" -p chio-federated-work --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized] target(s) in 49.68s
+     Running unittests src/main.rs (/tmp/chio-paper-target/debug/deps/chio_federated_work-6276a32dc736f2b9)
+
+running 1 test
+test funded_work::evolving::tests::receiver_rejects_signed_wrong_route_missing_treaty_and_foreign_capability_before_funding ... FAILED
+
+failures:
+
+---- funded_work::evolving::tests::receiver_rejects_signed_wrong_route_missing_treaty_and_foreign_capability_before_funding stdout ----
+
+thread 'funded_work::evolving::tests::receiver_rejects_signed_wrong_route_missing_treaty_and_foreign_capability_before_funding' (2330817) panicked at src/funded_work/evolving/tests.rs:185:9:
+assertion `left == right` failed: route
+  left: "funding observation reached"
+ right: "composed route does not target this receiver and task"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    funded_work::evolving::tests::receiver_rejects_signed_wrong_route_missing_treaty_and_foreign_capability_before_funding
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 96 filtered out; finished in 5.85s
+
+error: test failed, to rerun pass `--bin chio-federated-work`

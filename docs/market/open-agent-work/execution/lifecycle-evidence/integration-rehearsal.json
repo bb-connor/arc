@@ -1,0 +1,48 @@
+{
+  "capturedUtc": "2026-09-14T14:38:08.169460+00:00",
+  "researchHead": "331bd1bf8cd347c3b2cc70aaee459894bc5218df",
+  "securityHead": "f1b88451527b2dec7314114b3b1e91cf101312cf",
+  "mergeBase": "f5566d9a765c21cb36652a99c79de64968a656bf",
+  "shallow": false,
+  "command": "git merge-tree --write-tree --name-only --no-messages f1b88451527b2dec7314114b3b1e91cf101312cf 331bd1bf8c",
+  "exitCode": 1,
+  "resultTree": "490e19f6e3447ac66cc907dd5aae01b5bcf3407f",
+  "conflictPaths": [
+    "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal.rs",
+    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission.rs",
+    "crates/kernel/chio-kernel/tests/durable_admission_sqlite.rs",
+    "crates/kernel/chio-runtime-core/src/store/sqlite.rs",
+    "crates/kernel/chio-runtime-core/tests/runtime_admission.rs",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store.rs",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs",
+    "crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain.rs",
+    "crates/protocol/chio-a2a-edge/src/tests/all.rs",
+    "docs/formal/COVERAGE.md"
+  ],
+  "codeConflicts": 9,
+  "generatedConflicts": [
+    "docs/formal/COVERAGE.md"
+  ],
+  "nativeAdmissionSchemaVersions": {
+    "research": 10,
+    "security": 34
+  },
+  "inputs": [
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store.rs",
+      "researchSha256": "6772a78fc6b0f982cc6c51efb0c57c5803e422ecbd80ffed063c05bb42a9c3d4",
+      "securitySha256": "e45c0f8192c50a3efaca4bfd03f395a8b12e379acbc4cbf1f51e4033fca9852a"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs",
+      "researchSha256": "e59ffc7a7181d6ff669c0d1470761e498de1edfd8504f806af8826190a19a951",
+      "securitySha256": "798ede3608aab494b4a1142dcb0b8b34d5beafb935404961ec2e066e5b32ba2e"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain.rs",
+      "researchSha256": "c9b877d9ce760bc6845f27354cd75e23cc9932e3d6ca2d6cda7426b4a52286fe",
+      "securitySha256": "e99b7cfa8cad2b2f04e77992a4a47274faffcd780f3a12c27d254062cf88c5a4"
+    }
+  ],
+  "scope": "Read-only merge-tree rehearsal of two committed inputs. Security closeout documentation remains dirty and is excluded. No merge, conflict resolution, populated native store migration or integration build performed."
+}

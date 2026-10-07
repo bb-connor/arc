@@ -39,6 +39,8 @@
 //! key (authenticity). All three are mandatory and independent (ADAPTER-SPEC 5
 //! "feeds the verifier, not replaces it"; blueprint B.4).
 
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -48,7 +50,11 @@ use chio_federation::revocation_gossip::RevocationCatchupRequest;
 use chio_federation::revocation_gossip::RevocationCatchupResponse;
 use chio_federation::revocation_gossip::RevocationGossipBatch;
 use chio_federation::revocation_gossip::RevocationGossipError;
+use chio_kernel_core::RevocationSnapshot;
+use chio_kernel_core::RevocationView;
+use chio_kernel_core::RevocationViewSubject;
 use chio_revocation_oracle::Ed25519RootVerifier;
+use chio_revocation_oracle::EpochRoot;
 use chio_revocation_oracle::EpochRootVerifier;
 use chio_revocation_oracle::SignedEpochRoot;
 use iroh::endpoint::Connection;
@@ -300,6 +306,150 @@ pub trait RevocationRootSink: std::fmt::Debug + Send + Sync {
              default merged nothing."
                 .to_string(),
         ))
+    }
+}
+
+/// The locally-materialised revoked-subject leaf set a [`RevocationViewSink`]
+/// stamps into the snapshot it installs.
+///
+/// [`SignedEpochRoot`] carries a root HASH and a leaf COUNT, never the leaves, so
+/// the lane alone cannot tell a receiver WHICH subjects an epoch revoked. That is
+/// the split `chio_kernel_core::RevocationSnapshot` documents: the signed root and
+/// its issue time come from the federation lane; the leaf set is whatever the
+/// embedding kernel has materialised locally (from inclusion proofs, a catch-up
+/// pull, or its own revocation store). This trait is that seam.
+///
+/// The default source ([`NoLocalRevokedSubjects`]) materialises nothing, which
+/// makes the bridge a pure root-and-freshness bridge: it keeps the receiver's
+/// freshness window satisfied while an origin keeps ticking and denies every
+/// delegated call once the roots stop arriving, but it never names a revoked
+/// subject.
+pub trait RevokedSubjectSource: std::fmt::Debug + Send + Sync {
+    /// The revoked subjects this receiver has materialised for `root`. Returning
+    /// an empty set means "no locally known revocations at this epoch", which is
+    /// still gated by the snapshot's freshness at the consulting kernel.
+    fn revoked_at(&self, root: &EpochRoot) -> BTreeSet<RevocationViewSubject>;
+}
+
+/// The default [`RevokedSubjectSource`]: no locally materialised leaves.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct NoLocalRevokedSubjects;
+
+impl RevokedSubjectSource for NoLocalRevokedSubjects {
+    fn revoked_at(&self, _root: &EpochRoot) -> BTreeSet<RevocationViewSubject> {
+        BTreeSet::new()
+    }
+}
+
+/// [`RevocationRootSink`] that installs verified roots into a
+/// `chio_kernel_core::RevocationView`, the cache `ChioKernel::set_revocation_view`
+/// consults on every delegated capability.
+///
+/// This is the missing consumer of lane b: without it a verified root reaches no
+/// verifier, and with it a receiver's admission decisions are gated on an origin
+/// that keeps proving its revocation clock is alive. The kernel's own freshness
+/// bound denies every delegated call once the installed snapshot ages past its
+/// window, so a cut link degrades to denial rather than to stale allowance.
+///
+/// ## All-or-nothing merge
+///
+/// After verifying every signature and rejecting conflicting root bodies at
+/// the same epoch, this sink installs only the highest-epoch root in a batch.
+/// One monotone compare-and-swap commits the snapshot atomically; lower epochs
+/// are never installed. Older roots and identical projected snapshots are
+/// successful no-ops. A different projected snapshot at the installed epoch is
+/// rejected without changing the view.
+#[derive(Debug)]
+pub struct RevocationViewSink {
+    view: Arc<RevocationView>,
+    verifier: Ed25519RootVerifier,
+    subjects: Arc<dyn RevokedSubjectSource>,
+}
+
+impl RevocationViewSink {
+    /// Create an empty view for exactly one pinned revocation signer. Epochs
+    /// and freshness from independent signers are not comparable. Multi-origin
+    /// admission needs separate views and an explicit aggregation policy.
+    /// Materialises no leaves until [`Self::with_subject_source`] is supplied.
+    #[must_use]
+    pub fn new(verifier: Ed25519RootVerifier) -> Self {
+        Self {
+            view: Arc::new(RevocationView::new()),
+            verifier,
+            subjects: Arc::new(NoLocalRevokedSubjects),
+        }
+    }
+
+    /// Stamp the leaf set `subjects` materialises for each installed root into the
+    /// snapshot, so the consulting kernel can deny a named capability and not only
+    /// a stale clock.
+    #[must_use]
+    pub fn with_subject_source(mut self, subjects: Arc<dyn RevokedSubjectSource>) -> Self {
+        self.subjects = subjects;
+        self
+    }
+
+    /// The view this sink writes into.
+    #[must_use]
+    pub fn view(&self) -> &Arc<RevocationView> {
+        &self.view
+    }
+
+    /// Install one verified root. Older or identical snapshots are no-ops;
+    /// conflicting snapshots at the installed epoch are rejected.
+    fn install(&self, root: &EpochRoot) -> Result<(), RevocationLaneError> {
+        let candidate = RevocationSnapshot {
+            epoch: root.epoch,
+            root_hash: root.root_hash,
+            issued_at_unix_ms: root.issued_at_unix_ms,
+            revoked: self.subjects.revoked_at(root),
+        };
+        match self.view.install_if_newer(candidate.clone()) {
+            Ok(_previous) => Ok(()),
+            Err(chio_kernel_core::RevocationViewError::NonMonotoneEpoch { .. }) => {
+                // A concurrent writer can have advanced the epoch since the
+                // rejected swap. Classify against one current snapshot.
+                let current = self.view.load();
+                if candidate.epoch < current.epoch || candidate == *current {
+                    Ok(())
+                } else {
+                    Err(RevocationLaneError::SinkRejected(
+                        "conflicting revocation snapshot at installed epoch".to_owned(),
+                    ))
+                }
+            }
+        }
+    }
+}
+
+impl RevocationRootSink for RevocationViewSink {
+    fn merge_root(&self, signed: &SignedEpochRoot) -> Result<(), RevocationLaneError> {
+        signed
+            .verify(&self.verifier)
+            .map_err(|_| RevocationLaneError::BadSignature(self.verifier.signer_id().to_owned()))?;
+        self.install(&signed.root)
+    }
+
+    fn merge_batch(&self, roots: &[SignedEpochRoot]) -> Result<(), RevocationLaneError> {
+        // Check the whole batch before choosing an epoch. A foreign lower
+        // epoch is still a domain mismatch and cannot hide behind a valid max.
+        let mut epochs = BTreeMap::new();
+        for signed in roots {
+            signed.verify(&self.verifier).map_err(|_| {
+                RevocationLaneError::BadSignature(self.verifier.signer_id().to_owned())
+            })?;
+            if let Some(previous) = epochs.insert(signed.root.epoch, &signed.root) {
+                if previous != &signed.root {
+                    return Err(RevocationLaneError::SinkRejected(
+                        "conflicting revocation root bodies within batch".to_owned(),
+                    ));
+                }
+            }
+        }
+        let Some((_, highest)) = epochs.last_key_value() else {
+            return Ok(());
+        };
+        self.install(highest)
     }
 }
 

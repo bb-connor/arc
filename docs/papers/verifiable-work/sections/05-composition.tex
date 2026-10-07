@@ -1,0 +1,136 @@
+\section{Preservation of commitments}
+\label{sec:preservation}
+The kernel contract must preserve two quantities and one identity: the capacity
+allocated to work, the funds reserved for payment, and the invocation to which
+each execution right belongs. We first state the accounting invariants, then
+show why plan growth and recovery preserve them together.
+
+This is the property a planner needs when extending a distributed program:
+the extension must account for earlier commitments even when their execution
+or settlement is incomplete. The following argument concerns the specified
+composition rules and the authorities that enforce them.
+
+\subsection{Delegated and planned capacity}
+Let $B_D$ be a delegation root's ceiling, $b_v$ a leaf's ceiling and $U_v$ an
+internal slot's unused remainder. The allocation tree satisfies
+\begin{equation}
+ \sum_{\mathrm{leaves}\ v}b_v+\sum_{\mathrm{internal}\ v}U_v=B_D,
+ \qquad b_v,U_v\geq0. \label{eq:delegation}
+\end{equation}
+Subdivision moves capacity from a parent into its children. Only leaves can
+execute, so internal capacity cannot also be spent as a tool call. Selection
+and sealing change no ceiling. Restrictions on operations and readers, expiry
+and delegation depth hold transitively along the tree. The receiver's
+one-invocation capability and charge checks bound each executed leaf.
+
+For a graph $G_i$, let $\mathcal{A}_i$ be its set of uniquely identified
+allocations and $b(a)$ the ceiling of allocation $a$. A checked extension
+preserves
+\begin{equation}
+ \mathcal{A}_i\subseteq\mathcal{A}_{i+1},\quad
+ b_{i+1}(a)=b_i(a)\ (a\in\mathcal{A}_i),\quad
+ \sum_{a\in\mathcal{A}_{i+1}}b(a)\leq B_G, \label{eq:growth}
+\end{equation}
+where $B_G$ is the original declared pool. One protected sequence of graph
+versions per pool, with serialized installation, gives this bound a single
+accounting domain. Since allocations are retained,
+$\bigcup_{i=0}^{n}\mathcal{A}_i=\mathcal{A}_n$. The latest bound therefore covers
+every allocation installed, including work still running under an older graph.
+
+\subsection{Deposited funds}
+Consider one deposited amount $D_u$, accounted separately from later deposits.
+Let $F_u$ be its available funds, $L_u$ its locked funds, and $P_u,R_u$ its paid
+and refunded outflows. Then
+\begin{equation}
+ D_u=F_u+L_u+P_u+R_u,\qquad F_u,L_u,P_u,R_u\geq0.
+ \label{eq:conservation}
+\end{equation}
+Reservation moves funds from $F_u$ to $L_u$. Payment or refund moves an
+allocation's locked funds once to the corresponding outflow. Refunded cash
+remains an outflow from this deposited amount even if deposited again. A new
+deposit creates another accounting entry and leaves outstanding locks in the
+earlier entry unchanged.
+
+Acceptance restricts a claim to $\{\textsf{Payable},\textsf{Paid}\}$. A transition
+on another allocation cannot change that claim or release its reserve.
+This is the financial reason that a parent refund cannot revoke a child's
+earned payment. Withdrawal also requires the beneficiary's key, available
+evidence, transaction inclusion and a functioning asset.
+
+\Needspace{18\baselineskip}
+\subsection{The combined guarantee}
+\begin{proposition}[Preservation under plan growth and recovery]
+Assume the protected allocation, graph, execution and settlement state of
+Section~\ref{sec:sovereignty}, the authenticated references of
+Section~\ref{sec:contract}, and the transitions of Section~\ref{sec:execution}.
+Start with validly provisioned roots, verified initial graphs and funded
+accounts. Every finite interleaving of valid subdivision, selection, sealing, graph
+extension, execution, recovery and settlement has these properties:
+\begin{enumerate}
+ \item Delegation and graph allocations remain within their original bounds;
+       paid plus refunded funds do not exceed deposited backing.
+ \item A sealed invocation retains its receiver, capability, input, tool operation
+       and request. Plan growth and replay grant it no further execution right.
+ \item An earned child claim retains its terms and remains payable or paid
+       through parent failure, completion or refund.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+Initially, a root has all its capacity in one leaf, a verified graph fits its
+declared pool, and a fresh deposit has
+$(F_u,L_u,P_u,R_u)=(D_u,0,0,0)$. No execution right has been consumed or claim
+earned. The properties hold in this state. Induct over the permitted
+transitions.
+
+Subdivision preserves (\ref{eq:delegation}) by transferring capacity from the
+parent remainder to a child. Selection does not alter capacity. Sealing freezes
+the selected invocation before its permit can leave the allocator.
+
+Graph extension retains all earlier allocations and checks (\ref{eq:growth})
+before installing the successor. Existing continuation identifiers remain
+unchanged. A receiver's record of their use is therefore unchanged as well.
+The archive supplies the original graph and signature for an old request.
+Concurrent installers serialize through the same protected head.
+
+Admission checks that the permit, capability, task, route and treaty refer to
+the presented invocation. The payment agreement commits to that complete
+request. A substituted object fails a reference check or belongs to a different
+authorized commitment. Before dispatch, the receiver durably assigns the
+execution rights and budget hold to the original execution record. Replay
+consults that assignment; it cannot acquire the same rights for another invocation.
+Expiry, revocation and policy refusal may prevent a call but cannot create
+a replacement right.
+
+Recovery returns a stored permit or completed output when available. Otherwise,
+an unknown execution outcome remains unknown and supplies no fresh authority
+to call the tool. These steps create no allocation and release no consumed
+execution right. Financial retries reuse the persisted transaction and its
+allocation, subject to the same settlement checks as the original submission.
+
+Reservation, payment and refund preserve (\ref{eq:conservation}) and affect only
+their named allocations. Acceptance leaves the child in
+$\{\textsf{Payable},\textsf{Paid}\}$ under every subsequent child transition.
+A parent transition changes another allocation.
+
+These cases remain valid when interleaved: each shared resource has a serializing
+authority, and graph extension retains the resources named by earlier work.
+The authenticated references require each authority's decision to concern the
+same invocation, completing the induction.
+\end{proof}
+
+The argument depends on exclusive custody at each scarce resource. Two
+receivers can each be shown a signed promise against one deposit while neither
+sees the other promise. Each local view is consistent with an affordable
+exchange. A protected allocator or ledger must establish that both promises
+have not spent the same capacity; signatures alone cannot do so.
+
+The guarantee is safety under the specified transitions. A missing later record
+may prevent progress, but it cannot undo an earlier commitment. This is why
+separate local transactions suffice even when a handoff fails partway through.
+
+The accompanying Lean development checks abstract financial conservation and
+earned-state lemmas. Tests exercise the concrete admission and recovery rules.
+The full argument above is conditional on those rules; the artifact does not
+contain a machine-checked refinement from the argument to the Rust and Solidity
+implementations.

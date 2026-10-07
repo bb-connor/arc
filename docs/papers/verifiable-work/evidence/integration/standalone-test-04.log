@@ -1,0 +1,104 @@
+   Compiling chio-kernel v0.1.0 (/tmp/chio-paper-security-integration/crates/kernel/chio-kernel)
+   Compiling chio-finding-verifier v0.1.0 (/tmp/chio-paper-security-integration/crates/trust/chio-finding-verifier)
+   Compiling chio-cross-protocol v0.1.0 (/tmp/chio-paper-security-integration/crates/protocol/chio-cross-protocol)
+   Compiling chio-edge-metrics v0.1.0 (/tmp/chio-paper-security-integration/crates/protocol/chio-edge-metrics)
+   Compiling chio-a2a-adapter v0.1.0 (/tmp/chio-paper-security-integration/crates/protocol/chio-a2a-adapter)
+   Compiling chio-transaction-passport v0.1.0 (/tmp/chio-paper-security-integration/crates/platform/chio-transaction-passport)
+   Compiling chio-mcp-edge v0.1.0 (/tmp/chio-paper-security-integration/crates/protocol/chio-mcp-edge)
+   Compiling chio-a2a-edge v0.1.0 (/tmp/chio-paper-security-integration/crates/protocol/chio-a2a-edge)
+error[E0061]: this method takes 1 argument but 0 arguments were supplied
+   --> /tmp/chio-paper-security-integration/crates/protocol/chio-a2a-edge/src/v1.rs:204:14
+    |
+204 |         self.prune_deferred_tasks();
+    |              ^^^^^^^^^^^^^^^^^^^^-- argument #1 of type `ClockReading` is missing
+    |
+note: method defined here
+   --> /tmp/chio-paper-security-integration/crates/protocol/chio-a2a-edge/src/edge.rs:383:8
+    |
+383 |     fn prune_deferred_tasks(&mut self, now: ClockReading) -> Result<(), ClockError> {
+    |        ^^^^^^^^^^^^^^^^^^^^            -----------------
+help: provide the argument
+    |
+204 |         self.prune_deferred_tasks(/* ClockReading */);
+    |                                   ++++++++++++++++++
+
+error[E0061]: this method takes 5 arguments but 4 arguments were supplied
+   --> /tmp/chio-paper-security-integration/crates/protocol/chio-a2a-edge/src/v1.rs:210:18
+    |
+210 |             self.handle_stream_message_with_request_id(&message_id, &skill, &request, execution)?;
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                                --------- argument #4 of type `&ChioKernel` is missing
+    |
+note: method defined here
+   --> /tmp/chio-paper-security-integration/crates/protocol/chio-a2a-edge/src/edge.rs:571:12
+    |
+571 |     pub fn handle_stream_message_with_request_id(
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+576 |         kernel: &ChioKernel,
+    |         -------------------
+help: provide the argument
+    |
+210 |             self.handle_stream_message_with_request_id(&message_id, &skill, &request, /* &ChioKernel */, execution)?;
+    |                                                                                       ++++++++++++++++++
+
+error[E0308]: mismatched types
+   --> /tmp/chio-paper-security-integration/crates/protocol/chio-a2a-edge/src/v1.rs:218:34
+    |
+218 |         self.v1_project_response(response, true)
+    |              ------------------- ^^^^^^^^ expected `Value`, found `A2aJsonRpcResponse`
+    |              |
+    |              arguments to this method are incorrect
+    |
+note: method defined here
+   --> /tmp/chio-paper-security-integration/crates/protocol/chio-a2a-edge/src/v1.rs:221:8
+    |
+221 |     fn v1_project_response(&self, response: Value, wrap: bool) -> Result<Value, A2aEdgeError> {
+    |        ^^^^^^^^^^^^^^^^^^^        ---------------
+
+error[E0308]: `match` arms have incompatible types
+   --> /tmp/chio-paper-security-integration/crates/protocol/chio-a2a-edge/src/v1.rs:251:27
+    |
+249 |         match result {
+    |         ------------ `match` arms have incompatible types
+250 |             Ok(value) => json!({"jsonrpc": "2.0", "id": id, "result": value}),
+    |                          ---------------------------------------------------- this is found to be of type `serde_json::Value`
+251 |             Err(error) => Self::jsonrpc_error_response(id, error),
+    |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Value`, found `A2aJsonRpcResponse`
+
+error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+   --> /tmp/chio-paper-security-integration/crates/protocol/chio-a2a-edge/src/v1.rs:272:18
+    |
+272 |             self.handle_jsonrpc_task_cancel(Value::Null, params, execution)
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^                      --------- argument #3 of type `&ChioKernel` is missing
+    |
+note: method defined here
+   --> /tmp/chio-paper-security-integration/crates/protocol/chio-a2a-edge/src/edge.rs:842:8
+    |
+842 |     fn handle_jsonrpc_task_cancel(
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+846 |         kernel: &ChioKernel,
+    |         -------------------
+help: provide the argument
+    |
+272 |             self.handle_jsonrpc_task_cancel(Value::Null, params, /* &ChioKernel */, execution)
+    |                                                                  ++++++++++++++++++
+
+error[E0308]: mismatched types
+   --> /tmp/chio-paper-security-integration/crates/protocol/chio-a2a-edge/src/v1.rs:274:34
+    |
+274 |         self.v1_project_response(response, false)
+    |              ------------------- ^^^^^^^^ expected `Value`, found `A2aJsonRpcResponse`
+    |              |
+    |              arguments to this method are incorrect
+    |
+note: method defined here
+   --> /tmp/chio-paper-security-integration/crates/protocol/chio-a2a-edge/src/v1.rs:221:8
+    |
+221 |     fn v1_project_response(&self, response: Value, wrap: bool) -> Result<Value, A2aEdgeError> {
+    |        ^^^^^^^^^^^^^^^^^^^        ---------------
+
+Some errors have detailed explanations: E0061, E0308.
+For more information about an error, try `rustc --explain E0061`.
+error: could not compile `chio-a2a-edge` (lib) due to 6 previous errors
+warning: build failed, waiting for other jobs to finish...

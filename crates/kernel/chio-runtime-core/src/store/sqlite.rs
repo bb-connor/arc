@@ -10,6 +10,7 @@ mod admission_replay;
 mod evidence_artifacts;
 mod health_summaries;
 mod leases_scheduler;
+mod outcome_continuation;
 mod replay_source;
 mod run_write_fence;
 mod runs_steps;

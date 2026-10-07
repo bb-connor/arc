@@ -1,0 +1,19 @@
+? Verifying lockfile against supply-chain policies (48 entries)...
+Downloading solc@0.8.30: 0.00 B/6.73 MB
+Downloading ganache@7.9.2: 0.00 B/14.50 MB
+Packages are hard linked from the content-addressable store to the virtual store.
+  Content-addressable store is at: /home/connor/.local/share/pnpm/store/v11
+  Virtual store is at:             node_modules/.pnpm
+Downloading @trufflesuite/uws-js-unofficial@20.30.0-unofficial.0: 0.00 B/40.91 MB
+✓ Lockfile passes supply-chain policies (48 entries in 558ms)
+Lockfile is up to date, resolution step is skipped
+Packages: +48
+++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 48, reused 0, downloaded 48, added 48, done
+
+devDependencies:
++ ethers 6.16.0
++ ganache 7.9.2
++ solc 0.8.30
+
+Done in 1.2s using pnpm v12.4.1

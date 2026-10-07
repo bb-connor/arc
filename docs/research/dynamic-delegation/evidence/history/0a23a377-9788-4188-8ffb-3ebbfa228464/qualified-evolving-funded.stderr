@@ -1,0 +1,6 @@
+test_growth_preserves_original_work_and_earned_child_after_parent_loss (__main__.EvolvingWork.test_growth_preserves_original_work_and_earned_child_after_parent_loss) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 45.267s
+
+OK

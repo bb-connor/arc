@@ -1,0 +1,366 @@
+use super::*;
+
+mod continuation;
+
+// A2A 1.0 JSON-RPC projection onto the existing kernel task lifecycle.
+// Request metadata remains input, never an execution authority.
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct V1SendRequest {
+    message: V1Message,
+    #[serde(default)]
+    configuration: Option<V1SendConfiguration>,
+    #[serde(default)]
+    metadata: Option<Value>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct V1SendConfiguration {
+    #[serde(default)]
+    accepted_output_modes: Vec<String>,
+    #[serde(default)]
+    history_length: u32,
+    #[serde(default)]
+    return_immediately: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct V1Message {
+    message_id: String,
+    #[serde(default)]
+    task_id: Option<String>,
+    #[serde(default)]
+    context_id: Option<String>,
+    role: String,
+    parts: Vec<V1Part>,
+    #[serde(default)]
+    metadata: Option<Value>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct V1Part {
+    #[serde(default)]
+    text: Option<String>,
+    #[serde(default)]
+    data: Option<Value>,
+    #[serde(default)]
+    media_type: Option<String>,
+    #[serde(default)]
+    metadata: Option<Value>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct V1TaskRequest {
+    id: String,
+    #[serde(default)]
+    history_length: u32,
+    #[serde(default)]
+    metadata: Option<Value>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum V1OutputMode {
+    Json,
+    Text,
+}
+
+struct V1Invocation {
+    message_id: String,
+    task_id: Option<String>,
+    context_id: Option<String>,
+    request: SendMessageRequest,
+    output_mode: V1OutputMode,
+}
+
+fn v1_invalid(message: impl Into<String>) -> A2aEdgeError {
+    A2aEdgeError::InvalidRequest(message.into())
+}
+
+fn v1_object_metadata(metadata: &Option<Value>) -> Result<(), A2aEdgeError> {
+    if metadata.as_ref().is_some_and(|value| !value.is_object()) {
+        return Err(v1_invalid("metadata must be an object"));
+    }
+    Ok(())
+}
+
+impl V1SendRequest {
+    fn into_internal(self) -> Result<V1Invocation, A2aEdgeError> {
+        let config = self.configuration.unwrap_or_default();
+        if config.return_immediately {
+            return Err(A2aEdgeError::UnsupportedOperation(
+                "configuration.returnImmediately requires a background executor; use false or omit it",
+            ));
+        }
+        if config.history_length != 0 {
+            return Err(v1_invalid("task history is not supported"));
+        }
+        if !config.accepted_output_modes.is_empty()
+            && !config
+                .accepted_output_modes
+                .iter()
+                .any(|mode| mode == "text/plain" || mode == "application/json")
+        {
+            return Err(v1_invalid("no supported output mode was requested"));
+        }
+        let output_mode = if config.accepted_output_modes.is_empty()
+            || config
+                .accepted_output_modes
+                .iter()
+                .any(|mode| mode == "application/json")
+        {
+            V1OutputMode::Json
+        } else {
+            V1OutputMode::Text
+        };
+        let message = self.message;
+        if message.role != "ROLE_USER" {
+            return Err(v1_invalid("message.role must be ROLE_USER"));
+        }
+        validate_execution_agent_id(&message.message_id)
+            .map_err(|_| v1_invalid("message.messageId must be a nonblank, unpadded identifier"))?;
+        if message.message_id.len() > 256 {
+            return Err(v1_invalid("message.messageId exceeds 256 bytes"));
+        }
+        for (name, identifier) in [
+            ("message.taskId", message.task_id.as_deref()),
+            ("message.contextId", message.context_id.as_deref()),
+        ] {
+            if let Some(identifier) = identifier {
+                validate_execution_agent_id(identifier).map_err(|_| {
+                    v1_invalid(format!("{name} must be a nonblank, unpadded identifier"))
+                })?;
+                if identifier.len() > 256 {
+                    return Err(v1_invalid(format!("{name} exceeds 256 bytes")));
+                }
+            }
+        }
+        v1_object_metadata(&self.metadata)?;
+        v1_object_metadata(&message.metadata)?;
+        let parts = message
+            .parts
+            .into_iter()
+            .map(|part| {
+                v1_object_metadata(&part.metadata)?;
+                match (part.text, part.data, part.media_type.as_deref()) {
+                    (Some(text), None, None | Some("text/plain")) => Ok(A2aPart::Text { text }),
+                    (None, Some(data), None | Some("application/json")) => {
+                        Ok(A2aPart::Data { data })
+                    }
+                    _ => Err(v1_invalid(
+                        "each part must contain exactly one supported text or data value",
+                    )),
+                }
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let request = SendMessageRequest {
+            message: A2aMessage {
+                role: "user".to_string(),
+                parts,
+                metadata: message.metadata,
+            },
+            metadata: self.metadata,
+        };
+        // Validate before retaining a task, including duplicate data parts.
+        extract_arguments_from_message(&request.message)?;
+        Ok(V1Invocation {
+            message_id: message.message_id,
+            task_id: message.task_id,
+            context_id: message.context_id,
+            request,
+            output_mode,
+        })
+    }
+}
+
+fn v1_parts(parts: &[A2aPart], mode: V1OutputMode) -> Vec<Value> {
+    parts
+        .iter()
+        .map(|part| match (part, mode) {
+            (A2aPart::Text { text }, V1OutputMode::Text) => json!({"text": text}),
+            (A2aPart::Text { text }, V1OutputMode::Json) => json!({"data": {"text": text}}),
+            (A2aPart::Data { data }, V1OutputMode::Text) => json!({"text": data.to_string()}),
+            (A2aPart::Data { data }, V1OutputMode::Json) if data.is_object() => {
+                json!({"data": data})
+            }
+            (A2aPart::Data { data }, V1OutputMode::Json) => json!({"data": {"value": data}}),
+        })
+        .collect()
+}
+
+fn v1_task(task: &TaskResponse, mode: V1OutputMode) -> Value {
+    let state = match task.status {
+        TaskStatus::Working
+            if task
+                .metadata
+                .as_ref()
+                .is_some_and(|metadata| metadata["chio"]["decision"] == "pending_approval") =>
+        {
+            "TASK_STATE_INPUT_REQUIRED"
+        }
+        TaskStatus::Working => "TASK_STATE_WORKING",
+        TaskStatus::Completed => "TASK_STATE_COMPLETED",
+        TaskStatus::Failed => "TASK_STATE_FAILED",
+        TaskStatus::Cancelled => "TASK_STATE_CANCELED",
+    };
+    let mut result = json!({
+        "id": task.id,
+        "contextId": format!("context-{}", task.id),
+        "status": {"state": state},
+    });
+    if let Some(metadata) = &task.metadata {
+        result["metadata"] = metadata.clone();
+    }
+    if let Some(message) = &task.message {
+        result["artifacts"] = json!([{
+            "artifactId": format!("result-{}", task.id),
+            "parts": v1_parts(&message.parts, mode),
+        }]);
+    }
+    if let Some(reason) = &task.status_message {
+        result["status"]["message"] = json!({
+            "messageId": format!("status-{}", task.id),
+            "role": "ROLE_AGENT",
+            "parts": [{"text": reason}],
+        });
+    }
+    result
+}
+
+impl ChioA2aEdge {
+    fn handle_v1_send(
+        &mut self,
+        id: Value,
+        params: Value,
+        kernel: &ChioKernel,
+        execution: &A2aKernelExecutionContext,
+    ) -> Result<A2aJsonRpcResponse, A2aEdgeError> {
+        let skill = self.resolve_jsonrpc_target_skill_id(&params)?;
+        let parsed: V1SendRequest = serde_json::from_value(params)
+            .map_err(|error| v1_invalid(format!("invalid SendMessage request: {error}")))?;
+        let invocation = parsed.into_internal()?;
+        if invocation.task_id.is_some() {
+            return self.handle_v1_continuation(id, &skill, invocation, kernel, execution);
+        }
+        if invocation.context_id.is_some() {
+            return Err(v1_invalid("client-created contexts are not supported"));
+        }
+        let V1Invocation {
+            message_id,
+            request,
+            output_mode,
+            ..
+        } = invocation;
+        let task = self.handle_stream_message_with_request_id(
+            &message_id,
+            &skill,
+            &request,
+            kernel,
+            execution,
+        )?;
+        if let Some(retained) = self.tasks.get_mut(&task.id) {
+            retained.v1_output_mode = Some(output_mode);
+        }
+        let response = self.complete_task(&task.id, kernel, execution, id);
+        let projected = self.v1_project_response(response, true);
+        // Successful nonterminal admission retains bounded custody for lookup
+        // and cancellation. Terminal results transfer directly to the caller;
+        // execution and projection errors must also release their task slot.
+        let retain_task = projected
+            .as_ref()
+            .is_ok_and(|response| response.get("error").is_none())
+            && self
+                .tasks
+                .get(&task.id)
+                .is_some_and(|task| !task.response.status.is_terminal());
+        if !retain_task {
+            self.tasks.remove(&task.id);
+        }
+        projected
+    }
+
+    fn v1_project_response(
+        &self,
+        response: A2aJsonRpcResponse,
+        wrap: bool,
+    ) -> Result<A2aJsonRpcResponse, A2aEdgeError> {
+        if response.get("error").is_some() {
+            // Projection changes the successful task representation. Preserve
+            // the original wire error and its typed local cause intact.
+            return Ok(response);
+        }
+        let task: TaskResponse = serde_json::from_value(response["result"].clone())
+            .map_err(|error| A2aEdgeError::Kernel(format!("task projection failed: {error}")))?;
+        let mode = self
+            .tasks
+            .get(&task.id)
+            .and_then(|task| task.v1_output_mode)
+            .unwrap_or(V1OutputMode::Json);
+        let value = v1_task(&task, mode);
+        let result = if wrap { json!({"task": value}) } else { value };
+        Ok(A2aJsonRpcResponse::response(json!({
+            "jsonrpc": "2.0", "id": response["id"], "result": result,
+        })))
+    }
+
+    pub(super) fn handle_v1_jsonrpc(
+        &mut self,
+        id: Value,
+        method: &str,
+        params: Value,
+        kernel: &ChioKernel,
+        execution: &A2aKernelExecutionContext,
+    ) -> A2aJsonRpcResponse {
+        let result = if method == "SendMessage" {
+            self.handle_v1_send(id.clone(), params, kernel, execution)
+        } else {
+            self.handle_v1_task(id.clone(), method, params, kernel, execution)
+        };
+        match result {
+            Ok(response) => response,
+            Err(error) => Self::jsonrpc_error_response(id, error),
+        }
+    }
+
+    fn handle_v1_task(
+        &mut self,
+        id: Value,
+        method: &str,
+        params: Value,
+        kernel: &ChioKernel,
+        execution: &A2aKernelExecutionContext,
+    ) -> Result<A2aJsonRpcResponse, A2aEdgeError> {
+        let parsed: V1TaskRequest = serde_json::from_value(params)
+            .map_err(|error| v1_invalid(format!("invalid {method} request: {error}")))?;
+        if parsed.history_length != 0 {
+            return Err(v1_invalid("task history is not supported"));
+        }
+        v1_object_metadata(&parsed.metadata)?;
+        let now = kernel.authority_clock_reading()?;
+        self.prune_deferred_tasks(now)?;
+        validate_execution_context(execution, &self.config.peer_capabilities)?;
+        // Inaccessible and absent tasks have the same public error. Neither
+        // observation nor lookup grants authority to start their execution.
+        let task = self
+            .tasks
+            .get(&parsed.id)
+            .filter(|task| task.is_owned_by(execution))
+            .ok_or_else(|| A2aEdgeError::TaskNotFound(parsed.id.clone()))?;
+        if method == "GetTask" {
+            let mode = task.v1_output_mode.unwrap_or(V1OutputMode::Json);
+            return Ok(A2aJsonRpcResponse::response(json!({
+                "jsonrpc": "2.0", "id": id, "result": v1_task(&task.response, mode),
+            })));
+        }
+        if task.response.status.is_terminal() && task.response.status != TaskStatus::Cancelled {
+            return Err(A2aEdgeError::TaskNotCancelable(parsed.id));
+        }
+        let params = json!({"taskId": parsed.id});
+        let response = self.handle_jsonrpc_task_cancel(id, params, kernel, execution);
+        self.v1_project_response(response, false)
+    }
+}

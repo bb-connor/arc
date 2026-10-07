@@ -219,6 +219,31 @@ ALL_REFRESH_INVENTORY = (
     ),
 )
 ALL_CAMPAIGNS = tuple(campaign for campaign, _outcome, _case in ALL_REFRESH_INVENTORY)
+REFRESH_SHARD_COUNT = 7
+
+
+def refresh_shard(index: int) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Partition the fixed inventory without splitting a case across shards."""
+    if type(index) is not int or not 0 <= index < REFRESH_SHARD_COUNT:
+        raise EntrypointError("unknown evidence refresh shard")
+    cases: dict[str, list[str]] = {}
+    for campaign, _outcome, case in ALL_REFRESH_INVENTORY:
+        cases.setdefault(case, []).append(campaign)
+    groups: list[list[str]] = [[] for _ in range(REFRESH_SHARD_COUNT)]
+    for _case, campaigns in sorted(cases.items(), key=lambda row: (-len(row[1]), row[0])):
+        target = min(range(REFRESH_SHARD_COUNT), key=lambda i: (len(groups[i]), i))
+        groups[target].extend(campaigns)
+    if any(len(group) != 5 for group in groups):
+        raise EntrypointError("fixed refresh shard balance changed")
+    campaigns = tuple(sorted(groups[index]))
+    paths = tuple(sorted({
+        "crates/core/chio-adversarial-suite/manifest.json",
+        *(path for campaign, outcome, case in ALL_REFRESH_INVENTORY
+          if campaign in campaigns for path in (outcome, case)),
+    }))
+    return campaigns, paths
+
+
 OUTCOME_PATH_BY_CAMPAIGN = {
     campaign: outcome for campaign, outcome, _case in ALL_REFRESH_INVENTORY
 }
@@ -544,7 +569,9 @@ def candidate_environment(
     home = candidate_gate_root(gate_root) / "home"
     target = Path("/target/build")
     environment = {
-        "CARGO_BUILD_JOBS": "1",
+        # Compile within the existing four-CPU container quota. The verifier
+        # still owns one mutation at a time and the broker resets each command.
+        "CARGO_BUILD_JOBS": "4",
         "CARGO_HOME": "/cargo-home",
         "CARGO_INCREMENTAL": "0",
         "CARGO_NET_OFFLINE": "true",
@@ -588,7 +615,8 @@ def candidate_environment(
                     "CHIO_KEYLOG_AUDIT": "debug/chio-keylog-audit",
                     "CHIO_KEYLOG_WITNESS": "debug/chio-keylog-witness",
                 }[key]
-                if value != os.fspath(target / helper):
+                helper_target = Path("/target/artifacts/broker-helper-target")
+                if value != os.fspath(helper_target / helper):
                     raise EntrypointError("candidate helper path differs from its built executable")
                 environment[key] = value
             elif key == "RUSTFLAGS":
@@ -597,12 +625,13 @@ def candidate_environment(
                 environment[key] = value
             elif key == "CARGO_TARGET_DIR":
                 requested = Path(value)
-                persistent_cage_target = Path(
-                    "/target/artifacts/static-pie-target"
-                )
+                persistent_helper_targets = {
+                    Path("/target/artifacts/static-pie-target"),
+                    Path("/target/artifacts/broker-helper-target"),
+                }
                 if not requested.is_absolute() or not (
                     requested.is_relative_to(target)
-                    or requested == persistent_cage_target
+                    or requested in persistent_helper_targets
                 ):
                     raise EntrypointError("candidate target override escapes gate state")
                 environment[key] = value
@@ -1908,7 +1937,9 @@ def run_trusted_bounded(
         stderr=subprocess.DEVNULL,
         start_new_session=True,
     )
-    deadline = time.monotonic() + 30
+    # Cache materialization allows 300 seconds and execution probes allow 60.
+    # Include bounded setup overhead without exceeding the operation budget.
+    deadline = time.monotonic() + min(timeout_seconds, 420)
     while not socket_path.exists():
         if broker.poll() is not None or time.monotonic() >= deadline:
             abandon_broker(broker, socket_path, gate_root)
@@ -1950,7 +1981,8 @@ def run_trusted_bounded(
         raise EntrypointError("candidate command broker failed closed")
     if return_code != 0:
         raise EntrypointError(
-            f"trusted verifier failed with status {return_code}: {command[0]}"
+            f"trusted verifier failed with status {return_code}: {command[0]}; "
+            f"output tail: {output[-8192:]!r}"
         )
     return output
 
@@ -2169,6 +2201,14 @@ def adversarial_release(timeout_seconds: int) -> None:
     publish_regular("adversarial-evidence.log", execution_boundary_record() + log)
 
 
+def validate_committed_evidence(timeout_seconds: int) -> None:
+    log = run_trusted_bounded(
+        trusted_checker_arguments("--require-complete"), timeout_seconds
+    )
+    require_clean_repository(timeout_seconds)
+    publish_regular("committed-adversarial-evidence.log", execution_boundary_record() + log)
+
+
 def linux_enforcement(timeout_seconds: int) -> None:
     runner_log = execution_boundary_record() + run_trusted_bounded(
         [
@@ -2262,8 +2302,15 @@ def refresh_evidence(
     paths: tuple[str, ...],
     *,
     full_inventory: bool,
+    shard: int | None = None,
 ) -> None:
-    if full_inventory:
+    if shard is not None:
+        if full_inventory:
+            raise EntrypointError("partial refresh cannot claim the complete inventory")
+        expected_campaigns, expected_paths = refresh_shard(shard)
+        promotable_campaigns = expected_campaigns
+        new_outcome_paths = tuple(OUTCOME_PATH_BY_CAMPAIGN[c] for c in expected_campaigns)
+    elif full_inventory:
         expected_campaigns = ALL_CAMPAIGNS
         expected_paths = ALL_REFRESH_PATHS
         promotable_campaigns = ALL_CAMPAIGNS
@@ -2292,9 +2339,10 @@ def refresh_evidence(
         commands,
         timeout_seconds,
     )
-    run_trusted_bounded(
-        trusted_checker_arguments("--require-complete"), timeout_seconds
-    )
+    if shard is None:
+        run_trusted_bounded(
+            trusted_checker_arguments("--require-complete"), timeout_seconds
+        )
     tracked_patch, untracked_payload, ignored = repository_inventory(timeout_seconds)
     names = run_trusted_bounded(
         ["/usr/bin/git", "diff", "--name-only", "-z", "--no-ext-diff", "HEAD", "--"],
@@ -2335,22 +2383,32 @@ def refresh_evidence(
     ):
         raise EntrypointError("refreshed evidence source identity is invalid")
     checksum = hashlib.sha256(patch).hexdigest()
-    patch_name = "all-evidence.patch" if full_inventory else "linux-evidence.patch"
+    patch_name = (
+        "all-evidence.patch" if full_inventory or shard is not None
+        else "linux-evidence.patch"
+    )
     inventory_payload: bytes | None = None
-    if full_inventory:
+    if full_inventory or shard is not None:
         inventory = {
             "campaign_count": len(campaigns),
             "campaigns": list(campaigns),
             "case_count": len(
-                {case for _campaign, _outcome, case in ALL_REFRESH_INVENTORY}
+                {case for campaign, _outcome, case in ALL_REFRESH_INVENTORY
+                 if campaign in campaigns}
             ),
-            "outcome_count": len(ALL_REFRESH_INVENTORY),
+            "outcome_count": len(campaigns),
             "patch_sha256": checksum,
             "paths": list(paths),
             "schema": "chio.security-evidence-refresh.v1",
             "source_sha": source_sha,
             "execution_boundary": json.loads(execution_boundary_record()),
         }
+        if shard is not None:
+            inventory.update({
+                "schema": "chio.security-evidence-refresh-shard.v1",
+                "shard": shard,
+                "shard_count": REFRESH_SHARD_COUNT,
+            })
         inventory_payload = (
             json.dumps(inventory, sort_keys=True, separators=(",", ":")) + "\n"
         ).encode("utf-8")
@@ -2417,6 +2475,8 @@ def parse_args() -> argparse.Namespace:
             "linux-enforcement",
             "refresh-all-evidence",
             "refresh-linux-evidence",
+            "validate-committed-evidence",
+            *(f"refresh-evidence-shard-{i}" for i in range(REFRESH_SHARD_COUNT)),
         ),
     )
     parser.add_argument("--timeout-seconds", required=True, type=int)
@@ -2464,6 +2524,8 @@ def main() -> int:
     initialize_baseline()
     if args.operation == "adversarial-release":
         adversarial_release(args.timeout_seconds)
+    elif args.operation == "validate-committed-evidence":
+        validate_committed_evidence(args.timeout_seconds)
     elif args.operation == "linux-enforcement":
         linux_enforcement(args.timeout_seconds)
     elif args.operation == "refresh-linux-evidence":
@@ -2479,6 +2541,12 @@ def main() -> int:
             ALL_CAMPAIGNS,
             ALL_REFRESH_PATHS,
             full_inventory=True,
+        )
+    elif args.operation.startswith("refresh-evidence-shard-"):
+        shard = int(args.operation.removeprefix("refresh-evidence-shard-"))
+        campaigns, paths = refresh_shard(shard)
+        refresh_evidence(
+            args.timeout_seconds, campaigns, paths, full_inventory=False, shard=shard,
         )
     elif args.operation == "hostile-probe":
         hostile_probe(args.timeout_seconds, False)

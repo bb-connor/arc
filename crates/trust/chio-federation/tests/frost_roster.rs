@@ -2,9 +2,9 @@ use std::path::PathBuf;
 
 use chio_core_types::{Keypair, PublicKey};
 use chio_federation::frost::{
-    registered_frost_actions, FrostArtifactAuthorityRole, FrostArtifactTrustRoot,
-    FrostArtifactTrustStore, FrostAuthorizationDomain, FrostParticipantV1, FrostRosterKeyOrigin,
-    FrostRosterV1, CHIO_FROST_ROSTER_SCHEMA, FROST_ED25519_SHA512_SUITE_ID,
+    registered_frost_actions, FrostArtifactAuthorityRole, FrostArtifactTrustError,
+    FrostArtifactTrustRoot, FrostArtifactTrustStore, FrostAuthorizationDomain, FrostParticipantV1,
+    FrostRosterKeyOrigin, FrostRosterV1, CHIO_FROST_ROSTER_SCHEMA, FROST_ED25519_SHA512_SUITE_ID,
 };
 use frost_ed25519::keys::{SigningShare, VerifyingShare};
 
@@ -87,6 +87,29 @@ fn signed_roster() -> FrostRosterV1 {
         .recompute_roster_digest()
         .unwrap_or_else(|error| panic!("roster digest must compute: {error}"));
     roster
+}
+
+#[test]
+fn low_order_artifact_authorities_are_rejected_for_every_role(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut identity = [0; 32];
+    identity[0] = 1;
+    let weak_key = PublicKey::from_bytes(&identity)?;
+    for role in [
+        FrostArtifactAuthorityRole::Roster,
+        FrostArtifactAuthorityRole::EpochAnchor,
+        FrostArtifactAuthorityRole::AuthorizationSlotAnchor,
+    ] {
+        assert!(matches!(
+            FrostArtifactTrustStore::new([FrostArtifactTrustRoot {
+                role,
+                key_id: "authority.weak.v1".into(),
+                public_key: weak_key.clone(),
+            }]),
+            Err(FrostArtifactTrustError::InvalidRoot(_))
+        ));
+    }
+    Ok(())
 }
 
 #[test]

@@ -1,0 +1,154 @@
+{
+  "commit": "71e5cbc3bf7b08f477ed0e0361f2cca0c36eaea3",
+  "checks": [
+    {
+      "name": "standalone-all-final",
+      "sourceSnapshot": "v2",
+      "count": 95,
+      "kind": "Rust tests",
+      "commandReceipt": "standalone-all-final.json",
+      "commandReceiptSha256": "d96f623b74ccb8a9e3e596a4529b6e6d23f2a9db9484272ffad993c5acc9c4f0",
+      "log": "standalone-all-final.log",
+      "logSha256": "742981df39db760fd4f953fa5e2a50a9274c7cebf7233b9927ed5d42fe1ba382",
+      "exitCode": 0
+    },
+    {
+      "name": "peer-process-final",
+      "sourceSnapshot": "v2",
+      "count": 2,
+      "kind": "process scenarios",
+      "commandReceipt": "peer-process-final.json",
+      "commandReceiptSha256": "a20d89211a6bfdb527c0176d7b312507fa2048f80098476e8bb9f63c2044dc12",
+      "log": "peer-process-final.log",
+      "logSha256": "95919926e02bacb5139e48686854a46052b305e80096d12f8b2d0f4d61cba6a7",
+      "exitCode": 0
+    },
+    {
+      "name": "isolated-process-final",
+      "sourceSnapshot": "v2",
+      "count": 2,
+      "kind": "process scenarios",
+      "commandReceipt": "isolated-process-final.json",
+      "commandReceiptSha256": "155815953f1206748039bfd9e6dce9a71b2dc598ec82372d6b670a9e6b682627",
+      "log": "isolated-process-final.log",
+      "logSha256": "4d92312f50cbd86a1073b00f88f93367e6c8ad5692a111a5d448f925c4e03e8a",
+      "exitCode": 0
+    },
+    {
+      "name": "earned-child-process-final",
+      "sourceSnapshot": "v2",
+      "count": 4,
+      "kind": "process scenarios",
+      "commandReceipt": "earned-child-process-final.json",
+      "commandReceiptSha256": "43e952c1a39cf190a5e5dfb8a7ce51b91659c127b128376135d715ffe43d7614",
+      "log": "earned-child-process-final.log",
+      "logSha256": "63f3dfb1d27c0562aa2185564e584011fd3c3a2fa52091698430e975f6b5afab",
+      "exitCode": 0
+    },
+    {
+      "name": "refund-resolution-final",
+      "sourceSnapshot": "v2",
+      "count": 7,
+      "kind": "process scenarios",
+      "commandReceipt": "refund-resolution-final.json",
+      "commandReceiptSha256": "955ab0b730263e99a03f49aa0bf25d6c83d98a47ae6483bc0e734c210043f033",
+      "log": "refund-resolution-final.log",
+      "logSha256": "1cab8aac1a1fa619efa698baeb6e71848f2d3c8e377494d16ee66ba4202941e2",
+      "exitCode": 0
+    },
+    {
+      "name": "execution-custody-final",
+      "sourceSnapshot": "v2",
+      "count": 5,
+      "kind": "process scenarios",
+      "commandReceipt": "execution-custody-final.json",
+      "commandReceiptSha256": "9fb10bc799df473fc4f9ada21940348f9cab55346c6449791e76f7a9c61ea4f3",
+      "log": "execution-custody-final.log",
+      "logSha256": "9db2b0c5fa1969513eb2cd8931fb07f0067aa9b5d6f4d78c11a0540e2b9a1f22",
+      "exitCode": 0
+    },
+    {
+      "name": "standalone-clippy-retry",
+      "sourceSnapshot": "v3",
+      "count": null,
+      "kind": "strict standalone Clippy",
+      "commandReceipt": "standalone-clippy-retry.json",
+      "commandReceiptSha256": "fa27d5c8dfd94048970a02aa26067e2c9fd17428dbcb58199329c250891cf5b5",
+      "log": "standalone-clippy-retry.log",
+      "logSha256": "eeb14ca0b14f75a89eaea2ad25316dbdc7dc3f83b132627f8b41c679806e676f",
+      "exitCode": 0
+    },
+    {
+      "name": "peer-unit-final",
+      "sourceSnapshot": "v3",
+      "count": 4,
+      "kind": "Rust tests",
+      "commandReceipt": "peer-unit-final.json",
+      "commandReceiptSha256": "a43014d967d41b19e55ba4754c282daee90ed3d03bc8df3de812a9b01e5a0dc9",
+      "log": "peer-unit-final.log",
+      "logSha256": "40d55de293f1a149e1750d15eead470d8751dd061b9aec531975da03d76840f6",
+      "exitCode": 0
+    },
+    {
+      "name": "standalone-build-v3",
+      "sourceSnapshot": "v3",
+      "count": null,
+      "kind": "binary build",
+      "commandReceipt": "standalone-build-v3.json",
+      "commandReceiptSha256": "64529166a6fb308282e8dd8f54744eca06206af99f8fe6caf2484445d0d618ce",
+      "log": "standalone-build-v3.log",
+      "logSha256": "ad76ea027df9ea54997703793b8571038f51b4c90e4c31fc0d98e44426ff1df3",
+      "exitCode": 0
+    },
+    {
+      "name": "peer-process-v3",
+      "sourceSnapshot": "v3",
+      "count": 2,
+      "kind": "process scenarios",
+      "commandReceipt": "peer-process-v3.json",
+      "commandReceiptSha256": "195b51ff75593f1160958cdd2c3be4cf4583a459f08b945e0e6968d350775e38",
+      "log": "peer-process-v3.log",
+      "logSha256": "e7d45396bd6deb0abac0f8c51f111a1ecd40c871cff6356f1430556139625871",
+      "exitCode": 0
+    },
+    {
+      "name": "standalone-format-v3",
+      "sourceSnapshot": "v3",
+      "count": null,
+      "kind": "standalone format",
+      "commandReceipt": "standalone-format-v3.json",
+      "commandReceiptSha256": "ecd96d6d047ab8903cbede67b402132d610792a7ba1e0cb6bd198b7aa5a69127",
+      "log": "standalone-format-v3.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0
+    },
+    {
+      "name": "workspace-format",
+      "sourceSnapshot": "v2",
+      "count": null,
+      "kind": "workspace format",
+      "commandReceipt": "workspace-format.json",
+      "commandReceiptSha256": "e4269a4af69d700c6bf4b0c6cad4fb0aa7d15640d52d763339becfde51d51934",
+      "log": "workspace-format.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0
+    },
+    {
+      "name": "final-schema-registry",
+      "sourceSnapshot": "v2",
+      "count": null,
+      "kind": "schema registry",
+      "commandReceipt": "final-schema-registry.json",
+      "commandReceiptSha256": "1242d2e7e9363e90c0130fdbb60dc91169d19c6e6aa9495df287d77345f8fc3a",
+      "log": "final-schema-registry.log",
+      "logSha256": "f08ca40211ee4cf16919c55a0c548472ee01a0ff6808eadb1e60a66f4aa43553",
+      "exitCode": 0
+    }
+  ],
+  "v2SelectedProcessScenarioCount": 20,
+  "v3PeerRerunScenarioCount": 2,
+  "v2RustTests": 95,
+  "v3SelectedPeerRustTests": 4,
+  "fullWorkspaceTestsRun": false,
+  "globalReleaseQualified": false
+}

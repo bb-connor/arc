@@ -1,0 +1,9 @@
+{
+  "archive": "mutation-at-93a2552c.tar.gz",
+  "uncompressed_bytes": 18944000,
+  "uncompressed_sha256": "006a37a195c2cc7b2239b3b118970c13b4d0868fb8fc87b0a93f4492f597877b",
+  "archive_sha256": "05db129ac9d6e7fd5ff840aee9fc33d5711663a50e2e2fab49c1ee38ce7e8ec9",
+  "head": "93a2552c3a6eb15ac2756129f199f5714390e794",
+  "federation": "completed-advisory-survivors",
+  "runtime": "cancelled-with-three-uncompleted-mutations"
+}

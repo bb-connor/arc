@@ -20,6 +20,11 @@ on:
       - "scripts/setup-drogon-test-deps.sh"
       - "scripts/check-consumer-sdk-parity.sh"
       - "scripts/check-consumer-sdk-inventory.py"
+      - ".github/actions/enforced-native-fixture/**"
+      - "scripts/check-native-protocol-ci.py"
+      - "scripts/tests/check-native-protocol-ci.test.py"
+      - "scripts/prepare-enforced-native-fixture.py"
+      - "scripts/prepare-native-python-runtime.py"
       - "scripts/run-exact-cargo-test-inventory.sh"
       - "scripts/check-exact-cargo-test-inventory.py"
       - "tests/bindings/**"
@@ -43,6 +48,11 @@ on:
       - "scripts/setup-drogon-test-deps.sh"
       - "scripts/check-consumer-sdk-parity.sh"
       - "scripts/check-consumer-sdk-inventory.py"
+      - ".github/actions/enforced-native-fixture/**"
+      - "scripts/check-native-protocol-ci.py"
+      - "scripts/tests/check-native-protocol-ci.test.py"
+      - "scripts/prepare-enforced-native-fixture.py"
+      - "scripts/prepare-native-python-runtime.py"
       - "scripts/run-exact-cargo-test-inventory.sh"
       - "scripts/check-exact-cargo-test-inventory.py"
       - "tests/bindings/**"
@@ -150,7 +160,7 @@ jobs:
       - name: Install parity dependencies
         uses: ./.github/actions/apt-install
         with:
-          packages: protobuf-compiler cmake build-essential libcurl4-openssl-dev libssl-dev zlib1g-dev uuid-dev pkg-config
+          packages: protobuf-compiler cmake build-essential libcurl4-openssl-dev libssl-dev zlib1g-dev uuid-dev pkg-config musl-tools
 
       - name: Install current consumer SDK dependencies
         run: |
@@ -159,6 +169,9 @@ jobs:
 
       - name: Current consumer SDK parity
         run: ./scripts/check-consumer-sdk-parity.sh
+
+      - name: Qualify enforcing host and prepare native consumer fixture
+        uses: ./.github/actions/enforced-native-fixture
 
       - name: Run SDK parity
         run: |

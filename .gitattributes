@@ -12,3 +12,21 @@ releases/audit-reports/*.pdf binary
 
 # Mobile xcframework static archives are generated release artifacts.
 sdks/swift/Frameworks/ChioKernel.xcframework/**/*.a filter=lfs diff=lfs merge=lfs -text
+
+# Unified patch context represents an empty source line with one space.
+# The source-reconstruction gate verifies these exact authenticated bytes.
+third_party/npm/braces.patch whitespace=-blank-at-eol
+third_party/npm/node-forge.patch whitespace=-blank-at-eol
+
+# Authenticated qualification evidence is generated. Preserve historical bytes
+# while keeping logs and repeated inventories out of ordinary source diffs.
+docs/research/**/evidence/** linguist-generated -diff
+docs/papers/verifiable-work/evidence/** linguist-generated -diff
+docs/research/kernel-work/results/model/** linguist-generated -diff whitespace=-blank-at-eof
+docs/papers/programmable-sovereignty/bench/review-20261005/*.json linguist-generated -diff
+docs/papers/programmable-sovereignty/bench/review-20261005/*.csv linguist-generated -diff whitespace=cr-at-eol
+examples/funded-work-model/claim-traces.json linguist-generated -diff
+# These small authored ledgers remain reviewable source documents.
+docs/papers/verifiable-work/evidence/pr1173-review/REVIEW.md -linguist-generated diff
+docs/papers/verifiable-work/evidence/pr1173-review/logs.json -linguist-generated diff
+docs/papers/verifiable-work/evidence/pr1173-review/SECOND-REVIEW.md -linguist-generated diff

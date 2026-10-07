@@ -48,8 +48,24 @@ name = "refinesOnConstitution"
 path = "formal/lean4/Chio/Chio/Treaty/PredicateLang.lean"
 
 [[definition]]
+name = "containsUnsupported"
+path = "formal/lean4/Chio/Chio/Treaty/PredicateLang.lean"
+
+[[definition]]
+name = "containsUndefined"
+path = "formal/lean4/Chio/Chio/Treaty/PredicateLang.lean"
+
+[[definition]]
 name = "ofDecide"
 path = "formal/lean4/Chio/Chio/Treaty/IntersectionSyntactic.lean"
+
+[[definition]]
+name = "evaluate"
+path = "formal/lean4/Chio/Chio/Treaty/ReceiptPredicate.lean"
+
+[[definition]]
+name = "refinesOn"
+path = "formal/lean4/Chio/Chio/Treaty/ReceiptPredicate.lean"
 
 [[definition]]
 name = "IsLiteralScalar"
@@ -58,3 +74,7 @@ path = "formal/lean4/Chio/Chio/Json/Value.lean"
 [[definition]]
 name = "CanonicalInteger"
 path = "formal/lean4/Chio/Chio/Json/Value.lean"
+
+[[definition]]
+name = "fieldAgrees"
+path = "formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean"

@@ -85,13 +85,21 @@ BINARY_REPLACEMENTS: dict[str, frozenset[str]] = {
 }
 MANIFEST_SCHEMA_VERSION = 1
 MANIFEST_PRODUCER = "chio-adversarial-suite"
-INPUT_BINDING_SCHEMA = "chio.adversarial-mutation-inputs.v6"
+INPUT_BINDING_SCHEMA = "chio.adversarial-mutation-inputs.v7"
 DERIVED_CASES_ROOT = PurePosixPath("crates/core/chio-adversarial-suite/cases")
 DERIVED_MANIFEST_PATH = PurePosixPath(
     "crates/core/chio-adversarial-suite/manifest.json"
 )
 DERIVED_MUTATION_ROOT = PurePosixPath("audits/evidence/mutants/security")
 DERIVED_THREATS_ROOT = PurePosixPath("audits/evidence/threats")
+DERIVED_LINUX_EVIDENCE_ROOT = PurePosixPath("audits/evidence/enterprise-linux")
+DERIVED_LINUX_EVIDENCE_FILES = frozenset(
+    {
+        "enterprise-migration-canary.json",
+        "enterprise-migration-canary.json.sha256",
+        "enterprise-migration-binding-digest.txt",
+    }
+)
 REFRESH_STATE_ROOTS = frozenset(
     {
         ".chio-security-adversarial-evidence.refresh-transaction",
@@ -418,6 +426,11 @@ def is_derived_or_state_input(relative: PurePosixPath) -> bool:
     if parts[: len(DERIVED_THREATS_ROOT.parts)] == DERIVED_THREATS_ROOT.parts:
         return True
     if (
+        parts[: len(DERIVED_LINUX_EVIDENCE_ROOT.parts)]
+        == DERIVED_LINUX_EVIDENCE_ROOT.parts
+    ):
+        return True
+    if (
         len(parts) > len(DERIVED_MUTATION_ROOT.parts)
         and parts[: len(DERIVED_MUTATION_ROOT.parts)] == DERIVED_MUTATION_ROOT.parts
     ):
@@ -427,9 +440,58 @@ def is_derived_or_state_input(relative: PurePosixPath) -> bool:
     return False
 
 
+def validate_derived_linux_evidence_directory(root: Path) -> None:
+    """Permit only the fixed output namespace of the evidence-only descendant.
+
+    Signature and source-policy verification belong to the committed-evidence
+    gate. Here, reject extra inputs rather than hiding them from the source
+    digest. Compilation references to this namespace are rejected separately.
+    """
+
+    label = "derived Linux evidence"
+    path = lexical_path_below_root(
+        root, root / DERIVED_LINUX_EVIDENCE_ROOT, label, allow_missing_parents=True
+    )
+    try:
+        metadata = path.lstat()
+    except FileNotFoundError:
+        return
+    except OSError as error:
+        raise EvidenceError(f"{label}: output path cannot be inspected: {error}") from error
+    if not stat.S_ISDIR(metadata.st_mode):
+        raise EvidenceError(f"{label}: output path is not a directory")
+    parent = open_parent_directory_below_root(root, path, label)
+    descriptor: int | None = None
+    try:
+        flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+        flags |= getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+        descriptor = os.open(path.name, flags, dir_fd=parent)
+        identity = metadata_identity(os.fstat(descriptor))
+        with os.scandir(descriptor) as entries:
+            for entry in entries:
+                if entry.name not in DERIVED_LINUX_EVIDENCE_FILES:
+                    raise EvidenceError(f"{label}: unexpected derived evidence entry")
+                if not stat.S_ISREG(entry.stat(follow_symlinks=False).st_mode):
+                    raise EvidenceError(
+                        f"{label}: derived evidence entry is not a regular file"
+                    )
+        named = os.stat(path.name, dir_fd=parent, follow_symlinks=False)
+        if metadata_identity(named) != identity:
+            raise EvidenceError(f"{label}: output directory identity changed")
+    except OSError as error:
+        raise EvidenceError(
+            f"{label}: unable to inspect no-follow output directory: {error}"
+        ) from error
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+        os.close(parent)
+
+
 def repository_input_closure(root: Path) -> tuple[set[Path], set[Path]]:
     """Inventory every non-derived regular file and directory in the repository."""
 
+    validate_derived_linux_evidence_directory(root)
     inputs: set[Path] = set()
     directories: set[Path] = set()
 
@@ -3655,6 +3717,46 @@ def require_cargo_mutants_version(
     return observed_identity
 
 
+def cargo_mutants_source_path(
+    root: Path, package_prefix: PurePosixPath, value: str, label: str
+) -> str:
+    """Normalize Rust module parents only within a real, non-aliased package."""
+    parsed = PurePosixPath(value)
+    if ".." not in parsed.parts:
+        return canonical_repository_path(value, label)
+    if (
+        parsed.is_absolute()
+        or value != parsed.as_posix()
+        or "\\" in value
+        or any(not character.isprintable() for character in value)
+    ):
+        raise EvidenceError(f"{label}: invalid module source path")
+    prefix = package_prefix.parts
+    if parsed.parts[: len(prefix)] != prefix:
+        raise EvidenceError(f"{label}: module source escaped its Cargo package")
+    components: list[str] = []
+    try:
+        for index, component in enumerate(parsed.parts):
+            if component == "..":
+                if len(components) <= len(prefix):
+                    raise EvidenceError(f"{label}: module source escaped its Cargo package")
+                components.pop()
+                continue
+            components.append(component)
+            if index < len(parsed.parts) - 1:
+                metadata = root.joinpath(*components).lstat()
+                if not stat.S_ISDIR(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode):
+                    raise EvidenceError(f"{label}: module parent is not a no-follow directory")
+        path = canonical_repository_path("/".join(components), label)
+        safe_rust_path(path, label)
+        source = lexical_path_below_root(root, root / path, label)
+        if not stat.S_ISREG(source.lstat().st_mode):
+            raise EvidenceError(f"{label}: module source is not a regular file")
+    except OSError as error:
+        raise EvidenceError(f"{label}: module source is unavailable") from error
+    return path
+
+
 def cargo_mutants_source_inventory(
     root: Path,
     package_dir: Path,
@@ -3718,7 +3820,7 @@ def cargo_mutants_source_inventory(
         raw_path = entry["path"]
         if not isinstance(raw_path, str):
             raise EvidenceError(f"{label}: source inventory path is not a string")
-        path = canonical_repository_path(raw_path, label)
+        path = cargo_mutants_source_path(root, package_prefix, raw_path, label)
         safe_rust_path(path, label)
         parsed = PurePosixPath(path)
         if package_prefix != parsed and package_prefix not in parsed.parents:
@@ -3857,6 +3959,8 @@ def validate_campaign(
     controls: dict[str, dict[str, Any]],
     case_id: str,
     source_inventory: CargoMutantsSourceInventory | None = None,
+    *,
+    refresh_campaign: str | None = None,
 ) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise EvidenceError(f"{case_id}: mutation campaign is not an object")
@@ -3927,14 +4031,23 @@ def validate_campaign(
     if source_inventory is None:
         source_inventory = CargoMutantsSourceInventory()
     production_path = require_under_package(root, package_dirs, package, source)
-    production_payload = require_mutation_source_discoverable(
-        root,
-        package_dirs[package],
-        package,
-        source,
-        source_inventory,
-        f"{case_id}: mutation source",
-    )
+    if refresh_campaign is None or campaign_id == refresh_campaign:
+        production_payload = require_mutation_source_discoverable(
+            root,
+            package_dirs[package],
+            package,
+            source,
+            source_inventory,
+            f"{case_id}: mutation source",
+        )
+    else:
+        # Untouched campaigns are not being qualified by this refresh. Retain
+        # their path, function, schema and stored-outcome checks without starting
+        # unrelated Cargo commands. Ordinary validation still discovers every
+        # source, including the complete gate after a multi-campaign refresh.
+        production_payload = read_regular_file_below_root(
+            root, root / source, f"{case_id}: mutation source"
+        )
     rust_function_exists(
         production_path,
         selector,
@@ -4372,6 +4485,7 @@ def validate_case(
             controls,
             case_id,
             source_inventory,
+            refresh_campaign=refresh_campaign,
         )
         campaign_id = campaign["id"]
         if campaign_id in campaigns:
@@ -5281,7 +5395,7 @@ def prepare_enterprise_descriptor_control(
             "--target",
             "x86_64-unknown-linux-musl",
             "--package",
-            "chio-cage",
+            "chio-cage-init",
             "--bin",
             "chio-cage-init",
             "--features",
@@ -5327,9 +5441,36 @@ def prepare_enterprise_descriptor_control(
     environment.update(expected)
 
 
+def require_derived_outputs_absent_for_execution(root: Path) -> None:
+    """Execute only from a source view without signed publication outputs.
+
+    Static reference checks cannot prove what arbitrary build scripts or proc
+    macros read. The isolated runner omits this closed namespace from its Git
+    source projection. Direct invocations must fail before running candidate
+    code when the namespace is present; never delete a caller's signed evidence.
+    """
+    path = lexical_path_below_root(
+        root,
+        root / DERIVED_LINUX_EVIDENCE_ROOT,
+        "derived Linux evidence execution input",
+        allow_missing_parents=True,
+    )
+    try:
+        path.lstat()
+    except FileNotFoundError:
+        return
+    except OSError as error:
+        raise EvidenceError("derived Linux evidence execution input cannot be inspected") from error
+    raise EvidenceError(
+        "derived Linux evidence is present during candidate execution; "
+        "use the isolated source projection"
+    )
+
+
 def run_control(
     root: Path, control: dict[str, Any], environment: dict[str, str]
 ) -> None:
+    require_derived_outputs_absent_for_execution(root)
     required_os = control.get("required_target_os")
     if required_os is not None and platform.system().lower() != required_os:
         raise EvidenceError(
@@ -5622,6 +5763,11 @@ def run_campaign(
     cross_package_control = control["package"] != campaign["package"]
     if cross_package_control:
         command.extend(["--test-package", control["package"]])
+        # The pinned engine applies --test-package only to mutants. Its
+        # baseline otherwise runs the owner package with zero matching tests
+        # and derives the consumer deadline from that unrelated workload.
+        # A Cargo package argument also includes the control in the baseline.
+        command.append(f"--cargo-arg=--package={control['package']}")
     if control["features"]:
         command.extend(["--features", ",".join(control["features"])])
     # A Cargo target selector is global to every package in cargo-mutants'
@@ -5639,7 +5785,10 @@ def run_campaign(
     if campaign["id"] == "sandbox_fd_leak":
         # The descriptor closer runs in cage-init. An externally prebuilt
         # helper would stay unchanged while cargo-mutants edits its source.
-        # Build the static PIE helper and integration test from each mutant.
+        # Include the helper package's integration target so Cargo rebuilds
+        # its standalone binary alongside the consuming cage test.
+        if cross_package_control:
+            command.extend(["--test-package", campaign["package"]])
         command.append("--cargo-arg=--target=x86_64-unknown-linux-musl")
         mutation_environment = dict(environment)
         mutation_environment.pop("CHIO_CAGE_TEST_HELPER", None)

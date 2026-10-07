@@ -8,6 +8,8 @@ from pathlib import Path
 import graph
 import langgraph_worker
 import store
+from chio_process import WorkerError
+from langchain_core.messages import ToolMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from mcp_client import McpClient
 from provider import SavedChat, UnknownModelOutcome
@@ -37,6 +39,39 @@ def response(turn, calls=None):
 
 
 class GraphTests(unittest.TestCase):
+    def test_prepared_output_decoding_preserves_original_signed_artifact(self):
+        value = {"isError": False, "structuredContent": {"status": "superseded"}}
+        encoded_body = {
+            "status": 200,
+            "headers": [],
+            "body": list(json.dumps(value).encode()),
+            "evidence": {"schema": "chio.broker-execution-evidence.v2"},
+            "receiptReference": {},
+            "receipt": {},
+        }
+        original = ToolMessage(
+            content=json.dumps(encoded_body),
+            tool_call_id="call",
+            artifact={"chio": {"receipt_json": '{ "original": true }'}},
+        )
+        result = graph.decode_prepared_messages({"messages": [original]})
+        self.assertEqual(json.loads(result["messages"][0].content), value)
+        self.assertEqual(result["messages"][0].artifact, original.artifact)
+        self.assertNotEqual(result["messages"][0].content, original.content)
+        encoded_body["status"] = 500
+        invalid = original.model_copy(update={"content": json.dumps(encoded_body)})
+        with self.assertRaises(WorkerError):
+            graph.decode_prepared_messages({"messages": [invalid]})
+        wrapped = original.model_copy(
+            update={
+                "content": json.dumps(
+                    {"isError": False, "structuredContent": encoded_body}
+                )
+            }
+        )
+        with self.assertRaises(WorkerError):
+            graph.decode_prepared_messages({"messages": [wrapped]})
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)

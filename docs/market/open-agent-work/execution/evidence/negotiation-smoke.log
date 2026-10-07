@@ -1,0 +1,52 @@
+{
+  "output": "/tmp/chio-funding-execution-mfkbfx6y/negotiation-run",
+  "results": [
+    {
+      "scenario": "normal",
+      "crashExit": null,
+      "available": 900,
+      "reserved": 100,
+      "acceptanceEvents": 1,
+      "negativeCases": 4,
+      "concurrentDuplicateAcceptances": 4,
+      "verifiedReceipts": 11,
+      "verifierNegativeCases": 3,
+      "admissionStates": {
+        "compensated_before_dispatch": 1,
+        "completed": 7,
+        "dispatch_committed": 3
+      },
+      "workExecuted": false,
+      "settled": false
+    },
+    {
+      "scenario": "acceptance-sigkill",
+      "crashExit": 137,
+      "available": 900,
+      "reserved": 100,
+      "acceptanceEvents": 1,
+      "negativeCases": 4,
+      "concurrentDuplicateAcceptances": 4,
+      "verifiedReceipts": 11,
+      "verifierNegativeCases": 3,
+      "admissionStates": {
+        "compensated_before_dispatch": 1,
+        "completed": 7,
+        "dispatch_committed": 3,
+        "outcome_unknown_after_dispatch": 1
+      },
+      "workExecuted": false,
+      "settled": false
+    },
+    {
+      "scenario": "buyer-before-send-sigkill",
+      "buyerCrashExit": 137,
+      "acceptanceEvents": 0,
+      "available": 900,
+      "reserved": 100,
+      "state": "attempted",
+      "workExecuted": false,
+      "settled": false
+    }
+  ]
+}

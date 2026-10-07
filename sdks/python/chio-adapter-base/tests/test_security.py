@@ -99,12 +99,12 @@ def test_sanitised_env_accepts_explicit_base() -> None:
 
 def test_harden_git_argv_injects_no_verify_for_commit() -> None:
     out = harden_git_argv(["commit", "-m", "x"])
-    assert out == ["commit", "--no-verify", "-m", "x"]
+    assert out == ["-c", "core.hooksPath=/dev/null", "commit", "--no-verify", "-m", "x"]
 
 
 def test_harden_git_argv_skips_when_no_verify_present() -> None:
     out = harden_git_argv(["commit", "--no-verify", "-m", "x"])
-    assert out == ["commit", "--no-verify", "-m", "x"]
+    assert out == ["-c", "core.hooksPath=/dev/null", "commit", "--no-verify", "-m", "x"]
 
 
 def test_harden_git_argv_rejects_explicit_verify() -> None:
@@ -123,17 +123,45 @@ def test_harden_git_argv_passes_through_non_commit_subcommands() -> None:
 
 def test_harden_git_argv_skips_leading_global_flags() -> None:
     out = harden_git_argv(["-c", "user.name=x", "commit", "-m", "y"])
-    assert out == ["-c", "user.name=x", "commit", "--no-verify", "-m", "y"]
+    assert out == [
+        "-c",
+        "user.name=x",
+        "-c",
+        "core.hooksPath=/dev/null",
+        "commit",
+        "--no-verify",
+        "-m",
+        "y",
+    ]
 
 
 def test_harden_git_argv_skips_value_taking_c_global() -> None:
     out = harden_git_argv(["-C", "repo", "commit", "-m", "y"])
-    assert out == ["-C", "repo", "commit", "--no-verify", "-m", "y"]
+    assert out == [
+        "-C",
+        "repo",
+        "-c",
+        "core.hooksPath=/dev/null",
+        "commit",
+        "--no-verify",
+        "-m",
+        "y",
+    ]
     with pytest.raises(PermissionError):
         harden_git_argv(["-C", "repo", "commit", "--verify"])
 
     out = harden_git_argv(["git", "--git-dir", ".git", "commit", "-m", "y"])
-    assert out == ["git", "--git-dir", ".git", "commit", "--no-verify", "-m", "y"]
+    assert out == [
+        "git",
+        "--git-dir",
+        ".git",
+        "-c",
+        "core.hooksPath=/dev/null",
+        "commit",
+        "--no-verify",
+        "-m",
+        "y",
+    ]
     with pytest.raises(PermissionError):
         harden_git_argv(["git", "--git-dir", ".git", "commit", "--verify"])
 
@@ -153,16 +181,34 @@ def test_harden_git_argv_skips_git_global_values_named_commit() -> None:
 
 def test_harden_git_argv_allows_git_binary_prefix() -> None:
     out = harden_git_argv(["git", "-c", "user.name=x", "commit", "-m", "y"])
-    assert out == ["git", "-c", "user.name=x", "commit", "--no-verify", "-m", "y"]
+    assert out == [
+        "git",
+        "-c",
+        "user.name=x",
+        "-c",
+        "core.hooksPath=/dev/null",
+        "commit",
+        "--no-verify",
+        "-m",
+        "y",
+    ]
 
 
 def test_harden_git_argv_allows_windows_git_binary_prefix() -> None:
     out = harden_git_argv(["git.exe", "-C", "repo", "commit", "-m", "y"])
-    assert out == ["git.exe", "-C", "repo", "commit", "--no-verify", "-m", "y"]
+    assert out == [
+        "git.exe",
+        "-C",
+        "repo",
+        "-c",
+        "core.hooksPath=/dev/null",
+        "commit",
+        "--no-verify",
+        "-m",
+        "y",
+    ]
     with pytest.raises(PermissionError):
-        harden_git_argv(
-            [r"C:\Program Files\Git\bin\git.exe", "commit", "--verify"]
-        )
+        harden_git_argv([r"C:\Program Files\Git\bin\git.exe", "commit", "--verify"])
 
 
 def test_harden_git_argv_does_not_mutate_input() -> None:

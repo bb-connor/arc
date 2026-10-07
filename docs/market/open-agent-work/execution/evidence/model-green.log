@@ -1,0 +1,11 @@
+test_all_serial_orders_preserve_reserved_plus_available (test_funding_model.FundingTests.test_all_serial_orders_preserve_reserved_plus_available) ... ok
+test_authority_rejects_the_second_incompatible_allocation (test_funding_model.FundingTests.test_authority_rejects_the_second_incompatible_allocation) ... ok
+test_invalid_claim_cannot_change_backing (test_funding_model.FundingTests.test_invalid_claim_cannot_change_backing) ... ok
+test_invalid_deposit_cannot_create_an_authority (test_funding_model.FundingTests.test_invalid_deposit_cannot_create_an_authority) ... ok
+test_local_forks_can_promise_more_than_the_real_source (test_funding_model.FundingTests.test_local_forks_can_promise_more_than_the_real_source) ... ok
+test_replay_is_exact_and_does_not_reserve_twice (test_funding_model.FundingTests.test_replay_is_exact_and_does_not_reserve_twice) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.001s
+
+OK

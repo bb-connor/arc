@@ -1,0 +1,49 @@
+EE.EE
+======================================================================
+ERROR: test_exclusive_selection_requires_unearned_work (test_capital.CapitalTests.test_exclusive_selection_requires_unearned_work)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/test_capital.py", line 8, in test_exclusive_selection_requires_unearned_work
+    self.assertEqual(reserve(100, [Claim(30,"ready",0), Claim(50,"ready",0)]), 150)
+                     ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/capital.py", line 12, in reserve
+    raise NotImplementedError("structural reserve not implemented")
+NotImplementedError: structural reserve not implemented
+
+======================================================================
+ERROR: test_invalid_profiles_fail_closed (test_capital.CapitalTests.test_invalid_profiles_fail_closed)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/test_capital.py", line 17, in test_invalid_profiles_fail_closed
+    with self.assertRaises(ValueError): reserve(refund,claims)
+                                        ~~~~~~~^^^^^^^^^^^^^^^
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/capital.py", line 12, in reserve
+    raise NotImplementedError("structural reserve not implemented")
+NotImplementedError: structural reserve not implemented
+
+======================================================================
+ERROR: test_refund_and_earned_claims_coexist (test_capital.CapitalTests.test_refund_and_earned_claims_coexist)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/test_capital.py", line 6, in test_refund_and_earned_claims_coexist
+    self.assertEqual(reserve(100, [Claim(30,"earned"), Claim(30,"earned")]), 160)
+                     ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/capital.py", line 12, in reserve
+    raise NotImplementedError("structural reserve not implemented")
+NotImplementedError: structural reserve not implemented
+
+======================================================================
+ERROR: test_unknown_retains_backing_and_fenced_absence_releases_it (test_capital.CapitalTests.test_unknown_retains_backing_and_fenced_absence_releases_it)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/test_capital.py", line 11, in test_unknown_retains_backing_and_fenced_absence_releases_it
+    self.assertEqual(reserve(100,[Claim(30,"unknown")]),130)
+                     ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/capital.py", line 12, in reserve
+    raise NotImplementedError("structural reserve not implemented")
+NotImplementedError: structural reserve not implemented
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.004s
+
+FAILED (errors=4)

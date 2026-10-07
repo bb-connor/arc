@@ -1,0 +1,114 @@
+\section{Implementation and evaluation}
+\label{sec:evaluation}
+Chio implements capability evaluation, guarded tool dispatch and receipt signing
+in its Rust runtime. Delegation allocators and protected stores retain resource
+assignments; the swarm authority verifier checks task graphs and continuations;
+treaty admission governs cooperation between receivers. The work-commitment
+construction binds these mechanisms to durable execution records and funding.
+In the evaluated implementation, the example adapter's \texttt{Bindings} guard
+joins task identity, allocation digest and amount, receiver identity and request
+context. Its current program and allocation dimension are fixed, with a 100-unit
+parent contract. These cross-record joins have not yet been promoted into the
+public runtime admission API. The W1 runtime plan specifies that generalization;
+the present results qualify the fixed profile.
+The concrete profiles and their encodings are specified in
+Appendix~\ref{app:profiles}.
+
+Evaluation examines three consequences of this architecture: rejection of
+inconsistent commitments at admission, continuity of execution rights through
+plan growth and recovery, and preservation of earned payment through parent
+failure. The composed run follows the API example through all three boundaries.
+
+All runs use author-controlled infrastructure. The composed execution has three
+receiving keys and separate stores on one host, in-process treaty co-signers,
+a private development chain and mock tokens. The artifact records the source
+and command output for each run. Earlier financial-model and comparison results
+retain their original source revisions; Appendix~\ref{app:evidence} separates
+them from the current implementation's qualification.
+
+\subsection{Growth followed by parent failure}
+The API program begins with a declared ceiling of 300 units and three graph
+nodes: a planning root, a survey and an unstarted intermediary task. The buyer
+funds the survey and intermediary tasks under separate agreements. The survey
+has its own receiving key and execution store; its agreement names the
+intermediary as payment beneficiary. The survey examines an OpenAPI document
+and finds an operation without required
+authentication. This returned result triggers selection of an enrolled
+specialist. Its task, capability, sealed selection, payment agreement and
+100-unit deposit are created at that point. The checked graph grows to four
+nodes while preserving the survey's original execution evidence.
+
+The intermediary calls the specialist. A separately implemented Python checker
+accepts the bound result, and the escrow records the specialist as
+\textsf{Payable}. The intermediary process is then killed with SIGKILL before
+its own return is captured. Its funding eventually refunds, while its execution
+outcome remains unknown. With parent and verifier settlement signing disabled,
+the specialist's collector withdraws the original claim. Repeating collection
+produces neither another call nor another transfer.
+
+\begin{table}[ht]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l X l@{}}
+\toprule
+Task & Execution outcome & Financial outcome\\
+\midrule
+Survey & Completed; original evidence retained & Paid 100\\
+Intermediary & Unknown after dispatch & Refunded 100\\
+Specialist & Completed; original claim retained & Paid 100\\
+\bottomrule
+\end{tabularx}
+\caption{Recorded outcomes after graph growth, intermediary process loss and
+collection. The intermediary's refund does not establish whether its tool
+completed.}
+\label{tab:trajectory}
+\end{table}
+
+Each receiver records one tool call and one acquisition of its treaty and graph
+continuation resources. The operation, allocation, budget hold, authorization
+and durable claim identities remain unchanged through reopening and collection.
+Of the initial 2,000 mock units, the final balances are buyer 900, intermediary
+1,000, specialist 100 and escrow zero. The intermediary receives the survey
+payment and separately funds the specialist.
+
+The first collection report records an unavailable remote receipt co-signer.
+A later open has no unfinished local operation to reconcile; both reports retain
+the same execution and payment identities. The run establishes local completion
+and payment. It does not establish delivery of a final bilateral receipt.
+
+\subsection{Substitution, replay and concurrent growth}
+The rejection tests present authenticated but inconsistent records. A re-signed
+graph that changes an issued continuation is rejected. A sealed allocation
+cannot select a different invocation. Missing treaty evidence, a capability
+from another receiver, and a signed route naming another receiver are rejected
+before the funding check or tool execution. The example adapter supplies the
+missing-treaty and foreign-capability prechecks and the cross-record route join;
+these cases do not establish the same guarantees for arbitrary callers of the
+shipped runtime hook. Removing the adapter's route check causes its regression
+test to fail by reaching the funding check.
+
+Recovery tests return recorded output after process loss, allow independent
+siblings to proceed, and preserve unfinished work through a graph extension.
+A fresh request using a consumed continuation is rejected. When two extensions
+compete for the same graph head, only one commits. These cases exercise the
+state and reference checks used in the preservation argument.
+
+The current qualification records \NativeCommands{} terminal commands, including the composed
+run and four existing child-payment crash and transaction-recovery cases.
+Six optional chain regressions are exercised separately. Exact counts,
+ignored cases and retained initial failures are recorded in
+Appendix~\ref{app:evidence} and the artifact companion.
+
+\subsection{Financial comparison}
+An implementation of the financial state machine using ordinary SQL transactions
+matches every compared state and balance on the retained representative traces.
+The pinned ERC-8183 implementation also pays a separately funded child after
+parent refund and rejects overcommitment of available reserves. It supports
+partial settlement in addition to the fixed-price cases considered here.
+Chio records \textsf{Payable} before withdrawal; the pinned upstream completion
+pays immediately.
+
+These comparisons establish substantial overlap in the financial mechanisms.
+The composed run evaluates their connection to the kernel's admission contract,
+the authorized invocation and its changing task graph. The authentication inventory
+provides an easily checked workload for this purpose. It does not measure an
+economic advantage in outsourcing API review.

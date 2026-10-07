@@ -1,0 +1,134 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling chio-runtime-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-runtime-core)
+    Finished `test` profile [unoptimized] target(s) in 27.25s
+     Running tests/runtime_admission.rs (target/debug/deps/runtime_admission-6efaaa56bf9056f8)
+
+running 88 tests
+test ambiguous_release_failure_is_not_retried_after_same_admission_reacquire ... ok
+test chio_native_runtime_admission_schema_emits_chio_report ... ok
+test chio_runtime_hook_denies_incomplete_swarm_route_metadata_before_dispatch ... ok
+test chio_runtime_hook_denies_stale_swarm_continuation_before_dispatch ... ok
+test chio_runtime_hook_denies_swarm_context_without_required_evidence_refs ... ok
+test chio_runtime_hook_denies_swarm_continuation_expired_since_storage ... ok
+test chio_runtime_hook_denies_swarm_missing_route_metadata_before_dispatch ... ok
+test chio_runtime_hook_denies_swarm_route_metadata_mismatch_before_dispatch ... ok
+test chio_runtime_hook_denies_swarm_route_plan_not_bound_to_continuation ... ok
+test chio_runtime_hook_denies_swarm_route_selection_id_mismatch_before_dispatch ... ok
+test chio_runtime_hook_releases_chio_native_reserved_state_after_kernel_abort ... ok
+test chio_runtime_hook_revalidates_reserved_swarm_continuation_then_denies_replay ... ok
+test chio_runtime_hook_revalidates_resumable_swarm_continuation_without_replay_denial ... ok
+test consume_then_error_or_panic_keeps_ambiguous_marker_and_releases_only_prior_participants ... ok
+test destructive_consume_error_preserves_same_admission_replay_marker ... ok
+test destructive_consume_panic_preserves_same_admission_replay_marker ... ok
+test destructive_consume_panic_releases_only_observed_continuation_reservations ... ok
+test destructive_release_error_does_not_block_treaty_or_swarm_release ... ok
+test destructive_release_panic_does_not_block_treaty_or_swarm_release ... ok
+test kernel_hook_rejects_treaty_dsse_policy_verdict_disagreement ... ok
+test kernel_hook_rejects_treaty_dsse_unanimous_deny ... ok
+test kernel_hook_uses_configured_runtime_policy_to_deny ... ok
+test matching_destructive_admission_accepts_once_then_rejects_replay ... ok
+test mixed_release_failures_preserve_each_failed_id_and_reason ... ok
+test operation_owned::caller::authenticated::authenticated_caller_report_uses_original_runtime_claim_after_lease_expiry ... ok
+test operation_owned::caller::caller_context_retains_exact_runtime_episode_and_released_predecessor_after_restart ... ok
+test operation_owned::combined::combined_owned_denial_panic_and_source_loss_release_every_resource ... ok
+test operation_owned::combined::combined_owned_dispatch_retains_all_three_resources_and_replays_without_reacquisition ... ok
+test operation_owned::combined::combined_owned_imported_collision_in_any_resource_rejects_without_partial_custody ... ok
+test operation_owned::combined::contention::combined_owned_competitor_cannot_steal_a_parked_claim_and_release_allows_a_fresh_owner ... ok
+test operation_owned::combined::crash::combined_owned_process_loss_after_effect_does_not_redispatch ... 
+running 1 test
+test operation_owned::combined::crash::combined_owned_process_loss_after_effect_does_not_redispatch ... ok
+test operation_owned::combined::crash::combined_owned_process_loss_at_dispatch_retains_custody ... 
+running 1 test
+test operation_owned::combined::crash::combined_owned_process_loss_at_dispatch_retains_custody ... ok
+test operation_owned::combined::crash::combined_owned_process_loss_before_dispatch_releases_custody ... 
+running 1 test
+test operation_owned::combined::crash::combined_owned_process_loss_before_dispatch_releases_custody ... ok
+test operation_owned::combined::lifecycle::combined_owned_nonce_preflight_releases_three_resources_before_fresh_dispatch_claim ... ok
+test operation_owned::combined::lifecycle::combined_owned_predispatch_drop_releases_all_resources_and_budget ... ok
+test operation_owned::combined::lifecycle::combined_owned_tool_error_and_postdispatch_drop_retain_every_claim_and_captured_budget ... ok
+test operation_owned::combined::native_validity::native_runtime_deadline_includes_every_selected_signed_time_bound ... ok
+test operation_owned::combined::native_validity::native_runtime_deadline_includes_the_verified_bilateral_capability_lease ... ok
+test operation_owned::combined::native_validity::native_runtime_revalidation_binds_nonempty_signed_treaty_swarm_and_original_plan ... ok
+test operation_owned::faults::dropping_an_owned_dispatch_before_readiness_releases_custody_and_budget ... ok
+test operation_owned::faults::owned_allow_without_claim_or_after_second_attempt_never_dispatches ... ok
+test operation_owned::faults::owned_denial_panic_and_changed_source_release_exact_physical_claim ... ok
+test operation_owned::faults::real_trust_floor_write_failure_denies_and_releases_the_prior_claim ... ok
+test operation_owned::grant_fallback::ordinary_and_nested_fallback_retire_the_denied_grants_runtime_episode ... ok
+test operation_owned::live_owned_runtime_dispatch_retains_claim_and_real_trust_floor ... ok
+test operation_owned::nonce::owned_nonce_preflight_releases_before_issuance_and_dispatch_claims_a_new_episode ... ok
+test operation_owned::owned_runtime_denies_fixed_clock_override_and_wrong_physical_source ... ok
+test operation_owned::owned_runtime_denies_inactive_source_and_ephemeral_read_only_fallback ... ok
+test preparation::first_bundle_lookup_panic_never_enters_participant_commit ... ok
+test preparation::invalid_core_preparation_never_consumes_continuations_or_updates_trust_floor ... ok
+test preparation::pinned_bundle_is_the_only_snapshot_used_by_treaty_and_core_admission ... ok
+test preparation::treaty_payload_is_hashed_independently_of_the_stores_advertised_digest ... ok
+test preparation::trust_floor_write_then_panic_denies_and_releases_only_confirmed_reservations ... ok
+test runtime_failure_code_registry_covers_hook_surface_codes ... ok
+test runtime_trust_floor_panic_is_denied_and_releases_destructive_lease ... ok
+test signed_runtime_admission_report_detects_tampering ... ok
+test sqlite_runtime_hook_denies_replayed_swarm_continuation_before_dispatch ... ok
+test sqlite_runtime_hook_denies_stale_swarm_continuation_before_dispatch ... ok
+test swarm_binding::kernel::required_swarm_kernel_denies_omission_or_capability_substitution_before_tool ... ok
+test swarm_binding::kernel::required_swarm_kernel_dispatches_verified_capability_and_signs_binding ... ok
+test swarm_binding::swarm_binding_allows_leaf_of_multihop_witness_and_records_exact_binding ... ok
+test swarm_binding::swarm_binding_checks_graph_scope_even_when_witness_digest_matches_request ... ok
+test swarm_binding::swarm_binding_denies_changed_subject_issuer_scope_and_signature ... ok
+test swarm_binding::swarm_binding_denies_referenced_sibling_witness ... ok
+test swarm_binding::swarm_binding_denies_same_id_same_scope_reissued_capability ... ok
+test swarm_binding::swarm_binding_join_root_requires_consistent_capability_on_every_outgoing_edge ... ok
+test swarm_binding::swarm_binding_resumable_revalidation_rejects_stripped_context_and_metadata ... ok
+test swarm_binding::swarm_binding_revalidates_exact_capability_at_dispatch ... ok
+test swarm_binding::swarm_binding_revalidation_pins_even_an_alternative_valid_witness ... ok
+test swarm_consume_error_releases_treaty_and_preserves_same_admission_swarm_marker ... ok
+test swarm_consume_panic_releases_treaty_and_preserves_same_admission_swarm_marker ... ok
+test treaty_consume_error_preserves_same_admission_replay_marker ... ok
+test treaty_consume_panic_preserves_same_admission_replay_marker ... ok
+test treaty_record_revocation_is_rechecked_after_admission ... ok
+test treaty_runtime_hook_denies_bare_tool_continuation_audience ... ok
+test treaty_runtime_hook_denies_continuation_from_non_origin_source ... ok
+test treaty_runtime_hook_denies_mismatched_continuation_hash ... ok
+test treaty_runtime_hook_denies_missing_bilateral_invocation_evidence_ref ... ok
+test treaty_runtime_hook_denies_missing_lineage_evidence_ref ... ok
+test treaty_runtime_hook_denies_replayed_continuation ... ok
+test treaty_runtime_hook_denies_request_smuggled_dynamic_trust ... ok
+test treaty_runtime_hook_denies_request_smuggled_trust_root ... ok
+test treaty_runtime_hook_denies_stale_continuation_before_dispatch ... ok
+test treaty_runtime_hook_denies_unverified_lineage_bundle_before_dispatch ... ok
+test treaty_runtime_hook_preserves_millisecond_time_for_continuation_staleness ... ok
+test treaty_runtime_hook_releases_continuation_after_runtime_denial ... ok
+test treaty_runtime_hook_releases_reserved_state_after_kernel_abort ... ok
+test treaty_runtime_hook_requires_signed_bilateral_evidence_before_verification ... ok
+
+test result: ok. 88 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 146.07s
+
+     Running tests/runtime_treaty_predicate_substitution.rs (target/debug/deps/runtime_treaty_predicate_substitution-8e24f9014f3d6177)
+
+running 10 tests
+test duplicated_leaves_do_not_mask_the_receiver_comparison ... ok
+test every_pair_inside_the_binding_reference_is_rejected ... ok
+test every_statement_leaf_is_classified ... ok
+test optional_leaves_this_call_omits_can_be_added_to_the_signed_statement ... ok
+test single_field_substitutions_match_their_classification ... ok
+test single_field_substitutions_match_their_classification_without_lineage ... ok
+test the_exercised_leaves_are_the_leaves_a_strict_statement_carries ... ok
+test the_lean_model_and_the_executed_classification_are_the_same_enumeration ... FAILED
+test the_uncompared_leaves_substituted_together_are_still_admitted ... ok
+test the_unsubstituted_statement_is_admitted_and_consumes_its_continuation ... ok
+
+failures:
+
+---- the_lean_model_and_the_executed_classification_are_the_same_enumeration stdout ----
+
+thread 'the_lean_model_and_the_executed_classification_are_the_same_enumeration' (1209821) panicked at crates/kernel/chio-runtime-core/tests/runtime_treaty_predicate_substitution.rs:766:5:
+assertion `left == right` failed: the Lean classification and the executed classification must agree leaf for leaf
+  left: [("_type", "shape"), ("predicate/capability_lease_ref/expires_at_unix_ms", "receiverDomain"), ("predicate/capability_lease_ref/issuer", "receiverDomain"), ("predicate/capability_lease_ref/lease_id", "selfConsistent"), ("predicate/capability_lease_ref/scope_digest/alg", "absentOptional"), ("predicate/capability_lease_ref/scope_digest/value", "absentOptional"), ("predicate/co_sign", "receiverState"), ("predicate/consistency_anchor", "uncompared"), ("predicate/consistency_model", "receiverState"), ("predicate/cross_org_visibility", "shape"), ("predicate/governance_receipt_ref/digest/alg", "uncompared"), ("predicate/governance_receipt_ref/digest/value", "uncompared"), ("predicate/governance_receipt_ref/kernel_id", "uncompared"), ("predicate/governance_receipt_ref/receipt_id", "selfConsistent"), ("predicate/invocation_id", "selfConsistent"), ("predicate/policy_evaluation_summary/joint_disposition", "selfConsistent"), ("predicate/policy_evaluation_summary/server_a_verdict/policy_id", "uncompared"), ("predicate/policy_evaluation_summary/server_a_verdict/policy_version", "uncompared"), ("predicate/policy_evaluation_summary/server_a_verdict/rationale_code", "absentOptional"), ("predicate/policy_evaluation_summary/server_a_verdict/verdict", "selfConsistent"), ("predicate/policy_evaluation_summary/server_b_verdict/policy_id", "uncompared"), ("predicate/policy_evaluation_summary/server_b_verdict/policy_version", "uncompared"), ("predicate/policy_evaluation_summary/server_b_verdict/rationale_code", "absentOptional"), ("predicate/policy_evaluation_summary/server_b_verdict/verdict", "selfConsistent"), ("predicate/receipt_canonical_json", "absentRequired"), ("predicate/schema", "absentRequired"), ("predicate/timestamp_unix_ms", "uncompared"), ("predicate/tool_args_hash/alg", "shape"), ("predicate/tool_args_hash/value", "receiverState"), ("predicate/tool_name", "receiverState"), ("predicate/tool_server_a/alg", "shape"), ("predicate/tool_server_a/kernel_id", "receiverState"), ("predicate/tool_server_a/passport_key_fingerprint", "receiverState"), ("predicate/tool_server_b/alg", "shape"), ("predicate/tool_server_b/kernel_id", "receiverState"), ("predicate/tool_server_b/passport_key_fingerprint", "receiverState"), ("predicate/treaty_binding_ref/action_class_id", "receiverState"), ("predicate/treaty_binding_ref/admission_report_sha256", "uncompared"), ("predicate/treaty_binding_ref/consistency_model", "receiverState"), ("predicate/treaty_binding_ref/continuation_sha256", "receiverState"), ("predicate/treaty_binding_ref/governance_refs/0", "receiverState"), ("predicate/treaty_binding_ref/ladder_intersection_sha256", "receiverState"), ("predicate/treaty_binding_ref/lease_refs/0", "receiverState"), ("predicate/treaty_binding_ref/lineage_bundle_sha256", "receiverState"), ("predicate/treaty_binding_ref/local_receipt_sha256", "receiverState"), ("predicate/treaty_binding_ref/outcome_sha256", "receiverState"), ("predicate/treaty_binding_ref/remote_receipt_sha256", "receiverState"), ("predicate/treaty_binding_ref/request_sha256", "receiverState"), ("predicate/treaty_binding_ref/signer_kernel_ids/0", "receiverState"), ("predicate/treaty_binding_ref/signer_kernel_ids/1", "receiverState"), ("predicate/treaty_binding_ref/treaty_id", "receiverState"), ("predicate/treaty_binding_ref/treaty_scope_sha256", "receiverState"), ("predicateType", "shape"), ("subject/0/digest/sha256", "uncompared"), ("subject/0/name", "selfConsistent")]
+ right: [("_type", "shape"), ("predicate/capability_lease_ref/expires_at_unix_ms", "receiverDomain"), ("predicate/capability_lease_ref/issuer", "receiverState"), ("predicate/capability_lease_ref/lease_id", "selfConsistent"), ("predicate/capability_lease_ref/scope_digest/alg", "absentOptional"), ("predicate/capability_lease_ref/scope_digest/value", "absentOptional"), ("predicate/co_sign", "receiverState"), ("predicate/consistency_anchor", "uncompared"), ("predicate/consistency_model", "receiverState"), ("predicate/cross_org_visibility", "shape"), ("predicate/governance_receipt_ref/digest/alg", "receiverState"), ("predicate/governance_receipt_ref/digest/value", "receiverState"), ("predicate/governance_receipt_ref/kernel_id", "receiverState"), ("predicate/governance_receipt_ref/receipt_id", "selfConsistent"), ("predicate/invocation_id", "selfConsistent"), ("predicate/policy_evaluation_summary/joint_disposition", "selfConsistent"), ("predicate/policy_evaluation_summary/server_a_verdict/policy_id", "uncompared"), ("predicate/policy_evaluation_summary/server_a_verdict/policy_version", "uncompared"), ("predicate/policy_evaluation_summary/server_a_verdict/rationale_code", "absentOptional"), ("predicate/policy_evaluation_summary/server_a_verdict/verdict", "selfConsistent"), ("predicate/policy_evaluation_summary/server_b_verdict/policy_id", "uncompared"), ("predicate/policy_evaluation_summary/server_b_verdict/policy_version", "uncompared"), ("predicate/policy_evaluation_summary/server_b_verdict/rationale_code", "absentOptional"), ("predicate/policy_evaluation_summary/server_b_verdict/verdict", "selfConsistent"), ("predicate/receipt_canonical_json", "absentRequired"), ("predicate/schema", "absentRequired"), ("predicate/timestamp_unix_ms", "uncompared"), ("predicate/tool_args_hash/alg", "shape"), ("predicate/tool_args_hash/value", "receiverState"), ("predicate/tool_name", "receiverState"), ("predicate/tool_server_a/alg", "shape"), ("predicate/tool_server_a/kernel_id", "receiverState"), ("predicate/tool_server_a/passport_key_fingerprint", "receiverState"), ("predicate/tool_server_b/alg", "shape"), ("predicate/tool_server_b/kernel_id", "receiverState"), ("predicate/tool_server_b/passport_key_fingerprint", "receiverState"), ("predicate/treaty_binding_ref/action_class_id", "receiverState"), ("predicate/treaty_binding_ref/admission_report_sha256", "uncompared"), ("predicate/treaty_binding_ref/consistency_model", "receiverState"), ("predicate/treaty_binding_ref/continuation_sha256", "receiverState"), ("predicate/treaty_binding_ref/governance_refs/0", "receiverState"), ("predicate/treaty_binding_ref/ladder_intersection_sha256", "receiverState"), ("predicate/treaty_binding_ref/lease_refs/0", "receiverState"), ("predicate/treaty_binding_ref/lineage_bundle_sha256", "receiverState"), ("predicate/treaty_binding_ref/local_receipt_sha256", "receiverState"), ("predicate/treaty_binding_ref/outcome_sha256", "receiverState"), ("predicate/treaty_binding_ref/remote_receipt_sha256", "receiverState"), ("predicate/treaty_binding_ref/request_sha256", "receiverState"), ("predicate/treaty_binding_ref/signer_kernel_ids/0", "receiverState"), ("predicate/treaty_binding_ref/signer_kernel_ids/1", "receiverState"), ("predicate/treaty_binding_ref/treaty_id", "receiverState"), ("predicate/treaty_binding_ref/treaty_scope_sha256", "receiverState"), ("predicateType", "shape"), ("subject/0/digest/sha256", "uncompared"), ("subject/0/name", "selfConsistent")]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    the_lean_model_and_the_executed_classification_are_the_same_enumeration
+
+test result: FAILED. 9 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 203.19s
+
+error: test failed, to rerun pass `-p chio-runtime-core --test runtime_treaty_predicate_substitution`

@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: eb3605a1594254370980dcf328ad3f0c7a751ff746d1530b9981c40163f5694a
+# Schema sha256: 67efd95f8fba5bacf75bfc6b1a98b744c1c20e1926e9d9e813e27d8193058364
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -53,7 +53,7 @@ from .cage_enforcement_prepared_v1_schema import ChioCageEnforcementPreparedEvid
 from .cage_enforcement_record_v1_schema import ChioCageEnforcementRecordV1, ChioCageEnforcementRecordV11, ChioCageEnforcementRecordV12, ChioCageEnforcementRecordV13, State, State2
 from .cage_exec_transition_observed_v1_schema import ChioCageExecTransitionObservationV1, Digest, FileIdentity, Kind, RegularFileIdentity
 from .cage_fully_enforced_evidence_v1_schema import ChioCageFullyEnforcedEvidenceV1
-from .cage_init_plan_v2_schema import AbsoluteCanonicalPath, Access, AllowedSyscall, ArtifactEntry, BrokerPeerIdentity, ChioCageInitPlanV2, Digest, DirectoryIdentity, Environment, ExecutionIdentity, FdEntry, FdEntry1, FdEntry10, FdEntry2, FdEntry3, FdEntry4, FdEntry5, FdEntry6, FdEntry7, FdEntry8, FdEntry9, FdEntryBase, FdTable, FdTable1, FileIdentity, FilesystemGrant, ForbiddenResource, Kind, Kind5, Kind6, LandlockPlan, PathIdentity, Profile, Purpose, Purpose1, Purpose2, PurposeBrokerIpc, PurposeCageInitHelper, PurposeIndexedResource, PurposeTargetExecutable, PurposeTargetStderr, PurposeTargetStdin, PurposeTargetStdout, PurposeWorkingDirectory, RegularFileIdentity, ResourceLimits, SeccompPlan, SocketIdentity, StdioEntry, SupplementaryGid, SyscallArgumentConstraint, TargetArgv, TargetArgvItem
+from .cage_init_plan_v2_schema import AbsoluteCanonicalPath, Access, AllowedSyscall, ArgumentConstraint, ArtifactEntry, BrokerPeerIdentity, ChioCageInitPlanV2, Digest, DirectoryIdentity, Environment, ExecutionIdentity, FdEntry, FdEntry1, FdEntry10, FdEntry2, FdEntry3, FdEntry4, FdEntry5, FdEntry6, FdEntry7, FdEntry8, FdEntry9, FdEntryBase, FdTable, FdTable1, FileIdentity, FilesystemGrant, ForbiddenResource, Kind, Kind5, Kind6, LandlockPlan, PathIdentity, Profile, Purpose, Purpose1, Purpose2, PurposeBrokerIpc, PurposeCageInitHelper, PurposeIndexedResource, PurposeTargetExecutable, PurposeTargetStderr, PurposeTargetStdin, PurposeTargetStdout, PurposeWorkingDirectory, RegularFileIdentity, ResourceLimits, SeccompPlan, SocketIdentity, StdioEntry, SupplementaryGid, SyscallArgumentConstraint, TargetArgv, TargetArgvItem
 from .cage_process_exit_evidence_v1_schema import ChioCageProcessExitEvidenceV1, ChioCageProcessExitEvidenceV11, ChioCageProcessExitEvidenceV12, ExitCode, ExitCode1, Signal, Signal1
 from .cage_receipt_body_v1_schema import Bindings, ChioCageReceiptBodyV1, ChioCageReceiptBodyV11, ChioCageReceiptBodyV12, ChioCageReceiptBodyV13, ChioCageReceiptBodyV14, Digest, Identifier, Stage
 from .cage_receipt_metadata_v1_schema import ChioCageReceiptMetadataV1
@@ -108,6 +108,7 @@ __all__ = [
     "ApprovalRequirement",
     "ApprovalRequirement1",
     "ApprovalRequirement2",
+    "ArgumentConstraint",
     "ArtifactEntry",
     "AttemptIds",
     "AuditIdentifier",

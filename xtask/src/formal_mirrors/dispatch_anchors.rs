@@ -13,12 +13,29 @@ struct RequiredSource {
 
 const NATIVE_LIFECYCLE_SOURCES: &[RequiredSource] = &[
     RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/output_verdict.rs",
+        symbols: &[
+            "DELIVERY_MISMATCH_REDACTION_DOMAIN",
+            "receipt_visible_delivery_content",
+            "checked_output_decision",
+            "retained_checked_output_denial",
+            "visible_terminal_content",
+        ],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/deadline.rs",
+        symbols: &[
+            "ChioKernel::freeze_caller_start_deadline",
+            "CallerReturnWire::valid_deadline_shape",
+            "CallerReturnWire::start_deadline",
+        ],
+    },
+    RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/mod.rs",
         symbols: &["SecurityPreDispatchHook"],
     },
     RequiredSource {
-        path:
-            "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/lifecycle.rs",
+        path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/lifecycle.rs",
         symbols: &[
             "CapturedLifecycle",
             "CapturedLifecycle::finish",
@@ -129,6 +146,7 @@ const REQUIRED_SOURCES: &[RequiredSource] = &[
             "PreparedDispatchCredentials::dpop_credential",
             "ChioKernel::prepare_dispatch_credentials",
             "ChioKernel::prepare_credentials",
+            "PreparedDispatchCredentials::valid_until_unix_ms",
         ],
     },
     RequiredSource {
@@ -278,7 +296,8 @@ const DISPATCH_COMMIT_SOURCES: &[RequiredSource] = &[
             "SecurityReleaseRecordV1",
             "AcknowledgedSecurityReleaseV1",
             "AcknowledgedSecurityReleaseV1::acknowledge",
-            "AcknowledgedSecurityReleaseV1::record", "SecurityReleaseRecordV1::pending",
+            "AcknowledgedSecurityReleaseV1::record",
+            "SecurityReleaseRecordV1::pending",
             "SecurityReleaseRecordV1::canonical_bytes",
             "SecurityReleaseRecordV1::from_canonical_bytes",
             "SecurityReleaseRecordV1::validate_against",
@@ -354,7 +373,17 @@ const DISPATCH_COMMIT_SOURCES: &[RequiredSource] = &[
             "SqliteToolOutcomeStore::lookup_security_release",
             "initialize_tool_outcome_schema",
             "verify_tool_outcome_invariants",
-            "verify_outcome_projection",
+        ],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/tool_outcome_projection.rs",
+        symbols: &["verify_outcome_projection", "load_verified_projection"],
+    },
+    RequiredSource {
+        path: "crates/security/chio-security-types/src/flow.rs",
+        symbols: &[
+            "NATIVE_FLOW_DISPATCH_POLICY_SCHEMA",
+            "NATIVE_FLOW_DECLASSIFIED_DISPATCH_POLICY_SCHEMA",
         ],
     },
     RequiredSource {
@@ -374,7 +403,8 @@ const DISPATCH_COMMIT_SOURCES: &[RequiredSource] = &[
             "SecurityRequestLifecycleHandle::new",
             "SecurityRequestLifecycleHandle::finish_response",
             "SecurityRequestLifecycleHandle::ensure_final_release",
-            "SecurityRequestLifecycleHandle::ensure_final_release_for", "SecurityRequestLifecycleHandle::validate_release_context",
+            "SecurityRequestLifecycleHandle::ensure_final_release_for",
+            "SecurityRequestLifecycleHandle::validate_release_context",
             "SecurityRequestLifecycleHandle::drop",
         ],
     },
@@ -444,15 +474,18 @@ const DISPATCH_COMMIT_SOURCES: &[RequiredSource] = &[
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/evaluation/dispatch_commit_failure.rs",
-        symbols: &["ChioKernel::build_durable_dispatch_failure_response", "ChioKernel::build_pre_commit_credential_rejection_response"],
+        symbols: &[
+            "ChioKernel::build_durable_dispatch_failure_response",
+            "ChioKernel::build_pre_commit_credential_rejection_response",
+        ],
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/credential_reservation.rs",
-        symbols: &["DispatchCredentialReservation::rollback_before_dispatch_with_disposition", "DispatchCredentialReservation::retain_after_external_authorization", "DispatchCredentialReservation::retention_disposition"],
-    },
-    RequiredSource {
-        path: "crates/kernel/chio-kernel/src/kernel/credential_reservation/legacy_nonce.rs",
-        symbols: &["LegacyExecutionNonce", "LegacyExecutionNonce::discard_unconsumed", "LegacyExecutionNonce::disposition", "DispatchCredentialReservation::reserve_legacy_execution_nonce_at_effect_boundary", "rejected"],
+        symbols: &[
+            "DispatchCredentialReservation::rollback_before_dispatch_with_disposition",
+            "DispatchCredentialReservation::retain_after_external_authorization",
+            "DispatchCredentialReservation::retention_disposition",
+        ],
     },
 ];
 
@@ -518,7 +551,10 @@ const RUNTIME_PREPARATION_SOURCES: &[RequiredSource] = &[
 const RUNTIME_OWNERSHIP_SOURCES: &[RequiredSource] = &[
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/dpop_replay/integrity.rs",
-        symbols: &["verify_dpop_replay_projection_coverage", "verified_projection_records"],
+        symbols: &[
+            "verify_dpop_replay_projection_coverage",
+            "verified_projection_records",
+        ],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/dpop_replay/custody.rs",
@@ -534,15 +570,30 @@ const RUNTIME_OWNERSHIP_SOURCES: &[RequiredSource] = &[
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/admission_operation/store.rs",
-        symbols: &["AdmissionOperationStore", "QualifiedAdmissionOperationStoreExt"],
+        symbols: &[
+            "AdmissionOperationStore",
+            "QualifiedAdmissionOperationStoreExt",
+        ],
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_acquisition.rs",
-        symbols: &["NativeSecurityFlowJoinAuthority", "NativeSecurityFlowJoinAuthority::binding", "NativeSecurityFlowJoinAuthority::join", "NativeSecurityFlowJoinAuthority::join_once", "NativeSecurityFlowJoinAuthority::read_history", "NativeSecurityFlowJoinAuthority::finish", "ChioKernel::run_native_admission_preparation", "store_call"],
+        symbols: &[
+            "NativeSecurityFlowJoinAuthority",
+            "NativeSecurityFlowJoinAuthority::binding",
+            "NativeSecurityFlowJoinAuthority::join",
+            "NativeSecurityFlowJoinAuthority::join_once",
+            "NativeSecurityFlowJoinAuthority::read_history",
+            "NativeSecurityFlowJoinAuthority::finish",
+            "ChioKernel::run_native_admission_preparation",
+            "store_call",
+        ],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/store.rs",
-        symbols: &["SqliteAdmissionOperationStore::join_native_security_flow", "SqliteAdmissionOperationStore::load_native_security_flow_join"],
+        symbols: &[
+            "SqliteAdmissionOperationStore::join_native_security_flow",
+            "SqliteAdmissionOperationStore::load_native_security_flow_join",
+        ],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/readback.rs",
@@ -610,15 +661,16 @@ const RUNTIME_OWNERSHIP_SOURCES: &[RequiredSource] = &[
             "RetainedRequestWire",
             "immutable_tool_request_hash",
             "immutable_tool_request_hash_with_profile",
-            "RetainedToolAdmissionRequestV1::from_admission_with_profile",
+            "RetainedToolAdmissionRequestV1::from_admission",
             "RetainedToolAdmissionRequestV1::from_canonical_bytes",
-            "RetainedToolAdmissionRequestV1::schema",
             "RetainedToolAdmissionRequestV1::authority_profile",
             "RetainedToolAdmissionRequestV1::security_binding",
             "RetainedToolAdmissionRequestV1::native_security_authority_binding",
             "RetainedToolAdmissionRequestV1::validate_binding",
             "RetainedToolAdmissionRequestV1::validate_request_binding",
             "RetainedToolAdmissionRequestV1::validate_request_material",
+            "SCHEMA",
+            "RetainedToolAdmissionRequestV1::matching_grants_require_cumulative_approval",
         ],
     },
     RequiredSource {
@@ -654,7 +706,8 @@ const RUNTIME_OWNERSHIP_SOURCES: &[RequiredSource] = &[
             "load_history",
             "validate_claim_successor",
             "require_claim",
-        "ChioKernel::runtime_revalidation_source", ],
+            "ChioKernel::runtime_revalidation_source",
+        ],
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/runtime_participant.rs",
@@ -684,7 +737,10 @@ const RUNTIME_OWNERSHIP_SOURCES: &[RequiredSource] = &[
         symbols: &[
             "PreparedHookAdmission::reserve_operation_owned",
             "verify_revalidation_material",
-        "PreparedHookAdmission::verify_owned_dispatch", "PreparedHookAdmission::operation_owned_resources", "PreparedHookAdmission::operation_owned_plan_digest", ],
+            "PreparedHookAdmission::verify_owned_dispatch",
+            "PreparedHookAdmission::operation_owned_resources",
+            "PreparedHookAdmission::operation_owned_plan_digest",
+        ],
     },
 ];
 
@@ -750,11 +806,23 @@ const NATIVE_NONCE_PREFLIGHT_SOURCES: &[RequiredSource] = &[
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/admission_operation/native_input_join.rs",
-        symbols: &["InputJoinPhase","NativeSecurityInputJoinRequestV1::for_phase","NativeSecurityInputJoinRequestV1::validate_phase","NativeSecurityInputJoinRequestV1::validate_phase_resolution"],
+        symbols: &[
+            "InputJoinPhase",
+            "NativeSecurityInputJoinRequestV1::for_phase",
+            "NativeSecurityInputJoinRequestV1::validate_phase",
+            "NativeSecurityInputJoinRequestV1::validate_phase_resolution",
+        ],
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/admission_operation/native_nonce_preflight.rs",
-        symbols: &["NativeSecurityNoncePreflightJoinRequestV1","NativeSecurityNoncePreflightJoinRecordV1","NativeSecurityNoncePreflightJoinRequestV1::new","NativeSecurityNoncePreflightJoinRequestV1::validate","NativeSecurityNoncePreflightJoinRequestV1::validate_resolution","NativeSecurityNoncePreflightJoinRecordV1::validate"],
+        symbols: &[
+            "NativeSecurityNoncePreflightJoinRequestV1",
+            "NativeSecurityNoncePreflightJoinRecordV1",
+            "NativeSecurityNoncePreflightJoinRequestV1::new",
+            "NativeSecurityNoncePreflightJoinRequestV1::validate",
+            "NativeSecurityNoncePreflightJoinRequestV1::validate_resolution",
+            "NativeSecurityNoncePreflightJoinRecordV1::validate",
+        ],
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_acquisition.rs",
@@ -762,23 +830,38 @@ const NATIVE_NONCE_PREFLIGHT_SOURCES: &[RequiredSource] = &[
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_acquisition/nonce_preflight.rs",
-        symbols: &["NativeSecurityNoncePreflightJoinAuthority","NativeSecurityNoncePreflightJoinAuthority::finish","NativeSecurityNoncePreflightJoinAuthority::join_input","ChioKernel::run_native_nonce_preflight_preparation"],
+        symbols: &[
+            "NativeSecurityNoncePreflightJoinAuthority",
+            "NativeSecurityNoncePreflightJoinAuthority::finish",
+            "NativeSecurityNoncePreflightJoinAuthority::join_input",
+            "ChioKernel::run_native_nonce_preflight_preparation",
+        ],
     },
     RequiredSource {
         path: "crates/platform/chio-control-plane/src/security/adapters/native_flow.rs",
-        symbols: &["NativeFlowResolver::classify_admission_input","NativeFlowResolver::prepare_native_nonce_preflight"],
+        symbols: &[
+            "NativeFlowResolver::classify_admission_input",
+            "NativeFlowResolver::prepare_native_nonce_preflight",
+        ],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/store.rs",
-        symbols: &["SqliteAdmissionOperationStore::join_native_security_nonce_preflight","SqliteAdmissionOperationStore::load_native_security_nonce_preflight_join"],
+        symbols: &[
+            "SqliteAdmissionOperationStore::join_native_security_nonce_preflight",
+            "SqliteAdmissionOperationStore::load_native_security_nonce_preflight_join",
+        ],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/security_state/native_mutation.rs",
-        symbols: &["join_native_nonce_preflight","JoinAuthorization"],
+        symbols: &["join_native_nonce_preflight", "JoinAuthorization"],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight.rs",
-        symbols: &["NativeNoncePreflightJoinAuthority","projection_reference","checkpoint"],
+        symbols: &[
+            "NativeNoncePreflightJoinAuthority",
+            "projection_reference",
+            "checkpoint",
+        ],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/contract.rs",
@@ -786,15 +869,32 @@ const NATIVE_NONCE_PREFLIGHT_SOURCES: &[RequiredSource] = &[
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/write.rs",
-        symbols: &["SqliteAdmissionOperationStore::join_security_participant_nonce_preflight","SqliteAdmissionOperationStore::load_native_nonce_preflight_join_record","footprint"],
+        symbols: &[
+            "SqliteAdmissionOperationStore::join_security_participant_nonce_preflight",
+            "SqliteAdmissionOperationStore::load_native_nonce_preflight_join_record",
+            "footprint",
+        ],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/record.rs",
-        symbols: &["FORMAT","Record","Record::bytes","Record::digest","Record::evidence","Record::validate","Record::insert","head","load","load_operation"],
+        symbols: &[
+            "FORMAT",
+            "Record",
+            "Record::bytes",
+            "Record::digest",
+            "Record::evidence",
+            "Record::validate",
+            "Record::insert",
+            "head",
+            "load",
+            "load_operation",
+            "Record::validate_initialized",
+            "load_inner",
+        ],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/schema.rs",
-        symbols: &["sql","exists","catalog","verify_catalog"],
+        symbols: &["sql", "exists", "catalog", "verify_catalog"],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/integrity.rs",
@@ -802,7 +902,7 @@ const NATIVE_NONCE_PREFLIGHT_SOURCES: &[RequiredSource] = &[
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/rows.rs",
-        symbols: &["verify_rows","apply_image"],
+        symbols: &["verify_rows", "apply_image"],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/schema/migration_v33.rs",
@@ -813,31 +913,66 @@ const NATIVE_NONCE_PREFLIGHT_SOURCES: &[RequiredSource] = &[
 const NATIVE_INPUT_SOURCES: &[RequiredSource] = &[
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_acquisition.rs",
-        symbols: &["NativeSecurityFlowJoinAuthority::key", "NativeSecurityFlowJoinAuthority::attempt", "NativeSecurityFlowJoinAuthority::with_join_custody", "NativeSecurityFlowJoinAuthority::confirm"],
+        symbols: &[
+            "NativeSecurityFlowJoinAuthority::key",
+            "NativeSecurityFlowJoinAuthority::attempt",
+            "NativeSecurityFlowJoinAuthority::with_join_custody",
+            "NativeSecurityFlowJoinAuthority::confirm",
+        ],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/mutations.rs",
-        symbols: &["SqliteAdmissionOperationStore::join_security_participant_input", "SqliteAdmissionOperationStore::join_native_command"],
+        symbols: &[
+            "SqliteAdmissionOperationStore::join_security_participant_input",
+            "SqliteAdmissionOperationStore::join_native_command",
+        ],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/store.rs",
-        symbols: &["SqliteAdmissionOperationStore::join_native_security_input", "SqliteAdmissionOperationStore::load_native_security_input_join"],
+        symbols: &[
+            "SqliteAdmissionOperationStore::join_native_security_input",
+            "SqliteAdmissionOperationStore::load_native_security_input_join",
+        ],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/readback.rs",
-        symbols: &["SqliteAdmissionOperationStore::load_native_input_join_record", "SqliteAdmissionOperationStore::load_native_join_record"],
+        symbols: &[
+            "SqliteAdmissionOperationStore::load_native_input_join_record",
+            "SqliteAdmissionOperationStore::load_native_join_record",
+        ],
     },
     RequiredSource {
         path: "crates/platform/chio-control-plane/src/security/adapters/flow_policy.rs",
-        symbols: &["FlowPolicyView::classified_input_label", "FlowPolicyView::classify_arguments"],
+        symbols: &[
+            "FlowPolicyView::classified_input_label",
+            "FlowPolicyView::classify_arguments",
+        ],
     },
     RequiredSource {
         path: "crates/platform/chio-control-plane/src/security/adapters/native_flow.rs",
-        symbols: &["NativeFlowResolver::name", "NativeFlowResolver::native_authority_binding", "NativeFlowResolver::prepare_native_admission", "NativeFlowResolver::prepare_native_output", "NativeFlowResolver::commit"],
+        symbols: &[
+            "NativeFlowResolver::name",
+            "NativeFlowResolver::native_authority_binding",
+            "NativeFlowResolver::prepare_native_admission",
+            "NativeFlowResolver::prepare_native_output",
+            "NativeFlowResolver::commit",
+        ],
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/admission_operation/native_input_join.rs",
-        symbols: &["NativeSecurityInputJoinRequestV1", "NativeSecurityInputJoinRecordV1", "NativeSecurityInputJoinRequestV1::new", "NativeSecurityInputJoinRequestV1::operation_id", "NativeSecurityInputJoinRequestV1::key", "NativeSecurityInputJoinRequestV1::input_label", "NativeSecurityInputJoinRequestV1::transition_id", "NativeSecurityInputJoinRequestV1::validate", "NativeSecurityInputJoinRequestV1::validate_resolution", "NativeSecurityInputJoinRecordV1::validate", "transition_id"],
+        symbols: &[
+            "NativeSecurityInputJoinRequestV1",
+            "NativeSecurityInputJoinRecordV1",
+            "NativeSecurityInputJoinRequestV1::new",
+            "NativeSecurityInputJoinRequestV1::operation_id",
+            "NativeSecurityInputJoinRequestV1::key",
+            "NativeSecurityInputJoinRequestV1::input_label",
+            "NativeSecurityInputJoinRequestV1::transition_id",
+            "NativeSecurityInputJoinRequestV1::validate",
+            "NativeSecurityInputJoinRequestV1::validate_resolution",
+            "NativeSecurityInputJoinRecordV1::validate",
+            "transition_id",
+        ],
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_acquisition/input.rs",
@@ -849,11 +984,34 @@ const NATIVE_INPUT_SOURCES: &[RequiredSource] = &[
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/mutations/command.rs",
-        symbols: &["Command", "Command::key", "Command::transition_id", "Command::input", "Command::validate", "Command::matches", "Command::resolve"],
+        symbols: &[
+            "Command",
+            "Command::key",
+            "Command::transition_id",
+            "Command::input",
+            "Command::validate",
+            "Command::matches",
+            "Command::resolve",
+        ],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history.rs",
-        symbols: &["Record", "FORMAT", "INPUT_FORMAT", "MAX_RECORD_BYTES", "Record::join_record", "Record::input_record", "Record::bytes", "Record::digest", "Record::validate", "Record::insert", "format", "load", "head", "load_for_operation"],
+        symbols: &[
+            "Record",
+            "FORMAT",
+            "INPUT_FORMAT",
+            "MAX_RECORD_BYTES",
+            "Record::join_record",
+            "Record::input_record",
+            "Record::bytes",
+            "Record::digest",
+            "Record::validate",
+            "Record::insert",
+            "format",
+            "load",
+            "head",
+            "load_for_operation",
+        ],
     },
 ];
 
@@ -901,7 +1059,6 @@ const NATIVE_POLICY_EVIDENCE_SOURCES: &[RequiredSource] = &[
         path: "crates/platform/chio-control-plane/src/security/adapters/native_flow/policy.rs",
         symbols: &[
             "MAX_POLICY_BYTES",
-            "SCHEMA",
             "NativeFlowPolicyEvidence",
             "NativeFlowPolicyEvidence::canonical_bytes",
             "NativeFlowPolicyEvidence::digest",
@@ -925,7 +1082,11 @@ const NATIVE_DISPATCH_LEDGER_SOURCES: &[RequiredSource] = &[
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/budget_store/composite/native_capture.rs",
-        symbols: &["SqliteBudgetStore::load_native_capture_decision_tx","verify_capture_quota_delta","verify_capture_cumulative_delta"],
+        symbols: &[
+            "SqliteBudgetStore::load_native_capture_decision_tx",
+            "verify_capture_quota_delta",
+            "verify_capture_cumulative_delta",
+        ],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/budget_store/composite/transitions.rs",
@@ -933,7 +1094,10 @@ const NATIVE_DISPATCH_LEDGER_SOURCES: &[RequiredSource] = &[
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/lib.rs",
-        symbols: &["SqliteAdmissionOperationStore::capture_native_invocation_and_commit_dispatch","SqliteAdmissionOperationStore::load_native_dispatch_capture"],
+        symbols: &[
+            "SqliteAdmissionOperationStore::capture_native_invocation_and_commit_dispatch",
+            "SqliteAdmissionOperationStore::load_native_dispatch_capture",
+        ],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/participant.rs",
@@ -945,7 +1109,11 @@ const NATIVE_DISPATCH_LEDGER_SOURCES: &[RequiredSource] = &[
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/evaluation/native_capture_checkpoint.rs",
-        symbols: &["NativeCaptureCheckpointContext", "NativeCaptureCheckpointOutcome", "ChioKernel::evaluate_native_capture_checkpoint"],
+        symbols: &[
+            "NativeCaptureCheckpointContext",
+            "NativeCaptureCheckpointOutcome",
+            "ChioKernel::evaluate_native_capture_checkpoint",
+        ],
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/evaluation/evaluation_helpers.rs",
@@ -953,23 +1121,48 @@ const NATIVE_DISPATCH_LEDGER_SOURCES: &[RequiredSource] = &[
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/authority_profile.rs",
-        symbols: &["DurableToolAdmission::original_native_security_authority_binding", "DurableToolAdmission::original_retained_request"],
+        symbols: &[
+            "DurableToolAdmission::original_native_security_authority_binding",
+            "DurableToolAdmission::original_retained_request",
+        ],
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/credential_reservation/native_dispatch.rs",
-        symbols: &["VerifiedNativeDispatchCredentials", "VerifiedNativeDispatchCredentials::validate_binding", "DispatchCredentialReservation::verify_native_dispatch", "VerifiedNativeDispatchCredentials::runtime_validity", ],
+        symbols: &[
+            "VerifiedNativeDispatchCredentials",
+            "VerifiedNativeDispatchCredentials::validate_binding",
+            "DispatchCredentialReservation::verify_native_dispatch",
+            "VerifiedNativeDispatchCredentials::runtime_validity",
+        ],
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/capture.rs",
-        symbols: &["NativeSecurityDispatchCaptureAuthority", "NativeSecurityDispatchCaptureAuthority::prepare_egress", "NativeSecurityDispatchCaptureAuthority::capture", "ChioKernel::reach_native_capture_checkpoint"],
+        symbols: &[
+            "NativeSecurityDispatchCaptureAuthority",
+            "NativeSecurityDispatchCaptureAuthority::prepare_egress",
+            "NativeSecurityDispatchCaptureAuthority::capture",
+            "ChioKernel::reach_native_capture_checkpoint",
+        ],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/capture.rs",
-        symbols: &["NativeCaptureBinding", "VerifiedNativeCapture", "VerifiedNativeCapture::verify", "VerifiedNativeCapture::verify_owner", "VerifiedNativeCapture::verify_transition", "VerifiedNativeCapture::verify_deadline", "VerifiedNativeCapture::validate_time", "verify_capture_attachment"],
+        symbols: &[
+            "NativeCaptureBinding",
+            "VerifiedNativeCapture",
+            "VerifiedNativeCapture::verify",
+            "VerifiedNativeCapture::verify_owner",
+            "VerifiedNativeCapture::verify_transition",
+            "VerifiedNativeCapture::verify_deadline",
+            "VerifiedNativeCapture::validate_time",
+            "verify_capture_attachment",
+        ],
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/receipt_store.rs",
-        symbols: &["AdmissionNativeDispatchCapture", "QualifiedAdmissionProjectionStore"],
+        symbols: &[
+            "AdmissionNativeDispatchCapture",
+            "QualifiedAdmissionProjectionStore",
+        ],
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/admission_operation/authority_profile.rs",
@@ -977,7 +1170,11 @@ const NATIVE_DISPATCH_LEDGER_SOURCES: &[RequiredSource] = &[
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/admission_operation/retained_request.rs",
-        symbols: &["RetainedToolAdmissionRequestV1::matching_grants_require_dpop"],
+        symbols: &[
+            "RetainedToolAdmissionRequestV1::matching_grants_require_dpop",
+            "SCHEMA",
+            "RetainedToolAdmissionRequestV1::matching_grants_require_cumulative_approval",
+        ],
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/runtime_acquisition.rs",
@@ -1005,11 +1202,23 @@ const NATIVE_DISPATCH_LEDGER_SOURCES: &[RequiredSource] = &[
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/admission_operation/native_dispatch_ledger.rs",
-        symbols: &["NativeSecurityDispatchLedgerContext", "NativeSecurityDispatchLedgerRecordV1", "NativeSecurityDispatchLedgerContext::fmt", "NativeSecurityDispatchLedgerRecordV1::fmt"],
+        symbols: &[
+            "NativeSecurityDispatchLedgerContext",
+            "NativeSecurityDispatchLedgerRecordV1",
+            "NativeSecurityDispatchLedgerContext::fmt",
+            "NativeSecurityDispatchLedgerRecordV1::fmt",
+        ],
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/ledger.rs",
-        symbols: &["PreparedNativeSecurityEgress::acquire_and_commit_with_dispatch_ledger", "PreparedNativeSecurityEgress::validate_ledger_input", "PreparedNativeSecurityEgress::retain_dispatch_ledger", "PreparedNativeSecurityEgress::retain_dispatch_ledger_current", "PreparedNativeSecurityEgress::validate_ledger", "AcquiredNativeSecurityEgress::commit_with_dispatch_ledger"],
+        symbols: &[
+            "PreparedNativeSecurityEgress::acquire_and_commit_with_dispatch_ledger",
+            "PreparedNativeSecurityEgress::validate_ledger_input",
+            "PreparedNativeSecurityEgress::retain_dispatch_ledger",
+            "PreparedNativeSecurityEgress::retain_dispatch_ledger_current",
+            "PreparedNativeSecurityEgress::validate_ledger",
+            "AcquiredNativeSecurityEgress::commit_with_dispatch_ledger",
+        ],
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress.rs",
@@ -1021,27 +1230,66 @@ const NATIVE_DISPATCH_LEDGER_SOURCES: &[RequiredSource] = &[
     },
     RequiredSource {
         path: "crates/platform/chio-control-plane/src/security/adapters/native_flow.rs",
-        symbols: &["PreparedNativeFlowDispatch::commit_custody_with_dispatch_ledger", "PreparedNativeFlowDispatch::commit_custody_inner", "NativeFlowCustody::dispatch_ledger"],
+        symbols: &[
+            "PreparedNativeFlowDispatch::commit_custody_with_dispatch_ledger",
+            "PreparedNativeFlowDispatch::commit_custody_inner",
+            "NativeFlowCustody::dispatch_ledger",
+        ],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/store.rs",
-        symbols: &["SqliteAdmissionOperationStore::retain_native_dispatch_ledger", "SqliteAdmissionOperationStore::load_native_dispatch_ledger"],
+        symbols: &[
+            "SqliteAdmissionOperationStore::retain_native_dispatch_ledger",
+            "SqliteAdmissionOperationStore::load_native_dispatch_ledger",
+        ],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger.rs",
-        symbols: &["SCHEMA", "PROJECTION", "MUTATION", "MAX_RECORD_BYTES", "sql", "require_operation", "projection_reference", "SqliteAdmissionOperationStore::load_native_dispatch_ledger"],
+        symbols: &[
+            "SCHEMA",
+            "PROJECTION",
+            "MUTATION",
+            "MAX_RECORD_BYTES",
+            "sql",
+            "require_operation",
+            "projection_reference",
+            "SqliteAdmissionOperationStore::load_native_dispatch_ledger",
+        ],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/policy.rs",
-        symbols: &["POLICY_SCHEMA", "MAX_POLICY_BYTES", "Policy", "Inputs", "Decision", "required_option", "decode", "Policy::validate_binding", "Policy::validate_current", "Policy::validate_at"],
+        symbols: &[
+            "MAX_POLICY_BYTES",
+            "Policy",
+            "Inputs",
+            "Decision",
+            "required_option",
+            "decode",
+            "Policy::validate_binding",
+            "Policy::validate_current",
+            "Policy::validate_at",
+        ],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/record.rs",
-        symbols: &["Record", "Record::bytes", "Record::digest", "Record::evidence", "Record::validate"],
+        symbols: &[
+            "Record",
+            "Record::bytes",
+            "Record::digest",
+            "Record::evidence",
+            "Record::validate",
+            "Record::validate_initialized",
+        ],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/storage.rs",
-        symbols: &["current_operation", "load", "verify_coverage", "verify_reference", "verify_all"],
+        symbols: &[
+            "current_operation",
+            "load",
+            "verify_coverage",
+            "verify_reference",
+            "verify_all",
+        ],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/write.rs",
@@ -1065,11 +1313,22 @@ const NATIVE_DISPATCH_LEDGER_SOURCES: &[RequiredSource] = &[
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs",
-        symbols: &["initialize_admission_operation_schema", "migrate_schema", "verify_admission_operation_invariants", "verify_admission_operation_schema", "admission_operation_schema_catalog"],
+        symbols: &[
+            "initialize_admission_operation_schema",
+            "migrate_schema",
+            "verify_admission_operation_invariants",
+            "verify_admission_operation_schema",
+            "admission_operation_schema_catalog",
+        ],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/schema.rs",
-        symbols: &["recorded_version", "digest_version", "expected", "verify_version"],
+        symbols: &[
+            "recorded_version",
+            "digest_version",
+            "expected",
+            "verify_version",
+        ],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store.rs",
@@ -1115,11 +1374,17 @@ const NATIVE_OUTPUT_PREPARATION_SOURCES: &[RequiredSource] = &[
 const NATIVE_USE_SOURCES: &[RequiredSource] = &[
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/credential_reservation/native_dispatch.rs",
-        symbols: &["VerifiedNativeDispatchCredentials::execution_nonce", "DispatchCredentialReservation::verify_native_execution_nonce"],
+        symbols: &[
+            "VerifiedNativeDispatchCredentials::execution_nonce",
+            "DispatchCredentialReservation::verify_native_execution_nonce",
+        ],
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/ledger.rs",
-        symbols: &["PreparedNativeSecurityEgress::retain_for_declassified_capture", "PreparedNativeSecurityEgress::retain_for_capture_inner"],
+        symbols: &[
+            "PreparedNativeSecurityEgress::retain_for_declassified_capture",
+            "PreparedNativeSecurityEgress::retain_for_capture_inner",
+        ],
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress.rs",
@@ -1135,11 +1400,25 @@ const NATIVE_USE_SOURCES: &[RequiredSource] = &[
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/security_state/native_egress.rs",
-        symbols: &["NativeEgressCommand", "NativeEgressCommand::declassified", "NativeEgressCommand::permits_table", "NativeEgressCommand::expected_changes", "NativeEgressCommand::validate_changes"],
+        symbols: &[
+            "NativeEgressCommand",
+            "NativeEgressCommand::declassified",
+            "NativeEgressCommand::permits_table",
+            "NativeEgressCommand::expected_changes",
+            "NativeEgressCommand::validate_changes",
+        ],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/security_state/native_declassification.rs",
-        symbols: &["TABLES", "consumption_changes", "NativeDeclassificationOutcome", "NativeDeclassificationOutcome::released", "NativeDeclassificationOutcome::changes", "NativeDeclassificationOutcome::validate_change", "NativeDeclassificationOutcome::validate_changes"],
+        symbols: &[
+            "TABLES",
+            "consumption_changes",
+            "NativeDeclassificationOutcome",
+            "NativeDeclassificationOutcome::released",
+            "NativeDeclassificationOutcome::changes",
+            "NativeDeclassificationOutcome::validate_change",
+            "NativeDeclassificationOutcome::validate_changes",
+        ],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/security_state/declassification.rs",
@@ -1159,11 +1438,18 @@ const NATIVE_USE_SOURCES: &[RequiredSource] = &[
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/record.rs",
-        symbols: &["Record::format"],
+        symbols: &[
+            "Record::format",
+            "Record::validate_initialized",
+            "load_inner",
+        ],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/policy.rs",
-        symbols: &["DECLASSIFIED_POLICY_SCHEMA", "Policy::validate_live_declassification", "Policy::validate_owned_declassification"],
+        symbols: &[
+            "Policy::validate_live_declassification",
+            "Policy::validate_owned_declassification",
+        ],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/declassification.rs",
@@ -1171,7 +1457,11 @@ const NATIVE_USE_SOURCES: &[RequiredSource] = &[
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/record.rs",
-        symbols: &["Record::format"],
+        symbols: &[
+            "Record::format",
+            "Record::validate_initialized",
+            "load_inner",
+        ],
     },
 ];
 

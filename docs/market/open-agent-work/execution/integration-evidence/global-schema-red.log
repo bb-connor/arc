@@ -1,0 +1,18 @@
+
+running 4 tests
+test serving_owner::global_commit_chain::schema_tests::ignored_check_cannot_smuggle_future_projection_into_a_supported_predecessor ... ok
+test serving_owner::global_commit_chain::schema_tests::nonhistorical_runtime_kind_without_status_is_not_an_upgrade_predecessor ... ok
+test serving_owner::global_commit_chain::schema_tests::supported_previous_global_schemas_preserve_history_when_adding_replay_kinds ... FAILED
+test serving_owner::global_commit_chain::schema_tests::unexpected_trigger_on_previous_global_schema_is_not_repaired ... ok
+
+failures:
+
+---- serving_owner::global_commit_chain::schema_tests::supported_previous_global_schemas_preserve_history_when_adding_replay_kinds stdout ----
+Error: Invalid("global authority commit schema is not canonical")
+
+
+failures:
+    serving_owner::global_commit_chain::schema_tests::supported_previous_global_schemas_preserve_history_when_adding_replay_kinds
+
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 1660 filtered out; finished in 0.16s
+

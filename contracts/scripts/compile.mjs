@@ -13,6 +13,9 @@ function walkSolidityFiles(dir) {
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
+      // Research contracts have separate compiler and replay qualification.
+      // They are not members of the production contract package.
+      if (dir === srcDir && entry.name === "experimental") continue;
       files.push(...walkSolidityFiles(fullPath));
       continue;
     }

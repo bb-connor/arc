@@ -1,0 +1,96 @@
+   Compiling chio-security-types v0.1.0 (/tmp/chio-verifiable-work-paper/crates/security/chio-security-types)
+   Compiling chio-metrics-spec v0.1.0 (/tmp/chio-verifiable-work-paper/crates/observability/chio-metrics-spec)
+   Compiling chio-workflow-preflight v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-workflow-preflight)
+   Compiling chio-web3-bindings v0.1.0 (/tmp/chio-verifiable-work-paper/crates/economy/chio-web3-bindings)
+   Compiling chio-data-guards-redactors-default v0.1.0 (/tmp/chio-verifiable-work-paper/crates/guards/chio-data-guards/redactors/default)
+   Compiling chio-log-redact v0.1.0 (/tmp/chio-verifiable-work-paper/crates/observability/chio-log-redact)
+   Compiling chio-supervisor v0.1.0 (/tmp/chio-verifiable-work-paper/crates/core/chio-supervisor)
+   Compiling chio-bounded v0.1.0 (/tmp/chio-verifiable-work-paper/crates/core/chio-bounded)
+   Compiling chio-sqlite-file-identity v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-sqlite-file-identity)
+   Compiling chio-core-types v0.1.0 (/tmp/chio-verifiable-work-paper/crates/core/chio-core-types)
+   Compiling chio-listing v0.1.0 (/tmp/chio-verifiable-work-paper/crates/economy/chio-listing)
+   Compiling chio-fiscal v0.1.0 (/tmp/chio-verifiable-work-paper/crates/economy/chio-fiscal)
+   Compiling chio-revocation-oracle v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-revocation-oracle)
+   Compiling chio-finding v0.1.0 (/tmp/chio-verifiable-work-paper/crates/economy/chio-finding)
+   Compiling chio-governance v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-governance)
+   Compiling chio-pheromone v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-pheromone)
+   Compiling chio-open-market v0.1.0 (/tmp/chio-verifiable-work-paper/crates/economy/chio-open-market)
+   Compiling chio-appraisal v0.1.0 (/tmp/chio-verifiable-work-paper/crates/economy/chio-appraisal)
+   Compiling chio-federation v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-federation)
+   Compiling chio-underwriting v0.1.0 (/tmp/chio-verifiable-work-paper/crates/economy/chio-underwriting)
+   Compiling chio-fincred v0.1.0 (/tmp/chio-verifiable-work-paper/crates/economy/chio-fincred)
+   Compiling chio-did v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-did)
+   Compiling chio-credit v0.1.0 (/tmp/chio-verifiable-work-paper/crates/economy/chio-credit)
+   Compiling chio-egress-contract v0.1.0 (/tmp/chio-verifiable-work-paper/crates/protocol/chio-egress-contract)
+   Compiling chio-cage-plan v0.1.0 (/tmp/chio-verifiable-work-paper/crates/security/chio-cage-plan)
+   Compiling chio-lineage v0.1.0 (/tmp/chio-verifiable-work-paper/crates/observability/chio-lineage)
+   Compiling chio-attest-verify v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-attest-verify)
+   Compiling chio-weights v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-weights)
+   Compiling chio-custody-hw v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-custody-hw)
+   Compiling chio-market v0.1.0 (/tmp/chio-verifiable-work-paper/crates/economy/chio-market)
+   Compiling chio-web3 v0.1.0 (/tmp/chio-verifiable-work-paper/crates/economy/chio-web3)
+   Compiling chio-swarm-authority v0.1.0 (/tmp/chio-verifiable-work-paper/crates/kernel/chio-swarm-authority)
+   Compiling chio-autonomy v0.1.0 (/tmp/chio-verifiable-work-paper/crates/economy/chio-autonomy)
+   Compiling chio-kernel-core v0.1.0 (/tmp/chio-verifiable-work-paper/crates/kernel/chio-kernel-core)
+   Compiling chio-core v0.1.0 (/tmp/chio-verifiable-work-paper/crates/core/chio-core)
+   Compiling chio-response-model v0.1.0 (/tmp/chio-verifiable-work-paper/crates/core/chio-response-model)
+   Compiling chio-workflow v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-workflow)
+   Compiling chio-manifest v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-manifest)
+   Compiling chio-link v0.1.0 (/tmp/chio-verifiable-work-paper/crates/economy/chio-link)
+   Compiling chio-tool-call-fabric v0.1.0 (/tmp/chio-verifiable-work-paper/crates/protocol/chio-tool-call-fabric)
+   Compiling chio-settle v0.1.0 (/tmp/chio-verifiable-work-paper/crates/economy/chio-settle)
+   Compiling chio-disclosure-lineage v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-disclosure-lineage)
+   Compiling chio-selective-disclosure v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-selective-disclosure)
+   Compiling chio-attest-buyer-core v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-attest-buyer-core)
+   Compiling chio-federation-authority v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-federation-authority)
+   Compiling chio-kernel v0.1.0 (/tmp/chio-verifiable-work-paper/crates/kernel/chio-kernel)
+   Compiling chio-runtime-proof-parity v0.1.0 (/tmp/chio-verifiable-work-paper/crates/kernel/chio-runtime-proof-parity)
+   Compiling chio-finding-verifier v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-finding-verifier)
+   Compiling chio-transaction-passport v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-transaction-passport)
+   Compiling chio-risk-comptroller v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-risk-comptroller)
+   Compiling chio-commerce-order v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-commerce-order)
+   Compiling chio-edge-metrics v0.1.0 (/tmp/chio-verifiable-work-paper/crates/protocol/chio-edge-metrics)
+   Compiling chio-cross-protocol v0.1.0 (/tmp/chio-verifiable-work-paper/crates/protocol/chio-cross-protocol)
+   Compiling chio-mcp-edge v0.1.0 (/tmp/chio-verifiable-work-paper/crates/protocol/chio-mcp-edge)
+   Compiling chio-agent-web-interop v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-agent-web-interop)
+   Compiling chio-a2a-edge v0.1.0 (/tmp/chio-verifiable-work-paper/crates/protocol/chio-a2a-edge)
+   Compiling chio-store-sqlite v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-store-sqlite)
+   Compiling chio-runtime-core v0.1.0 (/tmp/chio-verifiable-work-paper/crates/kernel/chio-runtime-core)
+   Compiling chio-a2a-adapter v0.1.0 (/tmp/chio-verifiable-work-paper/crates/protocol/chio-a2a-adapter)
+   Compiling chio-federated-work v0.1.0 (/tmp/chio-verifiable-work-paper/examples/federated-work)
+error[E0277]: the trait bound `TreatyRuntimeArtifactRecord: serde::Serialize` is not satisfied
+   --> src/funded_work/composition.rs:162:24
+    |
+162 | ...s.push(json!({"kind":kind,"id":id,"record":store.treaty_runtime_artifact(kind, id)?.ok_or("treaty artifact absent")?}));
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |           |
+    |           the trait `common::_::_serde::Serialize` is not implemented for `TreatyRuntimeArtifactRecord`
+    |           required by a bound introduced by this call
+    |
+    = note: for local types consider adding `#[derive(serde::Serialize)]` to your `TreatyRuntimeArtifactRecord` type
+    = note: for types from other crates check whether the crate offers a `serde` feature flag
+    = help: the following other types implement trait `common::_::_serde::Serialize`:
+              &'a T
+              &'a mut T
+              ()
+              (T,)
+              (T0, T1)
+              (T0, T1, T2)
+              (T0, T1, T2, T3)
+              (T0, T1, T2, T3, T4)
+            and 3153 others
+    = note: required for `&TreatyRuntimeArtifactRecord` to implement `common::_::_serde::Serialize`
+note: required by a bound in `to_value`
+   --> /home/connor/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_json-1.0.149/src/value/mod.rs:997:8
+    |
+995 | pub fn to_value<T>(value: T) -> Result<Value, Error>
+    |        -------- required by a bound in this function
+996 | where
+997 |     T: Serialize,
+    |        ^^^^^^^^^ required by this bound in `to_value`
+    = note: the full name for the type has been written to '/tmp/chio-paper-target/debug/deps/chio_federated_work-357e577b0d86d5c8.long-type-6075810688922311771.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+    = note: this error originates in the macro `$crate::json_internal` which comes from the expansion of the macro `json` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `chio-federated-work` (bin "chio-federated-work") due to 1 previous error

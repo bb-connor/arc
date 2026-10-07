@@ -31,6 +31,7 @@
 #![cfg_attr(test, allow(clippy::expect_used, clippy::unwrap_used))]
 
 pub mod authority;
+pub mod delegation;
 pub mod grant;
 pub mod manifest;
 pub mod receipt;

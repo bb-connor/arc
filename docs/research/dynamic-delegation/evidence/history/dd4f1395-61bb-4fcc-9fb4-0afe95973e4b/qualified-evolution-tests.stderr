@@ -1,0 +1,36 @@
+warning: patch `cmpv2 v0.2.0 (/home/connor/backbay/arc-agentic-work-plan/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/home/connor/backbay/arc-agentic-work-plan/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/home/connor/backbay/arc-agentic-work-plan/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/home/connor/backbay/arc-agentic-work-plan/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/home/connor/backbay/arc-agentic-work-plan/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/home/connor/backbay/arc-agentic-work-plan/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/home/connor/backbay/arc-agentic-work-plan/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/home/connor/backbay/arc-agentic-work-plan/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/home/connor/backbay/arc-agentic-work-plan/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+    Finished `test` profile [unoptimized] target(s) in 0.98s
+     Running unittests src/lib.rs (/home/connor/chio-pr1173-target/debug/deps/chio_runtime_core-6cf546f9704af923)
+     Running tests/lease_boundaries.rs (/home/connor/chio-pr1173-target/debug/deps/lease_boundaries-b99f4d5935b08bf0)
+     Running tests/lease_write_fencing.rs (/home/connor/chio-pr1173-target/debug/deps/lease_write_fencing-23629f90f1db80f0)
+     Running tests/outcome_continuation.rs (/home/connor/chio-pr1173-target/debug/deps/outcome_continuation-2b32b8f53496570b)
+     Running tests/runtime_admission.rs (/home/connor/chio-pr1173-target/debug/deps/runtime_admission-ae38d940ca783ef9)
+     Running tests/runtime_agreement_context_scan.rs (/home/connor/chio-pr1173-target/debug/deps/runtime_agreement_context_scan-a50bcf09cef8bfd2)
+     Running tests/runtime_buyer_review.rs (/home/connor/chio-pr1173-target/debug/deps/runtime_buyer_review-e6dc521b3e9c3edc)
+     Running tests/runtime_kernel_hook.rs (/home/connor/chio-pr1173-target/debug/deps/runtime_kernel_hook-9a98508dc2c0b333)
+     Running tests/runtime_ops.rs (/home/connor/chio-pr1173-target/debug/deps/runtime_ops-8eecc3adf40860ad)
+     Running tests/runtime_ops_provider_health.rs (/home/connor/chio-pr1173-target/debug/deps/runtime_ops_provider_health-c6b1867d46aa50a0)
+     Running tests/runtime_orchestration.rs (/home/connor/chio-pr1173-target/debug/deps/runtime_orchestration-97f4253f1b606ab4)
+     Running tests/runtime_pheromone_policy.rs (/home/connor/chio-pr1173-target/debug/deps/runtime_pheromone_policy-d295bb9b8c7613ab)
+     Running tests/runtime_store.rs (/home/connor/chio-pr1173-target/debug/deps/runtime_store-876902a50130717d)
+     Running tests/runtime_treaty.rs (/home/connor/chio-pr1173-target/debug/deps/runtime_treaty-fd1b466a2ac24387)
+     Running tests/runtime_treaty_binding_substitution.rs (/home/connor/chio-pr1173-target/debug/deps/runtime_treaty_binding_substitution-0f5fda47e7d635ce)
+     Running tests/runtime_treaty_continuation_reopen.rs (/home/connor/chio-pr1173-target/debug/deps/runtime_treaty_continuation_reopen-15043c566d2aab04)
+     Running tests/runtime_treaty_predicate_substitution.rs (/home/connor/chio-pr1173-target/debug/deps/runtime_treaty_predicate_substitution-719d57986ea29b28)
+     Running tests/runtime_trust.rs (/home/connor/chio-pr1173-target/debug/deps/runtime_trust-c7554a0eea34bf11)
+     Running unittests src/lib.rs (/home/connor/chio-pr1173-target/debug/deps/chio_swarm_authority-d8ffd48b3c45a233)
+     Running tests/swarm_authority_stage0.rs (/home/connor/chio-pr1173-target/debug/deps/swarm_authority_stage0-5b5dfd087661cbb9)
+   Doc-tests chio_runtime_core
+   Doc-tests chio_swarm_authority

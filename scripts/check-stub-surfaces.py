@@ -12,9 +12,12 @@ import subprocess
 import sys
 
 
+# Clippy lint names end at a comma or closing parenthesis. Other qualified
+# markers still denote unfinished work, including macros separated by comments.
 MATCH_RE = re.compile(
-    r"(?i:bbs-stub|not_yet_implemented|advisory only|\btodo!\s*\(|"
-    r"\bunimplemented!\s*\(|\bnot implemented\b|\btodo\b|\bfixme\b|\bhack\b|"
+    r"(?i:bbs-stub|not_yet_implemented|advisory only|\btodo\s*!\s*\(|"
+    r"\bunimplemented\s*!\s*\(|\bnot implemented\b|(?<!clippy::)\btodo\b|"
+    r"\btodo\b(?!\s*[,)])|\bfixme\b|\bhack\b|"
     r"\bstubs?\b|\bplaceholders?\b)|\bXXX\b"
 )
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -37,6 +40,18 @@ def allow(reason: str, expires: str) -> AllowlistEntry:
 
 
 ALLOWLIST: dict[str, AllowlistEntry] = {
+    ".config/miri-crates.toml": allow(
+        "exact interpreter syscall limitation recorded by the unsafe-code qualification gate",
+        "2026-12-31",
+    ),
+    "crates/core/chio-response-model/src/simulation.rs": allow(
+        "local simulated lineage fence is never installed as live port authority",
+        "2026-12-31",
+    ),
+    "crates/platform/chio-store-sqlite/src/receipt_query/read.rs": allow(
+        "SQL parameter binding terminology in the checked cursor-overflow path",
+        "2026-12-31",
+    ),
     # Exact reviewed vendored text. These entries do not waive source audits
     # or permit new incomplete executable implementations in these files.
     "third_party/cmpv2-chio/Cargo.toml.orig": allow(
@@ -117,6 +132,10 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     ),
     # Exact upstream comments only. New code and comments remain checked;
     # supply-chain audits separately cover this pinned cryptographic source.
+    "third_party/aws-lc-rs-chio/CHIO-PATCH.patch.json": allow(
+        "serialized unchanged upstream import-maintenance comment in reviewed patch context",
+        "2026-12-31",
+    ),
     "third_party/aws-lc-rs-chio/Makefile": allow(
         "upstream optional macOS build recipe comments",
         "2026-12-31",
@@ -279,10 +298,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "route-template placeholder terminology",
         "2026-12-31",
     ),
-    "crates/kernel/chio-kernel-browser/src/clock.rs": allow(
-        "cfg(not wasm32) host-target test stub returns fail-closed time",
-        "2026-12-31",
-    ),
     "crates/kernel/chio-kernel-browser/src/rng.rs": allow(
         "cfg(not wasm32) host-target stub always fails outside browser wasm",
         "2026-12-31",
@@ -321,10 +336,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     ),
     "crates/tooling/chio-spec-codegen/src/threat_model.rs": allow(
         "reviewed threat-model test-stub generator, expected to fail closed until populated",
-        "2026-12-31",
-    ),
-    "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs": allow(
-        "SQL bind placeholder terminology, not an unfinished stub surface",
         "2026-12-31",
     ),
     "crates/trust/chio-tee/src/tap.rs": allow(
@@ -366,6 +377,15 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
 }
 
 ALLOWLIST_MATCHES: dict[str, tuple[str, ...]] = {
+    ".config/miri-crates.toml": (
+        r'^reason = "syscall: memfd_create \(aarch64 number 279\) is not implemented by Miri"$',
+    ),
+    "crates/core/chio-response-model/src/simulation.rs": (
+        r"^// A local model placeholder, never installed or passed to a port\.$",
+    ),
+    "crates/platform/chio-store-sqlite/src/receipt_query/read.rs": (
+        r"^// but must still bind placeholders if we reuse `params!`;$",
+    ),
     "third_party/cmpv2-chio/Cargo.toml.orig": (
         "^const-oid = \\{ version = \"0\\.9\", features = \\[\"db\"\\] \\} # TODO: path = \"\\.\\./const-oid\"$",
     ),
@@ -435,6 +455,9 @@ ALLOWLIST_MATCHES: dict[str, tuple[str, ...]] = {
     ),
     "third_party/seccompiler-chio/src/frontend/json.rs": (
         "^/// Dummy placeholder type for a JSON comment\\. Holds no value\\.$",
+    ),
+    "third_party/aws-lc-rs-chio/CHIO-PATCH.patch.json": (
+        r'^" // TODO: Uncomment when MSRV >= 1\.64\\n",$',
     ),
     "third_party/aws-lc-rs-chio/Makefile": (
         r"^# TODO: This build target produces linker error on Mac\.$",
@@ -539,7 +562,6 @@ ALLOWLIST_MATCHES: dict[str, tuple[str, ...]] = {
         r"not a placeholder",
     ),
     "crates/core/chio-core-types/src/crypto.rs": (
-        r"32-byte placeholder",
         r"all-zero placeholder",
     ),
     "crates/core/chio-core-types/src/plan.rs": (
@@ -569,10 +591,6 @@ ALLOWLIST_MATCHES: dict[str, tuple[str, ...]] = {
     ),
     "crates/platform/chio-http-core/src/routes.rs": (
         r"`\{id\}` placeholder",
-    ),
-    "crates/kernel/chio-kernel-browser/src/clock.rs": (
-        r"stub so `cargo test -p chio-kernel-browser`",
-        r"stub intentionally returns `0`",
     ),
     "crates/kernel/chio-kernel-browser/src/rng.rs": (
         r"Host-target stub",
@@ -630,9 +648,6 @@ ALLOWLIST_MATCHES: dict[str, tuple[str, ...]] = {
         r"sanitised stub must parse",
         r"let stub",
         r"contains_live_unimplemented_marker",
-    ),
-    "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs": (
-        r"bind placeholders",
     ),
     "crates/trust/chio-tee/src/tap.rs": (
         r"Stub `TrafficTap` implementation",

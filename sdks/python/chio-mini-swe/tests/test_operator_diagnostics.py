@@ -84,3 +84,32 @@ def test_failure_diagnostics_bound_and_tolerate_malformed_output(qualifier, tmp_
     assert result["worker_logs"][0]["classes"] == []
     assert qualifier.safe_run_report("[" * 65536) is None
     assert qualifier.safe_run_report(" " * 65537) is None
+
+
+def test_failure_diagnostics_identify_mcp_deadline_without_private_text(qualifier, tmp_path):
+    secret = "never-publish-this-private-route"
+    logs = tmp_path / "run/host/run-logs"
+    logs.mkdir(parents=True)
+    (logs / "coder-1.stderr").write_text(secret + "\nWorkerError: Chio worker: runtime_error\n")
+    output = tmp_path / "output"
+    output.mkdir()
+    failure = subprocess.CalledProcessError(
+        1,
+        ["operator", secret],
+        stderr=(
+            secret + "\nMCP tools/call request timed out after 60s\n"
+            "MCP initialize request exceeded its 10000ms deadline\n"
+            "MCP private_method request timed out after 12s\n"
+            "MCP tools/list request timed out after 99999s\n"
+        ),
+    )
+    qualifier.save_failure_diagnostics(tmp_path, output, failure)
+    text = (output / "operator-failure.json").read_text()
+    assert secret not in text and "private_method" not in text
+    result = json.loads(text)
+    assert result["host_mcp_deadlines"] == [
+        {"method": "tools/call", "timeout_ms": 60000},
+        {"method": "initialize", "timeout_ms": 10000},
+    ]
+    assert result["worker_logs"][1]["classes"] == ["worker_runtime_error"]
+    assert qualifier.mcp_deadlines(b"x" * 65537 + failure.stderr.encode()) == []

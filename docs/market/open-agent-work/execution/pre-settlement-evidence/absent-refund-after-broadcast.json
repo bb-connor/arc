@@ -1,0 +1,103 @@
+{
+  "after": {
+    "executionBundleSha256": null,
+    "executionCheckpointSha256": null,
+    "executionProjectionSha256": null,
+    "executionReceiptCount": 0,
+    "holdCount": 1,
+    "holdDisposition": "reconciled",
+    "holdId": "admission-budget:c3fe38632503db07c913c98febb0b5a95576de8a8e8e2fc1bc56286a32f9be49:0",
+    "operationCount": 1,
+    "operationId": "c3fe38632503db07c913c98febb0b5a95576de8a8e8e2fc1bc56286a32f9be49"
+  },
+  "before": {
+    "executionBundleSha256": null,
+    "executionCheckpointSha256": null,
+    "executionProjectionSha256": null,
+    "executionReceiptCount": 0,
+    "holdCount": 1,
+    "holdDisposition": "reconciled",
+    "holdId": "admission-budget:c3fe38632503db07c913c98febb0b5a95576de8a8e8e2fc1bc56286a32f9be49:0",
+    "operationCount": 1,
+    "operationId": "c3fe38632503db07c913c98febb0b5a95576de8a8e8e2fc1bc56286a32f9be49"
+  },
+  "chain": {
+    "beneficiaryBalance": "0",
+    "escrowBalance": "0",
+    "events": {
+      "ClaimSubmitted": 0,
+      "DecisionRecorded": 0,
+      "Funded": 1,
+      "Paid": 0,
+      "Refunded": 1,
+      "TimedOut": 1
+    },
+    "fundingTransaction": "0xc18a9c576409f70b68796ca97e29c9f2cd8c981d9ce8b7d77fc0c464a2f173cb",
+    "paid": "0",
+    "payerBalance": "1000",
+    "refunded": "100",
+    "state": "Refunded",
+    "transactions": {
+      "pay": [],
+      "record": [],
+      "refund": [
+        {
+          "hash": "0xcbe0d6f141feb9e7d63696371da7187abd929cab0df231aff8c08eed01a6c1c3",
+          "nonce": 2,
+          "status": 1
+        }
+      ],
+      "submit": []
+    }
+  },
+  "checkpoint": "refund-after-broadcast",
+  "first": {
+    "allocationId": "0xaff1214c1dfd5b792a3510c6c527174196485fcf2987dfc5f65a9f91a5403218",
+    "authorityUuid": "01a0a34f-26f7-7d22-a5cb-0867760d22e9",
+    "authorizationId": "funded-aff1214c1dfd5b792a3510c6c527174196485fcf2987dfc5f65a9f91a5403218",
+    "executions": 1,
+    "externalFundsTransferred": false,
+    "fundingCorrelation": "bound",
+    "holdId": "admission-budget:c3fe38632503db07c913c98febb0b5a95576de8a8e8e2fc1bc56286a32f9be49:0",
+    "nativeAuthorizationId": "funded-aff1214c1dfd5b792a3510c6c527174196485fcf2987dfc5f65a9f91a5403218",
+    "nativeEvaluationError": "durable admission failed: payment rail unavailable: exact ERC20 payout has not been observed; capture remains pending",
+    "nativePaymentAction": "capture",
+    "nativePaymentState": "Settling",
+    "nativeState": "Finalizing",
+    "operationId": "c3fe38632503db07c913c98febb0b5a95576de8a8e8e2fc1bc56286a32f9be49",
+    "paymentState": "pending",
+    "profile": "chio.experimental.local-confirmed-funding.v1",
+    "requestId": "funded-native-w0",
+    "settlementObservationError": null,
+    "settlementTransaction": null,
+    "startupReconciliationError": null
+  },
+  "killedSignal": 9,
+  "replay": {
+    "allocationId": "0xaff1214c1dfd5b792a3510c6c527174196485fcf2987dfc5f65a9f91a5403218",
+    "authorityUuid": "01a0a34f-26f7-7d22-a5cb-0867760d22e9",
+    "authorizationId": "funded-aff1214c1dfd5b792a3510c6c527174196485fcf2987dfc5f65a9f91a5403218",
+    "executions": 1,
+    "externalFundsTransferred": true,
+    "fundingCorrelation": "bound",
+    "holdId": "admission-budget:c3fe38632503db07c913c98febb0b5a95576de8a8e8e2fc1bc56286a32f9be49:0",
+    "nativeAuthorizationId": "funded-aff1214c1dfd5b792a3510c6c527174196485fcf2987dfc5f65a9f91a5403218",
+    "nativePaymentAction": "capture",
+    "nativePaymentState": "Settling",
+    "nativeState": "Finalizing",
+    "operationId": "c3fe38632503db07c913c98febb0b5a95576de8a8e8e2fc1bc56286a32f9be49",
+    "paymentState": "refunded",
+    "profile": "chio.experimental.local-confirmed-funding.v1",
+    "requestId": "funded-native-w0",
+    "settlementObservationError": null,
+    "settlementTransaction": "0xcbe0d6f141feb9e7d63696371da7187abd929cab0df231aff8c08eed01a6c1c3",
+    "startupReconciliationError": "durable admission failed: payment rail unavailable: exact ERC20 payout has not been observed; capture remains pending"
+  },
+  "verification": {
+    "decision": "absent",
+    "financial": "refund"
+  },
+  "retainedTransactions": {
+    "refund": "0xcbe0d6f141feb9e7d63696371da7187abd929cab0df231aff8c08eed01a6c1c3"
+  }
+}

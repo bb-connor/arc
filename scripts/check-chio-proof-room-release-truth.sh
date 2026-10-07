@@ -84,11 +84,13 @@ DEFAULT_DOC_EXCLUDES = (
     "docs/papers/",
     "docs/research/",
 )
-# Captured Rust source is immutable review evidence, not release copy. Pin the
+# Captured source and terminal results are immutable evidence, not release copy. Pin the
 # exact reviewed bytes so this path cannot become a home for unscanned claims.
 HISTORICAL_SOURCE_SNAPSHOTS = {
     "docs/reviews/artifacts/2026-09-29-native-clock-test-ownership/kernel-source-before.json":
         "b2350e625a2c78448768c7f8c23dbd3a2ee461e40bb1053cb628534111fa52c2",
+    "docs/market/open-agent-work/execution/15-native-integration-evidence.json":
+        "6ba0d3747d1d1ade6c7fcf4cb36368e5e9d5fcb60f39ca34e971236b93639761",
 }
 
 ALLOW_CONTEXT_RE = re.compile(

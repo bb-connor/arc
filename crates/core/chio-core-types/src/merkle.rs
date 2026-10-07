@@ -488,11 +488,13 @@ impl MerkleProof {
         while size > 1 {
             let step = inclusion_step(idx, size);
             if step.consume_sibling {
-                let sibling = self
-                    .audit_path
-                    .get(path_idx)
-                    .ok_or(Error::MerkleProofFailed)?;
-                path_idx = path_idx.checked_add(1).ok_or(Error::MerkleProofFailed)?;
+                let Some(sibling) = self.audit_path.get(path_idx) else {
+                    return Err(Error::MerkleProofFailed);
+                };
+                let Some(next_path_idx) = path_idx.checked_add(1) else {
+                    return Err(Error::MerkleProofFailed);
+                };
+                path_idx = next_path_idx;
                 h = if step.sibling_on_left {
                     node_hash(sibling, &h)
                 } else {

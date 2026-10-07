@@ -61,6 +61,11 @@ impl FrostArtifactTrustStore {
                     "artifact authority keys must use Ed25519",
                 ));
             }
+            if root.public_key.is_weak_ed25519() {
+                return Err(FrostArtifactTrustError::InvalidRoot(
+                    "artifact authority keys must not be weak",
+                ));
+            }
             let lookup = (root.role, root.key_id.clone());
             let material = root.public_key.to_hex();
             if trusted_material
@@ -137,7 +142,7 @@ impl FrostArtifactTrustStore {
         })?;
         let signature = Signature::from_hex(signature)
             .map_err(|_| FrostArtifactTrustError::InvalidSignature(role))?;
-        if !key.verify(message, &signature) {
+        if !key.verify_strict(message, &signature) {
             return Err(FrostArtifactTrustError::InvalidSignature(role));
         }
         Ok(())

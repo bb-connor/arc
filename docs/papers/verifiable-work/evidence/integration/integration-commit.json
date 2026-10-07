@@ -1,0 +1,26 @@
+{
+  "commit": "71e5cbc3bf7b08f477ed0e0361f2cca0c36eaea3",
+  "tree": "07165a27b9e0f6e07feaf2f56266f4d59862c075",
+  "parents": [
+    "491f585e9013dcb6335589c82d00ac219efbf0a6",
+    "7755d3762baa5e0fda0d171835a9000c26de9033"
+  ],
+  "trackedWorktreeClean": true,
+  "sourceManifestV3": {
+    "path": "source-manifest-v3.json",
+    "sha256": "c69a4db94361b2e4719ecac0d43af1d8088357903895d73637951f9a905710b4",
+    "matchingFiles": 21093
+  },
+  "binary": {
+    "path": "/tmp/chio-paper-integration-evidence/bin/chio-federated-work-v3",
+    "sha256": "919d5f4bad46f318f4e505e0377ee94f751a35a218c4713c1af58b06a1cdcfdf"
+  },
+  "v2SourceDelta": {
+    "patch": "v2-to-final.patch",
+    "changes": "v2-to-final-source-changes.json",
+    "meaning": "one redundant explicit autoderef removed; final peer unit and process checks qualify affected surface"
+  },
+  "privateChainOnly": true,
+  "hostedQualification": false,
+  "realFunds": false
+}

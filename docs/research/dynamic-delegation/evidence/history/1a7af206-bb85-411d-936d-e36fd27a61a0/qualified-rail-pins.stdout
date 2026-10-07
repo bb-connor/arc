@@ -1,0 +1,11 @@
+✔ native signer canonical bytes agree with all four Rust artifact vectors (2.197931ms)
+✔ one settlement signer retains distinct immutable verifier pins per allocation (2.00309ms)
+✔ native signer preserves facet order and rejects unsupported scalar encodings (7.461877ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 704.602911

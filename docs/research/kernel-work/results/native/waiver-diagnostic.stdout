@@ -1,0 +1,15 @@
+
+running 1 test
+test contractual_resolution::capture_waiver_requires_original_terms_and_keeps_positive_budget ... FAILED
+
+failures:
+
+---- contractual_resolution::capture_waiver_requires_original_terms_and_keeps_positive_budget stdout ----
+Error: "conflicting waiver race did not have exactly one winner: Err(CaptureWaiverError(\"admission operation invariant failed: urn:chio:error:kernel:clock-wall-clock-regression\")), Err(CaptureWaiverError(\"admission operation invariant failed: urn:chio:error:kernel:clock-wall-clock-regression\"))"
+
+
+failures:
+    contractual_resolution::capture_waiver_requires_original_terms_and_keeps_positive_budget
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 23 filtered out; finished in 4.71s
+

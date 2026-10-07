@@ -115,7 +115,7 @@ max_age_hours = 48
 #   nightly_wall_budget_hours_per_crate
 #                    : wall-clock budget for each mutants-nightly crate job.
 #   trust_boundary_crates
-#                    : crates covered by the six-crate mutation gate.
+#                    : crates covered by the mutation gate.
 #
 # Lifecycle:
 #   1. File lands with cycle_end_tag empty and observed_consecutive_nightly_
@@ -336,6 +336,8 @@ per_crate_kill_rate_percent:
   chio-kernel-core: pending_full_sweep
   chio-guards: pending_full_sweep
   chio-anchor: pending_full_sweep
+  chio-federation: pending_full_sweep
+  chio-runtime-core: pending_full_sweep
 note: "Blocking activation requires confirmed green mutants-nightly full sweeps and measured per-crate kill rates. Until then cycle_end_tag stays empty."
 """
 cycle_end_tag = ""
@@ -348,6 +350,8 @@ trust_boundary_crates = [
     "chio-kernel-core",
     "chio-guards",
     "chio-anchor",
+    "chio-federation",
+    "chio-runtime-core",
 ]
 
 [release_audit]

@@ -1,0 +1,22 @@
+environment: exit 0
+workflow-tests: exit 0
+native-tests: exit 0
+native-regression: exit 0
+evolution-tests: exit 0
+workflow-clippy: exit 0
+native-clippy: exit 0
+evolution-clippy: exit 0
+evolution-format: exit 0
+format: exit 0
+example: exit 0
+execution-export-tests: exit 0
+durable-regression: exit 0
+funded-tests: exit 0
+funded-clippy: exit 0
+funded-format: exit 0
+funded-build: exit 0
+rail-pins: exit 0
+evolving-funded: exit 0
+funded-child-regression: exit 0
+artifact-tests: exit 0
+PASS: 21 terminal checks, 36556 source files, 48 outputs

@@ -1,0 +1,36 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/chio-verifiable-work-paper/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/chio-verifiable-work-paper/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/chio-verifiable-work-paper/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-workflow v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-workflow)
+    Finished `test` profile [unoptimized] target(s) in 4.40s
+     Running tests/delegation.rs (/tmp/chio-paper-target/debug/deps/delegation-f9bf153f43632ef0)
+
+running 15 tests
+test predicates_validate_and_check_the_actual_json_result ... ok
+test mutation_requires_current_holder_and_untampered_signature ... ok
+test provider_offer_cannot_be_transplanted_to_different_terms_with_the_same_slot_id ... ok
+test sibling_allocation_is_atomic_across_connections ... ok
+test expiry_and_noncanonical_numeric_envelopes_reject ... ok
+test selection_and_dispatch_cannot_race_into_different_providers ... ok
+test replay_cannot_change_a_child_or_move_it_to_another_parent ... ok
+test sealed_allocation_is_portable_and_cannot_be_reassigned ... ok
+test dispatch_checks_subject_currency_ceiling_capability_and_arguments ... ok
+test neither_containers_nor_unqualified_receivers_can_execute ... ok
+test nested_holders_allocate_without_copying_parent_capacity ... ok
+test provider_replacement_stops_at_dispatch_and_survives_reopen ... ok
+test subdivision_preserves_effect_readers_expiry_and_depth ... ok
+test signed_selection_cannot_cross_allocator_namespaces ... ok
+test signed_subdivision_cannot_cross_allocator_or_root_namespaces ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.47s
+

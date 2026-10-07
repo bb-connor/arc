@@ -781,7 +781,7 @@ fn verify_deposit_self_signature(
     signed_body.cost_commitment = None;
     let canonical = canonical_json_bytes(&signed_body)
         .map_err(|error| FanoutError::Canonical(error.to_string()))?;
-    if origin_key.verify(&canonical, &frame.deposit.signature) {
+    if origin_key.verify_strict(&canonical, &frame.deposit.signature) {
         Ok(())
     } else {
         Err(FanoutError::DepositSignatureInvalid)

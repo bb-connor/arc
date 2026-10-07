@@ -104,9 +104,11 @@ impl ChioKernel {
         // Even an immediately ready preparation is an external callback. Do
         // not infer that authorization remained unchanged because it did not
         // visibly yield to this executor.
+        // Legacy preparation readies the registered transport in place. Retain
+        // that effective connection so its launch evidence is bound as well.
         Ok(PreparedToolDelivery {
             waited: true,
-            connection,
+            connection: Some(connection.unwrap_or_else(|| Arc::clone(server))),
         })
     }
 }

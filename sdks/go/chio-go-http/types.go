@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: a060591034caf4559f4ff71b3db89ffffb437c236241dbd9e3aa1f7268596384
+// Schema content SHA-256: 62f91ec250845ba35867c0b27fa5a74727d665e1c243d9b7341d3410f1586e5b
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/oapi-codegen/runtime"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // Defines values for AgentActiveResponseGovernedIntentOrderedEffects.
@@ -358,6 +359,12 @@ const (
 // Defines values for KernelCombinedCaptureMetadataSchema.
 const (
 	KernelCombinedCaptureMetadataSchemaChioAdmissionCaptureMetadataV1 KernelCombinedCaptureMetadataSchema = "chio.admission-capture-metadata.v1"
+)
+
+// Defines values for KernelDpopProofBodySchema.
+const (
+	KernelDpopProofBodySchemaChioDpopProofV1 KernelDpopProofBodySchema = "chio.dpop_proof.v1"
+	KernelDpopProofBodySchemaChioDpopProofV2 KernelDpopProofBodySchema = "chio.dpop_proof.v2"
 )
 
 // Defines values for KernelExecutionNonceNonceSchema.
@@ -2110,6 +2117,17 @@ const (
 	SecurityResponsePlanV1ApprovalRequirement1ApprovalTypeGoverned SecurityResponsePlanV1ApprovalRequirement1ApprovalType = "governed"
 )
 
+// Defines values for SecurityResponsePlanV1ExecutionBindingMode.
+const (
+	SecurityResponsePlanV1ExecutionBindingModeDryRun SecurityResponsePlanV1ExecutionBindingMode = "dry_run"
+	SecurityResponsePlanV1ExecutionBindingModeLive   SecurityResponsePlanV1ExecutionBindingMode = "live"
+)
+
+// Defines values for SecurityResponsePlanV1ExecutionBindingSchemaVersion.
+const (
+	SecurityResponsePlanV1ExecutionBindingSchemaVersionN1 SecurityResponsePlanV1ExecutionBindingSchemaVersion = 1
+)
+
 // Defines values for SecurityResponseStateTransitionReceiptBodyV1Cause.
 const (
 	SecurityResponseStateTransitionReceiptBodyV1CauseApplyCompleted       SecurityResponseStateTransitionReceiptBodyV1Cause = "apply_completed"
@@ -3352,6 +3370,31 @@ type KernelCombinedCaptureMetadata struct {
 
 // KernelCombinedCaptureMetadataSchema defines model for KernelCombinedCaptureMetadata.Schema.
 type KernelCombinedCaptureMetadataSchema string
+
+// KernelDpopProof defines model for KernelDpopProof.
+type KernelDpopProof struct {
+	Body struct {
+		ActionHash      string                                                   `json:"action_hash"`
+		AgentKey        CapabilityGovernedApprovalTokenGovernedApprovalPublicKey `json:"agent_key"`
+		CapabilityId    string                                                   `json:"capability_id"`
+		IssuedAt        int64                                                    `json:"issued_at"`
+		Nonce           string                                                   `json:"nonce"`
+		ReplayAuthority *struct {
+			DestinationStoreUuid openapi_types.UUID `json:"destination_store_uuid"`
+			DpopAuthorityId      string             `json:"dpop_authority_id"`
+			ExpectationId        string             `json:"expectation_id"`
+			MaxClockSkewSecs     int64              `json:"max_clock_skew_secs"`
+			ProofTtlSecs         int64              `json:"proof_ttl_secs"`
+		} `json:"replay_authority,omitempty"`
+		Schema     KernelDpopProofBodySchema `json:"schema"`
+		ToolName   string                    `json:"tool_name"`
+		ToolServer string                    `json:"tool_server"`
+	} `json:"body"`
+	Signature CapabilityGovernedApprovalTokenGovernedApprovalSignature `json:"signature"`
+}
+
+// KernelDpopProofBodySchema defines model for KernelDpopProof.Body.Schema.
+type KernelDpopProofBodySchema string
 
 // KernelExecutionNonce defines model for KernelExecutionNonce.
 type KernelExecutionNonce struct {
@@ -6049,11 +6092,11 @@ type SecurityCageInitPlanV2ResourceLimitsNofileSoft int64
 
 // SecurityCageInitPlanV2SeccompPlan defines model for SecurityCageInitPlanV2SeccompPlan.
 type SecurityCageInitPlanV2SeccompPlan struct {
-	AllowedSyscalls     []string                                                     `json:"allowed_syscalls"`
-	Architecture        SecurityCageInitPlanV2SeccompPlanArchitecture                `json:"architecture"`
-	ArgumentConstraints map[string][]SecurityCageInitPlanV2SyscallArgumentConstraint `json:"argument_constraints"`
-	DefaultAction       SecurityCageInitPlanV2SeccompPlanDefaultAction               `json:"default_action"`
-	Profile             SecurityCageInitPlanV2SeccompPlanProfile                     `json:"profile"`
+	AllowedSyscalls     []string                                                       `json:"allowed_syscalls"`
+	Architecture        SecurityCageInitPlanV2SeccompPlanArchitecture                  `json:"architecture"`
+	ArgumentConstraints map[string][][]SecurityCageInitPlanV2SyscallArgumentConstraint `json:"argument_constraints"`
+	DefaultAction       SecurityCageInitPlanV2SeccompPlanDefaultAction                 `json:"default_action"`
+	Profile             SecurityCageInitPlanV2SeccompPlanProfile                       `json:"profile"`
 }
 
 // SecurityCageInitPlanV2SeccompPlanArchitecture defines model for SecurityCageInitPlanV2SeccompPlan.Architecture.
@@ -7623,6 +7666,7 @@ type SecurityResponsePlanV1 struct {
 	ApprovalRequirement     SecurityResponsePlanV1ApprovalRequirement `json:"approval_requirement"`
 	CreatedAtUnixMs         SecurityResponsePlanV1Time                `json:"created_at_unix_ms"`
 	Effects                 []SecurityResponseEffectV1                `json:"effects"`
+	Execution               SecurityResponsePlanV1ExecutionBinding    `json:"execution"`
 	ExpiresAtUnixMs         SecurityResponsePlanV1Time                `json:"expires_at_unix_ms"`
 	OperatorCapability      SecurityResponsePlanV1OperatorCapability  `json:"operator_capability"`
 	PlanHash                SecurityResponsePlanV1Digest              `json:"plan_hash"`
@@ -7661,6 +7705,18 @@ type SecurityResponsePlanV1ApprovalRequirement1ApprovalType string
 
 // SecurityResponsePlanV1Digest defines model for SecurityResponsePlanV1Digest.
 type SecurityResponsePlanV1Digest = []int64
+
+// SecurityResponsePlanV1ExecutionBinding defines model for SecurityResponsePlanV1ExecutionBinding.
+type SecurityResponsePlanV1ExecutionBinding struct {
+	Mode          SecurityResponsePlanV1ExecutionBindingMode          `json:"mode"`
+	SchemaVersion SecurityResponsePlanV1ExecutionBindingSchemaVersion `json:"schema_version"`
+}
+
+// SecurityResponsePlanV1ExecutionBindingMode defines model for SecurityResponsePlanV1ExecutionBinding.Mode.
+type SecurityResponsePlanV1ExecutionBindingMode string
+
+// SecurityResponsePlanV1ExecutionBindingSchemaVersion defines model for SecurityResponsePlanV1ExecutionBinding.SchemaVersion.
+type SecurityResponsePlanV1ExecutionBindingSchemaVersion int64
 
 // SecurityResponsePlanV1Identifier defines model for SecurityResponsePlanV1Identifier.
 type SecurityResponsePlanV1Identifier = string

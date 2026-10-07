@@ -1,0 +1,6 @@
+{
+  "exit_code": 1,
+  "seconds": 6.02,
+  "artifacts": "/home/connor/backbay/arc-agentic-work-plan/examples/hello-drogon/.artifacts/runtime-probe-nqpsd1k2",
+  "scope": "Actual updated smoke runtime tail with existing C++ build and immutable CLI; not the complete build gate"
+}

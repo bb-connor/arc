@@ -1,0 +1,115 @@
+   Compiling chio-kernel v0.1.0 (/tmp/chio-paper-security-integration/crates/kernel/chio-kernel)
+error[E0425]: cannot find value `invalid` in this scope
+   --> /tmp/chio-paper-security-integration/crates/kernel/chio-kernel/src/tool_outcome/execution_evidence.rs:210:18
+    |
+210 |         .map_err(invalid)?,
+    |                  ^^^^^^^ not found in this scope
+    |
+note: these functions exist but are inaccessible
+   --> /tmp/chio-paper-security-integration/crates/kernel/chio-kernel/src/admission_operation/authority_profile.rs:202:1
+    |
+202 | fn invalid(message: &str) -> AdmissionOperationStoreError {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::admission_operation::authority_profile::invalid`: not accessible
+    |
+   ::: /tmp/chio-paper-security-integration/crates/kernel/chio-kernel/src/admission_operation/caller_dispatch_context.rs:205:1
+    |
+205 | fn invalid(error: impl std::fmt::Display) -> AdmissionOperationStoreError {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::admission_operation::caller_dispatch_context::invalid`: not accessible
+    |
+   ::: /tmp/chio-paper-security-integration/crates/kernel/chio-kernel/src/admission_operation/dpop_claim.rs:243:1
+    |
+243 | fn invalid(detail: impl std::fmt::Display) -> Error {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::admission_operation::dpop_claim::invalid`: not accessible
+    |
+   ::: /tmp/chio-paper-security-integration/crates/kernel/chio-kernel/src/admission_operation/execution_nonce.rs:207:1
+    |
+207 | fn invalid(detail: impl std::fmt::Display) -> AdmissionOperationStoreError {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::admission_operation::execution_nonce::invalid`: not accessible
+    |
+   ::: /tmp/chio-paper-security-integration/crates/kernel/chio-kernel/src/admission_operation/governed_approval_claim.rs:241:1
+    |
+241 | fn invalid(detail: impl std::fmt::Display) -> Error {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::admission_operation::governed_approval_claim::invalid`: not accessible
+    |
+   ::: /tmp/chio-paper-security-integration/crates/kernel/chio-kernel/src/admission_operation/governed_approval_replay.rs:310:1
+    |
+310 | fn invalid(message: impl Into<String>) -> Error {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::admission_operation::governed_approval_replay::invalid`: not accessible
+    |
+   ::: /tmp/chio-paper-security-integration/crates/kernel/chio-kernel/src/admission_operation/native_caller_custody.rs:150:1
+    |
+150 | fn invalid(error: impl std::fmt::Display) -> AdmissionOperationStoreError {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::admission_operation::native_caller_custody::invalid`: not accessible
+    |
+   ::: /tmp/chio-paper-security-integration/crates/kernel/chio-kernel/src/admission_operation/native_input_join.rs:184:1
+    |
+184 | fn invalid(error: impl std::fmt::Display) -> AdmissionOperationStoreError {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::admission_operation::native_input_join::invalid`: not accessible
+    |
+   ::: /tmp/chio-paper-security-integration/crates/kernel/chio-kernel/src/admission_operation/native_output_join.rs:173:1
+    |
+173 | fn invalid(error: impl std::fmt::Display) -> AdmissionOperationStoreError {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::admission_operation::native_output_join::invalid`: not accessible
+    |
+   ::: /tmp/chio-paper-security-integration/crates/kernel/chio-kernel/src/admission_operation/retained_request.rs:453:1
+    |
+453 | fn invalid(detail: impl std::fmt::Display) -> AdmissionOperationStoreError {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::admission_operation::retained_request::invalid`: not accessible
+    |
+   ::: /tmp/chio-paper-security-integration/crates/kernel/chio-kernel/src/admission_operation/runtime_replay.rs:246:1
+    |
+246 | fn invalid(detail: &str) -> AdmissionOperationStoreError {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::admission_operation::runtime_replay::invalid`: not accessible
+    |
+   ::: /tmp/chio-paper-security-integration/crates/kernel/chio-kernel/src/dpop/authority.rs:224:1
+    |
+224 | fn invalid(detail: impl std::fmt::Display) -> KernelError {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::dpop::authority::invalid`: not accessible
+    |
+   ::: /tmp/chio-paper-security-integration/crates/kernel/chio-kernel/src/dpop/replay_source.rs:274:1
+    |
+274 | fn invalid(message: impl Into<String>) -> KernelError {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::dpop::replay_source::invalid`: not accessible
+    |
+   ::: /tmp/chio-paper-security-integration/crates/kernel/chio-kernel/src/kernel/admission_coordinator/federation_context.rs:192:1
+    |
+192 | fn invalid(reason: &str) -> KernelError {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::kernel::admission_coordinator::federation_context::invalid`: not accessible
+    |
+   ::: /tmp/chio-paper-security-integration/crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_acquisition.rs:333:1
+    |
+333 | fn invalid(detail: &str) -> KernelError {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::kernel::admission_coordinator::native_acquisition::invalid`: not accessible
+    |
+   ::: /tmp/chio-paper-security-integration/crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress.rs:595:1
+    |
+595 | fn invalid(detail: &str) -> KernelError {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::kernel::admission_coordinator::native_egress::invalid`: not accessible
+    |
+   ::: /tmp/chio-paper-security-integration/crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_output.rs:405:1
+    |
+405 | fn invalid(message: &str) -> KernelError {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::kernel::admission_coordinator::native_output::invalid`: not accessible
+    |
+   ::: /tmp/chio-paper-security-integration/crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller.rs:492:1
+    |
+492 | fn invalid(reason: impl Into<String>) -> KernelError {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::kernel::admission_coordinator::return_context::caller::invalid`: not accessible
+    |
+   ::: /tmp/chio-paper-security-integration/crates/kernel/chio-kernel/src/kernel/admission_coordinator/supplemental_participant.rs:106:1
+    |
+106 | fn invalid(message: &str) -> KernelError {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::kernel::admission_coordinator::supplemental_participant::invalid`: not accessible
+    |
+   ::: /tmp/chio-paper-security-integration/crates/kernel/chio-kernel/src/kernel/credential_reservation/native_dispatch.rs:233:1
+    |
+233 | fn invalid(message: &str) -> KernelError {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::kernel::credential_reservation::native_dispatch::invalid`: not accessible
+    |
+   ::: /tmp/chio-paper-security-integration/crates/kernel/chio-kernel/src/tool_outcome/caller_delivery.rs:104:1
+    |
+104 | fn invalid() -> ToolOutcomeError {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::tool_outcome::caller_delivery::invalid`: not accessible
+
+For more information about this error, try `rustc --explain E0425`.
+error: could not compile `chio-kernel` (lib) due to 1 previous error

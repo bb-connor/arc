@@ -1,0 +1,23 @@
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/kernel/chio-kernel/src/kernel/credential_reservation/legacy_nonce.rs"
+rust_symbols = [
+  "LegacyExecutionNonce",
+  "LegacyExecutionNonce::discard_unconsumed",
+  "LegacyExecutionNonce::disposition",
+  "DispatchCredentialReservation::reserve_legacy_execution_nonce_at_effect_boundary",
+  "rejected",
+]
+normalized_sha256 = "9f364eee8cdf97d2296661cab7664485a7bc867a06ab796d64bcbfe2773ced41"
+symbol_sha256 = [
+  { symbol = "LegacyExecutionNonce", sha256 = "e0fc511398e13e6b3f9eb5f7214f03502d9d57c771598adf1b14f15312213c29" },
+  { symbol = "LegacyExecutionNonce::discard_unconsumed", sha256 = "590d25843491d45b42a3d73ad8169432c419c0b51b6aeb0132f3655bfb27ab2a" },
+  { symbol = "LegacyExecutionNonce::disposition", sha256 = "846a47d154a75d48db874b787413e0ddaaf6945058bbdf0a50db08924400fdb1" },
+  { symbol = "DispatchCredentialReservation::reserve_legacy_execution_nonce_at_effect_boundary", sha256 = "db6a1190089be2a36c7160ecb561df5ed238d3ef0194faccb4eac49459359652" },
+  { symbol = "rejected", sha256 = "02025014f264bb14805e7c57a196165b8cd72b5461aed584aa66762a5f3f9de5" },
+]
+
+# The native capture refusal is a lifecycle abstraction anchor, not a proof of
+# SQLite transactions, physical hold ownership or completed native activation.

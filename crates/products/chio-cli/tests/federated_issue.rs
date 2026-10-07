@@ -185,8 +185,8 @@ fn make_receipt(
     subject_key: &str,
     issuer_key: &str,
     timestamp: u64,
+    kernel_kp: &Keypair,
 ) -> ChioReceipt {
-    let kernel_kp = Keypair::generate();
     ChioReceipt::sign(
         ChioReceiptBody {
             id: id.to_string(),
@@ -221,7 +221,7 @@ fn make_receipt(
             kernel_key: kernel_kp.public_key(),
             bbs_projection_version: None,
         },
-        &kernel_kp,
+        kernel_kp,
     )
     .expect("sign receipt")
 }
@@ -273,6 +273,7 @@ fn seed_subject_history(
             &subject_key,
             &issuer_key,
             1_700_000_000,
+            &Keypair::generate(),
         ))
         .expect("append first receipt");
     receipt_store
@@ -282,6 +283,7 @@ fn seed_subject_history(
             &subject_key,
             &issuer_key,
             1_700_086_500,
+            &Keypair::generate(),
         ))
         .expect("append second receipt");
 
@@ -1642,14 +1644,13 @@ fn trust_service_federated_issue_supports_multi_hop_imported_upstream_parent() {
         .expect("first anchor id")
         .to_string();
 
-    let authority_public_key = Keypair::from_seed_hex(
+    let authority_keypair = Keypair::from_seed_hex(
         fs::read_to_string(&shared_signer_seed_path)
             .expect("read shared signer seed")
             .trim(),
     )
-    .expect("shared signer keypair")
-    .public_key()
-    .to_hex();
+    .expect("shared signer keypair");
+    let authority_public_key = authority_keypair.public_key().to_hex();
     {
         let store = SqliteReceiptStore::open(&a_receipt_db_path).expect("open a receipt store");
         store
@@ -1659,6 +1660,7 @@ fn trust_service_federated_issue_supports_multi_hop_imported_upstream_parent() {
                 &subject_hex,
                 &authority_public_key,
                 1_700_100_000,
+                &authority_keypair,
             ))
             .expect("append federated hop receipt");
     }
@@ -1678,6 +1680,10 @@ fn trust_service_federated_issue_supports_multi_hop_imported_upstream_parent() {
             a_receipt_db_path.to_str().expect("a receipt db path"),
             "evidence",
             "export",
+            "--kernel-seed-file",
+            shared_signer_seed_path
+                .to_str()
+                .expect("shared signer seed path"),
             "--output",
             evidence_package_dir.to_str().expect("evidence package dir"),
             "--capability",
@@ -1738,6 +1744,8 @@ fn trust_service_federated_issue_supports_multi_hop_imported_upstream_parent() {
             service_token_b,
             "evidence",
             "import",
+            "--trusted-kernel-pubkey",
+            &authority_public_key,
             "--input",
             evidence_package_dir
                 .to_str()

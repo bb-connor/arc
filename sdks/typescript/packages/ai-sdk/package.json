@@ -31,7 +31,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "ai": "^5.0.0",
+    "ai": "^5.0.210",
     "typescript": "~5.7.0",
     "vitest": "^4.1.11",
     "zod": "^3.23.8"
@@ -40,7 +40,8 @@
     "vite": {
       ".": "7.3.5",
       "esbuild": "0.28.1"
-    }
+    },
+    "source-map-js": "1.2.2"
   },
   "publishConfig": {
     "access": "public"

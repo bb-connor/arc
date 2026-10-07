@@ -1,0 +1,930 @@
+{
+  "schema": "chio.local-registered-work-evidence.v1",
+  "createdAtUTC": "2026-09-15T02:29:33.269643+00:00",
+  "baseCommit": "946e9f1cc7a16edc12a44d87960ed87c49348faa",
+  "branch": "feat/funded-native-admission",
+  "status": "qualified locally; source-bound candidate, no hosted or release qualification",
+  "scope": "Four registered native funded artifact families and original Finding acceptance requirements enforced by exact verifier-derived assessment",
+  "profile": "chio.experimental.local-confirmed-funding.v1",
+  "sourceObjects": {
+    "crates": "4d8f45e8efbf2d22c68e7c9645e38af5cf596e37",
+    "examples/federated-work": "8f0f7bc93713d3e170451ec145464bf207710fcd",
+    "examples/funded-work": "0d1dabaa87d2d799ff41bfb88b31d90903cef3b1",
+    "contracts": "58f7afe7d555427c21262458479acc471cd66c3d",
+    "fuzz": "5fc396a603eccfd406026bbbdf02d769729f09bd",
+    "spec": "eed0d9bdefef8add8c2c30dca7cbfa94a49c209a",
+    "formal": "fa7e1f4be462a208596071d5ad5bbf3773cf830f",
+    "Cargo.toml": "f622b684573a9e01d2807f6eb95a8f74bfdb6b23",
+    "Cargo.lock": "3beee23ddc1b00265130dc87b135da0b1cc2a0a3",
+    "rust-toolchain.toml": "b1dd491cdce6f8b98cfe02f6807980c0dfe48784",
+    "scripts": "97dd52130b59988086f7f50c9bfa8a44246dc311",
+    "xtask": "82dde61cbe5b4c77858cc05e7d4ad859da151203",
+    "docs/formal": "ab93173349d31f5cc4ef3bea4d7aa3b60fadd1b3"
+  },
+  "sourceBinding": "Source tree objects identify runtime and qualification inputs without a self-referential commit hash. Compare against the containing commit. Changed source hashes are retained separately.",
+  "binarySha256": "294def0d168787acf75c979845b878eb0f73416a6a06ba935bc0d8efb857fbbd",
+  "environment": {
+    "rust": "1.94.1 aarch64-unknown-linux-gnu",
+    "node": "24.16.0",
+    "ganacheBackend": "JavaScript fallback; optional native uWS and bigint bindings unavailable on this Node/architecture",
+    "python": "Python 3.13.13",
+    "pythonDependencies": "examples/federated-work/python_buyer/requirements.txt installed with --require-hashes",
+    "chainId": "31337",
+    "token": "private mock ERC20",
+    "confirmations": "two descendant blocks",
+    "fundingUnitsPerAllocation": 100,
+    "CARGO_TARGET_DIR": "target",
+    "CARGO_BUILD_JOBS": "3",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "RUST_TEST_THREADS": "1",
+    "umask": "022",
+    "coreDumps": "disabled",
+    "pinnedBuyerPython": "Python 3.12.3"
+  },
+  "requiredChecks": [
+    "rust-tests",
+    "rust-chain",
+    "standalone-clippy",
+    "build",
+    "core-tests",
+    "finding-tests",
+    "workspace-clippy",
+    "fuzz-check",
+    "python-buyer",
+    "python-funded",
+    "python-wire",
+    "schema-shapes",
+    "schema-registry",
+    "contract",
+    "node-wire",
+    "wire-cli",
+    "hygiene",
+    "formal-mirrors",
+    "standalone-fmt",
+    "workspace-fmt",
+    "proof-coverage",
+    "child",
+    "resolution",
+    "admission",
+    "lifecycle-nominal",
+    "lifecycle-crashes",
+    "lifecycle-deadlines",
+    "native-refunds",
+    "diff-check"
+  ],
+  "counts": {
+    "standaloneRustTests": 55,
+    "findingBridgeTestsIncluded": 10,
+    "coreTypeUnitTests": 390,
+    "findingAndVerifierTests": 268,
+    "findingFixtureRegeneratorsIntentionallyIgnored": 2,
+    "sharedWireByteVectors": 57,
+    "schemaShapeCases": 126,
+    "pythonRegressionTests": 74,
+    "contractAndInventoryTests": 19,
+    "nodeCanonicalWireTests": 2,
+    "baselineOwnedProcessScenarios": 43,
+    "additionalRequiredFacetChainScenarios": 2,
+    "totalOwnedChainAndProcessScenarios": 45,
+    "totalSIGKILL": 36
+  },
+  "artifacts": [
+    {
+      "path": "registered-work-evidence/absent-complete.json",
+      "sha256": "4744d55e91df8b10376c92728b11300246771ab8015fc492a504d1d731b74328",
+      "bytes": 3246
+    },
+    {
+      "path": "registered-work-evidence/absent-refund-after-broadcast.json",
+      "sha256": "923bbe1d755be360c87c9f4f0a9e18ce3f19f24fa9c945747c68cf646b811f4f",
+      "bytes": 3863
+    },
+    {
+      "path": "registered-work-evidence/admission.log",
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_smoke.py"
+      ],
+      "startedAt": "2026-09-15T02:15:28.879146+00:00",
+      "completedAt": "2026-09-15T02:17:28.007360+00:00",
+      "elapsedSeconds": 119.128,
+      "exitCode": 0,
+      "sha256": "eb3997f4174e13e6208f30b18a97269fd84213f85546a71ec091743db11e82f2",
+      "rawSha256": "eb3997f4174e13e6208f30b18a97269fd84213f85546a71ec091743db11e82f2",
+      "bytes": 410,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "binarySha256": "294def0d168787acf75c979845b878eb0f73416a6a06ba935bc0d8efb857fbbd"
+    },
+    {
+      "path": "registered-work-evidence/after-hold.json",
+      "sha256": "bbad18f07fe75024026425f2e3678654274cc1a62bd6151fc860be78b91721df",
+      "bytes": 2246
+    },
+    {
+      "path": "registered-work-evidence/after-stage.json",
+      "sha256": "6e70043b69dc09bf61b59307a2079862286b268f34e430c5bc7216af846ce3f1",
+      "bytes": 2009
+    },
+    {
+      "path": "registered-work-evidence/after-tool.json",
+      "sha256": "098030c33e77345601ff9d328674ef2fcd2905bac08755f6900f99cd4b22a230",
+      "bytes": 2161
+    },
+    {
+      "path": "registered-work-evidence/before-bind.json",
+      "sha256": "516120613d13f30718658307b82ede429f1e04478356ac22b38650fe41a79e42",
+      "bytes": 2038
+    },
+    {
+      "path": "registered-work-evidence/build.log",
+      "command": [
+        "cargo",
+        "build",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--locked"
+      ],
+      "startedAt": "2026-09-15T02:15:07.256559+00:00",
+      "completedAt": "2026-09-15T02:15:28.001386+00:00",
+      "elapsedSeconds": 20.745,
+      "exitCode": 0,
+      "sha256": "28be159eb660e6080020fd6b3d5cb4d2caae8333434999db523ae665e00d83f3",
+      "rawSha256": "28be159eb660e6080020fd6b3d5cb4d2caae8333434999db523ae665e00d83f3",
+      "bytes": 171,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "registered-work-evidence/child.log",
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_child.py"
+      ],
+      "startedAt": "2026-09-15T02:15:28.869427+00:00",
+      "completedAt": "2026-09-15T02:18:19.344727+00:00",
+      "elapsedSeconds": 170.475,
+      "exitCode": 0,
+      "sha256": "3c7fa5cdbb785c550d73379f098867d5cad0aac7d8e07d7f0974feec45a9b815",
+      "rawSha256": "3c7fa5cdbb785c550d73379f098867d5cad0aac7d8e07d7f0974feec45a9b815",
+      "bytes": 233,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "binarySha256": "294def0d168787acf75c979845b878eb0f73416a6a06ba935bc0d8efb857fbbd"
+    },
+    {
+      "path": "registered-work-evidence/contract.log",
+      "command": [
+        "node",
+        "--test",
+        "contracts/scripts/work-claim-escrow.test.mjs",
+        "contracts/scripts/work-claim-native-inventory.test.mjs"
+      ],
+      "startedAt": "2026-09-15T02:00:40.749499+00:00",
+      "completedAt": "2026-09-15T02:01:54.525595+00:00",
+      "elapsedSeconds": 73.776,
+      "exitCode": 0,
+      "sha256": "e1254791ec7022a80abadb06c703d70d94c768ec93f7168b78883d02355ba100",
+      "rawSha256": "e1254791ec7022a80abadb06c703d70d94c768ec93f7168b78883d02355ba100",
+      "bytes": 3172,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "registered-work-evidence/core-tests.log",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-core-types",
+        "--lib",
+        "--",
+        "--test-threads=1"
+      ],
+      "startedAt": "2026-09-15T02:15:28.044363+00:00",
+      "completedAt": "2026-09-15T02:16:01.665747+00:00",
+      "elapsedSeconds": 33.621,
+      "exitCode": 0,
+      "sha256": "1804975c16ef2cb3b4e9bb5781638d6f8dd54924726a0189126a31bc709ce959",
+      "rawSha256": "c45c3012f71e47c7441d07a3c076ec0eaaaf1e27de9ef5a828a57919b3ca2225",
+      "bytes": 31863,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "registered-work-evidence/diff-check.log",
+      "command": [
+        "git",
+        "diff",
+        "--cached",
+        "--check"
+      ],
+      "startedAt": "2026-09-15T02:29:32.492513+00:00",
+      "completedAt": "2026-09-15T02:29:32.546639+00:00",
+      "elapsedSeconds": 0.054,
+      "exitCode": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "registered-work-evidence/earned-child-none.json",
+      "sha256": "4f0133e189a51bc08a04591fca7c94f7528538c188cebde44ce6030950b32d52",
+      "bytes": 9076
+    },
+    {
+      "path": "registered-work-evidence/earned-child-pay-after-broadcast.json",
+      "sha256": "42f2599bf9332a85c38a9202b53e7e086525c834578bfb351e8a2e37be3bafca",
+      "bytes": 9073
+    },
+    {
+      "path": "registered-work-evidence/earned-child-pay-after-observation.json",
+      "sha256": "af4e6bd9e6b0171f10b7187e728fc036014e4d5ef2b3039d61602f72dec276f3",
+      "bytes": 9073
+    },
+    {
+      "path": "registered-work-evidence/earned-child-pay-after-prepare.json",
+      "sha256": "390f466f88e15daa3f77145e9a9ef06b8769718f4ca6c1573539250dc50fa245",
+      "bytes": 9073
+    },
+    {
+      "path": "registered-work-evidence/finding-tests.log",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-finding",
+        "-p",
+        "chio-finding-verifier",
+        "--",
+        "--test-threads=1"
+      ],
+      "startedAt": "2026-09-15T02:16:01.774141+00:00",
+      "completedAt": "2026-09-15T02:18:16.451640+00:00",
+      "elapsedSeconds": 134.677,
+      "exitCode": 0,
+      "sha256": "37f4ebb5d87e5d0a9135a240a1056262c4aa128c4a964a2d421d6092c6d0ffa0",
+      "rawSha256": "a4c06dcd94ce17a524f59fd4b4e56d950fd006820ff1821abbaeef307411f72e",
+      "bytes": 24055,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "registered-work-evidence/formal-mirrors.log",
+      "command": [
+        "target/debug/xtask",
+        "check",
+        "formal-mirrors"
+      ],
+      "startedAt": "2026-09-15T02:00:41.369342+00:00",
+      "completedAt": "2026-09-15T02:00:45.714515+00:00",
+      "elapsedSeconds": 4.345,
+      "exitCode": 0,
+      "sha256": "039c435a81d3345f94a044979165f19c28dda441658640c4061aa8126df0af86",
+      "rawSha256": "039c435a81d3345f94a044979165f19c28dda441658640c4061aa8126df0af86",
+      "bytes": 41,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "registered-work-evidence/fuzz-check.log",
+      "command": [
+        "cargo",
+        "check",
+        "--manifest-path",
+        "fuzz/Cargo.toml",
+        "--bins",
+        "--locked",
+        "--offline"
+      ],
+      "startedAt": "2026-09-15T02:27:19.083861+00:00",
+      "completedAt": "2026-09-15T02:29:12.925502+00:00",
+      "elapsedSeconds": 113.842,
+      "exitCode": 0,
+      "sha256": "c3152c1b10478baf8cf5bc254adc83d8561c17fb7e7901991ba29a2347c7ff6c",
+      "rawSha256": "c3152c1b10478baf8cf5bc254adc83d8561c17fb7e7901991ba29a2347c7ff6c",
+      "bytes": 5959,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "registered-work-evidence/happy.json",
+      "sha256": "721aaafe0d1c6f6807ee3fa896ba7a2ee90eaa1a340c79ab703b4952f1e781d6",
+      "bytes": 2806
+    },
+    {
+      "path": "registered-work-evidence/hygiene.log",
+      "command": [
+        "python3",
+        "scripts/check-rust-file-hygiene.py"
+      ],
+      "startedAt": "2026-09-15T02:00:41.289858+00:00",
+      "completedAt": "2026-09-15T02:00:42.650803+00:00",
+      "elapsedSeconds": 1.361,
+      "exitCode": 0,
+      "sha256": "4b2ea2d1c58f4d715543b81089960c325aab1578b9cbd9f6011565bb07a10ba8",
+      "rawSha256": "4b2ea2d1c58f4d715543b81089960c325aab1578b9cbd9f6011565bb07a10ba8",
+      "bytes": 43411,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "registered-work-evidence/lifecycle-crashes.log",
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_lifecycle.py",
+        "FundedLifecycle.test_sigkill_around_original_claim_decision_and_money"
+      ],
+      "startedAt": "2026-09-15T02:15:28.896711+00:00",
+      "completedAt": "2026-09-15T02:21:58.519360+00:00",
+      "elapsedSeconds": 389.623,
+      "exitCode": 0,
+      "sha256": "c812fc45b52411706af10d75a263fb653a0a8f59548458d88d5c900a690d1e4a",
+      "rawSha256": "c812fc45b52411706af10d75a263fb653a0a8f59548458d88d5c900a690d1e4a",
+      "bytes": 241,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "binarySha256": "294def0d168787acf75c979845b878eb0f73416a6a06ba935bc0d8efb857fbbd"
+    },
+    {
+      "path": "registered-work-evidence/lifecycle-deadlines.log",
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_lifecycle.py",
+        "FundedLifecycle.test_deadline_loss_refunds_even_with_retained_unrecorded_artifacts"
+      ],
+      "startedAt": "2026-09-15T02:15:28.876270+00:00",
+      "completedAt": "2026-09-15T02:17:44.829680+00:00",
+      "elapsedSeconds": 135.953,
+      "exitCode": 0,
+      "sha256": "64cd9920c88918b726b2d32b295c8d673a7c4e5d27c2ee5d157d72490f0cc9d6",
+      "rawSha256": "64cd9920c88918b726b2d32b295c8d673a7c4e5d27c2ee5d157d72490f0cc9d6",
+      "bytes": 267,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "binarySha256": "294def0d168787acf75c979845b878eb0f73416a6a06ba935bc0d8efb857fbbd"
+    },
+    {
+      "path": "registered-work-evidence/lifecycle-nominal.log",
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_lifecycle.py",
+        "FundedLifecycle.test_payout_rejection_and_missing_work_timeouts"
+      ],
+      "startedAt": "2026-09-15T02:15:28.881554+00:00",
+      "completedAt": "2026-09-15T02:17:32.182181+00:00",
+      "elapsedSeconds": 123.301,
+      "exitCode": 0,
+      "sha256": "e506d44adf83e755f9c658c45fc17ccd03c96d334410222317e312d25fa56578",
+      "rawSha256": "e506d44adf83e755f9c658c45fc17ccd03c96d334410222317e312d25fa56578",
+      "bytes": 229,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "binarySha256": "294def0d168787acf75c979845b878eb0f73416a6a06ba935bc0d8efb857fbbd"
+    },
+    {
+      "path": "registered-work-evidence/native-refunds.log",
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_lifecycle.py",
+        "FundedLifecycle.test_refund_preserves_unknown_execution_and_unwinds_undispatched_hold"
+      ],
+      "startedAt": "2026-09-15T02:15:28.902862+00:00",
+      "completedAt": "2026-09-15T02:16:22.382206+00:00",
+      "elapsedSeconds": 53.479,
+      "exitCode": 0,
+      "sha256": "e32a348c9f0672c594125d858d1c0d07aba75473c20fd8232cbb9bbe100e0a76",
+      "rawSha256": "e32a348c9f0672c594125d858d1c0d07aba75473c20fd8232cbb9bbe100e0a76",
+      "bytes": 272,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "binarySha256": "294def0d168787acf75c979845b878eb0f73416a6a06ba935bc0d8efb857fbbd"
+    },
+    {
+      "path": "registered-work-evidence/node-wire.log",
+      "command": [
+        "node",
+        "--test",
+        "contracts/scripts/work-claim-native-wire.test.mjs"
+      ],
+      "startedAt": "2026-09-15T02:04:23.397021+00:00",
+      "completedAt": "2026-09-15T02:04:23.728344+00:00",
+      "elapsedSeconds": 0.331,
+      "exitCode": 0,
+      "sha256": "21d3f255432c88f1b46c69275071c0dbe5464065e8a3c9bbc9a996c5a706a5e0",
+      "rawSha256": "21d3f255432c88f1b46c69275071c0dbe5464065e8a3c9bbc9a996c5a706a5e0",
+      "bytes": 298,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "registered-work-evidence/pay-after-claim.json",
+      "sha256": "92e1558efd6fd85e00b00f1dba2cbcad4b106235a8b75f3f73183aa327535aa3",
+      "bytes": 7474
+    },
+    {
+      "path": "registered-work-evidence/pay-after-decision.json",
+      "sha256": "3eb40dbe29ace98722714d41a5a2c7d0e1475e7cc0f31f23acdb9481906c3426",
+      "bytes": 7477
+    },
+    {
+      "path": "registered-work-evidence/pay-after-recorded-decision.json",
+      "sha256": "bfda7d5937558f2a397dab36a3e6f96e26134df9edfdf76ab8944976dd3b4816",
+      "bytes": 7486
+    },
+    {
+      "path": "registered-work-evidence/pay-after-submission.json",
+      "sha256": "ac63f4ac6446f59c0df5156334264fcead439a46ffaee809a695efbc5e57b4b9",
+      "bytes": 7479
+    },
+    {
+      "path": "registered-work-evidence/pay-claim-after-broadcast.json",
+      "sha256": "bd0802c549087655b2c4e22db89fadbb9651f9cc6e4ed3b4070a0ae02c201725",
+      "bytes": 7484
+    },
+    {
+      "path": "registered-work-evidence/pay-claim-after-prepare.json",
+      "sha256": "b33e16445089080df34d7dfa68cca8607bc19070ebca575eaa7a3aeeaccacd83",
+      "bytes": 7482
+    },
+    {
+      "path": "registered-work-evidence/pay-complete.json",
+      "sha256": "a88335c69def38ce2334d9b34303c5a7ac871c43334865e4e1691d4a48ae5d86",
+      "bytes": 6847
+    },
+    {
+      "path": "registered-work-evidence/pay-decision-after-broadcast.json",
+      "sha256": "f661af0144802680037ddf13e6fa406ea10a997c59ac18d95b0bc7abec08613a",
+      "bytes": 7487
+    },
+    {
+      "path": "registered-work-evidence/pay-decision-after-prepare.json",
+      "sha256": "93cb50cb01478bdb08b54f040ab721514071a33472ec5f727bb4b21e67c10aae",
+      "bytes": 7485
+    },
+    {
+      "path": "registered-work-evidence/pay-expired-after-decision.json",
+      "sha256": "4df8d04ab1aafb83e25fbc340fa6632a82b69b83d9afea97daa8d68336c81871",
+      "bytes": 4110
+    },
+    {
+      "path": "registered-work-evidence/pay-expired-after-submission.json",
+      "sha256": "00e257736168504324ebb77d74bf199221d839fe1a30dec691fe4884efcbf51c",
+      "bytes": 3869
+    },
+    {
+      "path": "registered-work-evidence/pay-expired-claim-after-prepare.json",
+      "sha256": "66d6ff6710e395f94e91011860164447f90c9c6a1e37d73bed6c15de40dd6d55",
+      "bytes": 3956
+    },
+    {
+      "path": "registered-work-evidence/pay-expired-decision-after-prepare.json",
+      "sha256": "e10a0b99919cc9f6249832d9d30e9bf717d0e57629846766a691124ee4079ebd",
+      "bytes": 4202
+    },
+    {
+      "path": "registered-work-evidence/pay-pay-after-broadcast.json",
+      "sha256": "ce121dc703278c2805d4c92b17dcfb946c704c76c5664969b59c7bb064cc979b",
+      "bytes": 7482
+    },
+    {
+      "path": "registered-work-evidence/pay-pay-after-observation.json",
+      "sha256": "3a8d3fe1ef53d35f14a5ab68448429e094fbe14bbf4fba98fef2cb9d236d25d5",
+      "bytes": 7484
+    },
+    {
+      "path": "registered-work-evidence/pay-pay-after-prepare.json",
+      "sha256": "53ef7aa07036f4d876fb4fd7f138160363d1fd2dc8049df8ddd6f8279fa89abe",
+      "bytes": 7480
+    },
+    {
+      "path": "registered-work-evidence/preexpired-complete.json",
+      "sha256": "14874c1813232caa80c716bf3b3c29bea821d603312b8ce451ff66e2353e240e",
+      "bytes": 3225
+    },
+    {
+      "path": "registered-work-evidence/proof-coverage.log",
+      "command": [
+        "target/debug/xtask",
+        "gen",
+        "proof-coverage",
+        "--check"
+      ],
+      "startedAt": "2026-09-15T02:12:16.549612+00:00",
+      "completedAt": "2026-09-15T02:12:22.281848+00:00",
+      "elapsedSeconds": 5.732,
+      "exitCode": 0,
+      "sha256": "f6f7e4ae12d9b3e0a3a8053be9604fdeebda525034915e4aecdd99f11c985c60",
+      "rawSha256": "f6f7e4ae12d9b3e0a3a8053be9604fdeebda525034915e4aecdd99f11c985c60",
+      "bytes": 48,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "registered-work-evidence/proof-update.log",
+      "command": [
+        "target/debug/xtask",
+        "gen",
+        "proof-coverage"
+      ],
+      "startedAt": "2026-09-15T02:01:57.184640+00:00",
+      "completedAt": "2026-09-15T02:02:02.942951+00:00",
+      "elapsedSeconds": 5.758,
+      "exitCode": 0,
+      "sha256": "caa1f58a0fb4b5dce3569e0273bf4a472ae9f8e893b562b8938738597877d446",
+      "rawSha256": "caa1f58a0fb4b5dce3569e0273bf4a472ae9f8e893b562b8938738597877d446",
+      "bytes": 103,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "role": "Source inventory regeneration; validated by final proof-coverage check"
+    },
+    {
+      "path": "registered-work-evidence/python-buyer.log",
+      "command": [
+        "/tmp/chio-python31-locked-venv/bin/python",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "examples/federated-work/python_buyer",
+        "-v"
+      ],
+      "startedAt": "2026-09-15T02:00:40.819279+00:00",
+      "completedAt": "2026-09-15T02:00:42.319193+00:00",
+      "elapsedSeconds": 1.5,
+      "exitCode": 0,
+      "sha256": "53fa5678e5f6958a1f9510ecb3223fb92adeeb3903a5ed708baa29cf8b3659de",
+      "rawSha256": "53fa5678e5f6958a1f9510ecb3223fb92adeeb3903a5ed708baa29cf8b3659de",
+      "bytes": 4637,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "registered-work-evidence/python-funded.log",
+      "command": [
+        "/tmp/chio-python31-locked-venv/bin/python",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "examples/funded-work",
+        "-v"
+      ],
+      "startedAt": "2026-09-15T02:00:40.903920+00:00",
+      "completedAt": "2026-09-15T02:00:51.150545+00:00",
+      "elapsedSeconds": 10.247,
+      "exitCode": 0,
+      "sha256": "e05bc69928273605cc61f56ca72aad45b4e647b8a3724aabde5f7215cad17cb4",
+      "rawSha256": "e05bc69928273605cc61f56ca72aad45b4e647b8a3724aabde5f7215cad17cb4",
+      "bytes": 5977,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "registered-work-evidence/python-wire.log",
+      "command": [
+        "/tmp/chio-python31-locked-venv/bin/python",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "examples/federated-work",
+        "-p",
+        "test_funded_wire.py",
+        "-v"
+      ],
+      "startedAt": "2026-09-15T02:00:40.958491+00:00",
+      "completedAt": "2026-09-15T02:00:41.125456+00:00",
+      "elapsedSeconds": 0.167,
+      "exitCode": 0,
+      "sha256": "ae22f2469926e36aed118bb4f2a93638f19653e3c41efc125598beca567192d1",
+      "rawSha256": "ae22f2469926e36aed118bb4f2a93638f19653e3c41efc125598beca567192d1",
+      "bytes": 782,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "registered-work-evidence/reject-complete.json",
+      "sha256": "cfbe12095a468972d043a97f5fbed5b961b9cd10bc0e6f2a418ab6033831127b",
+      "bytes": 6975
+    },
+    {
+      "path": "registered-work-evidence/reject-expired-after-decision.json",
+      "sha256": "b7d0fa018cf917616220d652cbbee65f92539bb4d17c930ec120074d06419a3b",
+      "bytes": 4110
+    },
+    {
+      "path": "registered-work-evidence/reject-refund-after-broadcast.json",
+      "sha256": "3f8c1c104aaeb57d346bf131b4602635267511bd94410adc10b67aff43a44cb0",
+      "bytes": 4361
+    },
+    {
+      "path": "registered-work-evidence/reject-refund-after-observation.json",
+      "sha256": "5ddb994b22732ecb7e4a99f2c64b91e486ff429201bd773a23aa5c18d59b5151",
+      "bytes": 4363
+    },
+    {
+      "path": "registered-work-evidence/reject-refund-after-prepare.json",
+      "sha256": "151287de66ed704ecfd745ffd464e1ba92bcdede410fbf40f953a313c226b514",
+      "bytes": 7611
+    },
+    {
+      "path": "registered-work-evidence/required-lineage-unsupported.json",
+      "sha256": "cb838f61d6cbc8f6c37caa21e7d031d7a0dcc5ae544382a1da5688b9291aba08",
+      "bytes": 4827
+    },
+    {
+      "path": "registered-work-evidence/required-receipt-unavailable.json",
+      "sha256": "e6df7300bf5f985a0ac04fae71deebf65fb367ca6c580baaa3f313d602349cee",
+      "bytes": 4839
+    },
+    {
+      "path": "registered-work-evidence/resolution-absent-none.json",
+      "sha256": "b6aa5c45a159bc94be82fdbe68bd84266d216ff3cad4fc647eacffd96485f805",
+      "bytes": 5191
+    },
+    {
+      "path": "registered-work-evidence/resolution-preexpired-none.json",
+      "sha256": "f622a76bfd6699f0ca648531648cc6da47d99cf20852eacc1cc8cd26980412bf",
+      "bytes": 5191
+    },
+    {
+      "path": "registered-work-evidence/resolution-reject-after-resolution-accepted.json",
+      "sha256": "e0d35c2ed034838b9bde01f7428eae1ea3cc984663eabb71ea59c932277181f7",
+      "bytes": 5506
+    },
+    {
+      "path": "registered-work-evidence/resolution-reject-after-resolution-completed.json",
+      "sha256": "7144763a9e40e4c1f92214953e74cf7549dfbb503e293a9b5e72df7f1959e9ed",
+      "bytes": 5506
+    },
+    {
+      "path": "registered-work-evidence/resolution-reject-after-resolution-retained.json",
+      "sha256": "7baf9bd29d813513cc4fb311d5efb7278142afeee32c59e3b7eb3935c26f1817",
+      "bytes": 5506
+    },
+    {
+      "path": "registered-work-evidence/resolution-reject-none.json",
+      "sha256": "e3a7456fabae58afe4d1ce984674a22787d5afb1d423699dc54b5b2db31160fc",
+      "bytes": 5509
+    },
+    {
+      "path": "registered-work-evidence/resolution-unavailable-none.json",
+      "sha256": "9da3a366418247fcabd5609ad52bb94a334b87694eef3fca42515a65714f6098",
+      "bytes": 5350
+    },
+    {
+      "path": "registered-work-evidence/resolution.log",
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_resolution.py"
+      ],
+      "startedAt": "2026-09-15T02:15:28.878841+00:00",
+      "completedAt": "2026-09-15T02:19:05.394901+00:00",
+      "elapsedSeconds": 216.516,
+      "exitCode": 0,
+      "sha256": "b13be16bd2b0734f6d3a307fd5b7bdb27cdfe975599d17ebebfac8e009a24bd6",
+      "rawSha256": "b13be16bd2b0734f6d3a307fd5b7bdb27cdfe975599d17ebebfac8e009a24bd6",
+      "bytes": 418,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "binarySha256": "294def0d168787acf75c979845b878eb0f73416a6a06ba935bc0d8efb857fbbd"
+    },
+    {
+      "path": "registered-work-evidence/review.json",
+      "sha256": "af88489bbe742e01e7706151e24fdc5117134ee4fa856bc1eaea41e56c5178e7",
+      "bytes": 1329
+    },
+    {
+      "path": "registered-work-evidence/rust-chain.log",
+      "command": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--locked",
+        "--",
+        "--ignored",
+        "--test-threads=1"
+      ],
+      "startedAt": "2026-09-15T02:13:30.911790+00:00",
+      "completedAt": "2026-09-15T02:15:01.167788+00:00",
+      "elapsedSeconds": 90.256,
+      "exitCode": 0,
+      "sha256": "14015ad634ad3113e3d16333c1370ac66a85cc42c15b82e39c1dfb49e4f386b7",
+      "rawSha256": "567f1cee4a4764cefcab8a932d8d9ca7537df08dd5e3f8f5e5b1b211d94bfcec",
+      "bytes": 3695,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "registered-work-evidence/rust-initial.log",
+      "command": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--locked",
+        "--",
+        "--test-threads=1"
+      ],
+      "startedAt": "2026-09-15T01:50:16.156878+00:00",
+      "completedAt": "2026-09-15T01:54:37.275575+00:00",
+      "elapsedSeconds": 261.119,
+      "exitCode": 0,
+      "sha256": "ea9ff7574535f48fcc416958fab86d294dbf06e1e481c7d2682ed35fd339e5a2",
+      "rawSha256": "47b60c3d6cf1137be9de7269099c02c1fde0f3a49c9cea1afe7b369e133681e7",
+      "bytes": 10788,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "role": "Supplementary initial regression only; final candidate uses rust-tests and rust-chain"
+    },
+    {
+      "path": "registered-work-evidence/rust-tests.log",
+      "command": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--locked",
+        "--",
+        "--test-threads=1"
+      ],
+      "startedAt": "2026-09-15T02:11:31.068037+00:00",
+      "completedAt": "2026-09-15T02:13:30.854628+00:00",
+      "elapsedSeconds": 119.787,
+      "exitCode": 0,
+      "sha256": "0759c32fff78898c0ccae84ac377b9a022c126aa0a83994cbf0ad92d4d349c73",
+      "rawSha256": "5f431eb6336683c36e8e2ce15505910aab02999e5b41001dbcbe526d29ae0464",
+      "bytes": 6197,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "registered-work-evidence/schema-registry.log",
+      "command": [
+        "bash",
+        "scripts/check-chio-schema-registry.sh"
+      ],
+      "startedAt": "2026-09-15T02:00:41.111312+00:00",
+      "completedAt": "2026-09-15T02:00:41.460845+00:00",
+      "elapsedSeconds": 0.35,
+      "exitCode": 0,
+      "sha256": "f08ca40211ee4cf16919c55a0c548472ee01a0ff6808eadb1e60a66f4aa43553",
+      "rawSha256": "f08ca40211ee4cf16919c55a0c548472ee01a0ff6808eadb1e60a66f4aa43553",
+      "bytes": 33,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "registered-work-evidence/schema-shapes.log",
+      "command": [
+        "env",
+        "CHIO_WORK_PYTHON=/tmp/chio-python31-locked-venv/bin/python",
+        "python3",
+        "scripts/tests/check-registered-work-schemas.py"
+      ],
+      "startedAt": "2026-09-15T02:00:41.030372+00:00",
+      "completedAt": "2026-09-15T02:00:41.580996+00:00",
+      "elapsedSeconds": 0.551,
+      "exitCode": 0,
+      "sha256": "ba150935afe83d28ce87209867e19524be41d17c16039228f4437a18e92520dd",
+      "rawSha256": "ba150935afe83d28ce87209867e19524be41d17c16039228f4437a18e92520dd",
+      "bytes": 138,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "registered-work-evidence/source-at-qualification.json",
+      "sha256": "5732cddc0f206a921c1c0b05444408028dcf7d4b84a8b4d2e146596c2cee3b1e",
+      "bytes": 14702
+    },
+    {
+      "path": "registered-work-evidence/source-preservation.json",
+      "sha256": "9ceeeb0654ada2937f6264c6b992563c6023e04f942086607f4e21b7c73ad26e",
+      "bytes": 222
+    },
+    {
+      "path": "registered-work-evidence/standalone-clippy.log",
+      "command": [
+        "cargo",
+        "clippy",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--all-targets",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "startedAt": "2026-09-15T02:15:01.218716+00:00",
+      "completedAt": "2026-09-15T02:15:07.209392+00:00",
+      "elapsedSeconds": 5.991,
+      "exitCode": 0,
+      "sha256": "2d0db59c19a7a647518fcdf5a749988b3fb1539f3ae70adba54f74b32fae10b6",
+      "rawSha256": "2d0db59c19a7a647518fcdf5a749988b3fb1539f3ae70adba54f74b32fae10b6",
+      "bytes": 170,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "registered-work-evidence/standalone-fmt.log",
+      "command": [
+        "cargo",
+        "fmt",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--",
+        "--check"
+      ],
+      "startedAt": "2026-09-15T02:12:51.227908+00:00",
+      "completedAt": "2026-09-15T02:12:51.535039+00:00",
+      "elapsedSeconds": 0.307,
+      "exitCode": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "registered-work-evidence/unavailable-complete.json",
+      "sha256": "6c0f39f548966d4faca231dbb81d4b1ab41488997425f0d42921bb4ea963c640",
+      "bytes": 3558
+    },
+    {
+      "path": "registered-work-evidence/undispatched-complete.json",
+      "sha256": "c98d4beeec9ba39829a65479d17dcab23cdd2f8d3186182642231afbf8779c60",
+      "bytes": 3712
+    },
+    {
+      "path": "registered-work-evidence/unknown-complete.json",
+      "sha256": "70cfcd39aaafff576d9db44a2ecfb07817309626f4ceaf5a72a451fc69f4a80e",
+      "bytes": 3623
+    },
+    {
+      "path": "registered-work-evidence/wire-cli.log",
+      "command": [
+        "/tmp/chio-python31-locked-venv/bin/python",
+        "-B",
+        "-c",
+        "import hashlib,json,pathlib,subprocess,sys\nsys.path.insert(0,'examples/federated-work')\nimport funded_wire\nmanifest=pathlib.Path('examples/federated-work/fixtures/registered-work/manifest.json')\ncases=json.loads(manifest.read_text())['cases']; shapes=funded_wire.Shapes(); results=[]\nfor case in cases:\n path=manifest.parent/case['file']; raw=path.read_bytes()\n rust=subprocess.run(['target/debug/chio-federated-work','experimental-funded-wire-check',str(path)],capture_output=True,text=True,timeout=10)\n try:\n  python=funded_wire.parse(raw,shapes); accepted=True\n except (ValueError,UnicodeError,OverflowError,RecursionError):\n  python=None; accepted=False\n assert accepted==case['accepted']==(rust.returncode==0),case['name']\n if accepted: assert python==json.loads(rust.stdout),case['name']\n results.append(dict(name=case['name'],accepted=accepted,sha256=hashlib.sha256(raw).hexdigest()))\nprint(json.dumps(dict(cases=len(results),passed=True,authorityVerified=False,results=results),indent=2))\n"
+      ],
+      "startedAt": "2026-09-15T02:15:28.212998+00:00",
+      "completedAt": "2026-09-15T02:15:28.703196+00:00",
+      "elapsedSeconds": 0.49,
+      "exitCode": 0,
+      "sha256": "3fe4a6eeb4bdb91365e0dc5ce273cc87644932bec7b8ad8cf796cce87782f2de",
+      "rawSha256": "3fe4a6eeb4bdb91365e0dc5ce273cc87644932bec7b8ad8cf796cce87782f2de",
+      "bytes": 9285,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "binarySha256": "294def0d168787acf75c979845b878eb0f73416a6a06ba935bc0d8efb857fbbd"
+    },
+    {
+      "path": "registered-work-evidence/workspace-clippy.log",
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--locked",
+        "--offline",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "startedAt": "2026-09-15T02:18:16.499015+00:00",
+      "completedAt": "2026-09-15T02:27:19.033922+00:00",
+      "elapsedSeconds": 542.535,
+      "exitCode": 0,
+      "sha256": "d6153769a57cf73cd665d8b4ff5a3be650f01a120f855b2cc24f9468a467c427",
+      "rawSha256": "d6153769a57cf73cd665d8b4ff5a3be650f01a120f855b2cc24f9468a467c427",
+      "bytes": 16976,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "registered-work-evidence/workspace-fmt.log",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "startedAt": "2026-09-15T02:07:05.888166+00:00",
+      "completedAt": "2026-09-15T02:07:28.165029+00:00",
+      "elapsedSeconds": 22.277,
+      "exitCode": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    }
+  ],
+  "notes": [
+    "Agreement v2 pins the complete Finding context digest and ordered required facets before native funding admission.",
+    "Decision v2 requires exact re-derivation of all thirteen facets at the retained evaluation time.",
+    "Required unavailable or unsupported facets produce no decision or payment; both owned-chain cases refund the original 100-unit allocation.",
+    "Rust unit parser, built Rust CLI and independent Python parser agree on all 57 exact byte vectors. Node encoding matches all four positive Rust artifacts.",
+    "Original operation, hold, allocation and transaction identities survive the 43 baseline process scenarios, including 36 SIGKILL events.",
+    "Finding artifacts remain asserted-class; no receipt/checkpoint, bond, status or runtime evidence bundle is fabricated.",
+    "Formal coverage refreshes source inventory only. Fuzz binaries are checked without a new fuzz campaign or full workspace test run.",
+    "Original paper checkout preserved across all 3688 snapshotted files. Public artifacts exclude private keys, full capabilities and authority databases."
+  ],
+  "remaining": [
+    "Pre-settlement execution evidence that can substantiate required Finding facets without making acceptance depend on its own later payment receipt",
+    "W1 and verified-fix linkage with existing commerce, standing and challenge artifacts",
+    "Disclosure, signing and rotation adversaries; sustained capacity beyond bounded retention",
+    "Independent implementation and independently administered cross-company operators",
+    "Public-chain finality, hosted qualification, external activation and real funds"
+  ]
+}

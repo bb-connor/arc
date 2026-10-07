@@ -1,0 +1,18 @@
+
+running 1 test
+test mutated_approvals_and_artifact_handoffs_never_dispatch ... FAILED
+
+failures:
+
+---- mutated_approvals_and_artifact_handoffs_never_dispatch stdout ----
+
+thread 'mutated_approvals_and_artifact_handoffs_never_dispatch' (1704586) panicked at crates/kernel/chio-kernel/tests/three_owner_composition.rs:287:13:
+signature control never reached cryptographic verification: Some("governed transaction denied: approval token request binding does not match the tool call")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    mutated_approvals_and_artifact_handoffs_never_dispatch
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 6.39s
+

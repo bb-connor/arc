@@ -1,0 +1,163 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/chio-verifiable-work-paper/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/chio-verifiable-work-paper/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/chio-verifiable-work-paper/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-runtime-core v0.1.0 (/tmp/chio-verifiable-work-paper/crates/kernel/chio-runtime-core)
+error[E0599]: no method named `extend_swarm_authority_bundle` found for struct `chio_runtime_core::SqliteRuntimeOrchestrationStore` in the current scope
+  --> crates/kernel/chio-runtime-core/tests/runtime_admission/swarm_evolution.rs:40:11
+   |
+40 |     store.extend_swarm_authority_bundle(&canonical_test_hash(&prior)?, next.clone(), &trusted_swarm_witness_keys())?;
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: there is a method `swarm_authority_bundle` with a similar name, but with different arguments
+  --> crates/kernel/chio-runtime-core/src/store/traits.rs:80:5
+   |
+80 | /     fn swarm_authority_bundle(
+81 | |         &self,
+82 | |         _task_graph_id: &str,
+83 | |     ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
+   | |_______________________________________________________________^
+
+error[E0599]: no method named `swarm_authority_bundle_for_graph` found for struct `chio_runtime_core::SqliteRuntimeOrchestrationStore` in the current scope
+  --> crates/kernel/chio-runtime-core/tests/runtime_admission/swarm_evolution.rs:45:25
+   |
+45 |     assert_eq!(reopened.swarm_authority_bundle_for_graph(id, &canonical_test_hash(&prior.task_graph)?)?, Some(prior.clone()));
+   |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: there is a method `swarm_authority_bundle` with a similar name, but with different arguments
+  --> crates/kernel/chio-runtime-core/src/store/traits.rs:80:5
+   |
+80 | /     fn swarm_authority_bundle(
+81 | |         &self,
+82 | |         _task_graph_id: &str,
+83 | |     ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
+   | |_______________________________________________________________^
+
+error[E0599]: no method named `swarm_authority_bundle_for_graph` found for struct `chio_runtime_core::SqliteRuntimeOrchestrationStore` in the current scope
+  --> crates/kernel/chio-runtime-core/tests/runtime_admission/swarm_evolution.rs:46:25
+   |
+46 |     assert_eq!(reopened.swarm_authority_bundle_for_graph(id, &canonical_test_hash(&next.task_graph)?)?, Some(next.clone()));
+   |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: there is a method `swarm_authority_bundle` with a similar name, but with different arguments
+  --> crates/kernel/chio-runtime-core/src/store/traits.rs:80:5
+   |
+80 | /     fn swarm_authority_bundle(
+81 | |         &self,
+82 | |         _task_graph_id: &str,
+83 | |     ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
+   | |_______________________________________________________________^
+
+error[E0599]: no method named `extend_swarm_authority_bundle` found for struct `chio_runtime_core::SqliteRuntimeOrchestrationStore` in the current scope
+  --> crates/kernel/chio-runtime-core/tests/runtime_admission/swarm_evolution.rs:48:22
+   |
+48 |     assert!(reopened.extend_swarm_authority_bundle(&canonical_test_hash(&prior)?, next.clone(), &trusted_swarm_witness_keys()).is_er...
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: there is a method `swarm_authority_bundle` with a similar name, but with different arguments
+  --> crates/kernel/chio-runtime-core/src/store/traits.rs:80:5
+   |
+80 | /     fn swarm_authority_bundle(
+81 | |         &self,
+82 | |         _task_graph_id: &str,
+83 | |     ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
+   | |_______________________________________________________________^
+
+error[E0599]: no method named `swarm_authority_bundle_for_graph` found for struct `chio_runtime_core::SqliteRuntimeOrchestrationStore` in the current scope
+  --> crates/kernel/chio-runtime-core/tests/runtime_admission/swarm_evolution.rs:51:28
+   |
+51 |     let unknown = reopened.swarm_authority_bundle_for_graph(id, &sha256_hex(b"unknown"))?.ok_or("missing current graph")?;
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: there is a method `swarm_authority_bundle` with a similar name, but with different arguments
+  --> crates/kernel/chio-runtime-core/src/store/traits.rs:80:5
+   |
+80 | /     fn swarm_authority_bundle(
+81 | |         &self,
+82 | |         _task_graph_id: &str,
+83 | |     ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
+   | |_______________________________________________________________^
+
+error[E0599]: no method named `extend_swarm_authority_bundle` found for struct `chio_runtime_core::SqliteRuntimeOrchestrationStore` in the current scope
+  --> crates/kernel/chio-runtime-core/tests/runtime_admission/swarm_evolution.rs:66:19
+   |
+66 |     assert!(store.extend_swarm_authority_bundle(&canonical_test_hash(&prior)?, next, &trusted_swarm_witness_keys()).is_err());
+   |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: there is a method `swarm_authority_bundle` with a similar name, but with different arguments
+  --> crates/kernel/chio-runtime-core/src/store/traits.rs:80:5
+   |
+80 | /     fn swarm_authority_bundle(
+81 | |         &self,
+82 | |         _task_graph_id: &str,
+83 | |     ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
+   | |_______________________________________________________________^
+
+error[E0599]: no method named `extend_swarm_authority_bundle` found for struct `chio_runtime_core::SqliteRuntimeOrchestrationStore` in the current scope
+  --> crates/kernel/chio-runtime-core/tests/runtime_admission/swarm_evolution.rs:92:24
+   |
+92 |             connection.extend_swarm_authority_bundle(&expected, next, &trusted_swarm_witness_keys()).is_ok()
+   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: there is a method `swarm_authority_bundle` with a similar name, but with different arguments
+  --> crates/kernel/chio-runtime-core/src/store/traits.rs:80:5
+   |
+80 | /     fn swarm_authority_bundle(
+81 | |         &self,
+82 | |         _task_graph_id: &str,
+83 | |     ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
+   | |_______________________________________________________________^
+
+error[E0282]: type annotations needed
+  --> crates/kernel/chio-runtime-core/tests/runtime_admission/swarm_evolution.rs:95:55
+   |
+95 |     let results: Vec<bool> = workers.into_iter().map(|w| w.join().map_err(|_| "writer panicked")).collect::<Result<_, _>>()?;
+   |                                                       ^  - type must be known at this point
+   |
+help: consider giving this closure parameter an explicit type
+   |
+95 |     let results: Vec<bool> = workers.into_iter().map(|w: /* Type */| w.join().map_err(|_| "writer panicked")).collect::<Result<_, _>>()?;
+   |                                                        ++++++++++++
+
+error[E0599]: no method named `extend_swarm_authority_bundle` found for struct `chio_runtime_core::SqliteRuntimeOrchestrationStore` in the current scope
+   --> crates/kernel/chio-runtime-core/tests/runtime_admission/swarm_evolution.rs:110:15
+    |
+110 |         store.extend_swarm_authority_bundle(&canonical_test_hash(&prior)?, next, &trusted_swarm_witness_keys())?;
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: there is a method `swarm_authority_bundle` with a similar name, but with different arguments
+   --> crates/kernel/chio-runtime-core/src/store/traits.rs:80:5
+    |
+ 80 | /     fn swarm_authority_bundle(
+ 81 | |         &self,
+ 82 | |         _task_graph_id: &str,
+ 83 | |     ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
+    | |_______________________________________________________________^
+
+error[E0599]: no method named `swarm_authority_bundle_for_graph` found for struct `chio_runtime_core::SqliteRuntimeOrchestrationStore` in the current scope
+   --> crates/kernel/chio-runtime-core/tests/runtime_admission/swarm_evolution.rs:126:30
+    |
+126 | ...   assert!(open(&path)?.swarm_authority_bundle_for_graph(&prior.task_graph.graph_id, &lookup_hash).is_err(), "accepted {corrupti...
+    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: there is a method `swarm_authority_bundle` with a similar name, but with different arguments
+   --> crates/kernel/chio-runtime-core/src/store/traits.rs:80:5
+    |
+ 80 | /     fn swarm_authority_bundle(
+ 81 | |         &self,
+ 82 | |         _task_graph_id: &str,
+ 83 | |     ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
+    | |_______________________________________________________________^
+
+Some errors have detailed explanations: E0282, E0599.
+For more information about an error, try `rustc --explain E0282`.
+error: could not compile `chio-runtime-core` (test "runtime_admission") due to 10 previous errors

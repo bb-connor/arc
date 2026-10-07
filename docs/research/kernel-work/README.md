@@ -1,0 +1,96 @@
+# Chio kernel breakthrough research
+
+This is the entry point for the research requested on 2026-10-02, after the
+completed funded-work manuscript was judged insufficient for Chio's foundational
+ambition. Read this package before changing that manuscript or restarting the
+novelty argument. The intended result is a consequential advance in how untrusted
+agents perform work across independently owned systems.
+
+**Current judgment:** [The contribution decision](CONTRIBUTION-DECISION.md) is
+useful implementation without an established research advance. Native fault
+experiments and two-family compatibility provide bounded evidence. The strongest
+provisioned baseline still has the same modeled outcomes; independent integration
+advantage and useful economics remain unmeasured. The flagship manuscript stays
+frozen until the breakthrough gate is supported.
+
+Start with these documents in order:
+
+1. [Research brief and design](../../superpowers/specs/2026-10-02-kernel-breakthrough-research-design.md):
+   the user's ambition, the previous failure modes, three candidate contributions,
+   the proposed model, and the decisions that must precede a paper rewrite.
+2. [Prior-art comparison](2026-10-02-prior-art.md): primary sources, actual overlap,
+   reading depth, and the strongest competing constructions to investigate.
+3. [Execution plan](../../superpowers/plans/2026-10-02-kernel-breakthrough-research.md):
+   ordered research tasks, concrete artifacts, experiments, acceptance criteria,
+   and conditions for stopping an unsupported direction.
+4. [G0 decision](G0-DECISION.md), [counterdesigns](counterdesigns.md),
+   [recovery crosswalk](recovery-crosswalk.md) and [claim register](claim-register.json):
+   the Task 1 result and the exact question for Tasks 2-3.
+5. [Task 1 source audit](task1-source-audit.md) and
+   [verification record](task1-validation.md): reading locations, source pins,
+   reproducible checks and review scope.
+6. [Common model](MODEL.md), [fixtures](fixtures.json), [witness](WITNESS.md) and
+   [G1 decision](G1-DECISION.md): shared semantics, repaired alternatives and the
+   narrowed scientific route registered before implementation.
+7. [G2 results and reproducibility](results/G2.md): 66 variants per arm, bounded
+   exploration, controls, corrections and the exact evidence limits.
+
+8. [Native correspondence](results/native-crosswalk.md), [G3 comparison](results/G3.md),
+   [fresh critique](results/independent-review.md) and
+   [contribution decision](CONTRIBUTION-DECISION.md): Tasks 5-7 outcomes and remaining gates.
+
+```mermaid
+flowchart LR
+  A[Assume recovery specs shipped] --> C[Precise composition claim]
+  B[Strong conventional counterdesigns] --> C
+  C --> D[Proof and useful-progress experiments]
+  D --> E[Independent critique and claim decision]
+  E --> F[Rewrite only around an earned result]
+```
+
+## Resume state
+
+| Item | State |
+| --- | --- |
+| Research and planning package | Written; source and documentation checks recorded in the plan |
+| Assumed shipped baseline | PR #1172 revision 3, all P0-P6 recovery semantics, by the user's explicit instruction |
+| Surviving investigation | R3 measured integration advantage; separate R2 algorithm/exclusivity novelty was rejected at G1 |
+| Task 1 | Complete: counterdesigns, crosswalk, claim register and G0 decision; fresh automated review accepted, clarifications resolved and checks passed |
+| Tasks 2-4 | Common model, G1 decision and executable bounded experiment; final review recorded in G2 |
+| Task 5 local work | Complete: source crosswalk, real-death local-owner trajectories and connector negative control; full native composition correspondence remains open |
+| Task 6 local work | Complete: two-family compatibility experiment and matched trial package; independent measurements and human critique remain open |
+| Task 7 | Contribution decision complete: useful implementation without established research advance; G4 unsupported |
+| Next execution task | Consume the recovery owners' pinned implementation to close missing native seams, then run the prepared independent integration study; do not repeat completed local experiments |
+| New theorem or mechanism | Not established |
+| Prototype / production | KW1 and two-family research labs plus owning native tests; no production implementation or root dependency changes |
+| External operator | None available; existing trial package prepared, invitation unsent |
+| Flagship manuscript | Frozen at the checkpoint below |
+| Publication and breakthrough status | Existing false/open statuses remain in force |
+
+The [recovery baseline manifest](recovery-baseline.json) pins PR #1172, its 111
+requirements and architecture files. Treat those specifications as shipped when
+reasoning about Chio's target contribution. Do not plan to rediscover or rebuild
+them. The composed system, including recovery, is eligible to be the contribution;
+it need not contain an unrelated additional invention beyond that PR.
+
+The user explicitly requested brainstorming, research and an actual plan before
+touching the paper again. Tasks 1-7 now record that research execution and its
+decision, with assumed semantics, measured local evidence and open native and
+independent empirical gates kept separate. The recorded contribution decision
+does not support manuscript re-entry yet.
+
+## Preserved checkpoint
+
+- Branch: `paper/verifiable-work-20261002`.
+- Source checkpoint: `5e1715636f2b66295ec3022d6161b91cb77a658d`.
+- Frozen `docs/papers/verifiable-work` Git tree:
+  `b8c5b771ca04903e219f9b42a50a050d326ba0ac`.
+- [Existing paper and artifact](../../papers/verifiable-work/README.md).
+- [Existing publication gates](../../papers/verifiable-work/PUBLICATION.json).
+- [Existing external trial package](../../papers/verifiable-work/trial/README.md).
+
+These are research provenance pins, not statements about the current main branch,
+hosted qualification, release readiness, or independent operation. The active
+security worktree and the user's original checkout are outside this planning
+change. Keep this package in Git; do not depend on a chat summary or a temporary
+directory as the only record of the reasoning.

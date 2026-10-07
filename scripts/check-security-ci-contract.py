@@ -56,23 +56,23 @@ EXPECTED_ACTIONLINT_CONFIG = {
 }
 EXPECTED_SECURITY_IMAGE_FROM = (
     "--platform=linux/amd64 "
-    "rust:1.94.1-alpine3.22@sha256:"
-    "667605141d2be37e8a27b3e5368fa388fcd3065ed2dbc2fe64665bce7254fc67"
+    "rust:1.95.0-alpine3.22@sha256:"
+    "2805e96db5234c9cfaf7ecb50f488693dab84d28ad30b6290cc1b707a18bf775"
 )
 EXPECTED_APK_LOCK_SHA256 = (
-    "354d439672c5c992ca20d54a276e30aea1dc431ae719357899885c7282169acd"
+    "f8fa718f8397f84a221ea28f87d69c46e4532ff72fd3c3ff691bd6d69586b651"
 )
 EXPECTED_CARGO_LOCK_SHA256 = (
-    "05d699fa27c0a3fb59f7bcc31c5bf77993231c7602240d8e609b05b21d92d13a"
+    "ea53828c0ee81c614f79cd107fcc7af06b29abb7ecc7484423d094fe70328e8e"
 )
 EXPECTED_RUST_TOOLCHAIN_SHA256 = (
-    "d52c5633ea77aefd345519d0a6c87e19c2636a1e90178585c30db481b3de9de0"
+    "24ef3b9d3edbd850aa386cb0a98e10450b0030991a4537cb359f54d49dbbb33a"
 )
 EXPECTED_CLIPPY_ARCHIVE_SHA256 = (
-    "637f50a513c887136bfd8c5b8ad946ee8c185f75041a1d9a091db998455efeda"
+    "c55a7b5604fe2e0400911c488b320922066fe23646235793cec7c8e5c03e7a61"
 )
 EXPECTED_RUSTFMT_ARCHIVE_SHA256 = (
-    "a1492d1c91d82b8d2101220accedffb1c2af7c97ea0793915c4a97d5c3d7424b"
+    "688a9ba3b40e9fd360dc083ff28b7ae43c110f2919ee939bb788a46a1e579a84"
 )
 EXPECTED_CARGO_MUTANTS_ARCHIVE_SHA256 = (
     "47040c9cded7996c38b9976af0a9c46c4902ec5eb59369fffec758410dba8028"
@@ -81,19 +81,25 @@ EXPECTED_CARGO_MUTANTS_LOCK_SHA256 = (
     "0810d8fe5d67224340e560656f51619cf8f78925a4bfeedd2e5f22d199ac92a4"
 )
 EXPECTED_SECURITY_ENTRYPOINT_SHA256 = (
-    "3cb6f4edeace2ef29a2cd35f5ac4b736ef3a5a6ed8e98379cbd5abc6c6157e4e"
+    "8926c71c4387410f7513dd7093cec021ddc4c04fc0be855e96a203836b679ead"
 )
 EXPECTED_SECURITY_ENTRYPOINT_FUNCTION_GRAPH_SHA256 = (
-    "d0da4a2df05b9c34922b0c1b47aedfae347ef1d7bf2abff34dab43a1c9a6316f"
+    "93e552d424ec2c27d74ca3cbba0d269b5bb708d5035d6273d8409c4387b43a49"
+)
+EXPECTED_SECURITY_RUNNER_SHA256 = (
+    "7eb10f4c2993fb40ffc24440c409f7c0a719a2bc1879ed65c10ff309494feabe"
+)
+EXPECTED_SECURITY_AGGREGATOR_SHA256 = (
+    "cf0de1d240c0d0de30a590674ec27c6937acec2aaef13b491d59ee1c9385f371"
 )
 EXPECTED_SECURITY_COMMAND_CLIENT_SHA256 = (
     "f4002072a4c7be0b2f7e97cf8f196b0947561332dbd27aa1ec9302764f7d2d20"
 )
 EXPECTED_SECURITY_ADVERSARIAL_CHECKER_SHA256 = (
-    "46ed452d8230e4e9744d3ac538d52eff8483b2fd7efb45ef4e37f2cf4a178008"
+    "c6552d29a356e634f2856669ce29d753da5aad986ed76ffae18b2022a31187fd"
 )
 EXPECTED_SECURITY_ADVERSARIAL_CHECKER_FUNCTION_GRAPH_SHA256 = (
-    "bf6b5b4c022a787673665bd78b466090f0a7830cb1505dc3710abfb641404480"
+    "8266d915f0b54c1eafcdc9db2f31f65be217ed9de87e142c0d9df770570ccf4e"
 )
 EXPECTED_TEMPORAL_GATE_SHA256 = (
     "f91b0a9a91fca90a51fd5c016d09c20828a767f07a0c4f4962adcadd12b3811a"
@@ -118,24 +124,6 @@ printf '%s  %s\n' '{EXPECTED_TEMPORAL_SELF_TEST_SHA256}' "${{temporal_self_test}
 printf '%s  %s\n' '{EXPECTED_TEMPORAL_GATE_SHA256}' "${{temporal_runner}}" | /usr/bin/sha256sum --check --strict
 /bin/bash -p "${{temporal_runner}}"
 """.strip()
-EXPECTED_DIRECT_APK_PACKAGES = (
-    "/tmp/ca-certificates-20260611-r0.apk",
-    "bash=5.2.37-r0",
-    "build-base=0.5-r3",
-    "cmake=3.31.7-r1",
-    "coreutils=9.7-r1",
-    "curl=8.14.1-r3",
-    "git=2.49.1-r0",
-    "jq=1.8.2-r0",
-    "linux-headers=6.14.2-r0",
-    "libexpat=2.8.5-r0",
-    "openssl-dev=3.5.8-r0",
-    "pkgconf=2.4.3-r0",
-    "protobuf=29.4-r0",
-    "protobuf-dev=29.4-r0",
-    "python3=3.12.14-r0",
-    "util-linux=2.41.6-r1",
-)
 EXPECTED_TRUSTED_BOUNDARY_FILES = frozenset(
     {
         "cargo-mutants",
@@ -905,11 +893,11 @@ EXPECTED_TRUST_JOB_DIGESTS = {
     (
         "enterprise evidence finalizer",
         "authorize-security-check-publication",
-    ): "44f78d1b6726ccb4f9dcf5ffcf1f8f447e6af3c0cd6446803e9719a7bc7ae0ea",
+    ): "ba12570c0bfc4982d977643e12522dc90b64d941224a18861556405c08140186",
     (
         "enterprise evidence finalizer",
         "publish-security-contract",
-    ): "36c623035b6ea06ee45a06f29ba8232d059994fd990bba5f7a10a315df6f447d",
+    ): "96b283337273721fffd49fbd1787d0f6d85791da36e1ac042cf72ecf911e5947",
     (
         "security contract revocation",
         "bind-revocation",
@@ -1228,7 +1216,9 @@ EXPECTED_MSRV_EXTRAS = {
         }
     }
 }
-EXPECTED_CARGO_VET_STEPS = (("cargo vet --locked", "cargo vet --locked"),)
+EXPECTED_CARGO_VET_STEPS = (
+    ("Verify source-bound fork and locked supply-chain audits", "bash scripts/check-supply-chain.sh"),
+)
 EXPECTED_CARGO_DENY_STEPS = (
     ("cargo deny check advisories", "cargo deny check advisories"),
     ("cargo deny check licenses", "cargo deny check licenses"),
@@ -1295,7 +1285,7 @@ EXPECTED_THREAT_CONCURRENCY = {
 }
 EXPECTED_CI_PYTHON_VALIDATORS_RUN = (
     "python -m pip install --disable-pip-version-check "
-    "PyYAML==6.0.2 jsonschema==4.26.0 referencing==0.37.0"
+    "PyYAML==6.0.3 jsonschema==4.26.0 referencing==0.37.0"
 )
 EXPECTED_ENTERPRISE_PYTHON_VALIDATORS_RUN = (
     "python -m pip install --disable-pip-version-check "
@@ -2005,45 +1995,50 @@ def validate_security_dockerfile(root: Path, document: str) -> None:
         raise ContractError("security execution image APK inventory copy changed")
 
     expected_apk = (
-        "wget -q -O /tmp/ca-certificates-20260611-r0.apk "
+        f"echo '{apk_digest} /tmp/security-evidence-apk.lock' | sha256sum -c -",
+        "sed -E 's/^(.+)-([0-9][^-]*(-r[0-9]+)?)$/\\1=\\2/' "
+        "/tmp/security-evidence-apk.lock > /tmp/security-evidence-apk.constraints",
+        'test "$(wc -l < /tmp/security-evidence-apk.constraints)" -eq 225',
+        "wget -q -O /tmp/ca-certificates-20260909-r0.apk "
         "https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/"
-        "ca-certificates-20260611-r0.apk",
-        "echo 'a8ad8f04dfba1a2897388c4b420b698bf1ecd870be10f0127134a567d5e59896 "
-        "/tmp/ca-certificates-20260611-r0.apk' | sha256sum -c -",
-        "apk add --no-cache " + " ".join(EXPECTED_DIRECT_APK_PACKAGES),
+        "ca-certificates-20260909-r0.apk",
+        "echo 'a1258993a229d2fdcc6d9665af75c9305184e4f5e5755c50b9ef0564b35138c4 "
+        "/tmp/ca-certificates-20260909-r0.apk' | sha256sum -c -",
+        "xargs -r apk add --no-cache /tmp/ca-certificates-20260909-r0.apk "
+        "< /tmp/security-evidence-apk.constraints",
         "apk info -v | LC_ALL=C sort > /tmp/security-evidence-apk.actual",
         "cmp /tmp/security-evidence-apk.lock /tmp/security-evidence-apk.actual",
-        f"echo '{apk_digest} /tmp/security-evidence-apk.lock' | sha256sum -c -",
-        "rm /tmp/ca-certificates-20260611-r0.apk "
-        "/tmp/security-evidence-apk.lock /tmp/security-evidence-apk.actual",
+        "rm /tmp/ca-certificates-20260909-r0.apk "
+        "/tmp/security-evidence-apk.lock /tmp/security-evidence-apk.actual "
+        "/tmp/security-evidence-apk.constraints",
     )
     if shell_clauses(instructions[2][1]) != expected_apk:
         raise ContractError("security execution image APK closure changed")
 
     expected_rust_components = (
         "curl --proto '=https' --tlsv1.2 --fail --location --output "
-        "/tmp/clippy.tar.gz https://static.rust-lang.org/dist/2026-03-26/"
-        "clippy-1.94.1-x86_64-unknown-linux-musl.tar.gz",
+        "/tmp/clippy.tar.gz https://static.rust-lang.org/dist/2026-04-16/"
+        "clippy-1.95.0-x86_64-unknown-linux-musl.tar.gz",
         f"echo '{EXPECTED_CLIPPY_ARCHIVE_SHA256} /tmp/clippy.tar.gz' | sha256sum -c -",
         "tar -xzf /tmp/clippy.tar.gz -C /tmp",
         "curl --proto '=https' --tlsv1.2 --fail --location --output "
-        "/tmp/rustfmt.tar.gz https://static.rust-lang.org/dist/2026-03-26/"
-        "rustfmt-1.94.1-x86_64-unknown-linux-musl.tar.gz",
+        "/tmp/rustfmt.tar.gz https://static.rust-lang.org/dist/2026-04-16/"
+        "rustfmt-1.95.0-x86_64-unknown-linux-musl.tar.gz",
         f"echo '{EXPECTED_RUSTFMT_ARCHIVE_SHA256} /tmp/rustfmt.tar.gz' | sha256sum -c -",
         "tar -xzf /tmp/rustfmt.tar.gz -C /tmp",
-        "rustup component add --toolchain 1.94.1-x86_64-unknown-linux-musl "
+        "rustup component add --toolchain 1.95.0-x86_64-unknown-linux-musl "
         "clippy rustfmt",
-        "cmp /usr/local/rustup/toolchains/1.94.1-x86_64-unknown-linux-musl/"
-        "bin/cargo-clippy /tmp/clippy-1.94.1-x86_64-unknown-linux-musl/"
+        "cmp /usr/local/rustup/toolchains/1.95.0-x86_64-unknown-linux-musl/"
+        "bin/cargo-clippy /tmp/clippy-1.95.0-x86_64-unknown-linux-musl/"
         "clippy-preview/bin/cargo-clippy",
-        "cmp /usr/local/rustup/toolchains/1.94.1-x86_64-unknown-linux-musl/"
-        "bin/clippy-driver /tmp/clippy-1.94.1-x86_64-unknown-linux-musl/"
+        "cmp /usr/local/rustup/toolchains/1.95.0-x86_64-unknown-linux-musl/"
+        "bin/clippy-driver /tmp/clippy-1.95.0-x86_64-unknown-linux-musl/"
         "clippy-preview/bin/clippy-driver",
-        "cmp /usr/local/rustup/toolchains/1.94.1-x86_64-unknown-linux-musl/"
-        "bin/cargo-fmt /tmp/rustfmt-1.94.1-x86_64-unknown-linux-musl/"
+        "cmp /usr/local/rustup/toolchains/1.95.0-x86_64-unknown-linux-musl/"
+        "bin/cargo-fmt /tmp/rustfmt-1.95.0-x86_64-unknown-linux-musl/"
         "rustfmt-preview/bin/cargo-fmt",
-        "cmp /usr/local/rustup/toolchains/1.94.1-x86_64-unknown-linux-musl/"
-        "bin/rustfmt /tmp/rustfmt-1.94.1-x86_64-unknown-linux-musl/"
+        "cmp /usr/local/rustup/toolchains/1.95.0-x86_64-unknown-linux-musl/"
+        "bin/rustfmt /tmp/rustfmt-1.95.0-x86_64-unknown-linux-musl/"
         "rustfmt-preview/bin/rustfmt",
         "printf '%s\\n' cargo-x86_64-unknown-linux-musl "
         "clippy-x86_64-unknown-linux-musl rust-std-x86_64-unknown-linux-musl "
@@ -2053,12 +2048,12 @@ def validate_security_dockerfile(root: Path, document: str) -> None:
         "/tmp/security-evidence-rust-components.actual",
         "cmp /tmp/security-evidence-rust-components.expected "
         "/tmp/security-evidence-rust-components.actual",
-        'test "$(cargo clippy --version)" = "clippy 0.1.94 '
-        '(e408947bfd 2026-03-25)"',
-        'test "$(cargo fmt --version)" = "rustfmt 1.8.0-stable '
-        '(e408947bfd 2026-03-25)"',
-        "rm -rf /tmp/clippy.tar.gz /tmp/clippy-1.94.1-x86_64-unknown-linux-musl "
-        "/tmp/rustfmt.tar.gz /tmp/rustfmt-1.94.1-x86_64-unknown-linux-musl "
+        'test "$(cargo clippy --version)" = "clippy 0.1.95 '
+        '(59807616e1 2026-04-14)"',
+        'test "$(cargo fmt --version)" = "rustfmt 1.9.0-stable '
+        '(59807616e1 2026-04-14)"',
+        "rm -rf /tmp/clippy.tar.gz /tmp/clippy-1.95.0-x86_64-unknown-linux-musl "
+        "/tmp/rustfmt.tar.gz /tmp/rustfmt-1.95.0-x86_64-unknown-linux-musl "
         "/tmp/security-evidence-rust-components.expected "
         "/tmp/security-evidence-rust-components.actual",
     )
@@ -2125,13 +2120,13 @@ def validate_security_dockerfile(root: Path, document: str) -> None:
     )
     expected_authority = (
         '--mount=type=bind,target=/opt/authorized-source,readonly '
-        'test "$(rustc --version)" = "rustc 1.94.1 '
-        '(e408947bf 2026-03-25)"',
+        'test "$(rustc --version)" = "rustc 1.95.0 '
+        '(59807616e 2026-04-14)"',
         'test "$(cargo mutants --version | awk \'{print $2}\')" = "25.3.1"',
-        'test "$(cargo clippy --version)" = "clippy 0.1.94 '
-        '(e408947bfd 2026-03-25)"',
-        'test "$(cargo fmt --version)" = "rustfmt 1.8.0-stable '
-        '(e408947bfd 2026-03-25)"',
+        'test "$(cargo clippy --version)" = "clippy 0.1.95 '
+        '(59807616e1 2026-04-14)"',
+        'test "$(cargo fmt --version)" = "rustfmt 1.9.0-stable '
+        '(59807616e1 2026-04-14)"',
         f"echo '{cargo_digest} Cargo.lock' | sha256sum -c -",
         f"echo '{toolchain_digest} rust-toolchain.toml' | sha256sum -c -",
         "cargo fetch --locked",
@@ -2966,7 +2961,7 @@ def validate_security_entrypoint(root: Path, source: str) -> None:
         }
     )
     expected_candidate_values = {
-        "CARGO_BUILD_JOBS": "'1'",
+        "CARGO_BUILD_JOBS": "'4'",
         "CARGO_HOME": "'/cargo-home'",
         "CARGO_INCREMENTAL": "'0'",
         "CARGO_NET_OFFLINE": "'true'",
@@ -3049,7 +3044,8 @@ if forwarded:
                 "CHIO_KEYLOG_AUDIT": "debug/chio-keylog-audit",
                 "CHIO_KEYLOG_WITNESS": "debug/chio-keylog-witness",
             }[key]
-            if value != os.fspath(target / helper):
+            helper_target = Path("/target/artifacts/broker-helper-target")
+            if value != os.fspath(helper_target / helper):
                 raise EntrypointError("candidate helper path differs from its built executable")
             environment[key] = value
         elif key == "RUSTFLAGS":
@@ -3058,10 +3054,13 @@ if forwarded:
             environment[key] = value
         elif key == "CARGO_TARGET_DIR":
             requested = Path(value)
-            persistent_cage_target = Path("/target/artifacts/static-pie-target")
+            persistent_helper_targets = {
+                Path("/target/artifacts/static-pie-target"),
+                Path("/target/artifacts/broker-helper-target"),
+            }
             if not requested.is_absolute() or not (
                 requested.is_relative_to(target)
-                or requested == persistent_cage_target
+                or requested in persistent_helper_targets
             ):
                 raise EntrypointError("candidate target override escapes gate state")
             environment[key] = value
@@ -4339,6 +4338,7 @@ def validate_security_execution_boundary_files(root: Path) -> None:
         "scripts/check-secret-broker-boundary.sh": 0o755,
         "scripts/check-security-adversarial-evidence.py": 0o755,
         "scripts/run-security-execution-container.py": 0o755,
+        "scripts/aggregate-security-evidence-shards.py": 0o644,
         "scripts/security-execution-command-client.py": 0o755,
         "scripts/security-execution-container-entrypoint.py": 0o755,
         "scripts/tests/run-security-execution-container.test.py": 0o755,
@@ -4628,7 +4628,7 @@ def validate_security_execution_boundary_files(root: Path) -> None:
         "validate_container_create_arguments(create_arguments)"
     )
     inspect_contract_call = main_body.find("validate_created_container(")
-    start_call = main_body.find('docker_output(docker, ["start", identifier]')
+    start_call = main_body.find("start_attached_container(")
     if (
         create_contract_call < 0
         or inspect_contract_call < create_contract_call
@@ -4644,6 +4644,13 @@ def validate_security_execution_boundary_files(root: Path) -> None:
         raise ContractError(
             "trusted security container runner exposes a host capability"
         )
+    if hashlib.sha256(runner.encode("utf-8")).hexdigest() != EXPECTED_SECURITY_RUNNER_SHA256:
+        raise ContractError("trusted security container runner source commitment changed")
+    aggregator_path = root / "scripts/aggregate-security-evidence-shards.py"
+    require_exact_file_digest(
+        aggregator_path, EXPECTED_SECURITY_AGGREGATOR_SHA256,
+        "trusted evidence aggregation source commitment",
+    )
 
     entrypoint = (
         root / "scripts/security-execution-container-entrypoint.py"
@@ -4662,6 +4669,9 @@ def validate_security_execution_boundary_files(root: Path) -> None:
         "scripts/check-secret-broker-boundary.sh": (
             "/private/candidate",
             "/opt/chio-security/gates/check-exact-cargo-test-inventory.py",
+            "/target/artifacts",
+            'helper_target="$candidate_artifacts/broker-helper-target"',
+            'CARGO_TARGET_DIR="$helper_target" cargo build',
         ),
         "scripts/check-cage-enforcement.sh": (
             "/private/candidate",
@@ -4823,9 +4833,9 @@ def validate_isolated_execution_job(
 # pinned action and unprivileged job setting. Update only after reviewing the
 # changed inventory; hashing parsed jobs ignores YAML formatting and comments.
 EXPECTED_NONCE_FIPS_JOBS = {
-    "threshold-crypto-floor": "ee2627806708706d8e70f8da457c4b59964a0c325e1db59bec9132fe95622d19",
-    "session-reports": "26f4afe70eb2eb0a53f0db676c21959f38a14091313a2d73bf7f53ab98b376cc",
-    "fips-smoke": "2d300a5b16e51ea5260cfad2eb0c2d09f7b179a82cd0a24e30ca744352e9bc9b",
+    "threshold-crypto-floor": "77ba506383be164f9871e4e5fe6c920a300fe4a9d7ef94b605b6ae8f0ebd1447",
+    "session-reports": "16ad2e1401ffc2ea0361cc508047e837d6ee3c09a01fa863e9cb3f35a461defc",
+    "fips-smoke": "6530286bad2e0e616421639eccc930cc6f39f2c95538d458257c3562b7bd69a6",
 }
 EXPECTED_NONCE_FIPS_PATHS = [
     ".github/workflows/chio-tee-fips.yml",
@@ -4885,13 +4895,15 @@ def validate_nonce_fips_contract(root: Path) -> None:
         or events["workflow_call"] != ""
         or events["workflow_dispatch"] != ""
         or set(events["pull_request"]) != {"branches-ignore", "paths"}
-        or events["pull_request"]["branches-ignore"] != ["main"]
+        or events["pull_request"]["branches-ignore"] != ["main", "packet/**", "integration/**"]
         or set(events["push"]) != {"branches", "paths"}
         or events["push"]["branches"] != ["project/**"]
         or events["pull_request"]["paths"] != events["push"]["paths"]
         or events["push"]["paths"] != EXPECTED_NONCE_FIPS_PATHS
         or ci.get("on", {}).get("push", {}).get("branches") != ["main"]
-        or ci.get("on", {}).get("pull_request", {}).get("branches") != ["main"]
+        or ci.get("on", {}).get("pull_request", {}).get("branches")
+        != ["main", "packet/**", "integration/**"]
+        or set(ci.get("on", {}).get("pull_request", {})) != {"branches", "types"}
     ):
         raise ContractError("nonce/FIPS triggers lose coverage or duplicate required CI")
     if (
@@ -7134,6 +7146,17 @@ def validate(root: Path) -> None:
         )
     failure_routine = publisher_run[failure_start:reconciliation_start]
     bad_ci_routine = publisher_run[reconciliation_start:success_start]
+    # This nested helper is called conditionally, which disables shell errexit.
+    # Its reviewed API and validation failures must propagate explicitly; the
+    # surrounding reconciliation must still retain monotone failure handling.
+    listing = re.search(
+        r"(?ms)^  list_matching_ci_runs\(\) \{\n.*?^  \}\n", bad_ci_routine
+    )
+    if listing is None or hashlib.sha256(listing[0].encode()).hexdigest() != (
+        "6c9a6d1bb96e8d733b842ec175255f6632f669301a3d60389dfe3278e4444a69"
+    ):
+        raise ContractError("publisher CI listing error propagation changed")
+    reconciliation_body = bad_ci_routine[:listing.start()] + bad_ci_routine[listing.end():]
     success_routine = publisher_run[success_start:branch_start]
     branch_routine = publisher_run[branch_start:]
     if (
@@ -7156,7 +7179,7 @@ def validate(root: Path) -> None:
         or "--request PATCH" in bad_ci_routine
         or bad_ci_routine.count("normalize_bad_ci_namespace ") != 5
         or bad_ci_routine.count("return 0") != 2
-        or "return 1" in bad_ci_routine
+        or "return 1" in reconciliation_body
         or "bad_ci_observed=false" not in bad_ci_routine
         or "bad_ci_observed=true" not in bad_ci_routine
         or "bad_ci_create_missing=false" not in bad_ci_routine

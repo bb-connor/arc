@@ -121,6 +121,8 @@ impl PrivateDecryptingKey {
     /// Retrieves the `PublicEncryptingKey` corresponding with this `PrivateDecryptingKey`.
     #[must_use]
     #[allow(clippy::missing_panics_doc)]
+    // CHIO-LINT rsa-public-key: Private and public wrappers enforce the same key predicate on the same immutable key.
+    #[allow(clippy::expect_used)]
     pub fn public_key(&self) -> PublicEncryptingKey {
         PublicEncryptingKey::new(self.0.clone()).expect(
             "PublicEncryptingKey key size to be supported by PrivateDecryptingKey key sizes",

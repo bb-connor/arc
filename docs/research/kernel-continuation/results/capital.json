@@ -1,0 +1,24 @@
+{
+  "examples": {
+    "fenced_absent": {
+      "B1": 100,
+      "candidate": 100
+    },
+    "three_exclusive_ready": {
+      "B1": 150,
+      "candidate": 150
+    },
+    "three_unknown": {
+      "B1": 250,
+      "candidate": 250
+    },
+    "two_earned": {
+      "B1": 160,
+      "candidate": 160
+    }
+  },
+  "mismatches": [],
+  "profiles": 4095,
+  "schema": "chio.research.capital.v1",
+  "synthetic": true
+}

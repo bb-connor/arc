@@ -1,0 +1,40 @@
+bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+✖ real W0 child has exact retained authority and balances (9643.794181ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 20044.570137
+
+✖ failing tests:
+
+test at contracts/scripts/work-claim-w0.test.mjs:15:3
+✖ real W0 child has exact retained authority and balances (9643.794181ms)
+  AssertionError [ERR_ASSERTION]: the parent provider must be the child buyer
+  + actual - expected
+  
+  + '379a2526d4ca227378cf933e640c878ac4399165afd5f4d624b01e6aeb42a153'
+  - '8019d5aba4b64adeee1878c18aa5c2eb7d8985651b2498598601fbf4e7b7eb7a'
+  
+      at TestContext.<anonymous> (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-w0.test.mjs:30:16)
+      at async Test.run (node:internal/test_runner/test:1313:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: '379a2526d4ca227378cf933e640c878ac4399165afd5f4d624b01e6aeb42a153',
+    expected: '8019d5aba4b64adeee1878c18aa5c2eb7d8985651b2498598601fbf4e7b7eb7a',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

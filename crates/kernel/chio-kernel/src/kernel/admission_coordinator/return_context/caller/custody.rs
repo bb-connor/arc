@@ -160,9 +160,8 @@ impl ChioKernel {
             approval: None,
             dpop: None,
         };
-        let profile = admission
-            .original_retained_request()
-            .map(|request| request.authority_profile());
+        let original = admission.original_retained_request();
+        let profile = original.map(|request| request.authority_profile());
         if profile.is_some_and(|profile| profile.runtime().is_some())
             && operation.runtime_participant_ledger_digest().is_none()
         {
@@ -170,14 +169,33 @@ impl ChioKernel {
                 "caller custody omitted its selected runtime authority",
             ));
         }
+        // Configuration alone selects no single-approval credential. Threshold
+        // approvals retain their typed proposal; a cumulative budget below its
+        // threshold has no approval artifacts. Any actual ledger is still read
+        // below, including a single approval on a cumulative grant. Its prior
+        // selection cannot be erased from the immutable operation or frame.
+        let unused_cumulative = original
+            .is_some_and(|request| request.matching_grants_require_cumulative_approval())
+            && operation.threshold_proposal_hash().is_none()
+            && operation.approval_set_hash().is_none();
         if profile.is_some_and(|profile| profile.approval().is_some())
+            && operation.binding().participant_requirements().approval
+            && operation.threshold_proposal().is_none()
+            && !unused_cumulative
             && operation.governed_approval_ledger_digest().is_none()
         {
             return Err(invalid(
                 "caller custody omitted its selected approval authority",
             ));
         }
-        if profile.is_some_and(|profile| profile.dpop().is_some())
+        // A configured credential source alone does not require a claim. Use
+        // the original aggregate grant requirement, never a later selection.
+        if admission
+            .original_retained_request()
+            .is_some_and(|request| {
+                request.matching_grants_require_dpop()
+                    && request.authority_profile().dpop().is_some()
+            })
             && operation.dpop_replay_ledger_digest().is_none()
         {
             return Err(invalid(

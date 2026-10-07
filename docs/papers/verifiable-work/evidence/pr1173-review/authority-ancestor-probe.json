@@ -1,0 +1,6 @@
+{
+  "status": 500,
+  "body": "{\"error\":\"authority fence rejected mutation: authority file custody: database ancestor has unsafe ownership or write permissions\"}",
+  "state_mode": "0o700",
+  "ancestor_mode": "0o775"
+}

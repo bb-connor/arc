@@ -1,0 +1,102 @@
+{
+  "after": {
+    "holdCount": 1,
+    "holdDisposition": "reconciled",
+    "holdId": "admission-budget:ff433de275efd18c25465886562a87b3daf7e5e5a9b040f9341f54f9bcc3def9:0",
+    "operationCount": 1,
+    "operationId": "ff433de275efd18c25465886562a87b3daf7e5e5a9b040f9341f54f9bcc3def9"
+  },
+  "before": {
+    "holdCount": 1,
+    "holdDisposition": "reconciled",
+    "holdId": "admission-budget:ff433de275efd18c25465886562a87b3daf7e5e5a9b040f9341f54f9bcc3def9:0",
+    "operationCount": 1,
+    "operationId": "ff433de275efd18c25465886562a87b3daf7e5e5a9b040f9341f54f9bcc3def9"
+  },
+  "chain": {
+    "beneficiaryBalance": "0",
+    "escrowBalance": "0",
+    "events": {
+      "ClaimSubmitted": 1,
+      "DecisionRecorded": 0,
+      "Funded": 1,
+      "Paid": 0,
+      "Refunded": 1,
+      "TimedOut": 1
+    },
+    "fundingTransaction": "0x61647c40be83954345898061935cf73cb7111d35ecbc9aee2ae23e5166c9e7d6",
+    "paid": "0",
+    "payerBalance": "1000",
+    "refunded": "100",
+    "state": "Refunded",
+    "transactions": {
+      "pay": [],
+      "record": [],
+      "refund": [
+        {
+          "hash": "0x369b3e5ffc377cc6361a07c44cf5fcc96fcdf3710a83af8d42fd0656513c8ee0",
+          "nonce": 2,
+          "status": 1
+        }
+      ],
+      "submit": [
+        {
+          "hash": "0x70618eaa9f005139430bc9ba860f81b99359ead96f8c3524ddfc1685a6482cbb",
+          "nonce": 0,
+          "status": 1
+        }
+      ]
+    }
+  },
+  "checkpoint": "after-decision",
+  "first": {
+    "allocationId": "0x65f30a18eb602bc1b7ba93caa34be582bcaf2479809fdba6c26d6820fd5c2d73",
+    "authorityUuid": "01a0a2da-2027-7cc1-bf95-4d655f852999",
+    "authorizationId": "funded-65f30a18eb602bc1b7ba93caa34be582bcaf2479809fdba6c26d6820fd5c2d73",
+    "executions": 1,
+    "externalFundsTransferred": false,
+    "fundingCorrelation": "bound",
+    "holdId": "admission-budget:ff433de275efd18c25465886562a87b3daf7e5e5a9b040f9341f54f9bcc3def9:0",
+    "nativeAuthorizationId": "funded-65f30a18eb602bc1b7ba93caa34be582bcaf2479809fdba6c26d6820fd5c2d73",
+    "nativeEvaluationError": "durable admission failed: payment rail unavailable: exact ERC20 payout has not been observed; capture remains pending",
+    "nativePaymentAction": "capture",
+    "nativePaymentState": "Settling",
+    "nativeState": "Finalizing",
+    "operationId": "ff433de275efd18c25465886562a87b3daf7e5e5a9b040f9341f54f9bcc3def9",
+    "paymentState": "pending",
+    "profile": "chio.experimental.local-confirmed-funding.v1",
+    "requestId": "funded-native-w0",
+    "settlementObservationError": null,
+    "settlementTransaction": null,
+    "startupReconciliationError": null
+  },
+  "killedSignal": 9,
+  "replay": {
+    "allocationId": "0x65f30a18eb602bc1b7ba93caa34be582bcaf2479809fdba6c26d6820fd5c2d73",
+    "authorityUuid": "01a0a2da-2027-7cc1-bf95-4d655f852999",
+    "authorizationId": "funded-65f30a18eb602bc1b7ba93caa34be582bcaf2479809fdba6c26d6820fd5c2d73",
+    "executions": 1,
+    "externalFundsTransferred": true,
+    "fundingCorrelation": "bound",
+    "holdId": "admission-budget:ff433de275efd18c25465886562a87b3daf7e5e5a9b040f9341f54f9bcc3def9:0",
+    "nativeAuthorizationId": "funded-65f30a18eb602bc1b7ba93caa34be582bcaf2479809fdba6c26d6820fd5c2d73",
+    "nativePaymentAction": "capture",
+    "nativePaymentState": "Settling",
+    "nativeState": "Finalizing",
+    "operationId": "ff433de275efd18c25465886562a87b3daf7e5e5a9b040f9341f54f9bcc3def9",
+    "paymentState": "refunded",
+    "profile": "chio.experimental.local-confirmed-funding.v1",
+    "requestId": "funded-native-w0",
+    "settlementObservationError": null,
+    "settlementTransaction": "0x369b3e5ffc377cc6361a07c44cf5fcc96fcdf3710a83af8d42fd0656513c8ee0",
+    "startupReconciliationError": "durable admission failed: payment rail unavailable: exact ERC20 payout has not been observed; capture remains pending"
+  },
+  "verification": {
+    "decision": "unrecorded-expired",
+    "financial": "refund"
+  },
+  "retainedTransactions": {
+    "submit": "0x70618eaa9f005139430bc9ba860f81b99359ead96f8c3524ddfc1685a6482cbb",
+    "refund": "0x369b3e5ffc377cc6361a07c44cf5fcc96fcdf3710a83af8d42fd0656513c8ee0"
+  }
+}

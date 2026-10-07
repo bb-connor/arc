@@ -1,0 +1,13 @@
+{
+  "baselineScripts": [
+    "https_smoke.py",
+    "python_smoke.py",
+    "resolution_smoke.py"
+  ],
+  "build": "CARGO_TARGET_DIR=target cargo build --manifest-path examples/federated-work/Cargo.toml --locked",
+  "clippy": "CARGO_TARGET_DIR=target cargo clippy --manifest-path examples/federated-work/Cargo.toml --locked --all-targets -- -D warnings",
+  "paper": "make -C docs/papers/evidence-crosses",
+  "pythonTests": "/path/to/venv/bin/python -m unittest discover -s examples/federated-work/python_buyer -p 'test_*.py'",
+  "rustTests": "CARGO_TARGET_DIR=target cargo test --manifest-path examples/federated-work/Cargo.toml --locked",
+  "subcontract": "/path/to/venv/bin/python examples/federated-work/subcontract_smoke.py --binary target/debug/chio-federated-work --python-env /path/to/venv --output /tmp/fresh-subcontracts"
+}

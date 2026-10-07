@@ -1,0 +1,9 @@
+{
+  "schema": "chio.integration-intake.v1",
+  "mode": "independent",
+  "records": "records.csv",
+  "artifacts": {},
+  "operators": {},
+  "adjudications": {},
+  "scheduled_incidents": {}
+}

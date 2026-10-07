@@ -127,6 +127,46 @@ credential-side policy intersection) plus the real-`mod` `trust_tier.rs`.
 Excluded: `fuzz.rs` (libFuzzer entry points covered by the
 trust-boundary fuzz lane).
 
+#### `chio-federation`
+
+Examined: the treaty admission path -- the bilateral DSSE envelope
+(`bilateral_dsse.rs` plus `bilateral_dsse/{builder,policy,sign,types,
+typestate_handlers,verify}.rs`), the operational bilateral verifier
+(`bilateral_verifier.rs` plus `bilateral_verifier/{config,cosign,error,
+state,support,treaty}.rs`), the co-signing producer and its rejection-code
+taxonomy (`bilateral.rs`), and the treaty scope, ladder intersection, and
+bilateral invocation validators (`treaty.rs`). The two umbrella files are
+`mod` declarations over their directories, so the child files are listed
+explicitly.
+
+Excluded: `_generated/**` (the typestate producer generated behind the
+`typestate` feature) and the crate's remaining modules (quorum, reputation,
+gossip, FROST, open admission, trust establishment), which are not on the
+treaty path.
+
+#### `chio-runtime-core`
+
+Examined: the treaty half of the runtime admission hook --
+`admission_hook.rs` (continuation reservation, consumption, and release)
+and its module directory (`admission_hook/*.rs`), which carries
+`treaty_ref.rs` (parses the `chioTreaty` request context and rejects
+request-borne trust), `store_artifacts.rs` (resolves treaty artifacts from
+the store), and `dsse.rs` and `treaty_evidence.rs` (envelope and
+evidence-chain verification before dispatch) -- plus `treaty.rs` and
+`treaty/predicate.rs` (the treaty validators and the bounded predicate
+evaluator) and `store/sqlite/admission_replay.rs` (the durable replay
+fence). The scope is written as a directory glob rather than as a list of
+filenames so that splitting the hook into further children cannot silently
+take the reserve/consume/release logic out of the shard. The PR lane runs
+the crate's own tests as the oracle;
+`tests/runtime_treaty_continuation_reopen.rs` is the target that
+distinguishes a live replay fence from a release that silently does
+nothing.
+
+Excluded: the `admission_hook/swarm_*.rs` children (the swarm-authority
+lane), and buyer review, orchestration, trust floors, and the JSON and
+in-memory stores; they are not on the treaty path.
+
 ## Formal model co-coverage
 
 Two scheduled mutation lanes measure whether the verification properties can
@@ -226,7 +266,7 @@ Workflow: `.github/workflows/mutants.yml`.
 Two jobs:
 
 - `mutants-pr` -- triggered when a PR changes source or mutation controls for
-  one of the six trust-boundary crates. Untouched matrix packages stop before
+  one of the eight trust-boundary crates. Untouched matrix packages stop before
   installing Rust or cargo-mutants. A selected package runs
   `cargo mutants --in-diff "$GIT_DIFF" --no-shuffle --jobs 2` with its
   per-crate `mutants.toml`. Same-repository PRs receive a summary comment and

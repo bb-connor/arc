@@ -32,6 +32,20 @@ function persist(directory, name, value) {
   try { fs.fsyncSync(parent); } finally { fs.closeSync(parent); }
 }
 
+// Decode application content for the model only. Signed receipt events remain
+// unchanged, and the driver verifies their original envelopes independently.
+export function decodePreparedOutput(value) {
+  assert.equal(value?.isError, false, "prepared resource did not return a result");
+  const response = value.structuredContent;
+  assert.equal(response?.status, 200);
+  assert.equal(response.evidence?.schema, "chio.broker-execution-evidence.v2");
+  assert.ok(Array.isArray(response.body) && response.body.length <= 131072);
+  assert.ok(response.body.every(byte => Number.isInteger(byte) && byte >= 0 && byte <= 255));
+  const decoded = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(Uint8Array.from(response.body)));
+  assert.equal(decoded?.isError, false, "resource returned a tool error");
+  return decoded;
+}
+
 export async function execute(bootstrap) {
   const settings = bootstrap.input;
   assert.equal(settings.worker_sha256, createHash("sha256").update(fs.readFileSync(fileURLToPath(import.meta.url))).digest("hex"), "worker source changed");
@@ -59,7 +73,15 @@ export async function execute(bootstrap) {
     baseURL: settings.provider === "openrouter" ? "https://openrouter.ai/api/v1" : "https://api.openai.com/v1",
     apiKey: key,
   });
-  const client = new processModule.ProcessClient(bootstrap.connection.socket_path, bootstrap.connection.credential);
+  class PreparedClient extends processModule.ProcessClient {
+    async invoke(operation, server, tool, args, options) {
+      const prepared = await this.prepareInvocation(operation, server, tool, args);
+      assert.equal(prepared?.schema, "chio.broker-execute.v1", "invalid host preparation");
+      return super.invoke(operation, server, tool, prepared, options);
+    }
+  }
+  const Client = settings.prepared_broker ? PreparedClient : processModule.ProcessClient;
+  const client = new Client(bootstrap.connection.socket_path, bootstrap.connection.credential);
   const receipts = [];
   const modelKey = createHash("sha256").update(JSON.stringify({ schema: "shared-resource-ai-sdk-v1", settings, versions })).digest("hex");
   const started = performance.now();
@@ -92,6 +114,9 @@ export async function execute(bootstrap) {
     },
   }).run(bindings => sdk.generateText({
     ...bindings,
+    ...(settings.prepared_broker ? { tools: Object.fromEntries(Object.entries(bindings.tools).map(([name, tool]) => [name, {
+      ...tool, execute: async (...args) => decodePreparedOutput(await tool.execute(...args)),
+    }])) } : {}),
     system: settings.instruction,
     prompt: "Assigned services: " + JSON.stringify(settings.services),
     maxRetries: 0,

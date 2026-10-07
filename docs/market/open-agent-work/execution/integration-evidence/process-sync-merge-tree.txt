@@ -1,0 +1,25 @@
+eb0189ea79022e76b0a3431d366c57617a230fb5
+docs/formal/COVERAGE.md
+
+Auto-merging .clusterfuzzlite/build.sh
+Auto-merging .github/workflows/fuzz.yml
+Auto-merging .gitignore
+Auto-merging Cargo.lock
+Auto-merging README.md
+Auto-merging crates/kernel/chio-kernel/README.md
+Auto-merging crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs
+Auto-merging crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal.rs
+Auto-merging crates/platform/chio-store-sqlite/src/admission_operation_store.rs
+Auto-merging crates/platform/chio-store-sqlite/src/admission_operation_store_tests.rs
+Auto-merging crates/platform/chio-store-sqlite/src/admission_operation_store_tests/recovery.rs
+Auto-merging docs/README.md
+Auto-merging docs/formal/COVERAGE.md
+CONFLICT (content): Merge conflict in docs/formal/COVERAGE.md
+Auto-merging formal/proof-manifest.toml
+Auto-merging fuzz/Cargo.toml
+Auto-merging fuzz/README.md
+Auto-merging fuzz/corpus_metadata.toml
+Auto-merging fuzz/oss-fuzz/build.sh
+Auto-merging fuzz/owners.toml
+Auto-merging fuzz/target-map.toml
+Auto-merging fuzz/tests/smoke.rs

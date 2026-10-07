@@ -1,0 +1,105 @@
+
+running 21 tests
+test admission::preparation::tests::commit_uses_owned_inputs_after_preparation_locals_are_dropped ... ok
+test admission_hook::dsse::tests::each_reference_binding_is_checked_independently_of_store_validation ... ok
+test replay_source::tests::marker_identity_is_kind_and_resource_not_historical_admission ... ok
+test admission::preparation::tests::commit_rechecks_trust_floor_advanced_after_preparation ... ok
+test replay_source::tests::source_evidence_rejects_tampering_and_noncanonical_encodings ... ok
+test admission::preparation::tests::supplied_bundle_preparation_and_drop_do_not_call_store ... ok
+test admission_hook::dsse::tests::agreeing_malformed_scope_is_still_rejected ... ok
+test replay_source::tests::source_evidence_round_trips_exact_identity_without_exposing_marker_debug ... ok
+test admission::preparation::tests::destructive_preparation_and_drop_never_reserve_or_claim_the_lease ... ok
+test treaty::tests::ladder_mode_rank_agrees_with_federation_on_every_spelling ... ok
+test types::presentation_window_tests::a_receiver_that_resolved_nothing_has_no_window ... ok
+test types::presentation_window_tests::each_counterparty_gets_the_intervals_resolved_for_it ... ok
+test types::presentation_window_tests::intervals_that_do_not_overlap_close_the_window ... ok
+test types::presentation_window_tests::a_record_the_receiver_cannot_read_an_interval_out_of_is_refused ... ok
+test types::presentation_window_tests::the_window_owns_the_upper_bound_of_any_validity_presented_to_it ... ok
+test types::presentation_window_tests::withdrawing_one_counterparty_record_closes_that_counterparty_alone ... ok
+test validation::evidence::tests::relative_evidence_path_helper_accepts_only_safe_paths ... ok
+test schema::identity_fixture_tests::runtime_schema_identities_match_canonical_fixture ... ok
+test admission::preparation::tests::destructive_commit_releases_lease_when_trust_floor_advanced_after_preparation ... ok
+test types::presentation_window_tests::the_window_is_the_intersection_of_the_resolved_intervals ... ok
+test replay_source::tests::source_bounds_reject_complete_input_without_truncation ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+
+running 8 tests
+test heartbeat_zero_is_not_stale_until_the_timeout_has_elapsed ... ok
+test lease_expiry_checks_both_integer_ranges_before_publishing ... ok
+test scheduler_fencing_exhaustion_rolls_back_an_earlier_claim ... ok
+test competing_owners_fence_once_and_old_heartbeats_cannot_revive_after_reopen ... ok
+test a_late_scheduler_write_failure_rolls_back_expirations_claims_and_tick ... ok
+test refused_heartbeats_preserve_every_persisted_field ... ok
+test fencing_exhaustion_and_invalid_tokens_survive_reopen_without_replacement ... ok
+test competing_schedulers_share_one_capacity_snapshot ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+
+running 13 tests
+test exact_expiry_uses_owned_time_instead_of_retained_caller_timestamp ... ok
+test transactions::owned_time_is_observed_inside_the_sqlite_write_transaction ... ok
+test owned_clock_failure_prevents_step_mutation ... ok
+test transactions::registration_cannot_reset_completed_work_or_mint_step_authority ... ok
+test stale_run_owner_cannot_overwrite_successor_after_reopen ... ok
+test stale_step_owner_cannot_replace_successor_receipt_or_destructive_flag ... ok
+test transactions::run_identity_owner_lease_and_fence_are_independently_bound ... ok
+test stale_owner_cannot_add_evidence_that_changes_successor_recovery ... ok
+test transactions::late_artifact_failure_rolls_back_run_steps_heartbeat_and_release ... ok
+test transactions::competing_takeovers_and_stale_progress_share_one_fence ... ok
+test transactions::write_clock_floor_survives_reopen_and_cannot_be_backdated ... ok
+test transactions::noninteger_durable_times_cannot_extend_or_authorize_a_lease ... ok
+test transactions::corrupt_durable_lease_fields_cannot_authorize_or_change_data ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.89s
+
+
+running 7 tests
+test outcome_claim_subprocess_worker ... ok
+test activation_is_immutable_and_has_no_new_token_reset_path ... ok
+test fresh_evidence_attempt_and_artifact_cannot_recreate_consumed_authority ... ok
+test competing_receiver_processes_spend_exactly_one_effect_slot ... ok
+test revocation_and_expiry_are_rechecked_at_claim_time ... ok
+test killed_dispatchers_preserve_uncertainty_before_and_after_the_external_effect ... ok
+test receiver_rule_binds_every_effect_and_outcome_input_without_burning_the_slot ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.53s
+
+
+running 100 tests
+test chio_native_runtime_admission_schema_emits_chio_report ... ok
+test chio_runtime_hook_denies_swarm_context_without_required_evidence_refs ... ok
+test chio_runtime_hook_releases_chio_native_reserved_state_after_kernel_abort ... ok
+test fault_cases::destructive_consume_error_preserves_same_admission_replay_marker ... ok
+test chio_runtime_hook_denies_swarm_route_selection_id_mismatch_before_dispatch ... ok
+test chio_runtime_hook_denies_incomplete_swarm_route_metadata_before_dispatch ... ok
+test chio_runtime_hook_denies_swarm_missing_route_metadata_before_dispatch ... ok
+test chio_runtime_hook_denies_stale_swarm_continuation_before_dispatch ... ok
+test fault_cases::destructive_consume_panic_preserves_same_admission_replay_marker ... ok
+test chio_runtime_hook_denies_swarm_route_plan_not_bound_to_continuation ... ok
+test chio_runtime_hook_denies_swarm_continuation_expired_since_storage ... ok
+test chio_runtime_hook_denies_swarm_route_metadata_mismatch_before_dispatch ... ok
+test chio_runtime_hook_revalidates_resumable_swarm_continuation_without_replay_denial ... ok
+test fault_cases::ambiguous_release_failure_is_not_retried_after_same_admission_reacquire ... ok
+test fault_cases::runtime_trust_floor_panic_is_denied_and_releases_destructive_lease ... ok
+test fault_cases::destructive_release_panic_does_not_block_treaty_or_swarm_release ... ok
+test chio_runtime_hook_revalidates_reserved_swarm_continuation_then_denies_replay ... ok
+test fault_cases::preparation::trust_floor_write_then_panic_denies_and_releases_only_confirmed_reservations ... ok
+test fault_cases::mixed_release_failures_preserve_each_failed_id_and_reason ... ok
+test fault_cases::preparation::first_bundle_lookup_panic_never_enters_participant_commit ... ok
+test fault_cases::destructive_release_error_does_not_block_treaty_or_swarm_release ... ok
+test fault_cases::destructive_consume_panic_releases_only_observed_continuation_reservations ... ok
+test fault_cases::treaty_consume_error_preserves_same_admission_replay_marker ... ok
+test fault_cases::preparation::treaty_payload_is_hashed_independently_of_the_stores_advertised_digest ... ok
+test matching_destructive_admission_accepts_once_then_rejects_replay ... ok
+test kernel_hook_rejects_treaty_dsse_policy_verdict_disagreement ... ok
+test kernel_hook_rejects_treaty_dsse_unanimous_deny ... ok
+test fault_cases::preparation::pinned_bundle_is_the_only_snapshot_used_by_treaty_and_core_admission ... ok
+test kernel_hook_uses_configured_runtime_policy_to_deny ... ok
+test fault_cases::treaty_consume_panic_preserves_same_admission_replay_marker ... ok
+test fault_cases::swarm_consume_error_releases_treaty_and_preserves_same_admission_swarm_marker ... ok
+test fault_cases::swarm_consume_panic_releases_treaty_and_preserves_same_admission_swarm_marker ... ok
+test fault_cases::consume_then_error_or_panic_keeps_ambiguous_marker_and_releases_only_prior_participants ... ok
+test fault_cases::preparation::invalid_core_preparation_never_consumes_continuations_or_updates_trust_floor ... ok

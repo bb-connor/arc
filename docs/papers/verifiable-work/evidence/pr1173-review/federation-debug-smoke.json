@@ -1,0 +1,2444 @@
+{
+  "admitted": {
+    "calls": 2,
+    "dispatched": 2,
+    "evidencePreparation": {
+      "max_ms": 51.8,
+      "mean_ms": 49.778999999999996,
+      "median_ci_high_ms": 51.8,
+      "median_ci_low_ms": 47.758,
+      "min_ms": 47.758,
+      "p50_ms": 49.778999999999996,
+      "p99_ms": 51.75958,
+      "samples": 2,
+      "std_ms": 2.8581256095560215
+    },
+    "freshnessDenialsAbsorbed": 0,
+    "receiverBudget": {
+      "attributed": {
+        "max_ms": 384.032843,
+        "mean_ms": 381.624048,
+        "median_ci_high_ms": 384.032843,
+        "median_ci_low_ms": 379.215253,
+        "min_ms": 379.215253,
+        "p50_ms": 381.624048,
+        "p99_ms": 383.9846671,
+        "samples": 2,
+        "shareOfWindow": 0.8607232867814226,
+        "std_ms": 3.4065505579764963
+      },
+      "notDecomposed": [
+        "the guard pipeline around the admission hook",
+        "the binding comparisons between the request's citations and the receiver-resolved artifacts",
+        "both DSSE signature verifications",
+        "canonicalization of the artifacts those comparisons hash",
+        "receipt construction and signing"
+      ],
+      "operationsPerCall": {
+        "admission_durable_ops": {
+          "max": 33,
+          "median": 33,
+          "min": 31
+        },
+        "continuation_ops": {
+          "max": 1,
+          "median": 1,
+          "min": 1
+        },
+        "cosign_hops": {
+          "max": 2,
+          "median": 2,
+          "min": 2
+        },
+        "dispatch_ops": {
+          "max": 1,
+          "median": 1,
+          "min": 1
+        },
+        "lease_ops": {
+          "max": 1,
+          "median": 1,
+          "min": 1
+        },
+        "receipt_append_ops": {
+          "max": 1,
+          "median": 1,
+          "min": 1
+        },
+        "receipt_other_ops": {
+          "max": 4,
+          "median": 4,
+          "min": 4
+        },
+        "revocation_ops": {
+          "max": 2,
+          "median": 2,
+          "min": 2
+        },
+        "store_resolve_ops": {
+          "max": 18,
+          "median": 18,
+          "min": 18
+        },
+        "tool_outcome_durable_ops": {
+          "max": 9,
+          "median": 9,
+          "min": 9
+        },
+        "trust_floor_ops": {
+          "max": 2,
+          "median": 2,
+          "min": 2
+        }
+      },
+      "parts": {
+        "continuationConsume": {
+          "max_ms": 4.901944,
+          "mean_ms": 4.0984,
+          "median_ci_high_ms": 4.901944,
+          "median_ci_low_ms": 3.294856,
+          "min_ms": 3.294856,
+          "p50_ms": 4.0984,
+          "p99_ms": 4.88587312,
+          "samples": 2,
+          "shareOfWindow": 0.009243621666486233,
+          "std_ms": 1.1363828227635266
+        },
+        "cosignConnect": {
+          "max_ms": 24.252958,
+          "mean_ms": 20.275638999999998,
+          "median_ci_high_ms": 24.252958,
+          "median_ci_low_ms": 16.29832,
+          "min_ms": 16.29832,
+          "p50_ms": 20.275638999999998,
+          "p99_ms": 24.17341162,
+          "samples": 2,
+          "shareOfWindow": 0.04573012296560932,
+          "std_ms": 5.624778471684196
+        },
+        "cosignExchange": {
+          "max_ms": 22.966672,
+          "mean_ms": 20.053098499999997,
+          "median_ci_high_ms": 22.966672,
+          "median_ci_low_ms": 17.139525,
+          "min_ms": 17.139525,
+          "p50_ms": 20.053098499999997,
+          "p99_ms": 22.908400529999998,
+          "samples": 2,
+          "shareOfWindow": 0.04522820021832485,
+          "std_ms": 4.120415158670847
+        },
+        "dispatch": {
+          "max_ms": 0.00528,
+          "mean_ms": 0.00526,
+          "median_ci_high_ms": 0.00528,
+          "median_ci_low_ms": 0.00524,
+          "min_ms": 0.00524,
+          "p50_ms": 0.00526,
+          "p99_ms": 0.0052796,
+          "samples": 2,
+          "shareOfWindow": 1.1863519901844034e-05,
+          "std_ms": 2.8284271247461973e-05
+        },
+        "durableAdmissionOperations": {
+          "max_ms": 243.858675,
+          "mean_ms": 234.91097150000002,
+          "median_ci_high_ms": 243.858675,
+          "median_ci_low_ms": 225.963268,
+          "min_ms": 225.963268,
+          "p50_ms": 234.91097150000002,
+          "p99_ms": 243.67972093,
+          "samples": 2,
+          "shareOfWindow": 0.5298233812836058,
+          "std_ms": 12.653963641793215
+        },
+        "durableReceiptAppend": {
+          "max_ms": 10.922094,
+          "mean_ms": 9.737948,
+          "median_ci_high_ms": 10.922094,
+          "median_ci_low_ms": 8.553802,
+          "min_ms": 8.553802,
+          "p50_ms": 9.737948,
+          "p99_ms": 10.898411079999999,
+          "samples": 2,
+          "shareOfWindow": 0.02196318249070766,
+          "std_ms": 1.6746353330298513
+        },
+        "durableToolOutcome": {
+          "max_ms": 81.256759,
+          "mean_ms": 78.2057025,
+          "median_ci_high_ms": 81.256759,
+          "median_ci_low_ms": 75.154646,
+          "min_ms": 75.154646,
+          "p50_ms": 78.2057025,
+          "p99_ms": 81.19573787,
+          "samples": 2,
+          "shareOfWindow": 0.17638686464761288,
+          "std_ms": 4.3148454818665885
+        },
+        "evidenceResolution": {
+          "max_ms": 3.214573,
+          "mean_ms": 3.1014935,
+          "median_ci_high_ms": 3.214573,
+          "median_ci_low_ms": 2.988414,
+          "min_ms": 2.988414,
+          "p50_ms": 3.1014935,
+          "p99_ms": 3.2123114100000003,
+          "samples": 2,
+          "shareOfWindow": 0.0069951767799790706,
+          "std_ms": 0.1599185625263684
+        },
+        "leaseConsume": {
+          "max_ms": 3.989779,
+          "mean_ms": 3.8647590000000003,
+          "median_ci_high_ms": 3.989779,
+          "median_ci_low_ms": 3.739739,
+          "min_ms": 3.739739,
+          "p50_ms": 3.8647590000000003,
+          "p99_ms": 3.9872786000000002,
+          "samples": 2,
+          "shareOfWindow": 0.008716662606907006,
+          "std_ms": 0.1768049795678842
+        },
+        "receiptStoreOther": {
+          "max_ms": 10.409211,
+          "mean_ms": 6.01301,
+          "median_ci_high_ms": 10.409211,
+          "median_ci_low_ms": 1.616809,
+          "min_ms": 1.616809,
+          "p50_ms": 6.01301,
+          "p99_ms": 10.321286980000002,
+          "samples": 2,
+          "shareOfWindow": 0.013561875248096425,
+          "std_ms": 6.217167077118163
+        },
+        "revocationStore": {
+          "max_ms": 0.28544,
+          "mean_ms": 0.2732005,
+          "median_ci_high_ms": 0.28544,
+          "median_ci_low_ms": 0.260961,
+          "min_ms": 0.260961,
+          "p50_ms": 0.2732005,
+          "p99_ms": 0.28519521000000003,
+          "samples": 2,
+          "shareOfWindow": 0.0006161824275558443,
+          "std_ms": 0.017309266896665516
+        },
+        "trustFloor": {
+          "max_ms": 1.94265,
+          "mean_ms": 1.0845655,
+          "median_ci_high_ms": 1.94265,
+          "median_ci_low_ms": 0.226481,
+          "min_ms": 0.226481,
+          "p50_ms": 1.0845655,
+          "p99_ms": 1.92548831,
+          "samples": 2,
+          "shareOfWindow": 0.0024461529266356324,
+          "std_ms": 1.213514737562136
+        }
+      },
+      "toleranceMs": 0.05,
+      "unattributed": {
+        "max_ms": 63.345672,
+        "mean_ms": 61.752307,
+        "median_ci_high_ms": 63.345672,
+        "median_ci_low_ms": 60.158942,
+        "min_ms": 60.158942,
+        "p50_ms": 61.752307,
+        "p99_ms": 63.313804700000006,
+        "samples": 2,
+        "shareOfWindow": 0.13927751389339973,
+        "std_ms": 2.2533583928106045
+      },
+      "window": {
+        "max_ms": 447.378,
+        "mean_ms": 443.376,
+        "median_ci_high_ms": 447.378,
+        "median_ci_low_ms": 439.374,
+        "min_ms": 439.374,
+        "p50_ms": 443.376,
+        "p99_ms": 447.29796,
+        "samples": 2,
+        "std_ms": 5.6596826766171
+      },
+      "worstAttributedMinusWindowMs": -60.158747000000005
+    },
+    "receiverEvaluate": {
+      "max_ms": 447.378,
+      "mean_ms": 443.376,
+      "median_ci_high_ms": 447.378,
+      "median_ci_low_ms": 439.374,
+      "min_ms": 439.374,
+      "p50_ms": 443.376,
+      "p99_ms": 447.29796,
+      "samples": 2,
+      "std_ms": 5.6596826766171
+    },
+    "roundTrip": {
+      "max_ms": 459.966537,
+      "mean_ms": 456.5728405,
+      "median_ci_high_ms": 459.966537,
+      "median_ci_low_ms": 453.179144,
+      "min_ms": 453.179144,
+      "p50_ms": 456.5728405,
+      "p99_ms": 459.89866307,
+      "samples": 2,
+      "std_ms": 4.7994116168781105
+    }
+  },
+  "benchmarkInputTreeSha256": "d7d0fe8957183351c27996a472ede3060be43b07ba6a938309aa473389c54f08",
+  "commit": "bec4c83fe00590da5de5af6749aebf168719d445",
+  "concurrent": {
+    "budgetContaminatedCalls": 2,
+    "budgetReported": false,
+    "calls": 2,
+    "callsPerWorker": 1,
+    "dispatched": 2,
+    "freshnessDenialsAbsorbed": 0,
+    "roundTrip": {
+      "max_ms": 766.022278,
+      "mean_ms": 750.5574625,
+      "median_ci_high_ms": 766.022278,
+      "median_ci_low_ms": 735.092647,
+      "min_ms": 735.092647,
+      "p50_ms": 750.5574625,
+      "p99_ms": 765.71298169,
+      "samples": 2,
+      "std_ms": 21.87055181969764
+    },
+    "sequentialEndToEnd": {
+      "max_ms": 511.766537,
+      "mean_ms": 506.3518405,
+      "median_ci_high_ms": 511.766537,
+      "median_ci_low_ms": 500.937144,
+      "min_ms": 500.937144,
+      "p50_ms": 506.3518405,
+      "p99_ms": 511.65824307,
+      "samples": 2,
+      "std_ms": 7.657537226434156
+    },
+    "sequentialThroughputCallsPerSecond": 1.9749113561284666,
+    "throughputCallsPerSecond": 2.3111087860329564,
+    "wallClockMs": 865.385486,
+    "workers": 2
+  },
+  "continuationRace": {
+    "admittedLatency": {
+      "max_ms": 540.7494929999999,
+      "mean_ms": 532.931075,
+      "median_ci_high_ms": 540.7494929999999,
+      "median_ci_low_ms": 525.112657,
+      "min_ms": 525.112657,
+      "p50_ms": 532.931075,
+      "p99_ms": 540.5931246399999,
+      "samples": 2,
+      "std_ms": 11.05691277190186
+    },
+    "admittedPerRound": 1,
+    "dispatched": 2,
+    "distinctWinners": 1,
+    "expectedDispatched": 2,
+    "freshnessDenialsAbsorbed": 0,
+    "replayFailureCode": "chio_treaty_continuation_replay",
+    "replayedLatency": {
+      "max_ms": 202.587474,
+      "mean_ms": 192.2526235,
+      "median_ci_high_ms": 202.587474,
+      "median_ci_low_ms": 181.917773,
+      "min_ms": 181.917773,
+      "p50_ms": 192.2526235,
+      "p99_ms": 202.38077699,
+      "samples": 2,
+      "std_ms": 14.615685742198345
+    },
+    "rounds": 2,
+    "roundsAttempted": 2,
+    "roundsDiscarded": 0,
+    "winnersByWorker": {
+      "0": 2
+    },
+    "workers": 2
+  },
+  "denied": {
+    "cases": {
+      "intersection_hash_mismatch": {
+        "calls": 2,
+        "cosignConnectionsPerCall": 1,
+        "dispatched": 0,
+        "expectedDispatched": 0,
+        "failureCode": "chio_treaty_intersection_mismatch",
+        "freshnessDenialsAbsorbed": 0,
+        "roundTrip": {
+          "max_ms": 119.656107,
+          "mean_ms": 116.465851,
+          "median_ci_high_ms": 119.656107,
+          "median_ci_low_ms": 113.275595,
+          "min_ms": 113.275595,
+          "p50_ms": 116.465851,
+          "p99_ms": 119.59230188000001,
+          "samples": 2,
+          "std_ms": 4.511703302642148
+        }
+      },
+      "missing_required_evidence": {
+        "calls": 2,
+        "cosignConnectionsPerCall": 1,
+        "dispatched": 0,
+        "expectedDispatched": 0,
+        "failureCode": "chio_treaty_missing_required_evidence",
+        "freshnessDenialsAbsorbed": 0,
+        "roundTrip": {
+          "max_ms": 114.026039,
+          "mean_ms": 110.09098,
+          "median_ci_high_ms": 114.026039,
+          "median_ci_low_ms": 106.155921,
+          "min_ms": 106.155921,
+          "p50_ms": 110.09098,
+          "p99_ms": 113.94733782,
+          "samples": 2,
+          "std_ms": 5.565013806538302
+        }
+      },
+      "scope_hash_mismatch": {
+        "calls": 2,
+        "cosignConnectionsPerCall": 1,
+        "dispatched": 0,
+        "expectedDispatched": 0,
+        "failureCode": "chio_treaty_scope_hash_mismatch",
+        "freshnessDenialsAbsorbed": 0,
+        "roundTrip": {
+          "max_ms": 119.955789,
+          "mean_ms": 109.1168155,
+          "median_ci_high_ms": 119.955789,
+          "median_ci_low_ms": 98.277842,
+          "min_ms": 98.277842,
+          "p50_ms": 109.1168155,
+          "p99_ms": 119.73900953,
+          "samples": 2,
+          "std_ms": 15.328623325902567
+        }
+      },
+      "smuggled_dynamic_trust": {
+        "calls": 2,
+        "cosignConnectionsPerCall": 1,
+        "dispatched": 0,
+        "expectedDispatched": 0,
+        "failureCode": "request_smuggled_dynamic_trust",
+        "freshnessDenialsAbsorbed": 0,
+        "roundTrip": {
+          "max_ms": 111.666267,
+          "mean_ms": 110.0519795,
+          "median_ci_high_ms": 111.666267,
+          "median_ci_low_ms": 108.437692,
+          "min_ms": 108.437692,
+          "p50_ms": 110.0519795,
+          "p99_ms": 111.63398125,
+          "samples": 2,
+          "std_ms": 2.282947276069362
+        }
+      },
+      "smuggled_trust_root": {
+        "calls": 2,
+        "cosignConnectionsPerCall": 1,
+        "dispatched": 0,
+        "expectedDispatched": 0,
+        "failureCode": "request_smuggled_trust_root",
+        "freshnessDenialsAbsorbed": 0,
+        "roundTrip": {
+          "max_ms": 107.070846,
+          "mean_ms": 102.3478625,
+          "median_ci_high_ms": 107.070846,
+          "median_ci_low_ms": 97.624879,
+          "min_ms": 97.624879,
+          "p50_ms": 102.3478625,
+          "p99_ms": 106.97638633,
+          "samples": 2,
+          "std_ms": 6.679307320564346
+        }
+      },
+      "unknown_ladder_intersection": {
+        "calls": 2,
+        "cosignConnectionsPerCall": 1,
+        "dispatched": 0,
+        "expectedDispatched": 0,
+        "failureCode": "chio_treaty_missing_intersection",
+        "freshnessDenialsAbsorbed": 0,
+        "roundTrip": {
+          "max_ms": 123.576487,
+          "mean_ms": 113.53907749999999,
+          "median_ci_high_ms": 123.576487,
+          "median_ci_low_ms": 103.501668,
+          "min_ms": 103.501668,
+          "p50_ms": 113.53907749999999,
+          "p99_ms": 123.37573881,
+          "samples": 2,
+          "std_ms": 14.19504064599255
+        }
+      },
+      "unknown_treaty_scope": {
+        "calls": 2,
+        "cosignConnectionsPerCall": 1,
+        "dispatched": 0,
+        "expectedDispatched": 0,
+        "failureCode": "chio_treaty_missing_scope",
+        "freshnessDenialsAbsorbed": 0,
+        "roundTrip": {
+          "max_ms": 116.21549,
+          "mean_ms": 110.53918250000001,
+          "median_ci_high_ms": 116.21549,
+          "median_ci_low_ms": 104.862875,
+          "min_ms": 104.862875,
+          "p50_ms": 110.53918250000001,
+          "p99_ms": 116.10196385,
+          "samples": 2,
+          "std_ms": 8.027511050700117
+        }
+      }
+    },
+    "freshnessDenialsAbsorbed": 0,
+    "receiverBudgets": {
+      "intersection_hash_mismatch": {
+        "attributed": {
+          "max_ms": 92.46465,
+          "mean_ms": 90.4840025,
+          "median_ci_high_ms": 92.46465,
+          "median_ci_low_ms": 88.503355,
+          "min_ms": 88.503355,
+          "p50_ms": 90.4840025,
+          "p99_ms": 92.42503705000001,
+          "samples": 2,
+          "shareOfWindow": 0.928774545025302,
+          "std_ms": 2.8010585567803696
+        },
+        "notDecomposed": [
+          "the guard pipeline around the admission hook",
+          "the binding comparisons between the request's citations and the receiver-resolved artifacts",
+          "both DSSE signature verifications",
+          "canonicalization of the artifacts those comparisons hash",
+          "receipt construction and signing"
+        ],
+        "operationsPerCall": {
+          "admission_durable_ops": {
+            "max": 11,
+            "median": 11,
+            "min": 11
+          },
+          "continuation_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "cosign_hops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "dispatch_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "lease_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "receipt_append_ops": {
+            "max": 1,
+            "median": 1,
+            "min": 1
+          },
+          "receipt_other_ops": {
+            "max": 2,
+            "median": 2,
+            "min": 2
+          },
+          "revocation_ops": {
+            "max": 1,
+            "median": 1,
+            "min": 1
+          },
+          "store_resolve_ops": {
+            "max": 3,
+            "median": 3,
+            "min": 3
+          },
+          "tool_outcome_durable_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "trust_floor_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          }
+        },
+        "parts": {
+          "continuationConsume": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "cosignConnect": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "cosignExchange": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "dispatch": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "durableAdmissionOperations": {
+            "max_ms": 76.932057,
+            "mean_ms": 75.084787,
+            "median_ci_high_ms": 76.932057,
+            "median_ci_low_ms": 73.237517,
+            "min_ms": 73.237517,
+            "p50_ms": 75.084787,
+            "p99_ms": 76.89511159999999,
+            "samples": 2,
+            "shareOfWindow": 0.7707090420126664,
+            "std_ms": 2.6124342873649495
+          },
+          "durableReceiptAppend": {
+            "max_ms": 13.788588,
+            "mean_ms": 11.687257500000001,
+            "median_ci_high_ms": 13.788588,
+            "median_ci_low_ms": 9.585927,
+            "min_ms": 9.585927,
+            "p50_ms": 11.687257500000001,
+            "p99_ms": 13.74656139,
+            "samples": 2,
+            "shareOfWindow": 0.11996404853063446,
+            "std_ms": 2.971730092128238
+          },
+          "durableToolOutcome": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "evidenceResolution": {
+            "max_ms": 0.552841,
+            "mean_ms": 0.5242020000000001,
+            "median_ci_high_ms": 0.552841,
+            "median_ci_low_ms": 0.495563,
+            "min_ms": 0.495563,
+            "p50_ms": 0.5242020000000001,
+            "p99_ms": 0.55226822,
+            "samples": 2,
+            "shareOfWindow": 0.005380680126869425,
+            "std_ms": 0.04050166221280311
+          },
+          "leaseConsume": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "receiptStoreOther": {
+            "max_ms": 4.701783,
+            "mean_ms": 2.9827545,
+            "median_ci_high_ms": 4.701783,
+            "median_ci_low_ms": 1.263726,
+            "min_ms": 1.263726,
+            "p50_ms": 2.9827545,
+            "p99_ms": 4.66740243,
+            "samples": 2,
+            "shareOfWindow": 0.030616533056875686,
+            "std_ms": 2.431073418805878
+          },
+          "revocationStore": {
+            "max_ms": 0.226082,
+            "mean_ms": 0.2050015,
+            "median_ci_high_ms": 0.226082,
+            "median_ci_low_ms": 0.183921,
+            "min_ms": 0.183921,
+            "p50_ms": 0.2050015,
+            "p99_ms": 0.22566039000000002,
+            "samples": 2,
+            "shareOfWindow": 0.0021042412982560585,
+            "std_ms": 0.029812329001606033
+          },
+          "trustFloor": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          }
+        },
+        "toleranceMs": 0.05,
+        "unattributed": {
+          "max_ms": 7.047394,
+          "mean_ms": 6.9394755,
+          "median_ci_high_ms": 7.047394,
+          "median_ci_low_ms": 6.831557,
+          "min_ms": 6.831557,
+          "p50_ms": 6.9394755,
+          "p99_ms": 7.04523563,
+          "samples": 2,
+          "shareOfWindow": 0.07123036141362923,
+          "std_ms": 0.1526198063309606
+        },
+        "window": {
+          "max_ms": 99.296,
+          "mean_ms": 97.423,
+          "median_ci_high_ms": 99.296,
+          "median_ci_low_ms": 95.55,
+          "min_ms": 95.55,
+          "p50_ms": 97.423,
+          "p99_ms": 99.25854000000001,
+          "samples": 2,
+          "std_ms": 2.6488220023248137
+        },
+        "worstAttributedMinusWindowMs": -6.8313500000000005
+      },
+      "missing_required_evidence": {
+        "attributed": {
+          "max_ms": 88.678275,
+          "mean_ms": 83.6753295,
+          "median_ci_high_ms": 88.678275,
+          "median_ci_low_ms": 78.672384,
+          "min_ms": 78.672384,
+          "p50_ms": 83.6753295,
+          "p99_ms": 88.57821609000001,
+          "samples": 2,
+          "shareOfWindow": 0.8825487496176604,
+          "std_ms": 7.075233377913449
+        },
+        "notDecomposed": [
+          "the guard pipeline around the admission hook",
+          "the binding comparisons between the request's citations and the receiver-resolved artifacts",
+          "both DSSE signature verifications",
+          "canonicalization of the artifacts those comparisons hash",
+          "receipt construction and signing"
+        ],
+        "operationsPerCall": {
+          "admission_durable_ops": {
+            "max": 11,
+            "median": 11,
+            "min": 11
+          },
+          "continuation_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "cosign_hops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "dispatch_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "lease_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "receipt_append_ops": {
+            "max": 1,
+            "median": 1,
+            "min": 1
+          },
+          "receipt_other_ops": {
+            "max": 2,
+            "median": 2,
+            "min": 2
+          },
+          "revocation_ops": {
+            "max": 1,
+            "median": 1,
+            "min": 1
+          },
+          "store_resolve_ops": {
+            "max": 8,
+            "median": 8,
+            "min": 8
+          },
+          "tool_outcome_durable_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "trust_floor_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          }
+        },
+        "parts": {
+          "continuationConsume": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "cosignConnect": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "cosignExchange": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "dispatch": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "durableAdmissionOperations": {
+            "max_ms": 75.578291,
+            "mean_ms": 71.66115149999999,
+            "median_ci_high_ms": 75.578291,
+            "median_ci_low_ms": 67.744012,
+            "min_ms": 67.744012,
+            "p50_ms": 71.66115149999999,
+            "p99_ms": 75.49994821,
+            "samples": 2,
+            "shareOfWindow": 0.7558316176393033,
+            "std_ms": 5.539671806607361
+          },
+          "durableReceiptAppend": {
+            "max_ms": 8.18048,
+            "mean_ms": 8.1639,
+            "median_ci_high_ms": 8.18048,
+            "median_ci_low_ms": 8.14732,
+            "min_ms": 8.14732,
+            "p50_ms": 8.1639,
+            "p99_ms": 8.180148399999998,
+            "samples": 2,
+            "shareOfWindow": 0.08610709727774203,
+            "std_ms": 0.02344766086414503
+          },
+          "durableToolOutcome": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "evidenceResolution": {
+            "max_ms": 1.441206,
+            "mean_ms": 1.4099255,
+            "median_ci_high_ms": 1.441206,
+            "median_ci_low_ms": 1.3786450000000001,
+            "min_ms": 1.378645,
+            "p50_ms": 1.4099255,
+            "p99_ms": 1.44058039,
+            "samples": 2,
+            "shareOfWindow": 0.014870906329434346,
+            "std_ms": 0.044237307337811664
+          },
+          "leaseConsume": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "receiptStoreOther": {
+            "max_ms": 3.349537,
+            "mean_ms": 2.2784115000000003,
+            "median_ci_high_ms": 3.349537,
+            "median_ci_low_ms": 1.207286,
+            "min_ms": 1.207286,
+            "p50_ms": 2.2784115000000003,
+            "p99_ms": 3.32811449,
+            "samples": 2,
+            "shareOfWindow": 0.024031088164875383,
+            "std_ms": 1.5148002091036628
+          },
+          "revocationStore": {
+            "max_ms": 0.161961,
+            "mean_ms": 0.161941,
+            "median_ci_high_ms": 0.161961,
+            "median_ci_low_ms": 0.161921,
+            "min_ms": 0.161921,
+            "p50_ms": 0.161941,
+            "p99_ms": 0.1619606,
+            "samples": 2,
+            "shareOfWindow": 0.0017080402063051755,
+            "std_ms": 2.8284271247450935e-05
+          },
+          "trustFloor": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          }
+        },
+        "toleranceMs": 0.05,
+        "unattributed": {
+          "max_ms": 12.758103,
+          "mean_ms": 11.135876,
+          "median_ci_high_ms": 12.758103,
+          "median_ci_low_ms": 9.513649,
+          "min_ms": 9.513649,
+          "p50_ms": 11.135876,
+          "p99_ms": 12.72565846,
+          "samples": 2,
+          "shareOfWindow": 0.1174534178523589,
+          "std_ms": 2.2941754246478196
+        },
+        "window": {
+          "max_ms": 101.436,
+          "mean_ms": 94.811,
+          "median_ci_high_ms": 101.436,
+          "median_ci_low_ms": 88.186,
+          "min_ms": 88.186,
+          "p50_ms": 94.811,
+          "p99_ms": 101.30350000000001,
+          "samples": 2,
+          "std_ms": 9.369164850721754
+        },
+        "worstAttributedMinusWindowMs": -9.513616000000013
+      },
+      "scope_hash_mismatch": {
+        "attributed": {
+          "max_ms": 86.512025,
+          "mean_ms": 80.06321249999999,
+          "median_ci_high_ms": 86.512025,
+          "median_ci_low_ms": 73.6144,
+          "min_ms": 73.6144,
+          "p50_ms": 80.06321249999999,
+          "p99_ms": 86.38304874999999,
+          "samples": 2,
+          "shareOfWindow": 0.9077101532252122,
+          "std_ms": 9.119998098701139
+        },
+        "notDecomposed": [
+          "the guard pipeline around the admission hook",
+          "the binding comparisons between the request's citations and the receiver-resolved artifacts",
+          "both DSSE signature verifications",
+          "canonicalization of the artifacts those comparisons hash",
+          "receipt construction and signing"
+        ],
+        "operationsPerCall": {
+          "admission_durable_ops": {
+            "max": 11,
+            "median": 11,
+            "min": 11
+          },
+          "continuation_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "cosign_hops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "dispatch_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "lease_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "receipt_append_ops": {
+            "max": 1,
+            "median": 1,
+            "min": 1
+          },
+          "receipt_other_ops": {
+            "max": 2,
+            "median": 2,
+            "min": 2
+          },
+          "revocation_ops": {
+            "max": 1,
+            "median": 1,
+            "min": 1
+          },
+          "store_resolve_ops": {
+            "max": 2,
+            "median": 2,
+            "min": 2
+          },
+          "tool_outcome_durable_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "trust_floor_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          }
+        },
+        "parts": {
+          "continuationConsume": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "cosignConnect": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "cosignExchange": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "dispatch": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "durableAdmissionOperations": {
+            "max_ms": 75.53893,
+            "mean_ms": 70.1864445,
+            "median_ci_high_ms": 75.53893,
+            "median_ci_low_ms": 64.833959,
+            "min_ms": 64.833959,
+            "p50_ms": 70.1864445,
+            "p99_ms": 75.43188029,
+            "samples": 2,
+            "shareOfWindow": 0.7957331001604244,
+            "std_ms": 7.569557586505337
+          },
+          "durableReceiptAppend": {
+            "max_ms": 9.055685,
+            "mean_ms": 8.0004795,
+            "median_ci_high_ms": 9.055685,
+            "median_ci_low_ms": 6.945274,
+            "min_ms": 6.945274,
+            "p50_ms": 8.0004795,
+            "p99_ms": 9.03458089,
+            "samples": 2,
+            "shareOfWindow": 0.09070478495751304,
+            "std_ms": 1.492285929190683
+          },
+          "durableToolOutcome": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "evidenceResolution": {
+            "max_ms": 0.354441,
+            "mean_ms": 0.3432415,
+            "median_ci_high_ms": 0.354441,
+            "median_ci_low_ms": 0.332042,
+            "min_ms": 0.332042,
+            "p50_ms": 0.3432415,
+            "p99_ms": 0.35421701,
+            "samples": 2,
+            "shareOfWindow": 0.0038914725606126743,
+            "std_ms": 0.015838484791797478
+          },
+          "leaseConsume": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "receiptStoreOther": {
+            "max_ms": 1.417927,
+            "mean_ms": 1.3594065,
+            "median_ci_high_ms": 1.417927,
+            "median_ci_low_ms": 1.300886,
+            "min_ms": 1.300886,
+            "p50_ms": 1.3594065,
+            "p99_ms": 1.4167565899999999,
+            "samples": 2,
+            "shareOfWindow": 0.015412160515172302,
+            "std_ms": 0.08276048477685467
+          },
+          "revocationStore": {
+            "max_ms": 0.17984,
+            "mean_ms": 0.1736405,
+            "median_ci_high_ms": 0.17984,
+            "median_ci_low_ms": 0.167441,
+            "min_ms": 0.167441,
+            "p50_ms": 0.1736405,
+            "p99_ms": 0.17971601,
+            "samples": 2,
+            "shareOfWindow": 0.0019686350314896805,
+            "std_ms": 0.008767416979931998
+          },
+          "trustFloor": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          }
+        },
+        "toleranceMs": 0.05,
+        "unattributed": {
+          "max_ms": 9.103765,
+          "mean_ms": 8.1410805,
+          "median_ci_high_ms": 9.103765,
+          "median_ci_low_ms": 7.178396,
+          "min_ms": 7.178396,
+          "p50_ms": 8.1410805,
+          "p99_ms": 9.084511309999998,
+          "samples": 2,
+          "shareOfWindow": 0.0922988373477243,
+          "std_ms": 1.3614414761863611
+        },
+        "window": {
+          "max_ms": 95.615,
+          "mean_ms": 88.20349999999999,
+          "median_ci_high_ms": 95.615,
+          "median_ci_low_ms": 80.792,
+          "min_ms": 80.792,
+          "p50_ms": 88.20349999999999,
+          "p99_ms": 95.46677,
+          "samples": 2,
+          "std_ms": 10.48144381752819
+        },
+        "worstAttributedMinusWindowMs": -7.177599999999998
+      },
+      "smuggled_dynamic_trust": {
+        "attributed": {
+          "max_ms": 89.029836,
+          "mean_ms": 88.1051325,
+          "median_ci_high_ms": 89.029836,
+          "median_ci_low_ms": 87.180429,
+          "min_ms": 87.180429,
+          "p50_ms": 88.1051325,
+          "p99_ms": 89.01134193,
+          "samples": 2,
+          "shareOfWindow": 0.9305569550063371,
+          "std_ms": 1.307728230873869
+        },
+        "notDecomposed": [
+          "the guard pipeline around the admission hook",
+          "the binding comparisons between the request's citations and the receiver-resolved artifacts",
+          "both DSSE signature verifications",
+          "canonicalization of the artifacts those comparisons hash",
+          "receipt construction and signing"
+        ],
+        "operationsPerCall": {
+          "admission_durable_ops": {
+            "max": 11,
+            "median": 11,
+            "min": 11
+          },
+          "continuation_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "cosign_hops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "dispatch_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "lease_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "receipt_append_ops": {
+            "max": 1,
+            "median": 1,
+            "min": 1
+          },
+          "receipt_other_ops": {
+            "max": 2,
+            "median": 2,
+            "min": 2
+          },
+          "revocation_ops": {
+            "max": 1,
+            "median": 1,
+            "min": 1
+          },
+          "store_resolve_ops": {
+            "max": 1,
+            "median": 1,
+            "min": 1
+          },
+          "tool_outcome_durable_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "trust_floor_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          }
+        },
+        "parts": {
+          "continuationConsume": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "cosignConnect": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "cosignExchange": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "dispatch": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "durableAdmissionOperations": {
+            "max_ms": 80.302594,
+            "mean_ms": 78.1284235,
+            "median_ci_high_ms": 80.302594,
+            "median_ci_low_ms": 75.954253,
+            "min_ms": 75.954253,
+            "p50_ms": 78.1284235,
+            "p99_ms": 80.25911059,
+            "samples": 2,
+            "shareOfWindow": 0.8251840251373045,
+            "std_ms": 3.074741408011497
+          },
+          "durableReceiptAppend": {
+            "max_ms": 7.136955,
+            "mean_ms": 7.103135,
+            "median_ci_high_ms": 7.136955,
+            "median_ci_low_ms": 7.069315,
+            "min_ms": 7.069315,
+            "p50_ms": 7.103135,
+            "p99_ms": 7.136278600000001,
+            "samples": 2,
+            "shareOfWindow": 0.07502254964089564,
+            "std_ms": 0.04782870267945865
+          },
+          "durableToolOutcome": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "evidenceResolution": {
+            "max_ms": 0.190561,
+            "mean_ms": 0.188001,
+            "median_ci_high_ms": 0.190561,
+            "median_ci_low_ms": 0.185441,
+            "min_ms": 0.185441,
+            "p50_ms": 0.188001,
+            "p99_ms": 0.1905098,
+            "samples": 2,
+            "shareOfWindow": 0.0019856463878326993,
+            "std_ms": 0.0036203867196751326
+          },
+          "leaseConsume": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "receiptStoreOther": {
+            "max_ms": 3.807419,
+            "mean_ms": 2.5204325,
+            "median_ci_high_ms": 3.807419,
+            "median_ci_low_ms": 1.233446,
+            "min_ms": 1.233446,
+            "p50_ms": 2.5204325,
+            "p99_ms": 3.7816792699999997,
+            "samples": 2,
+            "shareOfWindow": 0.02662053760033798,
+            "std_ms": 1.8200737628910812
+          },
+          "revocationStore": {
+            "max_ms": 0.16628,
+            "mean_ms": 0.16514050000000002,
+            "median_ci_high_ms": 0.16628,
+            "median_ci_low_ms": 0.164001,
+            "min_ms": 0.164001,
+            "p50_ms": 0.16514050000000002,
+            "p99_ms": 0.16625721000000002,
+            "samples": 2,
+            "shareOfWindow": 0.001744196239966202,
+            "std_ms": 0.001611496354324144
+          },
+          "trustFloor": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          }
+        },
+        "toleranceMs": 0.05,
+        "unattributed": {
+          "max_ms": 6.603191,
+          "mean_ms": 6.5753319999999995,
+          "median_ci_high_ms": 6.603191,
+          "median_ci_low_ms": 6.547473,
+          "min_ms": 6.547473,
+          "p50_ms": 6.5753319999999995,
+          "p99_ms": 6.602633819999999,
+          "samples": 2,
+          "shareOfWindow": 0.0694479509928179,
+          "std_ms": 0.039398575634151854
+        },
+        "window": {
+          "max_ms": 95.577,
+          "mean_ms": 94.68,
+          "median_ci_high_ms": 95.577,
+          "median_ci_low_ms": 93.783,
+          "min_ms": 93.783,
+          "p50_ms": 94.68,
+          "p99_ms": 95.55906,
+          "samples": 2,
+          "std_ms": 1.268549565448664
+        },
+        "worstAttributedMinusWindowMs": -6.547163999999995
+      },
+      "smuggled_trust_root": {
+        "attributed": {
+          "max_ms": 85.887342,
+          "mean_ms": 83.069148,
+          "median_ci_high_ms": 85.887342,
+          "median_ci_low_ms": 80.250954,
+          "min_ms": 80.250954,
+          "p50_ms": 83.069148,
+          "p99_ms": 85.83097812000001,
+          "samples": 2,
+          "shareOfWindow": 0.9225548824166366,
+          "std_ms": 3.98552817619849
+        },
+        "notDecomposed": [
+          "the guard pipeline around the admission hook",
+          "the binding comparisons between the request's citations and the receiver-resolved artifacts",
+          "both DSSE signature verifications",
+          "canonicalization of the artifacts those comparisons hash",
+          "receipt construction and signing"
+        ],
+        "operationsPerCall": {
+          "admission_durable_ops": {
+            "max": 11,
+            "median": 11,
+            "min": 11
+          },
+          "continuation_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "cosign_hops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "dispatch_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "lease_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "receipt_append_ops": {
+            "max": 1,
+            "median": 1,
+            "min": 1
+          },
+          "receipt_other_ops": {
+            "max": 2,
+            "median": 2,
+            "min": 2
+          },
+          "revocation_ops": {
+            "max": 1,
+            "median": 1,
+            "min": 1
+          },
+          "store_resolve_ops": {
+            "max": 1,
+            "median": 1,
+            "min": 1
+          },
+          "tool_outcome_durable_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "trust_floor_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          }
+        },
+        "parts": {
+          "continuationConsume": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "cosignConnect": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "cosignExchange": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "dispatch": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "durableAdmissionOperations": {
+            "max_ms": 77.31742,
+            "mean_ms": 71.7623725,
+            "median_ci_high_ms": 77.31742,
+            "median_ci_low_ms": 66.207325,
+            "min_ms": 66.207325,
+            "p50_ms": 71.7623725,
+            "p99_ms": 77.20631905,
+            "samples": 2,
+            "shareOfWindow": 0.7969833411999889,
+            "std_ms": 7.856023514126757
+          },
+          "durableReceiptAppend": {
+            "max_ms": 12.079099,
+            "mean_ms": 9.5244265,
+            "median_ci_high_ms": 12.079099,
+            "median_ci_low_ms": 6.969754,
+            "min_ms": 6.969754,
+            "p50_ms": 9.5244265,
+            "p99_ms": 12.02800555,
+            "samples": 2,
+            "shareOfWindow": 0.10577701085598469,
+            "std_ms": 3.61285249692158
+          },
+          "durableToolOutcome": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "evidenceResolution": {
+            "max_ms": 0.212201,
+            "mean_ms": 0.20022099999999998,
+            "median_ci_high_ms": 0.212201,
+            "median_ci_low_ms": 0.188241,
+            "min_ms": 0.188241,
+            "p50_ms": 0.20022099999999998,
+            "p99_ms": 0.2119614,
+            "samples": 2,
+            "shareOfWindow": 0.002223627731349085,
+            "std_ms": 0.016942278477229684
+          },
+          "leaseConsume": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "receiptStoreOther": {
+            "max_ms": 1.624568,
+            "mean_ms": 1.4198270000000002,
+            "median_ci_high_ms": 1.624568,
+            "median_ci_low_ms": 1.215086,
+            "min_ms": 1.215086,
+            "p50_ms": 1.4198270000000002,
+            "p99_ms": 1.62047318,
+            "samples": 2,
+            "shareOfWindow": 0.01576840936224561,
+            "std_ms": 0.28954749897382975
+          },
+          "revocationStore": {
+            "max_ms": 0.172881,
+            "mean_ms": 0.162301,
+            "median_ci_high_ms": 0.172881,
+            "median_ci_low_ms": 0.151721,
+            "min_ms": 0.151721,
+            "p50_ms": 0.162301,
+            "p99_ms": 0.1726694,
+            "samples": 2,
+            "shareOfWindow": 0.001802493267068329,
+            "std_ms": 0.014962379489907354
+          },
+          "trustFloor": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          }
+        },
+        "toleranceMs": 0.05,
+        "unattributed": {
+          "max_ms": 7.127314,
+          "mean_ms": 6.9736934999999995,
+          "median_ci_high_ms": 7.127314,
+          "median_ci_low_ms": 6.820073,
+          "min_ms": 6.820073,
+          "p50_ms": 6.9736934999999995,
+          "p99_ms": 7.1242415900000005,
+          "samples": 2,
+          "shareOfWindow": 0.0774489102368326,
+          "std_ms": 0.21725219455853628
+        },
+        "window": {
+          "max_ms": 92.707,
+          "mean_ms": 90.04249999999999,
+          "median_ci_high_ms": 92.707,
+          "median_ci_low_ms": 87.378,
+          "min_ms": 87.378,
+          "p50_ms": 90.04249999999999,
+          "p99_ms": 92.65370999999999,
+          "samples": 2,
+          "std_ms": 3.768172036943107
+        },
+        "worstAttributedMinusWindowMs": -6.81965799999999
+      },
+      "unknown_ladder_intersection": {
+        "attributed": {
+          "max_ms": 100.626772,
+          "mean_ms": 91.7271495,
+          "median_ci_high_ms": 100.626772,
+          "median_ci_low_ms": 82.827527,
+          "min_ms": 82.827527,
+          "p50_ms": 91.7271495,
+          "p99_ms": 100.44877955000001,
+          "samples": 2,
+          "shareOfWindow": 0.9228547663363347,
+          "std_ms": 12.585966839500749
+        },
+        "notDecomposed": [
+          "the guard pipeline around the admission hook",
+          "the binding comparisons between the request's citations and the receiver-resolved artifacts",
+          "both DSSE signature verifications",
+          "canonicalization of the artifacts those comparisons hash",
+          "receipt construction and signing"
+        ],
+        "operationsPerCall": {
+          "admission_durable_ops": {
+            "max": 11,
+            "median": 11,
+            "min": 11
+          },
+          "continuation_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "cosign_hops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "dispatch_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "lease_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "receipt_append_ops": {
+            "max": 1,
+            "median": 1,
+            "min": 1
+          },
+          "receipt_other_ops": {
+            "max": 2,
+            "median": 2,
+            "min": 2
+          },
+          "revocation_ops": {
+            "max": 1,
+            "median": 1,
+            "min": 1
+          },
+          "store_resolve_ops": {
+            "max": 3,
+            "median": 3,
+            "min": 3
+          },
+          "tool_outcome_durable_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "trust_floor_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          }
+        },
+        "parts": {
+          "continuationConsume": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "cosignConnect": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "cosignExchange": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "dispatch": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "durableAdmissionOperations": {
+            "max_ms": 87.934951,
+            "mean_ms": 78.137763,
+            "median_ci_high_ms": 87.934951,
+            "median_ci_low_ms": 68.340575,
+            "min_ms": 68.340575,
+            "p50_ms": 78.137763,
+            "p99_ms": 87.73900724,
+            "samples": 2,
+            "shareOfWindow": 0.7861337391216862,
+            "std_ms": 13.855316142718936
+          },
+          "durableReceiptAppend": {
+            "max_ms": 10.831293,
+            "mean_ms": 10.390271,
+            "median_ci_high_ms": 10.831293,
+            "median_ci_low_ms": 9.949249,
+            "min_ms": 9.949249,
+            "p50_ms": 10.390271,
+            "p99_ms": 10.82247256,
+            "samples": 2,
+            "shareOfWindow": 0.10453514764324161,
+            "std_ms": 0.6236992937049075
+          },
+          "durableToolOutcome": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "evidenceResolution": {
+            "max_ms": 0.418002,
+            "mean_ms": 0.412062,
+            "median_ci_high_ms": 0.418002,
+            "median_ci_low_ms": 0.406122,
+            "min_ms": 0.406122,
+            "p50_ms": 0.412062,
+            "p99_ms": 0.41788319999999995,
+            "samples": 2,
+            "shareOfWindow": 0.004145701494038935,
+            "std_ms": 0.008400428560496186
+          },
+          "leaseConsume": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "receiptStoreOther": {
+            "max_ms": 3.826219,
+            "mean_ms": 2.5499125,
+            "median_ci_high_ms": 3.826219,
+            "median_ci_low_ms": 1.273606,
+            "min_ms": 1.273606,
+            "p50_ms": 2.5499125,
+            "p99_ms": 3.80069287,
+            "samples": 2,
+            "shareOfWindow": 0.025654333718999948,
+            "std_ms": 1.8049699620449366
+          },
+          "revocationStore": {
+            "max_ms": 0.293482,
+            "mean_ms": 0.237141,
+            "median_ci_high_ms": 0.293482,
+            "median_ci_low_ms": 0.1808,
+            "min_ms": 0.1808,
+            "p50_ms": 0.237141,
+            "p99_ms": 0.29235518,
+            "samples": 2,
+            "shareOfWindow": 0.0023858443583681267,
+            "std_ms": 0.07967820631766256
+          },
+          "trustFloor": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          }
+        },
+        "toleranceMs": 0.05,
+        "unattributed": {
+          "max_ms": 8.606683,
+          "mean_ms": 7.6685575,
+          "median_ci_high_ms": 8.606683,
+          "median_ci_low_ms": 6.730432,
+          "min_ms": 6.730432,
+          "p50_ms": 7.6685575,
+          "p99_ms": 8.58792049,
+          "samples": 2,
+          "shareOfWindow": 0.07715234669752,
+          "std_ms": 1.3267098053080408
+        },
+        "window": {
+          "max_ms": 109.233,
+          "mean_ms": 99.39500000000001,
+          "median_ci_high_ms": 109.233,
+          "median_ci_low_ms": 89.557,
+          "min_ms": 89.557,
+          "p50_ms": 99.39500000000001,
+          "p99_ms": 109.03624,
+          "samples": 2,
+          "std_ms": 13.91303302662651
+        },
+        "worstAttributedMinusWindowMs": -6.729472999999999
+      },
+      "unknown_treaty_scope": {
+        "attributed": {
+          "max_ms": 86.722425,
+          "mean_ms": 85.777642,
+          "median_ci_high_ms": 86.722425,
+          "median_ci_low_ms": 84.832859,
+          "min_ms": 84.832859,
+          "p50_ms": 85.777642,
+          "p99_ms": 86.70352933999999,
+          "samples": 2,
+          "shareOfWindow": 0.9271404313731849,
+          "std_ms": 1.3361249320995414
+        },
+        "notDecomposed": [
+          "the guard pipeline around the admission hook",
+          "the binding comparisons between the request's citations and the receiver-resolved artifacts",
+          "both DSSE signature verifications",
+          "canonicalization of the artifacts those comparisons hash",
+          "receipt construction and signing"
+        ],
+        "operationsPerCall": {
+          "admission_durable_ops": {
+            "max": 11,
+            "median": 11,
+            "min": 11
+          },
+          "continuation_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "cosign_hops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "dispatch_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "lease_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "receipt_append_ops": {
+            "max": 1,
+            "median": 1,
+            "min": 1
+          },
+          "receipt_other_ops": {
+            "max": 2,
+            "median": 2,
+            "min": 2
+          },
+          "revocation_ops": {
+            "max": 1,
+            "median": 1,
+            "min": 1
+          },
+          "store_resolve_ops": {
+            "max": 2,
+            "median": 2,
+            "min": 2
+          },
+          "tool_outcome_durable_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          },
+          "trust_floor_ops": {
+            "max": 0,
+            "median": 0,
+            "min": 0
+          }
+        },
+        "parts": {
+          "continuationConsume": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "cosignConnect": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "cosignExchange": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "dispatch": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "durableAdmissionOperations": {
+            "max_ms": 73.014481,
+            "mean_ms": 72.7375385,
+            "median_ci_high_ms": 73.014481,
+            "median_ci_low_ms": 72.460596,
+            "min_ms": 72.460596,
+            "p50_ms": 72.7375385,
+            "p99_ms": 73.00894215000001,
+            "samples": 2,
+            "shareOfWindow": 0.7861945286618353,
+            "std_ms": 0.39165583949751664
+          },
+          "durableReceiptAppend": {
+            "max_ms": 12.631382,
+            "mean_ms": 11.411056,
+            "median_ci_high_ms": 12.631382,
+            "median_ci_low_ms": 10.19073,
+            "min_ms": 10.19073,
+            "p50_ms": 11.411056,
+            "p99_ms": 12.606975480000001,
+            "samples": 2,
+            "shareOfWindow": 0.12333809994757806,
+            "std_ms": 1.7258015797165096
+          },
+          "durableToolOutcome": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "evidenceResolution": {
+            "max_ms": 0.238521,
+            "mean_ms": 0.231321,
+            "median_ci_high_ms": 0.238521,
+            "median_ci_low_ms": 0.224121,
+            "min_ms": 0.224121,
+            "p50_ms": 0.231321,
+            "p99_ms": 0.238377,
+            "samples": 2,
+            "shareOfWindow": 0.0025002675140647548,
+            "std_ms": 0.010182337649086302
+          },
+          "leaseConsume": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          },
+          "receiptStoreOther": {
+            "max_ms": 1.243166,
+            "mean_ms": 1.236846,
+            "median_ci_high_ms": 1.243166,
+            "median_ci_low_ms": 1.230526,
+            "min_ms": 1.230526,
+            "p50_ms": 1.236846,
+            "p99_ms": 1.2430396,
+            "samples": 2,
+            "shareOfWindow": 0.013368634381231863,
+            "std_ms": 0.00893782971419795
+          },
+          "revocationStore": {
+            "max_ms": 0.16316,
+            "mean_ms": 0.16088049999999998,
+            "median_ci_high_ms": 0.16316,
+            "median_ci_low_ms": 0.158601,
+            "min_ms": 0.158601,
+            "p50_ms": 0.16088049999999998,
+            "p99_ms": 0.16311441,
+            "samples": 2,
+            "shareOfWindow": 0.0017389008684749537,
+            "std_ms": 0.0032236998154294753
+          },
+          "trustFloor": {
+            "max_ms": 0.0,
+            "mean_ms": 0.0,
+            "median_ci_high_ms": 0.0,
+            "median_ci_low_ms": 0.0,
+            "min_ms": 0.0,
+            "p50_ms": 0.0,
+            "p99_ms": 0.0,
+            "samples": 2,
+            "shareOfWindow": 0.0,
+            "std_ms": 0.0
+          }
+        },
+        "toleranceMs": 0.05,
+        "unattributed": {
+          "max_ms": 6.746551,
+          "mean_ms": 6.7412925,
+          "median_ci_high_ms": 6.746551,
+          "median_ci_low_ms": 6.736034,
+          "min_ms": 6.736034,
+          "p50_ms": 6.7412925,
+          "p99_ms": 6.746445830000001,
+          "samples": 2,
+          "shareOfWindow": 0.07286426498484087,
+          "std_ms": 0.007436642017738998
+        },
+        "window": {
+          "max_ms": 93.458,
+          "mean_ms": 92.51849999999999,
+          "median_ci_high_ms": 93.458,
+          "median_ci_low_ms": 91.579,
+          "min_ms": 91.579,
+          "p50_ms": 92.51849999999999,
+          "p99_ms": 93.43921,
+          "samples": 2,
+          "std_ms": 1.3286536418495263
+        },
+        "worstAttributedMinusWindowMs": -6.735574999999997
+      }
+    },
+    "roundTrip": {
+      "max_ms": 123.576487,
+      "mean_ms": 110.30739264285715,
+      "median_ci_high_ms": 116.21549,
+      "median_ci_low_ms": 105.286257,
+      "min_ms": 97.624879,
+      "p50_ms": 110.0519795,
+      "p99_ms": 123.10579625999999,
+      "samples": 14,
+      "std_ms": 7.983985027887876
+    }
+  },
+  "environment": {
+    "cargo": "1.94.1",
+    "commit": "bec4c83fe00590da5de5af6749aebf168719d445",
+    "cores": 12,
+    "cpuModel": "Neoverse-N1",
+    "loadAverage1m": 9.72,
+    "memoryGiB": 46.94236373901367,
+    "os": "Linux 6.17.0-1020-oracle aarch64",
+    "rolesStartedHere": [
+      "driver",
+      "origin",
+      "receiver"
+    ],
+    "rustc": "1.94.1",
+    "toolchainPin": "1.94.1",
+    "topology": "one host, 3 processes",
+    "worktreeDirty": true
+  },
+  "environments": {
+    "driver-origin-receiver": {
+      "cargo": "1.94.1",
+      "commit": "bec4c83fe00590da5de5af6749aebf168719d445",
+      "cores": 12,
+      "cpuModel": "Neoverse-N1",
+      "loadAverage1m": 9.72,
+      "memoryGiB": 46.94236373901367,
+      "os": "Linux 6.17.0-1020-oracle aarch64",
+      "rolesStartedHere": [
+        "driver",
+        "origin",
+        "receiver"
+      ],
+      "rustc": "1.94.1",
+      "toolchainPin": "1.94.1",
+      "topology": "one host, 3 processes",
+      "worktreeDirty": true
+    }
+  },
+  "freshnessDenialsAbsorbed": {
+    "admitted": 0,
+    "denied": 0,
+    "revocation": 3,
+    "total": 3
+  },
+  "method": {
+    "bootstrap": {
+      "resamples": 10000,
+      "seed": 1
+    },
+    "concurrent": "every worker drives its own calls end to end, so the receiver is evaluating `workers` admissions at once for the whole stage. Throughput is the call count over the wall clock of the stage, which is the only way it can differ from one over the latency. One call here is a preparation round trip followed by a call round trip, so the sequential figure beside it is one over the median of those two together (`sequentialEndToEnd`) rather than one over the call alone: both sides count the same work. budgetContaminatedCalls counts the calls whose decomposition claimed more time than the window it decomposes, which is what several calls sharing one set of counters looks like and why no decomposition is reported for this stage",
+    "confidence": 0.95,
+    "continuationRace": "each round mints one single-use continuation and `workers` calls that name it, each with its own admission bundle, lease, lineage bundle, bilateral invocation and DSSE envelope, then puts all of them in flight at once. Exactly one may be admitted, every other must carry the replay code, and the receiver's dispatch counter must move by exactly one per round. Any other outcome fails the run. A round in which any racer hit a revocation-freshness denial is discarded whole and run again, so the reported latencies are conditioned on rounds that saw no freshness denial: roundsDiscarded and roundsAttempted record how many were dropped. distinctWinners is the number of workers that won at least one round; the single-use property does not depend on it, and at a small round count one worker winning every round is an ordinary outcome that says nothing about the mechanism",
+    "cosignConnections": "measured, not assumed: the receiver reports the QUIC connections its co-signer opened to the origin when a call's preparation began and again once it had decided, and the run fails closed unless every call of a scenario cost the same number. The span covers the preparation's DSSE hop as well as the hops the admission decision makes, so a denied case, which never reaches the decision's hops, isolates the preparation's share: see denied.cases[name].cosignConnectionsPerCall",
+    "cutToDeny": "control document written to the first freshness denial that persists for 3 further calls, repeated 2 times. Each observation includes the kernel's own freshness bound, one origin control-poll period (250 ms) and one call of polling resolution",
+    "deniedRoundTrip": "pooled across the denial cases, which refuse at different depths of the admission hook; each case's own distribution is under denied.cases[name].roundTrip",
+    "evidencePreparation": "untimed relative to admission: the receiver mints the per-call treaty evidence and obtains the origin's DSSE signature over lane d",
+    "freshnessDenialsAbsorbed": "calls the receiver denied because its revocation snapshot fell outside the kernel's freshness window. They are the clock rather than the treaty, so they are retried and excluded from every latency distribution above; the counts record how many were excluded",
+    "hosts": "derived from the roles this run started: every role left to another machine adds a host, and a run that starts all of them records one",
+    "interval": "every interval here is a percentile bootstrap interval for the MEDIAN, which is the point estimate reported beside it. mean_ms and std_ms describe the sample and carry no interval of their own",
+    "percentile": "linear interpolation between order statistics",
+    "preflight": "reachability and clock offset, measured before anything else, from the three-timestamp estimate over the clock lane: the local clock before the request, the peer's clock in the reply, the local clock after. The reading is taken from the fastest exchange, whose half round trip bounds the error. A run whose hosts disagree by more than maxOffsetMs refuses to measure",
+    "receiverBudget": "the receiver's evaluation window attributed to its parts, each measured at the dependency that did the work rather than modelled: the co-signer's own connect and exchange timers, a stopwatch on every admission-store, receipt-store, revocation-store and durable admission-operation method, and the tool server. `unattributed` is the remainder of the window and is reported whole: `notDecomposed` lists what is in it, all of which runs inside the admission hook where this experiment has no dependency to time. The measured parts and that remainder are the window exactly, by construction, so their sum is not a check. The check is one-sided: a call whose parts sum PAST its window fails the run, because that is what several calls sharing one set of process-wide counters looks like. Nothing bounds how large the remainder may be. This is also why the concurrent stages report no decomposition",
+    "revokeToDeny": "control document written to first observing call, repeated 2 times. Each observation includes up to one origin control-poll period (250 ms, the epoch tick) and one call of polling resolution (the admitted round trip, p50 456.573 ms)",
+    "roundTrip": "sender send to sender receive on the experiment lane; includes the receiver's whole admission decision and, on the admitted path, both co-sign hops back to the origin",
+    "unmediated": "the same tool call over the same lane with the kernel taken out of the path: no capability check, no evidence resolution, no continuation, no dispatch through an admission and no receipt. It is the subtrahend, so mediationOverheadMs is what mediating this call costs rather than what admitting it costs. The tool at the end of it returns a constant JSON object in microseconds, so this stage bounds the transport and the tool, not any real workload. It counts into its own invocation counter, and the run fails closed unless the kernel's own dispatch counter stayed still throughout"
+  },
+  "profile": "debug",
+  "revocation": {
+    "callsUntilDeny": [
+      2,
+      2
+    ],
+    "cutCallsUntilDeny": [
+      2,
+      2
+    ],
+    "cutConfirmations": 3,
+    "cutFailureCodes": [
+      "revocation view snapshot is stale"
+    ],
+    "cutRepeats": 2,
+    "cutToDeny": {
+      "max_ms": 614.8452570000001,
+      "mean_ms": 604.5710465000001,
+      "median_ci_high_ms": 614.8452570000001,
+      "median_ci_low_ms": 594.2968360000001,
+      "min_ms": 594.2968360000001,
+      "p50_ms": 604.5710465000001,
+      "p99_ms": 614.63977279,
+      "samples": 2,
+      "std_ms": 14.529927831776032
+    },
+    "failureCodes": [
+      "capability has been revoked: cap-federated-pair"
+    ],
+    "freshnessDenialsAbsorbed": 3,
+    "revokeRepeats": 2,
+    "revokeToDeny": {
+      "max_ms": 640.7883439999999,
+      "mean_ms": 617.9836525,
+      "median_ci_high_ms": 640.7883439999999,
+      "median_ci_low_ms": 595.178961,
+      "min_ms": 595.178961,
+      "p50_ms": 617.9836525,
+      "p99_ms": 640.33225017,
+      "samples": 2,
+      "std_ms": 32.25070400503442
+    }
+  },
+  "schema": "chio.programmable-sovereignty.federated-pair-results.v1",
+  "topology": {
+    "achievedEpochRate": {
+      "deliveredRoots": 52,
+      "deliveryInterruptions": 2,
+      "epoch": 56,
+      "intervalMaxMs": 256,
+      "intervalMinMs": 246,
+      "intervalP50Ms": 250,
+      "intervalSamples": 49,
+      "nominalTickMs": 250,
+      "schema": "chio.experiment.federated-pair-epoch-rate.v1"
+    },
+    "admissionStore": "sqlite",
+    "cosignConnectionsPerAdmittedCall": 3,
+    "description": "one host, 3 processes",
+    "epochTickMs": 250,
+    "hosts": 1,
+    "preflight": {
+      "maxOffsetMs": 250,
+      "readings": [
+        {
+          "address": "127.0.0.1:43871",
+          "kernelId": "did:chio:org-a",
+          "minRoundTripMs": 2,
+          "offsetMs": 0,
+          "samples": 16,
+          "uncertaintyMs": 1
+        },
+        {
+          "address": "127.0.0.1:43872",
+          "kernelId": "did:chio:org-b",
+          "minRoundTripMs": 2,
+          "offsetMs": 0,
+          "samples": 16,
+          "uncertaintyMs": 1
+        }
+      ],
+      "samplesPerTarget": 16,
+      "scope": "local roles on this host"
+    },
+    "processesStartedHere": 3,
+    "rolesStartedHere": [
+      "driver",
+      "origin",
+      "receiver"
+    ],
+    "transport": "iroh QUIC, relays disabled"
+  },
+  "unmediated": {
+    "calls": 2,
+    "mediatedDispatchDelta": 0,
+    "mediationOverheadMs": 443.415896,
+    "mediationOverheadRatioNotReported": "the ratio of the admitted call to the unmediated one is not a stable statistic and is not reported. Its denominator is a few-millisecond round trip dominated by a fresh QUIC handshake around a tool that returns a constant JSON object in microseconds, so the ratio is a mediation constant divided by a small noisy number and moves by tens of percent between runs of the same code on the same host. The absolute overhead is the stable quantity and is reported above",
+    "roundTrip": {
+      "max_ms": 13.339505,
+      "mean_ms": 13.156944500000002,
+      "median_ci_high_ms": 13.339505,
+      "median_ci_low_ms": 12.974384,
+      "min_ms": 12.974384,
+      "p50_ms": 13.156944500000002,
+      "p99_ms": 13.33585379,
+      "samples": 2,
+      "std_ms": 0.25817953505361363
+    },
+    "toolInvocation": {
+      "max_ms": 0.00988,
+      "mean_ms": 0.00962,
+      "median_ci_high_ms": 0.00988,
+      "median_ci_low_ms": 0.00936,
+      "min_ms": 0.00936,
+      "p50_ms": 0.00962,
+      "p99_ms": 0.0098748,
+      "samples": 2,
+      "std_ms": 0.00036769552621700446
+    },
+    "unmediatedDispatchDelta": 2
+  },
+  "worktreeDirty": true
+}

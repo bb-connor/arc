@@ -387,6 +387,7 @@ impl<'de> Deserialize<'de> for EgressRestrictionEffectIds {
 #[cfg(test)]
 mod reader_boundary_tests {
     use super::*;
+    use alloc::string::ToString;
     use core::sync::atomic::{AtomicUsize, Ordering};
 
     #[test]

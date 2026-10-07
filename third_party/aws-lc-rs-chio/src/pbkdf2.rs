@@ -165,7 +165,7 @@ const MAX_USIZE32: u64 = u32::MAX as u64;
 /// # Panics
 ///
 /// `derive` panics if `out.len()` is larger than (2**32 - 1) * the digest
-/// algorithm's output length, per the PBKDF2 specification.
+/// algorithm's output length, per the PBKDF2 specification, or native derivation fails.
 //
 // # FIPS
 // The following conditions must be met:
@@ -178,6 +178,8 @@ const MAX_USIZE32: u64 = u32::MAX as u64;
 // * `sercet.len()` >= 14
 // * `iterations` >= 1000
 #[inline]
+// CHIO-LINT pbkdf2-derive: Preserve upstream unit-returning API; output-bound or native derivation failure panics.
+#[allow(clippy::expect_used)]
 pub fn derive(
     algorithm: Algorithm,
     iterations: NonZeroU32,

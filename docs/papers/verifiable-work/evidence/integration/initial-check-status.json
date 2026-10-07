@@ -1,0 +1,36 @@
+{
+  "securityParent": "491f585e9013dcb6335589c82d00ac219efbf0a6",
+  "fundedParent": "7755d3762baa5e0fda0d171835a9000c26de9033",
+  "standaloneInitialAttempts": [
+    {
+      "attempt": 1,
+      "exitCode": 101,
+      "reason": "lockfile requires security dependency refresh"
+    },
+    {
+      "attempt": 2,
+      "exitCode": 101,
+      "reason": "kernel fallible attribution and clock API mismatch"
+    },
+    {
+      "attempt": 3,
+      "exitCode": 101,
+      "reason": "attribution error mapping unresolved helper"
+    },
+    {
+      "attempt": 4,
+      "exitCode": 101,
+      "reason": "A2A checked clock and response API mismatch"
+    },
+    {
+      "attempt": 5,
+      "exitCode": 101,
+      "reason": "SQLite owner-bound clock API mismatch"
+    },
+    {
+      "attempt": 6,
+      "exitCode": 101,
+      "reason": "example fallible IDs, raw A2A ingress, DPoP and optional budget APIs"
+    }
+  ]
+}

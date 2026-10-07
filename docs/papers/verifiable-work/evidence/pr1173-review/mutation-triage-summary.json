@@ -1,0 +1,140 @@
+{
+  "run": 37178256525,
+  "head": "93a2552c3a6eb15ac2756129f199f5714390e794",
+  "run_conclusion": "cancelled",
+  "source_identities": [
+    {
+      "path": "crates/trust/chio-federation/src/treaty.rs",
+      "sha256": "ccb6b6a146a832628a744019bb02d8d41a29e51ea091f1b43b51ad2953777b14",
+      "current_matches_hosted_head": true
+    },
+    {
+      "path": "crates/kernel/chio-runtime-core/src/treaty.rs",
+      "sha256": "a0303de2f9240c575cb05bf2a59696bb8fc38b20c0c03dadf0c80cdf355c0821",
+      "current_matches_hosted_head": true
+    },
+    {
+      "path": "crates/kernel/chio-runtime-core/src/admission_hook/dsse.rs",
+      "sha256": "5d2e85225aced04dacb0fedcf399d5aa3d99e5fc88e86812e8092574d250d7e4",
+      "current_matches_hosted_head": true
+    },
+    {
+      "path": "crates/kernel/chio-runtime-core/src/admission_hook/treaty_ref.rs",
+      "sha256": "736e3dab0eb802591ffbd0e3a91618286c4176ac52d6c2c0a263b2d0853b4808",
+      "current_matches_hosted_head": true
+    }
+  ],
+  "packages": {
+    "federation": {
+      "total_mutants": 25,
+      "missed": 5,
+      "caught": 11,
+      "timeout": 0,
+      "unviable": 9,
+      "success": 0,
+      "enumerated_mutants": 25,
+      "uncompleted": []
+    },
+    "runtime": {
+      "total_mutants": 70,
+      "missed": 9,
+      "caught": 54,
+      "timeout": 0,
+      "unviable": 7,
+      "success": 0,
+      "enumerated_mutants": 73,
+      "uncompleted": [
+        {
+          "package": "chio-runtime-core",
+          "file": "crates/kernel/chio-runtime-core/src/admission_hook/treaty_ref.rs",
+          "function": {
+            "function_name": "treaty_ref_from_request",
+            "return_type": "-> Result<Option<TreatyReference>, &'static str>",
+            "span": {
+              "start": {
+                "line": 106,
+                "column": 1
+              },
+              "end": {
+                "line": 195,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 109,
+              "column": 5
+            },
+            "end": {
+              "line": 194,
+              "column": 8
+            }
+          },
+          "replacement": "Ok(None)",
+          "genre": "FnValue"
+        },
+        {
+          "package": "chio-runtime-core",
+          "file": "crates/kernel/chio-runtime-core/src/store/sqlite/admission_replay.rs",
+          "function": {
+            "function_name": "<impl RuntimeAdmissionStore for SqliteRuntimeOrchestrationStore>::swarm_authority_bundle_for_graph",
+            "return_type": "-> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError>",
+            "span": {
+              "start": {
+                "line": 103,
+                "column": 5
+              },
+              "end": {
+                "line": 109,
+                "column": 6
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 108,
+              "column": 9
+            },
+            "end": {
+              "line": 108,
+              "column": 80
+            }
+          },
+          "replacement": "Ok(None)",
+          "genre": "FnValue"
+        },
+        {
+          "package": "chio-runtime-core",
+          "file": "crates/kernel/chio-runtime-core/src/store/sqlite/admission_replay.rs",
+          "function": {
+            "function_name": "<impl RuntimeAdmissionStore for SqliteRuntimeOrchestrationStore>::swarm_authority_bundle_for_graph",
+            "return_type": "-> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError>",
+            "span": {
+              "start": {
+                "line": 103,
+                "column": 5
+              },
+              "end": {
+                "line": 109,
+                "column": 6
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 108,
+              "column": 9
+            },
+            "end": {
+              "line": 108,
+              "column": 80
+            }
+          },
+          "replacement": "Ok(Some(Default::default()))",
+          "genre": "FnValue"
+        }
+      ]
+    }
+  }
+}

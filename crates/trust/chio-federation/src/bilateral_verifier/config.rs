@@ -5,18 +5,18 @@ use super::*;
 // ---------------------------------------------------------------------------
 
 /// Action-class declaration looked up by `tool_name` in the verifier's
-/// local ladder manifest. Spec §7 step 15 requires
+/// local ladder manifest. Spec §7 step 22 requires
 /// `governance_receipt_ref` only when the class is `receipt-backed`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActionClassKind {
     /// Self-evident, low-stakes class. No governance receipt required.
     Routine,
     /// Receipt-backed class - requires `governance_receipt_ref` in the
-    /// predicate body (§7 step 15).
+    /// predicate body (§7 step 22).
     ReceiptBacked,
 }
 
-/// Fail-closed action-class invariant: policy controlling step 15's
+/// Fail-closed action-class invariant: policy controlling step 22's
 /// reaction to an unknown `tool_name`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum UnknownActionClassPolicy {
@@ -38,11 +38,11 @@ pub struct VerifierConfig<'a> {
     pub governance_receipt_store: &'a dyn GovernanceReceiptStore,
     pub revocation_oracle: &'a dyn RevocationOracle,
     pub pinned_epoch: PinnedEpoch,
-    /// Per-tool action-class table. The verifier (step 15) consults
+    /// Per-tool action-class table. The verifier (step 22) consults
     /// this with the predicate's `tool_name` to decide whether
     /// `governance_receipt_ref` is required.
     pub action_classes: BTreeMap<String, ActionClassKind>,
-    /// Fail-closed action-class invariant: controls how step 15 reacts
+    /// Fail-closed action-class invariant: controls how step 22 reacts
     /// to a `tool_name` that is not present in `action_classes`.
     ///
     /// The only supported value is [`UnknownActionClassPolicy::Reject`]
@@ -53,19 +53,19 @@ pub struct VerifierConfig<'a> {
 }
 
 /// Successful output of [`verify_bilateral_cosign_invocation`]
-/// (mirrors §7 step 17).
+/// (mirrors §7 step 26).
 #[derive(Debug, Clone)]
 pub struct VerifiedBilateralCoSignInvocation {
     /// The parsed Statement (subject + predicate).
     pub statement: DsseStatement,
     /// The resolved receipt the subject digest pointed at.
     pub resolved_receipt: ChioReceipt,
-    /// The resolved capability lease (step 14 always runs).
+    /// The resolved capability lease (step 21 always runs).
     pub resolved_lease: ResolvedLease,
     /// The resolved governance receipt, when the class is
-    /// `ReceiptBacked` (step 15).
+    /// `ReceiptBacked` (step 22).
     pub resolved_governance_receipt: Option<ResolvedGovernanceReceipt>,
-    /// The verdict both kernels agreed on (step 13).
+    /// The verdict both kernels agreed on (step 20).
     pub joint_verdict: String,
     /// Present only when the strict predicate declared n_of_m.
     ///

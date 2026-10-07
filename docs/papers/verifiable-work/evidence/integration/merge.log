@@ -1,0 +1,111 @@
+Auto-merging .clusterfuzzlite/build.sh
+Auto-merging .github/workflows/fuzz.yml
+Auto-merging .gitignore
+Auto-merging Cargo.lock
+Auto-merging README.md
+Auto-merging crates/core/chio-core-types/src/lib.rs
+Auto-merging crates/core/chio-core-types/src/receipt/mod.rs
+Auto-merging crates/core/chio-core-types/src/signed_artifact.rs
+Auto-merging crates/kernel/chio-kernel/README.md
+Auto-merging crates/kernel/chio-kernel/src/admission_operation/projection.rs
+Auto-merging crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs
+Auto-merging crates/kernel/chio-kernel/src/admission_operation/retained_request.rs
+Auto-merging crates/kernel/chio-kernel/src/admission_operation_tests/terminal_projection.rs
+Auto-merging crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs
+CONFLICT (content): Merge conflict in crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs
+Auto-merging crates/kernel/chio-kernel/src/kernel/admission_coordinator/recovery.rs
+CONFLICT (content): Merge conflict in crates/kernel/chio-kernel/src/kernel/admission_coordinator/recovery.rs
+Auto-merging crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/custody.rs
+CONFLICT (content): Merge conflict in crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/custody.rs
+Auto-merging crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/tests.rs
+Auto-merging crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/tests/fixture.rs
+CONFLICT (content): Merge conflict in crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/tests/fixture.rs
+Auto-merging crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal.rs
+CONFLICT (content): Merge conflict in crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal.rs
+Auto-merging crates/kernel/chio-kernel/src/kernel/construction.rs
+Auto-merging crates/kernel/chio-kernel/src/kernel/delivery_contract.rs
+Auto-merging crates/kernel/chio-kernel/src/kernel/kernel_struct.rs
+Auto-merging crates/kernel/chio-kernel/src/kernel/mod.rs
+Auto-merging crates/kernel/chio-kernel/src/kernel/tests/durable_admission.rs
+Auto-merging crates/kernel/chio-kernel/src/kernel/tests/durable_admission/operation_store.rs
+Auto-merging crates/kernel/chio-kernel/src/payment.rs
+Auto-merging crates/kernel/chio-kernel/src/tool_outcome.rs
+Auto-merging crates/kernel/chio-kernel/tests/durable_admission_sqlite.rs
+Auto-merging crates/kernel/chio-kernel/tests/durable_admission_sqlite/federation_context.rs
+CONFLICT (content): Merge conflict in crates/kernel/chio-kernel/tests/durable_admission_sqlite/federation_context.rs
+Auto-merging crates/kernel/chio-kernel/tests/durable_admission_sqlite/security_release.rs
+CONFLICT (content): Merge conflict in crates/kernel/chio-kernel/tests/durable_admission_sqlite/security_release.rs
+Auto-merging crates/kernel/chio-runtime-core/README.md
+Auto-merging crates/kernel/chio-runtime-core/src/admission_hook/dsse.rs
+Auto-merging crates/kernel/chio-runtime-core/src/admission_hook/swarm_ref.rs
+Auto-merging crates/kernel/chio-runtime-core/src/admission_hook/treaty_evidence.rs
+Auto-merging crates/kernel/chio-runtime-core/src/lib.rs
+Auto-merging crates/kernel/chio-runtime-core/src/schema.rs
+Auto-merging crates/kernel/chio-runtime-core/src/store/sqlite.rs
+Auto-merging crates/kernel/chio-runtime-core/src/treaty.rs
+Auto-merging crates/platform/chio-store-sqlite/src/admission_operation_store.rs
+CONFLICT (content): Merge conflict in crates/platform/chio-store-sqlite/src/admission_operation_store.rs
+Auto-merging crates/platform/chio-store-sqlite/src/admission_operation_store/participant.rs
+CONFLICT (content): Merge conflict in crates/platform/chio-store-sqlite/src/admission_operation_store/participant.rs
+Auto-merging crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs
+Auto-merging crates/platform/chio-store-sqlite/src/admission_operation_store/retained_request.rs
+Auto-merging crates/platform/chio-store-sqlite/src/admission_operation_store_tests.rs
+Auto-merging crates/platform/chio-store-sqlite/src/admission_operation_store_tests/recovery.rs
+Auto-merging crates/platform/chio-store-sqlite/src/admission_operation_store_tests/schema.rs
+Auto-merging crates/platform/chio-store-sqlite/src/admission_operation_store_tests/schema/caller_wait.rs
+Auto-merging crates/platform/chio-store-sqlite/src/budget_store.rs
+Auto-merging crates/platform/chio-store-sqlite/src/budget_store/payment_journal.rs
+Auto-merging crates/platform/chio-store-sqlite/src/finding_operator_payment.rs
+Auto-merging crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_projection.rs
+Auto-merging crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs
+Auto-merging crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain.rs
+Auto-merging crates/platform/chio-store-sqlite/src/tool_outcome_store.rs
+CONFLICT (content): Merge conflict in crates/platform/chio-store-sqlite/src/tool_outcome_store.rs
+Auto-merging crates/platform/chio-store-sqlite/tests/execution_nonce_caller_execution/authenticated.rs
+Auto-merging crates/protocol/chio-a2a-edge/README.md
+Auto-merging crates/protocol/chio-a2a-edge/src/edge.rs
+CONFLICT (content): Merge conflict in crates/protocol/chio-a2a-edge/src/edge.rs
+Auto-merging crates/protocol/chio-a2a-edge/src/lib.rs
+Auto-merging crates/protocol/chio-a2a-edge/src/tests/all.rs
+Auto-merging crates/trust/chio-attest-buyer-core/src/error.rs
+Auto-merging crates/trust/chio-attest-buyer-core/src/report.rs
+CONFLICT (content): Merge conflict in crates/trust/chio-attest-buyer-core/src/report.rs
+Auto-merging crates/trust/chio-attest-buyer-core/src/tests.rs
+CONFLICT (content): Merge conflict in crates/trust/chio-attest-buyer-core/src/tests.rs
+Auto-merging crates/trust/chio-attest-buyer/src/api.rs
+Auto-merging crates/trust/chio-federation-transport-iroh/Cargo.toml
+Auto-merging crates/trust/chio-federation-transport-iroh/src/lanes/bilateral.rs
+Auto-merging crates/trust/chio-federation-transport-iroh/src/lanes/revocation.rs
+Auto-merging crates/trust/chio-federation-transport-iroh/src/lanes/revocation/tests.rs
+CONFLICT (add/add): Merge conflict in crates/trust/chio-federation-transport-iroh/src/lanes/revocation/tests.rs
+Auto-merging crates/trust/chio-federation/src/bilateral_dsse/types.rs
+Auto-merging crates/trust/chio-federation/src/bilateral_dsse/verify.rs
+Auto-merging crates/trust/chio-federation/src/treaty.rs
+Auto-merging crates/trust/chio-finding-verifier/src/verify.rs
+Auto-merging crates/trust/chio-finding-verifier/tests/verifier.rs
+Auto-merging docs/README.md
+Auto-merging docs/formal/COVERAGE.md
+CONFLICT (content): Merge conflict in docs/formal/COVERAGE.md
+Auto-merging docs/security/consumer-support.md
+CONFLICT (content): Merge conflict in docs/security/consumer-support.md
+Auto-merging formal/adapter-source-inventory.toml
+CONFLICT (content): Merge conflict in formal/adapter-source-inventory.toml
+Auto-merging formal/apalache/PostAdmissionDropGuard.tla
+CONFLICT (content): Merge conflict in formal/apalache/PostAdmissionDropGuard.tla
+Auto-merging formal/proof-manifest.toml
+CONFLICT (content): Merge conflict in formal/proof-manifest.toml
+Auto-merging fuzz/Cargo.toml
+Auto-merging fuzz/README.md
+Auto-merging fuzz/corpus_metadata.toml
+Auto-merging fuzz/oss-fuzz/build.sh
+Auto-merging fuzz/owners.toml
+Auto-merging fuzz/src/entries.rs
+Auto-merging fuzz/target-map.toml
+Auto-merging fuzz/tests/smoke.rs
+Auto-merging scripts/check-flow-security.sh
+Auto-merging scripts/check-rust-file-hygiene.py
+CONFLICT (content): Merge conflict in scripts/check-rust-file-hygiene.py
+Auto-merging spec/schemas/MANIFEST.sha256
+CONFLICT (content): Merge conflict in spec/schemas/MANIFEST.sha256
+Auto-merging spec/schemas/registry.json
+Automatic merge failed; fix conflicts and then commit the result.

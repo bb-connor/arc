@@ -1,0 +1,10 @@
+{
+  "child": {
+    "buyer": "184c2808d2362b50d32fcfd039b86f4f6d3278c5953cbc60ed496041b1d77712",
+    "provider": "b00c8fcbdc55fdb0a80f294f9b87be8381f559f4307371fc4772852adcc2aada"
+  },
+  "parent": {
+    "buyer": "b500b748375d52987814ae6ae79c7faae0dd915768073db265b3dbe114d661d0",
+    "provider": "4b950e8b6a7764bccd293f9ff74081fc11282d675d461f648e8a445d8e83bf31"
+  }
+}

@@ -1,0 +1,28 @@
+test_growth_preserves_original_work_and_earned_child_after_parent_loss (__main__.EvolvingWork.test_growth_preserves_original_work_and_earned_child_after_parent_loss) ... FAIL
+
+======================================================================
+FAIL: test_growth_preserves_original_work_and_earned_child_after_parent_loss (__main__.EvolvingWork.test_growth_preserves_original_work_and_earned_child_after_parent_loss)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/examples/federated-work/test_evolving_work.py", line 19, in test_growth_preserves_original_work_and_earned_child_after_parent_loss
+    self.assertEqual(result.returncode, 0, result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /tmp/chio-verifiable-work-paper/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /tmp/chio-verifiable-work-paper/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+evolving parent missed earned-child SIGKILL: status=exit status: 0 stdout={"allocationId":"0x00c4b7c95ae4ff3ab4daa8181a2016444eba448550ee9605c3508aa920f2feda","authorityUuid":"01a0fffa-55f4-7dd1-994c-6d5903bbb59a","authorizationId":"funded-00c4b7c95ae4ff3ab4daa8181a2016444eba448550ee9605c3508aa920f2feda","executions":0,"externalFundsTransferred":false,"fundingCorrelation":"bound","holdId":"admission-budget:b896fffe0d6086cf9ca89fd3120b9d81c00454838029acd1d23e79f00653da5e:0","nativeAuthorizationId":"funded-00c4b7c95ae4ff3ab4daa8181a2016444eba448550ee9605c3508aa920f2feda","nativeEvaluationError":"receipt persistence failed: conflict: tool receipt `841cf8ca55e7c6c088a0a416708fc1968e5fa8f91e9bc45bdbc74beebd0234a6` has invalid financial metadata: missing field `grant_index`","nativePaymentAction":null,"nativePaymentState":"Authorized","nativeState":"OutcomeUnknownAfterDispatch","operationId":"b896fffe0d6086cf9ca89fd3120b9d81c00454838029acd1d23e79f00653da5e","paymentState":"pending","profile":"chio.experimental.local-confirmed-funding.v1","requestId":"parent","runtimeClaimHistory":[{"disposition":"retained_after_dispatch_commit","intent":{"episodeId":"01a0fffa-924d-7a72-8d79-176e209eed02","expectationId":"dc103f585bd2e9c3c871dd12fe4f479d82eba667caa650e5fc30edc9c922ccbc","grantIndex":0,"phase":"dispatch","planDigest":"ced6f922f985fcd0d482d5753813efe2c380fbcd97b57eb99b001b40da09a8d0","requestBindingHash":"8d678d37536d30eae317b69ac2c4251e1087adf022da071be75633ea25fb47af","resources":[{"artifactDigest":"95fd654ef679f027240183df571898ef536f9372be390956fb785660203ca316","kind":"treaty_continuation","resourceId":"treaty-continuation-parent"},{"artifactDigest":"7d18a3af65c5ccae5ef02a201e685accea57995d5c89118e2d90a483ceed4e1e","kind":"swarm_continuation","resourceId":"continue-parent"}],"runtimeAuthorityId":"runtime-01a0fffa-55f4-7dd1-994c-6d5903bbb59a"},"reference":{"claimDigest":"b6180c14e234094211d148582096f9031e177326a21ed7588aae3c1432bfee69","episodeId":"01a0fffa-924d-7a72-8d79-176e209eed02","operationId":"b896fffe0d6086cf9ca89fd3120b9d81c00454838029acd1d23e79f00653da5e"}}],"settlementObservationError":null,"settlementTransaction":null,"startupReconciliationError":null}
+ stderr=child earning failed: independent checker unavailable
+
+
+
+----------------------------------------------------------------------
+Ran 1 test in 35.300s
+
+FAILED (failures=1)

@@ -1,0 +1,26 @@
+test_growth_preserves_original_work_and_earned_child_after_parent_loss (__main__.EvolvingWork.test_growth_preserves_original_work_and_earned_child_after_parent_loss) ... FAIL
+
+======================================================================
+FAIL: test_growth_preserves_original_work_and_earned_child_after_parent_loss (__main__.EvolvingWork.test_growth_preserves_original_work_and_earned_child_after_parent_loss)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/examples/federated-work/test_evolving_work.py", line 19, in test_growth_preserves_original_work_and_earned_child_after_parent_loss
+    self.assertEqual(result.returncode, 0, result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /tmp/chio-verifiable-work-paper/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /tmp/chio-verifiable-work-paper/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+unsupported swarm route-plan egress constraint: local-native-invocation
+
+
+----------------------------------------------------------------------
+Ran 1 test in 18.801s
+
+FAILED (failures=1)

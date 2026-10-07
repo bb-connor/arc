@@ -1,0 +1,27 @@
+
+running 5 tests
+test composition_worker ... ok
+test test_rail_cannot_spend_refundable_parent_backing_on_child_claims ... ok
+test mutated_approvals_and_artifact_handoffs_never_dispatch ... FAILED
+test approved_artifacts_and_earned_child_survive_parent_finalization_loss ... FAILED
+test approval_authority_cannot_replace_receiver_owned_capability ... FAILED
+
+failures:
+
+---- mutated_approvals_and_artifact_handoffs_never_dispatch stdout ----
+Error: "handoff denied: Some(\"governed transaction denied: approval policy is not configured\")"
+
+---- approved_artifacts_and_earned_child_survive_parent_finalization_loss stdout ----
+Error: "handoff denied: Some(\"governed transaction denied: approval policy is not configured\")"
+
+---- approval_authority_cannot_replace_receiver_owned_capability stdout ----
+Error: "handoff denied: Some(\"governed transaction denied: approval policy is not configured\")"
+
+
+failures:
+    approval_authority_cannot_replace_receiver_owned_capability
+    approved_artifacts_and_earned_child_survive_parent_finalization_loss
+    mutated_approvals_and_artifact_handoffs_never_dispatch
+
+test result: FAILED. 2 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.56s
+

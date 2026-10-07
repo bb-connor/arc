@@ -24,10 +24,14 @@ fn current_mapping_parses_without_warnings() {
     let parsed = parse_mapping(include_str!("../../../../formal/MAPPING.md"));
 
     assert!(parsed.warnings.is_empty(), "{:?}", parsed.warnings);
-    assert_eq!(parsed.rows.len(), 106);
+    assert_eq!(parsed.rows.len(), 110);
     for property in [
         "verify_captured_invocation_count_monotonic",
         "verify_replay_fingerprint_uniqueness",
+        "clock_fence_preserves_last_success_on_regression",
+        "authority_deadline_never_extends_on_retry",
+        "future_skew_uses_checked_full_width_arithmetic",
+        "response_terminal_states_and_clean_rollback_are_closed",
     ] {
         assert!(parsed.rows.iter().any(|row| row.property == property));
     }

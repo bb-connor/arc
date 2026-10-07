@@ -1,0 +1,11 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--manifest-path",
+    "labs/kernel-work-composition/Cargo.toml"
+  ],
+  "exit_code": 101,
+  "expected": "36 semantic failures from unimplemented transitions/explorer"
+}

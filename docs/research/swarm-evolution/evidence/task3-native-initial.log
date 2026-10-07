@@ -1,0 +1,42 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/chio-verifiable-work-paper/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/chio-verifiable-work-paper/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/chio-verifiable-work-paper/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-runtime-core v0.1.0 (/tmp/chio-verifiable-work-paper/crates/kernel/chio-runtime-core)
+    Finished `test` profile [unoptimized] target(s) in 15.36s
+     Running tests/runtime_admission.rs (/tmp/chio-paper-target/debug/deps/runtime_admission-ef7a4ea6b7db4c90)
+
+running 6 tests
+test swarm_evolution::swarm_evolution_rejects_rewrite_without_installing_or_archiving ... ok
+test swarm_evolution::swarm_evolution_serializes_competing_writers ... ok
+test swarm_evolution::swarm_evolution_retains_exact_versions_after_reopen ... ok
+test swarm_evolution::swarm_evolution_rejects_corrupt_historical_binding ... ok
+test operation_owned::live_swarm::evolution::native_swarm_evolution_keeps_unstarted_original_work_executable ... ok
+test operation_owned::live_swarm::evolution::native_swarm_evolution_runs_added_work_and_preserves_original_replay ... FAILED
+
+failures:
+
+---- operation_owned::live_swarm::evolution::native_swarm_evolution_runs_added_work_and_preserves_original_replay stdout ----
+
+thread 'operation_owned::live_swarm::evolution::native_swarm_evolution_runs_added_work_and_preserves_original_replay' (1903519) panicked at crates/kernel/chio-runtime-core/tests/runtime_admission/operation_owned/live_swarm/evolution.rs:111:5:
+assertion `left == right` failed
+  left: [RuntimeParticipantClaimHistoryV1 { reference: RuntimeParticipantClaimReferenceV1 { operation_id: AdmissionOperationId(AdmissionDigest("acd68b8dea091ca03e15d5cf1d9dab3d86ee3a47abb77221aad1dd000f44b951")), episode_id: BoundedAdmissionText("01a0ff7c-8cb7-7da3-b08d-b577200e3793"), claim_digest: AdmissionDigest("efa472d17b0e87cddb4e898b71068d1bbdff26669698c504e0648a1d8dc58db5") }, intent: RuntimeParticipantClaimIntentV1 { episode_id: BoundedAdmissionText("01a0ff7c-8cb7-7da3-b08d-b577200e3793"), runtime_authority_id: BoundedAdmissionText("live-runtime-authority"), phase: Dispatch, grant_index: 0, plan_digest: AdmissionDigest("35007120b0b9d45c549d4b706beeac54340186aaa5bcc82dd8e1820aa04dfe55"), resource_count: 1, .. }, disposition: RetainedAfterDispatchCommit }]
+ right: [RuntimeParticipantClaimHistoryV1 { reference: RuntimeParticipantClaimReferenceV1 { operation_id: AdmissionOperationId(AdmissionDigest("eba8f6eab72470fce3ca0d33b3ac8a8ce70b041453edab7741226f4b061cdb0e")), episode_id: BoundedAdmissionText("01a0ff7c-8a2b-7581-adff-58cd4d875ae8"), claim_digest: AdmissionDigest("3939ebe099aadecf4c2c8511272298bc58151b98d214f2afcbefc287ab33be9f") }, intent: RuntimeParticipantClaimIntentV1 { episode_id: BoundedAdmissionText("01a0ff7c-8a2b-7581-adff-58cd4d875ae8"), runtime_authority_id: BoundedAdmissionText("live-runtime-authority"), phase: Dispatch, grant_index: 0, plan_digest: AdmissionDigest("a2ed97ee4d5409cd6d417f77e1c48ea6a1cbc853300eabe05c0ae869bfe1e283"), resource_count: 1, .. }, disposition: RetainedAfterDispatchCommit }]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    operation_owned::live_swarm::evolution::native_swarm_evolution_runs_added_work_and_preserves_original_replay
+
+test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 92 filtered out; finished in 5.20s
+
+error: test failed, to rerun pass `-p chio-runtime-core --test runtime_admission`

@@ -1,0 +1,5 @@
+{
+  "exit_code": 101,
+  "status": "compile failure",
+  "cause": "stale clock fixture API"
+}

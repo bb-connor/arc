@@ -2362,7 +2362,28 @@ impl ChioKernel {
         };
         let authorization = run_payment_adapter_operation("authorize", || {
             adapter.authorize(&authorization_request)
-        })?;
+        });
+        let authorization = match authorization {
+            Ok(authorization) => authorization,
+            Err(error @ (PaymentError::Declined(_) | PaymentError::InsufficientFunds)) => {
+                // These adapter responses are authoritative negatives. Persist
+                // that fact before cleanup; an unavailable reconciliation API
+                // must not turn a definite decline into an ambiguous hold.
+                if let (Some(admission), Some(journal)) =
+                    (durable_admission, durable_journal.as_ref())
+                {
+                    self.advance_durable_payment_journal(
+                        admission,
+                        journal,
+                        &crate::payment::PaymentJournalTransition::CancelBeforeAuthorization,
+                        trusted_now_unix_ms,
+                    )
+                    .map_err(|error| PaymentError::RailError(error.to_string()))?;
+                }
+                return Err(error);
+            }
+            Err(error) => return Err(error),
+        };
         validate_payment_adapter_identifier(&authorization.authorization_id, "authorization_id")?;
         if let (Some(admission), Some(journal)) = (durable_admission, durable_journal.as_ref()) {
             if !journal.rail_mode.accepts(authorization.state) {

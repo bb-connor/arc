@@ -3,12 +3,12 @@
 # stages. Base images are digest-pinned to match Dockerfile.sidecar /
 # Dockerfile.tee; bump the digests in lockstep with those files.
 
-ARG RUST_VERSION=1.94.1
+ARG RUST_VERSION=1.95.0
 ARG ALPINE_VERSION=3.22
 ARG NODE_VERSION=22
 
-FROM rust:${RUST_VERSION}-alpine${ALPINE_VERSION}@sha256:797631f9efd6957d0013f200e410478c380907eee3b469c6f80d89022df28bc7 AS rust-builder
-RUN apk add --no-cache build-base cmake openssl-dev openssl-libs-static pkgconf
+FROM rust:${RUST_VERSION}-alpine${ALPINE_VERSION}@sha256:064dfc925d68d1a63f4fd2871bd7dc6e6ea56692989a487185855d62885d90aa AS rust-builder
+RUN apk add --no-cache build-base cmake perl openssl-dev openssl-libs-static pkgconf protoc
 # The musl target links statically, so OpenSSL must be the static archive.
 ENV OPENSSL_STATIC=1 \
     OPENSSL_NO_VENDOR=1 \
@@ -35,24 +35,22 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
  && cargo build --profile docker-release --locked -p chio-cli --bin chio \
  && cp target/docker-release/chio /chio
 
-FROM rust:${RUST_VERSION}-alpine${ALPINE_VERSION}@sha256:797631f9efd6957d0013f200e410478c380907eee3b469c6f80d89022df28bc7 AS proof-room-builder
+FROM rust:${RUST_VERSION}-alpine${ALPINE_VERSION}@sha256:064dfc925d68d1a63f4fd2871bd7dc6e6ea56692989a487185855d62885d90aa AS proof-room-builder
+RUN apk add --no-cache build-base cmake perl openssl-dev openssl-libs-static pkgconf protoc
+# The quickstart runtime has no shared OpenSSL dependencies.
+ENV OPENSSL_STATIC=1
 WORKDIR /workspace
 
-# The proof room builds from the repository workspace. Cargo loads every
-# member manifest before it builds one package, so each workspace member root
-# is copied along with the schemas and fixtures the build reads at compile time.
-COPY Cargo.toml Cargo.lock ./
-COPY .cargo ./.cargo
-COPY crates ./crates
+COPY deploy/docker/proof-room-workspace/Cargo.toml ./Cargo.toml
+COPY deploy/docker/proof-room-workspace/Cargo.lock ./Cargo.lock
 COPY third_party ./third_party
-COPY bench ./bench
-COPY examples ./examples
-COPY formal ./formal
-COPY integrations ./integrations
-COPY tests ./tests
-COPY xtask ./xtask
-COPY spec ./spec
-COPY fixtures/proof-room ./fixtures/proof-room
+# The selected member retains its complete workspace path dependency closure.
+COPY crates ./crates
+COPY spec/schemas/chio-proof-room ./spec/schemas/chio-proof-room
+COPY spec/schemas/chio-runtime ./spec/schemas/chio-runtime
+COPY spec/schemas/chio-transaction ./spec/schemas/chio-transaction
+COPY fixtures/proof-room/catalog.json ./fixtures/proof-room/catalog.json
+COPY fixtures/proof-room/first-run/single-call-authority ./fixtures/proof-room/first-run/single-call-authority
 
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,target=/workspace/target,sharing=locked \

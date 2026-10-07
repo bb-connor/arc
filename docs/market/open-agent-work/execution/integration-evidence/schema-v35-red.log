@@ -1,0 +1,31 @@
+   Compiling chio-store-sqlite v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-store-sqlite)
+    Finished `test` profile [unoptimized] target(s) in 1m 12s
+     Running unittests src/lib.rs (target/debug/deps/chio_store_sqlite-5a6ec1936384c61e)
+
+running 4 tests
+test admission_operation_store::tests::schema_v35::v35_rejects_research_v10_release_namespace_without_mutation ... ok
+test admission_operation_store::tests::schema_v35::v35_rejects_weakened_or_future_v34_catalog_without_mutation ... ok
+test admission_operation_store::tests::schema_v35::v35_reopen_rejects_missing_immutable_release_barrier ... FAILED
+test admission_operation_store::tests::schema_v35::v35_upgrades_exact_v34_without_rewriting_operation_or_anchored_history ... FAILED
+
+failures:
+
+---- admission_operation_store::tests::schema_v35::v35_reopen_rejects_missing_immutable_release_barrier stdout ----
+Error: SqliteFailure(Error { code: Unknown, extended_code: 1 }, Some("no such trigger: unknown_payment_release_records_immutable"))
+
+---- admission_operation_store::tests::schema_v35::v35_upgrades_exact_v34_without_rewriting_operation_or_anchored_history stdout ----
+
+thread 'admission_operation_store::tests::schema_v35::v35_upgrades_exact_v34_without_rewriting_operation_or_anchored_history' (1157978) panicked at crates/platform/chio-store-sqlite/src/admission_operation_store_tests/schema_v35.rs:53:5:
+assertion `left == right` failed
+  left: 34
+ right: 35
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    admission_operation_store::tests::schema_v35::v35_reopen_rejects_missing_immutable_release_barrier
+    admission_operation_store::tests::schema_v35::v35_upgrades_exact_v34_without_rewriting_operation_or_anchored_history
+
+test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 1660 filtered out; finished in 11.39s
+
+error: test failed, to rerun pass `-p chio-store-sqlite --lib`

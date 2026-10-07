@@ -15,6 +15,11 @@ use super::finding_market_snapshot_versions::{
 };
 use super::{read_u64, sqlite_u64, SqliteServingOwnerError};
 
+mod payment;
+use payment::{
+    payment_journal_reference_digest, payment_resolution_reference_digest,
+    verify_payment_resolution_coverage,
+};
 mod projection_reference;
 mod schema_migration;
 use projection_reference::projection_reference_digest;
@@ -44,7 +49,7 @@ CREATE TABLE IF NOT EXISTS authority_global_commits (
     commit_sequence INTEGER PRIMARY KEY CHECK (commit_sequence > 0),
     mutation_kind TEXT NOT NULL CHECK (mutation_kind <> ''),
     projection_kind TEXT NOT NULL CHECK (
-        projection_kind IN ('baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication', 'factor_assignment_authority_set', 'fiscal', 'finding_challenge', 'finding_status', 'runtime_replay_migration', 'governed_approval_replay_migration', 'dpop_replay_migration', 'security_participant_migration', 'security_participant_state', 'security_participant_egress', 'native_dispatch_ledger', 'security_participant_output', 'security_participant_nonce_preflight')
+        projection_kind IN ('baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication', 'factor_assignment_authority_set', 'fiscal', 'finding_challenge', 'finding_status', 'runtime_replay_migration', 'governed_approval_replay_migration', 'dpop_replay_migration', 'security_participant_migration', 'security_participant_state', 'security_participant_egress', 'native_dispatch_ledger', 'security_participant_output', 'security_participant_nonce_preflight', 'payment_resolution')
     ),
     projection_key TEXT NOT NULL,
     projection_sequence INTEGER NOT NULL CHECK (projection_sequence >= 0),
@@ -1156,39 +1161,6 @@ pub(crate) fn budget_event_reference_digest(
     })
 }
 
-fn payment_journal_reference_digest(
-    connection: &Connection,
-    operation_id: &str,
-    journal_version: u64,
-) -> Result<String, SqliteServingOwnerError> {
-    let stored_version = connection
-        .query_row(
-            "SELECT journal_version FROM payment_journal WHERE operation_id = ?1",
-            [operation_id],
-            |row| row.get::<_, i64>(0),
-        )
-        .optional()?
-        .ok_or_else(|| invalid("payment journal projection reference is absent"))?;
-    if read_u64(stored_version, "payment journal version")? != journal_version {
-        return Err(invalid(
-            "payment journal projection sequence does not match its record",
-        ));
-    }
-    let tables = ["payment_journal", "payment_release_evidence"];
-    let mut snapshots = Vec::with_capacity(tables.len());
-    for table in tables {
-        snapshots.push(table_snapshot(
-            connection,
-            table,
-            Some(("operation_id", operation_id)),
-        )?);
-    }
-    digest(&AuthoritySnapshot {
-        format: "chio.sqlite-authority-payment-journal-reference.v1",
-        tables: snapshots,
-    })
-}
-
 fn baseline_projection_digest(connection: &Connection) -> Result<String, SqliteServingOwnerError> {
     baseline_projection_digest_for_tables(connection, table_names(connection, false)?)
 }
@@ -1721,6 +1693,7 @@ fn verify_global_projection_coverage(
     verify_channel_release_projection_coverage(connection)?;
     verify_finding_challenge_projection_coverage(connection)?;
     verify_finding_status_projection_coverage(connection)?;
+    verify_payment_resolution_coverage(connection)?;
     let incomplete = connection.query_row(
         r#"
         SELECT

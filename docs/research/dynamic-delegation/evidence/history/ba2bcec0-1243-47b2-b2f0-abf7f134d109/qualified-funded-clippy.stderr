@@ -1,0 +1,107 @@
+    Checking serde_json v1.0.149
+    Checking sha2 v0.10.9
+    Checking scrypt v0.11.0
+    Checking pkcs5 v0.7.1
+    Checking pkcs8 v0.10.2
+    Checking ed25519 v2.2.3
+    Checking ed25519-dalek v2.2.0
+    Checking chio-security-types v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/security/chio-security-types)
+    Checking rs_merkle v1.5.0
+    Checking aws-lc-rs v1.18.1
+    Checking frost-ed25519 v3.0.0
+    Checking rustls-webpki v0.103.13
+    Checking sec1 v0.7.3
+    Checking chio-metrics-spec v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/observability/chio-metrics-spec)
+    Checking elliptic-curve v0.13.8
+    Checking rustls v0.23.37
+    Checking tokio-rustls v0.26.4
+    Checking hyper-rustls v0.27.7
+    Checking rustls-platform-verifier v0.6.2
+    Checking reqwest v0.13.2
+    Checking ecdsa v0.16.9
+    Checking primeorder v0.13.6
+    Checking sha2 v0.11.0
+    Checking chio-core-types v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/core/chio-core-types)
+    Checking olpc-cjson v0.1.4
+    Checking pkcs1 v0.7.5
+    Checking oci-spec v0.9.0
+    Checking oauth2 v5.0.0
+    Checking rsa v0.9.10
+    Checking serde_with v3.18.0
+    Checking p256 v0.13.2
+    Checking p384 v0.13.1
+    Checking jsonwebtoken v10.4.0
+    Checking chio-workflow-preflight v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-workflow-preflight)
+    Checking serde_json_canonicalizer v0.3.2
+    Checking referencing v0.46.0
+    Checking tough v0.22.0
+    Checking chio-listing v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-listing)
+    Checking chio-revocation-oracle v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-revocation-oracle)
+    Checking chio-finding v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-finding)
+    Checking chio-fiscal v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-fiscal)
+    Checking chio-governance v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-governance)
+    Checking chio-pheromone v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-pheromone)
+    Checking chio-appraisal v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-appraisal)
+    Checking chio-open-market v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-open-market)
+    Checking chio-underwriting v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-underwriting)
+    Checking chio-federation v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-federation)
+    Checking chio-did v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-did)
+    Checking chio-fincred v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-fincred)
+    Checking openidconnect v4.0.1
+    Checking chio-credit v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-credit)
+    Checking sigstore_protobuf_specs v0.5.1
+    Checking oci-client v0.17.0
+    Checking scrypt v0.12.0
+    Checking sigstore v0.14.0
+    Checking jsonschema v0.46.0
+    Checking chio-market v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-market)
+    Checking chio-web3 v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-web3)
+    Checking chio-cage-plan v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/security/chio-cage-plan)
+    Checking chio-autonomy v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-autonomy)
+    Checking chio-egress-contract v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/protocol/chio-egress-contract)
+    Checking ciborium v0.2.2
+    Checking jsonwebtoken v9.3.1
+    Checking chio-core v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/core/chio-core)
+    Checking chio-attest-verify v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-attest-verify)
+    Checking coset v0.4.2
+    Checking chio-workflow v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-workflow)
+    Checking chio-manifest v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-manifest)
+    Checking chio-web3-bindings v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-web3-bindings)
+    Checking chio-lineage v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/observability/chio-lineage)
+    Checking chio-data-guards-redactors-default v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/guards/chio-data-guards/redactors/default)
+    Checking chio-tool-call-fabric v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/protocol/chio-tool-call-fabric)
+    Checking chio-log-redact v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/observability/chio-log-redact)
+    Checking chio-settle v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-settle)
+    Checking chio-weights v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-weights)
+    Checking chio-custody-hw v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-custody-hw)
+    Checking chio-link v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-link)
+    Checking chio-kernel-core v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/kernel/chio-kernel-core)
+    Checking ureq v2.12.1
+    Checking chio-swarm-authority v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/kernel/chio-swarm-authority)
+    Checking chio-response-model v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/core/chio-response-model)
+    Checking chio-supervisor v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/core/chio-supervisor)
+    Checking chio-bounded v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/core/chio-bounded)
+    Checking bls12_381_plus v0.8.13
+    Checking affinidi-bbs v0.1.0
+    Checking chio-disclosure-lineage v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-disclosure-lineage)
+    Checking chio-kernel v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/kernel/chio-kernel)
+    Checking chio-selective-disclosure v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-selective-disclosure)
+    Checking chio-attest-buyer-core v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-attest-buyer-core)
+    Checking chio-sqlite-file-identity v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-sqlite-file-identity)
+    Checking chio-federation-authority v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-federation-authority)
+    Checking chio-runtime-proof-parity v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/kernel/chio-runtime-proof-parity)
+    Checking rustls-pemfile v2.2.0
+    Checking chio-finding-verifier v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-finding-verifier)
+    Checking chio-edge-metrics v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/protocol/chio-edge-metrics)
+    Checking chio-cross-protocol v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/protocol/chio-cross-protocol)
+    Checking chio-transaction-passport v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-transaction-passport)
+    Checking chio-mcp-edge v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/protocol/chio-mcp-edge)
+    Checking chio-a2a-edge v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/protocol/chio-a2a-edge)
+    Checking chio-a2a-adapter v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/protocol/chio-a2a-adapter)
+    Checking chio-risk-comptroller v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-risk-comptroller)
+    Checking chio-commerce-order v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-commerce-order)
+    Checking chio-runtime-core v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/kernel/chio-runtime-core)
+    Checking chio-agent-web-interop v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-agent-web-interop)
+    Checking chio-store-sqlite v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-store-sqlite)
+    Checking chio-federated-work v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/examples/federated-work)
+    Finished `dev` profile [unoptimized] target(s) in 1m 56s

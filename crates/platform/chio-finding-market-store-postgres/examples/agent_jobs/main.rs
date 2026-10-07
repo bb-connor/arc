@@ -1,4 +1,4 @@
-//! A stdio MCP adapter over the existing PostgreSQL job lease API.
+//! Trusted PostgreSQL job lease adapter with HTTPS and legacy stdio transports.
 //! The database connection uses the production role and TLS checks.
 
 use std::error::Error;
@@ -10,13 +10,43 @@ use chio_finding_market_store_postgres::{
 };
 use serde_json::{json, Value};
 
+#[cfg(target_os = "linux")]
+mod host_adapter;
 mod resource;
 mod tools;
 
 const MAX_FRAME: u64 = 1024 * 1024;
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), Box<dyn Error>> {
+    if std::env::args().nth(1).as_deref() == Some("definitions") {
+        let args: Vec<_> = std::env::args().skip(2).collect();
+        if args.len() != 1 || !matches!(args[0].as_str(), "worker" | "operator") {
+            return Err("definitions requires worker or operator".into());
+        }
+        println!("{}", serde_json::to_string(&tools::definitions(&args[0]))?);
+        return Ok(());
+    }
+    #[cfg(target_os = "linux")]
+    if std::env::args().nth(1).as_deref() == Some("serve") {
+        let args: Vec<_> = std::env::args_os().skip(2).collect();
+        if args.len() != 1 {
+            return Err("serve requires one private configuration path".into());
+        }
+        return host_adapter::serve(std::path::Path::new(&args[0]));
+    }
+    tokio::runtime::Runtime::new()?.block_on(legacy())
+}
+
+fn database_config() -> Result<HostedPostgresConfig, Box<dyn Error>> {
+    let url =
+        std::env::var("CHIO_JOB_DATABASE_URL").map_err(|_| "CHIO_JOB_DATABASE_URL is required")?;
+    let ca = PathBuf::from(
+        std::env::var("CHIO_JOB_DATABASE_CA").map_err(|_| "CHIO_JOB_DATABASE_CA is required")?,
+    );
+    Ok(HostedPostgresConfig::new(url)?.with_ca_certificate(ca)?)
+}
+
+async fn legacy() -> Result<(), Box<dyn Error>> {
     let mut arguments = std::env::args().skip(1);
     let mode = arguments
         .next()
@@ -25,12 +55,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     if arguments.next().is_some() {
         return Err("unexpected arguments".into());
     }
-    let url =
-        std::env::var("CHIO_JOB_DATABASE_URL").map_err(|_| "CHIO_JOB_DATABASE_URL is required")?;
-    let ca = PathBuf::from(
-        std::env::var("CHIO_JOB_DATABASE_CA").map_err(|_| "CHIO_JOB_DATABASE_CA is required")?,
-    );
-    let config = HostedPostgresConfig::new(url)?.with_ca_certificate(ca)?;
+    let config = database_config()?;
     if mode == "migrate" {
         PostgresFindingMarketMigrator::connect(&config)
             .await?

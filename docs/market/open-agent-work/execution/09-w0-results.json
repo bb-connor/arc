@@ -1,0 +1,618 @@
+{
+  "schema": "chio.experimental.funded-w0-execution.v1",
+  "capturedUtc": "2026-09-14T11:03:33.454076+00:00",
+  "baseCommit": "64a671c4f6",
+  "implementationCommit": "028347541e4d480b0deed01f4017fa2a12f6b02f",
+  "branch": "research/funded-work-baseline",
+  "environment": {
+    "python": "Python 3.12.3",
+    "node": "v24.16.0",
+    "rust": "rustc 1.94.1 (e408947bf 2026-03-25)",
+    "host": "Linux-6.17.0-1020-oracle-aarch64-with-glibc2.39",
+    "machine": "aarch64",
+    "solc": "0.8.30",
+    "ethers": "6.16.0",
+    "ganache": "7.9.2",
+    "chainId": "31337",
+    "runtime": "Shanghai",
+    "compilerEvm": "Paris",
+    "optimizerRuns": 200,
+    "nativeAccelerators": "unavailable on this Node/aarch64 host; supported JavaScript fallback executed"
+  },
+  "runs": [
+    {
+      "command": "/tmp/chio-funding-execution-mfkbfx6y/python-env/bin/python -B -m unittest discover -s examples/funded-work -v",
+      "exitCode": 0,
+      "result": "23 passed, zero skips",
+      "log": "w0-evidence/python-final.log",
+      "sha256": "572ba2f60f5519f106fed3cc709f3aec8d04131fb3bc95be3e4b7877e36e9df9"
+    },
+    {
+      "command": "/tmp/chio-funding-execution-mfkbfx6y/python-env/bin/python -B -m unittest discover -s examples/federated-work/python_buyer -v",
+      "exitCode": 0,
+      "result": "30 passed",
+      "log": "w0-evidence/buyer-regressions.log",
+      "sha256": "990cee036f73f305847a5ad8309927159bf1411982b9e0a5ec1609f9deb67c57"
+    },
+    {
+      "command": "CARGO_BUILD_JOBS=4 CARGO_TARGET_DIR=target cargo build --locked --manifest-path examples/federated-work/Cargo.toml",
+      "exitCode": 0,
+      "result": "standalone binary built",
+      "log": "w0-evidence/checker-build.log",
+      "sha256": "65a7a6b95a7050977b6e72859f456b28ed7b158a186ebf0813106a1e4fcccd39"
+    },
+    {
+      "command": "CARGO_BUILD_JOBS=4 CARGO_TARGET_DIR=target cargo test --locked --manifest-path examples/federated-work/Cargo.toml",
+      "exitCode": 0,
+      "result": "11 passed",
+      "log": "w0-evidence/rust-tests.log",
+      "sha256": "e4adfbee9ea1b41616594951d730883145ec76596e801747c35e8cfcca933389"
+    },
+    {
+      "command": "CARGO_BUILD_JOBS=4 CARGO_TARGET_DIR=target cargo clippy --locked --manifest-path examples/federated-work/Cargo.toml --all-targets -- -D warnings",
+      "exitCode": 0,
+      "result": "passed",
+      "log": "w0-evidence/rust-clippy.log",
+      "sha256": "10dc51f0b7a12bdabf35716ffaedd38bf26398d4a148825875b32b38599a76d1"
+    },
+    {
+      "command": "cargo fmt --manifest-path examples/federated-work/Cargo.toml -- --check",
+      "exitCode": 0,
+      "result": "passed",
+      "log": "w0-evidence/rust-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "CHIO_W0_PYTHON=/tmp/chio-funding-execution-mfkbfx6y/python-env/bin/python CHIO_W0_EVIDENCE=/tmp/chio-w0-execution/runs node --test contracts/scripts/work-claim-w0.test.mjs contracts/scripts/work-claim-escrow.test.mjs contracts/scripts/work-claim-model.test.mjs contracts/scripts/escrow-fit.test.mjs",
+      "exitCode": 0,
+      "result": "141 passed, zero skips",
+      "log": "w0-evidence/node-final.log",
+      "sha256": "13e94543ac89d51307cb28ed47e87cedda081c6fc059736ba74a55290e059f2a",
+      "selectionNote": "The nonexistent fourth operand matched no tests in Node 24. The three existing files selected 141 checks. Legacy escrow is separately selected by its correct filename below."
+    },
+    {
+      "command": "node --test contracts/scripts/funded-work-fit.test.mjs",
+      "exitCode": 0,
+      "result": "6 passed, zero skips",
+      "log": "w0-evidence/legacy-escrow.log",
+      "sha256": "5c2fbf4ebae4dd62b830a75566723863acddb80bf632bbf57cfe629556dde502"
+    },
+    {
+      "command": "CHIO_W0_PYTHON=/tmp/chio-funding-execution-mfkbfx6y/python-env/bin/python node contracts/scripts/work-claim-w0.mjs child /tmp/chio-w0-execution/retained-child --output /tmp/chio-w0-execution/retained-child-public.json",
+      "exitCode": 0,
+      "result": "160 deposited, 60 paid, 100 refunded; private state retained",
+      "log": "w0-evidence/standalone-child.log",
+      "sha256": "0ace0a006cd041ab69213155990ebf0af8053c0cb902f908a136df35f1ffafb3"
+    },
+    {
+      "command": "/tmp/chio-funding-execution-mfkbfx6y/python-env/bin/python -B /tmp/chio-w0-execution/checker-mutation.py",
+      "exitCode": 1,
+      "result": "expected negative: bypassing actual predicate accepts false output",
+      "log": "w0-evidence/checker-mutation.log",
+      "sha256": "dfa1a308bc0d213eb945b5fb6e9c41f2042c27b5d8414e17bf748de81e60c1ea",
+      "sourceScope": "isolated test-side verifier mutation; repository code unchanged"
+    },
+    {
+      "command": "CHIO_W0_PYTHON=/tmp/chio-funding-execution-mfkbfx6y/python-env/bin/python node --test --test-name-pattern='real W0 child' contracts/scripts/work-claim-w0.test.mjs",
+      "exitCode": 1,
+      "result": "reproduced artifact identity mismatch before repair",
+      "log": "w0-evidence/child-identity-red.log",
+      "sha256": "5dd8f9d0bb41ba668f492c4b53eb3c5d8da1709dd5630bde8f2404870ad6a80e",
+      "sourceScope": "development, before five-party-key fixture repair"
+    }
+  ],
+  "sourceInventory": [
+    {
+      "path": "contracts/package.json",
+      "sha256": "64efeb00225f14767812ce75d78d52002fbc6faa999a4ee43887a31d8357a773"
+    },
+    {
+      "path": "contracts/pnpm-lock.yaml",
+      "sha256": "07cee51275b05dc9c4fea16f42e256bc5707c75a17794425c0c5c64695e23ce8"
+    },
+    {
+      "path": "contracts/scripts/fixtures/WorkClaimTestToken.sol",
+      "sha256": "eadb8d1455095e2d238e0c751139429f489d7febb0841d7b1073ec854c3444dd"
+    },
+    {
+      "path": "contracts/scripts/fixtures/work-claim-vectors.json",
+      "sha256": "43e40c4b99c9f15d5e0afe67a8aac9276fd7843251a52b65f9cc42aa3ffcbd80"
+    },
+    {
+      "path": "contracts/scripts/funded-work-fit.test.mjs",
+      "sha256": "83864ed61cea1136ec5a5b919d675f5394638329fef3caa99173949687dfb593"
+    },
+    {
+      "path": "contracts/scripts/work-claim-escrow.test.mjs",
+      "sha256": "66ca63196e940331b4525be1badbab9bdd67b2c2e91e89440400c27c991ab8e9"
+    },
+    {
+      "path": "contracts/scripts/work-claim-fixture.mjs",
+      "sha256": "3f4277028e40ef2feea444529fa68df5917658cdcc09e46ee984fecaf422db02"
+    },
+    {
+      "path": "contracts/scripts/work-claim-model.test.mjs",
+      "sha256": "fb970b03925ebd5de4ce46cf552b9d01751ce9d9b8a8361d716d15fb09934068"
+    },
+    {
+      "path": "contracts/scripts/work-claim-w0.mjs",
+      "sha256": "fe9068fad013ceac1d7a3a15b6d1ffb2ff96f39a44b05331495daad5867679c1"
+    },
+    {
+      "path": "contracts/scripts/work-claim-w0.test.mjs",
+      "sha256": "8bf277b8c4ee4618794ee00ace0d83f3a7228d40a40c88b118bc5ac3118bcf74"
+    },
+    {
+      "path": "contracts/src/ChioBondVault.sol",
+      "sha256": "c425add7c32c8617cbcaeba99ca4dffb3dee74cc16c6e539a77cffd9a0b38cd7"
+    },
+    {
+      "path": "contracts/src/ChioEscrow.sol",
+      "sha256": "0ee3d055c3696e0e4847b413838ee9d3e064c64018964d02c03b242dbe089e7f"
+    },
+    {
+      "path": "contracts/src/ChioIdentityRegistry.sol",
+      "sha256": "34feea40aeff3ffc36eec325dbb65aad0fbbe6ac4fe294efa50f47a8e746f1b7"
+    },
+    {
+      "path": "contracts/src/ChioPriceResolver.sol",
+      "sha256": "84fc5f6d020fda58faf09cdae27082703b617ba7afc473651efec1ea00d91146"
+    },
+    {
+      "path": "contracts/src/ChioRootRegistry.sol",
+      "sha256": "0a4d9e48cf4e902bcc641b8be4f44eddf0a2fada0b857abcfb875885ac7c112b"
+    },
+    {
+      "path": "contracts/src/experimental/ChioWorkClaimEscrow.sol",
+      "sha256": "b1def783516523cf58c2e60f9d541cdcc47ec07f80e9662e01f88c8cb77e1df9"
+    },
+    {
+      "path": "contracts/src/interfaces/IAggregatorV3.sol",
+      "sha256": "c9549e5a36ef15792f83547703d429fa0a3c88ef14b2b1b0a01916bc717ebefa"
+    },
+    {
+      "path": "contracts/src/interfaces/IChioBondVault.sol",
+      "sha256": "62d2b34a235a8e9543e7dc49869075beec79894636054d40f0cca98c8b45bccf"
+    },
+    {
+      "path": "contracts/src/interfaces/IChioEscrow.sol",
+      "sha256": "edccfaecb712daba527a68ecbb4092ae7adf91fdc7e0a9b13f1117430b69f9c9"
+    },
+    {
+      "path": "contracts/src/interfaces/IChioIdentityRegistry.sol",
+      "sha256": "dddea33a1506a26546ebbe52d258b227270dba284cc5138b4334740f479840be"
+    },
+    {
+      "path": "contracts/src/interfaces/IChioPriceResolver.sol",
+      "sha256": "412e5fcce50330e28ed4ead8479b3236b8b8765501fb5307c55171bf020d74de"
+    },
+    {
+      "path": "contracts/src/interfaces/IChioRootRegistry.sol",
+      "sha256": "1e8ddedfbf56ef3ca9c9c06e837db431078687f5c9c0b00bf8c55ce8ea7a5d01"
+    },
+    {
+      "path": "contracts/src/interfaces/IERC20.sol",
+      "sha256": "acd7d465fcd0264e92b038a0671f1b90e003325d2c48c211de23fcc09a7f3ec3"
+    },
+    {
+      "path": "contracts/src/interfaces/IERC20Permit.sol",
+      "sha256": "4751af7647654a4891bde119b9ba4662e3e09ef5fe2729fb13d6ea266f7cfb4e"
+    },
+    {
+      "path": "contracts/src/lib/ChioMerkle.sol",
+      "sha256": "4cf0734a1cbd8981a1e64ee3905a878bac2cb2c323168025b6464be65b701c17"
+    },
+    {
+      "path": "contracts/src/mocks/ChioCreate2Factory.sol",
+      "sha256": "e6e0010de71cb2e476ca09bbb1bec35bfacd4cf040c2549a694558a2ee4cb52b"
+    },
+    {
+      "path": "contracts/src/mocks/FeeOnTransferERC20.sol",
+      "sha256": "2b4a08527ce6b41979afe9b8f66c5cf35e6726ca2082374fe308cb74676dc6e8"
+    },
+    {
+      "path": "contracts/src/mocks/Mock1271Admin.sol",
+      "sha256": "f9f5adfc23ad42219a7c8a7a384fb24f6f7518e20e9943eb475a75ce852be3ca"
+    },
+    {
+      "path": "contracts/src/mocks/MockAggregatorV3.sol",
+      "sha256": "b22a0f951b8ab103a3804bd281ab25e02b46bd197f825fe2ce279146e92d74ca"
+    },
+    {
+      "path": "contracts/src/mocks/MockERC20.sol",
+      "sha256": "8a780f5a771b541061aeceb752652d446c52848d9a681835a2e496e5e4821a1d"
+    },
+    {
+      "path": "contracts/src/mocks/NoReturnERC20.sol",
+      "sha256": "3d2e72701c4fadc58ae398fa4c748d9602512bcb17fdaaa49231e9813efb7d20"
+    },
+    {
+      "path": "contracts/src/mocks/ReentrantBondToken.sol",
+      "sha256": "e8c3e32e3fd7280141853c3215db37db9372d10059fd8f7402c451ce82ee6ca9"
+    },
+    {
+      "path": "examples/federated-work/Cargo.lock",
+      "sha256": "324f2b8461ed53bad6771398691e8d71f34bcd98778a52314d217b316dad6165"
+    },
+    {
+      "path": "examples/federated-work/Cargo.toml",
+      "sha256": "5eb5b9fd20aea6e3f8f556bf839eb4164fbcca2d6aaf66ad6f7f0041b36a1708"
+    },
+    {
+      "path": "examples/federated-work/fixtures/openapi.json",
+      "sha256": "952c8a7286a67c8d9d67735bf05d3d083f70ad2d8d744346692de6c92d7ebeb6"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/client.py",
+      "sha256": "0e43b152c0ae5b50564567c131a5ed65315a8b209a5b86b6e39a0d5e55eacdf0"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/incident.py",
+      "sha256": "6ed05e38626deee623794eabf3aee1f6b9dfbfc4fc748777de00b17bfdcf4d91"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/incident_fixture.py",
+      "sha256": "d5451503f25d1f43273b7d6a1eaddae65e06871d0ce961d182f3a0b6286011fa"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/protocol.py",
+      "sha256": "5891d6d04e4f329f24078df332269e319a8e5f3cac031af5e0af93ef82523907"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/requirements.txt",
+      "sha256": "e28d708278727dc498f6d0d417418ba99a389f69547a6d4b1ef318a3a8508689"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/resolution.py",
+      "sha256": "522aaea1c25a55539fa0037ca07c15ce997f0ed85f0823b035f4f514d3a1b31d"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/resolution_fixture.py",
+      "sha256": "ee28d4d69d9aa304b66398575776552e9ff3d24fb1a7c4e7e99300dc1a703f8d"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/review.py",
+      "sha256": "3293712bc70c426462ceae97551b9efd3936fdab722960577a7b7b2afce74ef9"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/subcontract.py",
+      "sha256": "440a808d2e3ad548e9d5c8257156ba75aab77dd7524968042c2f0a5ca5d7726d"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/subcontract_fixture.py",
+      "sha256": "41621f8aef3582a7dffa4262ac951cdbd1a422ac0f7b6d51ccb87eac953101b1"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/subcontract_hostile_worker.py",
+      "sha256": "f2d54208897a32ebb8745e862d00b9c47e80bf3a8881f72af8c05e70be63f967"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/subcontract_probe.py",
+      "sha256": "660f7b3333ec93827e0e8180cd16413e0fc02b31c90138fc241271bee16b47f3"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/test_enrollment.py",
+      "sha256": "a03256175cf6fa5acf94e7c43135b864f38139470ad5ecee7152d3e48cc9e784"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/test_incident.py",
+      "sha256": "7628183eb43012dfbbd320b0a0d0de5dbbe662b16cf07c92ec908b067feeedd3"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/test_protocol.py",
+      "sha256": "a902f486d3a9fc90d2b7c00adc771de3c3a1fce14f2f3110c63cc4e39c006945"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/test_resolution.py",
+      "sha256": "bb005e152ee878ce45a0f1defe825786d1e434c1b9aadf1a64054a9c3f4e5fee"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/test_subcontract.py",
+      "sha256": "d8ac3b9b9d5d15b3b9cf05baaf1c6e1fda7f9ce9f3fb6b6d222e33927398d20a"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/tls_fixture.py",
+      "sha256": "816d7bf8174a34219173fee8f157ffb771c6bb3e72734939f4b42c3aef3cbe7d"
+    },
+    {
+      "path": "examples/federated-work/src/main.rs",
+      "sha256": "2187bd88ed29cce420db9d7b77dde7ac111f7dbed26e3f74de2e92cbfd7eb279"
+    },
+    {
+      "path": "examples/federated-work/src/review.rs",
+      "sha256": "bc491412dd649ba4fbd49c5409c39740acd30bbfa6618ef81c40188235828919"
+    },
+    {
+      "path": "examples/funded-work/PROFILE.md",
+      "sha256": "df3cac2566527687a0b90144e1a63f7ab07cc5277b9aa15a58ea9998a3e71311"
+    },
+    {
+      "path": "examples/funded-work/README.md",
+      "sha256": "77145564505af6d3ff9abf43b23ddef92dc07eb8f7304ec3a89c4f827ba8d061"
+    },
+    {
+      "path": "examples/funded-work/artifacts.py",
+      "sha256": "6402934927085b638a5aff473253b9c8aaa894934f54cab1f010900682635670"
+    },
+    {
+      "path": "examples/funded-work/checker-profile.json",
+      "sha256": "dbb11df4e9402024bd330cb39dc7fc484f062e278ca593986636d86d3101ad78"
+    },
+    {
+      "path": "examples/funded-work/custody.py",
+      "sha256": "8dd664d09cf56ca18c4b1ab0e40954afc64af20c5d18f22c4b73c47cf03305c7"
+    },
+    {
+      "path": "examples/funded-work/fixture.py",
+      "sha256": "dc6dec97aeb1487248b931c1a9b7ea8cd28449fecb28afdc11b2f5b1381ad549"
+    },
+    {
+      "path": "examples/funded-work/parser-vectors.json",
+      "sha256": "13730196269f3785efa1133320cd0dc378ae60e71c3fb333dbc4730e531253ea"
+    },
+    {
+      "path": "examples/funded-work/test_checker_command.py",
+      "sha256": "9b4a4f49b19e255477f7655ebaf9129dfb492ba25bc693ecd0c8649232132fbd"
+    },
+    {
+      "path": "examples/funded-work/test_custody.py",
+      "sha256": "2c03a55bc2e6c1358dd58e5ec7e4227662d29cd8dfe55f95f25a8d19a1e3f663"
+    },
+    {
+      "path": "examples/funded-work/test_protocol.py",
+      "sha256": "81e6e2d2775a7cc2662db487a7932f678d0bab8bca3fc291ee52ce4dbda66c01"
+    },
+    {
+      "path": "examples/funded-work/test_verifier.py",
+      "sha256": "6b86673167bb691e6853063d4968ff0e04dcb2b82d8afe61d717e2360861f481"
+    },
+    {
+      "path": "examples/funded-work/verifier.py",
+      "sha256": "32a22bd3ea51fc6a7954edfe01ff6a10dea24eab9496226c194fec81e31467f3"
+    },
+    {
+      "path": "examples/funded-work-model/claim-traces.json",
+      "sha256": "0b8984fe29ed929450b72d8fa3ac35bbc4938888a5378f6e015bf7d02daf1cdc"
+    }
+  ],
+  "sourceInventoryScope": "Direct experiment sources and reused checker/contract inputs. Full Rust dependency source is bound by the implementation commit and its locked standalone manifest, not exhaustively enumerated here.",
+  "checkerBinary": {
+    "path": "target/debug/chio-federated-work",
+    "sha256": "d463a6fcea329ccc2eda6f7770e73ee37996610668b2ce6001b69bef2818d454"
+  },
+  "artifacts": [
+    {
+      "path": "w0-evidence/accepted.json",
+      "sha256": "b625363e306c752f90d1ae0f14b23760d32bbe4266359e2c3ac86ef818af583c",
+      "bytes": 31162
+    },
+    {
+      "path": "w0-evidence/buyer-regressions.log",
+      "sha256": "990cee036f73f305847a5ad8309927159bf1411982b9e0a5ec1609f9deb67c57",
+      "bytes": 4637
+    },
+    {
+      "path": "w0-evidence/checker-build.log",
+      "sha256": "65a7a6b95a7050977b6e72859f456b28ed7b158a186ebf0813106a1e4fcccd39",
+      "bytes": 164
+    },
+    {
+      "path": "w0-evidence/checker-command-red.log",
+      "sha256": "1bc4207091eaf0abc900bdbeb1d8c81f8e5a0165e75e4e64a2eac75355eab655",
+      "bytes": 1168
+    },
+    {
+      "path": "w0-evidence/checker-mutation.log",
+      "sha256": "dfa1a308bc0d213eb945b5fb6e9c41f2042c27b5d8414e17bf748de81e60c1ea",
+      "bytes": 827
+    },
+    {
+      "path": "w0-evidence/checker-mutation.py",
+      "sha256": "60bbdc87453c6c726c515422807a76e6bff72bbd2006785b1775f4c9a8c50051",
+      "bytes": 854
+    },
+    {
+      "path": "w0-evidence/child-identity-red.log",
+      "sha256": "5dd8f9d0bb41ba668f492c4b53eb3c5d8da1709dd5630bde8f2404870ad6a80e",
+      "bytes": 1730
+    },
+    {
+      "path": "w0-evidence/child.json",
+      "sha256": "611a92335522d4396e660df9d4460a3c2016cdf7ee0f1e4bcce9ac165e662536",
+      "bytes": 46634
+    },
+    {
+      "path": "w0-evidence/custody-green.log",
+      "sha256": "1db730bd148ed5fd47c5b96fa68bbf370df609140ec970dad87b4054a9df35b2",
+      "bytes": 2405
+    },
+    {
+      "path": "w0-evidence/custody-readback.log",
+      "sha256": "2deae942d41014961985e634ba93a619cd8ffa95118c656c35bb22cac7feacf6",
+      "bytes": 134
+    },
+    {
+      "path": "w0-evidence/custody-red.log",
+      "sha256": "ca96b249a0dc713cdeca2650b2ffb1f76697a8d50911ae89b93ad8beba695031",
+      "bytes": 12516
+    },
+    {
+      "path": "w0-evidence/integration-red.log",
+      "sha256": "42fbec80da542bf0f8fa0da0cea39a6784a524240b319737bcb4244f4d20996c",
+      "bytes": 3611
+    },
+    {
+      "path": "w0-evidence/legacy-escrow.log",
+      "sha256": "5c2fbf4ebae4dd62b830a75566723863acddb80bf632bbf57cfe629556dde502",
+      "bytes": 1436
+    },
+    {
+      "path": "w0-evidence/missing-custody.json",
+      "sha256": "1f66ab9f58b788d53f865ca952e8bc04a26507e4c8410880bf31379fa38a0728",
+      "bytes": 26092
+    },
+    {
+      "path": "w0-evidence/node-final.log",
+      "sha256": "13e94543ac89d51307cb28ed47e87cedda081c6fc059736ba74a55290e059f2a",
+      "bytes": 11200
+    },
+    {
+      "path": "w0-evidence/observer-red.log",
+      "sha256": "c08d0fdb12366fb6272b666993c8dd03d712e16a288b40c67dd0d58e21aad30f",
+      "bytes": 3266
+    },
+    {
+      "path": "w0-evidence/protocol-green.log",
+      "sha256": "46ad56fab21bda70c2b5a8d7be5c26fb17ef9de667c5031e966c6aa5708c45ef",
+      "bytes": 801
+    },
+    {
+      "path": "w0-evidence/protocol-red.log",
+      "sha256": "b08b59012f66424e0ecd6ada11871e5ff8f0c8e4964a79400e3ef37db5c4af34",
+      "bytes": 13081
+    },
+    {
+      "path": "w0-evidence/python-final.log",
+      "sha256": "572ba2f60f5519f106fed3cc709f3aec8d04131fb3bc95be3e4b7877e36e9df9",
+      "bytes": 3507
+    },
+    {
+      "path": "w0-evidence/rejected.json",
+      "sha256": "efd4f09b14ec29c9fcb6e65d5c9993b1b15eccd9a0c8f90d773194deceeb0522",
+      "bytes": 31162
+    },
+    {
+      "path": "w0-evidence/rust-clippy.log",
+      "sha256": "10dc51f0b7a12bdabf35716ffaedd38bf26398d4a148825875b32b38599a76d1",
+      "bytes": 163
+    },
+    {
+      "path": "w0-evidence/rust-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "w0-evidence/rust-tests.log",
+      "sha256": "e4adfbee9ea1b41616594951d730883145ec76596e801747c35e8cfcca933389",
+      "bytes": 1349
+    },
+    {
+      "path": "w0-evidence/security-gate.json",
+      "sha256": "1e08d2d5f8b2fefddaa6417f2e916db880eefe0cf82ff693f765c1253ab7997e",
+      "bytes": 1798
+    },
+    {
+      "path": "w0-evidence/security-pr.json",
+      "sha256": "2740d567eaa8d88b11128f8743a6106f1f02667300cdb5b0d74415293a153918",
+      "bytes": 273
+    },
+    {
+      "path": "w0-evidence/source-preservation.json",
+      "sha256": "0e0b4c0636a3c7ea86fd18be0ea23d3b93cc47ad8fc07f0cad1c88d8920e33d7",
+      "bytes": 133
+    },
+    {
+      "path": "w0-evidence/standalone-child.json",
+      "sha256": "60bd35f5167462c8b674f494de16743953827b1fad76256806f4e481c2413bc0",
+      "bytes": 46633
+    },
+    {
+      "path": "w0-evidence/standalone-child.log",
+      "sha256": "0ace0a006cd041ab69213155990ebf0af8053c0cb902f908a136df35f1ffafb3",
+      "bytes": 795
+    }
+  ],
+  "outcomes": [
+    {
+      "case": "accepted",
+      "escrowFunded": "100",
+      "paid": "100",
+      "refunded": "0",
+      "remaining": "0",
+      "finalBalances": {
+        "A": "900",
+        "B": "1100",
+        "C": "0",
+        "escrow": "0"
+      },
+      "providerCheckerMs": 26.602210999999443,
+      "verificationMicros": 16774,
+      "workPathGas": "525653"
+    },
+    {
+      "case": "rejected",
+      "escrowFunded": "100",
+      "paid": "0",
+      "refunded": "100",
+      "remaining": "0",
+      "finalBalances": {
+        "A": "1000",
+        "B": "1000",
+        "C": "0",
+        "escrow": "0"
+      },
+      "providerCheckerMs": 14.871313999999984,
+      "verificationMicros": 16244,
+      "workPathGas": "505955"
+    },
+    {
+      "case": "missing-custody",
+      "escrowFunded": "100",
+      "paid": "0",
+      "refunded": "100",
+      "remaining": "0",
+      "finalBalances": {
+        "A": "1000",
+        "B": "1000",
+        "C": "0",
+        "escrow": "0"
+      },
+      "providerCheckerMs": 15.504555999999866,
+      "verificationMicros": null,
+      "workPathGas": "430987"
+    },
+    {
+      "case": "child",
+      "escrowFunded": "160",
+      "paid": "60",
+      "refunded": "100",
+      "remaining": "0",
+      "finalBalances": {
+        "A": "1000",
+        "B": "940",
+        "C": "60",
+        "escrow": "0"
+      },
+      "providerCheckerMs": 19.114134999999806,
+      "verificationMicros": 15745,
+      "workPathGas": "891525"
+    }
+  ],
+  "preservation": {
+    "files_checked": 3688,
+    "changed_files": [],
+    "head_unchanged": true,
+    "branch_unchanged": true,
+    "status_unchanged": true
+  },
+  "securityGate": {
+    "capturedUtc": "2026-09-14T11:00:40.856986+00:00",
+    "head": "6bb648b613b44ff5aaf1853768f2747bff166077",
+    "worktreeStatus": "",
+    "acceptanceOpening": "# M4 local consumer-boundary acceptance\n\nStatus: final qualification in progress on 2026-09-14 UTC. The completed rows below\nare local evidence, not a completed milestone, hosted CI result or release\nauthorization. Required running rows must finish successfully before closeout.\nThe complete workspace test command, normal build and strict all-target Clippy\npassed on the earlier `740f359ccc` source, followed by the explicit C++/Drogon\ngates, formatting, file hygiene and proof-coverage freshness. That serial driver\nexited zero. Final review then reproduced two additional defects: the receipt\nschemas and some SDK validators omitted the native `chio_internal` origin, and\nthe retained operation's independent 17-attachment limit rejected a valid\n18-attachment outcome append. These repairs change production source. Earlier\ngreen results are not final qualification for the repaired candidate; current\nM4/M3, composed flow, workspace and affected consumer gates must be refreshed.\nThe native caller restart/expiry test and two MCP ready-session restart tests\nfailed during qualification. Their corrections passed focused regressions; the\ncomplete final gates remain required. Hosted checks additionally exposed stale\ndependent proof fixtures; their repair passed local and hosted proof gates without\nweakening verification.\nM4 cannot close on this candidate's current evidence.",
+    "acceptanceSha256": "b9b679282505871c493df294ed2e6af32968d9e0f46fb94a6a094ff2a6df2804",
+    "selectedForIntegration": false,
+    "reason": "Acceptance report says qualification remains in progress and M4 cannot close on current evidence."
+  },
+  "retainedPrivateState": "/tmp/chio-w0-execution/retained-child",
+  "limits": [
+    "Single host and one administrative fixture; five generated Ed25519 keys plus private-chain EVM keys.",
+    "Actual bounded Rust/Python W0 check, not independently operated companies or independently authored protocol implementations.",
+    "Owner-local SQLite custody; immediate reopen verified, no remote access control, rollback resistance or long-duration availability proof.",
+    "Private development chain and mock tokens, not public-chain finality or native funding admission.",
+    "No native Finding facets, challenge court, native process-loss recovery or unknown-payment correlation.",
+    "Example-local profiles; registry and SDK integration remain pending.",
+    "Work-path gas excludes setup; timings are one-run diagnostics with different startup boundaries.",
+    "Native integration remains gated on a qualified Security M4 checkpoint."
+  ]
+}

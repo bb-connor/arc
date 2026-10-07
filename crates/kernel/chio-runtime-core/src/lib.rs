@@ -37,6 +37,7 @@ mod error;
 mod hash;
 mod ops;
 mod orchestration;
+pub mod outcome_continuation;
 mod pheromone_policy;
 mod replay_source;
 mod schema;
@@ -185,11 +186,11 @@ pub use types::{
     RuntimeProviderHealthCheck, RuntimeProviderHealthReport, RuntimeProviderLoadedWeightsEvidence,
     RuntimeRecoveryDrillReport, RuntimeRequestBinding, RuntimeRunContract, RuntimeRunLease,
     RuntimeSchedulerTickReport, RuntimeStepEvidence, RuntimeSupervisorProfile,
-    RuntimeTrustFloorEntry, RuntimeTrustFloorState, RuntimeTrustedVerifierKey,
-    RuntimeTrustedVerifierKeysDocument, RuntimeVerifierTrustBundleV4, RuntimeWorkflowRunReport,
-    SignedRuntimeAdmissionReport, SignedRuntimePeerWeights, SignedRuntimePheromonePolicy,
-    SignedRuntimePheromoneQueryReport, SignedRuntimeVerifierTrustBundle,
-    TreatyRuntimeArtifactRecord, TreatyScope, WeightsBindingMode,
+    RuntimeTreatyGovernanceRecord, RuntimeTreatyLeaseRecord, RuntimeTrustFloorEntry,
+    RuntimeTrustFloorState, RuntimeTrustedVerifierKey, RuntimeTrustedVerifierKeysDocument,
+    RuntimeVerifierTrustBundleV4, RuntimeWorkflowRunReport, SignedRuntimeAdmissionReport,
+    SignedRuntimePeerWeights, SignedRuntimePheromonePolicy, SignedRuntimePheromoneQueryReport,
+    SignedRuntimeVerifierTrustBundle, TreatyRuntimeArtifactRecord, TreatyScope, WeightsBindingMode,
 };
 pub(crate) use validation::{ensure_sha256_hash, is_sha256_hex, rejected};
 pub use validation::{

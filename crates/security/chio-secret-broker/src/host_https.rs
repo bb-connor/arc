@@ -29,27 +29,35 @@ use std::{
 use subtle::ConstantTimeEq;
 use zeroize::Zeroizing;
 
-/// A fixed host-owned JSON operation. The bearer never reaches this adapter.
-pub(crate) trait JsonAdapter: Send + Sync + 'static {
+/// A fixed trusted-host JSON operation. The authenticated bearer is consumed
+/// by the server and never reaches this adapter. Implementations must bound
+/// execution time and preserve uncertainty on failed or interrupted effects.
+pub trait JsonAdapter: Send + Sync + 'static {
     fn timeout_ms(&self) -> u64;
     fn execute_json(&self, bytes: &[u8]) -> Result<Vec<u8>>;
 }
 
-pub(crate) struct HttpsEndpoint {
+/// Operator-owned loopback endpoint and private credential paths.
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HttpsEndpoint {
     pub bind: SocketAddr,
     pub certificate_der: Vec<u8>,
     pub private_key_file: PathBuf,
     pub bearer_file: PathBuf,
 }
 
-pub(crate) struct HostHttpsServer {
+/// Bounded HTTPS custody for an operator-installed resource adapter.
+/// This runs outside the native cage and is part of the trusted host.
+pub struct HostHttpsServer {
     listener: TcpListener,
     tls: Arc<ServerConfig>,
     bearer: Zeroizing<Vec<u8>>,
     adapter: Box<dyn JsonAdapter>,
 }
 
-pub(crate) fn private_bytes(path: &std::path::Path, maximum: u64) -> Result<Zeroizing<Vec<u8>>> {
+/// Read a bounded, owner-only regular file without following its final symlink.
+pub fn private_bytes(path: &std::path::Path, maximum: u64) -> Result<Zeroizing<Vec<u8>>> {
     if !path.is_absolute() {
         return Err(denied());
     }
@@ -80,7 +88,9 @@ pub(crate) fn private_bytes(path: &std::path::Path, maximum: u64) -> Result<Zero
 }
 
 impl HostHttpsServer {
-    pub(crate) fn bind(config: HttpsEndpoint, adapter: impl JsonAdapter) -> Result<Self> {
+    /// Validate endpoint custody and bind loopback HTTPS. Resource execution
+    /// begins only after the request passes the bearer and framing checks.
+    pub fn bind(config: HttpsEndpoint, adapter: impl JsonAdapter) -> Result<Self> {
         if !config.bind.ip().is_loopback()
             || config.bind.port() == 0
             || config.certificate_der.len() > 16_384

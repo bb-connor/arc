@@ -100,6 +100,14 @@ impl RuntimeAdmissionStore for SqliteRuntimeOrchestrationStore {
         self.load_swarm_authority_bundle(task_graph_id)
     }
 
+    fn swarm_authority_bundle_for_graph(
+        &self,
+        task_graph_id: &str,
+        graph_sha256: &str,
+    ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
+        self.load_swarm_authority_bundle_for_graph(task_graph_id, graph_sha256)
+    }
+
     fn consume_destructive_lease(
         &self,
         lease_id: &str,

@@ -10,6 +10,13 @@ on:
       - "crates/kernel/chio-process/**"
       - "crates/protocol/chio-mcp-adapter/**"
       - "crates/products/chio-cli/**"
+      - ".github/actions/enforced-native-fixture/**"
+      - ".github/actions/prepared-native-broker/**"
+      - "crates/security/chio-secret-broker/**"
+      - "scripts/check-native-protocol-ci.py"
+      - "scripts/tests/check-native-protocol-ci.test.py"
+      - "scripts/prepare-enforced-native-fixture.py"
+      - "scripts/prepare-native-python-runtime.py"
       - "Cargo.lock"
       - ".github/workflows/postgres-job-swarm.yml"
   push:
@@ -22,6 +29,13 @@ on:
       - "crates/kernel/chio-process/**"
       - "crates/protocol/chio-mcp-adapter/**"
       - "crates/products/chio-cli/**"
+      - ".github/actions/enforced-native-fixture/**"
+      - ".github/actions/prepared-native-broker/**"
+      - "crates/security/chio-secret-broker/**"
+      - "scripts/check-native-protocol-ci.py"
+      - "scripts/tests/check-native-protocol-ci.test.py"
+      - "scripts/prepare-enforced-native-fixture.py"
+      - "scripts/prepare-native-python-runtime.py"
       - "Cargo.lock"
       - ".github/workflows/postgres-job-swarm.yml"
   workflow_dispatch:
@@ -37,7 +51,7 @@ jobs:
   native:
     name: Native PostgreSQL worker API and process ownership
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     env:
       CARGO_BUILD_JOBS: "2"
       CARGO_PROFILE_DEV_DEBUG: "0"
@@ -48,29 +62,35 @@ jobs:
         run: rustup toolchain install --profile minimal --component clippy --component rustfmt
       - uses: ./.github/actions/apt-install
         with:
-          packages: protobuf-compiler
+          packages: protobuf-compiler musl-tools
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
       - uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39
       - name: Build the real gateway and kernel
         run: |
           cargo fmt -p chio-finding-market-store-postgres -- --check
           cargo test --locked -p chio-finding-market-store-postgres --lib
+          cargo test --locked -p chio-finding-market-store-postgres --example agent_jobs
           cargo clippy --locked -p chio-finding-market-store-postgres --example agent_jobs --test worker_lease_api -- -D warnings
           cargo build --locked -p chio-finding-market-store-postgres --example agent_jobs
-          cargo build --locked -p chio-cli --bin chio
+          cargo build --locked --profile docker-release -p chio-cli --features real-linux-enforcement --bin chio
       - name: Install the process package and create a dedicated TLS fixture
         run: |
           umask 077
           job_root=$(mktemp -d /tmp/chio-pg-jobs-XXXXXX)
           echo "CHIO_JOB_FIXTURE_ROOT=$job_root" >> "$GITHUB_ENV"
-          cp target/debug/chio "$job_root/chio"
+          cp target/docker-release/chio "$job_root/chio"
           cp target/debug/examples/agent_jobs "$job_root/agent-jobs"
           chmod 700 "$job_root/chio" "$job_root/agent-jobs"
           uv build sdks/python/chio-process --wheel --out-dir "$job_root/wheels"
           uv venv --python /usr/bin/python3 "$job_root/venv"
           uv pip install --python "$job_root/venv/bin/python" --no-deps "$job_root/wheels/chio_process-0.1.0-py3-none-any.whl"
+          "$job_root/venv/bin/python" -m unittest discover -s examples/postgres-job-swarm -p 'test_*.py'
           docker pull postgres:17.11
           python3 examples/postgres-job-swarm/postgres.py start --binary "$job_root/agent-jobs" --output "$job_root/database"
+      - name: Build prepared native broker transports
+        uses: ./.github/actions/prepared-native-broker
+      - name: Qualify enforcing host and prepare native consumer fixture
+        uses: ./.github/actions/enforced-native-fixture
       - name: Exercise the public worker role and actual native process host
         run: |
           python3 examples/postgres-job-swarm/check_api.py --database-state "$CHIO_JOB_FIXTURE_ROOT/database/state.json"
@@ -78,6 +98,23 @@ jobs:
       - name: Lose a committed claim response and recover without redispatch
         run: |
           "$CHIO_JOB_FIXTURE_ROOT/venv/bin/python" examples/postgres-job-swarm/qualify_claim_loss.py --chio "$CHIO_JOB_FIXTURE_ROOT/chio" --database-state "$CHIO_JOB_FIXTURE_ROOT/database/state.json" --output "$CHIO_JOB_FIXTURE_ROOT/claim-loss"
+      - name: Confined broker survives preparation runtime retirement
+        run: |
+          set -euo pipefail
+          test "$(id -u)" -ne 0
+          test_name=process_boundary_tests::native::confined::confined_broker_mcp_survives_retirement_of_its_preparation_runtime
+          "$CHIO_BROKER_TEST_BINARY" --list --exact "$test_name" > "$RUNNER_TEMP/broker-preparation.list"
+          env CHIO_CAGE_TEST_HELPER="$CHIO_CAGE_INIT" CHIO_BROKER_MCP_TOOL="$CHIO_BROKER_MCP_TOOL" CHIO_KEYLOG_WITNESS="$CHIO_KEYLOG_WITNESS" CHIO_KEYLOG_AUDIT="$CHIO_KEYLOG_AUDIT" "$CHIO_BROKER_TEST_BINARY" --exact "$test_name" --nocapture 2>&1 | tee "$RUNNER_TEMP/broker-preparation.log"
+          python3 scripts/check-exact-cargo-test-inventory.py --label "confined broker preparation lifetime" --allow-filtered --list-output "$RUNNER_TEMP/broker-preparation.list" --run-output "$RUNNER_TEMP/broker-preparation.log" "$test_name"
+      - name: Preserve the exact broker lifetime test inventory
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: postgres-broker-preparation-lifetime
+          path: |
+            ${{ runner.temp }}/broker-preparation.list
+            ${{ runner.temp }}/broker-preparation.log
+          if-no-files-found: warn
       - name: Preserve only nonsecret qualification evidence
         if: ${{ always() && env.CHIO_JOB_FIXTURE_ROOT != '' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -97,6 +134,19 @@ jobs:
             ${{ env.CHIO_JOB_FIXTURE_ROOT }}/claim-loss/qualification.json
             ${{ env.CHIO_JOB_FIXTURE_ROOT }}/claim-loss/receipts.ndjson
             ${{ env.CHIO_JOB_FIXTURE_ROOT }}/claim-loss/kernel.pub
+          if-no-files-found: warn
+      - name: Preserve recorded operator evidence after qualification failure
+        if: ${{ failure() && env.CHIO_JOB_FIXTURE_ROOT != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: postgres-job-operator-responses
+          # These fixed fixture responses also enter the successful public
+          # report. Private connection files, requests and service logs stay local.
+          path: |
+            ${{ env.CHIO_JOB_FIXTURE_ROOT }}/qualification/operator-*/response.json
+            ${{ env.CHIO_JOB_FIXTURE_ROOT }}/qualification/operator-*/receipts.ndjson
+            ${{ env.CHIO_JOB_FIXTURE_ROOT }}/qualification/operator-*/verification.json
+            ${{ env.CHIO_JOB_FIXTURE_ROOT }}/qualification/operator-*/kernel.pub
           if-no-files-found: warn
       - name: Stop only this job's database container
         if: ${{ always() && env.CHIO_JOB_FIXTURE_ROOT != '' }}

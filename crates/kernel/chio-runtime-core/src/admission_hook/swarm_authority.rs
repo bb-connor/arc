@@ -20,7 +20,11 @@ pub(super) fn verify_swarm_authority_reference_from_store<S>(
 where
     S: RuntimeAdmissionStore,
 {
-    let Some(mut bundle) = store.swarm_authority_bundle(&reference.task_graph.evidence_id)? else {
+    let Some(mut bundle) = store.swarm_authority_bundle_for_graph(
+        &reference.task_graph.evidence_id,
+        &reference.task_graph.artifact_sha256,
+    )?
+    else {
         return rejected(
             "missing_chio_swarm_authority_bundle",
             "swarm-bound request referenced authority evidence that is not in the verifier-owned store",

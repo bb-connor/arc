@@ -43,6 +43,25 @@ class FipsContractTests(unittest.TestCase):
     def test_current_reviewed_inventory_passes(self):
         self.validate(FIPS, CI)
 
+    def test_every_required_base_has_exactly_one_fips_route(self):
+        for branch in ("main", "packet/**", "integration/**"):
+            with self.subTest(branch=branch):
+                changed_ci = copy.deepcopy(CI)
+                changed_ci["on"]["pull_request"]["branches"].remove(branch)
+                with self.assertRaises(CHECKER.ContractError):
+                    self.validate(FIPS, changed_ci)
+                changed_fips = copy.deepcopy(FIPS)
+                changed_fips["on"]["pull_request"]["branches-ignore"].remove(branch)
+                with self.assertRaises(CHECKER.ContractError):
+                    self.validate(changed_fips, CI)
+
+    def test_required_ci_cannot_hide_behind_path_filters(self):
+        for field in ("paths", "paths-ignore"):
+            changed = copy.deepcopy(CI)
+            changed["on"]["pull_request"][field] = ["docs/**"]
+            with self.subTest(field=field), self.assertRaises(CHECKER.ContractError):
+                self.validate(FIPS, changed)
+
     def test_each_cargo_command_requires_locked_resolution(self):
         cases = 0
         for job_id, job in FIPS["jobs"].items():
@@ -66,7 +85,7 @@ class FipsContractTests(unittest.TestCase):
                 if step.get("name") == "Install Rust toolchain"
             )
             for original, substitute in [
-                ("1.94.1", "stable"),
+                ("1.95.0", "stable"),
                 ("rustc --version --verbose", "true"),
                 ("cargo --version", "true"),
             ]:

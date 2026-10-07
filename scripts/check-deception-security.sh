@@ -37,6 +37,7 @@ run_exact_target --label "decoy materialization" --expected \
   foreign_existing_file_is_never_adopted_even_when_content_matches \
   hardlink_invalidates_retry_and_cleanup \
   identity_or_key_rebinding_cannot_adopt_an_existing_file \
+  materialize::unix::reader_boundary_tests::materialized_paths_obey_the_persisted_path_limit \
   materialize_creates_restrictive_tree_and_exact_retry_is_idempotent \
   materialize_rejects_empty_or_nul_operation_identity \
   materialize_rejects_unsafe_relative_paths_before_mutation \
@@ -113,6 +114,7 @@ run_exact_target --label "sealed private registry store" --expected \
   scan_uses_byte_ordered_opaque_cursor_without_duplicates \
   sqlite_fixture_contains_tokens_and_ciphertext_but_no_raw_secrets \
   stable_operation_can_record_distinct_retry_transitions_for_one_artifact \
+  tenant_isolation::exact_decoy_tokens_never_grant_cross_tenant_reads_after_restart \
   transition_replay_rejects_shape_valid_equal_generation_tampering \
   transition_replay_returns_original_snapshot_after_later_update_and_reopen \
   watermark_observation_identity_is_source_tenant_scoped \
@@ -126,4 +128,4 @@ run_exact_target --label "native canary and honey-tool pre-dispatch denial" --al
   honey_tool_pre_dispatch_denial \
   -- cargo test -p chio-conformance --test active_defense pre_dispatch_denial
 
-echo "Deception security gate passed (82 exact tests)"
+echo "Deception security gate passed (85 exact tests)"

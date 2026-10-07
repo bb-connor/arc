@@ -149,3 +149,17 @@ test("state blobs snapshot input and verify canonical bytes and digest on read",
   await assert.rejects(disconnected.putBlob(new Uint8Array(1_048_577)), TypeError);
   await assert.rejects(disconnected.readBlob("A".repeat(64)), TypeError);
 });
+
+
+test("prepared invocation binds the original arguments without dispatch", async () => {
+  const prepared = { schema: "chio.broker-execute.v1", proof: { nonce: "original" } };
+  const requests = [];
+  const calls = await fixture((socket, request) => {
+    requests.push(request.operation);
+    socket.end(JSON.stringify({ protocol: PROTOCOL, ok: true, result: prepared }) + "\n");
+  }, async client => {
+    assert.deepEqual(await client.prepareInvocation("claim", "jobs-admin-assign", "assign", { limit: 1 }), prepared);
+  });
+  assert.equal(calls, 1);
+  assert.deepEqual(requests, [{ op: "prepare_invocation", operation_key: "claim", server_id: "jobs-admin-assign", tool_name: "assign", arguments: { limit: 1 } }]);
+});

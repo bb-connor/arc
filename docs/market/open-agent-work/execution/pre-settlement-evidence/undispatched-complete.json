@@ -1,0 +1,103 @@
+{
+  "after": {
+    "executionBundleSha256": null,
+    "executionCheckpointSha256": null,
+    "executionProjectionSha256": null,
+    "executionReceiptCount": 0,
+    "holdCount": 1,
+    "holdDisposition": "reversed",
+    "holdId": "admission-budget:f5fab6c16f283955847dd055beb3e8a165a98847b0a92f312e1b2c6ed6716a0b:0",
+    "operationCount": 1,
+    "operationId": "f5fab6c16f283955847dd055beb3e8a165a98847b0a92f312e1b2c6ed6716a0b"
+  },
+  "before": {
+    "executionBundleSha256": null,
+    "executionCheckpointSha256": null,
+    "executionProjectionSha256": null,
+    "executionReceiptCount": 0,
+    "holdCount": 1,
+    "holdDisposition": "open",
+    "holdId": "admission-budget:f5fab6c16f283955847dd055beb3e8a165a98847b0a92f312e1b2c6ed6716a0b:0",
+    "operationCount": 1,
+    "operationId": "f5fab6c16f283955847dd055beb3e8a165a98847b0a92f312e1b2c6ed6716a0b"
+  },
+  "chain": {
+    "beneficiaryBalance": "0",
+    "escrowBalance": "0",
+    "events": {
+      "ClaimSubmitted": 0,
+      "DecisionRecorded": 0,
+      "Funded": 1,
+      "Paid": 0,
+      "Refunded": 1,
+      "TimedOut": 1
+    },
+    "fundingTransaction": "0x3b3d90ebe91ee587d9ab4cfe5b2eb8fedf6ece01cbdc9442c3f089bdce175c15",
+    "paid": "0",
+    "payerBalance": "1000",
+    "refunded": "100",
+    "state": "Refunded",
+    "transactions": {
+      "pay": [],
+      "record": [],
+      "refund": [
+        {
+          "hash": "0xbb03168eb3fcf7448c2b71e06aa84bfb44fb1a55dc309c73f5af7d4fe038a6f6",
+          "nonce": 2,
+          "status": 1
+        }
+      ],
+      "submit": []
+    }
+  },
+  "checkpoint": "after-hold",
+  "first": {
+    "allocationId": "0x2131d275a3019a3fd8d4b8c3aba6c26da78f36e6eb2dcdf308b443eed2259c41",
+    "authorityUuid": "01a0a34c-7b85-7000-b8ac-08b962128672",
+    "authorizationId": "funded-2131d275a3019a3fd8d4b8c3aba6c26da78f36e6eb2dcdf308b443eed2259c41",
+    "executions": 0,
+    "externalFundsTransferred": false,
+    "fundingCorrelation": "bound",
+    "holdId": "admission-budget:f5fab6c16f283955847dd055beb3e8a165a98847b0a92f312e1b2c6ed6716a0b:0",
+    "nativeAuthorizationId": "funded-2131d275a3019a3fd8d4b8c3aba6c26da78f36e6eb2dcdf308b443eed2259c41",
+    "nativePaymentAction": "release",
+    "nativePaymentState": "Settling",
+    "nativeState": "CapturePending",
+    "operationId": "f5fab6c16f283955847dd055beb3e8a165a98847b0a92f312e1b2c6ed6716a0b",
+    "paymentState": "pending",
+    "profile": "chio.experimental.local-confirmed-funding.v1",
+    "requestId": "funded-native-w0",
+    "settlementObservationError": null,
+    "settlementTransaction": null,
+    "startupReconciliationError": "durable admission failed: payment rail unavailable: exact allocation refund has not been observed"
+  },
+  "killedSignal": 9,
+  "replay": {
+    "allocationId": "0x2131d275a3019a3fd8d4b8c3aba6c26da78f36e6eb2dcdf308b443eed2259c41",
+    "authorityUuid": "01a0a34c-7b85-7000-b8ac-08b962128672",
+    "authorizationId": "funded-2131d275a3019a3fd8d4b8c3aba6c26da78f36e6eb2dcdf308b443eed2259c41",
+    "executions": 0,
+    "externalFundsTransferred": true,
+    "fundingCorrelation": "bound",
+    "holdId": "admission-budget:f5fab6c16f283955847dd055beb3e8a165a98847b0a92f312e1b2c6ed6716a0b:0",
+    "nativeAuthorizationId": "funded-2131d275a3019a3fd8d4b8c3aba6c26da78f36e6eb2dcdf308b443eed2259c41",
+    "nativePaymentAction": "release",
+    "nativePaymentState": "Settled",
+    "nativeState": "CompensatedBeforeDispatch",
+    "operationId": "f5fab6c16f283955847dd055beb3e8a165a98847b0a92f312e1b2c6ed6716a0b",
+    "paymentState": "refunded",
+    "profile": "chio.experimental.local-confirmed-funding.v1",
+    "requestId": "funded-native-w0",
+    "settlementObservationError": null,
+    "settlementTransaction": "0xbb03168eb3fcf7448c2b71e06aa84bfb44fb1a55dc309c73f5af7d4fe038a6f6",
+    "startupReconciliationError": null
+  },
+  "verification": {
+    "decision": "absent",
+    "financial": "refund",
+    "finding": null
+  },
+  "retainedTransactions": {
+    "refund": "0xbb03168eb3fcf7448c2b71e06aa84bfb44fb1a55dc309c73f5af7d4fe038a6f6"
+  }
+}

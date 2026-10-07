@@ -1,0 +1,25 @@
+test_changed_evidence_fails_closed (test_evidence.EvidenceTests.test_changed_evidence_fails_closed) ... FAIL
+test_inventory_cannot_read_outside_artifact_root (test_evidence.EvidenceTests.test_inventory_cannot_read_outside_artifact_root) ... FAIL
+
+======================================================================
+FAIL: test_changed_evidence_fails_closed (test_evidence.EvidenceTests.test_changed_evidence_fails_closed)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/papers/verifiable-work/tools/test_evidence.py", line 15, in test_changed_evidence_fails_closed
+    self.assertIsNotNone(verify_files, 'evidence verifier missing')
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: unexpectedly None : evidence verifier missing
+
+======================================================================
+FAIL: test_inventory_cannot_read_outside_artifact_root (test_evidence.EvidenceTests.test_inventory_cannot_read_outside_artifact_root)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/papers/verifiable-work/tools/test_evidence.py", line 27, in test_inventory_cannot_read_outside_artifact_root
+    self.assertIsNotNone(verify_files, 'evidence verifier missing')
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: unexpectedly None : evidence verifier missing
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.001s
+
+FAILED (failures=2)

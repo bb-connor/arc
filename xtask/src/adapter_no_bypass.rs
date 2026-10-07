@@ -17,6 +17,7 @@ mod source;
 const SOURCE_INVENTORY_PATH: &str = "formal/adapter-source-inventory.toml";
 const MCP_LAUNCH_SOURCE: &str =
     "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc";
+const API_ROUTE_SOURCE: &str = "crates/products/chio-api-protect/src/evaluator/route_matching.rs";
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -152,6 +153,18 @@ struct CallContract {
 }
 
 const CALL_CONTRACTS: &[CallContract] = &[
+    CallContract {
+        path: API_ROUTE_SOURCE,
+        function: "RequestEvaluator::match_route_with_status",
+        target: "decoded_authority_path",
+        minimum: 1,
+    },
+    CallContract {
+        path: API_ROUTE_SOURCE,
+        function: "RequestEvaluator::match_route_with_status",
+        target: "select_route",
+        minimum: 2,
+    },
     CallContract {
         path: "crates/kernel/chio-kernel/src/provider_verdict.rs",
         function: "build_tool_call_request",
@@ -425,8 +438,8 @@ fn validate_workspace(root: &Path) -> Result<(), String> {
     )?;
     require_path(
         parsed
-            .get("crates/products/chio-api-protect/src/evaluator.rs")
-            .ok_or_else(|| "API protect evaluator was not parsed".to_string())?,
+            .get(API_ROUTE_SOURCE)
+            .ok_or_else(|| "API protect route matching source was not parsed".to_string())?,
         "RequestEvaluator::match_route_with_status",
         "PolicyDecision::DenyByDefault",
     )?;
@@ -707,6 +720,9 @@ fn is_test_path(path: &Path) -> bool {
 fn parse_source(source: &str, label: &str) -> Result<SourceFacts, String> {
     let syntax = syn::parse_file(source)
         .map_err(|error| format!("cannot parse production Rust source {label}: {error}"))?;
+    if test_only(&syntax.attrs) {
+        return Ok(SourceFacts::default());
+    }
     let mut visitor = FunctionVisitor::default();
     visitor.visit_file(&syntax);
     let mut functions = BTreeMap::new();
@@ -862,7 +878,12 @@ fn impl_name(node: &ItemImpl) -> Option<String> {
 fn test_only(attrs: &[Attribute]) -> bool {
     attrs.iter().any(|attribute| {
         let path = normalize_tokens(attribute.path());
-        path == "test" || path.ends_with("::test") || normalize_tokens(attribute) == "#[cfg(test)]"
+        path == "test"
+            || path.ends_with("::test")
+            || (attribute.path().is_ident("cfg")
+                && attribute
+                    .parse_args::<syn::Path>()
+                    .is_ok_and(|condition| condition.is_ident("test")))
     })
 }
 
@@ -998,6 +1019,38 @@ fn require_binary_tokens(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn file_level_test_cfg_disables_helpers_and_includes() -> Result<(), String> {
+        let facts = parse_source(
+            "#![cfg(test)]\nfn helper() { server.invoke(); }\ninclude!(\"absent.inc\");",
+            "crates/protocol/chio-example-edge/src/runtime_tests/helper.rs",
+        )?;
+        assert!(facts.functions.is_empty());
+        assert!(facts.includes.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn production_file_cfg_and_test_named_paths_do_not_hide_effects() -> Result<(), String> {
+        for condition in [
+            "",
+            "#![cfg(feature = \"test\")]",
+            "#![cfg(any(test, feature = \"live\"))]",
+        ] {
+            let facts = parse_source(
+                &format!("{condition}\nfn helper() {{ server.invoke(); }}"),
+                "crates/protocol/chio-example-edge/src/runtime_tests/helper.rs",
+            )?;
+            assert!(!facts.functions.is_empty());
+            let sources = BTreeMap::from([(
+                "crates/protocol/chio-example-edge/src/runtime_tests/helper.rs".into(),
+                facts,
+            )]);
+            assert!(validate_dangerous_calls(&sources, false).is_err());
+        }
+        Ok(())
+    }
 
     #[test]
     fn every_current_mediation_contract_detects_a_removed_required_call() -> Result<(), String> {

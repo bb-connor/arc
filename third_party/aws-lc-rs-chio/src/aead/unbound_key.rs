@@ -607,6 +607,8 @@ impl From<AeadCtx> for UnboundKey {
 }
 
 impl From<hkdf::Okm<'_, &'static Algorithm>> for UnboundKey {
+    // CHIO-LINT aead-from-okm: Preserve upstream infallible From; native derivation or key initialization failure panics.
+    #[allow(clippy::unwrap_used)]
     fn from(okm: hkdf::Okm<&'static Algorithm>) -> Self {
         let mut key_bytes = [0; MAX_KEY_LEN];
         let key_bytes = &mut key_bytes[..okm.len().key_len];

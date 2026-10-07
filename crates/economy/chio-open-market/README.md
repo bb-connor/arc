@@ -25,7 +25,8 @@ that back it. It builds on `chio-listing` for listings and pricing hints and
 
 ## Public API
 
-- `bidding::{bid, accept}` - the two entry points of the bid/ask/accept flow,
+- `bidding::{bid, accept, verify_acceptance}` - mint an offer, sign acceptance,
+  and verify received acceptance under locally selected buyer/provider keys,
   plus `BidRequest`, `RequestedScope`, `BidMintContext`, `AskResponse`,
   `AcceptedBid`, `ReservationReceipt`, `VerifiedReservationReceipt`, and
   `BiddingError`. Signed envelopes: `SignedBidRequest`, `SignedAskResponse`,
@@ -47,6 +48,13 @@ that back it. It builds on `chio-listing` for listings and pricing hints and
 - Re-exported: `canonical_json_bytes`, `capability`, `crypto`, `receipt`
   (from `chio-core-types`), `governance` (`chio-governance`), `listing`
   (`chio-listing`).
+
+`verify_acceptance` checks the received buyer signature and reconstructs the
+exact accepted body from the signed offer and verified reservation. Its caller
+selects the reservation authority before constructing the witness. It does not
+reserve funds, check the original job's application policy, authorize execution,
+establish current funds availability, or settle a purchase. Those decisions
+belong to the receiving runtime and selected payment service.
 
 ## Testing
 

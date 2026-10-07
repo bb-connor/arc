@@ -19,7 +19,7 @@ env:
   # Nightly-tier proptest case count; the PR-tier (256) lives in ci.yml.
   PROPTEST_CASES: "4096"
   # These pins must agree with formal-pr-smoke.yml.
-  CHIO_KANI_VERSION: 0.67.0
+  CHIO_KANI_VERSION: 0.68.0
   CHIO_ELAN_VERSION: v4.2.1
   CHIO_ELAN_TARBALL_SHA256: 4e717523217af592fa2d7b9c479410a31816c065d66ccbf0c2149337cfec0f5c
   CHIO_AENEAS_RELEASE_TAG: build-2026.04.22.215158-38d10a22642d75d051e14006cc6e45055381f10e
@@ -220,6 +220,7 @@ jobs:
           set -euo pipefail
           cargo install kani-verifier --locked --version "${CHIO_KANI_VERSION}"
           cargo kani setup
+          python3 scripts/kani-toolchain.py install
           cargo kani --version
 
       - name: Run chio-kernel-core lanes.pr + lanes.nightly_only Kani harnesses
@@ -379,6 +380,7 @@ jobs:
           set -euo pipefail
           cargo install kani-verifier --locked --version "${CHIO_KANI_VERSION}"
           cargo kani setup
+          python3 scripts/kani-toolchain.py install
           sudo apt-get update
           sudo apt-get install -y opam
           opam init --disable-sandboxing --bare -y

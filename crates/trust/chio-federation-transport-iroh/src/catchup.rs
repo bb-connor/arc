@@ -992,6 +992,9 @@ fn order_check(roots: &[SignedEpochRoot]) -> Result<(), CatchupError> {
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
+    #[path = "request_modes.rs"]
+    mod request_modes;
+
     use super::*;
     use chio_core_types::canonical_json_bytes;
     use chio_revocation_oracle::Ed25519RootSigner;

@@ -1,0 +1,205 @@
+{
+  "after": {
+    "executionBundleSha256": "f697da2183c326187274c9fc5573baeba4b64c95df1128e46fab97f5d143b6e1",
+    "executionCheckpointSha256": "dcee12289e680b927ec357846656a983ded4c97eb0ef7e60d1a2dbcd3f9e2fcd",
+    "executionProjectionSha256": "8182238d488a38b8299e35e6837f64c1725363e519ad256a59285182b8102ac9",
+    "executionReceiptCount": 1,
+    "holdCount": 1,
+    "holdDisposition": "reconciled",
+    "holdId": "admission-budget:c4b6359533566c3b61e668b982dda6e5ca0a3c11016b88ef7f342898b922638b:0",
+    "operationCount": 1,
+    "operationId": "c4b6359533566c3b61e668b982dda6e5ca0a3c11016b88ef7f342898b922638b"
+  },
+  "before": {
+    "executionBundleSha256": "f697da2183c326187274c9fc5573baeba4b64c95df1128e46fab97f5d143b6e1",
+    "executionCheckpointSha256": "dcee12289e680b927ec357846656a983ded4c97eb0ef7e60d1a2dbcd3f9e2fcd",
+    "executionProjectionSha256": "8182238d488a38b8299e35e6837f64c1725363e519ad256a59285182b8102ac9",
+    "executionReceiptCount": 1,
+    "holdCount": 1,
+    "holdDisposition": "reconciled",
+    "holdId": "admission-budget:c4b6359533566c3b61e668b982dda6e5ca0a3c11016b88ef7f342898b922638b:0",
+    "operationCount": 1,
+    "operationId": "c4b6359533566c3b61e668b982dda6e5ca0a3c11016b88ef7f342898b922638b"
+  },
+  "chain": {
+    "beneficiaryBalance": "100",
+    "escrowBalance": "0",
+    "events": {
+      "ClaimSubmitted": 1,
+      "DecisionRecorded": 1,
+      "Funded": 1,
+      "Paid": 1,
+      "Refunded": 0,
+      "TimedOut": 0
+    },
+    "fundingTransaction": "0x519d47bbd9b517fb67d2125376b8291dbec8422514e52246f8a13fc364c2b931",
+    "paid": "100",
+    "payerBalance": "900",
+    "refunded": "0",
+    "state": "Paid",
+    "transactions": {
+      "pay": [
+        {
+          "hash": "0x8bfd190c387b5046cbc780b3b6d72890b3847fd1bd2cacadcf0aa5c82d59e7a0",
+          "nonce": 1,
+          "status": 1
+        }
+      ],
+      "record": [
+        {
+          "hash": "0x20bb0afe1daa476bf9cc7260066d9ea738942ecc7ceb7f4b0cea1c9dca67af90",
+          "nonce": 0,
+          "status": 1
+        }
+      ],
+      "refund": [],
+      "submit": [
+        {
+          "hash": "0xbd86c6f8690eed86bf4421fbd2f7a0b2a83751cd45947eb514e21bcc0ecab3b8",
+          "nonce": 0,
+          "status": 1
+        }
+      ]
+    }
+  },
+  "checkpoint": "after-recorded-decision",
+  "first": {
+    "allocationId": "0xb4bcd8d19fce3427e9daa1e563ce2ebe8d643cc052e699cc94e1365043866564",
+    "authorityUuid": "01a0a34c-9d8e-7293-ab42-4bc4315ea05f",
+    "authorizationId": "funded-b4bcd8d19fce3427e9daa1e563ce2ebe8d643cc052e699cc94e1365043866564",
+    "executions": 1,
+    "externalFundsTransferred": false,
+    "fundingCorrelation": "bound",
+    "holdId": "admission-budget:c4b6359533566c3b61e668b982dda6e5ca0a3c11016b88ef7f342898b922638b:0",
+    "nativeAuthorizationId": "funded-b4bcd8d19fce3427e9daa1e563ce2ebe8d643cc052e699cc94e1365043866564",
+    "nativeEvaluationError": "durable admission failed: payment rail unavailable: exact ERC20 payout has not been observed; capture remains pending",
+    "nativePaymentAction": "capture",
+    "nativePaymentState": "Settling",
+    "nativeState": "Finalizing",
+    "operationId": "c4b6359533566c3b61e668b982dda6e5ca0a3c11016b88ef7f342898b922638b",
+    "paymentState": "pending",
+    "profile": "chio.experimental.local-confirmed-funding.v1",
+    "requestId": "funded-native-w0",
+    "settlementObservationError": null,
+    "settlementTransaction": null,
+    "startupReconciliationError": null
+  },
+  "killedSignal": 9,
+  "replay": {
+    "allocationId": "0xb4bcd8d19fce3427e9daa1e563ce2ebe8d643cc052e699cc94e1365043866564",
+    "authorityUuid": "01a0a34c-9d8e-7293-ab42-4bc4315ea05f",
+    "authorizationId": "funded-b4bcd8d19fce3427e9daa1e563ce2ebe8d643cc052e699cc94e1365043866564",
+    "executions": 1,
+    "externalFundsTransferred": true,
+    "fundingCorrelation": "bound",
+    "holdId": "admission-budget:c4b6359533566c3b61e668b982dda6e5ca0a3c11016b88ef7f342898b922638b:0",
+    "nativeAuthorizationId": "funded-b4bcd8d19fce3427e9daa1e563ce2ebe8d643cc052e699cc94e1365043866564",
+    "nativePaymentAction": "capture",
+    "nativePaymentState": "Settled",
+    "nativeState": "Completed",
+    "operationId": "c4b6359533566c3b61e668b982dda6e5ca0a3c11016b88ef7f342898b922638b",
+    "paymentState": "paid",
+    "profile": "chio.experimental.local-confirmed-funding.v1",
+    "requestId": "funded-native-w0",
+    "settlementObservationError": null,
+    "settlementTransaction": "0x8bfd190c387b5046cbc780b3b6d72890b3847fd1bd2cacadcf0aa5c82d59e7a0",
+    "startupReconciliationError": null
+  },
+  "verification": {
+    "accepted": true,
+    "commitment": "0x34c0678c4261bcf09be2698908b86717c4c4ecdf3b4d4026c86442dfb9c8b774",
+    "decision": "verified",
+    "decisionSha256": "c024e396626bcc47c8576cca576dc165300fa3e2f876234e18898720f2efa34c",
+    "financial": "payout",
+    "findingAssessment": {
+      "contextSha256": "a4675b87a272d62527e418e9283b4a856a56d79edb0dad2783cc01f0305afd5a",
+      "evaluatedAt": 1789446109,
+      "facets": [
+        {
+          "facet": "artifact_integrity",
+          "outcome": "verified",
+          "reason": "structure, content address, and issuer signature verified"
+        },
+        {
+          "facet": "receipt_authenticity",
+          "outcome": "verified",
+          "reason": "production evidence receipts verified strictly"
+        },
+        {
+          "facet": "checkpoint_membership",
+          "outcome": "verified",
+          "reason": "every production receipt is a member of a pinned, signature-valid checkpoint"
+        },
+        {
+          "facet": "kernel_and_revocation_trust",
+          "outcome": "unavailable",
+          "reason": "revocation freshness evidence not supplied"
+        },
+        {
+          "facet": "issuer_lineage",
+          "outcome": "unavailable",
+          "reason": "signed capability snapshot evidence not supplied"
+        },
+        {
+          "facet": "recipe_binding",
+          "outcome": "unavailable",
+          "reason": "finding commits no replay recipe"
+        },
+        {
+          "facet": "intent_binding",
+          "outcome": "unavailable",
+          "reason": "intent commitment ordering evidence not supplied"
+        },
+        {
+          "facet": "metered_exposure_backing",
+          "outcome": "unavailable",
+          "reason": "execution-only production receipts do not establish financial backing"
+        },
+        {
+          "facet": "settled_spend_backing",
+          "outcome": "unavailable",
+          "reason": "metered exposure floor not established"
+        },
+        {
+          "facet": "runtime_assurance_backing",
+          "outcome": "unavailable",
+          "reason": "finding claims no runtime assurance tier"
+        },
+        {
+          "facet": "bond_backing",
+          "outcome": "unavailable",
+          "reason": "no fresh collateral snapshot supplied"
+        },
+        {
+          "facet": "status_liveness",
+          "outcome": "unavailable",
+          "reason": "portable status non-inclusion proof not supplied"
+        },
+        {
+          "facet": "guarantee_consistency",
+          "outcome": "verified",
+          "reason": "claims are consistent with the evaluated facets"
+        }
+      ],
+      "findingArtifactSha256": "9712e1d8c31c35031b6825db3baabe8b6ee9cdf2b0ebebc2256ad1889c68eb05",
+      "outcome": "accepted",
+      "requiredFacets": [
+        "artifact_integrity",
+        "receipt_authenticity",
+        "checkpoint_membership",
+        "guarantee_consistency"
+      ],
+      "resolvedEvidenceBundleSha256": "e696ba1d2301bceecab06ae855108ebeed18b8873f9df349858aa9025656a1c0",
+      "schema": "chio.experimental.funded-finding-assessment.v1"
+    },
+    "findingAssurance": "asserted-finding-with-explicit-facets-and-independent-w0-checks",
+    "findingId": "264e1084b2c976b4145c2a3ce0c4824446a6da02d7a1657a02f773cf10c58965",
+    "observationSha256": "4edc92dad177548767ca1132ff0e2e44676a49d78254e62066317780cd4d17f1",
+    "transactionHash": "0x8bfd190c387b5046cbc780b3b6d72890b3847fd1bd2cacadcf0aa5c82d59e7a0"
+  },
+  "retainedTransactions": {
+    "submit": "0xbd86c6f8690eed86bf4421fbd2f7a0b2a83751cd45947eb514e21bcc0ecab3b8",
+    "record": "0x20bb0afe1daa476bf9cc7260066d9ea738942ecc7ceb7f4b0cea1c9dca67af90",
+    "pay": "0x8bfd190c387b5046cbc780b3b6d72890b3847fd1bd2cacadcf0aa5c82d59e7a0"
+  }
+}

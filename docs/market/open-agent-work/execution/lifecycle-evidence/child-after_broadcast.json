@@ -1,0 +1,2240 @@
+{
+  "schema": "chio.experimental.funded-w0-run.v1",
+  "scenario": "child",
+  "scope": "One host, actual Rust/Python W0 predicate, local SQLite custody, private chain and mock tokens.",
+  "pins": {
+    "buyer": "1b0edae42128ead17eaf6e8032a63da8bb55aff167b822d54ae45e1bf3032db0",
+    "custodian": "ffb8cbbd03f6a2281027b8a8c8ccf839dff46c19016c4d5f4dc50db073573feb",
+    "provider": "59c44580818005d3ee5fc6583901de543d6c16dbe2188a823c2a8eede6af8f15",
+    "verifier": "ad85244f30024ed89305513391e97c6f09c66163ac00bf5b08e8b1a0ff09f6fe"
+  },
+  "agreement": {
+    "body": {
+      "assurance": "artifact-only-v1",
+      "buyerKey": "1b0edae42128ead17eaf6e8032a63da8bb55aff167b822d54ae45e1bf3032db0",
+      "checkerSha256": "d412a85c82c0e3334f0f8b783e39ffb1a06ea93c3ddac3bdb53bf31cdca49ca7",
+      "custodianKey": "ffb8cbbd03f6a2281027b8a8c8ccf839dff46c19016c4d5f4dc50db073573feb",
+      "custody": {
+        "policy": "local-retain-indefinitely-v1",
+        "retainUntil": 1791936008
+      },
+      "deadlines": {
+        "challengeUntil": 1789344004,
+        "refundAfter": 1789344008,
+        "resolveBy": 1789344006,
+        "submitBy": 1789344002
+      },
+      "inputSha256": "952c8a7286a67c8d9d67735bf05d3d083f70ad2d8d744346692de6c92d7ebeb6",
+      "parentAgreementSha256": "11d5bedf8c235301609dcda252cb4e47e6efd1a88e8f8b923db241c3a15a8dc8",
+      "providerKey": "59c44580818005d3ee5fc6583901de543d6c16dbe2188a823c2a8eede6af8f15",
+      "rail": {
+        "amount": "60",
+        "beneficiary": "0xd03ea8624c8c5987235048901fb614fdca89b117",
+        "chainId": "31337",
+        "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+        "payer": "0x22d491bde2303f2f43325b2108d26f1eaba1e32b",
+        "runtimeKeccak256": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f",
+        "token": "0x5b1869d9a4c187f2eaa108f3062412ecf0526b24",
+        "verifier": "0xe11ba2b4d45eaed5996cd0823791e0c93114882d"
+      },
+      "schema": "chio.experimental.funded-w0-agreement.v1",
+      "verifierKey": "ad85244f30024ed89305513391e97c6f09c66163ac00bf5b08e8b1a0ff09f6fe",
+      "workId": "child-w0"
+    },
+    "buyerSignature": "8a7118944b6f88e68324ae2f07d8e35b5733af51f5df3753c6104aa4809f60f8716e8694643545459c21967213cea36439e4171d6cb2e646816610367965560a",
+    "providerSignature": "e789333ff04af52e999d5b02c12f28b133d7c4ae8270531b3e52bb91daf3cca83778cbfc6955b5dc955990b3dc1f6da1e4676ec7dc672d2d1754dc6e09133e03"
+  },
+  "agreementDigest": "0x19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+  "parentAgreement": {
+    "agreement": {
+      "body": {
+        "assurance": "artifact-only-v1",
+        "buyerKey": "6aa084a8163da3ea76aca96ff7e1e98cc54afd4420e4c57305239ed1294139e1",
+        "checkerSha256": "d412a85c82c0e3334f0f8b783e39ffb1a06ea93c3ddac3bdb53bf31cdca49ca7",
+        "custodianKey": "ffb8cbbd03f6a2281027b8a8c8ccf839dff46c19016c4d5f4dc50db073573feb",
+        "custody": {
+          "policy": "local-retain-indefinitely-v1",
+          "retainUntil": 1791936008
+        },
+        "deadlines": {
+          "challengeUntil": 1789344004,
+          "refundAfter": 1789344008,
+          "resolveBy": 1789344006,
+          "submitBy": 1789344002
+        },
+        "inputSha256": "952c8a7286a67c8d9d67735bf05d3d083f70ad2d8d744346692de6c92d7ebeb6",
+        "parentAgreementSha256": null,
+        "providerKey": "1b0edae42128ead17eaf6e8032a63da8bb55aff167b822d54ae45e1bf3032db0",
+        "rail": {
+          "amount": "100",
+          "beneficiary": "0x22d491bde2303f2f43325b2108d26f1eaba1e32b",
+          "chainId": "31337",
+          "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+          "payer": "0xffcf8fdee72ac11b5c542428b35eef5769c409f0",
+          "runtimeKeccak256": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f",
+          "token": "0x5b1869d9a4c187f2eaa108f3062412ecf0526b24",
+          "verifier": "0xe11ba2b4d45eaed5996cd0823791e0c93114882d"
+        },
+        "schema": "chio.experimental.funded-w0-agreement.v1",
+        "verifierKey": "ad85244f30024ed89305513391e97c6f09c66163ac00bf5b08e8b1a0ff09f6fe",
+        "workId": "unsubmitted-parent"
+      },
+      "buyerSignature": "f8a79f3d5528810f5aa5261967c644046e27f74f8e80f9d69f8a3e00a822395968524dd9cbe6be77d95642a4cc5190a25759294b3459dbfb0c2228236ac27300",
+      "providerSignature": "45357a9c9ff901182b077ddc827df0a54a00f86cf3b48052b51ae78c3cb5c49268a6a9c35d16a464c7808383d64f19bfe204bb13e5d0dba1749f0589b413ea08"
+    },
+    "agreementDigest": "0x11d5bedf8c235301609dcda252cb4e47e6efd1a88e8f8b923db241c3a15a8dc8",
+    "pins": {
+      "buyer": "6aa084a8163da3ea76aca96ff7e1e98cc54afd4420e4c57305239ed1294139e1",
+      "custodian": "ffb8cbbd03f6a2281027b8a8c8ccf839dff46c19016c4d5f4dc50db073573feb",
+      "provider": "1b0edae42128ead17eaf6e8032a63da8bb55aff167b822d54ae45e1bf3032db0",
+      "verifier": "ad85244f30024ed89305513391e97c6f09c66163ac00bf5b08e8b1a0ff09f6fe"
+    }
+  },
+  "input": "{\n  \"openapi\": \"3.1.0\",\n  \"info\": {\"title\": \"Example company payments API\", \"version\": \"1.0.0\"},\n  \"components\": {\"securitySchemes\": {\"serviceToken\": {\"type\": \"http\", \"scheme\": \"bearer\"}}},\n  \"security\": [{\"serviceToken\": []}],\n  \"paths\": {\n    \"/accounts\": {\"get\": {\"responses\": {\"200\": {\"description\": \"Accounts\"}}}},\n    \"/refunds\": {\"post\": {\"security\": [], \"responses\": {\"201\": {\"description\": \"Refund staged\"}}}},\n    \"/health\": {\"get\": {\"security\": [{}, {\"serviceToken\": []}], \"responses\": {\"200\": {\"description\": \"Healthy\"}}}},\n    \"/sessions\": {\"delete\": {\"security\": [{\"serviceToken\": []}], \"responses\": {\"204\": {\"description\": \"Session ended\"}}}}\n  }\n}\n",
+  "output": {
+    "schema": "chio.experimental.funded-w0-output.v1",
+    "operations": [
+      {
+        "authenticationRequired": true,
+        "method": "get",
+        "path": "/accounts"
+      },
+      {
+        "authenticationRequired": false,
+        "method": "get",
+        "path": "/health"
+      },
+      {
+        "authenticationRequired": false,
+        "method": "post",
+        "path": "/refunds"
+      },
+      {
+        "authenticationRequired": true,
+        "method": "delete",
+        "path": "/sessions"
+      }
+    ]
+  },
+  "submission": {
+    "body": {
+      "agreementSha256": "19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+      "allocationId": "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+      "checkerSha256": "d412a85c82c0e3334f0f8b783e39ffb1a06ea93c3ddac3bdb53bf31cdca49ca7",
+      "custody": {
+        "body": {
+          "agreementSha256": "19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+          "inputSha256": "952c8a7286a67c8d9d67735bf05d3d083f70ad2d8d744346692de6c92d7ebeb6",
+          "outputSha256": "900a10ca289b370ef4d0ccabaae3f99d91068065ca6deb7a657a98c9c139eea8",
+          "policy": "local-retain-indefinitely-v1",
+          "retainUntil": 1791936008,
+          "schema": "chio.experimental.funded-w0-custody.v1"
+        },
+        "signature": "1bfa82a7e7ca209efbb0a3366e8d35c0c21a5ec0e20a7f52fcf13f2e4b2dcb93108a632d6d94429a71c5896ddf72daf013b39828ef1c3bae4c688a90ce6d3307",
+        "signerKey": "ffb8cbbd03f6a2281027b8a8c8ccf839dff46c19016c4d5f4dc50db073573feb"
+      },
+      "inputSha256": "952c8a7286a67c8d9d67735bf05d3d083f70ad2d8d744346692de6c92d7ebeb6",
+      "outputSha256": "900a10ca289b370ef4d0ccabaae3f99d91068065ca6deb7a657a98c9c139eea8",
+      "schema": "chio.experimental.funded-w0-submission.v1"
+    },
+    "signature": "802e632ab9d684874d510547fc6a120be4b040eb43b149e6a424f5b7ab88cce71b7234298dbc808b578a1e1558c53e9b56058544190ff70b7fafc8dfdc1de205",
+    "signerKey": "59c44580818005d3ee5fc6583901de543d6c16dbe2188a823c2a8eede6af8f15"
+  },
+  "observationForVerifier": {
+    "allocationId": "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+    "agreementDigest": "0x19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+    "commitment": "0x84f9677cd9a205a11c6266f7370939816e7200204ed7ea63e37c65e5a97ac2ca",
+    "state": "Submitted",
+    "chainTime": 1789344005,
+    "rail": {
+      "chainId": "31337",
+      "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+      "runtimeKeccak256": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f",
+      "token": "0x5b1869d9a4c187f2eaa108f3062412ecf0526b24",
+      "payer": "0x22d491bde2303f2f43325b2108d26f1eaba1e32b",
+      "beneficiary": "0xd03ea8624c8c5987235048901fb614fdca89b117",
+      "verifier": "0xe11ba2b4d45eaed5996cd0823791e0c93114882d",
+      "amount": "60"
+    },
+    "deadlines": {
+      "submitBy": 1789344002,
+      "challengeUntil": 1789344004,
+      "resolveBy": 1789344006,
+      "refundAfter": 1789344008
+    }
+  },
+  "certificate": {
+    "authorization": {
+      "accepted": true,
+      "agreementDigest": "0x19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+      "allocationId": "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+      "amount": "60",
+      "beneficiary": "0xd03ea8624c8c5987235048901fb614fdca89b117",
+      "commitment": "0x84f9677cd9a205a11c6266f7370939816e7200204ed7ea63e37c65e5a97ac2ca",
+      "decisionDigest": "0xb5de60b4ff5b97597a7f58654011171c0b12ae9a713cd69e42d5357733e48e63",
+      "token": "0x5b1869d9a4c187f2eaa108f3062412ecf0526b24"
+    },
+    "decision": {
+      "body": {
+        "accepted": true,
+        "agreementSha256": "19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+        "allocationId": "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+        "assurance": "artifact-only-v1",
+        "checkerSha256": "d412a85c82c0e3334f0f8b783e39ffb1a06ea93c3ddac3bdb53bf31cdca49ca7",
+        "commitment": "0x84f9677cd9a205a11c6266f7370939816e7200204ed7ea63e37c65e5a97ac2ca",
+        "custodyReceiptSha256": "2115b75ff71db02af080e646abdd61e7fe0719c3c23b09bdc479917cdde5f097",
+        "inputSha256": "952c8a7286a67c8d9d67735bf05d3d083f70ad2d8d744346692de6c92d7ebeb6",
+        "outputSha256": "900a10ca289b370ef4d0ccabaae3f99d91068065ca6deb7a657a98c9c139eea8",
+        "predicate": "match",
+        "rail": {
+          "amount": "60",
+          "beneficiary": "0xd03ea8624c8c5987235048901fb614fdca89b117",
+          "chainId": "31337",
+          "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+          "payer": "0x22d491bde2303f2f43325b2108d26f1eaba1e32b",
+          "runtimeKeccak256": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f",
+          "token": "0x5b1869d9a4c187f2eaa108f3062412ecf0526b24",
+          "verifier": "0xe11ba2b4d45eaed5996cd0823791e0c93114882d"
+        },
+        "retainUntil": 1791936008,
+        "retentionPolicy": "local-retain-indefinitely-v1",
+        "schema": "chio.experimental.funded-w0-decision.v1"
+      },
+      "signature": "a4949860ed5a338b3d98a63c21b0df5b56f96f827366091b2362847e1bfddd871cf2367c94b3167c772dbc02205c9bf0140b21c929f8fefb2feceab1bb3c390f",
+      "signerKey": "ad85244f30024ed89305513391e97c6f09c66163ac00bf5b08e8b1a0ff09f6fe"
+    },
+    "decisionDigest": "0xb5de60b4ff5b97597a7f58654011171c0b12ae9a713cd69e42d5357733e48e63",
+    "domain": {
+      "chainId": "31337",
+      "name": "ChioWorkClaimEscrow",
+      "verifyingContract": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+      "version": "1"
+    },
+    "verificationMicros": 16070
+  },
+  "evmCertificate": [
+    "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+    "0xb5de60b4ff5b97597a7f58654011171c0b12ae9a713cd69e42d5357733e48e63",
+    true,
+    "0x5e4d6b8b96bae8d7bbc60156ff65f0d6c42187cd87c49f775b19979e5e9624b9072dbdcc105e55e13a88bea1e06b938fd38ffeb688909a6435eb41da113c1db41b"
+  ],
+  "verifierFailure": null,
+  "providerCheckerMs": 15.016674000013154,
+  "observations": [
+    {
+      "label": "funded",
+      "chainTime": 1789344000,
+      "work": {
+        "allocationId": "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+        "agreementDigest": "0x19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+        "state": "Funded",
+        "commitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "decisionDigest": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "accepted": false,
+        "paid": "0",
+        "refunded": "0",
+        "amount": "60"
+      },
+      "parent": {
+        "allocationId": "0x7316d050ce8a16fef7d6d021c25f0617513da04bbad758a2f9f7c8863b090096",
+        "agreementDigest": "0x11d5bedf8c235301609dcda252cb4e47e6efd1a88e8f8b923db241c3a15a8dc8",
+        "state": "Funded",
+        "commitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "decisionDigest": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "accepted": false,
+        "paid": "0",
+        "refunded": "0",
+        "amount": "100"
+      },
+      "balances": {
+        "A": "900",
+        "B": "940",
+        "C": "0",
+        "escrow": "160"
+      }
+    },
+    {
+      "label": "submitted",
+      "chainTime": 1789344002,
+      "work": {
+        "allocationId": "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+        "agreementDigest": "0x19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+        "state": "Submitted",
+        "commitment": "0x84f9677cd9a205a11c6266f7370939816e7200204ed7ea63e37c65e5a97ac2ca",
+        "decisionDigest": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "accepted": false,
+        "paid": "0",
+        "refunded": "0",
+        "amount": "60"
+      },
+      "parent": {
+        "allocationId": "0x7316d050ce8a16fef7d6d021c25f0617513da04bbad758a2f9f7c8863b090096",
+        "agreementDigest": "0x11d5bedf8c235301609dcda252cb4e47e6efd1a88e8f8b923db241c3a15a8dc8",
+        "state": "Funded",
+        "commitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "decisionDigest": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "accepted": false,
+        "paid": "0",
+        "refunded": "0",
+        "amount": "100"
+      },
+      "balances": {
+        "A": "900",
+        "B": "940",
+        "C": "0",
+        "escrow": "160"
+      }
+    },
+    {
+      "label": "decided_unwithdrawn",
+      "chainTime": 1789344005,
+      "work": {
+        "allocationId": "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+        "agreementDigest": "0x19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+        "state": "Payable",
+        "commitment": "0x84f9677cd9a205a11c6266f7370939816e7200204ed7ea63e37c65e5a97ac2ca",
+        "decisionDigest": "0xb5de60b4ff5b97597a7f58654011171c0b12ae9a713cd69e42d5357733e48e63",
+        "accepted": true,
+        "paid": "0",
+        "refunded": "0",
+        "amount": "60"
+      },
+      "parent": {
+        "allocationId": "0x7316d050ce8a16fef7d6d021c25f0617513da04bbad758a2f9f7c8863b090096",
+        "agreementDigest": "0x11d5bedf8c235301609dcda252cb4e47e6efd1a88e8f8b923db241c3a15a8dc8",
+        "state": "Funded",
+        "commitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "decisionDigest": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "accepted": false,
+        "paid": "0",
+        "refunded": "0",
+        "amount": "100"
+      },
+      "balances": {
+        "A": "900",
+        "B": "940",
+        "C": "0",
+        "escrow": "160"
+      }
+    },
+    {
+      "label": "parent_refunded",
+      "chainTime": 1789344009,
+      "work": {
+        "allocationId": "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+        "agreementDigest": "0x19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+        "state": "Payable",
+        "commitment": "0x84f9677cd9a205a11c6266f7370939816e7200204ed7ea63e37c65e5a97ac2ca",
+        "decisionDigest": "0xb5de60b4ff5b97597a7f58654011171c0b12ae9a713cd69e42d5357733e48e63",
+        "accepted": true,
+        "paid": "0",
+        "refunded": "0",
+        "amount": "60"
+      },
+      "parent": {
+        "allocationId": "0x7316d050ce8a16fef7d6d021c25f0617513da04bbad758a2f9f7c8863b090096",
+        "agreementDigest": "0x11d5bedf8c235301609dcda252cb4e47e6efd1a88e8f8b923db241c3a15a8dc8",
+        "state": "Refunded",
+        "commitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "decisionDigest": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "accepted": false,
+        "paid": "0",
+        "refunded": "100",
+        "amount": "100"
+      },
+      "balances": {
+        "A": "1000",
+        "B": "940",
+        "C": "0",
+        "escrow": "60"
+      }
+    },
+    {
+      "label": "financial_terminal",
+      "chainTime": 1789344030,
+      "work": {
+        "allocationId": "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+        "agreementDigest": "0x19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+        "state": "Paid",
+        "commitment": "0x84f9677cd9a205a11c6266f7370939816e7200204ed7ea63e37c65e5a97ac2ca",
+        "decisionDigest": "0xb5de60b4ff5b97597a7f58654011171c0b12ae9a713cd69e42d5357733e48e63",
+        "accepted": true,
+        "paid": "60",
+        "refunded": "0",
+        "amount": "60"
+      },
+      "parent": {
+        "allocationId": "0x7316d050ce8a16fef7d6d021c25f0617513da04bbad758a2f9f7c8863b090096",
+        "agreementDigest": "0x11d5bedf8c235301609dcda252cb4e47e6efd1a88e8f8b923db241c3a15a8dc8",
+        "state": "Refunded",
+        "commitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "decisionDigest": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "accepted": false,
+        "paid": "0",
+        "refunded": "100",
+        "amount": "100"
+      },
+      "balances": {
+        "A": "1000",
+        "B": "940",
+        "C": "60",
+        "escrow": "0"
+      }
+    }
+  ],
+  "receipts": [
+    {
+      "label": "fund_unsubmitted-parent",
+      "receipt": {
+        "_type": "TransactionReceipt",
+        "blockHash": "0x244b9e825cb00f795e2d5a9c14a0b13440b8a929747f1f04a16e46438e647b75",
+        "blockNumber": 9,
+        "contractAddress": null,
+        "cumulativeGasUsed": "284329",
+        "from": "0xFFcf8FDEE72ac11b5c542428B35EEF5769C409f0",
+        "gasPrice": "390325757",
+        "blobGasUsed": null,
+        "blobGasPrice": null,
+        "gasUsed": "284329",
+        "hash": "0x32f291e1095dbcb1a8c81b0ef2328b341fa41567cf8cada1ad14ee292fb00e55",
+        "index": 0,
+        "logs": [
+          {
+            "_type": "log",
+            "address": "0x5b1869D9A4C187F2EAa108f3062412ecf0526b24",
+            "blockHash": "0x244b9e825cb00f795e2d5a9c14a0b13440b8a929747f1f04a16e46438e647b75",
+            "blockNumber": 9,
+            "data": "0x0000000000000000000000000000000000000000000000000000000000000064",
+            "index": 0,
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+              "0x000000000000000000000000ffcf8fdee72ac11b5c542428b35eef5769c409f0",
+              "0x000000000000000000000000e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab"
+            ],
+            "transactionHash": "0x32f291e1095dbcb1a8c81b0ef2328b341fa41567cf8cada1ad14ee292fb00e55",
+            "transactionIndex": 0
+          },
+          {
+            "_type": "log",
+            "address": "0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab",
+            "blockHash": "0x244b9e825cb00f795e2d5a9c14a0b13440b8a929747f1f04a16e46438e647b75",
+            "blockNumber": 9,
+            "data": "0x",
+            "index": 1,
+            "topics": [
+              "0xd29f6517bae43da99a759bba98e84bc12a19806dbe6f7fa1970749b7685d6755",
+              "0x7316d050ce8a16fef7d6d021c25f0617513da04bbad758a2f9f7c8863b090096",
+              "0x11d5bedf8c235301609dcda252cb4e47e6efd1a88e8f8b923db241c3a15a8dc8",
+              "0x000000000000000000000000ffcf8fdee72ac11b5c542428b35eef5769c409f0"
+            ],
+            "transactionHash": "0x32f291e1095dbcb1a8c81b0ef2328b341fa41567cf8cada1ad14ee292fb00e55",
+            "transactionIndex": 0
+          }
+        ],
+        "logsBloom": "0x00000000000000000100020000000800000080000000000010000000000000000004000000000000080000000000000000000000000000000000000000000000200000000000000000002008000000000000000000000000000000000000000000000000000000000000001000000000000000000000000008000010000000010000000000000000000000000000000000000000000000000000100100000000000000000040000000000000000000000000400000000000000000000000000000000002000000000000000000000000000000000100000080000000000040000000000002000000000001000000000000000000000000000000000000000000",
+        "status": 1,
+        "to": "0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab"
+      }
+    },
+    {
+      "label": "fund_child-w0",
+      "receipt": {
+        "_type": "TransactionReceipt",
+        "blockHash": "0x5665e5c1ef05361b9f25b2a8d3682c73f5110b9e563cf4a3588dd471d8155d66",
+        "blockNumber": 10,
+        "contractAddress": null,
+        "cumulativeGasUsed": "267229",
+        "from": "0x22d491Bde2303f2f43325b2108D26f1eAbA1e32b",
+        "gasPrice": "342459879",
+        "blobGasUsed": null,
+        "blobGasPrice": null,
+        "gasUsed": "267229",
+        "hash": "0x1e052f271a8335b30f38c168d9f444439773c526caebe1b2fb941d99ed32fa3d",
+        "index": 0,
+        "logs": [
+          {
+            "_type": "log",
+            "address": "0x5b1869D9A4C187F2EAa108f3062412ecf0526b24",
+            "blockHash": "0x5665e5c1ef05361b9f25b2a8d3682c73f5110b9e563cf4a3588dd471d8155d66",
+            "blockNumber": 10,
+            "data": "0x000000000000000000000000000000000000000000000000000000000000003c",
+            "index": 0,
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+              "0x00000000000000000000000022d491bde2303f2f43325b2108d26f1eaba1e32b",
+              "0x000000000000000000000000e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab"
+            ],
+            "transactionHash": "0x1e052f271a8335b30f38c168d9f444439773c526caebe1b2fb941d99ed32fa3d",
+            "transactionIndex": 0
+          },
+          {
+            "_type": "log",
+            "address": "0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab",
+            "blockHash": "0x5665e5c1ef05361b9f25b2a8d3682c73f5110b9e563cf4a3588dd471d8155d66",
+            "blockNumber": 10,
+            "data": "0x",
+            "index": 1,
+            "topics": [
+              "0xd29f6517bae43da99a759bba98e84bc12a19806dbe6f7fa1970749b7685d6755",
+              "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+              "0x19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+              "0x00000000000000000000000022d491bde2303f2f43325b2108d26f1eaba1e32b"
+            ],
+            "transactionHash": "0x1e052f271a8335b30f38c168d9f444439773c526caebe1b2fb941d99ed32fa3d",
+            "transactionIndex": 0
+          }
+        ],
+        "logsBloom": "0x00000000000000000100020000000000000080000000000010000000000000000004000000000000090000000000000000000000004000000000000000000000200000000000000000000008000000000000040000001000000000000000000000000000000000000000001000000000000000000000000000000010008000000000000000000000000200000000000000000000000000000000100108000000000000000040000000000000000000000000400000000000000000000000000000000002000000000000000000000000000000000000000000000000000080000000000000000000000000000000010000000000000000000000000000000000",
+        "status": 1,
+        "to": "0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab"
+      }
+    },
+    {
+      "label": "submit_exact_artifact",
+      "receipt": {
+        "_type": "TransactionReceipt",
+        "blockHash": "0x90112eb34f7de7eb5c2f08133d348c959453cabbe078bd62e08c22d89a8252da",
+        "blockNumber": 12,
+        "contractAddress": null,
+        "cumulativeGasUsed": "62599",
+        "from": "0xd03ea8624C8C5987235048901fB614fDcA89b117",
+        "gasPrice": "1207694337",
+        "blobGasUsed": null,
+        "blobGasPrice": null,
+        "gasUsed": "62599",
+        "hash": "0xee23a15c77e8a2d4594dc94a85f96fc60dc5ad68cfc3fd8768bb3a9359a46ad2",
+        "index": 0,
+        "logs": [
+          {
+            "_type": "log",
+            "address": "0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab",
+            "blockHash": "0x90112eb34f7de7eb5c2f08133d348c959453cabbe078bd62e08c22d89a8252da",
+            "blockNumber": 12,
+            "data": "0x84f9677cd9a205a11c6266f7370939816e7200204ed7ea63e37c65e5a97ac2ca",
+            "index": 0,
+            "topics": [
+              "0x4655773214d69732a8c6708c632565c6e71fc8ec47f1425534c2eda8e689f303",
+              "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436"
+            ],
+            "transactionHash": "0xee23a15c77e8a2d4594dc94a85f96fc60dc5ad68cfc3fd8768bb3a9359a46ad2",
+            "transactionIndex": 0
+          }
+        ],
+        "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000040000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000001000000000000000000000000000000000080000000080000000000000000000000000000800000000000000000000000000000",
+        "status": 1,
+        "to": "0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab"
+      }
+    },
+    {
+      "label": "record_checked_decision",
+      "receipt": {
+        "_type": "TransactionReceipt",
+        "blockHash": "0x7628ae8d1d6970922924bfafd4345d5daf3f9fcecdba4013bbc584c5bb8e6121",
+        "blockNumber": 14,
+        "contractAddress": null,
+        "cumulativeGasUsed": "97962",
+        "from": "0x95cED938F7991cd0dFcb48F0a06a40FA1aF46EBC",
+        "gasPrice": "1159110780",
+        "blobGasUsed": null,
+        "blobGasPrice": null,
+        "gasUsed": "97962",
+        "hash": "0xf0fac9e6c64997b5d4a80628780db33a76c518f0255483f05ac267db1a6d5071",
+        "index": 0,
+        "logs": [
+          {
+            "_type": "log",
+            "address": "0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab",
+            "blockHash": "0x7628ae8d1d6970922924bfafd4345d5daf3f9fcecdba4013bbc584c5bb8e6121",
+            "blockNumber": 14,
+            "data": "0xb5de60b4ff5b97597a7f58654011171c0b12ae9a713cd69e42d5357733e48e630000000000000000000000000000000000000000000000000000000000000001",
+            "index": 0,
+            "topics": [
+              "0x146dddf6d910378af13362f0896c0fd3878718429b98a5d40c3baea05e703c7a",
+              "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436"
+            ],
+            "transactionHash": "0xf0fac9e6c64997b5d4a80628780db33a76c518f0255483f05ac267db1a6d5071",
+            "transactionIndex": 0
+          }
+        ],
+        "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000004000200000000000000000000000000000000000000200000000000000000000000000000000000040000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000200000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000000",
+        "status": 1,
+        "to": "0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab"
+      }
+    },
+    {
+      "label": "unsubmitted_parent_refund",
+      "receipt": {
+        "_type": "TransactionReceipt",
+        "blockHash": "0xc836582547ae705fb0482106de33b9bf07fd95c3d5f3f624dc0e847180da0a9a",
+        "blockNumber": 16,
+        "contractAddress": null,
+        "cumulativeGasUsed": "84995",
+        "from": "0x95cED938F7991cd0dFcb48F0a06a40FA1aF46EBC",
+        "gasPrice": "1121932846",
+        "blobGasUsed": null,
+        "blobGasPrice": null,
+        "gasUsed": "84995",
+        "hash": "0x9e7cad71069223d9bc339ce3461187332788b2cf1b95c67b4af01ff60eaa1894",
+        "index": 0,
+        "logs": [
+          {
+            "_type": "log",
+            "address": "0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab",
+            "blockHash": "0xc836582547ae705fb0482106de33b9bf07fd95c3d5f3f624dc0e847180da0a9a",
+            "blockNumber": 16,
+            "data": "0x",
+            "index": 0,
+            "topics": [
+              "0x49aeaa48f2cccf7596e2541f2abcdfa8c4aaa4f12da088ee9d0bd6c14adfedb2",
+              "0x7316d050ce8a16fef7d6d021c25f0617513da04bbad758a2f9f7c8863b090096"
+            ],
+            "transactionHash": "0x9e7cad71069223d9bc339ce3461187332788b2cf1b95c67b4af01ff60eaa1894",
+            "transactionIndex": 0
+          },
+          {
+            "_type": "log",
+            "address": "0x5b1869D9A4C187F2EAa108f3062412ecf0526b24",
+            "blockHash": "0xc836582547ae705fb0482106de33b9bf07fd95c3d5f3f624dc0e847180da0a9a",
+            "blockNumber": 16,
+            "data": "0x0000000000000000000000000000000000000000000000000000000000000064",
+            "index": 1,
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+              "0x000000000000000000000000e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+              "0x000000000000000000000000ffcf8fdee72ac11b5c542428b35eef5769c409f0"
+            ],
+            "transactionHash": "0x9e7cad71069223d9bc339ce3461187332788b2cf1b95c67b4af01ff60eaa1894",
+            "transactionIndex": 0
+          },
+          {
+            "_type": "log",
+            "address": "0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab",
+            "blockHash": "0xc836582547ae705fb0482106de33b9bf07fd95c3d5f3f624dc0e847180da0a9a",
+            "blockNumber": 16,
+            "data": "0x0000000000000000000000000000000000000000000000000000000000000064",
+            "index": 2,
+            "topics": [
+              "0xf552ca82e113ac3c539c3d617f29fcd19c172a0c75dad017555c9e109f7fe183",
+              "0x7316d050ce8a16fef7d6d021c25f0617513da04bbad758a2f9f7c8863b090096",
+              "0x000000000000000000000000ffcf8fdee72ac11b5c542428b35eef5769c409f0"
+            ],
+            "transactionHash": "0x9e7cad71069223d9bc339ce3461187332788b2cf1b95c67b4af01ff60eaa1894",
+            "transactionIndex": 0
+          }
+        ],
+        "logsBloom": "0x00000000000000000000020000000800000080000000000010000000000000000004000000000000080000000000000000000000800000000000000000000000200000020000000000000008000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000010000000000000000080000000000000000000000000000000000000000000100000000000000000000040040000000000000000000000400000000000000000000000000000008002000000000000000000000400000000000000000080000000000040000000000002000000000001000000000000000000000000000000000000000000",
+        "status": 1,
+        "to": "0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab"
+      }
+    },
+    {
+      "label": "earned_payment_after_deadlines",
+      "receipt": {
+        "_type": "TransactionReceipt",
+        "blockHash": "0x7aa6de015ab30e80d504b2b6b88ee88c0258b800bd99206b58df76ad343c51bf",
+        "blockNumber": 18,
+        "contractAddress": null,
+        "cumulativeGasUsed": "94414",
+        "from": "0xd03ea8624C8C5987235048901fB614fDcA89b117",
+        "gasPrice": "1093430405",
+        "blobGasUsed": null,
+        "blobGasPrice": null,
+        "gasUsed": "94414",
+        "hash": "0xd4ac4350f2c224764e4904139a1ecba6c7daa835656772b3e3b274c902aac88c",
+        "index": 0,
+        "logs": [
+          {
+            "_type": "log",
+            "address": "0x5b1869D9A4C187F2EAa108f3062412ecf0526b24",
+            "blockHash": "0x7aa6de015ab30e80d504b2b6b88ee88c0258b800bd99206b58df76ad343c51bf",
+            "blockNumber": 18,
+            "data": "0x000000000000000000000000000000000000000000000000000000000000003c",
+            "index": 0,
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+              "0x000000000000000000000000e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+              "0x000000000000000000000000d03ea8624c8c5987235048901fb614fdca89b117"
+            ],
+            "transactionHash": "0xd4ac4350f2c224764e4904139a1ecba6c7daa835656772b3e3b274c902aac88c",
+            "transactionIndex": 0
+          },
+          {
+            "_type": "log",
+            "address": "0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab",
+            "blockHash": "0x7aa6de015ab30e80d504b2b6b88ee88c0258b800bd99206b58df76ad343c51bf",
+            "blockNumber": 18,
+            "data": "0x000000000000000000000000000000000000000000000000000000000000003c",
+            "index": 1,
+            "topics": [
+              "0x606160394df2742a67735645b7e783304d61d2dbc5b550e8c6acfaf27b6291d7",
+              "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+              "0x000000000000000000000000d03ea8624c8c5987235048901fb614fdca89b117"
+            ],
+            "transactionHash": "0xd4ac4350f2c224764e4904139a1ecba6c7daa835656772b3e3b274c902aac88c",
+            "transactionIndex": 0
+          }
+        ],
+        "logsBloom": "0x00000000000000000800020000000000000080000000000010000000000000000004000000000000080000000000000000000000000000000000000000000000200000000000000000000008008000000000040000001000000000000000000000000000000000000000000000000000000000004000000000000010000000000000000000000000000000000000000000000000000000000000100000000000004000000040000002000000000000000000400000000000000000000008000000000002000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000000",
+        "status": 1,
+        "to": "0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab"
+      }
+    }
+  ],
+  "runtimeCodeKeccak256": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f",
+  "railRecoveries": [
+    {
+      "label": "submit_exact_artifact",
+      "schema": "chio.experimental.rail-recovery-run.v1",
+      "killPoint": "after_broadcast",
+      "keylessWorker": true,
+      "operationId": "0xa21ff04a6e4f458487fd4c7b21199e8cd3c62ed66701b1bc8810690441401659",
+      "transactionHash": "0xee23a15c77e8a2d4594dc94a85f96fc60dc5ad68cfc3fd8768bb3a9359a46ad2",
+      "originalNonce": "0",
+      "killed": {
+        "code": null,
+        "signal": "SIGKILL",
+        "pid": 1095690,
+        "killedAt": "after_broadcast",
+        "checkpoints": [
+          "before_broadcast",
+          "after_broadcast"
+        ],
+        "broadcasts": 1,
+        "result": null,
+        "failure": null,
+        "stderr": "",
+        "callbackFailure": null
+      },
+      "afterLoss": {
+        "observation": null,
+        "prepared": {
+          "intent": {
+            "action": "submit",
+            "actor": "0xd03ea8624c8c5987235048901fb614fdca89b117",
+            "agreementDigest": "0x19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+            "allocationId": "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+            "callData": "0x54d410ce4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae43684f9677cd9a205a11c6266f7370939816e7200204ed7ea63e37c65e5a97ac2ca",
+            "domain": {
+              "chainId": "31337",
+              "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+              "genesisHash": "0xaf58ffaa910ae012477ba905a26205288bcc3bc1b6bd029706f4c1dea78078d5",
+              "runtimeKeccak256": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f"
+            },
+            "gasLimit": "1000000",
+            "maxFeePerGas": "2000000000",
+            "maxPriorityFeePerGas": "1000000000",
+            "operationId": "0xa21ff04a6e4f458487fd4c7b21199e8cd3c62ed66701b1bc8810690441401659",
+            "schema": "chio.experimental.rail-intent.v1"
+          },
+          "nonce": "0",
+          "rawTransaction": "0x02f8b2827a6980843b9aca008477359400830f424094e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab80b84454d410ce4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae43684f9677cd9a205a11c6266f7370939816e7200204ed7ea63e37c65e5a97ac2cac080a01e61ff3b5d500b52f65d9c9851cfa8ab6fae8547b717697e122a7f3b2d9edbfaa04217eac99e4a970d1a1ae0b124118a3eccef8348f91101305562221cb822b43b",
+          "transactionHash": "0xee23a15c77e8a2d4594dc94a85f96fc60dc5ad68cfc3fd8768bb3a9359a46ad2"
+        },
+        "state": "Unknown",
+        "uncertainty": null
+      },
+      "restarted": {
+        "code": 0,
+        "signal": null,
+        "pid": 1095700,
+        "killedAt": null,
+        "checkpoints": [
+          "after_observation",
+          "after_recorded"
+        ],
+        "broadcasts": 0,
+        "result": {
+          "observation": {
+            "blockHash": "0x90112eb34f7de7eb5c2f08133d348c959453cabbe078bd62e08c22d89a8252da",
+            "blockNumber": 12,
+            "status": "Included",
+            "transactionHash": "0xee23a15c77e8a2d4594dc94a85f96fc60dc5ad68cfc3fd8768bb3a9359a46ad2",
+            "transactionIndex": 0
+          },
+          "prepared": {
+            "intent": {
+              "action": "submit",
+              "actor": "0xd03ea8624c8c5987235048901fb614fdca89b117",
+              "agreementDigest": "0x19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+              "allocationId": "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+              "callData": "0x54d410ce4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae43684f9677cd9a205a11c6266f7370939816e7200204ed7ea63e37c65e5a97ac2ca",
+              "domain": {
+                "chainId": "31337",
+                "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+                "genesisHash": "0xaf58ffaa910ae012477ba905a26205288bcc3bc1b6bd029706f4c1dea78078d5",
+                "runtimeKeccak256": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f"
+              },
+              "gasLimit": "1000000",
+              "maxFeePerGas": "2000000000",
+              "maxPriorityFeePerGas": "1000000000",
+              "operationId": "0xa21ff04a6e4f458487fd4c7b21199e8cd3c62ed66701b1bc8810690441401659",
+              "schema": "chio.experimental.rail-intent.v1"
+            },
+            "nonce": "0",
+            "rawTransaction": "0x02f8b2827a6980843b9aca008477359400830f424094e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab80b84454d410ce4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae43684f9677cd9a205a11c6266f7370939816e7200204ed7ea63e37c65e5a97ac2cac080a01e61ff3b5d500b52f65d9c9851cfa8ab6fae8547b717697e122a7f3b2d9edbfaa04217eac99e4a970d1a1ae0b124118a3eccef8348f91101305562221cb822b43b",
+            "transactionHash": "0xee23a15c77e8a2d4594dc94a85f96fc60dc5ad68cfc3fd8768bb3a9359a46ad2"
+          },
+          "state": "Included",
+          "uncertainty": null
+        },
+        "failure": null,
+        "stderr": "",
+        "callbackFailure": null
+      },
+      "retried": {
+        "code": 0,
+        "signal": null,
+        "pid": 1095710,
+        "killedAt": null,
+        "checkpoints": [
+          "after_observation",
+          "after_recorded"
+        ],
+        "broadcasts": 0,
+        "result": {
+          "observation": {
+            "blockHash": "0x90112eb34f7de7eb5c2f08133d348c959453cabbe078bd62e08c22d89a8252da",
+            "blockNumber": 12,
+            "status": "Included",
+            "transactionHash": "0xee23a15c77e8a2d4594dc94a85f96fc60dc5ad68cfc3fd8768bb3a9359a46ad2",
+            "transactionIndex": 0
+          },
+          "prepared": {
+            "intent": {
+              "action": "submit",
+              "actor": "0xd03ea8624c8c5987235048901fb614fdca89b117",
+              "agreementDigest": "0x19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+              "allocationId": "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+              "callData": "0x54d410ce4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae43684f9677cd9a205a11c6266f7370939816e7200204ed7ea63e37c65e5a97ac2ca",
+              "domain": {
+                "chainId": "31337",
+                "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+                "genesisHash": "0xaf58ffaa910ae012477ba905a26205288bcc3bc1b6bd029706f4c1dea78078d5",
+                "runtimeKeccak256": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f"
+              },
+              "gasLimit": "1000000",
+              "maxFeePerGas": "2000000000",
+              "maxPriorityFeePerGas": "1000000000",
+              "operationId": "0xa21ff04a6e4f458487fd4c7b21199e8cd3c62ed66701b1bc8810690441401659",
+              "schema": "chio.experimental.rail-intent.v1"
+            },
+            "nonce": "0",
+            "rawTransaction": "0x02f8b2827a6980843b9aca008477359400830f424094e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab80b84454d410ce4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae43684f9677cd9a205a11c6266f7370939816e7200204ed7ea63e37c65e5a97ac2cac080a01e61ff3b5d500b52f65d9c9851cfa8ab6fae8547b717697e122a7f3b2d9edbfaa04217eac99e4a970d1a1ae0b124118a3eccef8348f91101305562221cb822b43b",
+            "transactionHash": "0xee23a15c77e8a2d4594dc94a85f96fc60dc5ad68cfc3fd8768bb3a9359a46ad2"
+          },
+          "state": "Included",
+          "uncertainty": null
+        },
+        "failure": null,
+        "stderr": "",
+        "callbackFailure": null
+      },
+      "journal": {
+        "observation": {
+          "blockHash": "0x90112eb34f7de7eb5c2f08133d348c959453cabbe078bd62e08c22d89a8252da",
+          "blockNumber": 12,
+          "status": "Included",
+          "transactionHash": "0xee23a15c77e8a2d4594dc94a85f96fc60dc5ad68cfc3fd8768bb3a9359a46ad2",
+          "transactionIndex": 0
+        },
+        "prepared": {
+          "intent": {
+            "action": "submit",
+            "actor": "0xd03ea8624c8c5987235048901fb614fdca89b117",
+            "agreementDigest": "0x19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+            "allocationId": "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+            "callData": "0x54d410ce4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae43684f9677cd9a205a11c6266f7370939816e7200204ed7ea63e37c65e5a97ac2ca",
+            "domain": {
+              "chainId": "31337",
+              "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+              "genesisHash": "0xaf58ffaa910ae012477ba905a26205288bcc3bc1b6bd029706f4c1dea78078d5",
+              "runtimeKeccak256": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f"
+            },
+            "gasLimit": "1000000",
+            "maxFeePerGas": "2000000000",
+            "maxPriorityFeePerGas": "1000000000",
+            "operationId": "0xa21ff04a6e4f458487fd4c7b21199e8cd3c62ed66701b1bc8810690441401659",
+            "schema": "chio.experimental.rail-intent.v1"
+          },
+          "nonce": "0",
+          "rawTransaction": "0x02f8b2827a6980843b9aca008477359400830f424094e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab80b84454d410ce4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae43684f9677cd9a205a11c6266f7370939816e7200204ed7ea63e37c65e5a97ac2cac080a01e61ff3b5d500b52f65d9c9851cfa8ab6fae8547b717697e122a7f3b2d9edbfaa04217eac99e4a970d1a1ae0b124118a3eccef8348f91101305562221cb822b43b",
+          "transactionHash": "0xee23a15c77e8a2d4594dc94a85f96fc60dc5ad68cfc3fd8768bb3a9359a46ad2"
+        },
+        "state": "Included",
+        "uncertainty": null
+      },
+      "canonicalTransactionCount": 1,
+      "broadcasts": 1,
+      "scope": "Actual rail-worker SIGKILL, same signed transaction, one private Ganache chain; no native execution or public finality."
+    },
+    {
+      "label": "record_checked_decision",
+      "schema": "chio.experimental.rail-recovery-run.v1",
+      "killPoint": "after_broadcast",
+      "keylessWorker": true,
+      "operationId": "0x51f4a367ffac13b3575fbae63af4a476cd67601d1c2593bb3e9c2d2281cd11ee",
+      "transactionHash": "0xf0fac9e6c64997b5d4a80628780db33a76c518f0255483f05ac267db1a6d5071",
+      "originalNonce": "0",
+      "killed": {
+        "code": null,
+        "signal": "SIGKILL",
+        "pid": 1095796,
+        "killedAt": "after_broadcast",
+        "checkpoints": [
+          "before_broadcast",
+          "after_broadcast"
+        ],
+        "broadcasts": 1,
+        "result": null,
+        "failure": null,
+        "stderr": "",
+        "callbackFailure": null
+      },
+      "afterLoss": {
+        "observation": null,
+        "prepared": {
+          "intent": {
+            "action": "decision",
+            "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+            "agreementDigest": "0x19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+            "allocationId": "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+            "callData": "0xaab4bcb44eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436b5de60b4ff5b97597a7f58654011171c0b12ae9a713cd69e42d5357733e48e630000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000415e4d6b8b96bae8d7bbc60156ff65f0d6c42187cd87c49f775b19979e5e9624b9072dbdcc105e55e13a88bea1e06b938fd38ffeb688909a6435eb41da113c1db41b00000000000000000000000000000000000000000000000000000000000000",
+            "domain": {
+              "chainId": "31337",
+              "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+              "genesisHash": "0xaf58ffaa910ae012477ba905a26205288bcc3bc1b6bd029706f4c1dea78078d5",
+              "runtimeKeccak256": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f"
+            },
+            "gasLimit": "1000000",
+            "maxFeePerGas": "2000000000",
+            "maxPriorityFeePerGas": "1000000000",
+            "operationId": "0x51f4a367ffac13b3575fbae63af4a476cd67601d1c2593bb3e9c2d2281cd11ee",
+            "schema": "chio.experimental.rail-intent.v1"
+          },
+          "nonce": "0",
+          "rawTransaction": "0x02f90173827a6980843b9aca008477359400830f424094e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab80b90104aab4bcb44eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436b5de60b4ff5b97597a7f58654011171c0b12ae9a713cd69e42d5357733e48e630000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000415e4d6b8b96bae8d7bbc60156ff65f0d6c42187cd87c49f775b19979e5e9624b9072dbdcc105e55e13a88bea1e06b938fd38ffeb688909a6435eb41da113c1db41b00000000000000000000000000000000000000000000000000000000000000c080a009b94196ee3c2e8e80e1c2474f063355715679b7a31416bf1b268eeec9f6749aa01048adf4e0ab5c7a0b92e601dc34ece40fb0503bd641ee71eae143a226db07bd",
+          "transactionHash": "0xf0fac9e6c64997b5d4a80628780db33a76c518f0255483f05ac267db1a6d5071"
+        },
+        "state": "Unknown",
+        "uncertainty": null
+      },
+      "restarted": {
+        "code": 0,
+        "signal": null,
+        "pid": 1095806,
+        "killedAt": null,
+        "checkpoints": [
+          "after_observation",
+          "after_recorded"
+        ],
+        "broadcasts": 0,
+        "result": {
+          "observation": {
+            "blockHash": "0x7628ae8d1d6970922924bfafd4345d5daf3f9fcecdba4013bbc584c5bb8e6121",
+            "blockNumber": 14,
+            "status": "Included",
+            "transactionHash": "0xf0fac9e6c64997b5d4a80628780db33a76c518f0255483f05ac267db1a6d5071",
+            "transactionIndex": 0
+          },
+          "prepared": {
+            "intent": {
+              "action": "decision",
+              "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+              "agreementDigest": "0x19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+              "allocationId": "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+              "callData": "0xaab4bcb44eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436b5de60b4ff5b97597a7f58654011171c0b12ae9a713cd69e42d5357733e48e630000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000415e4d6b8b96bae8d7bbc60156ff65f0d6c42187cd87c49f775b19979e5e9624b9072dbdcc105e55e13a88bea1e06b938fd38ffeb688909a6435eb41da113c1db41b00000000000000000000000000000000000000000000000000000000000000",
+              "domain": {
+                "chainId": "31337",
+                "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+                "genesisHash": "0xaf58ffaa910ae012477ba905a26205288bcc3bc1b6bd029706f4c1dea78078d5",
+                "runtimeKeccak256": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f"
+              },
+              "gasLimit": "1000000",
+              "maxFeePerGas": "2000000000",
+              "maxPriorityFeePerGas": "1000000000",
+              "operationId": "0x51f4a367ffac13b3575fbae63af4a476cd67601d1c2593bb3e9c2d2281cd11ee",
+              "schema": "chio.experimental.rail-intent.v1"
+            },
+            "nonce": "0",
+            "rawTransaction": "0x02f90173827a6980843b9aca008477359400830f424094e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab80b90104aab4bcb44eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436b5de60b4ff5b97597a7f58654011171c0b12ae9a713cd69e42d5357733e48e630000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000415e4d6b8b96bae8d7bbc60156ff65f0d6c42187cd87c49f775b19979e5e9624b9072dbdcc105e55e13a88bea1e06b938fd38ffeb688909a6435eb41da113c1db41b00000000000000000000000000000000000000000000000000000000000000c080a009b94196ee3c2e8e80e1c2474f063355715679b7a31416bf1b268eeec9f6749aa01048adf4e0ab5c7a0b92e601dc34ece40fb0503bd641ee71eae143a226db07bd",
+            "transactionHash": "0xf0fac9e6c64997b5d4a80628780db33a76c518f0255483f05ac267db1a6d5071"
+          },
+          "state": "Included",
+          "uncertainty": null
+        },
+        "failure": null,
+        "stderr": "",
+        "callbackFailure": null
+      },
+      "retried": {
+        "code": 0,
+        "signal": null,
+        "pid": 1095816,
+        "killedAt": null,
+        "checkpoints": [
+          "after_observation",
+          "after_recorded"
+        ],
+        "broadcasts": 0,
+        "result": {
+          "observation": {
+            "blockHash": "0x7628ae8d1d6970922924bfafd4345d5daf3f9fcecdba4013bbc584c5bb8e6121",
+            "blockNumber": 14,
+            "status": "Included",
+            "transactionHash": "0xf0fac9e6c64997b5d4a80628780db33a76c518f0255483f05ac267db1a6d5071",
+            "transactionIndex": 0
+          },
+          "prepared": {
+            "intent": {
+              "action": "decision",
+              "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+              "agreementDigest": "0x19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+              "allocationId": "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+              "callData": "0xaab4bcb44eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436b5de60b4ff5b97597a7f58654011171c0b12ae9a713cd69e42d5357733e48e630000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000415e4d6b8b96bae8d7bbc60156ff65f0d6c42187cd87c49f775b19979e5e9624b9072dbdcc105e55e13a88bea1e06b938fd38ffeb688909a6435eb41da113c1db41b00000000000000000000000000000000000000000000000000000000000000",
+              "domain": {
+                "chainId": "31337",
+                "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+                "genesisHash": "0xaf58ffaa910ae012477ba905a26205288bcc3bc1b6bd029706f4c1dea78078d5",
+                "runtimeKeccak256": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f"
+              },
+              "gasLimit": "1000000",
+              "maxFeePerGas": "2000000000",
+              "maxPriorityFeePerGas": "1000000000",
+              "operationId": "0x51f4a367ffac13b3575fbae63af4a476cd67601d1c2593bb3e9c2d2281cd11ee",
+              "schema": "chio.experimental.rail-intent.v1"
+            },
+            "nonce": "0",
+            "rawTransaction": "0x02f90173827a6980843b9aca008477359400830f424094e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab80b90104aab4bcb44eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436b5de60b4ff5b97597a7f58654011171c0b12ae9a713cd69e42d5357733e48e630000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000415e4d6b8b96bae8d7bbc60156ff65f0d6c42187cd87c49f775b19979e5e9624b9072dbdcc105e55e13a88bea1e06b938fd38ffeb688909a6435eb41da113c1db41b00000000000000000000000000000000000000000000000000000000000000c080a009b94196ee3c2e8e80e1c2474f063355715679b7a31416bf1b268eeec9f6749aa01048adf4e0ab5c7a0b92e601dc34ece40fb0503bd641ee71eae143a226db07bd",
+            "transactionHash": "0xf0fac9e6c64997b5d4a80628780db33a76c518f0255483f05ac267db1a6d5071"
+          },
+          "state": "Included",
+          "uncertainty": null
+        },
+        "failure": null,
+        "stderr": "",
+        "callbackFailure": null
+      },
+      "journal": {
+        "observation": {
+          "blockHash": "0x7628ae8d1d6970922924bfafd4345d5daf3f9fcecdba4013bbc584c5bb8e6121",
+          "blockNumber": 14,
+          "status": "Included",
+          "transactionHash": "0xf0fac9e6c64997b5d4a80628780db33a76c518f0255483f05ac267db1a6d5071",
+          "transactionIndex": 0
+        },
+        "prepared": {
+          "intent": {
+            "action": "decision",
+            "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+            "agreementDigest": "0x19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+            "allocationId": "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+            "callData": "0xaab4bcb44eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436b5de60b4ff5b97597a7f58654011171c0b12ae9a713cd69e42d5357733e48e630000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000415e4d6b8b96bae8d7bbc60156ff65f0d6c42187cd87c49f775b19979e5e9624b9072dbdcc105e55e13a88bea1e06b938fd38ffeb688909a6435eb41da113c1db41b00000000000000000000000000000000000000000000000000000000000000",
+            "domain": {
+              "chainId": "31337",
+              "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+              "genesisHash": "0xaf58ffaa910ae012477ba905a26205288bcc3bc1b6bd029706f4c1dea78078d5",
+              "runtimeKeccak256": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f"
+            },
+            "gasLimit": "1000000",
+            "maxFeePerGas": "2000000000",
+            "maxPriorityFeePerGas": "1000000000",
+            "operationId": "0x51f4a367ffac13b3575fbae63af4a476cd67601d1c2593bb3e9c2d2281cd11ee",
+            "schema": "chio.experimental.rail-intent.v1"
+          },
+          "nonce": "0",
+          "rawTransaction": "0x02f90173827a6980843b9aca008477359400830f424094e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab80b90104aab4bcb44eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436b5de60b4ff5b97597a7f58654011171c0b12ae9a713cd69e42d5357733e48e630000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000415e4d6b8b96bae8d7bbc60156ff65f0d6c42187cd87c49f775b19979e5e9624b9072dbdcc105e55e13a88bea1e06b938fd38ffeb688909a6435eb41da113c1db41b00000000000000000000000000000000000000000000000000000000000000c080a009b94196ee3c2e8e80e1c2474f063355715679b7a31416bf1b268eeec9f6749aa01048adf4e0ab5c7a0b92e601dc34ece40fb0503bd641ee71eae143a226db07bd",
+          "transactionHash": "0xf0fac9e6c64997b5d4a80628780db33a76c518f0255483f05ac267db1a6d5071"
+        },
+        "state": "Included",
+        "uncertainty": null
+      },
+      "canonicalTransactionCount": 1,
+      "broadcasts": 1,
+      "scope": "Actual rail-worker SIGKILL, same signed transaction, one private Ganache chain; no native execution or public finality."
+    },
+    {
+      "label": "unsubmitted_parent_refund",
+      "schema": "chio.experimental.rail-recovery-run.v1",
+      "killPoint": "after_broadcast",
+      "keylessWorker": true,
+      "operationId": "0xc49b1612b070b935768c0a9a61eb7e7c4d2ed2f012a02f96cb0b4533aba2bd2c",
+      "transactionHash": "0x9e7cad71069223d9bc339ce3461187332788b2cf1b95c67b4af01ff60eaa1894",
+      "originalNonce": "1",
+      "killed": {
+        "code": null,
+        "signal": "SIGKILL",
+        "pid": 1095870,
+        "killedAt": "after_broadcast",
+        "checkpoints": [
+          "before_broadcast",
+          "after_broadcast"
+        ],
+        "broadcasts": 1,
+        "result": null,
+        "failure": null,
+        "stderr": "",
+        "callbackFailure": null
+      },
+      "afterLoss": {
+        "observation": null,
+        "prepared": {
+          "intent": {
+            "action": "refund",
+            "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+            "agreementDigest": "0x11d5bedf8c235301609dcda252cb4e47e6efd1a88e8f8b923db241c3a15a8dc8",
+            "allocationId": "0x7316d050ce8a16fef7d6d021c25f0617513da04bbad758a2f9f7c8863b090096",
+            "callData": "0xe9acfa7c7316d050ce8a16fef7d6d021c25f0617513da04bbad758a2f9f7c8863b090096",
+            "domain": {
+              "chainId": "31337",
+              "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+              "genesisHash": "0xaf58ffaa910ae012477ba905a26205288bcc3bc1b6bd029706f4c1dea78078d5",
+              "runtimeKeccak256": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f"
+            },
+            "gasLimit": "1000000",
+            "maxFeePerGas": "2000000000",
+            "maxPriorityFeePerGas": "1000000000",
+            "operationId": "0xc49b1612b070b935768c0a9a61eb7e7c4d2ed2f012a02f96cb0b4533aba2bd2c",
+            "schema": "chio.experimental.rail-intent.v1"
+          },
+          "nonce": "1",
+          "rawTransaction": "0x02f891827a6901843b9aca008477359400830f424094e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab80a4e9acfa7c7316d050ce8a16fef7d6d021c25f0617513da04bbad758a2f9f7c8863b090096c080a02dc69a83e06d3a52280cf6ca0b361345ccc387ea8c8567b832bf89ad253d78aea01e57e02ed6a8de81e5e8f1eae4fc6b185c76bd0b0a8d3f8b7857b98a1cd4c049",
+          "transactionHash": "0x9e7cad71069223d9bc339ce3461187332788b2cf1b95c67b4af01ff60eaa1894"
+        },
+        "state": "Unknown",
+        "uncertainty": null
+      },
+      "restarted": {
+        "code": 0,
+        "signal": null,
+        "pid": 1095880,
+        "killedAt": null,
+        "checkpoints": [
+          "after_observation",
+          "after_recorded"
+        ],
+        "broadcasts": 0,
+        "result": {
+          "observation": {
+            "blockHash": "0xc836582547ae705fb0482106de33b9bf07fd95c3d5f3f624dc0e847180da0a9a",
+            "blockNumber": 16,
+            "status": "Included",
+            "transactionHash": "0x9e7cad71069223d9bc339ce3461187332788b2cf1b95c67b4af01ff60eaa1894",
+            "transactionIndex": 0
+          },
+          "prepared": {
+            "intent": {
+              "action": "refund",
+              "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+              "agreementDigest": "0x11d5bedf8c235301609dcda252cb4e47e6efd1a88e8f8b923db241c3a15a8dc8",
+              "allocationId": "0x7316d050ce8a16fef7d6d021c25f0617513da04bbad758a2f9f7c8863b090096",
+              "callData": "0xe9acfa7c7316d050ce8a16fef7d6d021c25f0617513da04bbad758a2f9f7c8863b090096",
+              "domain": {
+                "chainId": "31337",
+                "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+                "genesisHash": "0xaf58ffaa910ae012477ba905a26205288bcc3bc1b6bd029706f4c1dea78078d5",
+                "runtimeKeccak256": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f"
+              },
+              "gasLimit": "1000000",
+              "maxFeePerGas": "2000000000",
+              "maxPriorityFeePerGas": "1000000000",
+              "operationId": "0xc49b1612b070b935768c0a9a61eb7e7c4d2ed2f012a02f96cb0b4533aba2bd2c",
+              "schema": "chio.experimental.rail-intent.v1"
+            },
+            "nonce": "1",
+            "rawTransaction": "0x02f891827a6901843b9aca008477359400830f424094e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab80a4e9acfa7c7316d050ce8a16fef7d6d021c25f0617513da04bbad758a2f9f7c8863b090096c080a02dc69a83e06d3a52280cf6ca0b361345ccc387ea8c8567b832bf89ad253d78aea01e57e02ed6a8de81e5e8f1eae4fc6b185c76bd0b0a8d3f8b7857b98a1cd4c049",
+            "transactionHash": "0x9e7cad71069223d9bc339ce3461187332788b2cf1b95c67b4af01ff60eaa1894"
+          },
+          "state": "Included",
+          "uncertainty": null
+        },
+        "failure": null,
+        "stderr": "",
+        "callbackFailure": null
+      },
+      "retried": {
+        "code": 0,
+        "signal": null,
+        "pid": 1095914,
+        "killedAt": null,
+        "checkpoints": [
+          "after_observation",
+          "after_recorded"
+        ],
+        "broadcasts": 0,
+        "result": {
+          "observation": {
+            "blockHash": "0xc836582547ae705fb0482106de33b9bf07fd95c3d5f3f624dc0e847180da0a9a",
+            "blockNumber": 16,
+            "status": "Included",
+            "transactionHash": "0x9e7cad71069223d9bc339ce3461187332788b2cf1b95c67b4af01ff60eaa1894",
+            "transactionIndex": 0
+          },
+          "prepared": {
+            "intent": {
+              "action": "refund",
+              "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+              "agreementDigest": "0x11d5bedf8c235301609dcda252cb4e47e6efd1a88e8f8b923db241c3a15a8dc8",
+              "allocationId": "0x7316d050ce8a16fef7d6d021c25f0617513da04bbad758a2f9f7c8863b090096",
+              "callData": "0xe9acfa7c7316d050ce8a16fef7d6d021c25f0617513da04bbad758a2f9f7c8863b090096",
+              "domain": {
+                "chainId": "31337",
+                "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+                "genesisHash": "0xaf58ffaa910ae012477ba905a26205288bcc3bc1b6bd029706f4c1dea78078d5",
+                "runtimeKeccak256": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f"
+              },
+              "gasLimit": "1000000",
+              "maxFeePerGas": "2000000000",
+              "maxPriorityFeePerGas": "1000000000",
+              "operationId": "0xc49b1612b070b935768c0a9a61eb7e7c4d2ed2f012a02f96cb0b4533aba2bd2c",
+              "schema": "chio.experimental.rail-intent.v1"
+            },
+            "nonce": "1",
+            "rawTransaction": "0x02f891827a6901843b9aca008477359400830f424094e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab80a4e9acfa7c7316d050ce8a16fef7d6d021c25f0617513da04bbad758a2f9f7c8863b090096c080a02dc69a83e06d3a52280cf6ca0b361345ccc387ea8c8567b832bf89ad253d78aea01e57e02ed6a8de81e5e8f1eae4fc6b185c76bd0b0a8d3f8b7857b98a1cd4c049",
+            "transactionHash": "0x9e7cad71069223d9bc339ce3461187332788b2cf1b95c67b4af01ff60eaa1894"
+          },
+          "state": "Included",
+          "uncertainty": null
+        },
+        "failure": null,
+        "stderr": "",
+        "callbackFailure": null
+      },
+      "journal": {
+        "observation": {
+          "blockHash": "0xc836582547ae705fb0482106de33b9bf07fd95c3d5f3f624dc0e847180da0a9a",
+          "blockNumber": 16,
+          "status": "Included",
+          "transactionHash": "0x9e7cad71069223d9bc339ce3461187332788b2cf1b95c67b4af01ff60eaa1894",
+          "transactionIndex": 0
+        },
+        "prepared": {
+          "intent": {
+            "action": "refund",
+            "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+            "agreementDigest": "0x11d5bedf8c235301609dcda252cb4e47e6efd1a88e8f8b923db241c3a15a8dc8",
+            "allocationId": "0x7316d050ce8a16fef7d6d021c25f0617513da04bbad758a2f9f7c8863b090096",
+            "callData": "0xe9acfa7c7316d050ce8a16fef7d6d021c25f0617513da04bbad758a2f9f7c8863b090096",
+            "domain": {
+              "chainId": "31337",
+              "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+              "genesisHash": "0xaf58ffaa910ae012477ba905a26205288bcc3bc1b6bd029706f4c1dea78078d5",
+              "runtimeKeccak256": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f"
+            },
+            "gasLimit": "1000000",
+            "maxFeePerGas": "2000000000",
+            "maxPriorityFeePerGas": "1000000000",
+            "operationId": "0xc49b1612b070b935768c0a9a61eb7e7c4d2ed2f012a02f96cb0b4533aba2bd2c",
+            "schema": "chio.experimental.rail-intent.v1"
+          },
+          "nonce": "1",
+          "rawTransaction": "0x02f891827a6901843b9aca008477359400830f424094e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab80a4e9acfa7c7316d050ce8a16fef7d6d021c25f0617513da04bbad758a2f9f7c8863b090096c080a02dc69a83e06d3a52280cf6ca0b361345ccc387ea8c8567b832bf89ad253d78aea01e57e02ed6a8de81e5e8f1eae4fc6b185c76bd0b0a8d3f8b7857b98a1cd4c049",
+          "transactionHash": "0x9e7cad71069223d9bc339ce3461187332788b2cf1b95c67b4af01ff60eaa1894"
+        },
+        "state": "Included",
+        "uncertainty": null
+      },
+      "canonicalTransactionCount": 1,
+      "broadcasts": 1,
+      "scope": "Actual rail-worker SIGKILL, same signed transaction, one private Ganache chain; no native execution or public finality."
+    },
+    {
+      "label": "earned_payment_after_deadlines",
+      "schema": "chio.experimental.rail-recovery-run.v1",
+      "killPoint": "after_broadcast",
+      "keylessWorker": true,
+      "operationId": "0x7c4e8c0094da5bb2de0293c1f721eebc292c87ad8e751ff74f0ec1f4904b30f8",
+      "transactionHash": "0xd4ac4350f2c224764e4904139a1ecba6c7daa835656772b3e3b274c902aac88c",
+      "originalNonce": "1",
+      "killed": {
+        "code": null,
+        "signal": "SIGKILL",
+        "pid": 1095960,
+        "killedAt": "after_broadcast",
+        "checkpoints": [
+          "before_broadcast",
+          "after_broadcast"
+        ],
+        "broadcasts": 1,
+        "result": null,
+        "failure": null,
+        "stderr": "",
+        "callbackFailure": null
+      },
+      "afterLoss": {
+        "observation": null,
+        "prepared": {
+          "intent": {
+            "action": "pay",
+            "actor": "0xd03ea8624c8c5987235048901fb614fdca89b117",
+            "agreementDigest": "0x19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+            "allocationId": "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+            "callData": "0x3d935eaa4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+            "domain": {
+              "chainId": "31337",
+              "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+              "genesisHash": "0xaf58ffaa910ae012477ba905a26205288bcc3bc1b6bd029706f4c1dea78078d5",
+              "runtimeKeccak256": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f"
+            },
+            "gasLimit": "1000000",
+            "maxFeePerGas": "2000000000",
+            "maxPriorityFeePerGas": "1000000000",
+            "operationId": "0x7c4e8c0094da5bb2de0293c1f721eebc292c87ad8e751ff74f0ec1f4904b30f8",
+            "schema": "chio.experimental.rail-intent.v1"
+          },
+          "nonce": "1",
+          "rawTransaction": "0x02f891827a6901843b9aca008477359400830f424094e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab80a43d935eaa4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436c001a0ff89c9be355de7a8b88d4fb77cd2a26cbff2bf8d21a63f2e90a1db315e626d72a03a3069e3086fa8092c7fe0d633a54836fd7da5b67224dcba41d0fb494ca14bd7",
+          "transactionHash": "0xd4ac4350f2c224764e4904139a1ecba6c7daa835656772b3e3b274c902aac88c"
+        },
+        "state": "Unknown",
+        "uncertainty": null
+      },
+      "restarted": {
+        "code": 0,
+        "signal": null,
+        "pid": 1095970,
+        "killedAt": null,
+        "checkpoints": [
+          "after_observation",
+          "after_recorded"
+        ],
+        "broadcasts": 0,
+        "result": {
+          "observation": {
+            "blockHash": "0x7aa6de015ab30e80d504b2b6b88ee88c0258b800bd99206b58df76ad343c51bf",
+            "blockNumber": 18,
+            "status": "Included",
+            "transactionHash": "0xd4ac4350f2c224764e4904139a1ecba6c7daa835656772b3e3b274c902aac88c",
+            "transactionIndex": 0
+          },
+          "prepared": {
+            "intent": {
+              "action": "pay",
+              "actor": "0xd03ea8624c8c5987235048901fb614fdca89b117",
+              "agreementDigest": "0x19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+              "allocationId": "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+              "callData": "0x3d935eaa4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+              "domain": {
+                "chainId": "31337",
+                "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+                "genesisHash": "0xaf58ffaa910ae012477ba905a26205288bcc3bc1b6bd029706f4c1dea78078d5",
+                "runtimeKeccak256": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f"
+              },
+              "gasLimit": "1000000",
+              "maxFeePerGas": "2000000000",
+              "maxPriorityFeePerGas": "1000000000",
+              "operationId": "0x7c4e8c0094da5bb2de0293c1f721eebc292c87ad8e751ff74f0ec1f4904b30f8",
+              "schema": "chio.experimental.rail-intent.v1"
+            },
+            "nonce": "1",
+            "rawTransaction": "0x02f891827a6901843b9aca008477359400830f424094e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab80a43d935eaa4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436c001a0ff89c9be355de7a8b88d4fb77cd2a26cbff2bf8d21a63f2e90a1db315e626d72a03a3069e3086fa8092c7fe0d633a54836fd7da5b67224dcba41d0fb494ca14bd7",
+            "transactionHash": "0xd4ac4350f2c224764e4904139a1ecba6c7daa835656772b3e3b274c902aac88c"
+          },
+          "state": "Included",
+          "uncertainty": null
+        },
+        "failure": null,
+        "stderr": "",
+        "callbackFailure": null
+      },
+      "retried": {
+        "code": 0,
+        "signal": null,
+        "pid": 1095998,
+        "killedAt": null,
+        "checkpoints": [
+          "after_observation",
+          "after_recorded"
+        ],
+        "broadcasts": 0,
+        "result": {
+          "observation": {
+            "blockHash": "0x7aa6de015ab30e80d504b2b6b88ee88c0258b800bd99206b58df76ad343c51bf",
+            "blockNumber": 18,
+            "status": "Included",
+            "transactionHash": "0xd4ac4350f2c224764e4904139a1ecba6c7daa835656772b3e3b274c902aac88c",
+            "transactionIndex": 0
+          },
+          "prepared": {
+            "intent": {
+              "action": "pay",
+              "actor": "0xd03ea8624c8c5987235048901fb614fdca89b117",
+              "agreementDigest": "0x19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+              "allocationId": "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+              "callData": "0x3d935eaa4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+              "domain": {
+                "chainId": "31337",
+                "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+                "genesisHash": "0xaf58ffaa910ae012477ba905a26205288bcc3bc1b6bd029706f4c1dea78078d5",
+                "runtimeKeccak256": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f"
+              },
+              "gasLimit": "1000000",
+              "maxFeePerGas": "2000000000",
+              "maxPriorityFeePerGas": "1000000000",
+              "operationId": "0x7c4e8c0094da5bb2de0293c1f721eebc292c87ad8e751ff74f0ec1f4904b30f8",
+              "schema": "chio.experimental.rail-intent.v1"
+            },
+            "nonce": "1",
+            "rawTransaction": "0x02f891827a6901843b9aca008477359400830f424094e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab80a43d935eaa4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436c001a0ff89c9be355de7a8b88d4fb77cd2a26cbff2bf8d21a63f2e90a1db315e626d72a03a3069e3086fa8092c7fe0d633a54836fd7da5b67224dcba41d0fb494ca14bd7",
+            "transactionHash": "0xd4ac4350f2c224764e4904139a1ecba6c7daa835656772b3e3b274c902aac88c"
+          },
+          "state": "Included",
+          "uncertainty": null
+        },
+        "failure": null,
+        "stderr": "",
+        "callbackFailure": null
+      },
+      "journal": {
+        "observation": {
+          "blockHash": "0x7aa6de015ab30e80d504b2b6b88ee88c0258b800bd99206b58df76ad343c51bf",
+          "blockNumber": 18,
+          "status": "Included",
+          "transactionHash": "0xd4ac4350f2c224764e4904139a1ecba6c7daa835656772b3e3b274c902aac88c",
+          "transactionIndex": 0
+        },
+        "prepared": {
+          "intent": {
+            "action": "pay",
+            "actor": "0xd03ea8624c8c5987235048901fb614fdca89b117",
+            "agreementDigest": "0x19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+            "allocationId": "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+            "callData": "0x3d935eaa4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+            "domain": {
+              "chainId": "31337",
+              "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+              "genesisHash": "0xaf58ffaa910ae012477ba905a26205288bcc3bc1b6bd029706f4c1dea78078d5",
+              "runtimeKeccak256": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f"
+            },
+            "gasLimit": "1000000",
+            "maxFeePerGas": "2000000000",
+            "maxPriorityFeePerGas": "1000000000",
+            "operationId": "0x7c4e8c0094da5bb2de0293c1f721eebc292c87ad8e751ff74f0ec1f4904b30f8",
+            "schema": "chio.experimental.rail-intent.v1"
+          },
+          "nonce": "1",
+          "rawTransaction": "0x02f891827a6901843b9aca008477359400830f424094e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab80a43d935eaa4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436c001a0ff89c9be355de7a8b88d4fb77cd2a26cbff2bf8d21a63f2e90a1db315e626d72a03a3069e3086fa8092c7fe0d633a54836fd7da5b67224dcba41d0fb494ca14bd7",
+          "transactionHash": "0xd4ac4350f2c224764e4904139a1ecba6c7daa835656772b3e3b274c902aac88c"
+        },
+        "state": "Included",
+        "uncertainty": null
+      },
+      "canonicalTransactionCount": 1,
+      "broadcasts": 1,
+      "scope": "Actual rail-worker SIGKILL, same signed transaction, one private Ganache chain; no native execution or public finality."
+    }
+  ],
+  "accounting": {
+    "escrowFunded": "160",
+    "paid": "60",
+    "refunded": "100",
+    "remaining": "0"
+  },
+  "escrowEvents": [
+    {
+      "_type": "log",
+      "address": "0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab",
+      "blockHash": "0x62dfa7660a1c64d895befe1abfae2a4f49d28bddca0bc6f530d0d719bc64bfdc",
+      "blockNumber": 3,
+      "data": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "index": 0,
+      "removed": false,
+      "topics": [
+        "0x9a8e30a8658b96ab3f034ce4bac6806278b4aee5880ccdd1ac35e4ed5bb31d23",
+        "0x0000000000000000000000005b1869d9a4c187f2eaa108f3062412ecf0526b24"
+      ],
+      "transactionHash": "0x4cfaa0ca0e4ece8e0361917ea35777b6524760ef6a044f659bd95b8d7970ff85",
+      "transactionIndex": 0
+    },
+    {
+      "_type": "log",
+      "address": "0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab",
+      "blockHash": "0x5fc237ad081c6c463f358ab6c0efdb04241b5ff6b03856024ef7ee17fd6343da",
+      "blockNumber": 4,
+      "data": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "index": 0,
+      "removed": false,
+      "topics": [
+        "0xd24d764ab9323f85d48f83536786e48e5233c7ef5f4db6a2321e5a126d9239ba",
+        "0x000000000000000000000000e11ba2b4d45eaed5996cd0823791e0c93114882d"
+      ],
+      "transactionHash": "0x41721ca4b762544f2d07ce30743de02999269d5b330bcf8f8fbefe57037fcebb",
+      "transactionIndex": 0
+    },
+    {
+      "_type": "log",
+      "address": "0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab",
+      "blockHash": "0x244b9e825cb00f795e2d5a9c14a0b13440b8a929747f1f04a16e46438e647b75",
+      "blockNumber": 9,
+      "data": "0x",
+      "index": 1,
+      "removed": false,
+      "topics": [
+        "0xd29f6517bae43da99a759bba98e84bc12a19806dbe6f7fa1970749b7685d6755",
+        "0x7316d050ce8a16fef7d6d021c25f0617513da04bbad758a2f9f7c8863b090096",
+        "0x11d5bedf8c235301609dcda252cb4e47e6efd1a88e8f8b923db241c3a15a8dc8",
+        "0x000000000000000000000000ffcf8fdee72ac11b5c542428b35eef5769c409f0"
+      ],
+      "transactionHash": "0x32f291e1095dbcb1a8c81b0ef2328b341fa41567cf8cada1ad14ee292fb00e55",
+      "transactionIndex": 0
+    },
+    {
+      "_type": "log",
+      "address": "0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab",
+      "blockHash": "0x5665e5c1ef05361b9f25b2a8d3682c73f5110b9e563cf4a3588dd471d8155d66",
+      "blockNumber": 10,
+      "data": "0x",
+      "index": 1,
+      "removed": false,
+      "topics": [
+        "0xd29f6517bae43da99a759bba98e84bc12a19806dbe6f7fa1970749b7685d6755",
+        "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+        "0x19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+        "0x00000000000000000000000022d491bde2303f2f43325b2108d26f1eaba1e32b"
+      ],
+      "transactionHash": "0x1e052f271a8335b30f38c168d9f444439773c526caebe1b2fb941d99ed32fa3d",
+      "transactionIndex": 0
+    },
+    {
+      "_type": "log",
+      "address": "0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab",
+      "blockHash": "0x90112eb34f7de7eb5c2f08133d348c959453cabbe078bd62e08c22d89a8252da",
+      "blockNumber": 12,
+      "data": "0x84f9677cd9a205a11c6266f7370939816e7200204ed7ea63e37c65e5a97ac2ca",
+      "index": 0,
+      "removed": false,
+      "topics": [
+        "0x4655773214d69732a8c6708c632565c6e71fc8ec47f1425534c2eda8e689f303",
+        "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436"
+      ],
+      "transactionHash": "0xee23a15c77e8a2d4594dc94a85f96fc60dc5ad68cfc3fd8768bb3a9359a46ad2",
+      "transactionIndex": 0
+    },
+    {
+      "_type": "log",
+      "address": "0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab",
+      "blockHash": "0x7628ae8d1d6970922924bfafd4345d5daf3f9fcecdba4013bbc584c5bb8e6121",
+      "blockNumber": 14,
+      "data": "0xb5de60b4ff5b97597a7f58654011171c0b12ae9a713cd69e42d5357733e48e630000000000000000000000000000000000000000000000000000000000000001",
+      "index": 0,
+      "removed": false,
+      "topics": [
+        "0x146dddf6d910378af13362f0896c0fd3878718429b98a5d40c3baea05e703c7a",
+        "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436"
+      ],
+      "transactionHash": "0xf0fac9e6c64997b5d4a80628780db33a76c518f0255483f05ac267db1a6d5071",
+      "transactionIndex": 0
+    },
+    {
+      "_type": "log",
+      "address": "0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab",
+      "blockHash": "0xc836582547ae705fb0482106de33b9bf07fd95c3d5f3f624dc0e847180da0a9a",
+      "blockNumber": 16,
+      "data": "0x",
+      "index": 0,
+      "removed": false,
+      "topics": [
+        "0x49aeaa48f2cccf7596e2541f2abcdfa8c4aaa4f12da088ee9d0bd6c14adfedb2",
+        "0x7316d050ce8a16fef7d6d021c25f0617513da04bbad758a2f9f7c8863b090096"
+      ],
+      "transactionHash": "0x9e7cad71069223d9bc339ce3461187332788b2cf1b95c67b4af01ff60eaa1894",
+      "transactionIndex": 0
+    },
+    {
+      "_type": "log",
+      "address": "0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab",
+      "blockHash": "0xc836582547ae705fb0482106de33b9bf07fd95c3d5f3f624dc0e847180da0a9a",
+      "blockNumber": 16,
+      "data": "0x0000000000000000000000000000000000000000000000000000000000000064",
+      "index": 2,
+      "removed": false,
+      "topics": [
+        "0xf552ca82e113ac3c539c3d617f29fcd19c172a0c75dad017555c9e109f7fe183",
+        "0x7316d050ce8a16fef7d6d021c25f0617513da04bbad758a2f9f7c8863b090096",
+        "0x000000000000000000000000ffcf8fdee72ac11b5c542428b35eef5769c409f0"
+      ],
+      "transactionHash": "0x9e7cad71069223d9bc339ce3461187332788b2cf1b95c67b4af01ff60eaa1894",
+      "transactionIndex": 0
+    },
+    {
+      "_type": "log",
+      "address": "0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab",
+      "blockHash": "0x7aa6de015ab30e80d504b2b6b88ee88c0258b800bd99206b58df76ad343c51bf",
+      "blockNumber": 18,
+      "data": "0x000000000000000000000000000000000000000000000000000000000000003c",
+      "index": 1,
+      "removed": false,
+      "topics": [
+        "0x606160394df2742a67735645b7e783304d61d2dbc5b550e8c6acfaf27b6291d7",
+        "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+        "0x000000000000000000000000d03ea8624c8c5987235048901fb614fdca89b117"
+      ],
+      "transactionHash": "0xd4ac4350f2c224764e4904139a1ecba6c7daa835656772b3e3b274c902aac88c",
+      "transactionIndex": 0
+    }
+  ],
+  "tokenEvents": [
+    {
+      "_type": "log",
+      "address": "0x5b1869D9A4C187F2EAa108f3062412ecf0526b24",
+      "blockHash": "0x5b1602b1712d6c7cc1a8866d7d084dd7e9317226e49b6d3887b534be90b9098e",
+      "blockNumber": 5,
+      "data": "0x00000000000000000000000000000000000000000000000000000000000003e8",
+      "index": 0,
+      "removed": false,
+      "topics": [
+        "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+        "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "0x000000000000000000000000ffcf8fdee72ac11b5c542428b35eef5769c409f0"
+      ],
+      "transactionHash": "0xfeb6e33c851a30102a6b8a924352481081b976c675516c1d90e2393bd23256da",
+      "transactionIndex": 0
+    },
+    {
+      "_type": "log",
+      "address": "0x5b1869D9A4C187F2EAa108f3062412ecf0526b24",
+      "blockHash": "0xa49e8017754354b75804d1c07a6227c5c1eb478e31d6525a4d4a8c84c01cf55f",
+      "blockNumber": 6,
+      "data": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "index": 0,
+      "removed": false,
+      "topics": [
+        "0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925",
+        "0x000000000000000000000000ffcf8fdee72ac11b5c542428b35eef5769c409f0",
+        "0x000000000000000000000000e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab"
+      ],
+      "transactionHash": "0x79c6a3c7ed9d0944072d11dfe95d07a8e07be2dd928cc469e4677e966ed7ce3a",
+      "transactionIndex": 0
+    },
+    {
+      "_type": "log",
+      "address": "0x5b1869D9A4C187F2EAa108f3062412ecf0526b24",
+      "blockHash": "0x71921e3c8e1993599a38d78c8b40192509fca591c1c4aeb595b4837007c83737",
+      "blockNumber": 7,
+      "data": "0x00000000000000000000000000000000000000000000000000000000000003e8",
+      "index": 0,
+      "removed": false,
+      "topics": [
+        "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+        "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "0x00000000000000000000000022d491bde2303f2f43325b2108d26f1eaba1e32b"
+      ],
+      "transactionHash": "0xb61a8d21e82a14e672e219035770462003b96961bd6cf146ce8c3195133c54ff",
+      "transactionIndex": 0
+    },
+    {
+      "_type": "log",
+      "address": "0x5b1869D9A4C187F2EAa108f3062412ecf0526b24",
+      "blockHash": "0xa3250a27e953984cd59304df438d5605b82d036ba1940be1656a7ba25f231d27",
+      "blockNumber": 8,
+      "data": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "index": 0,
+      "removed": false,
+      "topics": [
+        "0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925",
+        "0x00000000000000000000000022d491bde2303f2f43325b2108d26f1eaba1e32b",
+        "0x000000000000000000000000e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab"
+      ],
+      "transactionHash": "0xc610aedf32c90269694700fb3a99d9a43bd2dee388854058bab4872642ae52d7",
+      "transactionIndex": 0
+    },
+    {
+      "_type": "log",
+      "address": "0x5b1869D9A4C187F2EAa108f3062412ecf0526b24",
+      "blockHash": "0x244b9e825cb00f795e2d5a9c14a0b13440b8a929747f1f04a16e46438e647b75",
+      "blockNumber": 9,
+      "data": "0x0000000000000000000000000000000000000000000000000000000000000064",
+      "index": 0,
+      "removed": false,
+      "topics": [
+        "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+        "0x000000000000000000000000ffcf8fdee72ac11b5c542428b35eef5769c409f0",
+        "0x000000000000000000000000e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab"
+      ],
+      "transactionHash": "0x32f291e1095dbcb1a8c81b0ef2328b341fa41567cf8cada1ad14ee292fb00e55",
+      "transactionIndex": 0
+    },
+    {
+      "_type": "log",
+      "address": "0x5b1869D9A4C187F2EAa108f3062412ecf0526b24",
+      "blockHash": "0x5665e5c1ef05361b9f25b2a8d3682c73f5110b9e563cf4a3588dd471d8155d66",
+      "blockNumber": 10,
+      "data": "0x000000000000000000000000000000000000000000000000000000000000003c",
+      "index": 0,
+      "removed": false,
+      "topics": [
+        "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+        "0x00000000000000000000000022d491bde2303f2f43325b2108d26f1eaba1e32b",
+        "0x000000000000000000000000e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab"
+      ],
+      "transactionHash": "0x1e052f271a8335b30f38c168d9f444439773c526caebe1b2fb941d99ed32fa3d",
+      "transactionIndex": 0
+    },
+    {
+      "_type": "log",
+      "address": "0x5b1869D9A4C187F2EAa108f3062412ecf0526b24",
+      "blockHash": "0xc836582547ae705fb0482106de33b9bf07fd95c3d5f3f624dc0e847180da0a9a",
+      "blockNumber": 16,
+      "data": "0x0000000000000000000000000000000000000000000000000000000000000064",
+      "index": 1,
+      "removed": false,
+      "topics": [
+        "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+        "0x000000000000000000000000e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+        "0x000000000000000000000000ffcf8fdee72ac11b5c542428b35eef5769c409f0"
+      ],
+      "transactionHash": "0x9e7cad71069223d9bc339ce3461187332788b2cf1b95c67b4af01ff60eaa1894",
+      "transactionIndex": 0
+    },
+    {
+      "_type": "log",
+      "address": "0x5b1869D9A4C187F2EAa108f3062412ecf0526b24",
+      "blockHash": "0x7aa6de015ab30e80d504b2b6b88ee88c0258b800bd99206b58df76ad343c51bf",
+      "blockNumber": 18,
+      "data": "0x000000000000000000000000000000000000000000000000000000000000003c",
+      "index": 0,
+      "removed": false,
+      "topics": [
+        "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+        "0x000000000000000000000000e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+        "0x000000000000000000000000d03ea8624c8c5987235048901fb614fdca89b117"
+      ],
+      "transactionHash": "0xd4ac4350f2c224764e4904139a1ecba6c7daa835656772b3e3b274c902aac88c",
+      "transactionIndex": 0
+    }
+  ],
+  "limitations": [
+    "No native funding admission, Finding assurance or crash recovery.",
+    "Private-chain observations are not a public-chain finality proof.",
+    "All keys and custody share one administrative host; no remote or independent custody claim.",
+    "No challenge court, fee/bond backing, sustained retention or deployed API security claim.",
+    "The child case leaves the parent unsubmitted; it does not kill a native parent process.",
+    "Gas and checker time are functional costs, not evidence of economic advantage."
+  ],
+  "lifecycle": {
+    "schema": "chio.experimental.rail-lifecycle-run.v1",
+    "killPoint": "after_broadcast",
+    "reobservations": [
+      {
+        "afterOperation": "0xa21ff04a6e4f458487fd4c7b21199e8cd3c62ed66701b1bc8810690441401659",
+        "operationId": "0xa21ff04a6e4f458487fd4c7b21199e8cd3c62ed66701b1bc8810690441401659",
+        "worker": {
+          "code": 0,
+          "signal": null,
+          "pid": 1095741,
+          "killedAt": null,
+          "checkpoints": [
+            "after_observation",
+            "after_recorded"
+          ],
+          "broadcasts": 0,
+          "result": {
+            "observation": {
+              "blockHash": "0x90112eb34f7de7eb5c2f08133d348c959453cabbe078bd62e08c22d89a8252da",
+              "blockNumber": 12,
+              "status": "Included",
+              "transactionHash": "0xee23a15c77e8a2d4594dc94a85f96fc60dc5ad68cfc3fd8768bb3a9359a46ad2",
+              "transactionIndex": 0
+            },
+            "prepared": {
+              "intent": {
+                "action": "submit",
+                "actor": "0xd03ea8624c8c5987235048901fb614fdca89b117",
+                "agreementDigest": "0x19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+                "allocationId": "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+                "callData": "0x54d410ce4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae43684f9677cd9a205a11c6266f7370939816e7200204ed7ea63e37c65e5a97ac2ca",
+                "domain": {
+                  "chainId": "31337",
+                  "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+                  "genesisHash": "0xaf58ffaa910ae012477ba905a26205288bcc3bc1b6bd029706f4c1dea78078d5",
+                  "runtimeKeccak256": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f"
+                },
+                "gasLimit": "1000000",
+                "maxFeePerGas": "2000000000",
+                "maxPriorityFeePerGas": "1000000000",
+                "operationId": "0xa21ff04a6e4f458487fd4c7b21199e8cd3c62ed66701b1bc8810690441401659",
+                "schema": "chio.experimental.rail-intent.v1"
+              },
+              "nonce": "0",
+              "rawTransaction": "0x02f8b2827a6980843b9aca008477359400830f424094e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab80b84454d410ce4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae43684f9677cd9a205a11c6266f7370939816e7200204ed7ea63e37c65e5a97ac2cac080a01e61ff3b5d500b52f65d9c9851cfa8ab6fae8547b717697e122a7f3b2d9edbfaa04217eac99e4a970d1a1ae0b124118a3eccef8348f91101305562221cb822b43b",
+              "transactionHash": "0xee23a15c77e8a2d4594dc94a85f96fc60dc5ad68cfc3fd8768bb3a9359a46ad2"
+            },
+            "state": "Included",
+            "uncertainty": null
+          },
+          "failure": null,
+          "stderr": "",
+          "callbackFailure": null
+        }
+      },
+      {
+        "afterOperation": "0x51f4a367ffac13b3575fbae63af4a476cd67601d1c2593bb3e9c2d2281cd11ee",
+        "operationId": "0xa21ff04a6e4f458487fd4c7b21199e8cd3c62ed66701b1bc8810690441401659",
+        "worker": {
+          "code": 0,
+          "signal": null,
+          "pid": 1095827,
+          "killedAt": null,
+          "checkpoints": [
+            "after_observation",
+            "after_recorded"
+          ],
+          "broadcasts": 0,
+          "result": {
+            "observation": {
+              "blockHash": "0x90112eb34f7de7eb5c2f08133d348c959453cabbe078bd62e08c22d89a8252da",
+              "blockNumber": 12,
+              "status": "Included",
+              "transactionHash": "0xee23a15c77e8a2d4594dc94a85f96fc60dc5ad68cfc3fd8768bb3a9359a46ad2",
+              "transactionIndex": 0
+            },
+            "prepared": {
+              "intent": {
+                "action": "submit",
+                "actor": "0xd03ea8624c8c5987235048901fb614fdca89b117",
+                "agreementDigest": "0x19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+                "allocationId": "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+                "callData": "0x54d410ce4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae43684f9677cd9a205a11c6266f7370939816e7200204ed7ea63e37c65e5a97ac2ca",
+                "domain": {
+                  "chainId": "31337",
+                  "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+                  "genesisHash": "0xaf58ffaa910ae012477ba905a26205288bcc3bc1b6bd029706f4c1dea78078d5",
+                  "runtimeKeccak256": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f"
+                },
+                "gasLimit": "1000000",
+                "maxFeePerGas": "2000000000",
+                "maxPriorityFeePerGas": "1000000000",
+                "operationId": "0xa21ff04a6e4f458487fd4c7b21199e8cd3c62ed66701b1bc8810690441401659",
+                "schema": "chio.experimental.rail-intent.v1"
+              },
+              "nonce": "0",
+              "rawTransaction": "0x02f8b2827a6980843b9aca008477359400830f424094e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab80b84454d410ce4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae43684f9677cd9a205a11c6266f7370939816e7200204ed7ea63e37c65e5a97ac2cac080a01e61ff3b5d500b52f65d9c9851cfa8ab6fae8547b717697e122a7f3b2d9edbfaa04217eac99e4a970d1a1ae0b124118a3eccef8348f91101305562221cb822b43b",
+              "transactionHash": "0xee23a15c77e8a2d4594dc94a85f96fc60dc5ad68cfc3fd8768bb3a9359a46ad2"
+            },
+            "state": "Included",
+            "uncertainty": null
+          },
+          "failure": null,
+          "stderr": "",
+          "callbackFailure": null
+        }
+      },
+      {
+        "afterOperation": "0x51f4a367ffac13b3575fbae63af4a476cd67601d1c2593bb3e9c2d2281cd11ee",
+        "operationId": "0x51f4a367ffac13b3575fbae63af4a476cd67601d1c2593bb3e9c2d2281cd11ee",
+        "worker": {
+          "code": 0,
+          "signal": null,
+          "pid": 1095856,
+          "killedAt": null,
+          "checkpoints": [
+            "after_observation",
+            "after_recorded"
+          ],
+          "broadcasts": 0,
+          "result": {
+            "observation": {
+              "blockHash": "0x7628ae8d1d6970922924bfafd4345d5daf3f9fcecdba4013bbc584c5bb8e6121",
+              "blockNumber": 14,
+              "status": "Included",
+              "transactionHash": "0xf0fac9e6c64997b5d4a80628780db33a76c518f0255483f05ac267db1a6d5071",
+              "transactionIndex": 0
+            },
+            "prepared": {
+              "intent": {
+                "action": "decision",
+                "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+                "agreementDigest": "0x19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+                "allocationId": "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+                "callData": "0xaab4bcb44eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436b5de60b4ff5b97597a7f58654011171c0b12ae9a713cd69e42d5357733e48e630000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000415e4d6b8b96bae8d7bbc60156ff65f0d6c42187cd87c49f775b19979e5e9624b9072dbdcc105e55e13a88bea1e06b938fd38ffeb688909a6435eb41da113c1db41b00000000000000000000000000000000000000000000000000000000000000",
+                "domain": {
+                  "chainId": "31337",
+                  "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+                  "genesisHash": "0xaf58ffaa910ae012477ba905a26205288bcc3bc1b6bd029706f4c1dea78078d5",
+                  "runtimeKeccak256": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f"
+                },
+                "gasLimit": "1000000",
+                "maxFeePerGas": "2000000000",
+                "maxPriorityFeePerGas": "1000000000",
+                "operationId": "0x51f4a367ffac13b3575fbae63af4a476cd67601d1c2593bb3e9c2d2281cd11ee",
+                "schema": "chio.experimental.rail-intent.v1"
+              },
+              "nonce": "0",
+              "rawTransaction": "0x02f90173827a6980843b9aca008477359400830f424094e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab80b90104aab4bcb44eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436b5de60b4ff5b97597a7f58654011171c0b12ae9a713cd69e42d5357733e48e630000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000415e4d6b8b96bae8d7bbc60156ff65f0d6c42187cd87c49f775b19979e5e9624b9072dbdcc105e55e13a88bea1e06b938fd38ffeb688909a6435eb41da113c1db41b00000000000000000000000000000000000000000000000000000000000000c080a009b94196ee3c2e8e80e1c2474f063355715679b7a31416bf1b268eeec9f6749aa01048adf4e0ab5c7a0b92e601dc34ece40fb0503bd641ee71eae143a226db07bd",
+              "transactionHash": "0xf0fac9e6c64997b5d4a80628780db33a76c518f0255483f05ac267db1a6d5071"
+            },
+            "state": "Included",
+            "uncertainty": null
+          },
+          "failure": null,
+          "stderr": "",
+          "callbackFailure": null
+        }
+      },
+      {
+        "afterOperation": "0xc49b1612b070b935768c0a9a61eb7e7c4d2ed2f012a02f96cb0b4533aba2bd2c",
+        "operationId": "0xa21ff04a6e4f458487fd4c7b21199e8cd3c62ed66701b1bc8810690441401659",
+        "worker": {
+          "code": 0,
+          "signal": null,
+          "pid": 1095925,
+          "killedAt": null,
+          "checkpoints": [
+            "after_observation",
+            "after_recorded"
+          ],
+          "broadcasts": 0,
+          "result": {
+            "observation": {
+              "blockHash": "0x90112eb34f7de7eb5c2f08133d348c959453cabbe078bd62e08c22d89a8252da",
+              "blockNumber": 12,
+              "status": "Included",
+              "transactionHash": "0xee23a15c77e8a2d4594dc94a85f96fc60dc5ad68cfc3fd8768bb3a9359a46ad2",
+              "transactionIndex": 0
+            },
+            "prepared": {
+              "intent": {
+                "action": "submit",
+                "actor": "0xd03ea8624c8c5987235048901fb614fdca89b117",
+                "agreementDigest": "0x19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+                "allocationId": "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+                "callData": "0x54d410ce4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae43684f9677cd9a205a11c6266f7370939816e7200204ed7ea63e37c65e5a97ac2ca",
+                "domain": {
+                  "chainId": "31337",
+                  "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+                  "genesisHash": "0xaf58ffaa910ae012477ba905a26205288bcc3bc1b6bd029706f4c1dea78078d5",
+                  "runtimeKeccak256": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f"
+                },
+                "gasLimit": "1000000",
+                "maxFeePerGas": "2000000000",
+                "maxPriorityFeePerGas": "1000000000",
+                "operationId": "0xa21ff04a6e4f458487fd4c7b21199e8cd3c62ed66701b1bc8810690441401659",
+                "schema": "chio.experimental.rail-intent.v1"
+              },
+              "nonce": "0",
+              "rawTransaction": "0x02f8b2827a6980843b9aca008477359400830f424094e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab80b84454d410ce4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae43684f9677cd9a205a11c6266f7370939816e7200204ed7ea63e37c65e5a97ac2cac080a01e61ff3b5d500b52f65d9c9851cfa8ab6fae8547b717697e122a7f3b2d9edbfaa04217eac99e4a970d1a1ae0b124118a3eccef8348f91101305562221cb822b43b",
+              "transactionHash": "0xee23a15c77e8a2d4594dc94a85f96fc60dc5ad68cfc3fd8768bb3a9359a46ad2"
+            },
+            "state": "Included",
+            "uncertainty": null
+          },
+          "failure": null,
+          "stderr": "",
+          "callbackFailure": null
+        }
+      },
+      {
+        "afterOperation": "0xc49b1612b070b935768c0a9a61eb7e7c4d2ed2f012a02f96cb0b4533aba2bd2c",
+        "operationId": "0x51f4a367ffac13b3575fbae63af4a476cd67601d1c2593bb3e9c2d2281cd11ee",
+        "worker": {
+          "code": 0,
+          "signal": null,
+          "pid": 1095935,
+          "killedAt": null,
+          "checkpoints": [
+            "after_observation",
+            "after_recorded"
+          ],
+          "broadcasts": 0,
+          "result": {
+            "observation": {
+              "blockHash": "0x7628ae8d1d6970922924bfafd4345d5daf3f9fcecdba4013bbc584c5bb8e6121",
+              "blockNumber": 14,
+              "status": "Included",
+              "transactionHash": "0xf0fac9e6c64997b5d4a80628780db33a76c518f0255483f05ac267db1a6d5071",
+              "transactionIndex": 0
+            },
+            "prepared": {
+              "intent": {
+                "action": "decision",
+                "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+                "agreementDigest": "0x19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+                "allocationId": "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+                "callData": "0xaab4bcb44eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436b5de60b4ff5b97597a7f58654011171c0b12ae9a713cd69e42d5357733e48e630000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000415e4d6b8b96bae8d7bbc60156ff65f0d6c42187cd87c49f775b19979e5e9624b9072dbdcc105e55e13a88bea1e06b938fd38ffeb688909a6435eb41da113c1db41b00000000000000000000000000000000000000000000000000000000000000",
+                "domain": {
+                  "chainId": "31337",
+                  "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+                  "genesisHash": "0xaf58ffaa910ae012477ba905a26205288bcc3bc1b6bd029706f4c1dea78078d5",
+                  "runtimeKeccak256": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f"
+                },
+                "gasLimit": "1000000",
+                "maxFeePerGas": "2000000000",
+                "maxPriorityFeePerGas": "1000000000",
+                "operationId": "0x51f4a367ffac13b3575fbae63af4a476cd67601d1c2593bb3e9c2d2281cd11ee",
+                "schema": "chio.experimental.rail-intent.v1"
+              },
+              "nonce": "0",
+              "rawTransaction": "0x02f90173827a6980843b9aca008477359400830f424094e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab80b90104aab4bcb44eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436b5de60b4ff5b97597a7f58654011171c0b12ae9a713cd69e42d5357733e48e630000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000415e4d6b8b96bae8d7bbc60156ff65f0d6c42187cd87c49f775b19979e5e9624b9072dbdcc105e55e13a88bea1e06b938fd38ffeb688909a6435eb41da113c1db41b00000000000000000000000000000000000000000000000000000000000000c080a009b94196ee3c2e8e80e1c2474f063355715679b7a31416bf1b268eeec9f6749aa01048adf4e0ab5c7a0b92e601dc34ece40fb0503bd641ee71eae143a226db07bd",
+              "transactionHash": "0xf0fac9e6c64997b5d4a80628780db33a76c518f0255483f05ac267db1a6d5071"
+            },
+            "state": "Included",
+            "uncertainty": null
+          },
+          "failure": null,
+          "stderr": "",
+          "callbackFailure": null
+        }
+      },
+      {
+        "afterOperation": "0xc49b1612b070b935768c0a9a61eb7e7c4d2ed2f012a02f96cb0b4533aba2bd2c",
+        "operationId": "0xc49b1612b070b935768c0a9a61eb7e7c4d2ed2f012a02f96cb0b4533aba2bd2c",
+        "worker": {
+          "code": 0,
+          "signal": null,
+          "pid": 1095945,
+          "killedAt": null,
+          "checkpoints": [
+            "after_observation",
+            "after_recorded"
+          ],
+          "broadcasts": 0,
+          "result": {
+            "observation": {
+              "blockHash": "0xc836582547ae705fb0482106de33b9bf07fd95c3d5f3f624dc0e847180da0a9a",
+              "blockNumber": 16,
+              "status": "Included",
+              "transactionHash": "0x9e7cad71069223d9bc339ce3461187332788b2cf1b95c67b4af01ff60eaa1894",
+              "transactionIndex": 0
+            },
+            "prepared": {
+              "intent": {
+                "action": "refund",
+                "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+                "agreementDigest": "0x11d5bedf8c235301609dcda252cb4e47e6efd1a88e8f8b923db241c3a15a8dc8",
+                "allocationId": "0x7316d050ce8a16fef7d6d021c25f0617513da04bbad758a2f9f7c8863b090096",
+                "callData": "0xe9acfa7c7316d050ce8a16fef7d6d021c25f0617513da04bbad758a2f9f7c8863b090096",
+                "domain": {
+                  "chainId": "31337",
+                  "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+                  "genesisHash": "0xaf58ffaa910ae012477ba905a26205288bcc3bc1b6bd029706f4c1dea78078d5",
+                  "runtimeKeccak256": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f"
+                },
+                "gasLimit": "1000000",
+                "maxFeePerGas": "2000000000",
+                "maxPriorityFeePerGas": "1000000000",
+                "operationId": "0xc49b1612b070b935768c0a9a61eb7e7c4d2ed2f012a02f96cb0b4533aba2bd2c",
+                "schema": "chio.experimental.rail-intent.v1"
+              },
+              "nonce": "1",
+              "rawTransaction": "0x02f891827a6901843b9aca008477359400830f424094e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab80a4e9acfa7c7316d050ce8a16fef7d6d021c25f0617513da04bbad758a2f9f7c8863b090096c080a02dc69a83e06d3a52280cf6ca0b361345ccc387ea8c8567b832bf89ad253d78aea01e57e02ed6a8de81e5e8f1eae4fc6b185c76bd0b0a8d3f8b7857b98a1cd4c049",
+              "transactionHash": "0x9e7cad71069223d9bc339ce3461187332788b2cf1b95c67b4af01ff60eaa1894"
+            },
+            "state": "Included",
+            "uncertainty": null
+          },
+          "failure": null,
+          "stderr": "",
+          "callbackFailure": null
+        }
+      },
+      {
+        "afterOperation": "0x7c4e8c0094da5bb2de0293c1f721eebc292c87ad8e751ff74f0ec1f4904b30f8",
+        "operationId": "0xa21ff04a6e4f458487fd4c7b21199e8cd3c62ed66701b1bc8810690441401659",
+        "worker": {
+          "code": 0,
+          "signal": null,
+          "pid": 1096028,
+          "killedAt": null,
+          "checkpoints": [
+            "after_observation",
+            "after_recorded"
+          ],
+          "broadcasts": 0,
+          "result": {
+            "observation": {
+              "blockHash": "0x90112eb34f7de7eb5c2f08133d348c959453cabbe078bd62e08c22d89a8252da",
+              "blockNumber": 12,
+              "status": "Included",
+              "transactionHash": "0xee23a15c77e8a2d4594dc94a85f96fc60dc5ad68cfc3fd8768bb3a9359a46ad2",
+              "transactionIndex": 0
+            },
+            "prepared": {
+              "intent": {
+                "action": "submit",
+                "actor": "0xd03ea8624c8c5987235048901fb614fdca89b117",
+                "agreementDigest": "0x19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+                "allocationId": "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+                "callData": "0x54d410ce4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae43684f9677cd9a205a11c6266f7370939816e7200204ed7ea63e37c65e5a97ac2ca",
+                "domain": {
+                  "chainId": "31337",
+                  "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+                  "genesisHash": "0xaf58ffaa910ae012477ba905a26205288bcc3bc1b6bd029706f4c1dea78078d5",
+                  "runtimeKeccak256": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f"
+                },
+                "gasLimit": "1000000",
+                "maxFeePerGas": "2000000000",
+                "maxPriorityFeePerGas": "1000000000",
+                "operationId": "0xa21ff04a6e4f458487fd4c7b21199e8cd3c62ed66701b1bc8810690441401659",
+                "schema": "chio.experimental.rail-intent.v1"
+              },
+              "nonce": "0",
+              "rawTransaction": "0x02f8b2827a6980843b9aca008477359400830f424094e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab80b84454d410ce4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae43684f9677cd9a205a11c6266f7370939816e7200204ed7ea63e37c65e5a97ac2cac080a01e61ff3b5d500b52f65d9c9851cfa8ab6fae8547b717697e122a7f3b2d9edbfaa04217eac99e4a970d1a1ae0b124118a3eccef8348f91101305562221cb822b43b",
+              "transactionHash": "0xee23a15c77e8a2d4594dc94a85f96fc60dc5ad68cfc3fd8768bb3a9359a46ad2"
+            },
+            "state": "Included",
+            "uncertainty": null
+          },
+          "failure": null,
+          "stderr": "",
+          "callbackFailure": null
+        }
+      },
+      {
+        "afterOperation": "0x7c4e8c0094da5bb2de0293c1f721eebc292c87ad8e751ff74f0ec1f4904b30f8",
+        "operationId": "0x51f4a367ffac13b3575fbae63af4a476cd67601d1c2593bb3e9c2d2281cd11ee",
+        "worker": {
+          "code": 0,
+          "signal": null,
+          "pid": 1096038,
+          "killedAt": null,
+          "checkpoints": [
+            "after_observation",
+            "after_recorded"
+          ],
+          "broadcasts": 0,
+          "result": {
+            "observation": {
+              "blockHash": "0x7628ae8d1d6970922924bfafd4345d5daf3f9fcecdba4013bbc584c5bb8e6121",
+              "blockNumber": 14,
+              "status": "Included",
+              "transactionHash": "0xf0fac9e6c64997b5d4a80628780db33a76c518f0255483f05ac267db1a6d5071",
+              "transactionIndex": 0
+            },
+            "prepared": {
+              "intent": {
+                "action": "decision",
+                "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+                "agreementDigest": "0x19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+                "allocationId": "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+                "callData": "0xaab4bcb44eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436b5de60b4ff5b97597a7f58654011171c0b12ae9a713cd69e42d5357733e48e630000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000415e4d6b8b96bae8d7bbc60156ff65f0d6c42187cd87c49f775b19979e5e9624b9072dbdcc105e55e13a88bea1e06b938fd38ffeb688909a6435eb41da113c1db41b00000000000000000000000000000000000000000000000000000000000000",
+                "domain": {
+                  "chainId": "31337",
+                  "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+                  "genesisHash": "0xaf58ffaa910ae012477ba905a26205288bcc3bc1b6bd029706f4c1dea78078d5",
+                  "runtimeKeccak256": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f"
+                },
+                "gasLimit": "1000000",
+                "maxFeePerGas": "2000000000",
+                "maxPriorityFeePerGas": "1000000000",
+                "operationId": "0x51f4a367ffac13b3575fbae63af4a476cd67601d1c2593bb3e9c2d2281cd11ee",
+                "schema": "chio.experimental.rail-intent.v1"
+              },
+              "nonce": "0",
+              "rawTransaction": "0x02f90173827a6980843b9aca008477359400830f424094e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab80b90104aab4bcb44eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436b5de60b4ff5b97597a7f58654011171c0b12ae9a713cd69e42d5357733e48e630000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000415e4d6b8b96bae8d7bbc60156ff65f0d6c42187cd87c49f775b19979e5e9624b9072dbdcc105e55e13a88bea1e06b938fd38ffeb688909a6435eb41da113c1db41b00000000000000000000000000000000000000000000000000000000000000c080a009b94196ee3c2e8e80e1c2474f063355715679b7a31416bf1b268eeec9f6749aa01048adf4e0ab5c7a0b92e601dc34ece40fb0503bd641ee71eae143a226db07bd",
+              "transactionHash": "0xf0fac9e6c64997b5d4a80628780db33a76c518f0255483f05ac267db1a6d5071"
+            },
+            "state": "Included",
+            "uncertainty": null
+          },
+          "failure": null,
+          "stderr": "",
+          "callbackFailure": null
+        }
+      },
+      {
+        "afterOperation": "0x7c4e8c0094da5bb2de0293c1f721eebc292c87ad8e751ff74f0ec1f4904b30f8",
+        "operationId": "0xc49b1612b070b935768c0a9a61eb7e7c4d2ed2f012a02f96cb0b4533aba2bd2c",
+        "worker": {
+          "code": 0,
+          "signal": null,
+          "pid": 1096048,
+          "killedAt": null,
+          "checkpoints": [
+            "after_observation",
+            "after_recorded"
+          ],
+          "broadcasts": 0,
+          "result": {
+            "observation": {
+              "blockHash": "0xc836582547ae705fb0482106de33b9bf07fd95c3d5f3f624dc0e847180da0a9a",
+              "blockNumber": 16,
+              "status": "Included",
+              "transactionHash": "0x9e7cad71069223d9bc339ce3461187332788b2cf1b95c67b4af01ff60eaa1894",
+              "transactionIndex": 0
+            },
+            "prepared": {
+              "intent": {
+                "action": "refund",
+                "actor": "0x95ced938f7991cd0dfcb48f0a06a40fa1af46ebc",
+                "agreementDigest": "0x11d5bedf8c235301609dcda252cb4e47e6efd1a88e8f8b923db241c3a15a8dc8",
+                "allocationId": "0x7316d050ce8a16fef7d6d021c25f0617513da04bbad758a2f9f7c8863b090096",
+                "callData": "0xe9acfa7c7316d050ce8a16fef7d6d021c25f0617513da04bbad758a2f9f7c8863b090096",
+                "domain": {
+                  "chainId": "31337",
+                  "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+                  "genesisHash": "0xaf58ffaa910ae012477ba905a26205288bcc3bc1b6bd029706f4c1dea78078d5",
+                  "runtimeKeccak256": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f"
+                },
+                "gasLimit": "1000000",
+                "maxFeePerGas": "2000000000",
+                "maxPriorityFeePerGas": "1000000000",
+                "operationId": "0xc49b1612b070b935768c0a9a61eb7e7c4d2ed2f012a02f96cb0b4533aba2bd2c",
+                "schema": "chio.experimental.rail-intent.v1"
+              },
+              "nonce": "1",
+              "rawTransaction": "0x02f891827a6901843b9aca008477359400830f424094e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab80a4e9acfa7c7316d050ce8a16fef7d6d021c25f0617513da04bbad758a2f9f7c8863b090096c080a02dc69a83e06d3a52280cf6ca0b361345ccc387ea8c8567b832bf89ad253d78aea01e57e02ed6a8de81e5e8f1eae4fc6b185c76bd0b0a8d3f8b7857b98a1cd4c049",
+              "transactionHash": "0x9e7cad71069223d9bc339ce3461187332788b2cf1b95c67b4af01ff60eaa1894"
+            },
+            "state": "Included",
+            "uncertainty": null
+          },
+          "failure": null,
+          "stderr": "",
+          "callbackFailure": null
+        }
+      },
+      {
+        "afterOperation": "0x7c4e8c0094da5bb2de0293c1f721eebc292c87ad8e751ff74f0ec1f4904b30f8",
+        "operationId": "0x7c4e8c0094da5bb2de0293c1f721eebc292c87ad8e751ff74f0ec1f4904b30f8",
+        "worker": {
+          "code": 0,
+          "signal": null,
+          "pid": 1096058,
+          "killedAt": null,
+          "checkpoints": [
+            "after_observation",
+            "after_recorded"
+          ],
+          "broadcasts": 0,
+          "result": {
+            "observation": {
+              "blockHash": "0x7aa6de015ab30e80d504b2b6b88ee88c0258b800bd99206b58df76ad343c51bf",
+              "blockNumber": 18,
+              "status": "Included",
+              "transactionHash": "0xd4ac4350f2c224764e4904139a1ecba6c7daa835656772b3e3b274c902aac88c",
+              "transactionIndex": 0
+            },
+            "prepared": {
+              "intent": {
+                "action": "pay",
+                "actor": "0xd03ea8624c8c5987235048901fb614fdca89b117",
+                "agreementDigest": "0x19a9556753cbb7cf522aad2205fbc10592b24688adae1b742ffa2b26b899f2b9",
+                "allocationId": "0x4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+                "callData": "0x3d935eaa4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436",
+                "domain": {
+                  "chainId": "31337",
+                  "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+                  "genesisHash": "0xaf58ffaa910ae012477ba905a26205288bcc3bc1b6bd029706f4c1dea78078d5",
+                  "runtimeKeccak256": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f"
+                },
+                "gasLimit": "1000000",
+                "maxFeePerGas": "2000000000",
+                "maxPriorityFeePerGas": "1000000000",
+                "operationId": "0x7c4e8c0094da5bb2de0293c1f721eebc292c87ad8e751ff74f0ec1f4904b30f8",
+                "schema": "chio.experimental.rail-intent.v1"
+              },
+              "nonce": "1",
+              "rawTransaction": "0x02f891827a6901843b9aca008477359400830f424094e78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab80a43d935eaa4eb745a6f2072e04bd577c1ca4b16d5adf6003097063a0071a0e73edb2bae436c001a0ff89c9be355de7a8b88d4fb77cd2a26cbff2bf8d21a63f2e90a1db315e626d72a03a3069e3086fa8092c7fe0d633a54836fd7da5b67224dcba41d0fb494ca14bd7",
+              "transactionHash": "0xd4ac4350f2c224764e4904139a1ecba6c7daa835656772b3e3b274c902aac88c"
+            },
+            "state": "Included",
+            "uncertainty": null
+          },
+          "failure": null,
+          "stderr": "",
+          "callbackFailure": null
+        }
+      }
+    ],
+    "scope": "All post-funding W0 actions use durable worker recovery. Funding, orchestration-parent loss and native admission are outside this experiment."
+  }
+}

@@ -135,7 +135,7 @@ impl Algorithm {
 }
 
 impl AlgorithmId {
-    fn evp_cipher(&self) -> ConstPointer<'_, EVP_CIPHER> {
+    fn evp_cipher(&self) -> Result<ConstPointer<'_, EVP_CIPHER>, Unspecified> {
         unsafe {
             ConstPointer::new_static(match self {
                 AlgorithmId::Aes128 => EVP_aes_128_cbc(),
@@ -143,7 +143,7 @@ impl AlgorithmId {
                 AlgorithmId::Aes256 => EVP_aes_256_cbc(),
                 AlgorithmId::Tdes => EVP_des_ede3_cbc(),
             })
-            .unwrap()
+            .map_err(|()| Unspecified)
         }
     }
 }
@@ -216,6 +216,8 @@ pub struct Key {
 }
 
 impl Clone for LcPtr<CMAC_CTX> {
+    // CHIO-LINT cmac-clone: Preserve upstream Clone; native allocation or context-copy failure panics.
+    #[allow(clippy::expect_used)]
     fn clone(&self) -> Self {
         let mut new_ctx = LcPtr::new(unsafe { CMAC_CTX_new() }).expect("CMAC_CTX_new failed");
         unsafe {
@@ -275,7 +277,7 @@ impl Key {
         let mut ctx = LcPtr::new(unsafe { CMAC_CTX_new() })?;
 
         unsafe {
-            let cipher = algorithm.id.evp_cipher();
+            let cipher = algorithm.id.evp_cipher()?;
             if 1 != CMAC_Init(
                 ctx.as_mut_ptr(),
                 key_value.as_ptr().cast(),

@@ -1,0 +1,10 @@
+✔ native signer canonical bytes agree with all four Rust artifact vectors (2.133571ms)
+✔ native signer preserves facet order and rejects unsupported scalar encodings (7.420116ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 284.423117

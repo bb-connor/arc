@@ -1,0 +1,7 @@
+{
+  "version": "v1.8.4",
+  "host_architecture": "aarch64",
+  "source_url": "https://github.com/foundry-rs/foundry/releases/download/v1.8.4/foundry_v1.8.4_linux_arm64.tar.gz",
+  "archive_sha256": "sha256:d998f88314c057dc37c1de9a2044f49b273505965ff94bea5c3c5aefa9d1debd",
+  "binary_sha256": "ef03e11c795af5aabc72b8a96972dc5d82d380cc3d925880f39c149502913d94"
+}

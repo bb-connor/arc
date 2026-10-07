@@ -1,0 +1,29 @@
+[
+  {
+    "label": "drogon-complete",
+    "command": [
+      "bash",
+      "scripts/check-chio-drogon.sh"
+    ],
+    "log": "/tmp/chio-pr1173-hosted-repair-drogon-complete.log",
+    "started": 1791095306.3769314,
+    "status": "complete",
+    "exit_code": 0,
+    "finished": 1791095356.0661619
+  },
+  {
+    "label": "fuzz-corpus-complete",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--manifest-path",
+      "fuzz/Cargo.toml"
+    ],
+    "log": "/tmp/chio-pr1173-hosted-repair-fuzz-corpus-complete.log",
+    "started": 1791095356.066956,
+    "status": "complete",
+    "exit_code": 0,
+    "finished": 1791095716.5145776
+  }
+]

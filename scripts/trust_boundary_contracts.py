@@ -14,7 +14,10 @@ import re
 _spec = importlib.util.spec_from_file_location("trust_boundary_reader_rules", Path(__file__).with_name("trust_boundary_reader_rules.py"))
 _rules = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_rules)
-SUPPORT_PATHS = _rules.SUPPORT_PATHS
+_witness_spec = importlib.util.spec_from_file_location("trust_boundary_reader_witnesses", Path(__file__).with_name("trust_boundary_reader_witnesses.py"))
+_witnesses = importlib.util.module_from_spec(_witness_spec)
+_witness_spec.loader.exec_module(_witnesses)
+SUPPORT_PATHS = tuple(sorted(set(_rules.SUPPORT_PATHS) | set(_witnesses.SUPPORT_PATHS)))
 
 METHODS = frozenset({
     "canonicalize", "decode_external", "decode_document", "decode_signed",
@@ -68,6 +71,26 @@ def owner_code(code, row):
     for nested in functions(code):
         if row[1] < nested[1] < nested[3] <= row[3]:
             output[nested[1] - row[1]:nested[3] - row[1]] = " " * (nested[3] - nested[1])
+    return "".join(output)
+
+
+@lru_cache(maxsize=256)
+def scoped_owner_bodies(code):
+    return {row[0]: owner_code(code, row) for row in functions(code)}
+
+
+@lru_cache(maxsize=256)
+def scoped_declarations(code):
+    """Keep root declarations and headers, excluding every nested brace body."""
+    output = list(code)
+    depth = 0
+    for index, char in enumerate(code):
+        if char == "}":
+            depth = max(0, depth - 1)
+        if depth and char != "\n":
+            output[index] = " "
+        if char == "{":
+            depth += 1
     return "".join(output)
 
 
@@ -213,6 +236,9 @@ def local_apis(path, code, row, decoders, constructors, production_code, support
         if re.search(r"\bserde_json::from_slice\s*\(\s*" + re.escape(name) + r"\.as_bytes\s*\(", body):
             apis.append("CanonicalBody::as_bytes")
     apis.extend(_rules.special_apis(path, row[0], body, supports))
+    apis.extend(_witnesses.verified_apis(
+        path, row[0], body, supports, scoped_owner_bodies, scoped_declarations,
+    ))
     constrained = [api for api in apis if api not in {"serde_json::from_value", "serde::Deserializer"}]
     return sorted(set(apis)), bool(constrained)
 

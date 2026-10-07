@@ -1,0 +1,182 @@
+[
+  {
+    "path": "docs/market/open-agent-work/execution/integration-evidence/a2a-interop-v2.log",
+    "sha256": "f7db4d91cd8afee52a16cb0353daae836b44699c47744cefe10473a6195f0596",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/market/open-agent-work/execution/integration-evidence/a2a-tests.log",
+    "sha256": "e6cd252b708f2f11b588e541ced09a4af7f3fa1187c642509f2daf1343c8dfd2",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/market/open-agent-work/execution/integration-evidence/admission-store.log",
+    "sha256": "419125cb20109f77b7a97c456f14ce4aca21eaa9036fb19310236f868e2b7bb0",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/market/open-agent-work/execution/integration-evidence/caller-custody-followup.patch",
+    "sha256": "fcad800e10c27a37772b10e1862d2435e204cb43ec3d4590de41e41092a18c3c",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/market/open-agent-work/execution/integration-evidence/caller-custody-kernel.log",
+    "sha256": "cab70c69e5af60b07f19bea11364b832afa5b739b03d1bdb39045f853b0968b0",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/market/open-agent-work/execution/integration-evidence/composed-tests-v2.log",
+    "sha256": "938e5577c61ef543b98e21973ab2c4a9fdb0bcf1fc0717d412ae372001ccbbf3",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/market/open-agent-work/execution/integration-evidence/consumer-startup-umask022.log",
+    "sha256": "beab3ab209b21c5603e07edbc80d8cdca164ae84331ecf14cf5185fa0dcfbb8f",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/market/open-agent-work/execution/integration-evidence/federation-conformance.log",
+    "sha256": "e1dcae95ab844c56253e7dc5bf004ba7fa2adb58b1a45957c2da7958152f1dd5",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/market/open-agent-work/execution/integration-evidence/global-schema-red.log",
+    "sha256": "b7a3bf1c9424db7ccb899766c07f10fac04282c4e03b0802c83956f9a1b00bd1",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/market/open-agent-work/execution/integration-evidence/iroh-tests.log",
+    "sha256": "9de42f0904fd83d462637dd51ad166e887ac95e5efdb5d40d4de62dfee659c51",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/market/open-agent-work/execution/integration-evidence/kernel-lib.log",
+    "sha256": "1ddf2642b295dca170dbc70d9b77a9c2087cfe31b2bc229d5e8dfb84a0453853",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/market/open-agent-work/execution/integration-evidence/kernel-sqlite.log",
+    "sha256": "94f1e617d4860458d2da7c012cddc2943e53a76c97e8e2419486e303c93e7c09",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/market/open-agent-work/execution/integration-evidence/outcome-tests-green.log",
+    "sha256": "014d04bd5187dfa1d61649d24a86e6c2e8b380d71cfbf73377d5e5ebd3676e00",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/market/open-agent-work/execution/integration-evidence/outcome-tests-v2.log",
+    "sha256": "b00788687a139a4e88026d436f3c8427c6a418656e0656a0ac74cf45455965ed",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/market/open-agent-work/execution/integration-evidence/predicate-final.log",
+    "sha256": "f97baf164cfdd1c7ca5eb3379d9a5ab4953b7156bc539e8e67a9cc296e2cb3e5",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/market/open-agent-work/execution/integration-evidence/runtime-extra-tests-final.log",
+    "sha256": "d8d984d4297f21ab8120d8b3350ab55f6a5379abf7e31a665bef1a2e8b9451bd",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/market/open-agent-work/execution/integration-evidence/runtime-tests.log",
+    "sha256": "011bb6593b7cefadbce337e7b68bee140b1e21492f3bd6d2978a8e265fd5a88a",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/market/open-agent-work/execution/integration-evidence/schema-green.log",
+    "sha256": "582a4e9cce91a81bd0e91d5312d458f500034e12600600e6dea864f854d9da10",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/market/open-agent-work/execution/integration-evidence/security-baseline.log",
+    "sha256": "b763a62b455480bc070e99885ea5ee4cd310232452f8ed7651818aead71ff195",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/market/open-agent-work/execution/integration-evidence/standalone-tests.log",
+    "sha256": "d9f8ee0be99f99b11963397aaa9f478b798db19b9569999ac0d0e5cd2c34d9f4",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/market/open-agent-work/execution/w0-evidence/child-identity-red.log",
+    "sha256": "5dd8f9d0bb41ba668f492c4b53eb3c5d8da1709dd5630bde8f2404870ad6a80e",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/market/open-agent-work/execution/w0-evidence/protocol-red.log",
+    "sha256": "b08b59012f66424e0ecd6ada11871e5ff8f0c8e4964a79400e3ef37db5c4af34",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/market/open-agent-work/execution/w0-evidence/rust-tests.log",
+    "sha256": "e4adfbee9ea1b41616594951d730883145ec76596e801747c35e8cfcca933389",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv",
+    "sha256": "45d6adc0f9a25fc24137c48f255eb4cc9fe48602e43f9c563aea199580f6305e",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/papers/programmable-sovereignty/bench/results/baseline-negative-matrix.csv",
+    "sha256": "8b794fcd755c407b54acdfe1bf0ca28c519c9183bc90166c7cab35ab70f6ae90",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/papers/programmable-sovereignty/bench/results/baseline-substitution-matrix.csv",
+    "sha256": "e87d1af54ef23a66eea61dfd4e0647fbf125db4ab1ff0aac84889deeb24d884c",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv",
+    "sha256": "433c44a53d228aec4b5effb470250d8e6b8b2c4e6f3557eb89b221840458e2e4",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv",
+    "sha256": "a51437ff480cca90e6238967861cefc2aafc2ffb266f7737914c9d081944b0a5",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/papers/review-2026-09/02-p1-claim-audit.md",
+    "sha256": "0a8cc7ed9e0cf5169bb575ae9bba0d6b0bb2dcbfe043ef685fe9cd455e6f8cfd",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/papers/review-2026-09/04-formal-evidence-audit.md",
+    "sha256": "0cc8d35975e80e346b0e013514a098144109e3a344758a1dec2b407b0a70af5b",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/papers/review-2026-09/05-cross-paper-consistency.md",
+    "sha256": "3f77a65a96d21e804ebed9dc70617606c854bc18c78306041275279afa1eb5d3",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/papers/review-2026-09/06-foundational-paper-benchmark.md",
+    "sha256": "3b3cf1cd41231848c91a600500000dbdfbd936aa65663a86fd7c48294b1573c2",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/papers/review-2026-09/07-simulated-pc-reviews.md",
+    "sha256": "6106f1d8bbf443769868e6b7118de440538475e9a1d67e42f535e320876834ee",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/papers/review-2026-09/08-the-thesis.md",
+    "sha256": "a5915be772806af670d39fa9c6a6ddf86790ed3d5f84a61cb0ae61bf2d5e6d62",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/papers/review-2026-09/09-claim-surface-and-landscape.md",
+    "sha256": "75f397faec1db8db3ba56445bbbf88a1b346a7f0e2d67badb6ec3b76d2a06513",
+    "identicalToFundedParent": true
+  },
+  {
+    "path": "docs/papers/review-2026-09/11-prose-and-structure-audit.md",
+    "sha256": "e12fc7d5c52d1f43b8cd4019d00322626f1c010cdd5c0ff405346bda9a930631",
+    "identicalToFundedParent": true
+  }
+]

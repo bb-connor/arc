@@ -2,7 +2,8 @@ use chio_core_types::crypto::Keypair;
 use chio_federation::{
     treaty::compute_ladder_intersection, treaty::evaluate_cross_boundary_admission,
     treaty::governance_ladder_manifest_sha256, treaty::ladder_intersection_sha256,
-    treaty::CrossBoundaryAdmissionInput, treaty::CrossBoundaryEvidenceRef,
+    treaty::ladder_mode_rank, treaty::CrossBoundaryAdmissionInput,
+    treaty::CrossBoundaryAdmissionReport, treaty::CrossBoundaryEvidenceRef,
     treaty::GovernanceLadderActionClass, treaty::GovernanceLadderManifest,
     treaty::GovernanceLadderQuorum, treaty::TreatyScope,
     treaty::CHIO_FEDERATION_GOVERNANCE_LADDER_MANIFEST_SCHEMA,
@@ -95,6 +96,29 @@ fn chio_treaty_uses_canonical_n_of_m_vocabulary_and_quorum_metadata(
 }
 
 #[test]
+fn chio_ladder_mode_rank_accepts_only_the_spec_vocabulary() {
+    for (mode, rank) in [
+        ("observation", 0),
+        ("guarded", 1),
+        ("receipt_backed", 2),
+        ("partition_contingency", 3),
+        ("maintenance", 4),
+    ] {
+        match ladder_mode_rank(mode) {
+            Ok(actual) => assert_eq!(actual, rank, "{mode}"),
+            Err(error) => panic!("{mode} must rank: {error}"),
+        }
+    }
+    for mode in ["quorum_required", "quorum-required", "receipt-backed", ""] {
+        let error = match ladder_mode_rank(mode) {
+            Ok(rank) => panic!("{mode:?} must not rank as {rank}"),
+            Err(error) => error,
+        };
+        assert_eq!(error.code(), "chio_federation_ladder_invalid_mode");
+    }
+}
+
+#[test]
 fn chio_cross_boundary_admission_report_uses_chio_codes_and_checks(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let manifest_a = treaty_manifest("kernel.buyer", treaty_action("receipt_backed", false));
@@ -131,6 +155,145 @@ fn chio_cross_boundary_admission_report_uses_chio_codes_and_checks(
         report.checks
     );
     Ok(())
+}
+
+#[test]
+fn chio_bilateral_modes_require_exact_verified_invocation_evidence(
+) -> Result<(), Box<dyn std::error::Error>> {
+    for mode in ["bilateral_required", "bilateral_if_cross_org"] {
+        let mut action = treaty_action("receipt_backed", false);
+        action.co_sign = mode.to_string();
+        let denied =
+            admission_with_evidence(action.clone(), &["receipt_lineage"], &["receipt_lineage"])?;
+        assert!(!denied.accepted, "{mode} admitted without an invocation");
+        assert_eq!(
+            denied.failure_code.as_deref(),
+            Some("chio_federation_treaty_missing_required_evidence")
+        );
+        assert_required_evidence(&denied, &["bilateral_invocation", "receipt_lineage"]);
+
+        let present = ["receipt_lineage", "bilateral_invocation"];
+        let unverified = admission_with_evidence(action.clone(), &present, &["receipt_lineage"])?;
+        assert!(
+            !unverified.accepted,
+            "{mode} admitted an unverified invocation"
+        );
+        assert_eq!(
+            unverified.failure_code.as_deref(),
+            Some("chio_federation_treaty_unverified_required_evidence")
+        );
+        assert_required_evidence(&unverified, &["bilateral_invocation", "receipt_lineage"]);
+
+        let accepted = admission_with_evidence(action, &present, &present)?;
+        assert!(accepted.accepted, "{mode}: {:?}", accepted.failure_code);
+        assert_eq!(accepted.failure_code, None);
+        assert_required_evidence(&accepted, &["bilateral_invocation", "receipt_lineage"]);
+    }
+    Ok(())
+}
+
+#[test]
+fn chio_bilateral_evidence_is_not_duplicated_when_manifest_requires_it(
+) -> Result<(), Box<dyn std::error::Error>> {
+    for mode in ["bilateral_required", "bilateral_if_cross_org"] {
+        let mut action = treaty_action("receipt_backed", false);
+        action.co_sign = mode.to_string();
+        action
+            .evidence_required
+            .push("bilateral_invocation".to_string());
+        let evidence = ["receipt_lineage", "bilateral_invocation"];
+        let report = admission_with_evidence(action, &evidence, &evidence)?;
+        assert!(report.accepted, "{mode}: {:?}", report.failure_code);
+        assert_required_evidence(&report, &["bilateral_invocation", "receipt_lineage"]);
+    }
+    Ok(())
+}
+
+#[test]
+fn chio_no_cosign_admission_requires_only_declared_evidence(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut action = treaty_action("receipt_backed", false);
+    action.co_sign = "none".to_string();
+    let report = admission_with_evidence(action, &["receipt_lineage"], &["receipt_lineage"])?;
+    assert!(report.accepted, "{:?}", report.failure_code);
+    assert_eq!(report.failure_code, None);
+    assert_required_evidence(&report, &["receipt_lineage"]);
+    Ok(())
+}
+
+#[test]
+fn chio_quorum_admission_requires_exact_verified_quorum_evidence(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut action = treaty_action("receipt_backed", false);
+    action.co_sign = "n_of_m".to_string();
+    action.consistency_model = "quorum-required".to_string();
+    action.co_sign_quorum = Some(GovernanceLadderQuorum {
+        n: 2,
+        m: 3,
+        scope: "treaty".to_string(),
+    });
+    let denied =
+        admission_with_evidence(action.clone(), &["receipt_lineage"], &["receipt_lineage"])?;
+    assert!(!denied.accepted);
+    assert_eq!(
+        denied.failure_code.as_deref(),
+        Some("chio_federation_treaty_missing_required_evidence")
+    );
+    assert_required_evidence(&denied, &["quorum_signature", "receipt_lineage"]);
+
+    let present = ["receipt_lineage", "quorum_signature"];
+    let unverified = admission_with_evidence(action.clone(), &present, &["receipt_lineage"])?;
+    assert!(!unverified.accepted);
+    assert_eq!(
+        unverified.failure_code.as_deref(),
+        Some("chio_federation_treaty_unverified_required_evidence")
+    );
+    assert_required_evidence(&unverified, &["quorum_signature", "receipt_lineage"]);
+
+    let accepted = admission_with_evidence(action, &present, &present)?;
+    assert!(accepted.accepted, "{:?}", accepted.failure_code);
+    assert_eq!(accepted.failure_code, None);
+    assert_required_evidence(&accepted, &["quorum_signature", "receipt_lineage"]);
+    Ok(())
+}
+
+fn admission_with_evidence(
+    action: GovernanceLadderActionClass,
+    present: &[&str],
+    verified: &[&str],
+) -> Result<CrossBoundaryAdmissionReport, Box<dyn std::error::Error>> {
+    let buyer = treaty_manifest("kernel.buyer", action.clone());
+    let vendor = treaty_manifest("kernel.vendor", action);
+    let scope = treaty_scope(&buyer, &vendor)?;
+    let intersection = compute_ladder_intersection(&scope, &[buyer, vendor], 1_800_000_001_000)?;
+    Ok(evaluate_cross_boundary_admission(
+        CrossBoundaryAdmissionInput {
+            treaty_scope: &scope,
+            ladder_intersection: &intersection,
+            expected_ladder_intersection_sha256: Some(ladder_intersection_sha256(&intersection)?),
+            action_class_id: "workflow.destructive.vendor_call",
+            present_evidence: present.iter().map(|name| (*name).to_string()).collect(),
+            verified_evidence: verified
+                .iter()
+                .map(|name| CrossBoundaryEvidenceRef {
+                    evidence_class: (*name).to_string(),
+                    artifact_sha256: "d".repeat(64),
+                    verified: true,
+                })
+                .collect(),
+            now_unix_ms: 1_800_000_002_000,
+        },
+    )?)
+}
+
+fn assert_required_evidence(report: &CrossBoundaryAdmissionReport, expected: &[&str]) {
+    let mut required: Vec<_> = report
+        .required_evidence
+        .iter()
+        .map(String::as_str)
+        .collect();
+    required.sort_unstable();
+    assert_eq!(required, expected);
 }
 
 fn treaty_action(mode: &str, destructive: bool) -> GovernanceLadderActionClass {

@@ -1,0 +1,259 @@
+{
+  "task": {
+    "contextId": "context-a2a-task-60cb75e51eb0f5ff65443e84603df25e654ac3d46bfe7fc44870f127a6936598-1",
+    "id": "a2a-task-60cb75e51eb0f5ff65443e84603df25e654ac3d46bfe7fc44870f127a6936598-1",
+    "metadata": {
+      "chio": {
+        "a2aSurface": "authoritative_blocking_send",
+        "authoritative": true,
+        "authorityPath": "cross_protocol_orchestrator",
+        "bridge": {
+          "bridgeId": "chio-bridge-a2a-native-a2a-task-60cb75e51eb0f5ff65443e84603df25e654ac3d46bfe7fc44870f127a6936598-1",
+          "capabilityEnvelope": {
+            "attenuatedScope": {
+              "grants": [
+                {
+                  "constraints": [
+                    {
+                      "type": "max_args_size",
+                      "value": 262144
+                    }
+                  ],
+                  "dpop_required": true,
+                  "operations": [
+                    "invoke"
+                  ],
+                  "server_id": "security-review-provider",
+                  "tool_name": "quote"
+                }
+              ]
+            },
+            "bridgeId": "chio-bridge-a2a-native-a2a-task-60cb75e51eb0f5ff65443e84603df25e654ac3d46bfe7fc44870f127a6936598-1",
+            "bridgedAt": 1789360901,
+            "capabilityRef": {
+              "chioCapabilityId": "negotiation-1f0c9a733651aae59a31fbbb31ba70c004279e995cd2a89ea776586e47325b1e",
+              "originProtocol": "a2a",
+              "parentCapabilityHash": "87072739941880b9c27faa52514f406a806da619d0e9bf6811c910764fe58379",
+              "protocolContext": {
+                "targetSkillId": "quote"
+              }
+            },
+            "schema": "chio.cross-protocol-cap.v1",
+            "targetProtocol": "native"
+          },
+          "capabilityRef": {
+            "chioCapabilityId": "negotiation-1f0c9a733651aae59a31fbbb31ba70c004279e995cd2a89ea776586e47325b1e",
+            "originProtocol": "a2a",
+            "parentCapabilityHash": "87072739941880b9c27faa52514f406a806da619d0e9bf6811c910764fe58379",
+            "protocolContext": {
+              "targetSkillId": "quote"
+            }
+          },
+          "route": {
+            "multiHop": false,
+            "selectedProtocols": [
+              "a2a",
+              "native"
+            ],
+            "terminalProtocol": "native"
+          },
+          "sourceProtocol": "a2a",
+          "targetProtocol": "native",
+          "terminalProtocol": "native",
+          "trace": {
+            "hops": [
+              {
+                "bridgeId": "chio-bridge-a2a-native-a2a-task-60cb75e51eb0f5ff65443e84603df25e654ac3d46bfe7fc44870f127a6936598-1",
+                "protocol": "a2a",
+                "requestId": "a2a-task-60cb75e51eb0f5ff65443e84603df25e654ac3d46bfe7fc44870f127a6936598-1",
+                "timestamp": 1789360901
+              },
+              {
+                "bridgeId": "chio-bridge-a2a-native-a2a-task-60cb75e51eb0f5ff65443e84603df25e654ac3d46bfe7fc44870f127a6936598-1",
+                "protocol": "native",
+                "receiptId": "c0a484bf44637761d7a172eebe2d2894803d70f6847cb695f644584081966578",
+                "requestId": "24f72cbd9fff3e933b0f9cfefb7221b8",
+                "timestamp": 1789360901
+              }
+            ],
+            "sessionFingerprint": "256d5fcc5e9e3940cb8a4f7af21e7c5b1b31828aaaec14d20cc343f257355099",
+            "traceId": "cfe4837d0ffbf84467fd37ae29766e26a6441852b6f0e910c25bdcc80e17f90c"
+          }
+        },
+        "capabilityId": "negotiation-1f0c9a733651aae59a31fbbb31ba70c004279e995cd2a89ea776586e47325b1e",
+        "decision": "deny",
+        "executionNonce": null,
+        "lifecycle": {
+          "messageSend": "blocking_terminal_task",
+          "messageStream": "deferred_task_poll",
+          "taskCancel": "supported",
+          "taskGet": "supported"
+        },
+        "reason": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: procurement permit differs from receiver's activated delegation policy",
+        "receipt": {
+          "action": {
+            "parameter_hash": "a0d4edd34c6575a93f1ba5e817fecabbf758a92350c649b31273c86a3684789d",
+            "parameters": {
+              "agreement": {
+                "buyer": "681652d9115272f33abead9ba521a2f391923e1673958dba05b18820f5fe3225",
+                "checker": "openapi-explicit-auth-v1",
+                "creditProfile": "provider-local-credit-checked-or-zero-v1",
+                "deadline": 1789361494,
+                "inputSha256": "2184a89310ecaddefb65643b02bea92b119e3fc31e03bdfbd4dc52271b65f1cc",
+                "jobId": "malicious-sandbox-extra-job",
+                "priceCeiling": 100,
+                "profile": "chio.example.security-review-agreement.v3",
+                "provider": "f998682c69653f7ebf706fc58791db77b08f240b1f787beac6ca1d82d9c3b10e",
+                "subcontracting": false
+              },
+              "bid": {
+                "body": {
+                  "agentId": "681652d9115272f33abead9ba521a2f391923e1673958dba05b18820f5fe3225",
+                  "issuedAt": 1789360901,
+                  "listingId": "security-review-v1",
+                  "maxPricePerCall": {
+                    "currency": "TST",
+                    "units": 100
+                  },
+                  "requestedScope": {
+                    "capabilityScopePrefix": "tools:security-review:7c0b8c6d51dbff9a3dee448d18e227067aebd316f7a02c5dcf7759f5c73c0b99",
+                    "maxInvocations": 1,
+                    "serverId": "security-review-provider",
+                    "toolName": "review"
+                  },
+                  "schema": "chio.marketplace.bid-request.v1",
+                  "windowSeconds": 593
+                },
+                "signature": "ffe116510506fae12e1b79dc132d95ec4a2e08cff89abf8e8fa5ce1ff0082ec15e8ec18d433fc4db79e67e690afb4111baf91d6376a963d60a68ac88f605a704",
+                "signerKey": "681652d9115272f33abead9ba521a2f391923e1673958dba05b18820f5fe3225"
+              }
+            }
+          },
+          "boundary_class": "prevent",
+          "capability_id": "negotiation-1f0c9a733651aae59a31fbbb31ba70c004279e995cd2a89ea776586e47325b1e",
+          "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "decision": {
+            "guard": "kernel",
+            "reason": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: procurement permit differs from receiver's activated delegation policy",
+            "verdict": "deny"
+          },
+          "id": "c0a484bf44637761d7a172eebe2d2894803d70f6847cb695f644584081966578",
+          "kernel_key": "f998682c69653f7ebf706fc58791db77b08f240b1f787beac6ca1d82d9c3b10e",
+          "metadata": {
+            "attribution": {
+              "delegation_depth": 0,
+              "issuer_key": "f998682c69653f7ebf706fc58791db77b08f240b1f787beac6ca1d82d9c3b10e",
+              "subject_key": "681652d9115272f33abead9ba521a2f391923e1673958dba05b18820f5fe3225"
+            },
+            "budget_authority": {
+              "authority_profile": "authoritative_hold_event",
+              "guarantee_level": "single_node_atomic",
+              "metering_profile": "max_cost_preauthorize_then_reconcile_actual"
+            },
+            "chio_receipt_signing_nonce": "rcpt-01a09e38-8e58-7fa0-a927-92d3cb9d801c",
+            "receipt_context": {
+              "request_id": "24f72cbd9fff3e933b0f9cfefb7221b8"
+            },
+            "route_selection": {
+              "candidates": [
+                {
+                  "available": true,
+                  "routeId": "native-route",
+                  "selectedProtocols": [
+                    "a2a",
+                    "native"
+                  ],
+                  "targetProtocol": "native"
+                }
+              ],
+              "decision": "select",
+              "requestedTargetProtocol": "native",
+              "routeSelectionId": "23c21c78671eb0571e809413ce5d6747436eaab15598e4d4205477b248bc05c7",
+              "selectedProtocols": [
+                "a2a",
+                "native"
+              ],
+              "selectedRouteId": "native-route",
+              "selectedTargetProtocol": "native",
+              "sourceProtocol": "a2a"
+            }
+          },
+          "policy_hash": "e503dcdaee2a0ac92139f18cf50594237455c0408d78e50c1212ce75d5fc9ab1",
+          "receipt_kind": "mediated_decision",
+          "redaction_mode": "none",
+          "signature": "89e5ace62e173ca715afc27869ebdae46c9d1128564e4264c0d5e61b491f4f1e7032666b7ed728c8e228952aade43718d0ec51687c7687f5491fa7b1ff0cb705",
+          "timestamp": 1789360901,
+          "tool_name": "quote",
+          "tool_origin": "caller_executed",
+          "tool_server": "security-review-provider",
+          "trust_level": "mediated"
+        },
+        "receiptId": "c0a484bf44637761d7a172eebe2d2894803d70f6847cb695f644584081966578",
+        "receiptRef": {
+          "bridgeId": "chio-bridge-a2a-native-a2a-task-60cb75e51eb0f5ff65443e84603df25e654ac3d46bfe7fc44870f127a6936598-1",
+          "capabilityId": "negotiation-1f0c9a733651aae59a31fbbb31ba70c004279e995cd2a89ea776586e47325b1e",
+          "receiptId": "c0a484bf44637761d7a172eebe2d2894803d70f6847cb695f644584081966578",
+          "sourceProtocol": "a2a",
+          "targetProtocol": "native",
+          "traceId": "cfe4837d0ffbf84467fd37ae29766e26a6441852b6f0e910c25bdcc80e17f90c"
+        },
+        "routeSelection": {
+          "candidates": [
+            {
+              "available": true,
+              "routeId": "native-route",
+              "selectedProtocols": [
+                "a2a",
+                "native"
+              ],
+              "targetProtocol": "native"
+            }
+          ],
+          "decision": "select",
+          "requestedTargetProtocol": "native",
+          "routeSelectionId": "23c21c78671eb0571e809413ce5d6747436eaab15598e4d4205477b248bc05c7",
+          "selectedProtocols": [
+            "a2a",
+            "native"
+          ],
+          "selectedRouteId": "native-route",
+          "selectedTargetProtocol": "native",
+          "sourceProtocol": "a2a"
+        },
+        "runtimeLifecycle": {
+          "blockingEntrypoint": "message/send",
+          "cancelEntrypoint": "task/cancel",
+          "claimEligible": true,
+          "compatibilityOnly": false,
+          "followUpEntrypoint": "task/get",
+          "partialOutputDelivery": "collated_terminal_payload",
+          "streamDelivery": "collated_terminal_payload",
+          "streamEntrypoint": "message/stream",
+          "surface": "a2a_authoritative"
+        },
+        "targetExecution": {
+          "multiHop": false,
+          "notificationCount": 0,
+          "projectedResult": false,
+          "routeHopCount": 2,
+          "terminalProtocol": "native"
+        },
+        "terminalState": {
+          "state": "completed"
+        }
+      }
+    },
+    "status": {
+      "message": {
+        "messageId": "status-a2a-task-60cb75e51eb0f5ff65443e84603df25e654ac3d46bfe7fc44870f127a6936598-1",
+        "parts": [
+          {
+            "text": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: procurement permit differs from receiver's activated delegation policy"
+          }
+        ],
+        "role": "ROLE_AGENT"
+      },
+      "state": "TASK_STATE_FAILED"
+    }
+  }
+}

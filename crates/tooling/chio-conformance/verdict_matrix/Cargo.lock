@@ -849,7 +849,7 @@ dependencies = [
  "bitflags",
  "cexpr",
  "clang-sys",
- "itertools 0.10.5",
+ "itertools 0.13.0",
  "log",
  "prettyplease",
  "proc-macro2",
@@ -1142,6 +1142,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-cage-plan"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "libc",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "chio-conformance-verdict-matrix"
 version = "0.1.0"
 dependencies = [
@@ -1149,6 +1160,7 @@ dependencies = [
  "chio-core-types",
  "chio-kernel",
  "chio-kernel-browser",
+ "chio-test-support",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -1260,6 +1272,7 @@ dependencies = [
 name = "chio-egress-contract"
 version = "0.1.0"
 dependencies = [
+ "chio-core-types",
  "reqwest",
  "serde",
  "serde_json",
@@ -1349,12 +1362,14 @@ dependencies = [
  "chio-log-redact",
  "chio-manifest",
  "chio-metrics-spec",
+ "chio-response-model",
  "chio-security-types",
  "chio-settle",
  "chio-supervisor",
  "chio-tool-call-fabric",
  "chio-underwriting",
  "chio-weights",
+ "chio-workflow",
  "chrono",
  "dashmap",
  "futures",
@@ -1394,6 +1409,7 @@ version = "0.1.0"
 dependencies = [
  "arc-swap",
  "chio-core-types",
+ "chio-security-types",
  "serde",
  "serde_json",
 ]
@@ -1445,6 +1461,7 @@ dependencies = [
 name = "chio-manifest"
 version = "0.1.0"
 dependencies = [
+ "chio-cage-plan",
  "chio-core",
  "chio-security-types",
  "jsonschema",
@@ -1503,6 +1520,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-response-model"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-security-types",
+ "hex",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "chio-revocation-oracle"
 version = "0.1.0"
 dependencies = [
@@ -1540,6 +1569,7 @@ dependencies = [
  "hex",
  "reqwest",
  "secp256k1 0.31.1",
+ "secrecy",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -1557,6 +1587,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-test-support"
+version = "0.1.0"
+dependencies = [
+ "chio-security-types",
+ "tempfile",
+]
+
+[[package]]
 name = "chio-tool-call-fabric"
 version = "0.1.0"
 dependencies = [
@@ -1564,6 +1602,7 @@ dependencies = [
  "async-trait",
  "chio-core-types",
  "chio-manifest",
+ "chio-security-types",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -1612,6 +1651,28 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-workflow"
+version = "0.1.0"
+dependencies = [
+ "chio-core",
+ "chio-workflow-preflight",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tracing",
+]
+
+[[package]]
+name = "chio-workflow-preflight"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
  "thiserror 1.0.69",
 ]
 
@@ -5189,6 +5250,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dcb913707158fadaf0d8702c2db0e857de66eb003ccfdda5924b5f5ac98efb38"
 dependencies = [
  "cc",
+]
+
+[[package]]
+name = "secrecy"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e891af845473308773346dc847b2c23ee78fe442e0472ac50e22a18a93d3ae5a"
+dependencies = [
+ "serde",
+ "zeroize",
 ]
 
 [[package]]

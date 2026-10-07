@@ -987,6 +987,24 @@ sha256    = "1fb3285823fc65c7955acc8bf3432904333d5afde276bf3a708b3b66275b460c"
 source    = "hand_curated_coverage"
 
 [[seed]]
+target    = "bilateral_dsse_verify"
+path      = "fuzz/corpus/bilateral_dsse_verify/valid.json"
+sha256    = "57406228a5933ffae2b44e51fe075db9f5c29f8621ee061d8c9dfae3919d0a89"
+source    = "hand_curated_coverage"
+
+[[seed]]
+target    = "bilateral_dsse_verify"
+path      = "fuzz/corpus/bilateral_dsse_verify/tampered-signature.json"
+sha256    = "e3780ff36723f7bd3ce437e7597cbec8e5da1982478416ff2462739def183bd5"
+source    = "hand_curated_coverage"
+
+[[seed]]
+target    = "bilateral_dsse_verify"
+path      = "fuzz/corpus/bilateral_dsse_verify/wrong-predicate-type.json"
+sha256    = "a24478ffc3065377aa1b25b71fae27103b59b8a6b53edd89c4174cc0101bba7a"
+source    = "hand_curated_coverage"
+
+[[seed]]
 target    = "fuzz_merkle_checkpoint"
 path      = "fuzz/corpus/fuzz_merkle_checkpoint/single-leaf.ndjson"
 sha256    = "76c0f0c6873ba644deb41b08a24e1aeec7833897608f87450c20c57331fc27fe"

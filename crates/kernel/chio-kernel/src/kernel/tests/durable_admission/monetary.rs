@@ -1,5 +1,81 @@
 use super::*;
 
+struct DefiniteDeclineRail {
+    insufficient_funds: bool,
+    mode: PaymentRailMode,
+}
+
+impl PaymentAdapter for DefiniteDeclineRail {
+    fn rail_id(&self) -> &'static str {
+        "definite-decline-test"
+    }
+    fn rail_mode(&self) -> Option<PaymentRailMode> {
+        Some(self.mode)
+    }
+    fn authorize(&self, _: &PaymentAuthorizeRequest) -> Result<PaymentAuthorization, PaymentError> {
+        Err(if self.insufficient_funds {
+            PaymentError::InsufficientFunds
+        } else {
+            PaymentError::Declined("definite test decline".into())
+        })
+    }
+    fn capture(&self, _: &str, _: u64, _: &str, _: &str) -> Result<PaymentResult, PaymentError> {
+        panic!("declined authorization must never capture")
+    }
+    fn release(&self, _: &str, _: &str) -> Result<PaymentResult, PaymentError> {
+        panic!("declined authorization must never release")
+    }
+    fn refund(&self, _: &str, _: u64, _: &str, _: &str) -> Result<PaymentResult, PaymentError> {
+        panic!("declined authorization must never refund")
+    }
+    // Keep the default unavailable settlement lookup: the definitive reply
+    // itself is the authority for recording that no authorization exists.
+}
+
+#[test]
+fn definite_payment_decline_closes_without_a_settlement_lookup() {
+    for mode in [
+        PaymentRailMode::ReversibleHold,
+        PaymentRailMode::PrepaidFinal,
+    ] {
+        for insufficient_funds in [false, true] {
+            let mut grant = make_grant("durable-server", "mutate");
+            grant.max_cost_per_invocation = Some(MonetaryAmount {
+                units: 10,
+                currency: "USD".into(),
+            });
+            grant.max_total_cost = grant.max_cost_per_invocation.clone();
+            let (mut kernel, request, store, invocations) = durable_admission_fixture_with_grants(
+                "definite-decline-without-lookup",
+                vec![grant],
+            );
+            kernel.set_payment_adapter(Box::new(DefiniteDeclineRail {
+                insufficient_funds,
+                mode,
+            }));
+            let response = kernel
+                .evaluate_tool_call_blocking(&request)
+                .expect("signed definite denial");
+            assert_eq!(response.verdict, Verdict::Deny);
+            assert!(response.receipt.verify_signature().expect("signed denial"));
+            assert_eq!(
+                store.operation().state(),
+                AdmissionOperationState::CompensatedBeforeDispatch
+            );
+            let journal = store.payment_journal().expect("retained declined journal");
+            assert_eq!(journal.state, PaymentJournalState::Closed);
+            assert!(journal.authorization_id.is_none());
+            assert_eq!(invocations.load(Ordering::SeqCst), 0);
+            assert_eq!(
+                kernel
+                    .reconcile_recoverable_admissions()
+                    .expect("no stranded decline"),
+                0
+            );
+        }
+    }
+}
+
 #[test]
 fn budget_backend_error_compensates_durable_admission_before_dispatch() {
     let mut grant = make_grant("durable-server", "mutate");

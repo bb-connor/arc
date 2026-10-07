@@ -1,0 +1,9 @@
+workflow-tests: exit 0
+native-tests: exit 0
+native-regression: exit 0
+workflow-clippy: exit 0
+native-clippy: exit 0
+format: exit 0
+example: exit 0
+artifact-tests: exit 0
+PASS: 8 terminal checks, 36545 source files, 17 outputs

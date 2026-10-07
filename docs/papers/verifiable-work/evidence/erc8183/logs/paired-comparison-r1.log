@@ -1,0 +1,1820 @@
+Compiling 68 files with Solc 0.8.28
+Solc 0.8.28 finished in 3.25s
+Compiler run successful!
+
+Ran 8 tests for test/ChioPaperComparison.t.sol:ChioPaperComparisonTest
+[PASS] test_earnedChildRemainsWithdrawableAfterParentRefundAndAdminChanges() (gas: 1378718)
+Traces:
+  [1532385] ChioPaperComparisonTest::test_earnedChildRemainsWithdrawableAfterParentRefundAndAdminChanges()
+    ├─ [51255] MockUSDC::mint(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], 60)
+    │   ├─ emit Transfer(from: 0x0000000000000000000000000000000000000000, to: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], amount: 60)
+    │   └─ ← [Stop]
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [303943] ChioWorkClaimEscrow::fund(Terms({ agreementDigest: 0xff483e972a04a9a62bb4b7d04ae403c615604e4090521ecc5bb7af67f71be09c, payer: 0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02, beneficiary: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, verifier: 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968, token: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, amount: 100, submitBy: 1003600 [1.003e6], challengeUntil: 1007200 [1.007e6], resolveBy: 1010800 [1.01e6], refundAfter: 1014400 [1.014e6] }))
+    │   ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   │   └─ ← [Return] 100
+    │   ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [28420] MockUSDC::transferFrom(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 100)
+    │   │   ├─ emit Transfer(from: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], to: ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], amount: 100)
+    │   │   └─ ← [Return] true
+    │   ├─ [559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 100
+    │   ├─ emit Funded(allocationId: 0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0, agreementDigest: 0xff483e972a04a9a62bb4b7d04ae403c615604e4090521ecc5bb7af67f71be09c, payer: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return] 0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [286843] ChioWorkClaimEscrow::fund(Terms({ agreementDigest: 0xef5b8fe8789ed448b54018e6e47371bfa696902c135a273e35ad0d4cf6df057e, payer: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, beneficiary: 0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC, verifier: 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968, token: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, amount: 60, submitBy: 1003600 [1.003e6], challengeUntil: 1007200 [1.007e6], resolveBy: 1010800 [1.01e6], refundAfter: 1014400 [1.014e6] }))
+    │   ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   │   └─ ← [Return] 60
+    │   ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 100
+    │   ├─ [11320] MockUSDC::transferFrom(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 60)
+    │   │   ├─ emit Transfer(from: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], to: ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], amount: 60)
+    │   │   └─ ← [Return] true
+    │   ├─ [559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 160
+    │   ├─ emit Funded(allocationId: 0xd3b4c1b3d8185aa4dcb82c42d6f901971a7652b27b2c8b4fe012907d9bf391dd, agreementDigest: 0xef5b8fe8789ed448b54018e6e47371bfa696902c135a273e35ad0d4cf6df057e, payer: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return] 0xd3b4c1b3d8185aa4dcb82c42d6f901971a7652b27b2c8b4fe012907d9bf391dd
+    ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   └─ ← [Return] 160
+    ├─ [2325] MockUSDC::totalSupply() [staticcall]
+    │   └─ ← [Return] 160
+    ├─ [0] VM::prank(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC])
+    │   └─ ← [Return]
+    ├─ [78243] ChioWorkClaimEscrow::submitClaim(0xd3b4c1b3d8185aa4dcb82c42d6f901971a7652b27b2c8b4fe012907d9bf391dd, 0x177a3dc1c567e41d1200095a80248766c051770bd930ccae75fa8d11e334189c)
+    │   ├─ emit ClaimSubmitted(allocationId: 0xd3b4c1b3d8185aa4dcb82c42d6f901971a7652b27b2c8b4fe012907d9bf391dd, commitment: 0x177a3dc1c567e41d1200095a80248766c051770bd930ccae75fa8d11e334189c)
+    │   └─ ← [Stop]
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [78243] ChioWorkClaimEscrow::submitClaim(0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0, 0x4c0edd9af9a85bec1ff5e90e38d9a72a689675cfe7a81905fd40d8fd869f6852)
+    │   ├─ emit ClaimSubmitted(allocationId: 0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0, commitment: 0x4c0edd9af9a85bec1ff5e90e38d9a72a689675cfe7a81905fd40d8fd869f6852)
+    │   └─ ← [Stop]
+    ├─ [0] VM::warp(1007201 [1.007e6])
+    │   └─ ← [Return]
+    ├─ [29701] ChioWorkClaimEscrow::getWork(0xd3b4c1b3d8185aa4dcb82c42d6f901971a7652b27b2c8b4fe012907d9bf391dd) [staticcall]
+    │   └─ ← [Return] Work({ terms: Terms({ agreementDigest: 0xef5b8fe8789ed448b54018e6e47371bfa696902c135a273e35ad0d4cf6df057e, payer: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, beneficiary: 0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC, verifier: 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968, token: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, amount: 60, submitBy: 1003600 [1.003e6], challengeUntil: 1007200 [1.007e6], resolveBy: 1010800 [1.01e6], refundAfter: 1014400 [1.014e6] }), state: 2, commitment: 0x177a3dc1c567e41d1200095a80248766c051770bd930ccae75fa8d11e334189c, decisionDigest: 0x0000000000000000000000000000000000000000000000000000000000000000, accepted: false, paid: 0, refunded: 0 })
+    ├─ [0] VM::sign("<pk>", 0x0e29547770bfbb34989fffc8a81e51a747f3ff0f33f2dbba72de5e1b226d4bac) [staticcall]
+    │   └─ ← [Return] 28, 0xc4e24c2a6228dab2e4d41f05f5f133926be3d5a26c4fb508cb32e341daab055a, 0x3ca9f5d3288fb3ae56d5a9d4e0feac903408e1fdfe2c97640df5618325fb218a
+    ├─ [117871] ChioWorkClaimEscrow::recordDecision(0xd3b4c1b3d8185aa4dcb82c42d6f901971a7652b27b2c8b4fe012907d9bf391dd, 0xfe119ccf4bd756807824061b402342ea0a1f7f3b9c441afc618221786e3bb37f, true, 0xc4e24c2a6228dab2e4d41f05f5f133926be3d5a26c4fb508cb32e341daab055a3ca9f5d3288fb3ae56d5a9d4e0feac903408e1fdfe2c97640df5618325fb218a1c)
+    │   ├─ [3000] PRECOMPILES::ecrecover(0x0e29547770bfbb34989fffc8a81e51a747f3ff0f33f2dbba72de5e1b226d4bac, 28, 89053151434337654147352511671615325597188118066497169188372854241940887766362, 27439064689618847901933268732077677206119278109730406502593313547480502837642) [staticcall]
+    │   │   └─ ← [Return] 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968
+    │   ├─ emit DecisionRecorded(allocationId: 0xd3b4c1b3d8185aa4dcb82c42d6f901971a7652b27b2c8b4fe012907d9bf391dd, decisionDigest: 0xfe119ccf4bd756807824061b402342ea0a1f7f3b9c441afc618221786e3bb37f, accepted: true)
+    │   └─ ← [Stop]
+    ├─ [0] VM::warp(1014401 [1.014e6])
+    │   └─ ← [Return]
+    ├─ [121988] ChioWorkClaimEscrow::withdrawRefund(0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0)
+    │   ├─ emit TimedOut(allocationId: 0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0)
+    │   ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 160
+    │   ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [25981] MockUSDC::transfer(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], 100)
+    │   │   ├─ emit Transfer(from: ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], to: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 100)
+    │   │   └─ ← [Return] true
+    │   ├─ [559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 60
+    │   ├─ [559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   │   └─ ← [Return] 100
+    │   ├─ emit Refunded(allocationId: 0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0, payer: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 100)
+    │   └─ ← [Stop]
+    ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   └─ ← [Return] 100
+    ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   └─ ← [Return] 60
+    ├─ [2325] MockUSDC::totalSupply() [staticcall]
+    │   └─ ← [Return] 160
+    ├─ [29701] ChioWorkClaimEscrow::getWork(0xd3b4c1b3d8185aa4dcb82c42d6f901971a7652b27b2c8b4fe012907d9bf391dd) [staticcall]
+    │   └─ ← [Return] Work({ terms: Terms({ agreementDigest: 0xef5b8fe8789ed448b54018e6e47371bfa696902c135a273e35ad0d4cf6df057e, payer: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, beneficiary: 0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC, verifier: 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968, token: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, amount: 60, submitBy: 1003600 [1.003e6], challengeUntil: 1007200 [1.007e6], resolveBy: 1010800 [1.01e6], refundAfter: 1014400 [1.014e6] }), state: 3, commitment: 0x177a3dc1c567e41d1200095a80248766c051770bd930ccae75fa8d11e334189c, decisionDigest: 0xfe119ccf4bd756807824061b402342ea0a1f7f3b9c441afc618221786e3bb37f, accepted: true, paid: 0, refunded: 0 })
+    ├─ [44797] ChioWorkClaimEscrow::setPaused(true)
+    │   ├─ emit FundingPaused(paused: true)
+    │   └─ ← [Stop]
+    ├─ [28693] ChioWorkClaimEscrow::setTokenAllowed(MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], false)
+    │   ├─ emit TokenAllowed(token: MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], allowed: false)
+    │   └─ ← [Stop]
+    ├─ [28613] ChioWorkClaimEscrow::setVerifierAllowed(0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968, false)
+    │   ├─ emit VerifierAllowed(verifier: 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968, allowed: false)
+    │   └─ ← [Stop]
+    ├─ [0] VM::warp(9640000 [9.64e6])
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC])
+    │   └─ ← [Return]
+    ├─ [117856] ChioWorkClaimEscrow::withdrawPayment(0xd3b4c1b3d8185aa4dcb82c42d6f901971a7652b27b2c8b4fe012907d9bf391dd)
+    │   ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 60
+    │   ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [25981] MockUSDC::transfer(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], 60)
+    │   │   ├─ emit Transfer(from: ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], to: worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], amount: 60)
+    │   │   └─ ← [Return] true
+    │   ├─ [559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   │   └─ ← [Return] 60
+    │   ├─ emit Paid(allocationId: 0xd3b4c1b3d8185aa4dcb82c42d6f901971a7652b27b2c8b4fe012907d9bf391dd, beneficiary: worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], amount: 60)
+    │   └─ ← [Stop]
+    ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   └─ ← [Return] 100
+    ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   └─ ← [Return] 60
+    ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2325] MockUSDC::totalSupply() [staticcall]
+    │   └─ ← [Return] 160
+    └─ ← [Stop]
+
+[PASS] test_evaluatorOutageRefundsSubmittedJobAfterDeadline() (gas: 501539)
+Traces:
+  [566290] ChioPaperComparisonTest::test_evaluatorOutageRefundsSubmittedJobAfterDeadline()
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [303943] ChioWorkClaimEscrow::fund(Terms({ agreementDigest: 0xc97b92af145839f85901b36fc95a6c40dad4dd6bc69708055a45d53bd9013eff, payer: 0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02, beneficiary: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, verifier: 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968, token: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, amount: 100, submitBy: 1003600 [1.003e6], challengeUntil: 1007200 [1.007e6], resolveBy: 1010800 [1.01e6], refundAfter: 1014400 [1.014e6] }))
+    │   ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   │   └─ ← [Return] 100
+    │   ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [28420] MockUSDC::transferFrom(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 100)
+    │   │   ├─ emit Transfer(from: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], to: ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], amount: 100)
+    │   │   └─ ← [Return] true
+    │   ├─ [559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 100
+    │   ├─ emit Funded(allocationId: 0xd5410d671a26df525cb0973380d347918c3d38affc46e71c70db23cb0c8514f1, agreementDigest: 0xc97b92af145839f85901b36fc95a6c40dad4dd6bc69708055a45d53bd9013eff, payer: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return] 0xd5410d671a26df525cb0973380d347918c3d38affc46e71c70db23cb0c8514f1
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [78255] ChioWorkClaimEscrow::submitClaim(0xd5410d671a26df525cb0973380d347918c3d38affc46e71c70db23cb0c8514f1, 0xf5057806dd9ab38c7614e1293bf1c6e35e702f39bc73914aeae32420d3b77a11)
+    │   ├─ emit ClaimSubmitted(allocationId: 0xd5410d671a26df525cb0973380d347918c3d38affc46e71c70db23cb0c8514f1, commitment: 0xf5057806dd9ab38c7614e1293bf1c6e35e702f39bc73914aeae32420d3b77a11)
+    │   └─ ← [Stop]
+    ├─ [0] VM::warp(1014401 [1.014e6])
+    │   └─ ← [Return]
+    ├─ [122000] ChioWorkClaimEscrow::withdrawRefund(0xd5410d671a26df525cb0973380d347918c3d38affc46e71c70db23cb0c8514f1)
+    │   ├─ emit TimedOut(allocationId: 0xd5410d671a26df525cb0973380d347918c3d38affc46e71c70db23cb0c8514f1)
+    │   ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 100
+    │   ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [25981] MockUSDC::transfer(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], 100)
+    │   │   ├─ emit Transfer(from: ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], to: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 100)
+    │   │   └─ ← [Return] true
+    │   ├─ [559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   │   └─ ← [Return] 100
+    │   ├─ emit Refunded(allocationId: 0xd5410d671a26df525cb0973380d347918c3d38affc46e71c70db23cb0c8514f1, payer: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 100)
+    │   └─ ← [Stop]
+    ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   └─ ← [Return] 100
+    ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2325] MockUSDC::totalSupply() [staticcall]
+    │   └─ ← [Return] 100
+    └─ ← [Stop]
+
+[PASS] test_independentChildCanCompleteAfterParentExpiryRefund() (gas: 1245543)
+Traces:
+  [1389607] ChioPaperComparisonTest::test_independentChildCanCompleteAfterParentExpiryRefund()
+    ├─ [51255] MockUSDC::mint(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], 60)
+    │   ├─ emit Transfer(from: 0x0000000000000000000000000000000000000000, to: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], amount: 60)
+    │   └─ ← [Stop]
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [303943] ChioWorkClaimEscrow::fund(Terms({ agreementDigest: 0xff483e972a04a9a62bb4b7d04ae403c615604e4090521ecc5bb7af67f71be09c, payer: 0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02, beneficiary: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, verifier: 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968, token: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, amount: 100, submitBy: 1003600 [1.003e6], challengeUntil: 1007200 [1.007e6], resolveBy: 1010800 [1.01e6], refundAfter: 1014400 [1.014e6] }))
+    │   ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   │   └─ ← [Return] 100
+    │   ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [28420] MockUSDC::transferFrom(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 100)
+    │   │   ├─ emit Transfer(from: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], to: ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], amount: 100)
+    │   │   └─ ← [Return] true
+    │   ├─ [559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 100
+    │   ├─ emit Funded(allocationId: 0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0, agreementDigest: 0xff483e972a04a9a62bb4b7d04ae403c615604e4090521ecc5bb7af67f71be09c, payer: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return] 0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [286843] ChioWorkClaimEscrow::fund(Terms({ agreementDigest: 0xef5b8fe8789ed448b54018e6e47371bfa696902c135a273e35ad0d4cf6df057e, payer: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, beneficiary: 0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC, verifier: 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968, token: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, amount: 60, submitBy: 1018000 [1.018e6], challengeUntil: 1021600 [1.021e6], resolveBy: 1025200 [1.025e6], refundAfter: 1028800 [1.028e6] }))
+    │   ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   │   └─ ← [Return] 60
+    │   ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 100
+    │   ├─ [11320] MockUSDC::transferFrom(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 60)
+    │   │   ├─ emit Transfer(from: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], to: ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], amount: 60)
+    │   │   └─ ← [Return] true
+    │   ├─ [559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 160
+    │   ├─ emit Funded(allocationId: 0x13188355fc4800cfdddb38a965992841354eb91eb52681a2912b84db2814781b, agreementDigest: 0xef5b8fe8789ed448b54018e6e47371bfa696902c135a273e35ad0d4cf6df057e, payer: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return] 0x13188355fc4800cfdddb38a965992841354eb91eb52681a2912b84db2814781b
+    ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   └─ ← [Return] 160
+    ├─ [2325] MockUSDC::totalSupply() [staticcall]
+    │   └─ ← [Return] 160
+    ├─ [0] VM::prank(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC])
+    │   └─ ← [Return]
+    ├─ [78243] ChioWorkClaimEscrow::submitClaim(0x13188355fc4800cfdddb38a965992841354eb91eb52681a2912b84db2814781b, 0x0633f4e93970a84d1865065855e80d13e396d566e8e264020a98609ee8efa8b5)
+    │   ├─ emit ClaimSubmitted(allocationId: 0x13188355fc4800cfdddb38a965992841354eb91eb52681a2912b84db2814781b, commitment: 0x0633f4e93970a84d1865065855e80d13e396d566e8e264020a98609ee8efa8b5)
+    │   └─ ← [Stop]
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [78243] ChioWorkClaimEscrow::submitClaim(0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0, 0x4c0edd9af9a85bec1ff5e90e38d9a72a689675cfe7a81905fd40d8fd869f6852)
+    │   ├─ emit ClaimSubmitted(allocationId: 0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0, commitment: 0x4c0edd9af9a85bec1ff5e90e38d9a72a689675cfe7a81905fd40d8fd869f6852)
+    │   └─ ← [Stop]
+    ├─ [0] VM::warp(1014401 [1.014e6])
+    │   └─ ← [Return]
+    ├─ [121988] ChioWorkClaimEscrow::withdrawRefund(0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0)
+    │   ├─ emit TimedOut(allocationId: 0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0)
+    │   ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 160
+    │   ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [25981] MockUSDC::transfer(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], 100)
+    │   │   ├─ emit Transfer(from: ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], to: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 100)
+    │   │   └─ ← [Return] true
+    │   ├─ [559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 60
+    │   ├─ [559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   │   └─ ← [Return] 100
+    │   ├─ emit Refunded(allocationId: 0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0, payer: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 100)
+    │   └─ ← [Stop]
+    ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   └─ ← [Return] 100
+    ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   └─ ← [Return] 60
+    ├─ [2325] MockUSDC::totalSupply() [staticcall]
+    │   └─ ← [Return] 160
+    ├─ [0] VM::warp(1021601 [1.021e6])
+    │   └─ ← [Return]
+    ├─ [29701] ChioWorkClaimEscrow::getWork(0x13188355fc4800cfdddb38a965992841354eb91eb52681a2912b84db2814781b) [staticcall]
+    │   └─ ← [Return] Work({ terms: Terms({ agreementDigest: 0xef5b8fe8789ed448b54018e6e47371bfa696902c135a273e35ad0d4cf6df057e, payer: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, beneficiary: 0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC, verifier: 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968, token: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, amount: 60, submitBy: 1018000 [1.018e6], challengeUntil: 1021600 [1.021e6], resolveBy: 1025200 [1.025e6], refundAfter: 1028800 [1.028e6] }), state: 2, commitment: 0x0633f4e93970a84d1865065855e80d13e396d566e8e264020a98609ee8efa8b5, decisionDigest: 0x0000000000000000000000000000000000000000000000000000000000000000, accepted: false, paid: 0, refunded: 0 })
+    ├─ [0] VM::sign("<pk>", 0x2910082b94159c27f9b71347b583f24ee405fadb3091af89185f231e9021066c) [staticcall]
+    │   └─ ← [Return] 27, 0x85d7c2f644a9e51bb8b77934098764543f05342e33e5369a832bec90c0032fdc, 0x06a7841ab30aa729a0915395826e92038e7490530d6dc9353cb37e5ec97f78e3
+    ├─ [117839] ChioWorkClaimEscrow::recordDecision(0x13188355fc4800cfdddb38a965992841354eb91eb52681a2912b84db2814781b, 0x9895fb77d24369a63932b196c5f0909a2d7d534c8c5a30d122e26efa5f3f560e, true, 0x85d7c2f644a9e51bb8b77934098764543f05342e33e5369a832bec90c0032fdc06a7841ab30aa729a0915395826e92038e7490530d6dc9353cb37e5ec97f78e31b)
+    │   ├─ [3000] PRECOMPILES::ecrecover(0x2910082b94159c27f9b71347b583f24ee405fadb3091af89185f231e9021066c, 27, 60538826558671066336776506051215597084417589834667649964819529541712571740124, 3009852301649260803633641627094985431883382191564418531873100833713551276259) [staticcall]
+    │   │   └─ ← [Return] 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968
+    │   ├─ emit DecisionRecorded(allocationId: 0x13188355fc4800cfdddb38a965992841354eb91eb52681a2912b84db2814781b, decisionDigest: 0x9895fb77d24369a63932b196c5f0909a2d7d534c8c5a30d122e26efa5f3f560e, accepted: true)
+    │   └─ ← [Stop]
+    ├─ [0] VM::prank(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC])
+    │   └─ ← [Return]
+    ├─ [117844] ChioWorkClaimEscrow::withdrawPayment(0x13188355fc4800cfdddb38a965992841354eb91eb52681a2912b84db2814781b)
+    │   ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 60
+    │   ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [25981] MockUSDC::transfer(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], 60)
+    │   │   ├─ emit Transfer(from: ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], to: worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], amount: 60)
+    │   │   └─ ← [Return] true
+    │   ├─ [559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   │   └─ ← [Return] 60
+    │   ├─ emit Paid(allocationId: 0x13188355fc4800cfdddb38a965992841354eb91eb52681a2912b84db2814781b, beneficiary: worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], amount: 60)
+    │   └─ ← [Stop]
+    ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   └─ ← [Return] 100
+    ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   └─ ← [Return] 60
+    ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2325] MockUSDC::totalSupply() [staticcall]
+    │   └─ ← [Return] 160
+    └─ ← [Stop]
+
+[PASS] test_independentChildPaymentSurvivesParentRejection() (gas: 1306686)
+Logs:
+  Chio parent rejected after child paid: buyer=100 intermediary=0 worker=60 escrow=0 supply=160
+
+Traces:
+  [1470314] ChioPaperComparisonTest::test_independentChildPaymentSurvivesParentRejection()
+    ├─ [51255] MockUSDC::mint(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], 60)
+    │   ├─ emit Transfer(from: 0x0000000000000000000000000000000000000000, to: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], amount: 60)
+    │   └─ ← [Stop]
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [303943] ChioWorkClaimEscrow::fund(Terms({ agreementDigest: 0xff483e972a04a9a62bb4b7d04ae403c615604e4090521ecc5bb7af67f71be09c, payer: 0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02, beneficiary: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, verifier: 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968, token: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, amount: 100, submitBy: 1003600 [1.003e6], challengeUntil: 1007200 [1.007e6], resolveBy: 1010800 [1.01e6], refundAfter: 1014400 [1.014e6] }))
+    │   ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   │   └─ ← [Return] 100
+    │   ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [28420] MockUSDC::transferFrom(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 100)
+    │   │   ├─ emit Transfer(from: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], to: ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], amount: 100)
+    │   │   └─ ← [Return] true
+    │   ├─ [559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 100
+    │   ├─ emit Funded(allocationId: 0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0, agreementDigest: 0xff483e972a04a9a62bb4b7d04ae403c615604e4090521ecc5bb7af67f71be09c, payer: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return] 0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [286843] ChioWorkClaimEscrow::fund(Terms({ agreementDigest: 0xef5b8fe8789ed448b54018e6e47371bfa696902c135a273e35ad0d4cf6df057e, payer: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, beneficiary: 0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC, verifier: 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968, token: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, amount: 60, submitBy: 1003600 [1.003e6], challengeUntil: 1007200 [1.007e6], resolveBy: 1010800 [1.01e6], refundAfter: 1014400 [1.014e6] }))
+    │   ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   │   └─ ← [Return] 60
+    │   ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 100
+    │   ├─ [11320] MockUSDC::transferFrom(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 60)
+    │   │   ├─ emit Transfer(from: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], to: ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], amount: 60)
+    │   │   └─ ← [Return] true
+    │   ├─ [559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 160
+    │   ├─ emit Funded(allocationId: 0xd3b4c1b3d8185aa4dcb82c42d6f901971a7652b27b2c8b4fe012907d9bf391dd, agreementDigest: 0xef5b8fe8789ed448b54018e6e47371bfa696902c135a273e35ad0d4cf6df057e, payer: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return] 0xd3b4c1b3d8185aa4dcb82c42d6f901971a7652b27b2c8b4fe012907d9bf391dd
+    ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   └─ ← [Return] 160
+    ├─ [2325] MockUSDC::totalSupply() [staticcall]
+    │   └─ ← [Return] 160
+    ├─ [0] VM::prank(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC])
+    │   └─ ← [Return]
+    ├─ [78243] ChioWorkClaimEscrow::submitClaim(0xd3b4c1b3d8185aa4dcb82c42d6f901971a7652b27b2c8b4fe012907d9bf391dd, 0x177a3dc1c567e41d1200095a80248766c051770bd930ccae75fa8d11e334189c)
+    │   ├─ emit ClaimSubmitted(allocationId: 0xd3b4c1b3d8185aa4dcb82c42d6f901971a7652b27b2c8b4fe012907d9bf391dd, commitment: 0x177a3dc1c567e41d1200095a80248766c051770bd930ccae75fa8d11e334189c)
+    │   └─ ← [Stop]
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [78243] ChioWorkClaimEscrow::submitClaim(0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0, 0x4c0edd9af9a85bec1ff5e90e38d9a72a689675cfe7a81905fd40d8fd869f6852)
+    │   ├─ emit ClaimSubmitted(allocationId: 0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0, commitment: 0x4c0edd9af9a85bec1ff5e90e38d9a72a689675cfe7a81905fd40d8fd869f6852)
+    │   └─ ← [Stop]
+    ├─ [0] VM::warp(1007201 [1.007e6])
+    │   └─ ← [Return]
+    ├─ [29701] ChioWorkClaimEscrow::getWork(0xd3b4c1b3d8185aa4dcb82c42d6f901971a7652b27b2c8b4fe012907d9bf391dd) [staticcall]
+    │   └─ ← [Return] Work({ terms: Terms({ agreementDigest: 0xef5b8fe8789ed448b54018e6e47371bfa696902c135a273e35ad0d4cf6df057e, payer: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, beneficiary: 0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC, verifier: 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968, token: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, amount: 60, submitBy: 1003600 [1.003e6], challengeUntil: 1007200 [1.007e6], resolveBy: 1010800 [1.01e6], refundAfter: 1014400 [1.014e6] }), state: 2, commitment: 0x177a3dc1c567e41d1200095a80248766c051770bd930ccae75fa8d11e334189c, decisionDigest: 0x0000000000000000000000000000000000000000000000000000000000000000, accepted: false, paid: 0, refunded: 0 })
+    ├─ [0] VM::sign("<pk>", 0x0e29547770bfbb34989fffc8a81e51a747f3ff0f33f2dbba72de5e1b226d4bac) [staticcall]
+    │   └─ ← [Return] 28, 0xc4e24c2a6228dab2e4d41f05f5f133926be3d5a26c4fb508cb32e341daab055a, 0x3ca9f5d3288fb3ae56d5a9d4e0feac903408e1fdfe2c97640df5618325fb218a
+    ├─ [117871] ChioWorkClaimEscrow::recordDecision(0xd3b4c1b3d8185aa4dcb82c42d6f901971a7652b27b2c8b4fe012907d9bf391dd, 0xfe119ccf4bd756807824061b402342ea0a1f7f3b9c441afc618221786e3bb37f, true, 0xc4e24c2a6228dab2e4d41f05f5f133926be3d5a26c4fb508cb32e341daab055a3ca9f5d3288fb3ae56d5a9d4e0feac903408e1fdfe2c97640df5618325fb218a1c)
+    │   ├─ [3000] PRECOMPILES::ecrecover(0x0e29547770bfbb34989fffc8a81e51a747f3ff0f33f2dbba72de5e1b226d4bac, 28, 89053151434337654147352511671615325597188118066497169188372854241940887766362, 27439064689618847901933268732077677206119278109730406502593313547480502837642) [staticcall]
+    │   │   └─ ← [Return] 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968
+    │   ├─ emit DecisionRecorded(allocationId: 0xd3b4c1b3d8185aa4dcb82c42d6f901971a7652b27b2c8b4fe012907d9bf391dd, decisionDigest: 0xfe119ccf4bd756807824061b402342ea0a1f7f3b9c441afc618221786e3bb37f, accepted: true)
+    │   └─ ← [Stop]
+    ├─ [0] VM::prank(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC])
+    │   └─ ← [Return]
+    ├─ [117856] ChioWorkClaimEscrow::withdrawPayment(0xd3b4c1b3d8185aa4dcb82c42d6f901971a7652b27b2c8b4fe012907d9bf391dd)
+    │   ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 160
+    │   ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [25981] MockUSDC::transfer(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], 60)
+    │   │   ├─ emit Transfer(from: ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], to: worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], amount: 60)
+    │   │   └─ ← [Return] true
+    │   ├─ [559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 100
+    │   ├─ [559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   │   └─ ← [Return] 60
+    │   ├─ emit Paid(allocationId: 0xd3b4c1b3d8185aa4dcb82c42d6f901971a7652b27b2c8b4fe012907d9bf391dd, beneficiary: worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], amount: 60)
+    │   └─ ← [Stop]
+    ├─ [29701] ChioWorkClaimEscrow::getWork(0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0) [staticcall]
+    │   └─ ← [Return] Work({ terms: Terms({ agreementDigest: 0xff483e972a04a9a62bb4b7d04ae403c615604e4090521ecc5bb7af67f71be09c, payer: 0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02, beneficiary: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, verifier: 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968, token: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, amount: 100, submitBy: 1003600 [1.003e6], challengeUntil: 1007200 [1.007e6], resolveBy: 1010800 [1.01e6], refundAfter: 1014400 [1.014e6] }), state: 2, commitment: 0x4c0edd9af9a85bec1ff5e90e38d9a72a689675cfe7a81905fd40d8fd869f6852, decisionDigest: 0x0000000000000000000000000000000000000000000000000000000000000000, accepted: false, paid: 0, refunded: 0 })
+    ├─ [0] VM::sign("<pk>", 0x29ef70b78913aff3e26bfc2b19b0eac557b5a9d9f2f843ba027ca9651ad5684e) [staticcall]
+    │   └─ ← [Return] 27, 0x3e76d9142575f066bec95689871476ac9a6a3838479f29d856890a09befee963, 0x14710376911249fa0085e15acd3b577f362e0b280ef386a31537a5b8078a8201
+    ├─ [97913] ChioWorkClaimEscrow::recordDecision(0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0, 0x233732266d6be3d64509d0c24fe8974e8a89a77774b2156cac1da700ad039a1e, false, 0x3e76d9142575f066bec95689871476ac9a6a3838479f29d856890a09befee96314710376911249fa0085e15acd3b577f362e0b280ef386a31537a5b8078a82011b)
+    │   ├─ [3000] PRECOMPILES::ecrecover(0x29ef70b78913aff3e26bfc2b19b0eac557b5a9d9f2f843ba027ca9651ad5684e, 27, 28253382787907624435502927420786622534669151723439642380392480914921083562339, 9245934591775838230390479332095748385318626930441983630454490057804010390017) [staticcall]
+    │   │   └─ ← [Return] 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968
+    │   ├─ emit DecisionRecorded(allocationId: 0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0, decisionDigest: 0x233732266d6be3d64509d0c24fe8974e8a89a77774b2156cac1da700ad039a1e, accepted: false)
+    │   └─ ← [Stop]
+    ├─ [117750] ChioWorkClaimEscrow::withdrawRefund(0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0)
+    │   ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 100
+    │   ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [25981] MockUSDC::transfer(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], 100)
+    │   │   ├─ emit Transfer(from: ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], to: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 100)
+    │   │   └─ ← [Return] true
+    │   ├─ [559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   │   └─ ← [Return] 100
+    │   ├─ emit Refunded(allocationId: 0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0, payer: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 100)
+    │   └─ ← [Stop]
+    ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   └─ ← [Return] 100
+    ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   └─ ← [Return] 60
+    ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2325] MockUSDC::totalSupply() [staticcall]
+    │   └─ ← [Return] 160
+    ├─ emit log(val: "Chio parent rejected after child paid: buyer=100 intermediary=0 worker=60 escrow=0 supply=160")
+    └─ ← [Stop]
+
+[FAIL: next call did not revert as expected] test_newAcceptanceRejectedAfterResolveByEvenBeforeRefund() (gas: 434007)
+Traces:
+  [2737404] ChioPaperComparisonTest::setUp()
+    ├─ [0] VM::warp(1000000 [1e6])
+    │   └─ ← [Return]
+    ├─ [0] VM::addr(<pk>) [staticcall]
+    │   └─ ← [Return] 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968
+    ├─ [507908] → new MockUSDC@0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f
+    │   └─ ← [Return] 1862 bytes of code
+    ├─ [1845566] → new ChioWorkClaimEscrow@0x2e234DAe75C793f67A35089C9d99245E1C58470b
+    │   └─ ← [Return] 8281 bytes of code
+    ├─ [48431] ChioWorkClaimEscrow::setTokenAllowed(MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], true)
+    │   ├─ emit TokenAllowed(token: MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], allowed: true)
+    │   └─ ← [Stop]
+    ├─ [45725] ChioWorkClaimEscrow::setVerifierAllowed(0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968, true)
+    │   ├─ emit VerifierAllowed(verifier: 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968, allowed: true)
+    │   └─ ← [Stop]
+    ├─ [68355] MockUSDC::mint(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], 100)
+    │   ├─ emit Transfer(from: 0x0000000000000000000000000000000000000000, to: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 100)
+    │   └─ ← [Stop]
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [46678] MockUSDC::approve(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 115792089237316195423570985008687907853269984665640564039457584007913129639935 [1.157e77])
+    │   ├─ emit Approval(owner: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], spender: ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], amount: 115792089237316195423570985008687907853269984665640564039457584007913129639935 [1.157e77])
+    │   └─ ← [Return] true
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [46678] MockUSDC::approve(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 115792089237316195423570985008687907853269984665640564039457584007913129639935 [1.157e77])
+    │   ├─ emit Approval(owner: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], spender: ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], amount: 115792089237316195423570985008687907853269984665640564039457584007913129639935 [1.157e77])
+    │   └─ ← [Return] true
+    └─ ← [Stop]
+
+  [434007] ChioPaperComparisonTest::test_newAcceptanceRejectedAfterResolveByEvenBeforeRefund()
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [303943] ChioWorkClaimEscrow::fund(Terms({ agreementDigest: 0xd22ba2f5c26069bdb74740bf6cd2bda72537f7f337ee89e9c1a90344f6a36333, payer: 0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02, beneficiary: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, verifier: 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968, token: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, amount: 100, submitBy: 1003600 [1.003e6], challengeUntil: 1007200 [1.007e6], resolveBy: 1010800 [1.01e6], refundAfter: 1014400 [1.014e6] }))
+    │   ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   │   └─ ← [Return] 100
+    │   ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [28420] MockUSDC::transferFrom(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 100)
+    │   │   ├─ emit Transfer(from: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], to: ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], amount: 100)
+    │   │   └─ ← [Return] true
+    │   ├─ [559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 100
+    │   ├─ emit Funded(allocationId: 0x28a75e5a4d8dfcef7ee870e30d68441a54083305c32eabbe4805ce9a25af5396, agreementDigest: 0xd22ba2f5c26069bdb74740bf6cd2bda72537f7f337ee89e9c1a90344f6a36333, payer: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return] 0x28a75e5a4d8dfcef7ee870e30d68441a54083305c32eabbe4805ce9a25af5396
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [78255] ChioWorkClaimEscrow::submitClaim(0x28a75e5a4d8dfcef7ee870e30d68441a54083305c32eabbe4805ce9a25af5396, 0x284288e0dc02cbb55efc867354558c67967135e0c1c252411562c7cce31e4ade)
+    │   ├─ emit ClaimSubmitted(allocationId: 0x28a75e5a4d8dfcef7ee870e30d68441a54083305c32eabbe4805ce9a25af5396, commitment: 0x284288e0dc02cbb55efc867354558c67967135e0c1c252411562c7cce31e4ade)
+    │   └─ ← [Stop]
+    ├─ [0] VM::warp(1010801 [1.01e6])
+    │   └─ ← [Return]
+    ├─ [0] VM::expectRevert(OutsideResolutionWindow())
+    │   └─ ← [Return]
+    ├─ [29701] ChioWorkClaimEscrow::getWork(0x28a75e5a4d8dfcef7ee870e30d68441a54083305c32eabbe4805ce9a25af5396) [staticcall]
+    │   └─ ← [Return] Work({ terms: Terms({ agreementDigest: 0xd22ba2f5c26069bdb74740bf6cd2bda72537f7f337ee89e9c1a90344f6a36333, payer: 0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02, beneficiary: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, verifier: 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968, token: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, amount: 100, submitBy: 1003600 [1.003e6], challengeUntil: 1007200 [1.007e6], resolveBy: 1010800 [1.01e6], refundAfter: 1014400 [1.014e6] }), state: 2, commitment: 0x284288e0dc02cbb55efc867354558c67967135e0c1c252411562c7cce31e4ade, decisionDigest: 0x0000000000000000000000000000000000000000000000000000000000000000, accepted: false, paid: 0, refunded: 0 })
+    └─ ← [Revert] next call did not revert as expected
+
+Backtrace:
+  at ChioPaperComparisonTest.test_newAcceptanceRejectedAfterResolveByEvenBeforeRefund
+
+[PASS] test_sameOneHundredUnitsCannotFundTwoSixtyUnitJobs() (gas: 625185)
+Traces:
+  [645085] ChioPaperComparisonTest::test_sameOneHundredUnitsCannotFundTwoSixtyUnitJobs()
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [303931] ChioWorkClaimEscrow::fund(Terms({ agreementDigest: 0x692e3fbb06193c3a65b6ccb60c9ec6fb32af21c16d3f6ac10039258c2a5d4d2d, payer: 0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02, beneficiary: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, verifier: 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968, token: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, amount: 60, submitBy: 1003600 [1.003e6], challengeUntil: 1007200 [1.007e6], resolveBy: 1010800 [1.01e6], refundAfter: 1014400 [1.014e6] }))
+    │   ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   │   └─ ← [Return] 100
+    │   ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [28420] MockUSDC::transferFrom(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 60)
+    │   │   ├─ emit Transfer(from: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], to: ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], amount: 60)
+    │   │   └─ ← [Return] true
+    │   ├─ [559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   │   └─ ← [Return] 40
+    │   ├─ [559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 60
+    │   ├─ emit Funded(allocationId: 0x5d5c32818d65afe3f31e80f06ad82726a1db5aec70ff9f081791e0079fc5f887, agreementDigest: 0x692e3fbb06193c3a65b6ccb60c9ec6fb32af21c16d3f6ac10039258c2a5d4d2d, payer: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return] 0x5d5c32818d65afe3f31e80f06ad82726a1db5aec70ff9f081791e0079fc5f887
+    ├─ [0] VM::expectRevert(TransferFailed())
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [274191] ChioWorkClaimEscrow::fund(Terms({ agreementDigest: 0x45318970bfff215a328f56895f3a97d4f276a44c24c135c12c37867a1f667b8a, payer: 0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02, beneficiary: 0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC, verifier: 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968, token: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, amount: 60, submitBy: 1003600 [1.003e6], challengeUntil: 1007200 [1.007e6], resolveBy: 1010800 [1.01e6], refundAfter: 1014400 [1.014e6] }))
+    │   ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   │   └─ ← [Return] 40
+    │   ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 60
+    │   ├─ [3333] MockUSDC::transferFrom(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 60)
+    │   │   └─ ← [Revert] ERC20InsufficientBalance(0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02, 40, 60)
+    │   └─ ← [Revert] TransferFailed()
+    ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   └─ ← [Return] 40
+    ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   └─ ← [Return] 60
+    ├─ [2325] MockUSDC::totalSupply() [staticcall]
+    │   └─ ← [Return] 100
+    └─ ← [Stop]
+
+[PASS] test_successfulParentAndChildExchangeSeparatesPayableAndPaid() (gas: 1450895)
+Logs:
+  Chio success: buyer=0 intermediary=100 worker=60 escrow=0 supply=160
+
+Traces:
+  [1614859] ChioPaperComparisonTest::test_successfulParentAndChildExchangeSeparatesPayableAndPaid()
+    ├─ [51255] MockUSDC::mint(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], 60)
+    │   ├─ emit Transfer(from: 0x0000000000000000000000000000000000000000, to: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], amount: 60)
+    │   └─ ← [Stop]
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [303943] ChioWorkClaimEscrow::fund(Terms({ agreementDigest: 0xff483e972a04a9a62bb4b7d04ae403c615604e4090521ecc5bb7af67f71be09c, payer: 0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02, beneficiary: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, verifier: 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968, token: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, amount: 100, submitBy: 1003600 [1.003e6], challengeUntil: 1007200 [1.007e6], resolveBy: 1010800 [1.01e6], refundAfter: 1014400 [1.014e6] }))
+    │   ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   │   └─ ← [Return] 100
+    │   ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [28420] MockUSDC::transferFrom(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 100)
+    │   │   ├─ emit Transfer(from: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], to: ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], amount: 100)
+    │   │   └─ ← [Return] true
+    │   ├─ [559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 100
+    │   ├─ emit Funded(allocationId: 0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0, agreementDigest: 0xff483e972a04a9a62bb4b7d04ae403c615604e4090521ecc5bb7af67f71be09c, payer: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return] 0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [286843] ChioWorkClaimEscrow::fund(Terms({ agreementDigest: 0xef5b8fe8789ed448b54018e6e47371bfa696902c135a273e35ad0d4cf6df057e, payer: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, beneficiary: 0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC, verifier: 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968, token: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, amount: 60, submitBy: 1003600 [1.003e6], challengeUntil: 1007200 [1.007e6], resolveBy: 1010800 [1.01e6], refundAfter: 1014400 [1.014e6] }))
+    │   ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   │   └─ ← [Return] 60
+    │   ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 100
+    │   ├─ [11320] MockUSDC::transferFrom(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 60)
+    │   │   ├─ emit Transfer(from: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], to: ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], amount: 60)
+    │   │   └─ ← [Return] true
+    │   ├─ [559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 160
+    │   ├─ emit Funded(allocationId: 0xd3b4c1b3d8185aa4dcb82c42d6f901971a7652b27b2c8b4fe012907d9bf391dd, agreementDigest: 0xef5b8fe8789ed448b54018e6e47371bfa696902c135a273e35ad0d4cf6df057e, payer: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return] 0xd3b4c1b3d8185aa4dcb82c42d6f901971a7652b27b2c8b4fe012907d9bf391dd
+    ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   └─ ← [Return] 160
+    ├─ [2325] MockUSDC::totalSupply() [staticcall]
+    │   └─ ← [Return] 160
+    ├─ [0] VM::prank(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC])
+    │   └─ ← [Return]
+    ├─ [78243] ChioWorkClaimEscrow::submitClaim(0xd3b4c1b3d8185aa4dcb82c42d6f901971a7652b27b2c8b4fe012907d9bf391dd, 0x177a3dc1c567e41d1200095a80248766c051770bd930ccae75fa8d11e334189c)
+    │   ├─ emit ClaimSubmitted(allocationId: 0xd3b4c1b3d8185aa4dcb82c42d6f901971a7652b27b2c8b4fe012907d9bf391dd, commitment: 0x177a3dc1c567e41d1200095a80248766c051770bd930ccae75fa8d11e334189c)
+    │   └─ ← [Stop]
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [78243] ChioWorkClaimEscrow::submitClaim(0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0, 0x4c0edd9af9a85bec1ff5e90e38d9a72a689675cfe7a81905fd40d8fd869f6852)
+    │   ├─ emit ClaimSubmitted(allocationId: 0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0, commitment: 0x4c0edd9af9a85bec1ff5e90e38d9a72a689675cfe7a81905fd40d8fd869f6852)
+    │   └─ ← [Stop]
+    ├─ [0] VM::warp(1007201 [1.007e6])
+    │   └─ ← [Return]
+    ├─ [29701] ChioWorkClaimEscrow::getWork(0xd3b4c1b3d8185aa4dcb82c42d6f901971a7652b27b2c8b4fe012907d9bf391dd) [staticcall]
+    │   └─ ← [Return] Work({ terms: Terms({ agreementDigest: 0xef5b8fe8789ed448b54018e6e47371bfa696902c135a273e35ad0d4cf6df057e, payer: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, beneficiary: 0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC, verifier: 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968, token: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, amount: 60, submitBy: 1003600 [1.003e6], challengeUntil: 1007200 [1.007e6], resolveBy: 1010800 [1.01e6], refundAfter: 1014400 [1.014e6] }), state: 2, commitment: 0x177a3dc1c567e41d1200095a80248766c051770bd930ccae75fa8d11e334189c, decisionDigest: 0x0000000000000000000000000000000000000000000000000000000000000000, accepted: false, paid: 0, refunded: 0 })
+    ├─ [0] VM::sign("<pk>", 0x0e29547770bfbb34989fffc8a81e51a747f3ff0f33f2dbba72de5e1b226d4bac) [staticcall]
+    │   └─ ← [Return] 28, 0xc4e24c2a6228dab2e4d41f05f5f133926be3d5a26c4fb508cb32e341daab055a, 0x3ca9f5d3288fb3ae56d5a9d4e0feac903408e1fdfe2c97640df5618325fb218a
+    ├─ [117871] ChioWorkClaimEscrow::recordDecision(0xd3b4c1b3d8185aa4dcb82c42d6f901971a7652b27b2c8b4fe012907d9bf391dd, 0xfe119ccf4bd756807824061b402342ea0a1f7f3b9c441afc618221786e3bb37f, true, 0xc4e24c2a6228dab2e4d41f05f5f133926be3d5a26c4fb508cb32e341daab055a3ca9f5d3288fb3ae56d5a9d4e0feac903408e1fdfe2c97640df5618325fb218a1c)
+    │   ├─ [3000] PRECOMPILES::ecrecover(0x0e29547770bfbb34989fffc8a81e51a747f3ff0f33f2dbba72de5e1b226d4bac, 28, 89053151434337654147352511671615325597188118066497169188372854241940887766362, 27439064689618847901933268732077677206119278109730406502593313547480502837642) [staticcall]
+    │   │   └─ ← [Return] 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968
+    │   ├─ emit DecisionRecorded(allocationId: 0xd3b4c1b3d8185aa4dcb82c42d6f901971a7652b27b2c8b4fe012907d9bf391dd, decisionDigest: 0xfe119ccf4bd756807824061b402342ea0a1f7f3b9c441afc618221786e3bb37f, accepted: true)
+    │   └─ ← [Stop]
+    ├─ [29701] ChioWorkClaimEscrow::getWork(0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0) [staticcall]
+    │   └─ ← [Return] Work({ terms: Terms({ agreementDigest: 0xff483e972a04a9a62bb4b7d04ae403c615604e4090521ecc5bb7af67f71be09c, payer: 0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02, beneficiary: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, verifier: 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968, token: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, amount: 100, submitBy: 1003600 [1.003e6], challengeUntil: 1007200 [1.007e6], resolveBy: 1010800 [1.01e6], refundAfter: 1014400 [1.014e6] }), state: 2, commitment: 0x4c0edd9af9a85bec1ff5e90e38d9a72a689675cfe7a81905fd40d8fd869f6852, decisionDigest: 0x0000000000000000000000000000000000000000000000000000000000000000, accepted: false, paid: 0, refunded: 0 })
+    ├─ [0] VM::sign("<pk>", 0x1ae1daef471f8b2e491c9b60856f6ea9cb4e7cd8ec10d72dc81e156c291e36a5) [staticcall]
+    │   └─ ← [Return] 27, 0xf1e26b6c3b2f5b65999dec700dae3b0d491c40a22d57dbce2d058330282c96a3, 0x1f92ab2574b1d0a46121846182b977bf1955c1d6077d8f458cc69234788d8345
+    ├─ [117839] ChioWorkClaimEscrow::recordDecision(0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0, 0xc62a0e895840e7e6c414523e11c59141a0205496a0e363341b84a85a40b50c48, true, 0xf1e26b6c3b2f5b65999dec700dae3b0d491c40a22d57dbce2d058330282c96a31f92ab2574b1d0a46121846182b977bf1955c1d6077d8f458cc69234788d83451b)
+    │   ├─ [3000] PRECOMPILES::ecrecover(0x1ae1daef471f8b2e491c9b60856f6ea9cb4e7cd8ec10d72dc81e156c291e36a5, 27, 109407445349973367855160677370643858542516405209122574350082663653091104822947, 14280839185971604707827165025705269411185009118419231574066994491476803420997) [staticcall]
+    │   │   └─ ← [Return] 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968
+    │   ├─ emit DecisionRecorded(allocationId: 0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0, decisionDigest: 0xc62a0e895840e7e6c414523e11c59141a0205496a0e363341b84a85a40b50c48, accepted: true)
+    │   └─ ← [Stop]
+    ├─ [29701] ChioWorkClaimEscrow::getWork(0xd3b4c1b3d8185aa4dcb82c42d6f901971a7652b27b2c8b4fe012907d9bf391dd) [staticcall]
+    │   └─ ← [Return] Work({ terms: Terms({ agreementDigest: 0xef5b8fe8789ed448b54018e6e47371bfa696902c135a273e35ad0d4cf6df057e, payer: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, beneficiary: 0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC, verifier: 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968, token: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, amount: 60, submitBy: 1003600 [1.003e6], challengeUntil: 1007200 [1.007e6], resolveBy: 1010800 [1.01e6], refundAfter: 1014400 [1.014e6] }), state: 3, commitment: 0x177a3dc1c567e41d1200095a80248766c051770bd930ccae75fa8d11e334189c, decisionDigest: 0xfe119ccf4bd756807824061b402342ea0a1f7f3b9c441afc618221786e3bb37f, accepted: true, paid: 0, refunded: 0 })
+    ├─ [29701] ChioWorkClaimEscrow::getWork(0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0) [staticcall]
+    │   └─ ← [Return] Work({ terms: Terms({ agreementDigest: 0xff483e972a04a9a62bb4b7d04ae403c615604e4090521ecc5bb7af67f71be09c, payer: 0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02, beneficiary: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, verifier: 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968, token: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, amount: 100, submitBy: 1003600 [1.003e6], challengeUntil: 1007200 [1.007e6], resolveBy: 1010800 [1.01e6], refundAfter: 1014400 [1.014e6] }), state: 3, commitment: 0x4c0edd9af9a85bec1ff5e90e38d9a72a689675cfe7a81905fd40d8fd869f6852, decisionDigest: 0xc62a0e895840e7e6c414523e11c59141a0205496a0e363341b84a85a40b50c48, accepted: true, paid: 0, refunded: 0 })
+    ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   └─ ← [Return] 160
+    ├─ [2325] MockUSDC::totalSupply() [staticcall]
+    │   └─ ← [Return] 160
+    ├─ [0] VM::prank(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC])
+    │   └─ ← [Return]
+    ├─ [117856] ChioWorkClaimEscrow::withdrawPayment(0xd3b4c1b3d8185aa4dcb82c42d6f901971a7652b27b2c8b4fe012907d9bf391dd)
+    │   ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 160
+    │   ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [25981] MockUSDC::transfer(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], 60)
+    │   │   ├─ emit Transfer(from: ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], to: worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], amount: 60)
+    │   │   └─ ← [Return] true
+    │   ├─ [559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 100
+    │   ├─ [559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   │   └─ ← [Return] 60
+    │   ├─ emit Paid(allocationId: 0xd3b4c1b3d8185aa4dcb82c42d6f901971a7652b27b2c8b4fe012907d9bf391dd, beneficiary: worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], amount: 60)
+    │   └─ ← [Stop]
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [117844] ChioWorkClaimEscrow::withdrawPayment(0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0)
+    │   ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 100
+    │   ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [25981] MockUSDC::transfer(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], 100)
+    │   │   ├─ emit Transfer(from: ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], to: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], amount: 100)
+    │   │   └─ ← [Return] true
+    │   ├─ [559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   │   └─ ← [Return] 100
+    │   ├─ emit Paid(allocationId: 0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0, beneficiary: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], amount: 100)
+    │   └─ ← [Stop]
+    ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   └─ ← [Return] 100
+    ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   └─ ← [Return] 60
+    ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2325] MockUSDC::totalSupply() [staticcall]
+    │   └─ ← [Return] 160
+    ├─ emit log(val: "Chio success: buyer=0 intermediary=100 worker=60 escrow=0 supply=160")
+    └─ ← [Stop]
+
+[PASS] test_unsettledParentBudgetCannotFundChildWithoutWorkingCapital() (gas: 620440)
+Traces:
+  [645140] ChioPaperComparisonTest::test_unsettledParentBudgetCannotFundChildWithoutWorkingCapital()
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [303943] ChioWorkClaimEscrow::fund(Terms({ agreementDigest: 0xff483e972a04a9a62bb4b7d04ae403c615604e4090521ecc5bb7af67f71be09c, payer: 0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02, beneficiary: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, verifier: 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968, token: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, amount: 100, submitBy: 1003600 [1.003e6], challengeUntil: 1007200 [1.007e6], resolveBy: 1010800 [1.01e6], refundAfter: 1014400 [1.014e6] }))
+    │   ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   │   └─ ← [Return] 100
+    │   ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [28420] MockUSDC::transferFrom(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 100)
+    │   │   ├─ emit Transfer(from: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], to: ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], amount: 100)
+    │   │   └─ ← [Return] true
+    │   ├─ [559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 100
+    │   ├─ emit Funded(allocationId: 0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0, agreementDigest: 0xff483e972a04a9a62bb4b7d04ae403c615604e4090521ecc5bb7af67f71be09c, payer: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return] 0x62610c824ff1257c43e6ded5c19621deb8dfa0008a9e4664617cd28c9fc1efd0
+    ├─ [0] VM::expectRevert(TransferFailed())
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [274191] ChioWorkClaimEscrow::fund(Terms({ agreementDigest: 0xef5b8fe8789ed448b54018e6e47371bfa696902c135a273e35ad0d4cf6df057e, payer: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, beneficiary: 0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC, verifier: 0xC5ac1c9F3F7aA07A373B7170269052b1bC97E968, token: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, amount: 60, submitBy: 1003600 [1.003e6], challengeUntil: 1007200 [1.007e6], resolveBy: 1010800 [1.01e6], refundAfter: 1014400 [1.014e6] }))
+    │   ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 100
+    │   ├─ [3333] MockUSDC::transferFrom(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 60)
+    │   │   └─ ← [Revert] ERC20InsufficientBalance(0xD20A6CAAA6194D7285C23b63681E2843126A7709, 0, 60)
+    │   └─ ← [Revert] TransferFailed()
+    ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(ChioWorkClaimEscrow: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   └─ ← [Return] 100
+    ├─ [2325] MockUSDC::totalSupply() [staticcall]
+    │   └─ ← [Return] 100
+    └─ ← [Stop]
+
+Suite result: FAILED. 7 passed; 1 failed; 0 skipped; finished in 19.61ms (32.66ms CPU time)
+
+Ran 12 tests for test/ERC8183PaperComparison.t.sol:ERC8183PaperComparisonTest
+[PASS] test_adminPauseBlocksRefundUntilUnpause() (gas: 589166)
+Traces:
+  [603566] ERC8183PaperComparisonTest::test_adminPauseBlocksRefundUntilUnpause()
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [162354] ERC1967Proxy::fallback(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1003600 [1.003e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0)
+    │   ├─ [134647] ERC8183::createJob(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1003600 [1.003e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0) [delegatecall]
+    │   │   ├─ emit JobCreated(jobId: 1, client: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], provider: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], expiredAt: 1003600 [1.003e6], hook: 0x0000000000000000000000000000000000000000)
+    │   │   └─ ← [Return] 1
+    │   └─ ← [Return] 1
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [90456] ERC1967Proxy::fallback(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x)
+    │   ├─ [63574] ERC8183::setBudget(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x) [delegatecall]
+    │   │   ├─ emit BudgetSet(jobId: 1, token: MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], amount: 100)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [86969] ERC1967Proxy::fallback(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x)
+    │   ├─ [60087] ERC8183::fund(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x) [delegatecall]
+    │   │   ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   │   │   └─ ← [Return] 0
+    │   │   ├─ [30420] MockUSDC::transferFrom(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], 100)
+    │   │   │   ├─ emit Transfer(from: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], to: ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], amount: 100)
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ [559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   │   │   └─ ← [Return] 100
+    │   │   ├─ emit JobFunded(jobId: 1, client: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 100)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::warp(1003600 [1.003e6])
+    │   └─ ← [Return]
+    ├─ [52042] ERC1967Proxy::fallback()
+    │   ├─ [26100] ERC8183::pause() [delegatecall]
+    │   │   ├─ emit Paused(account: ERC8183PaperComparisonTest: [0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496])
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::expectRevert(EnforcedPause())
+    │   └─ ← [Return]
+    ├─ [28586] ERC1967Proxy::fallback(1)
+    │   ├─ [2497] ERC8183::claimRefund(1) [delegatecall]
+    │   │   └─ ← [Revert] EnforcedPause()
+    │   └─ ← [Revert] EnforcedPause()
+    ├─ [35010] ERC1967Proxy::fallback()
+    │   ├─ [9068] ERC8183::unpause() [delegatecall]
+    │   │   ├─ emit Unpaused(account: ERC8183PaperComparisonTest: [0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496])
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [83778] ERC1967Proxy::fallback(1)
+    │   ├─ [57693] ERC8183::claimRefund(1) [delegatecall]
+    │   │   ├─ [29981] MockUSDC::transfer(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], 100)
+    │   │   │   ├─ emit Transfer(from: ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], to: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 100)
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ emit Refunded(jobId: 1, client: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 100)
+    │   │   ├─ emit JobExpired(jobId: 1)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   └─ ← [Return] 100
+    ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2325] MockUSDC::totalSupply() [staticcall]
+    │   └─ ← [Return] 100
+    └─ ← [Stop]
+
+[PASS] test_afterGraceCompletionCanWinIfRefundHasNotExecuted() (gas: 602091)
+Traces:
+  [611691] ERC8183PaperComparisonTest::test_afterGraceCompletionCanWinIfRefundHasNotExecuted()
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [162354] ERC1967Proxy::fallback(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1003600 [1.003e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0)
+    │   ├─ [134647] ERC8183::createJob(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1003600 [1.003e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0) [delegatecall]
+    │   │   ├─ emit JobCreated(jobId: 1, client: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], provider: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], expiredAt: 1003600 [1.003e6], hook: 0x0000000000000000000000000000000000000000)
+    │   │   └─ ← [Return] 1
+    │   └─ ← [Return] 1
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [90456] ERC1967Proxy::fallback(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x)
+    │   ├─ [63574] ERC8183::setBudget(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x) [delegatecall]
+    │   │   ├─ emit BudgetSet(jobId: 1, token: MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], amount: 100)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [86969] ERC1967Proxy::fallback(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x)
+    │   ├─ [60087] ERC8183::fund(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x) [delegatecall]
+    │   │   ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   │   │   └─ ← [Return] 0
+    │   │   ├─ [30420] MockUSDC::transferFrom(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], 100)
+    │   │   │   ├─ emit Transfer(from: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], to: ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], amount: 100)
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ [559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   │   │   └─ ← [Return] 100
+    │   │   ├─ emit JobFunded(jobId: 1, client: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 100)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [51922] ERC1967Proxy::fallback(1, 0x1758b2051aaebc7b303d6dcfe3910ad3d22e44de6ee6cbc7252135a77255e293, 0x)
+    │   ├─ [25042] ERC8183::submit(1, 0x1758b2051aaebc7b303d6dcfe3910ad3d22e44de6ee6cbc7252135a77255e293, 0x) [delegatecall]
+    │   │   ├─ emit JobSubmitted(jobId: 1, provider: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], deliverable: 0x1758b2051aaebc7b303d6dcfe3910ad3d22e44de6ee6cbc7252135a77255e293)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [5231] ERC1967Proxy::fallback() [staticcall]
+    │   ├─ [350] ERC8183::EVALUATION_GRACE_PERIOD() [delegatecall]
+    │   │   └─ ← [Return] 3600
+    │   └─ ← [Return] 3600
+    ├─ [0] VM::warp(1871200 [1.871e6])
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d])
+    │   └─ ← [Return]
+    ├─ [97480] ERC1967Proxy::fallback(1, 0x1bb1938abfadc7a5fce59d8d25ad567930abb3d51bc6ee51d4a1ebd1be2c4f64, 0x)
+    │   ├─ [70600] ERC8183::complete(1, 0x1bb1938abfadc7a5fce59d8d25ad567930abb3d51bc6ee51d4a1ebd1be2c4f64, 0x) [delegatecall]
+    │   │   ├─ [29981] MockUSDC::transfer(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], 100)
+    │   │   │   ├─ emit Transfer(from: ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], to: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], amount: 100)
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ emit PaymentReleased(jobId: 1, recipient: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], amount: 100)
+    │   │   ├─ emit JobCompleted(jobId: 1, evaluator: evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], reason: 0x1bb1938abfadc7a5fce59d8d25ad567930abb3d51bc6ee51d4a1ebd1be2c4f64)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::expectRevert(WrongStatus())
+    │   └─ ← [Return]
+    ├─ [33669] ERC1967Proxy::fallback(1)
+    │   ├─ [7580] ERC8183::claimRefund(1) [delegatecall]
+    │   │   └─ ← [Revert] WrongStatus()
+    │   └─ ← [Revert] WrongStatus()
+    ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   └─ ← [Return] 100
+    ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2325] MockUSDC::totalSupply() [staticcall]
+    │   └─ ← [Return] 100
+    └─ ← [Stop]
+
+[PASS] test_afterGraceRefundPreventsLaterCompletion() (gas: 588963)
+Traces:
+  [598563] ERC8183PaperComparisonTest::test_afterGraceRefundPreventsLaterCompletion()
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [162354] ERC1967Proxy::fallback(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1003600 [1.003e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0)
+    │   ├─ [134647] ERC8183::createJob(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1003600 [1.003e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0) [delegatecall]
+    │   │   ├─ emit JobCreated(jobId: 1, client: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], provider: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], expiredAt: 1003600 [1.003e6], hook: 0x0000000000000000000000000000000000000000)
+    │   │   └─ ← [Return] 1
+    │   └─ ← [Return] 1
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [90456] ERC1967Proxy::fallback(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x)
+    │   ├─ [63574] ERC8183::setBudget(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x) [delegatecall]
+    │   │   ├─ emit BudgetSet(jobId: 1, token: MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], amount: 100)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [86969] ERC1967Proxy::fallback(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x)
+    │   ├─ [60087] ERC8183::fund(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x) [delegatecall]
+    │   │   ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   │   │   └─ ← [Return] 0
+    │   │   ├─ [30420] MockUSDC::transferFrom(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], 100)
+    │   │   │   ├─ emit Transfer(from: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], to: ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], amount: 100)
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ [559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   │   │   └─ ← [Return] 100
+    │   │   ├─ emit JobFunded(jobId: 1, client: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 100)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [51922] ERC1967Proxy::fallback(1, 0x1758b2051aaebc7b303d6dcfe3910ad3d22e44de6ee6cbc7252135a77255e293, 0x)
+    │   ├─ [25042] ERC8183::submit(1, 0x1758b2051aaebc7b303d6dcfe3910ad3d22e44de6ee6cbc7252135a77255e293, 0x) [delegatecall]
+    │   │   ├─ emit JobSubmitted(jobId: 1, provider: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], deliverable: 0x1758b2051aaebc7b303d6dcfe3910ad3d22e44de6ee6cbc7252135a77255e293)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [5231] ERC1967Proxy::fallback() [staticcall]
+    │   ├─ [350] ERC8183::EVALUATION_GRACE_PERIOD() [delegatecall]
+    │   │   └─ ← [Return] 3600
+    │   └─ ← [Return] 3600
+    ├─ [0] VM::warp(1007200 [1.007e6])
+    │   └─ ← [Return]
+    ├─ [84047] ERC1967Proxy::fallback(1)
+    │   ├─ [57962] ERC8183::claimRefund(1) [delegatecall]
+    │   │   ├─ [29981] MockUSDC::transfer(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], 100)
+    │   │   │   ├─ emit Transfer(from: ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], to: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 100)
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ emit Refunded(jobId: 1, client: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 100)
+    │   │   ├─ emit JobExpired(jobId: 1)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::expectRevert(WrongStatus())
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d])
+    │   └─ ← [Return]
+    ├─ [34282] ERC1967Proxy::fallback(1, 0x6c61746520616363657074616e63650000000000000000000000000000000000, 0x)
+    │   ├─ [7602] ERC8183::complete(1, 0x6c61746520616363657074616e63650000000000000000000000000000000000, 0x) [delegatecall]
+    │   │   └─ ← [Revert] WrongStatus()
+    │   └─ ← [Revert] WrongStatus()
+    ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   └─ ← [Return] 100
+    ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2325] MockUSDC::totalSupply() [staticcall]
+    │   └─ ← [Return] 100
+    └─ ← [Stop]
+
+[PASS] test_approvedMilestoneSurvivesJobRejectionWithRemainingRefund() (gas: 788570)
+Logs:
+  ERC8183 single-job milestone: buyer refund=40 provider paid=60 escrow=0 supply=100
+
+Traces:
+  [802970] ERC8183PaperComparisonTest::test_approvedMilestoneSurvivesJobRejectionWithRemainingRefund()
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [162354] ERC1967Proxy::fallback(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1003600 [1.003e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0)
+    │   ├─ [134647] ERC8183::createJob(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1003600 [1.003e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0) [delegatecall]
+    │   │   ├─ emit JobCreated(jobId: 1, client: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], provider: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], expiredAt: 1003600 [1.003e6], hook: 0x0000000000000000000000000000000000000000)
+    │   │   └─ ← [Return] 1
+    │   └─ ← [Return] 1
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [90456] ERC1967Proxy::fallback(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x)
+    │   ├─ [63574] ERC8183::setBudget(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x) [delegatecall]
+    │   │   ├─ emit BudgetSet(jobId: 1, token: MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], amount: 100)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [86969] ERC1967Proxy::fallback(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x)
+    │   ├─ [60087] ERC8183::fund(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x) [delegatecall]
+    │   │   ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   │   │   └─ ← [Return] 0
+    │   │   ├─ [30420] MockUSDC::transferFrom(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], 100)
+    │   │   │   ├─ emit Transfer(from: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], to: ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], amount: 100)
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ [559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   │   │   └─ ← [Return] 100
+    │   │   ├─ emit JobFunded(jobId: 1, client: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 100)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [92651] ERC1967Proxy::fallback(1, 60, 0x2d4d2d9b90b6f0da296c9949fd0a8e0e06bd306b40242908c5df973e1b7460bc, 0x)
+    │   ├─ [65625] ERC8183::submitClaim(1, 60, 0x2d4d2d9b90b6f0da296c9949fd0a8e0e06bd306b40242908c5df973e1b7460bc, 0x) [delegatecall]
+    │   │   ├─ emit ClaimSubmitted(jobId: 1, provider: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], cumulativeAmount: 60, delta: 60, deliverable: 0x2d4d2d9b90b6f0da296c9949fd0a8e0e06bd306b40242908c5df973e1b7460bc, optParams: 0x)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d])
+    │   └─ ← [Return]
+    ├─ [122762] ERC1967Proxy::fallback(1, 60, 0x2d4d2d9b90b6f0da296c9949fd0a8e0e06bd306b40242908c5df973e1b7460bc, 0x)
+    │   ├─ [95736] ERC8183::approveClaim(1, 60, 0x2d4d2d9b90b6f0da296c9949fd0a8e0e06bd306b40242908c5df973e1b7460bc, 0x) [delegatecall]
+    │   │   ├─ [29981] MockUSDC::transfer(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], 60)
+    │   │   │   ├─ emit Transfer(from: ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], to: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], amount: 60)
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ emit PaymentReleased(jobId: 1, recipient: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], amount: 60)
+    │   │   ├─ emit Settled(jobId: 1, cumulativeAmount: 60, delta: 60)
+    │   │   ├─ emit ClaimApproved(jobId: 1, approver: evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], cumulativeAmount: 60, delta: 60, deliverable: 0x2d4d2d9b90b6f0da296c9949fd0a8e0e06bd306b40242908c5df973e1b7460bc)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [28631] ERC1967Proxy::fallback(1) [staticcall]
+    │   ├─ [23663] ERC8183::getJob(1) [delegatecall]
+    │   │   └─ ← [Return] Job({ client: 0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02, status: 1, provider: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, expiredAt: 1003600 [1.003e6], evaluator: 0xCA5453e74F0CCC802aDd48A547cd965512fFd45d, submittedAt: 0, budget: 100, hook: 0x0000000000000000000000000000000000000000, paymentToken: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, providerAgentId: 0, description: "paper fixture", settledAmount: 60, payoutReceiver: 0x0000000000000000000000000000000000000000 })
+    │   └─ ← [Return] Job({ client: 0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02, status: 1, provider: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, expiredAt: 1003600 [1.003e6], evaluator: 0xCA5453e74F0CCC802aDd48A547cd965512fFd45d, submittedAt: 0, budget: 100, hook: 0x0000000000000000000000000000000000000000, paymentToken: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, providerAgentId: 0, description: "paper fixture", settledAmount: 60, payoutReceiver: 0x0000000000000000000000000000000000000000 })
+    ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   └─ ← [Return] 60
+    ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   └─ ← [Return] 40
+    ├─ [2325] MockUSDC::totalSupply() [staticcall]
+    │   └─ ← [Return] 100
+    ├─ [0] VM::prank(evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d])
+    │   └─ ← [Return]
+    ├─ [88028] ERC1967Proxy::fallback(1, 0x72656d61696e696e6720776f726b206661696c65640000000000000000000000, 0x)
+    │   ├─ [61280] ERC8183::reject(1, 0x72656d61696e696e6720776f726b206661696c65640000000000000000000000, 0x) [delegatecall]
+    │   │   ├─ [29981] MockUSDC::transfer(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], 40)
+    │   │   │   ├─ emit Transfer(from: ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], to: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 40)
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ emit Refunded(jobId: 1, client: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 40)
+    │   │   ├─ emit JobRejected(jobId: 1, rejector: evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], reason: 0x72656d61696e696e6720776f726b206661696c65640000000000000000000000)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   └─ ← [Return] 40
+    ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   └─ ← [Return] 60
+    ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2325] MockUSDC::totalSupply() [staticcall]
+    │   └─ ← [Return] 100
+    ├─ emit log(val: "ERC8183 single-job milestone: buyer refund=40 provider paid=60 escrow=0 supply=100")
+    └─ ← [Stop]
+
+[PASS] test_clientCannotRejectFundedJobWhenEvaluatorIsDistinct() (gas: 434471)
+Traces:
+  [439271] ERC8183PaperComparisonTest::test_clientCannotRejectFundedJobWhenEvaluatorIsDistinct()
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [162354] ERC1967Proxy::fallback(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1003600 [1.003e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0)
+    │   ├─ [134647] ERC8183::createJob(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1003600 [1.003e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0) [delegatecall]
+    │   │   ├─ emit JobCreated(jobId: 1, client: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], provider: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], expiredAt: 1003600 [1.003e6], hook: 0x0000000000000000000000000000000000000000)
+    │   │   └─ ← [Return] 1
+    │   └─ ← [Return] 1
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [90456] ERC1967Proxy::fallback(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x)
+    │   ├─ [63574] ERC8183::setBudget(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x) [delegatecall]
+    │   │   ├─ emit BudgetSet(jobId: 1, token: MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], amount: 100)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [86969] ERC1967Proxy::fallback(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x)
+    │   ├─ [60087] ERC8183::fund(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x) [delegatecall]
+    │   │   ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   │   │   └─ ← [Return] 0
+    │   │   ├─ [30420] MockUSDC::transferFrom(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], 100)
+    │   │   │   ├─ emit Transfer(from: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], to: ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], amount: 100)
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ [559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   │   │   └─ ← [Return] 100
+    │   │   ├─ emit JobFunded(jobId: 1, client: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 100)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::expectRevert(Unauthorized())
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [36615] ERC1967Proxy::fallback(1, 0x756e696c61746572616c2063616e63656c6c6174696f6e000000000000000000, 0x)
+    │   ├─ [9839] ERC8183::reject(1, 0x756e696c61746572616c2063616e63656c6c6174696f6e000000000000000000, 0x) [delegatecall]
+    │   │   └─ ← [Revert] Unauthorized()
+    │   └─ ← [Revert] Unauthorized()
+    ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   └─ ← [Return] 100
+    ├─ [2325] MockUSDC::totalSupply() [staticcall]
+    │   └─ ← [Return] 100
+    └─ ← [Stop]
+
+[PASS] test_evaluatorOutageRefundsSubmittedJobAfterGrace() (gas: 622172)
+Traces:
+  [631772] ERC8183PaperComparisonTest::test_evaluatorOutageRefundsSubmittedJobAfterGrace()
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [162354] ERC1967Proxy::fallback(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1003600 [1.003e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0)
+    │   ├─ [134647] ERC8183::createJob(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1003600 [1.003e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0) [delegatecall]
+    │   │   ├─ emit JobCreated(jobId: 1, client: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], provider: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], expiredAt: 1003600 [1.003e6], hook: 0x0000000000000000000000000000000000000000)
+    │   │   └─ ← [Return] 1
+    │   └─ ← [Return] 1
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [90456] ERC1967Proxy::fallback(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x)
+    │   ├─ [63574] ERC8183::setBudget(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x) [delegatecall]
+    │   │   ├─ emit BudgetSet(jobId: 1, token: MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], amount: 100)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [86969] ERC1967Proxy::fallback(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x)
+    │   ├─ [60087] ERC8183::fund(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x) [delegatecall]
+    │   │   ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   │   │   └─ ← [Return] 0
+    │   │   ├─ [30420] MockUSDC::transferFrom(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], 100)
+    │   │   │   ├─ emit Transfer(from: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], to: ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], amount: 100)
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ [559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   │   │   └─ ← [Return] 100
+    │   │   ├─ emit JobFunded(jobId: 1, client: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 100)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [51922] ERC1967Proxy::fallback(1, 0x1758b2051aaebc7b303d6dcfe3910ad3d22e44de6ee6cbc7252135a77255e293, 0x)
+    │   ├─ [25042] ERC8183::submit(1, 0x1758b2051aaebc7b303d6dcfe3910ad3d22e44de6ee6cbc7252135a77255e293, 0x) [delegatecall]
+    │   │   ├─ emit JobSubmitted(jobId: 1, provider: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], deliverable: 0x1758b2051aaebc7b303d6dcfe3910ad3d22e44de6ee6cbc7252135a77255e293)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::warp(1003600 [1.003e6])
+    │   └─ ← [Return]
+    ├─ [0] VM::expectRevert(GracePeriodActive())
+    │   └─ ← [Return]
+    ├─ [38246] ERC1967Proxy::fallback(1)
+    │   ├─ [12157] ERC8183::claimRefund(1) [delegatecall]
+    │   │   └─ ← [Revert] GracePeriodActive()
+    │   └─ ← [Revert] GracePeriodActive()
+    ├─ [5231] ERC1967Proxy::fallback() [staticcall]
+    │   ├─ [350] ERC8183::EVALUATION_GRACE_PERIOD() [delegatecall]
+    │   │   └─ ← [Return] 3600
+    │   └─ ← [Return] 3600
+    ├─ [0] VM::warp(1007200 [1.007e6])
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(stranger: [0x49052147F5D97A723DEBdf07680fFFaDAd29A5dC])
+    │   └─ ← [Return]
+    ├─ [84047] ERC1967Proxy::fallback(1)
+    │   ├─ [57962] ERC8183::claimRefund(1) [delegatecall]
+    │   │   ├─ [29981] MockUSDC::transfer(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], 100)
+    │   │   │   ├─ emit Transfer(from: ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], to: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 100)
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ emit Refunded(jobId: 1, client: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 100)
+    │   │   ├─ emit JobExpired(jobId: 1)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [28631] ERC1967Proxy::fallback(1) [staticcall]
+    │   ├─ [23663] ERC8183::getJob(1) [delegatecall]
+    │   │   └─ ← [Return] Job({ client: 0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02, status: 5, provider: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, expiredAt: 1003600 [1.003e6], evaluator: 0xCA5453e74F0CCC802aDd48A547cd965512fFd45d, submittedAt: 1000000 [1e6], budget: 100, hook: 0x0000000000000000000000000000000000000000, paymentToken: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, providerAgentId: 0, description: "paper fixture", settledAmount: 0, payoutReceiver: 0x0000000000000000000000000000000000000000 })
+    │   └─ ← [Return] Job({ client: 0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02, status: 5, provider: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, expiredAt: 1003600 [1.003e6], evaluator: 0xCA5453e74F0CCC802aDd48A547cd965512fFd45d, submittedAt: 1000000 [1e6], budget: 100, hook: 0x0000000000000000000000000000000000000000, paymentToken: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, providerAgentId: 0, description: "paper fixture", settledAmount: 0, payoutReceiver: 0x0000000000000000000000000000000000000000 })
+    ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   └─ ← [Return] 100
+    ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2325] MockUSDC::totalSupply() [staticcall]
+    │   └─ ← [Return] 100
+    └─ ← [Stop]
+
+[PASS] test_independentChildCanCompleteAfterParentExpiryRefund() (gas: 1174408)
+Logs:
+  ERC8183 child completed after parent refund: buyer=100 intermediary=0 worker=60 escrow=0 supply=160
+
+Traces:
+  [1188808] ERC8183PaperComparisonTest::test_independentChildCanCompleteAfterParentExpiryRefund()
+    ├─ [51255] MockUSDC::mint(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], 60)
+    │   ├─ emit Transfer(from: 0x0000000000000000000000000000000000000000, to: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], amount: 60)
+    │   └─ ← [Stop]
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [162354] ERC1967Proxy::fallback(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1003600 [1.003e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0)
+    │   ├─ [134647] ERC8183::createJob(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1003600 [1.003e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0) [delegatecall]
+    │   │   ├─ emit JobCreated(jobId: 1, client: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], provider: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], expiredAt: 1003600 [1.003e6], hook: 0x0000000000000000000000000000000000000000)
+    │   │   └─ ← [Return] 1
+    │   └─ ← [Return] 1
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [90456] ERC1967Proxy::fallback(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x)
+    │   ├─ [63574] ERC8183::setBudget(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x) [delegatecall]
+    │   │   ├─ emit BudgetSet(jobId: 1, token: MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], amount: 100)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [86969] ERC1967Proxy::fallback(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x)
+    │   ├─ [60087] ERC8183::fund(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x) [delegatecall]
+    │   │   ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   │   │   └─ ← [Return] 0
+    │   │   ├─ [30420] MockUSDC::transferFrom(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], 100)
+    │   │   │   ├─ emit Transfer(from: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], to: ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], amount: 100)
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ [559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   │   │   └─ ← [Return] 100
+    │   │   ├─ emit JobFunded(jobId: 1, client: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 100)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [145254] ERC1967Proxy::fallback(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1014400 [1.014e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0)
+    │   ├─ [117547] ERC8183::createJob(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1014400 [1.014e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0) [delegatecall]
+    │   │   ├─ emit JobCreated(jobId: 2, client: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], provider: worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], evaluator: evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], expiredAt: 1014400 [1.014e6], hook: 0x0000000000000000000000000000000000000000)
+    │   │   └─ ← [Return] 2
+    │   └─ ← [Return] 2
+    ├─ [0] VM::prank(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC])
+    │   └─ ← [Return]
+    ├─ [90456] ERC1967Proxy::fallback(2, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 60, 0x)
+    │   ├─ [63574] ERC8183::setBudget(2, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 60, 0x) [delegatecall]
+    │   │   ├─ emit BudgetSet(jobId: 2, token: MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], amount: 60)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [69869] ERC1967Proxy::fallback(2, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 60, 0x)
+    │   ├─ [42987] ERC8183::fund(2, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 60, 0x) [delegatecall]
+    │   │   ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   │   │   └─ ← [Return] 100
+    │   │   ├─ [13320] MockUSDC::transferFrom(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], 60)
+    │   │   │   ├─ emit Transfer(from: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], to: ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], amount: 60)
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ [559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   │   │   └─ ← [Return] 160
+    │   │   ├─ emit JobFunded(jobId: 2, client: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], amount: 60)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   └─ ← [Return] 160
+    ├─ [2325] MockUSDC::totalSupply() [staticcall]
+    │   └─ ← [Return] 160
+    ├─ [0] VM::prank(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC])
+    │   └─ ← [Return]
+    ├─ [51910] ERC1967Proxy::fallback(2, 0x56cc610c06132676ca5657c6870d3c5b397501364de5993f3700621288676456, 0x)
+    │   ├─ [25042] ERC8183::submit(2, 0x56cc610c06132676ca5657c6870d3c5b397501364de5993f3700621288676456, 0x) [delegatecall]
+    │   │   ├─ emit JobSubmitted(jobId: 2, provider: worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], deliverable: 0x56cc610c06132676ca5657c6870d3c5b397501364de5993f3700621288676456)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [51922] ERC1967Proxy::fallback(1, 0x1758b2051aaebc7b303d6dcfe3910ad3d22e44de6ee6cbc7252135a77255e293, 0x)
+    │   ├─ [25042] ERC8183::submit(1, 0x1758b2051aaebc7b303d6dcfe3910ad3d22e44de6ee6cbc7252135a77255e293, 0x) [delegatecall]
+    │   │   ├─ emit JobSubmitted(jobId: 1, provider: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], deliverable: 0x1758b2051aaebc7b303d6dcfe3910ad3d22e44de6ee6cbc7252135a77255e293)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [5231] ERC1967Proxy::fallback() [staticcall]
+    │   ├─ [350] ERC8183::EVALUATION_GRACE_PERIOD() [delegatecall]
+    │   │   └─ ← [Return] 3600
+    │   └─ ← [Return] 3600
+    ├─ [0] VM::warp(1007200 [1.007e6])
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(stranger: [0x49052147F5D97A723DEBdf07680fFFaDAd29A5dC])
+    │   └─ ← [Return]
+    ├─ [84047] ERC1967Proxy::fallback(1)
+    │   ├─ [57962] ERC8183::claimRefund(1) [delegatecall]
+    │   │   ├─ [29981] MockUSDC::transfer(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], 100)
+    │   │   │   ├─ emit Transfer(from: ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], to: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 100)
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ emit Refunded(jobId: 1, client: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 100)
+    │   │   ├─ emit JobExpired(jobId: 1)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   └─ ← [Return] 100
+    ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   └─ ← [Return] 60
+    ├─ [2325] MockUSDC::totalSupply() [staticcall]
+    │   └─ ← [Return] 160
+    ├─ [0] VM::prank(evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d])
+    │   └─ ← [Return]
+    ├─ [97480] ERC1967Proxy::fallback(2, 0xc831615256f0cfd2a7fdad1dc6a69ead35d34546604016f455fb0da061783ad6, 0x)
+    │   ├─ [70600] ERC8183::complete(2, 0xc831615256f0cfd2a7fdad1dc6a69ead35d34546604016f455fb0da061783ad6, 0x) [delegatecall]
+    │   │   ├─ [29981] MockUSDC::transfer(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], 60)
+    │   │   │   ├─ emit Transfer(from: ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], to: worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], amount: 60)
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ emit PaymentReleased(jobId: 2, recipient: worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], amount: 60)
+    │   │   ├─ emit JobCompleted(jobId: 2, evaluator: evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], reason: 0xc831615256f0cfd2a7fdad1dc6a69ead35d34546604016f455fb0da061783ad6)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   └─ ← [Return] 100
+    ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   └─ ← [Return] 60
+    ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2325] MockUSDC::totalSupply() [staticcall]
+    │   └─ ← [Return] 160
+    ├─ emit log(val: "ERC8183 child completed after parent refund: buyer=100 intermediary=0 worker=60 escrow=0 supply=160")
+    └─ ← [Stop]
+
+[PASS] test_independentChildPaymentSurvivesParentRejection() (gas: 1175164)
+Logs:
+  ERC8183 parent rejected after child paid: buyer=100 intermediary=0 worker=60 escrow=0 supply=160
+
+Traces:
+  [1189564] ERC8183PaperComparisonTest::test_independentChildPaymentSurvivesParentRejection()
+    ├─ [51255] MockUSDC::mint(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], 60)
+    │   ├─ emit Transfer(from: 0x0000000000000000000000000000000000000000, to: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], amount: 60)
+    │   └─ ← [Stop]
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [162354] ERC1967Proxy::fallback(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1003600 [1.003e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0)
+    │   ├─ [134647] ERC8183::createJob(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1003600 [1.003e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0) [delegatecall]
+    │   │   ├─ emit JobCreated(jobId: 1, client: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], provider: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], expiredAt: 1003600 [1.003e6], hook: 0x0000000000000000000000000000000000000000)
+    │   │   └─ ← [Return] 1
+    │   └─ ← [Return] 1
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [90456] ERC1967Proxy::fallback(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x)
+    │   ├─ [63574] ERC8183::setBudget(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x) [delegatecall]
+    │   │   ├─ emit BudgetSet(jobId: 1, token: MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], amount: 100)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [86969] ERC1967Proxy::fallback(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x)
+    │   ├─ [60087] ERC8183::fund(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x) [delegatecall]
+    │   │   ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   │   │   └─ ← [Return] 0
+    │   │   ├─ [30420] MockUSDC::transferFrom(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], 100)
+    │   │   │   ├─ emit Transfer(from: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], to: ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], amount: 100)
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ [559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   │   │   └─ ← [Return] 100
+    │   │   ├─ emit JobFunded(jobId: 1, client: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 100)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [145254] ERC1967Proxy::fallback(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1014400 [1.014e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0)
+    │   ├─ [117547] ERC8183::createJob(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1014400 [1.014e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0) [delegatecall]
+    │   │   ├─ emit JobCreated(jobId: 2, client: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], provider: worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], evaluator: evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], expiredAt: 1014400 [1.014e6], hook: 0x0000000000000000000000000000000000000000)
+    │   │   └─ ← [Return] 2
+    │   └─ ← [Return] 2
+    ├─ [0] VM::prank(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC])
+    │   └─ ← [Return]
+    ├─ [90456] ERC1967Proxy::fallback(2, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 60, 0x)
+    │   ├─ [63574] ERC8183::setBudget(2, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 60, 0x) [delegatecall]
+    │   │   ├─ emit BudgetSet(jobId: 2, token: MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], amount: 60)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [69869] ERC1967Proxy::fallback(2, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 60, 0x)
+    │   ├─ [42987] ERC8183::fund(2, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 60, 0x) [delegatecall]
+    │   │   ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   │   │   └─ ← [Return] 100
+    │   │   ├─ [13320] MockUSDC::transferFrom(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], 60)
+    │   │   │   ├─ emit Transfer(from: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], to: ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], amount: 60)
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ [559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   │   │   └─ ← [Return] 160
+    │   │   ├─ emit JobFunded(jobId: 2, client: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], amount: 60)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   └─ ← [Return] 160
+    ├─ [2325] MockUSDC::totalSupply() [staticcall]
+    │   └─ ← [Return] 160
+    ├─ [0] VM::prank(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC])
+    │   └─ ← [Return]
+    ├─ [51910] ERC1967Proxy::fallback(2, 0x56cc610c06132676ca5657c6870d3c5b397501364de5993f3700621288676456, 0x)
+    │   ├─ [25042] ERC8183::submit(2, 0x56cc610c06132676ca5657c6870d3c5b397501364de5993f3700621288676456, 0x) [delegatecall]
+    │   │   ├─ emit JobSubmitted(jobId: 2, provider: worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], deliverable: 0x56cc610c06132676ca5657c6870d3c5b397501364de5993f3700621288676456)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d])
+    │   └─ ← [Return]
+    ├─ [97480] ERC1967Proxy::fallback(2, 0xc831615256f0cfd2a7fdad1dc6a69ead35d34546604016f455fb0da061783ad6, 0x)
+    │   ├─ [70600] ERC8183::complete(2, 0xc831615256f0cfd2a7fdad1dc6a69ead35d34546604016f455fb0da061783ad6, 0x) [delegatecall]
+    │   │   ├─ [29981] MockUSDC::transfer(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], 60)
+    │   │   │   ├─ emit Transfer(from: ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], to: worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], amount: 60)
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ emit PaymentReleased(jobId: 2, recipient: worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], amount: 60)
+    │   │   ├─ emit JobCompleted(jobId: 2, evaluator: evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], reason: 0xc831615256f0cfd2a7fdad1dc6a69ead35d34546604016f455fb0da061783ad6)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [51922] ERC1967Proxy::fallback(1, 0x1758b2051aaebc7b303d6dcfe3910ad3d22e44de6ee6cbc7252135a77255e293, 0x)
+    │   ├─ [25042] ERC8183::submit(1, 0x1758b2051aaebc7b303d6dcfe3910ad3d22e44de6ee6cbc7252135a77255e293, 0x) [delegatecall]
+    │   │   ├─ emit JobSubmitted(jobId: 1, provider: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], deliverable: 0x1758b2051aaebc7b303d6dcfe3910ad3d22e44de6ee6cbc7252135a77255e293)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d])
+    │   └─ ← [Return]
+    ├─ [88129] ERC1967Proxy::fallback(1, 0x706172656e74206661696c656400000000000000000000000000000000000000, 0x)
+    │   ├─ [61477] ERC8183::reject(1, 0x706172656e74206661696c656400000000000000000000000000000000000000, 0x) [delegatecall]
+    │   │   ├─ [29981] MockUSDC::transfer(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], 100)
+    │   │   │   ├─ emit Transfer(from: ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], to: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 100)
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ emit Refunded(jobId: 1, client: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 100)
+    │   │   ├─ emit JobRejected(jobId: 1, rejector: evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], reason: 0x706172656e74206661696c656400000000000000000000000000000000000000)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [28631] ERC1967Proxy::fallback(1) [staticcall]
+    │   ├─ [23663] ERC8183::getJob(1) [delegatecall]
+    │   │   └─ ← [Return] Job({ client: 0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02, status: 4, provider: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, expiredAt: 1003600 [1.003e6], evaluator: 0xCA5453e74F0CCC802aDd48A547cd965512fFd45d, submittedAt: 1000000 [1e6], budget: 100, hook: 0x0000000000000000000000000000000000000000, paymentToken: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, providerAgentId: 0, description: "paper fixture", settledAmount: 0, payoutReceiver: 0x0000000000000000000000000000000000000000 })
+    │   └─ ← [Return] Job({ client: 0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02, status: 4, provider: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, expiredAt: 1003600 [1.003e6], evaluator: 0xCA5453e74F0CCC802aDd48A547cd965512fFd45d, submittedAt: 1000000 [1e6], budget: 100, hook: 0x0000000000000000000000000000000000000000, paymentToken: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, providerAgentId: 0, description: "paper fixture", settledAmount: 0, payoutReceiver: 0x0000000000000000000000000000000000000000 })
+    ├─ [28631] ERC1967Proxy::fallback(2) [staticcall]
+    │   ├─ [23663] ERC8183::getJob(2) [delegatecall]
+    │   │   └─ ← [Return] Job({ client: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, status: 3, provider: 0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC, expiredAt: 1014400 [1.014e6], evaluator: 0xCA5453e74F0CCC802aDd48A547cd965512fFd45d, submittedAt: 1000000 [1e6], budget: 60, hook: 0x0000000000000000000000000000000000000000, paymentToken: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, providerAgentId: 0, description: "paper fixture", settledAmount: 0, payoutReceiver: 0x0000000000000000000000000000000000000000 })
+    │   └─ ← [Return] Job({ client: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, status: 3, provider: 0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC, expiredAt: 1014400 [1.014e6], evaluator: 0xCA5453e74F0CCC802aDd48A547cd965512fFd45d, submittedAt: 1000000 [1e6], budget: 60, hook: 0x0000000000000000000000000000000000000000, paymentToken: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, providerAgentId: 0, description: "paper fixture", settledAmount: 0, payoutReceiver: 0x0000000000000000000000000000000000000000 })
+    ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   └─ ← [Return] 100
+    ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   └─ ← [Return] 60
+    ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2325] MockUSDC::totalSupply() [staticcall]
+    │   └─ ← [Return] 160
+    ├─ emit log(val: "ERC8183 parent rejected after child paid: buyer=100 intermediary=0 worker=60 escrow=0 supply=160")
+    └─ ← [Stop]
+
+[PASS] test_pendingMilestoneOutageClientCanClearThenRefund() (gas: 669895)
+Traces:
+  [684295] ERC8183PaperComparisonTest::test_pendingMilestoneOutageClientCanClearThenRefund()
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [162354] ERC1967Proxy::fallback(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1003600 [1.003e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0)
+    │   ├─ [134647] ERC8183::createJob(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1003600 [1.003e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0) [delegatecall]
+    │   │   ├─ emit JobCreated(jobId: 1, client: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], provider: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], expiredAt: 1003600 [1.003e6], hook: 0x0000000000000000000000000000000000000000)
+    │   │   └─ ← [Return] 1
+    │   └─ ← [Return] 1
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [90456] ERC1967Proxy::fallback(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x)
+    │   ├─ [63574] ERC8183::setBudget(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x) [delegatecall]
+    │   │   ├─ emit BudgetSet(jobId: 1, token: MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], amount: 100)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [86969] ERC1967Proxy::fallback(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x)
+    │   ├─ [60087] ERC8183::fund(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x) [delegatecall]
+    │   │   ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   │   │   └─ ← [Return] 0
+    │   │   ├─ [30420] MockUSDC::transferFrom(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], 100)
+    │   │   │   ├─ emit Transfer(from: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], to: ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], amount: 100)
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ [559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   │   │   └─ ← [Return] 100
+    │   │   ├─ emit JobFunded(jobId: 1, client: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 100)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [92651] ERC1967Proxy::fallback(1, 60, 0xdde2e3d128a3d767db0f999e21a44df2be2709747cc3d5f74639eed8f5f4d96b, 0x)
+    │   ├─ [65625] ERC8183::submitClaim(1, 60, 0xdde2e3d128a3d767db0f999e21a44df2be2709747cc3d5f74639eed8f5f4d96b, 0x) [delegatecall]
+    │   │   ├─ emit ClaimSubmitted(jobId: 1, provider: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], cumulativeAmount: 60, delta: 60, deliverable: 0xdde2e3d128a3d767db0f999e21a44df2be2709747cc3d5f74639eed8f5f4d96b, optParams: 0x)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [5231] ERC1967Proxy::fallback() [staticcall]
+    │   ├─ [350] ERC8183::EVALUATION_GRACE_PERIOD() [delegatecall]
+    │   │   └─ ← [Return] 3600
+    │   └─ ← [Return] 3600
+    ├─ [0] VM::warp(1007200 [1.007e6])
+    │   └─ ← [Return]
+    ├─ [0] VM::expectRevert(PendingClaimExists())
+    │   └─ ← [Return]
+    ├─ [35872] ERC1967Proxy::fallback(1)
+    │   ├─ [9783] ERC8183::claimRefund(1) [delegatecall]
+    │   │   └─ ← [Revert] PendingClaimExists()
+    │   └─ ← [Revert] PendingClaimExists()
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [45521] ERC1967Proxy::fallback(1, 60, 0xdde2e3d128a3d767db0f999e21a44df2be2709747cc3d5f74639eed8f5f4d96b, 0x636c69656e742072656a65637465640000000000000000000000000000000000, 0x)
+    │   ├─ [18181] ERC8183::rejectClaim(1, 60, 0xdde2e3d128a3d767db0f999e21a44df2be2709747cc3d5f74639eed8f5f4d96b, 0x636c69656e742072656a65637465640000000000000000000000000000000000, 0x) [delegatecall]
+    │   │   ├─ emit ClaimRejected(jobId: 1, rejector: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], reason: 0x636c69656e742072656a65637465640000000000000000000000000000000000)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [83778] ERC1967Proxy::fallback(1)
+    │   ├─ [57693] ERC8183::claimRefund(1) [delegatecall]
+    │   │   ├─ [29981] MockUSDC::transfer(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], 100)
+    │   │   │   ├─ emit Transfer(from: ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], to: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 100)
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ emit Refunded(jobId: 1, client: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 100)
+    │   │   ├─ emit JobExpired(jobId: 1)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   └─ ← [Return] 100
+    ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2325] MockUSDC::totalSupply() [staticcall]
+    │   └─ ← [Return] 100
+    └─ ← [Stop]
+
+[PASS] test_sameOneHundredUnitsCannotFundTwoSixtyUnitJobs() (gas: 774531)
+Traces:
+  [774531] ERC8183PaperComparisonTest::test_sameOneHundredUnitsCannotFundTwoSixtyUnitJobs()
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [162354] ERC1967Proxy::fallback(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1003600 [1.003e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0)
+    │   ├─ [134647] ERC8183::createJob(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1003600 [1.003e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0) [delegatecall]
+    │   │   ├─ emit JobCreated(jobId: 1, client: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], provider: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], expiredAt: 1003600 [1.003e6], hook: 0x0000000000000000000000000000000000000000)
+    │   │   └─ ← [Return] 1
+    │   └─ ← [Return] 1
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [90456] ERC1967Proxy::fallback(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 60, 0x)
+    │   ├─ [63574] ERC8183::setBudget(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 60, 0x) [delegatecall]
+    │   │   ├─ emit BudgetSet(jobId: 1, token: MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], amount: 60)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [86969] ERC1967Proxy::fallback(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 60, 0x)
+    │   ├─ [60087] ERC8183::fund(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 60, 0x) [delegatecall]
+    │   │   ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   │   │   └─ ← [Return] 0
+    │   │   ├─ [30420] MockUSDC::transferFrom(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], 60)
+    │   │   │   ├─ emit Transfer(from: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], to: ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], amount: 60)
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ [559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   │   │   └─ ← [Return] 60
+    │   │   ├─ emit JobFunded(jobId: 1, client: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 60)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [145254] ERC1967Proxy::fallback(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1003600 [1.003e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0)
+    │   ├─ [117547] ERC8183::createJob(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1003600 [1.003e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0) [delegatecall]
+    │   │   ├─ emit JobCreated(jobId: 2, client: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], provider: worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], evaluator: evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], expiredAt: 1003600 [1.003e6], hook: 0x0000000000000000000000000000000000000000)
+    │   │   └─ ← [Return] 2
+    │   └─ ← [Return] 2
+    ├─ [0] VM::prank(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC])
+    │   └─ ← [Return]
+    ├─ [90456] ERC1967Proxy::fallback(2, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 60, 0x)
+    │   ├─ [63574] ERC8183::setBudget(2, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 60, 0x) [delegatecall]
+    │   │   ├─ emit BudgetSet(jobId: 2, token: MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], amount: 60)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::expectRevert(ERC20InsufficientBalance(0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02, 40, 60))
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [58357] ERC1967Proxy::fallback(2, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 60, 0x)
+    │   ├─ [31462] ERC8183::fund(2, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 60, 0x) [delegatecall]
+    │   │   ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   │   │   └─ ← [Return] 60
+    │   │   ├─ [5333] MockUSDC::transferFrom(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], 60)
+    │   │   │   └─ ← [Revert] ERC20InsufficientBalance(0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02, 40, 60)
+    │   │   └─ ← [Revert] ERC20InsufficientBalance(0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02, 40, 60)
+    │   └─ ← [Revert] ERC20InsufficientBalance(0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02, 40, 60)
+    ├─ [28631] ERC1967Proxy::fallback(1) [staticcall]
+    │   ├─ [23663] ERC8183::getJob(1) [delegatecall]
+    │   │   └─ ← [Return] Job({ client: 0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02, status: 1, provider: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, expiredAt: 1003600 [1.003e6], evaluator: 0xCA5453e74F0CCC802aDd48A547cd965512fFd45d, submittedAt: 0, budget: 60, hook: 0x0000000000000000000000000000000000000000, paymentToken: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, providerAgentId: 0, description: "paper fixture", settledAmount: 0, payoutReceiver: 0x0000000000000000000000000000000000000000 })
+    │   └─ ← [Return] Job({ client: 0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02, status: 1, provider: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, expiredAt: 1003600 [1.003e6], evaluator: 0xCA5453e74F0CCC802aDd48A547cd965512fFd45d, submittedAt: 0, budget: 60, hook: 0x0000000000000000000000000000000000000000, paymentToken: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, providerAgentId: 0, description: "paper fixture", settledAmount: 0, payoutReceiver: 0x0000000000000000000000000000000000000000 })
+    ├─ [28631] ERC1967Proxy::fallback(2) [staticcall]
+    │   ├─ [23663] ERC8183::getJob(2) [delegatecall]
+    │   │   └─ ← [Return] Job({ client: 0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02, status: 0, provider: 0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC, expiredAt: 1003600 [1.003e6], evaluator: 0xCA5453e74F0CCC802aDd48A547cd965512fFd45d, submittedAt: 0, budget: 60, hook: 0x0000000000000000000000000000000000000000, paymentToken: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, providerAgentId: 0, description: "paper fixture", settledAmount: 0, payoutReceiver: 0x0000000000000000000000000000000000000000 })
+    │   └─ ← [Return] Job({ client: 0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02, status: 0, provider: 0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC, expiredAt: 1003600 [1.003e6], evaluator: 0xCA5453e74F0CCC802aDd48A547cd965512fFd45d, submittedAt: 0, budget: 60, hook: 0x0000000000000000000000000000000000000000, paymentToken: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, providerAgentId: 0, description: "paper fixture", settledAmount: 0, payoutReceiver: 0x0000000000000000000000000000000000000000 })
+    ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   └─ ← [Return] 40
+    ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   └─ ← [Return] 60
+    ├─ [2325] MockUSDC::totalSupply() [staticcall]
+    │   └─ ← [Return] 100
+    └─ ← [Stop]
+
+[PASS] test_successfulParentAndChildExchangePaysImmediately() (gas: 1205310)
+Logs:
+  ERC8183 success: buyer=0 intermediary=100 worker=60 escrow=0 supply=160
+
+Traces:
+  [1219710] ERC8183PaperComparisonTest::test_successfulParentAndChildExchangePaysImmediately()
+    ├─ [51255] MockUSDC::mint(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], 60)
+    │   ├─ emit Transfer(from: 0x0000000000000000000000000000000000000000, to: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], amount: 60)
+    │   └─ ← [Stop]
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [162354] ERC1967Proxy::fallback(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1003600 [1.003e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0)
+    │   ├─ [134647] ERC8183::createJob(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1003600 [1.003e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0) [delegatecall]
+    │   │   ├─ emit JobCreated(jobId: 1, client: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], provider: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], expiredAt: 1003600 [1.003e6], hook: 0x0000000000000000000000000000000000000000)
+    │   │   └─ ← [Return] 1
+    │   └─ ← [Return] 1
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [90456] ERC1967Proxy::fallback(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x)
+    │   ├─ [63574] ERC8183::setBudget(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x) [delegatecall]
+    │   │   ├─ emit BudgetSet(jobId: 1, token: MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], amount: 100)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [86969] ERC1967Proxy::fallback(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x)
+    │   ├─ [60087] ERC8183::fund(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x) [delegatecall]
+    │   │   ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   │   │   └─ ← [Return] 0
+    │   │   ├─ [30420] MockUSDC::transferFrom(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], 100)
+    │   │   │   ├─ emit Transfer(from: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], to: ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], amount: 100)
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ [559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   │   │   └─ ← [Return] 100
+    │   │   ├─ emit JobFunded(jobId: 1, client: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 100)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [145254] ERC1967Proxy::fallback(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1014400 [1.014e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0)
+    │   ├─ [117547] ERC8183::createJob(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1014400 [1.014e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0) [delegatecall]
+    │   │   ├─ emit JobCreated(jobId: 2, client: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], provider: worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], evaluator: evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], expiredAt: 1014400 [1.014e6], hook: 0x0000000000000000000000000000000000000000)
+    │   │   └─ ← [Return] 2
+    │   └─ ← [Return] 2
+    ├─ [0] VM::prank(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC])
+    │   └─ ← [Return]
+    ├─ [90456] ERC1967Proxy::fallback(2, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 60, 0x)
+    │   ├─ [63574] ERC8183::setBudget(2, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 60, 0x) [delegatecall]
+    │   │   ├─ emit BudgetSet(jobId: 2, token: MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], amount: 60)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [69869] ERC1967Proxy::fallback(2, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 60, 0x)
+    │   ├─ [42987] ERC8183::fund(2, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 60, 0x) [delegatecall]
+    │   │   ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   │   │   └─ ← [Return] 100
+    │   │   ├─ [13320] MockUSDC::transferFrom(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], 60)
+    │   │   │   ├─ emit Transfer(from: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], to: ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], amount: 60)
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ [559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   │   │   └─ ← [Return] 160
+    │   │   ├─ emit JobFunded(jobId: 2, client: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], amount: 60)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   └─ ← [Return] 160
+    ├─ [2325] MockUSDC::totalSupply() [staticcall]
+    │   └─ ← [Return] 160
+    ├─ [0] VM::prank(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC])
+    │   └─ ← [Return]
+    ├─ [51910] ERC1967Proxy::fallback(2, 0x56cc610c06132676ca5657c6870d3c5b397501364de5993f3700621288676456, 0x)
+    │   ├─ [25042] ERC8183::submit(2, 0x56cc610c06132676ca5657c6870d3c5b397501364de5993f3700621288676456, 0x) [delegatecall]
+    │   │   ├─ emit JobSubmitted(jobId: 2, provider: worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], deliverable: 0x56cc610c06132676ca5657c6870d3c5b397501364de5993f3700621288676456)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d])
+    │   └─ ← [Return]
+    ├─ [97480] ERC1967Proxy::fallback(2, 0xc831615256f0cfd2a7fdad1dc6a69ead35d34546604016f455fb0da061783ad6, 0x)
+    │   ├─ [70600] ERC8183::complete(2, 0xc831615256f0cfd2a7fdad1dc6a69ead35d34546604016f455fb0da061783ad6, 0x) [delegatecall]
+    │   │   ├─ [29981] MockUSDC::transfer(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], 60)
+    │   │   │   ├─ emit Transfer(from: ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], to: worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], amount: 60)
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ emit PaymentReleased(jobId: 2, recipient: worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], amount: 60)
+    │   │   ├─ emit JobCompleted(jobId: 2, evaluator: evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], reason: 0xc831615256f0cfd2a7fdad1dc6a69ead35d34546604016f455fb0da061783ad6)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [28631] ERC1967Proxy::fallback(2) [staticcall]
+    │   ├─ [23663] ERC8183::getJob(2) [delegatecall]
+    │   │   └─ ← [Return] Job({ client: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, status: 3, provider: 0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC, expiredAt: 1014400 [1.014e6], evaluator: 0xCA5453e74F0CCC802aDd48A547cd965512fFd45d, submittedAt: 1000000 [1e6], budget: 60, hook: 0x0000000000000000000000000000000000000000, paymentToken: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, providerAgentId: 0, description: "paper fixture", settledAmount: 0, payoutReceiver: 0x0000000000000000000000000000000000000000 })
+    │   └─ ← [Return] Job({ client: 0xD20A6CAAA6194D7285C23b63681E2843126A7709, status: 3, provider: 0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC, expiredAt: 1014400 [1.014e6], evaluator: 0xCA5453e74F0CCC802aDd48A547cd965512fFd45d, submittedAt: 1000000 [1e6], budget: 60, hook: 0x0000000000000000000000000000000000000000, paymentToken: 0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f, providerAgentId: 0, description: "paper fixture", settledAmount: 0, payoutReceiver: 0x0000000000000000000000000000000000000000 })
+    ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   └─ ← [Return] 60
+    ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   └─ ← [Return] 100
+    ├─ [2325] MockUSDC::totalSupply() [staticcall]
+    │   └─ ← [Return] 160
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [51922] ERC1967Proxy::fallback(1, 0x1758b2051aaebc7b303d6dcfe3910ad3d22e44de6ee6cbc7252135a77255e293, 0x)
+    │   ├─ [25042] ERC8183::submit(1, 0x1758b2051aaebc7b303d6dcfe3910ad3d22e44de6ee6cbc7252135a77255e293, 0x) [delegatecall]
+    │   │   ├─ emit JobSubmitted(jobId: 1, provider: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], deliverable: 0x1758b2051aaebc7b303d6dcfe3910ad3d22e44de6ee6cbc7252135a77255e293)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d])
+    │   └─ ← [Return]
+    ├─ [97480] ERC1967Proxy::fallback(1, 0x1bb1938abfadc7a5fce59d8d25ad567930abb3d51bc6ee51d4a1ebd1be2c4f64, 0x)
+    │   ├─ [70600] ERC8183::complete(1, 0x1bb1938abfadc7a5fce59d8d25ad567930abb3d51bc6ee51d4a1ebd1be2c4f64, 0x) [delegatecall]
+    │   │   ├─ [29981] MockUSDC::transfer(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], 100)
+    │   │   │   ├─ emit Transfer(from: ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], to: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], amount: 100)
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ emit PaymentReleased(jobId: 1, recipient: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], amount: 100)
+    │   │   ├─ emit JobCompleted(jobId: 1, evaluator: evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], reason: 0x1bb1938abfadc7a5fce59d8d25ad567930abb3d51bc6ee51d4a1ebd1be2c4f64)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   └─ ← [Return] 100
+    ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   └─ ← [Return] 60
+    ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2325] MockUSDC::totalSupply() [staticcall]
+    │   └─ ← [Return] 160
+    ├─ emit log(val: "ERC8183 success: buyer=0 intermediary=100 worker=60 escrow=0 supply=160")
+    └─ ← [Stop]
+
+[PASS] test_unsettledParentBudgetCannotFundChildWithoutWorkingCapital() (gas: 697135)
+Traces:
+  [701935] ERC8183PaperComparisonTest::test_unsettledParentBudgetCannotFundChildWithoutWorkingCapital()
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [162354] ERC1967Proxy::fallback(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1003600 [1.003e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0)
+    │   ├─ [134647] ERC8183::createJob(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1003600 [1.003e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0) [delegatecall]
+    │   │   ├─ emit JobCreated(jobId: 1, client: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], provider: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], evaluator: evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], expiredAt: 1003600 [1.003e6], hook: 0x0000000000000000000000000000000000000000)
+    │   │   └─ ← [Return] 1
+    │   └─ ← [Return] 1
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [90456] ERC1967Proxy::fallback(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x)
+    │   ├─ [63574] ERC8183::setBudget(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x) [delegatecall]
+    │   │   ├─ emit BudgetSet(jobId: 1, token: MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], amount: 100)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02])
+    │   └─ ← [Return]
+    ├─ [86969] ERC1967Proxy::fallback(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x)
+    │   ├─ [60087] ERC8183::fund(1, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 100, 0x) [delegatecall]
+    │   │   ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   │   │   └─ ← [Return] 0
+    │   │   ├─ [30420] MockUSDC::transferFrom(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], 100)
+    │   │   │   ├─ emit Transfer(from: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], to: ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], amount: 100)
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ [559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   │   │   └─ ← [Return] 100
+    │   │   ├─ emit JobFunded(jobId: 1, client: buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02], amount: 100)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [145254] ERC1967Proxy::fallback(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1003600 [1.003e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0)
+    │   ├─ [117547] ERC8183::createJob(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], 1003600 [1.003e6], "paper fixture", 0x0000000000000000000000000000000000000000, 0) [delegatecall]
+    │   │   ├─ emit JobCreated(jobId: 2, client: intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], provider: worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC], evaluator: evaluator: [0xCA5453e74F0CCC802aDd48A547cd965512fFd45d], expiredAt: 1003600 [1.003e6], hook: 0x0000000000000000000000000000000000000000)
+    │   │   └─ ← [Return] 2
+    │   └─ ← [Return] 2
+    ├─ [0] VM::prank(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC])
+    │   └─ ← [Return]
+    ├─ [90456] ERC1967Proxy::fallback(2, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 60, 0x)
+    │   ├─ [63574] ERC8183::setBudget(2, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 60, 0x) [delegatecall]
+    │   │   ├─ emit BudgetSet(jobId: 2, token: MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], amount: 60)
+    │   │   └─ ← [Stop]
+    │   └─ ← [Return]
+    ├─ [0] VM::expectRevert(ERC20InsufficientBalance(0xD20A6CAAA6194D7285C23b63681E2843126A7709, 0, 60))
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709])
+    │   └─ ← [Return]
+    ├─ [58357] ERC1967Proxy::fallback(2, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 60, 0x)
+    │   ├─ [31462] ERC8183::fund(2, MockUSDC: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 60, 0x) [delegatecall]
+    │   │   ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   │   │   └─ ← [Return] 100
+    │   │   ├─ [5333] MockUSDC::transferFrom(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709], ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a], 60)
+    │   │   │   └─ ← [Revert] ERC20InsufficientBalance(0xD20A6CAAA6194D7285C23b63681E2843126A7709, 0, 60)
+    │   │   └─ ← [Revert] ERC20InsufficientBalance(0xD20A6CAAA6194D7285C23b63681E2843126A7709, 0, 60)
+    │   └─ ← [Revert] ERC20InsufficientBalance(0xD20A6CAAA6194D7285C23b63681E2843126A7709, 0, 60)
+    ├─ [2559] MockUSDC::balanceOf(buyer: [0x0fF93eDfa7FB7Ad5E962E4C0EdB9207C03a0fe02]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(intermediary: [0xD20A6CAAA6194D7285C23b63681E2843126A7709]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(worker: [0x12C2e0AE414896CCA77C9D9fb8f0394ecfa7F7FC]) [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [2559] MockUSDC::balanceOf(ERC1967Proxy: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]) [staticcall]
+    │   └─ ← [Return] 100
+    ├─ [2325] MockUSDC::totalSupply() [staticcall]
+    │   └─ ← [Return] 100
+    └─ ← [Stop]
+
+Suite result: ok. 12 passed; 0 failed; 0 skipped; finished in 8.08ms (10.14ms CPU time)
+
+Ran 2 test suites in 52.94ms (27.69ms CPU time): 19 tests passed, 1 failed, 0 skipped (20 total tests)
+
+Failing tests:
+Encountered 1 failing test in test/ChioPaperComparison.t.sol:ChioPaperComparisonTest
+[FAIL: next call did not revert as expected] test_newAcceptanceRejectedAfterResolveByEvenBeforeRefund() (gas: 434007)
+
+Encountered a total of 1 failing tests, 19 tests succeeded
+
+Tip: Run `forge test --rerun` to retry only the 1 failed test
+Tip: Run `forge test --debug --match-test <TEST_NAME>` to inspect one failing test in the debugger

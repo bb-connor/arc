@@ -134,12 +134,17 @@ mod admission_evidence;
 mod durable_finalization_tests;
 #[path = "finding_wedge_purchase_e2e_tests/operator_recovery_tests.rs"]
 mod operator_recovery_tests;
+#[path = "finding_wedge_purchase_e2e_tests/payment_rail.rs"]
+mod payment_rail;
 #[path = "finding_wedge_purchase_e2e_tests/public_route_support.rs"]
 mod public_route_support;
 #[path = "finding_wedge_purchase_e2e_tests/replay_determinism_tests.rs"]
 mod replay_determinism_tests;
 #[path = "finding_wedge_purchase_e2e_tests/token_binding_tests.rs"]
 mod token_binding_tests;
+use payment_rail::{PaymentCalls, PrepaidFinalAdapter, ReversibleHoldAdapter};
+#[path = "finding_wedge_purchase_e2e_tests/payment_rail_tests.rs"]
+mod payment_rail_tests;
 use public_route_support::{
     assert_terminal_cannot_rebind_public_request, FixedTerminalExecutor, RoutedPurchaseExecutor,
 };
@@ -1726,155 +1731,6 @@ fn admission_witness(
 // ---------------------------------------------------------------------------
 // Kernel-side wiring
 // ---------------------------------------------------------------------------
-
-#[derive(Default)]
-struct PaymentCalls {
-    authorizations: AtomicU64,
-    captures: AtomicU64,
-    releases: AtomicU64,
-}
-
-struct ReversibleHoldAdapter {
-    calls: Arc<PaymentCalls>,
-    authorize_hook: Option<Arc<dyn Fn() -> Result<(), String> + Send + Sync>>,
-}
-
-impl PaymentAdapter for ReversibleHoldAdapter {
-    fn rail_id(&self) -> &'static str {
-        "wedge-reversible-hold"
-    }
-
-    fn rail_mode(&self) -> Option<PaymentRailMode> {
-        Some(PaymentRailMode::ReversibleHold)
-    }
-
-    fn authorize(
-        &self,
-        request: &PaymentAuthorizeRequest,
-    ) -> Result<PaymentAuthorization, PaymentError> {
-        self.calls.authorizations.fetch_add(1, Ordering::SeqCst);
-        if let Some(hook) = self.authorize_hook.as_ref() {
-            hook().map_err(PaymentError::RailError)?;
-        }
-        Ok(PaymentAuthorization {
-            authorization_id: format!("authorization:{}", request.reference),
-            state: PaymentAuthorizationState::Held,
-            metadata: serde_json::json!({}),
-        })
-    }
-
-    fn capture(
-        &self,
-        authorization_id: &str,
-        _amount_units: u64,
-        _currency: &str,
-        _reference: &str,
-    ) -> Result<PaymentResult, PaymentError> {
-        self.calls.captures.fetch_add(1, Ordering::SeqCst);
-        Ok(PaymentResult {
-            transaction_id: authorization_id.to_owned(),
-            settlement_status: RailSettlementStatus::Settled,
-            metadata: serde_json::json!({}),
-        })
-    }
-
-    fn release(
-        &self,
-        authorization_id: &str,
-        _reference: &str,
-    ) -> Result<PaymentResult, PaymentError> {
-        self.calls.releases.fetch_add(1, Ordering::SeqCst);
-        Ok(PaymentResult {
-            transaction_id: format!("release:{authorization_id}"),
-            settlement_status: RailSettlementStatus::Released,
-            metadata: serde_json::json!({}),
-        })
-    }
-
-    fn refund(
-        &self,
-        transaction_id: &str,
-        _amount_units: u64,
-        _currency: &str,
-        _reference: &str,
-    ) -> Result<PaymentResult, PaymentError> {
-        Ok(PaymentResult {
-            transaction_id: transaction_id.to_owned(),
-            settlement_status: RailSettlementStatus::Refunded,
-            metadata: serde_json::json!({}),
-        })
-    }
-}
-
-/// A final-settlement rail: it prepays, so it cannot arbitrate a compare
-/// that only runs after the tool returns.
-struct PrepaidFinalAdapter {
-    calls: Arc<PaymentCalls>,
-}
-
-impl PaymentAdapter for PrepaidFinalAdapter {
-    fn rail_id(&self) -> &'static str {
-        "wedge-prepaid-final"
-    }
-
-    fn rail_mode(&self) -> Option<PaymentRailMode> {
-        Some(PaymentRailMode::PrepaidFinal)
-    }
-
-    fn authorize(
-        &self,
-        request: &PaymentAuthorizeRequest,
-    ) -> Result<PaymentAuthorization, PaymentError> {
-        self.calls.authorizations.fetch_add(1, Ordering::SeqCst);
-        Ok(PaymentAuthorization {
-            authorization_id: format!("prepaid:{}", request.reference),
-            state: PaymentAuthorizationState::PrepaidFinal,
-            metadata: serde_json::json!({}),
-        })
-    }
-
-    fn capture(
-        &self,
-        authorization_id: &str,
-        _amount_units: u64,
-        _currency: &str,
-        _reference: &str,
-    ) -> Result<PaymentResult, PaymentError> {
-        self.calls.captures.fetch_add(1, Ordering::SeqCst);
-        Ok(PaymentResult {
-            transaction_id: authorization_id.to_owned(),
-            settlement_status: RailSettlementStatus::Settled,
-            metadata: serde_json::json!({}),
-        })
-    }
-
-    fn release(
-        &self,
-        authorization_id: &str,
-        _reference: &str,
-    ) -> Result<PaymentResult, PaymentError> {
-        self.calls.releases.fetch_add(1, Ordering::SeqCst);
-        Ok(PaymentResult {
-            transaction_id: format!("release:{authorization_id}"),
-            settlement_status: RailSettlementStatus::Released,
-            metadata: serde_json::json!({}),
-        })
-    }
-
-    fn refund(
-        &self,
-        transaction_id: &str,
-        _amount_units: u64,
-        _currency: &str,
-        _reference: &str,
-    ) -> Result<PaymentResult, PaymentError> {
-        Ok(PaymentResult {
-            transaction_id: transaction_id.to_owned(),
-            settlement_status: RailSettlementStatus::Refunded,
-            metadata: serde_json::json!({}),
-        })
-    }
-}
 
 /// Counts dispatches into the buyer-blind reveal server without changing
 /// what it serves.

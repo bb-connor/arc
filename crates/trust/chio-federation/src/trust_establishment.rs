@@ -452,7 +452,10 @@ impl PeerHandshakeEnvelope {
             .validate()
             .map_err(|e| PeerHandshakeError::CapabilityNegotiation(e.to_string()))?;
         let bytes = self.challenge.canonical_bytes()?;
-        if !self.declared_public_key.verify(&bytes, &self.signature) {
+        if !self
+            .declared_public_key
+            .verify_strict(&bytes, &self.signature)
+        {
             return Err(PeerHandshakeError::InvalidSignature);
         }
         Ok(())

@@ -1,0 +1,67 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/chio-verifiable-work-paper/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/chio-verifiable-work-paper/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/chio-verifiable-work-paper/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-kernel v0.1.0 (/tmp/chio-verifiable-work-paper/crates/kernel/chio-kernel)
+    Finished `test` profile [unoptimized] target(s) in 14.54s
+     Running tests/dynamic_delegation.rs (/tmp/chio-paper-target/debug/deps/dynamic_delegation-9ff40172805672af)
+
+running 5 tests
+test changed_native_identity_payload_and_ceiling_never_dispatch ... FAILED
+test receiver_executes_with_allocator_offline_and_rejects_another_receiver ... FAILED
+test output_must_satisfy_the_immutable_contract ... FAILED
+test output_transform_cannot_bypass_the_contract ... FAILED
+test dynamic_selection_recursion_and_native_replay ... FAILED
+
+failures:
+
+---- changed_native_identity_payload_and_ceiling_never_dispatch stdout ----
+
+thread 'changed_native_identity_payload_and_ceiling_never_dispatch' (1812570) panicked at crates/kernel/chio-kernel/tests/dynamic_delegation.rs:123:9:
+wrong rejection: Some("durable admission failed: durable monetary admission requires a recoverable payment rail identity")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- receiver_executes_with_allocator_offline_and_rejects_another_receiver stdout ----
+
+thread 'receiver_executes_with_allocator_offline_and_rejects_another_receiver' (1812574) panicked at crates/kernel/chio-kernel/tests/dynamic_delegation.rs:23:5:
+assertion `left == right` failed: Some("durable admission failed: durable monetary admission requires a recoverable payment rail identity")
+  left: Deny
+ right: Allow
+
+---- output_must_satisfy_the_immutable_contract stdout ----
+
+thread 'output_must_satisfy_the_immutable_contract' (1812572) panicked at crates/kernel/chio-kernel/tests/dynamic_delegation.rs:143:5:
+assertion `left == right` failed
+  left: 0
+ right: 1
+
+---- output_transform_cannot_bypass_the_contract stdout ----
+
+thread 'output_transform_cannot_bypass_the_contract' (1812573) panicked at crates/kernel/chio-kernel/tests/dynamic_delegation.rs:72:5:
+assertion `left == right` failed
+  left: 0
+ right: 1
+
+---- dynamic_selection_recursion_and_native_replay stdout ----
+Error: "native delegation failed: Some(\"durable admission failed: durable monetary admission requires a recoverable payment rail identity\")"
+
+
+failures:
+    changed_native_identity_payload_and_ceiling_never_dispatch
+    dynamic_selection_recursion_and_native_replay
+    output_must_satisfy_the_immutable_contract
+    output_transform_cannot_bypass_the_contract
+    receiver_executes_with_allocator_offline_and_rejects_another_receiver
+
+test result: FAILED. 0 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.96s
+
+error: test failed, to rerun pass `-p chio-kernel --test dynamic_delegation`

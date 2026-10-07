@@ -1,0 +1,15 @@
+   Compiling chio-store-sqlite v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-store-sqlite)
+    Finished `test` profile [unoptimized] target(s) in 1m 12s
+     Running unittests src/lib.rs (target/debug/deps/chio_store_sqlite-5a6ec1936384c61e)
+admission_operation_store::tests::dpop_replay::claims::kernel_routes::authenticated_caller::authenticated_caller_start_retains_physical_dpop_and_reports_after_proof_expiry: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 0.84s
+     Running unittests src/lib.rs (target/debug/deps/chio_store_sqlite-5a6ec1936384c61e)
+
+running 1 test
+test admission_operation_store::tests::dpop_replay::claims::kernel_routes::authenticated_caller::authenticated_caller_start_retains_physical_dpop_and_reports_after_proof_expiry ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1663 filtered out; finished in 9.58s
+
+original physical DPoP caller custody passed (1 exact tests)

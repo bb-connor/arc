@@ -1,0 +1,7 @@
+test_killed_workers_preserve_original_funding_operation_and_hold (__main__.FundedNativeSmoke.test_killed_workers_preserve_original_funding_operation_and_hold) ... ok
+test_real_deposit_binds_one_native_operation_and_hold (__main__.FundedNativeSmoke.test_real_deposit_binds_one_native_operation_and_hold) ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 119.025s
+
+OK

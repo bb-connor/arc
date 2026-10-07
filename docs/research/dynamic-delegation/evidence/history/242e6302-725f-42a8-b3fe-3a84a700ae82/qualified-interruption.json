@@ -1,0 +1,15 @@
+{
+  "schema": "chio.qualification.interruption.v1",
+  "reason": "Codex daemon restarted and terminated the local qualification recorder. No recorder or owned target test process remained at recovery.",
+  "source_head": "72fb721b97ea7c28cd90af4c372648ef547c6b5c",
+  "completed_commands": {
+    "environment": 0,
+    "workflow-tests": 0,
+    "native-tests": 0,
+    "native-regression": 0
+  },
+  "last_command": "evolution-tests",
+  "last_command_exit": "not recorded",
+  "observed_utc": "2026-10-05T19:25:37.526651+00:00",
+  "log": "review-native-qualification-after-preflight.log"
+}

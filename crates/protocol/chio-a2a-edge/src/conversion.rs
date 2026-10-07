@@ -1,8 +1,10 @@
+use super::*;
+
 // Message/argument conversion helpers and Chio metadata envelope builders
 // for kernel-mediated requests.
 
 /// Extract validated tool arguments from A2A message parts.
-fn extract_arguments_from_message(message: &A2aMessage) -> Result<Value, A2aEdgeError> {
+pub(super) fn extract_arguments_from_message(message: &A2aMessage) -> Result<Value, A2aEdgeError> {
     if message.parts.is_empty() {
         return Err(A2aEdgeError::InvalidRequest(
             "message.parts must contain at least one part".to_string(),
@@ -39,7 +41,7 @@ fn extract_arguments_from_message(message: &A2aMessage) -> Result<Value, A2aEdge
 }
 
 /// Convert a tool result to A2A message parts.
-fn result_to_parts(result: &Value) -> Vec<A2aPart> {
+pub(super) fn result_to_parts(result: &Value) -> Vec<A2aPart> {
     if let Some(text) = result.as_str() {
         vec![A2aPart::Text {
             text: text.to_string(),
@@ -66,7 +68,7 @@ fn result_to_parts(result: &Value) -> Vec<A2aPart> {
     }
 }
 
-fn task_response_from_orchestrated(
+pub(super) fn task_response_from_orchestrated(
     task_id: String,
     orchestrated: OrchestratedToolCall,
 ) -> TaskResponse {
@@ -129,7 +131,7 @@ fn terminal_state_reason(terminal_state: &OperationTerminalState) -> Option<Stri
     }
 }
 
-fn pending_task_metadata(authority_path: &str, message_stream: &str) -> Value {
+pub(super) fn pending_task_metadata(authority_path: &str, message_stream: &str) -> Value {
     json!({
         "chio": {
             "receiptId": Value::Null,
@@ -152,7 +154,7 @@ fn pending_task_metadata(authority_path: &str, message_stream: &str) -> Value {
     })
 }
 
-fn cancelled_task_metadata(authority_path: &str, message_stream: &str) -> Value {
+pub(super) fn cancelled_task_metadata(authority_path: &str, message_stream: &str) -> Value {
     json!({
         "chio": {
             "receiptId": Value::Null,
@@ -217,7 +219,7 @@ fn annotate_authoritative_a2a_metadata(metadata: &mut Value, output: Option<&Too
     }
 }
 
-fn build_a2a_source_envelope(
+pub(super) fn build_a2a_source_envelope(
     skill_id: &str,
     request: &SendMessageRequest,
 ) -> Result<Value, A2aEdgeError> {
@@ -232,7 +234,7 @@ fn build_a2a_source_envelope(
     Ok(envelope)
 }
 
-fn ensure_chio_metadata(
+pub(super) fn ensure_chio_metadata(
     envelope: &mut Value,
 ) -> Result<&mut serde_json::Map<String, Value>, BridgeError> {
     let Some(object) = envelope.as_object_mut() else {

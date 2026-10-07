@@ -41,6 +41,14 @@ impl CombinedFixture {
         retired: Option<RuntimeReplayParticipantKind>,
         prepare: impl FnOnce(&mut TreatyRuntimeFixture, &Keypair, &Keypair) -> TestResult,
     ) -> TestResult<Self> {
+        Self::with_swarm_input(retired, prepare, runtime_swarm_bundle(false)?)
+    }
+
+    fn with_swarm_input(
+        retired: Option<RuntimeReplayParticipantKind>,
+        prepare: impl FnOnce(&mut TreatyRuntimeFixture, &Keypair, &Keypair) -> TestResult,
+        swarm: SwarmAuthorityBundle,
+    ) -> TestResult<Self> {
         let origin_key = Keypair::generate();
         let local_key = Keypair::generate();
         let mut treaty = treaty_runtime_fixture_with_signers(
@@ -49,7 +57,6 @@ impl CombinedFixture {
             local_key.clone(),
         )?;
         prepare(&mut treaty, &origin_key, &local_key)?;
-        let swarm = runtime_swarm_bundle(false)?;
         let inner = Fixture::with_request(true, |source| {
             let args = serde_json::json!({"record": "vendor-ledger-7", "value": "closed"});
             let mut admission = bundle();

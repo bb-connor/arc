@@ -1,0 +1,18 @@
+{
+  "parent": {
+    "capabilityId": "work-1cc77f34de608649d4b0e9d823573dbbf8b3cf09f516038bf591fda2e0c93361",
+    "exposure": 0,
+    "invocations": 1,
+    "issuer": "3abca15df59ddd7e7013ca068a628f6fd0800d0d9a91ce1f6c9c05fb78661fb1",
+    "realizedSpend": 0,
+    "subject": "a9e44e99123c1c55607c5628e39aa1ddacb769088cd16f2c8d49ed3145a338f4"
+  },
+  "specialist": {
+    "capabilityId": "work-2321d250a6df78fbfcbe85f4a1c25397ecb4a22de453315773160db10a9d6994",
+    "exposure": 0,
+    "invocations": 1,
+    "issuer": "09d79d84d1706f5bcd99a0decb0ff9a82fc072160567cc6f62db4905f9887baa",
+    "realizedSpend": 0,
+    "subject": "4e5fe7e4b672db79691708dbd154b7b1b4c26d1b4dd24f07cb7c22094e640c17"
+  }
+}

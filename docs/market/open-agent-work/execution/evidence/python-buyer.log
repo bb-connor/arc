@@ -1,0 +1,41 @@
+test_delegation_profile_does_not_add_issuer_authority (test_enrollment.EnrollmentTests.test_delegation_profile_does_not_add_issuer_authority) ... ok
+test_discovery_cannot_forward_credentials_or_downgrade_transport (test_enrollment.EnrollmentTests.test_discovery_cannot_forward_credentials_or_downgrade_transport) ... ok
+test_expired_enrollment_cannot_activate_but_historical_pins_remain_readable (test_enrollment.EnrollmentTests.test_expired_enrollment_cannot_activate_but_historical_pins_remain_readable) ... ok
+test_local_activation_persists_pins_without_shared_private_credentials (test_enrollment.EnrollmentTests.test_local_activation_persists_pins_without_shared_private_credentials) ... ok
+test_origin_rejects_credentials_routes_and_ambiguous_spellings (test_enrollment.EnrollmentTests.test_origin_rejects_credentials_routes_and_ambiguous_spellings) ... ok
+test_tls_uses_activated_roots_hostname_and_version_without_environment_key_logging (test_enrollment.EnrollmentTests.test_tls_uses_activated_roots_hostname_and_version_without_environment_key_logging) ... ok
+test_valid_signatures_cannot_widen_enrollment_authority (test_enrollment.EnrollmentTests.test_valid_signatures_cannot_widen_enrollment_authority) ... ok
+test_native_incident_verifies_with_local_pins (test_incident.IncidentTests.test_native_incident_verifies_with_local_pins) ... ok
+test_retention_requires_local_attempt_and_preserves_reserved_credits (test_incident.IncidentTests.test_retention_requires_local_attempt_and_preserves_reserved_credits) ... ok
+test_unknown_cannot_substitute_for_checked_work (test_incident.IncidentTests.test_unknown_cannot_substitute_for_checked_work) ... ok
+test_valid_signatures_do_not_authorize_malformed_incidents (test_incident.IncidentTests.test_valid_signatures_do_not_authorize_malformed_incidents) ... ok
+setUpClass (test_protocol.ProtocolTests) ... ERROR
+test_completed_release_verifies_under_local_pins (test_resolution.ResolutionTests.test_completed_release_verifies_under_local_pins) ... ok
+test_only_exact_retained_consent_restores_credit_once (test_resolution.ResolutionTests.test_only_exact_retained_consent_restores_credit_once) ... ok
+test_valid_outer_signatures_cannot_invent_settlement_authority (test_resolution.ResolutionTests.test_valid_outer_signatures_cannot_invent_settlement_authority) ... ok
+test_disclosure_permission_is_exact_and_bounded (test_subcontract.SubcontractTests.test_disclosure_permission_is_exact_and_bounded) ... ok
+test_even_valid_promisor_signatures_cannot_widen_a_permit (test_subcontract.SubcontractTests.test_even_valid_promisor_signatures_cannot_widen_a_permit) ... ok
+test_four_roles_cannot_collapse_to_shared_keys (test_subcontract.SubcontractTests.test_four_roles_cannot_collapse_to_shared_keys) ... ok
+test_parent_hash_separates_otherwise_identical_procurements (test_subcontract.SubcontractTests.test_parent_hash_separates_otherwise_identical_procurements) ... ok
+test_parent_signature_cannot_replace_child_evidence (test_subcontract.SubcontractTests.test_parent_signature_cannot_replace_child_evidence) ... ok
+test_project_reconstructs_only_approved_authentication (test_subcontract.SubcontractTests.test_project_reconstructs_only_approved_authentication) ... ok
+
+======================================================================
+ERROR: setUpClass (test_protocol.ProtocolTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/federated-work/python_buyer/test_protocol.py", line 21, in setUpClass
+    cls.public = client.read(EVIDENCE / "paid-normal-public.json")
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/connor/backbay/arc-funded-work/examples/federated-work/python_buyer/client.py", line 28, in read
+    with Path(path).open("rb") as stream:
+         ^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/pathlib.py", line 1015, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/home/connor/backbay/arc-funded-work/docs/papers/review-2026-09/evidence/30-recoverable-checked-output-rejections/paid-normal-public.json'
+
+----------------------------------------------------------------------
+Ran 20 tests in 0.715s
+
+FAILED (errors=1)

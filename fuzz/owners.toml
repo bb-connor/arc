@@ -96,9 +96,21 @@ path  = "crates/trust/chio-revocation-oracle"
 crate = "chio-federation"
 path  = "crates/trust/chio-federation"
 
+[targets.bilateral_dsse_verify]
+crate = "chio-federation"
+path  = "crates/trust/chio-federation"
+
 [targets.finding_worker_protocol]
 crate = "chio-finding-worker"
 path  = "crates/platform/chio-finding-worker"
+
+[targets.response_authority_protocol]
+crate = "chio-control-plane"
+path  = "crates/platform/chio-control-plane"
+
+[targets.response_lifecycle]
+crate = "chio-quarantine"
+path  = "crates/security/chio-quarantine"
 
 [targets.underwriting_policy_input]
 crate = "chio-underwriting"

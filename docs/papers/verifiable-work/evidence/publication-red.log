@@ -1,0 +1,27 @@
+test_changed_evidence_fails_closed (test_evidence.EvidenceTests.test_changed_evidence_fails_closed) ... ok
+test_inventory_cannot_read_outside_artifact_root (test_evidence.EvidenceTests.test_inventory_cannot_read_outside_artifact_root) ... ok
+test_publication_cannot_drop_required_gates (test_evidence.EvidenceTests.test_publication_cannot_drop_required_gates) ... FAIL
+test_publication_requires_results_and_explicit_readiness (test_evidence.EvidenceTests.test_publication_requires_results_and_explicit_readiness) ... FAIL
+
+======================================================================
+FAIL: test_publication_cannot_drop_required_gates (test_evidence.EvidenceTests.test_publication_cannot_drop_required_gates)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/papers/verifiable-work/tools/test_evidence.py", line 16, in test_publication_cannot_drop_required_gates
+    self.assertTrue(hasattr(check, 'verify_publication'), 'publication validator missing')
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true : publication validator missing
+
+======================================================================
+FAIL: test_publication_requires_results_and_explicit_readiness (test_evidence.EvidenceTests.test_publication_requires_results_and_explicit_readiness)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/papers/verifiable-work/tools/test_evidence.py", line 23, in test_publication_requires_results_and_explicit_readiness
+    self.assertTrue(hasattr(check, 'verify_publication'), 'publication validator missing')
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true : publication validator missing
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.007s
+
+FAILED (failures=2)

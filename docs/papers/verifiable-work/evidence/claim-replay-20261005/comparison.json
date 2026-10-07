@@ -1,0 +1,17 @@
+{
+  "schema": "chio.paper.matched-escrow.v1",
+  "traces": 270,
+  "checked_steps": 738,
+  "states_seen": [
+    "Funded",
+    "Paid",
+    "Payable",
+    "Refunded",
+    "Rejected",
+    "Submitted",
+    "TimedOut"
+  ],
+  "mismatches": [],
+  "scope": "sequential trusted SQL rail; symbolic authenticated actors; same-author implementation",
+  "conclusion": "same observable monetary behavior on the finite trace corpus"
+}

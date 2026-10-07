@@ -1,0 +1,6 @@
+{
+  "exit_code": 1,
+  "regressions": 4,
+  "failed": 4,
+  "cause": "aggregate check did not bind prerequisite records or verifier scripts"
+}

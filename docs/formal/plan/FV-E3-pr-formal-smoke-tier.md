@@ -79,7 +79,7 @@ then applies these narrower sets:
 Workflow, root Cargo, lockfile, and Rust toolchain changes select every
 applicable Rust lane. Editing the formal workflow selects all four lanes.
 
-The mutation workflow filters to the six trust-boundary crate source trees,
+The mutation workflow filters to the eight trust-boundary crate source trees,
 their mutation configuration, shared mutation scripts, `releases.toml`, and
 the workflow itself. A per-package diff check prevents untouched matrix entries
 from paying setup or mutation costs.

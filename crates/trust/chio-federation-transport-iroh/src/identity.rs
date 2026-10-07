@@ -637,7 +637,7 @@ impl TransportDirectoryBundleDocument {
             })?;
         let signature_ok = issuer
             .public_key
-            .verify_canonical(&self.body, &self.signature)
+            .verify_canonical_strict(&self.body, &self.signature)
             .map_err(|error| IdentityError::CanonicalJson(error.to_string()))?;
         if !signature_ok {
             return Err(IdentityError::SignatureInvalid);
@@ -678,7 +678,7 @@ impl TransportDirectoryBundleDocument {
                     transport_endorsement_preimage(&entry.kernel_id, &entry.transport_endpoint_id);
                 let endorsed = entry
                     .passport_public_key
-                    .verify(&transport_preimage, &entry.passport_endorsement);
+                    .verify_strict(&transport_preimage, &entry.passport_endorsement);
                 if !endorsed {
                     return Err(IdentityError::EndorsementInvalid(entry.kernel_id.clone()));
                 }
@@ -711,7 +711,7 @@ impl TransportDirectoryBundleDocument {
                 );
                 let oracle_endorsed = entry
                     .passport_public_key
-                    .verify(&signer_preimage, &signer.oracle_endorsement);
+                    .verify_strict(&signer_preimage, &signer.oracle_endorsement);
                 if !oracle_endorsed {
                     return Err(IdentityError::OracleEndorsementInvalid {
                         kernel_id: entry.kernel_id.clone(),
@@ -729,6 +729,12 @@ impl TransportDirectoryBundleDocument {
                         signer_id: signer.signer_id.clone(),
                         algorithm,
                     });
+                }
+                if signer.oracle_public_key.is_weak_ed25519() {
+                    return Err(IdentityError::MalformedEntry(format!(
+                        "revocation signer {} has a weak Ed25519 key",
+                        signer.signer_id
+                    )));
                 }
                 let binding = SignerBinding {
                     endpoint: entry.transport_endpoint_id,
@@ -1196,6 +1202,64 @@ mod tests {
             bundle.verify_bundle(&trust).unwrap_err(),
             IdentityError::SignatureInvalid
         );
+    }
+
+    fn low_order_forgery() -> Result<(PublicKey, Signature), Box<dyn std::error::Error>> {
+        let mut identity = [0; 32];
+        identity[0] = 1;
+        let mut signature = [0; 64];
+        signature[0] = 1;
+        Ok((
+            PublicKey::from_bytes(&identity)?,
+            Signature::from_bytes(&signature),
+        ))
+    }
+
+    #[test]
+    fn low_order_directory_issuer_cannot_authorize_peers() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let (mut bundle, mut trust) = signed_bundle(&[EntrySpec::admitted("did:chio:a", 1, 10)]);
+        let (weak_key, forged) = low_order_forgery()?;
+        assert!(weak_key.verify_canonical(&bundle.body, &forged)?);
+        trust.issuers[0].public_key = weak_key;
+        bundle.signature = forged;
+        assert!(matches!(
+            bundle.verify_bundle(&trust),
+            Err(IdentityError::SignatureInvalid)
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn low_order_passport_cannot_endorse_a_transport() -> Result<(), Box<dyn std::error::Error>> {
+        let (mut bundle, trust) = signed_bundle(&[EntrySpec::admitted("did:chio:a", 1, 10)]);
+        let (weak_key, forged) = low_order_forgery()?;
+        let peer = &mut bundle.directory.peers[0];
+        assert!(weak_key.verify(
+            &transport_endorsement_preimage(&peer.kernel_id, &peer.transport_endpoint_id),
+            &forged,
+        ));
+        peer.passport_public_key = weak_key;
+        peer.passport_endorsement = forged;
+        repin_and_resign(&mut bundle);
+        assert!(matches!(
+            bundle.verify_bundle(&trust),
+            Err(IdentityError::EndorsementInvalid(kernel)) if kernel == "did:chio:a"
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn low_order_oracle_key_is_rejected_even_with_valid_endorsement(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let (weak_key, _) = low_order_forgery()?;
+        let peer = EntrySpec::admitted("did:chio:a", 1, 10).with_signer("oracle-a", &weak_key);
+        let (bundle, trust) = signed_bundle(&[peer]);
+        assert!(matches!(
+            bundle.verify_bundle(&trust),
+            Err(IdentityError::MalformedEntry(_))
+        ));
+        Ok(())
     }
 
     #[test]

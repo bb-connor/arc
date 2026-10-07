@@ -1,0 +1,103 @@
+{
+  "schema": "chio.integration-intake.v1",
+  "mode": "synthetic",
+  "records": "records.csv",
+  "scheduled_incidents": {
+    "I1/Chio": [
+      "I1-Chio-incident"
+    ],
+    "I1/B1": [
+      "I1-B1-incident"
+    ],
+    "I2/Chio": [
+      "I2-Chio-incident"
+    ],
+    "I2/B1": [
+      "I2-B1-incident"
+    ],
+    "I3/Chio": [
+      "I3-Chio-incident"
+    ],
+    "I3/B1": [
+      "I3-B1-incident"
+    ],
+    "I4/Chio": [
+      "I4-Chio-incident"
+    ],
+    "I4/B1": [
+      "I4-B1-incident"
+    ],
+    "I5/Chio": [
+      "I5-Chio-incident"
+    ],
+    "I5/B1": [
+      "I5-B1-incident"
+    ],
+    "I6/Chio": [
+      "I6-Chio-incident"
+    ],
+    "I6/B1": [
+      "I6-B1-incident"
+    ]
+  },
+  "artifacts": {
+    "33c87fd3907e0b2ee15e6aba8ae7c8a03260ba017b3c5b12511f53e728f3e247": "synthetic-source.txt",
+    "bba920f1e5e97b96c59253efb482e639a0f7ee161a11f6d222f924d69d9c3cdf": "synthetic-adjudication.json",
+    "c9cae6e6feded193025057283c93c9e84c4c5df91111301a6fc969eb962e8c3e": "synthetic-attestation.txt",
+    "96d00f3a6375806882b561b63642646747a794a47677cecd1f9f83a99d486945": "I1-Chio.jsonl",
+    "797e62fa71f1d895a506962316097c5c22285352bff2fccecf20542e629805d9": "I1-B1.jsonl",
+    "5e77772854fb2d174e4521d4959d8e1497323a6a6daff8681534c01a2a4b4046": "I2-Chio.jsonl",
+    "64d02cd4a3e377e295359cb6c5ea04477ebac5a36d1c68069eb63e77b5cb24f5": "I2-B1.jsonl",
+    "74e2a3076c8c6ea20918c5f49cc80dd5f153e7efcc58fa62147b8a44e104f237": "I3-Chio.jsonl",
+    "8bc4e85613816d409999fb0e72452cd3f7595cfe766f9352c1ac96da262f3a20": "I3-B1.jsonl",
+    "f02d13c526ec76e5207ad48cbf03d8b88fecd8dacaec3d6aa26b626cd973de97": "I4-Chio.jsonl",
+    "66c7ebeb04d71ea148e9a0288deefec3ab7884bf5893a8f3129a0bf19e601d56": "I4-B1.jsonl",
+    "c0ddfac6dbdf7fda3bc2c72cfbe9df34998ac3cfe9ecddf3656cebe01b28da6f": "I5-Chio.jsonl",
+    "241a426eab28ef540bb7caf533ca070c1786db1a3cf4a56b5cc74d97fe1228da": "I5-B1.jsonl",
+    "a1daad0d97d17d2af6a50ffeff5c753c30b55da3a0aadd415e9938fcb00a54d8": "I6-Chio.jsonl",
+    "55221c11bc4df0b7934b8913e54b1e4a014ebdfeca6a59021260e35d53c62a5e": "I6-B1.jsonl"
+  },
+  "operators": {
+    "SYNTHETIC-operator": {
+      "administration_id": "SYNTHETIC-admin"
+    }
+  },
+  "adjudications": {
+    "I1": {
+      "safety_matched": true,
+      "progress_matched": true,
+      "quality_matched": true,
+      "artifact_sha": "bba920f1e5e97b96c59253efb482e639a0f7ee161a11f6d222f924d69d9c3cdf"
+    },
+    "I2": {
+      "safety_matched": true,
+      "progress_matched": true,
+      "quality_matched": true,
+      "artifact_sha": "bba920f1e5e97b96c59253efb482e639a0f7ee161a11f6d222f924d69d9c3cdf"
+    },
+    "I3": {
+      "safety_matched": true,
+      "progress_matched": true,
+      "quality_matched": true,
+      "artifact_sha": "bba920f1e5e97b96c59253efb482e639a0f7ee161a11f6d222f924d69d9c3cdf"
+    },
+    "I4": {
+      "safety_matched": true,
+      "progress_matched": true,
+      "quality_matched": true,
+      "artifact_sha": "bba920f1e5e97b96c59253efb482e639a0f7ee161a11f6d222f924d69d9c3cdf"
+    },
+    "I5": {
+      "safety_matched": true,
+      "progress_matched": true,
+      "quality_matched": true,
+      "artifact_sha": "bba920f1e5e97b96c59253efb482e639a0f7ee161a11f6d222f924d69d9c3cdf"
+    },
+    "I6": {
+      "safety_matched": true,
+      "progress_matched": true,
+      "quality_matched": true,
+      "artifact_sha": "bba920f1e5e97b96c59253efb482e639a0f7ee161a11f6d222f924d69d9c3cdf"
+    }
+  }
+}

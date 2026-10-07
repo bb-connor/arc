@@ -1,0 +1,186 @@
+bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+✔ one real deposit cannot fund a second escrow or change its beneficiary (3877.944661ms)
+✔ beneficiary claims a signed release without another buyer action and cannot be paid twice (3851.515348ms)
+✔ a pre-expiry operator certificate does not preserve a claim past refund time (3006.460272ms)
+ℹ {"case":"timely-certificate-loses-to-expiry","certifiedAt":1789344000,"deadline":1789344100,"refundedAt":1789344101,"paid":"0","refunded":"100"}
+✔ administrative pause blocks release while an expired refund remains possible (3055.740409ms)
+✔ changing the registered operator key does not migrate an existing escrow pin (2828.795832ms)
+✔ a separately funded child stays paid when its unpaid parent expires (5734.767658ms)
+bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+✔ accepted claim survives deadlines, funding pause and future verifier rotation (5663.992429ms)
+✔ only a timely provider commitment opens the verifier decision window (3273.53734ms)
+▶ verifier outage and absent submission reach refund only strictly after timeout
+  ✔ false (2925.665638ms)
+  ✔ true (2547.401776ms)
+✔ verifier outage and absent submission reach refund only strictly after timeout (5474.07966ms)
+✔ rejected work refunds without creating a payment right (3158.578987ms)
+✔ still-unpaid earned child withdraws after the parent is refunded (6500.893531ms)
+ℹ {"case":"unpaid-earned-child-survives-parent-refund","parentRefunded":"100","childPaidAfterParentRefund":"60","intermediaryLoss":"60"}
+✔ funding binds every term and cannot allocate the same agreement twice (2612.294059ms)
+✔ another payer cannot squat a publicly known agreement digest (4075.339714ms)
+✔ fixed allocation and authorization vectors are accepted by the deployed bytecode (2938.980903ms)
+✔ invalid amounts, roles, deadlines and administrative callers cannot create backing (1281.277929ms)
+✔ maximum supported integer deposits and refunds without rounding (2456.462771ms)
+✔ a release signature cannot substitute its domain, claim, decision, asset or beneficiary (3652.506719ms)
+✔ future verifier rotation does not replace a funded agreements decision key (2986.858097ms)
+✔ competing mined withdrawals produce one payment and no refund (2972.756976ms)
+✔ failed, taxed or malformed token transfers cannot consume a payable claim (6747.195824ms)
+✔ inexact deposits and failed refunds roll back allocation and terminal state (4368.17851ms)
+✔ token callbacks cannot reenter the financial transition (4258.858519ms)
+bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+▶ model edge representatives agree with actual claim states and token balances
+  ✔ 0: submit Funded -> Submitted (true) (278.071803ms)
+  ✔ 1: submit Funded -> Funded (false) (138.017496ms)
+  ✔ 2: decide Funded -> Funded (false) (269.311157ms)
+  ✔ 3: decide Funded -> Funded (false) (187.185198ms)
+  ✔ 4: pay Funded -> Funded (false) (109.871706ms)
+  ✔ 5: refund Funded -> Funded (false) (138.535339ms)
+  ✔ 6: expire Funded -> Funded (false) (119.376517ms)
+  ✔ 7: submit Funded -> Submitted (true) (183.187737ms)
+  ✔ 8: submit Funded -> Funded (false) (117.356626ms)
+  ✔ 9: decide Funded -> Funded (false) (154.091861ms)
+  ✔ 10: decide Funded -> Funded (false) (162.625748ms)
+  ✔ 11: pay Funded -> Funded (false) (115.489696ms)
+  ✔ 12: refund Funded -> Funded (false) (154.364343ms)
+  ✔ 13: expire Funded -> Funded (false) (141.584515ms)
+  ✔ 14: submit Submitted -> Submitted (true) (409.670745ms)
+  ✔ 15: submit Submitted -> Submitted (false) (311.219699ms)
+  ✔ 16: decide Submitted -> Submitted (false) (345.00348ms)
+  ✔ 17: decide Submitted -> Submitted (false) (340.475056ms)
+  ✔ 18: pay Submitted -> Submitted (false) (281.875103ms)
+  ✔ 19: refund Submitted -> Submitted (false) (281.035139ms)
+  ✔ 20: expire Submitted -> Submitted (false) (289.475424ms)
+  ✔ 21: submit Submitted -> Submitted (true) (349.051541ms)
+  ✔ 22: submit Submitted -> Submitted (false) (425.81103ms)
+  ✔ 23: decide Submitted -> Submitted (false) (382.70348ms)
+  ✔ 24: decide Submitted -> Submitted (false) (374.742757ms)
+  ✔ 25: pay Submitted -> Submitted (false) (364.450143ms)
+  ✔ 26: refund Submitted -> Submitted (false) (386.989142ms)
+  ✔ 27: expire Submitted -> Submitted (false) (324.221728ms)
+  ✔ 28: decide Submitted -> Payable (true) (943.385867ms)
+  ✔ 29: decide Submitted -> Rejected (true) (875.329705ms)
+  ✔ 30: decide Submitted -> Payable (true) (979.902941ms)
+  ✔ 31: decide Submitted -> Rejected (true) (1283.199955ms)
+  ✔ 32: submit Payable -> Payable (true) (1438.059859ms)
+  ✔ 33: submit Payable -> Payable (false) (1360.061722ms)
+  ✔ 34: decide Payable -> Payable (true) (1509.665518ms)
+  ✔ 35: decide Payable -> Payable (false) (1217.946083ms)
+  ✔ 36: decide Payable -> Payable (false) (1254.451236ms)
+  ✔ 37: pay Payable -> Paid (true) (2027.320547ms)
+  ✔ 38: pay Payable -> Payable (false) (1352.644356ms)
+  ✔ 39: refund Payable -> Payable (false) (1260.279623ms)
+  ✔ 40: expire Payable -> Payable (false) (1459.105039ms)
+  ✔ 41: submit Rejected -> Rejected (true) (1243.429451ms)
+  ✔ 42: submit Rejected -> Rejected (false) (1161.024492ms)
+  ✔ 43: decide Rejected -> Rejected (false) (1303.425608ms)
+  ✔ 44: decide Rejected -> Rejected (true) (1259.126051ms)
+  ✔ 45: pay Rejected -> Rejected (false) (1346.541635ms)
+  ✔ 46: refund Rejected -> Refunded (true) (2210.543782ms)
+  ✔ 47: expire Rejected -> Rejected (false) (1302.719198ms)
+  ✔ 48: submit Payable -> Payable (true) (1288.787404ms)
+  ✔ 49: submit Payable -> Payable (false) (1274.738528ms)
+  ✔ 50: decide Payable -> Payable (true) (1221.713285ms)
+  ✔ 51: decide Payable -> Payable (false) (1317.644713ms)
+  ✔ 52: decide Payable -> Payable (false) (1292.946781ms)
+  ✔ 53: pay Payable -> Paid (true) (1751.360412ms)
+  ✔ 54: pay Payable -> Payable (false) (1060.609466ms)
+  ✔ 55: refund Payable -> Payable (false) (1156.416774ms)
+  ✔ 56: expire Payable -> Payable (false) (1136.554787ms)
+  ✔ 57: submit Rejected -> Rejected (true) (1343.737004ms)
+  ✔ 58: submit Rejected -> Rejected (false) (1225.594978ms)
+  ✔ 59: decide Rejected -> Rejected (false) (1143.13986ms)
+  ✔ 60: decide Rejected -> Rejected (true) (1275.68124ms)
+  ✔ 61: pay Rejected -> Rejected (false) (1133.824088ms)
+  ✔ 62: refund Rejected -> Refunded (true) (2065.909745ms)
+  ✔ 63: expire Rejected -> Rejected (false) (1265.983745ms)
+  ✔ 64: submit Paid -> Paid (true) (2414.195624ms)
+  ✔ 65: submit Paid -> Paid (false) (2069.630516ms)
+  ✔ 66: decide Paid -> Paid (true) (2382.245049ms)
+  ✔ 67: decide Paid -> Paid (false) (2168.087031ms)
+  ✔ 68: decide Paid -> Paid (false) (2339.481335ms)
+  ✔ 69: pay Paid -> Paid (false) (2230.928117ms)
+  ✔ 70: refund Paid -> Paid (false) (2240.669846ms)
+  ✔ 71: expire Paid -> Paid (false) (2244.633783ms)
+  ✔ 72: submit Refunded -> Refunded (true) (2360.384432ms)
+  ✔ 73: submit Refunded -> Refunded (false) (2361.443154ms)
+  ✔ 74: decide Refunded -> Refunded (false) (2190.589448ms)
+  ✔ 75: decide Refunded -> Refunded (true) (2241.183673ms)
+  ✔ 76: pay Refunded -> Refunded (false) (2220.249759ms)
+  ✔ 77: refund Refunded -> Refunded (false) (2061.271397ms)
+  ✔ 78: expire Refunded -> Refunded (false) (2142.823944ms)
+  ✔ 79: submit Paid -> Paid (true) (2164.891818ms)
+  ✔ 80: submit Paid -> Paid (false) (2172.055893ms)
+  ✔ 81: decide Paid -> Paid (true) (2237.067233ms)
+  ✔ 82: decide Paid -> Paid (false) (2514.35401ms)
+  ✔ 83: decide Paid -> Paid (false) (2511.23515ms)
+  ✔ 84: pay Paid -> Paid (false) (2164.175919ms)
+  ✔ 85: refund Paid -> Paid (false) (2082.376366ms)
+  ✔ 86: expire Paid -> Paid (false) (2270.175352ms)
+  ✔ 87: submit Refunded -> Refunded (true) (2293.777672ms)
+  ✔ 88: submit Refunded -> Refunded (false) (2351.863375ms)
+  ✔ 89: decide Refunded -> Refunded (false) (2109.230936ms)
+  ✔ 90: decide Refunded -> Refunded (true) (2162.224931ms)
+  ✔ 91: pay Refunded -> Refunded (false) (2157.795266ms)
+  ✔ 92: refund Refunded -> Refunded (false) (2235.688072ms)
+  ✔ 93: expire Refunded -> Refunded (false) (2172.380016ms)
+  ✔ 94: refund Funded -> Refunded (true) (1285.567995ms)
+  ✔ 95: expire Funded -> TimedOut (true) (263.542464ms)
+  ✔ 96: refund Funded -> Refunded (true) (1388.105773ms)
+  ✔ 97: expire Funded -> TimedOut (true) (278.822024ms)
+  ✔ 98: decide Refunded -> Refunded (false) (1548.794375ms)
+  ✔ 99: submit TimedOut -> TimedOut (false) (334.213595ms)
+  ✔ 100: decide TimedOut -> TimedOut (false) (397.319726ms)
+  ✔ 101: decide TimedOut -> TimedOut (false) (482.615775ms)
+  ✔ 102: pay TimedOut -> TimedOut (false) (361.293257ms)
+  ✔ 103: refund TimedOut -> Refunded (true) (1247.39835ms)
+  ✔ 104: expire TimedOut -> TimedOut (true) (475.143935ms)
+  ✔ 105: decide Refunded -> Refunded (false) (1510.129727ms)
+  ✔ 106: submit TimedOut -> TimedOut (false) (383.757214ms)
+  ✔ 107: decide TimedOut -> TimedOut (false) (459.404331ms)
+  ✔ 108: decide TimedOut -> TimedOut (false) (442.246242ms)
+  ✔ 109: pay TimedOut -> TimedOut (false) (404.468122ms)
+  ✔ 110: refund TimedOut -> Refunded (true) (1284.060618ms)
+  ✔ 111: expire TimedOut -> TimedOut (true) (450.096441ms)
+  ✔ 112: refund Submitted -> Refunded (true) (1364.971962ms)
+  ✔ 113: expire Submitted -> TimedOut (true) (538.455665ms)
+  ✔ 114: refund Submitted -> Refunded (true) (1384.769504ms)
+  ✔ 115: expire Submitted -> TimedOut (true) (558.59385ms)
+  ✔ 116: submit TimedOut -> TimedOut (true) (688.35109ms)
+  ✔ 117: submit TimedOut -> TimedOut (true) (678.675319ms)
+✔ model edge representatives agree with actual claim states and token balances (146711.839374ms)
+ℹ {"modelStates":5508,"modelTransitions":132192,"bytecodeTraceRepresentatives":118}
+ℹ tests 143
+ℹ suites 0
+ℹ pass 143
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 158241.904927

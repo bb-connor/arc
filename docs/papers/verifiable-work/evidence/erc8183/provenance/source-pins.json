@@ -1,0 +1,113 @@
+{
+  "repository": "https://github.com/erc-8183/base-contracts",
+  "commit": "142e669c1fd318486a4628395b629f033654dd06",
+  "tracked_diff": "",
+  "files": {
+    "contracts/ERC8183.sol": {
+      "sha256": "c5db4bcdc89dce6cc53629a19fcbcb73e973bc07f83b07a730aa4712bdedb1e4",
+      "git_blob": "a57f9f71aff6e32816d6f47e8431c89437296a34"
+    },
+    "contracts/ERC8183WithAuthorization.sol": {
+      "sha256": "75042e29e58dcb91766acc6641deb1b664df5e612b0e89100391a5cb3da0e9a8",
+      "git_blob": "88fc5476d1fe329161dfb1247d12263f4a4166f8"
+    },
+    "contracts/IERC8183Hook.sol": {
+      "sha256": "2d7797c0b59e793092cf67db93ac9d715500372b144de3d12dbadca70b63d744",
+      "git_blob": "6b71d49d47c129b10a04179630f33e89a9d8bc6b"
+    },
+    "contracts/IDisburser.sol": {
+      "sha256": "51e8dae2f2f0e34fa31a777edb67b45bd5d50a8bc341c605e4eaa5f4f3724209",
+      "git_blob": "fa4566b679678a385ad75681d57a9c61dbfb9468"
+    },
+    "contracts/mocks/MockUSDC.sol": {
+      "sha256": "6279d86a275c6bd105eec5225a544ef39ad9304ea008005a5f8eafcb4a4cb423",
+      "git_blob": "9334f7f6f0abb6154606e1bcb772a72c326d9dc8"
+    },
+    "foundry.toml": {
+      "sha256": "d1573cda927d3277151d96ef521207053c54ee27f2a8501ea120a8b3c97532e3",
+      "git_blob": "3872e6dac14c516b3f6e135e328ec557765d0fec"
+    },
+    ".gitmodules": {
+      "sha256": "42a423b635130b56d5a3f4f4abd099bd186f4e32a26cf07acd6fd4e4fdb6a877",
+      "git_blob": "9296efd5b310af4ad93e1f6e46ff89191008950b"
+    },
+    "LICENSE": {
+      "sha256": "40953fdb2ef029617b15a370dcbee145499b771b591b23caeffbc784a6d0af1c",
+      "git_blob": "6289b2d578a62ffe68a0f43bd80ad2f1648bb870"
+    }
+  },
+  "dependencies": {
+    "lib/forge-std": "620536fa5277db4e3fd46772d5cbc1ea0696fb43",
+    "lib/openzeppelin-contracts": "5fd1781b1454fd1ef8e722282f86f9293cacf256",
+    "lib/openzeppelin-contracts/lib/erc4626-tests": "232ff9ba8194e406967f52ecc5cb52ed764209e9",
+    "lib/openzeppelin-contracts/lib/forge-std": "3b20d60d14b343ee4f908cb8079495c07f5e8981",
+    "lib/openzeppelin-contracts/lib/halmos-cheatcodes": "7328abe100445fc53885c21d0e713b95293cf14c",
+    "lib/openzeppelin-contracts-upgradeable": "7bf4727aacdbfaa0f36cbd664654d0c9e1dc52bf",
+    "lib/openzeppelin-contracts-upgradeable/lib/erc4626-tests": "232ff9ba8194e406967f52ecc5cb52ed764209e9",
+    "lib/openzeppelin-contracts-upgradeable/lib/forge-std": "3b20d60d14b343ee4f908cb8079495c07f5e8981",
+    "lib/openzeppelin-contracts-upgradeable/lib/halmos-cheatcodes": "7328abe100445fc53885c21d0e713b95293cf14c",
+    "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts": "5fd1781b1454fd1ef8e722282f86f9293cacf256",
+    "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/lib/erc4626-tests": "232ff9ba8194e406967f52ecc5cb52ed764209e9",
+    "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/lib/forge-std": "3b20d60d14b343ee4f908cb8079495c07f5e8981",
+    "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/lib/halmos-cheatcodes": "7328abe100445fc53885c21d0e713b95293cf14c"
+  },
+  "compiler": {
+    "version": "0.8.28+commit.7893614a.Linux.g++",
+    "sha256": "891ecdd8f92a8211ee99f21bc3052b63fa098b4807f21ed8311d66e35d5aeb84",
+    "evm": "cancun",
+    "optimizer_runs": 200
+  },
+  "compiler_artifact_templates": {
+    "ERC8183": {
+      "bytecode": {
+        "bytes": 21209,
+        "sha256": "8e54c2c78382c4ec973a43a864167d0e95f650348861aa2144cc5f923c104149"
+      },
+      "deployedBytecode": {
+        "bytes": 20960,
+        "sha256": "6186574798d6dad3b01127c9278cbd4882f45533c8786c5f4d6a8ff19065f645"
+      }
+    },
+    "ChioWorkClaimEscrow": {
+      "bytecode": {
+        "bytes": 8473,
+        "sha256": "fe966ac3501c1b2f919557b1f420923a9fcb7acbb0d0cfc37e7dc3f6279c7a88"
+      },
+      "deployedBytecode": {
+        "bytes": 8281,
+        "sha256": "46f8a2600c992f4bf7ca82958695bb316cf7ac02ccfbceaaa69a1f738b899a62"
+      }
+    },
+    "ERC8183_comparison": {
+      "bytecode": {
+        "bytes": 21209,
+        "sha256": "52d397986df7e75ae3db6f7e36ba7558d56dd688b321f431d1a4f1422c8b0837"
+      },
+      "deployedBytecode": {
+        "bytes": 20960,
+        "sha256": "9d3154e2065edae8612878b3c0977d93c681b85946495aab514e7032e4400f4c"
+      }
+    },
+    "ERC1967Proxy_comparison": {
+      "bytecode": {
+        "bytes": 950,
+        "sha256": "3f40f33de236a0703941fc90dedb13ddceb1f92210724382f9d67e2b7c4713ad"
+      },
+      "deployedBytecode": {
+        "bytes": 163,
+        "sha256": "5e64c8dab0cce027eeaa5133a936098d290737bc3cb00c763a50c0a7b93aa818"
+      }
+    },
+    "MockUSDC_comparison": {
+      "bytecode": {
+        "bytes": 2327,
+        "sha256": "d53fbfce739a4fd7b6a49d8c5daffdd1ed26adfc70c14e1a96fed9eff2978b25"
+      },
+      "deployedBytecode": {
+        "bytes": 1862,
+        "sha256": "cc1d492b13d9d536249759ce8a386cac314d2fe8cd427bdb2c5d34b9335bcdcb"
+      }
+    }
+  },
+  "compiler_artifact_note": "Compiler output templates; immutable values are not runtime-patched in deployedBytecode, and paths/metadata may change bytecode hashes. No gas comparison is inferred."
+}

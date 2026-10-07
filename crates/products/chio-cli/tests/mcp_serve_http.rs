@@ -1004,9 +1004,28 @@ fn spawn_http_server_with_control_plane(
 ) -> ServerGuard {
     let policy_path = write_policy(dir);
     let script_path = write_mock_server_script(dir);
+    // Reuse the fixture's exact, signed startup-marker write grant to record
+    // dispatch before the mock handles any tool. No directory write is granted.
+    let script = fs::read_to_string(&script_path).expect("read control-backed mock script");
+    let dispatch_branch = "    if method == \"tools/call\":\n";
+    assert_eq!(script.matches(dispatch_branch).count(), 1);
+    let script = script.replacen(
+        dispatch_branch,
+        concat!(
+            "    if method == \"tools/call\":\n",
+            "        with open(STARTUP_MARKER_PATH, \"a\", encoding=\"utf-8\") as handle:\n",
+            "            handle.write(\"tools/call\\n\")\n",
+        ),
+        1,
+    );
+    fs::write(&script_path, script).expect("write dispatch-tracked control-backed mock script");
     let session_db_path = default_session_db_path(dir, listen);
 
     let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
+    command.env(
+        "CHIO_MCP_STARTUP_MARKER_PATH",
+        dir.join("control-plane-dispatch.log"),
+    );
     command.args([
         "--control-url",
         control_url,
@@ -1041,6 +1060,14 @@ fn spawn_http_server_with_control_plane(
         &script_path,
         "spawn control-backed chio mcp serve-http",
     )
+}
+
+fn control_plane_dispatch_count(dir: &Path) -> usize {
+    fs::read_to_string(dir.join("control-plane-dispatch.log"))
+        .expect("read control-backed mock dispatches")
+        .lines()
+        .filter(|line| *line == "tools/call")
+        .count()
 }
 
 fn wait_for_server_result(
@@ -4352,10 +4379,6 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
         .as_array()
         .expect("session A capabilities");
     assert!(!caps_a_before.is_empty());
-    let capability_id = caps_a_before[0]["capabilityId"]
-        .as_str()
-        .expect("capability id")
-        .to_string();
     assert!(caps_a_before.iter().all(|capability| {
         capability["issuerPublicKey"].as_str() == Some(old_public_key.as_str())
     }));
@@ -4383,6 +4406,7 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
         tool_call["result"]["structuredContent"]["echo"], "distributed hello",
         "control-backed tool response: {tool_call:#}"
     );
+    assert_eq!(control_plane_dispatch_count(&node_a_dir), 1);
 
     let control_receipts = get_control_tool_receipts(
         &client,
@@ -4448,7 +4472,7 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
             "method": "tools/call",
             "params": {
                 "name": "echo_json",
-                "arguments": {"message": "old session still valid"}
+                "arguments": {"message": "unannounced rotation must deny"}
             }
         }),
     );
@@ -4456,10 +4480,19 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
     let (tool_call_after_rotation, notifications) =
         read_sse_until_response(tool_call_after_rotation, json!(42), |_| {});
     assert!(notifications.is_empty());
-    assert_eq!(
-        tool_call_after_rotation["result"]["structuredContent"]["echo"],
-        "old session still valid"
+    // Retaining the historical issuer does not update this node's current pin.
+    // Every fresh call checks the current lifecycle, including an old session.
+    assert_eq!(tool_call_after_rotation["result"]["isError"], true);
+    let rotation_denial = tool_call_after_rotation["result"]["content"][0]["text"]
+        .as_str()
+        .expect("pin-drift denial text");
+    assert!(rotation_denial.contains("capability issuer lifecycle denied"));
+    assert!(
+        rotation_denial.contains("current key does not match the operator pin"),
+        "unexpected pin-drift response: {tool_call_after_rotation:#}"
     );
+    assert!(tool_call_after_rotation["result"]["structuredContent"].is_null());
+    assert_eq!(control_plane_dispatch_count(&node_a_dir), 1);
 
     let rejected_session = post_json(
         &client,
@@ -4510,7 +4543,7 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
         wait_for_server_result,
     );
     let base_url_b = format!("http://{repinned_listen_b}");
-    let (session_b, _protocol_b) = initialize_session(&client, &base_url_b, auth_token);
+    let (session_b, protocol_b) = initialize_session(&client, &base_url_b, auth_token);
     let trust_b = get_admin_session_trust(&client, &base_url_b, admin_token, &session_b);
     assert_eq!(trust_b.status(), reqwest::StatusCode::OK);
     let trust_b: Value = trust_b.json().expect("session trust json");
@@ -4521,8 +4554,38 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
     assert!(caps_b.iter().all(|capability| {
         capability["issuerPublicKey"].as_str() == Some(new_public_key.as_str())
     }));
+    let capability_id = caps_b[0]["capabilityId"]
+        .as_str()
+        .expect("repinned capability id")
+        .to_string();
 
-    let revoke = post_admin_capability_revoke(&client, &base_url_b, admin_token, &capability_id);
+    let repinned_call = post_json(
+        &client,
+        &base_url_b,
+        auth_token,
+        Some(&session_b),
+        Some(&protocol_b),
+        &json!({
+            "jsonrpc": "2.0",
+            "id": 44,
+            "method": "tools/call",
+            "params": {
+                "name": "echo_json",
+                "arguments": {"message": "explicitly repinned session"}
+            }
+        }),
+    );
+    assert_eq!(repinned_call.status(), reqwest::StatusCode::OK);
+    let (repinned_call, notifications) = read_sse_until_response(repinned_call, json!(44), |_| {});
+    assert!(notifications.is_empty());
+    assert_eq!(
+        repinned_call["result"]["structuredContent"]["echo"], "explicitly repinned session",
+        "repinned tool response: {repinned_call:#}"
+    );
+    assert_eq!(control_plane_dispatch_count(&node_b_dir), 1);
+
+    // Revoke B's live capability through A's separate admin/control path.
+    let revoke = post_admin_capability_revoke(&client, &base_url_a, admin_token, &capability_id);
     assert_eq!(revoke.status(), reqwest::StatusCode::OK);
     let revoke: Value = revoke.json().expect("revoke capability json");
     assert_eq!(revoke["capabilityId"], capability_id);
@@ -4544,10 +4607,10 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
 
     let denied_response = post_json(
         &client,
-        &base_url_a,
+        &base_url_b,
         auth_token,
-        Some(&session_a),
-        Some(&protocol_a),
+        Some(&session_b),
+        Some(&protocol_b),
         &json!({
             "jsonrpc": "2.0",
             "id": 43,
@@ -4567,6 +4630,7 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
         .as_str()
         .expect("denied text")
         .contains("revoked"));
+    assert_eq!(control_plane_dispatch_count(&node_b_dir), 1);
 }
 
 #[test]

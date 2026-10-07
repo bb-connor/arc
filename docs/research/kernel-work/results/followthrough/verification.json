@@ -1,0 +1,300 @@
+{
+  "schema": "chio.research.followthrough-verification.v1",
+  "complete": true,
+  "base": "188031256600903676eb69bda3144b9e8a1660da",
+  "head_at_start": "bc3ed4a1839b1a99316f50f9947a0596dcc6d00d",
+  "sources": {
+    "native_tree_sha256": "b8ecbca9be984ea16087a03895eb423cd1caaa2b8dd9943f93fd7f5244a1543e",
+    "native_file_count": 7392,
+    "files": {
+      "docs/research/kernel-work/2026-10-02-prior-art.md": "3d84633b21085377908211990b090c49837c27bbf458cfde02a8fd81bfd8a6b8",
+      "docs/research/kernel-work/CONTRIBUTION-DECISION.md": "a821c272c5e3965d8d33e97b3a5ac6fc4c83222df4562caceb1c2db4113cecc7",
+      "docs/research/kernel-work/G0-DECISION.md": "7e36758c6610a741d836162d468e95cf8d5b8fe480b5d6f1c975e088ff7db32a",
+      "docs/research/kernel-work/G1-DECISION.md": "a782ba3ed8492366626adea547ea360db7175df5ae5d90a5d7b8bb5fbf4c2a42",
+      "docs/research/kernel-work/MODEL.md": "b557abf38c3d4250d31da0bc678dffbb40dde18da1be119187df59136575305b",
+      "docs/research/kernel-work/README.md": "ec74362355b6ed738852d2d7a9226a96c3b7e9ac3d0211eb8fbe38d5b723ea79",
+      "docs/research/kernel-work/WITNESS.md": "dc9c077f14f84f77d03b80d33305a02aa931cee2bf48f3f84d976598d381debe",
+      "docs/research/kernel-work/claim-register.json": "3cadce8abed21535f69b94cb8768664ffba577dedd0d92492f60db650a5ecd91",
+      "docs/research/kernel-work/counterdesigns.md": "1587a8d25129535934334c3025e0ad4010981589e73f6ef0d47f580688aabada",
+      "docs/research/kernel-work/fixtures.json": "06eefba4e2a00b927589a231d10090a898cfe74d317a9e003dd7817fc7d15c08",
+      "docs/research/kernel-work/recovery-baseline.json": "d3aa0d749badc2d7536e7e4169274d3e4c57a318bac51218cf7fc825ae8ab73b",
+      "docs/research/kernel-work/recovery-crosswalk.md": "cde1bc51b8dd455d2c218364ddb23281dc10ef7e95358e4506b9479b8d164920",
+      "docs/research/kernel-work/results/model/clippy.stderr": "8d1102b454ebd8e1fa06f91ead268997ec8c780cb2abbecdd4438f84256dd2d3",
+      "docs/research/kernel-work/results/model/clippy.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "docs/research/kernel-work/results/model/explorer.stderr": "4308ec222dc29b99777493aa7ce8f4a0f475877ce6d0bc0495951f7399d379ae",
+      "docs/research/kernel-work/results/model/explorer.stdout": "643e980275589836f42bf6c5fa89e06b363857b3058b55a5910cc902f8cc5569",
+      "docs/research/kernel-work/results/model/format.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "docs/research/kernel-work/results/model/format.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "docs/research/kernel-work/results/model/provenance.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "docs/research/kernel-work/results/model/provenance.stdout": "d96d9b7ce927188e0542df428eb4540b252ef87d1fdc29ef1951dc0f6c77bf1d",
+      "docs/research/kernel-work/results/model/tests.stderr": "282570a6c44f4b4b3ca297dc9e034f7181bc97ffb7a44657459260e3c2fb6eb2",
+      "docs/research/kernel-work/results/model/tests.stdout": "71c23737a8222e711de2cf8f8c07d0a99d8f81c56c69c8fffa42be534d4e1616",
+      "docs/research/kernel-work/results/model/verification.json": "02d32b5fac5329b6b97f5fc498a211e48cada6f85e4afed9d468d4846d855231",
+      "docs/research/kernel-work/task1-source-audit.md": "0690a93f4ed040dc83e5f8d90391c030578cd465ae60aeb3eb7c2fde26310fdc",
+      "docs/research/kernel-work/task1-sources.json": "a3b5ebd0b911097babf09b85854bb014488cff6b703a9026acc8183ce7730bcf",
+      "docs/research/kernel-work/task1-validation.md": "1125f2a83596f41cfa21a361f4fd46d5e9c483e185abe2aebae7db537cdbf218",
+      "docs/research/kernel-work/task3-sources.json": "93ece993ff5ecbd7beba0c7eaaa1f3cd69990996d73213ed3ebbdb887a7fe75c",
+      "docs/research/kernel-work/test_followthrough.py": "20f2b0b9489e5e042d9accf24fef889a4f23b3d3c30f521b444f7cd1095cb0a7",
+      "docs/research/kernel-work/verify_followthrough.py": "8cd1f856602fd17f9dd00615ac15950718b2afea58ee8ed081124f0641eaf237",
+      "docs/research/kernel-work/verify_task1.py": "6ad9fc84aca88f2fbe54e28f88db9042ec2c80f5dab33995688f93caae4fc8aa",
+      "labs/kernel-work-composition/Cargo.lock": "e03e42a170fa008809fdd2ad214a010d2e30726c971fb4762e93770518af9e24",
+      "labs/kernel-work-composition/Cargo.toml": "0929d242c8072004b6717af28a909c10172908f561ca1f1bb659ece1a8085e5f",
+      "labs/kernel-work-composition/README.md": "02acf386f5d0b62e4fc08f1e44f1fd39e8ba8146511e0ac499cf5db52777d424",
+      "labs/kernel-work-composition/rust-toolchain.toml": "f53198ae4fdecfd87da36fe431c771b54c51e975d01c0e99f653bc14d5d48211",
+      "labs/kernel-work-composition/src/baseline.rs": "a5d2fe3b0542e784e512abceac24908c958cb0f3906df4e5ed597c8da4bd83fa",
+      "labs/kernel-work-composition/src/bin/explore.rs": "1684338fbbcacb94dec2e2a83131d85e2ebce93caa82e6bf0aca5382fb51ef57",
+      "labs/kernel-work-composition/src/continuation.rs": "1f74833212f672090548e0d57a4f9908a3f089492d57083e09f308daf3589ad1",
+      "labs/kernel-work-composition/src/exploration.rs": "c9b77478be871f688207a177e2eff6d8031d67bbf27220936e10b3b196c66682",
+      "labs/kernel-work-composition/src/lib.rs": "79e20dcd1c30f3931041e26660e080b4261c20f6c06208b80ad5b1a0059d8849",
+      "labs/kernel-work-composition/src/model.rs": "6339f4c63adeec2521ff43753011a694babd84bfd8636caacbb66bb9023d06cc",
+      "labs/kernel-work-composition/tests/scenarios.rs": "2e82b087cb5bac7df0ea5dc6d87ed7e11923008bf75c9b1d27658f3dcb6b6e30",
+      "labs/kernel-work-composition/verify.py": "3048d70ee2e137dd0e9fa6160fb7769d9739968aa83843be4c2a4d5a42059abc",
+      "labs/kernel-work-families/Cargo.lock": "462f2cfae04adcedf115592e63f27b1d04f2db8d80870fc2bb8abcf7678f062c",
+      "labs/kernel-work-families/Cargo.toml": "fed9e90552121f2196870635d1c48e1c1a2683b69fa1a86241945e76b816b29d",
+      "labs/kernel-work-families/README.md": "b91b05d2d4463485b314df16aae5bcc97cfb5ddc2f2423e61052e84b4841f3e4",
+      "labs/kernel-work-families/rust-toolchain.toml": "8292b79552b38f73aaa7410bd8b0226ddf9a5e2cb6516a139c0090723194e11a",
+      "labs/kernel-work-families/src/lib.rs": "6da7d3a06ee913d390595eca08715b07b19d7b4266d065506ae3ac5607c6ba17",
+      "labs/kernel-work-families/src/main.rs": "f24ab8e6e1c8204c1a01fec00338f84faef78f7b8543b28919ad0db8ac76f32c",
+      "labs/kernel-work-families/tests/families.rs": "abf6d24107e2c08751c8585eddcb2dea27de9611058e1c0f121bb23b802f5213"
+    }
+  },
+  "rustc": "rustc 1.94.1 (e408947bf 2026-03-25)\nbinary: rustc\ncommit-hash: e408947bfd200af42db322daf0fadfe7e26d3bd1\ncommit-date: 2026-03-25\nhost: aarch64-unknown-linux-gnu\nrelease: 1.94.1\nLLVM version: 21.1.8\n",
+  "commands": [
+    {
+      "name": "native-process",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-process",
+        "--features",
+        "worker-server",
+        "--test",
+        "crash_recovery",
+        "--test",
+        "nonce_recovery",
+        "--test",
+        "aggregate_family",
+        "--test",
+        "cross_owner_recovery",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "environment": {
+        "CHIO_CHECKOUT_ROOT": "/tmp/chio-verifiable-work-paper",
+        "CARGO_BUILD_JOBS": "4",
+        "CARGO_TARGET_DIR": "/tmp/chio-paper-target"
+      },
+      "elapsed_seconds": 126.239,
+      "stdout_sha256": "ce6ac3a60cbdee2723f55b4f89afb2265b7dcdf2028deba03323b17da6b1b001",
+      "stderr_sha256": "ca3c0c2428caf0e207a2c1aee031ed2cb1804feeffdc3f46ae612b96dcbdb787"
+    },
+    {
+      "name": "native-admission",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-kernel",
+        "--test",
+        "durable_admission_sqlite"
+      ],
+      "exit_code": 0,
+      "environment": {
+        "CHIO_CHECKOUT_ROOT": "/tmp/chio-verifiable-work-paper",
+        "CARGO_BUILD_JOBS": "4",
+        "CARGO_TARGET_DIR": "/tmp/chio-paper-target"
+      },
+      "elapsed_seconds": 67.117,
+      "stdout_sha256": "ab1ffa9b2674b3c7d73c1419ce268be4f4764d333c0ef0241cbcd55a1cd91e53",
+      "stderr_sha256": "929dbe70f0d0985f52bd5b1a3aeda84fca214b780cbbc7801fdb2fe29ff86dbb"
+    },
+    {
+      "name": "native-lint",
+      "argv": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "chio-process",
+        "--features",
+        "worker-server",
+        "--test",
+        "cross_owner_recovery",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "environment": {
+        "CHIO_CHECKOUT_ROOT": "/tmp/chio-verifiable-work-paper",
+        "CARGO_BUILD_JOBS": "4",
+        "CARGO_TARGET_DIR": "/tmp/chio-paper-target"
+      },
+      "elapsed_seconds": 1.18,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "811d9ecec97bc589e0720b4dad30f3fab73deb23751fabfb4ea3d542322667b2"
+    },
+    {
+      "name": "admission-lint",
+      "argv": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "chio-kernel",
+        "--test",
+        "durable_admission_sqlite",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "environment": {
+        "CHIO_CHECKOUT_ROOT": "/tmp/chio-verifiable-work-paper",
+        "CARGO_BUILD_JOBS": "4",
+        "CARGO_TARGET_DIR": "/tmp/chio-paper-target"
+      },
+      "elapsed_seconds": 1.134,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "9b36e2e54d6f48fa39eb2495ac1104a93be2b3fc2d200e45583f0da45c0e81f4"
+    },
+    {
+      "name": "native-format",
+      "argv": [
+        "rustfmt",
+        "--check",
+        "--edition",
+        "2021",
+        "crates/kernel/chio-process/tests/cross_owner_recovery.rs",
+        "crates/kernel/chio-kernel/tests/durable_admission_sqlite/contractual_resolution.rs"
+      ],
+      "exit_code": 0,
+      "environment": {
+        "CHIO_CHECKOUT_ROOT": "/tmp/chio-verifiable-work-paper",
+        "CARGO_BUILD_JOBS": "4",
+        "CARGO_TARGET_DIR": "/tmp/chio-paper-target"
+      },
+      "elapsed_seconds": 0.066,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "family-tests",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "labs/kernel-work-families/Cargo.toml"
+      ],
+      "exit_code": 0,
+      "environment": {
+        "CHIO_CHECKOUT_ROOT": "/tmp/chio-verifiable-work-paper",
+        "CARGO_BUILD_JOBS": "4",
+        "CARGO_TARGET_DIR": "/tmp/chio-paper-tooling-target"
+      },
+      "elapsed_seconds": 0.216,
+      "stdout_sha256": "62d0ac5b071223ec65c7750cbb5d49a58213ea7c3b56b418f4d199fb6684392e",
+      "stderr_sha256": "69d4242cad0b029f093d6872659e70edc12683dfc55f0ebf24f4abd7b46e100f"
+    },
+    {
+      "name": "family-comparison",
+      "argv": [
+        "cargo",
+        "run",
+        "--locked",
+        "--manifest-path",
+        "labs/kernel-work-families/Cargo.toml"
+      ],
+      "exit_code": 0,
+      "environment": {
+        "CHIO_CHECKOUT_ROOT": "/tmp/chio-verifiable-work-paper",
+        "CARGO_BUILD_JOBS": "4",
+        "CARGO_TARGET_DIR": "/tmp/chio-paper-tooling-target"
+      },
+      "elapsed_seconds": 0.169,
+      "stdout_sha256": "187d91226d051113c4c1cf1c7c0244ae4e9429dbb65f6d36ea03d670997f0cc5",
+      "stderr_sha256": "1c8cb42a87ee6b81df73350245d6df9b9b12bc97fc5a7b48ea127a0fa00a7da2"
+    },
+    {
+      "name": "family-lint",
+      "argv": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--manifest-path",
+        "labs/kernel-work-families/Cargo.toml",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "environment": {
+        "CHIO_CHECKOUT_ROOT": "/tmp/chio-verifiable-work-paper",
+        "CARGO_BUILD_JOBS": "4",
+        "CARGO_TARGET_DIR": "/tmp/chio-paper-tooling-target"
+      },
+      "elapsed_seconds": 0.169,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "59639588a6f1826f129cbcd121edc07279dab94786f5fa5bde6b3439b2e845cc"
+    },
+    {
+      "name": "family-format",
+      "argv": [
+        "cargo",
+        "fmt",
+        "--manifest-path",
+        "labs/kernel-work-families/Cargo.toml",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "environment": {
+        "CHIO_CHECKOUT_ROOT": "/tmp/chio-verifiable-work-paper",
+        "CARGO_BUILD_JOBS": "4",
+        "CARGO_TARGET_DIR": "/tmp/chio-paper-tooling-target"
+      },
+      "elapsed_seconds": 0.118,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "prior-model",
+      "argv": [
+        "/home/connor/.local/share/mise/installs/python/3.13/bin/python3",
+        "labs/kernel-work-composition/verify.py",
+        "--check"
+      ],
+      "exit_code": 0,
+      "environment": {
+        "CHIO_CHECKOUT_ROOT": "/tmp/chio-verifiable-work-paper",
+        "CARGO_BUILD_JOBS": "4",
+        "CARGO_TARGET_DIR": "/tmp/chio-paper-target"
+      },
+      "elapsed_seconds": 0.116,
+      "stdout_sha256": "e2aea9286e9ac045450c9714264228bebc94ca81c0028dee194b781bfed5c5ee",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "prior-provenance",
+      "argv": [
+        "/home/connor/.local/share/mise/installs/python/3.13/bin/python3",
+        "docs/research/kernel-work/verify_task1.py"
+      ],
+      "exit_code": 0,
+      "environment": {
+        "CHIO_CHECKOUT_ROOT": "/tmp/chio-verifiable-work-paper",
+        "CARGO_BUILD_JOBS": "4",
+        "CARGO_TARGET_DIR": "/tmp/chio-paper-target"
+      },
+      "elapsed_seconds": 0.27,
+      "stdout_sha256": "d96d9b7ce927188e0542df428eb4540b252ef87d1fdc29ef1951dc0f6c77bf1d",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

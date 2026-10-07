@@ -1,0 +1,11 @@
+{
+  "result": "pass",
+  "recovery_documents_verified": 16,
+  "requirements": 111,
+  "crosswalk_groups": 15,
+  "claims": 3,
+  "primary_documents_catalogued": 29,
+  "primary_document_hashes_verified": 0,
+  "paper_tree": "b8c5b771ca04903e219f9b42a50a050d326ba0ac",
+  "scientific_validity_proved": false
+}

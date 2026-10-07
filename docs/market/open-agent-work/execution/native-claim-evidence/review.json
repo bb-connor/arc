@@ -1,0 +1,19 @@
+{
+  "scope": "Independent read-only source review of native Finding, claim, settlement and process recovery diff",
+  "reviewer": "review_claim_settlement",
+  "finalResult": "No remaining blockers found in the reviewed diff",
+  "reviewedBeforeFinalRuntimeQualification": true,
+  "checkedAtUTC": "2026-09-14T23:06:32.432540+00:00",
+  "resolvedFindings": [
+    "Retained unbroadcast submission and unrecorded decision can miss deadlines and refund without artifact substitution",
+    "Locally signed decisions are not treated as on-chain recorded authority",
+    "Separate public expire followed by refund is accepted from observed authoritative state",
+    "Recovered recorded rejection is reported distinctly from verifier absence",
+    "Transaction inventory independently catches duplicate idempotent transactions with no replay events",
+    "Absent receipt semantic responses do not poison LocalChain transport",
+    "Socket observer survives semantic errors and disconnected clients; actual second worker resumes over the same socket",
+    "Refund preserves positive native capture intent and unknown execution; undispatched release remains the original release"
+  ],
+  "runtimeQualification": "Separate command logs and scenario reports in the manifest; reviewer did not execute Cargo tests",
+  "sourceSha256File": "source-at-qualification.json"
+}

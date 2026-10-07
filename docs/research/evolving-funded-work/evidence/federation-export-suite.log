@@ -1,0 +1,38 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/chio-verifiable-work-paper/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/chio-verifiable-work-paper/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/chio-verifiable-work-paper/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-kernel v0.1.0 (/tmp/chio-verifiable-work-paper/crates/kernel/chio-kernel)
+   Compiling chio-finding-verifier v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-finding-verifier)
+   Compiling chio-transaction-passport v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-transaction-passport)
+   Compiling chio-risk-comptroller v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-risk-comptroller)
+   Compiling chio-commerce-order v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-commerce-order)
+   Compiling chio-agent-web-interop v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-agent-web-interop)
+   Compiling chio-store-sqlite v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-store-sqlite)
+    Finished `test` profile [unoptimized] target(s) in 1m 30s
+     Running unittests src/lib.rs (/tmp/chio-paper-target/debug/deps/chio_kernel-497ebf29aad34e8e)
+
+running 11 tests
+test kernel::tests::durable_admission::execution_evidence::execution_export_replay_respects_the_current_crypto_floor ... ok
+test kernel::tests::durable_admission::execution_evidence::execution_export_rejects_signer_identity_substitution ... ok
+test kernel::tests::durable_admission::execution_evidence::execution_export_replays_original_receipt_after_signer_replacement ... ok
+test kernel::tests::durable_admission::execution_evidence::execution_export_rejects_fence_change_during_signing ... ok
+test kernel::tests::durable_admission::execution_evidence::execution_export_signer_runs_outside_mutation_sequencer ... ok
+test kernel::tests::durable_admission::execution_evidence::execution_export_rejects_retained_request_change_during_signing ... ok
+test kernel::tests::durable_admission::execution_evidence::execution_export_revalidates_original_lease_after_signer_callback ... ok
+test kernel::tests::durable_admission::execution_evidence::federated_execution_export_rejects_missing_or_substituted_frozen_context ... ok
+test kernel::tests::durable_admission::execution_evidence::execution_export_identity_callback_runs_outside_mutation_sequencer ... ok
+test kernel::tests::durable_admission::execution_evidence::federated_execution_export_uses_original_admission_without_remote_completion ... ok
+test kernel::tests::durable_admission::execution_evidence::execution_export_contains_signer_panic_without_publishing ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 1503 filtered out; finished in 0.69s
+

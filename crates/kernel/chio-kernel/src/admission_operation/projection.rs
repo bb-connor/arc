@@ -22,6 +22,10 @@ use super::*;
 
 mod capabilities;
 pub use capabilities::AdmissionProjectionCapabilities;
+mod participant_presence;
+pub(super) use participant_presence::{
+    validate_completed_participant_presence, validate_denied_after_delivery_participant_presence,
+};
 mod participant_evidence;
 pub use participant_evidence::*;
 mod channel_terminal;
@@ -1095,53 +1099,6 @@ pub struct AdmissionCompletedProjection {
     pub channel_terminal: Option<VerifiedChannelTerminalProjectionV1>,
 }
 
-/// The presence rule for the denied-after-delivery terminal, the analogue
-/// of [`validate_completed_participant_presence`]: a paid operation must
-/// carry the payment evidence binding its released journal, an observed
-/// operation must carry its observation attempt, and a requirement this
-/// terminal cannot represent (authorization consumption, outcome
-/// eligibility, obligation, channel) denies the projection outright.
-pub(super) fn validate_denied_after_delivery_participant_presence(
-    requirements: AdmissionParticipantRequirements,
-    payment_evidence: Option<&PaymentTerminalEvidence>,
-    observer_work: Option<&ObservationAttemptZero>,
-) -> Result<(), AdmissionOperationError> {
-    if requirements.authorization_consumption
-        || requirements.outcome_eligibility
-        || requirements.obligation
-        || requirements.channel
-        || payment_evidence.is_some() != requirements.payment
-        || observer_work.is_some() != requirements.observation_attempt_zero
-    {
-        return Err(AdmissionOperationError::TerminalProjectionBindingMismatch);
-    }
-    Ok(())
-}
-
-pub(super) fn validate_completed_participant_presence(
-    requirements: AdmissionParticipantRequirements,
-    completed: &AdmissionCompletedProjection,
-) -> Result<(), AdmissionOperationError> {
-    let obligation_required = if requirements.channel {
-        completed
-            .channel_terminal
-            .as_ref()
-            .is_some_and(|channel| channel.actual_charge().units > 0)
-    } else {
-        requirements.obligation
-    };
-    if completed.payment_evidence.is_some() != requirements.payment
-        || completed.authorization.is_some() != requirements.authorization_consumption
-        || completed.eligibility.is_some() != requirements.outcome_eligibility
-        || completed.observer_work.is_some() != requirements.observation_attempt_zero
-        || completed.channel_terminal.is_some() != requirements.channel
-        || completed.obligation.is_some() != obligation_required
-    {
-        return Err(AdmissionOperationError::TerminalProjectionBindingMismatch);
-    }
-    Ok(())
-}
-
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum AdmissionReceiptOrIncident {
@@ -1168,7 +1125,16 @@ pub enum DeliveryDenialReason {
     /// The purchased Finding was no longer live at the terminal release
     /// boundary after the provider returned.
     FindingStatusChanged,
+    /// A trusted checked-output pricing guard rejected the returned work.
+    OutputGuardRejected,
 }
+
+/// Stable receipt reason for a checked-output pricing rejection.
+pub const OUTPUT_GUARD_REJECTION_REASON: &str =
+    "returned output failed the agreed zero-charge check";
+/// Public redaction preimage for rejected work with no committed output digest.
+pub const OUTPUT_GUARD_REJECTION_REDACTION_DOMAIN: &[u8] =
+    b"chio.output-guard-rejection.redacted.v1\0";
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "terminal", rename_all = "snake_case")]

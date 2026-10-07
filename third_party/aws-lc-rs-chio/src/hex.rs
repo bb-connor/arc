@@ -3,6 +3,8 @@
 
 /// Converts bytes to a lower-case hex string
 #[allow(clippy::missing_panics_doc)]
+// CHIO-LINT hex-encode: Both nibbles are in 0..=15, so radix-16 conversion succeeds.
+#[allow(clippy::unwrap_used)]
 pub fn encode<T: AsRef<[u8]>>(bytes: T) -> String {
     let bytes = bytes.as_ref();
     let mut encoding = String::with_capacity(2 * bytes.len());
@@ -34,9 +36,9 @@ pub fn decode(hex_str: &str) -> Result<Vec<u8>, String> {
             return Err("Invalid hex string".to_string());
         }
         #[allow(clippy::cast_possible_truncation)]
-        // DON'T PANIC: it should not be possible to panic because we verify above that the character is a
-        // hex digit.
-        let value = ch.to_digit(16).unwrap() as u8;
+        let value = ch
+            .to_digit(16)
+            .ok_or_else(|| "Invalid hex string".to_string())? as u8;
         if index % 2 == 0 {
             current_byte = value << 4;
         } else {
@@ -60,6 +62,8 @@ pub fn decode(hex_str: &str) -> Result<Vec<u8>, String> {
 /// It ignores any characters that are not valid hex digits.
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
+// CHIO-LINT hex-dirty: Filtering to ASCII hexadecimal excludes every decode character error.
+#[allow(clippy::unwrap_used)]
 pub fn decode_dirty(hex_str: &str) -> Vec<u8> {
     let clean: String = hex_str.chars().filter(char::is_ascii_hexdigit).collect();
     // DON'T PANIC: it should not be possible to panic because we filter out all non-hex digits.

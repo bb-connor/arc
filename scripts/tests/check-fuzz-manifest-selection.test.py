@@ -21,6 +21,8 @@ for path in paths + [
     "crates/guards/chio-data-guards/redactors/default/Cargo.toml",
     "Cargo.lock",
     "fuzz/target-map.toml",
+    "scripts/tests/check-cflite-builder.test.py",
+    "scripts/tests/check-fuzz-manifest-selection.test.py",
 ]:
     assert selector.search(path), (
         f"manifest/control edit does not select full fuzz inventory: {path}"
@@ -41,7 +43,7 @@ inventory = sorted(
 )
 assert inventory, "fuzz target inventory must not be empty"
 fallback_start = workflow.index("          if grep -qE '")
-fallback_end = workflow.index("          fired_count=", fallback_start)
+fallback_end = workflow.index("          {\n", fallback_start)
 fallback = "\n".join(
     line[10:] for line in workflow[fallback_start:fallback_end].splitlines()
 )

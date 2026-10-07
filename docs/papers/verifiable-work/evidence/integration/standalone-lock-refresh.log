@@ -1,0 +1,7 @@
+     Locking 6 packages to latest compatible versions
+    Updating aws-lc-fips-sys v0.13.14 -> v0.14.2
+    Updating aws-lc-rs v1.16.2 -> v1.18.1
+    Updating aws-lc-sys v0.39.1 -> v0.45.0
+      Adding chio-cage-plan v0.1.0 (/tmp/chio-paper-security-integration/crates/security/chio-cage-plan)
+      Adding chio-response-model v0.1.0 (/tmp/chio-paper-security-integration/crates/core/chio-response-model)
+      Adding secrecy v0.10.3

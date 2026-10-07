@@ -1,0 +1,105 @@
+test_accepted_claim_can_be_withdrawn_after_all_deadlines (test_claim_model.ClaimModelTests.test_accepted_claim_can_be_withdrawn_after_all_deadlines) ... FAIL
+test_decision_window_is_exclusive_then_inclusive (test_claim_model.ClaimModelTests.test_decision_window_is_exclusive_then_inclusive) ... FAIL
+test_earned_child_withdraws_after_parent_refund (test_claim_model.ClaimModelTests.test_earned_child_withdraws_after_parent_refund) ... FAIL
+test_exact_submission_replays_without_renewing_its_deadline (test_claim_model.ClaimModelTests.test_exact_submission_replays_without_renewing_its_deadline) ... FAIL
+test_expected_parent_revenue_is_not_child_backing (test_claim_model.ClaimModelTests.test_expected_parent_revenue_is_not_child_backing) ... FAIL
+test_malformed_terms_or_foreign_authority_cannot_move_money (test_claim_model.ClaimModelTests.test_malformed_terms_or_foreign_authority_cannot_move_money) ... FAIL
+test_refund_failure_is_atomic_and_does_not_resolve_unknown_execution (test_claim_model.ClaimModelTests.test_refund_failure_is_atomic_and_does_not_resolve_unknown_execution) ... FAIL
+test_rejected_work_has_only_a_refund_terminal (test_claim_model.ClaimModelTests.test_rejected_work_has_only_a_refund_terminal) ... FAIL
+test_transfer_failure_keeps_the_claim_due_and_execution_unknown (test_claim_model.ClaimModelTests.test_transfer_failure_keeps_the_claim_due_and_execution_unknown) ... FAIL
+test_unsubmitted_or_uncertified_work_refunds_only_after_timeout (test_claim_model.ClaimModelTests.test_unsubmitted_or_uncertified_work_refunds_only_after_timeout) ... FAIL
+
+======================================================================
+FAIL: test_accepted_claim_can_be_withdrawn_after_all_deadlines (test_claim_model.ClaimModelTests.test_accepted_claim_can_be_withdrawn_after_all_deadlines)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work-model/test_claim_model.py", line 14, in setUp
+    self.assertIsNotNone(ClaimLedger, "the funded-claim model is not implemented")
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: unexpectedly None : the funded-claim model is not implemented
+
+======================================================================
+FAIL: test_decision_window_is_exclusive_then_inclusive (test_claim_model.ClaimModelTests.test_decision_window_is_exclusive_then_inclusive)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work-model/test_claim_model.py", line 14, in setUp
+    self.assertIsNotNone(ClaimLedger, "the funded-claim model is not implemented")
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: unexpectedly None : the funded-claim model is not implemented
+
+======================================================================
+FAIL: test_earned_child_withdraws_after_parent_refund (test_claim_model.ClaimModelTests.test_earned_child_withdraws_after_parent_refund)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work-model/test_claim_model.py", line 14, in setUp
+    self.assertIsNotNone(ClaimLedger, "the funded-claim model is not implemented")
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: unexpectedly None : the funded-claim model is not implemented
+
+======================================================================
+FAIL: test_exact_submission_replays_without_renewing_its_deadline (test_claim_model.ClaimModelTests.test_exact_submission_replays_without_renewing_its_deadline)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work-model/test_claim_model.py", line 14, in setUp
+    self.assertIsNotNone(ClaimLedger, "the funded-claim model is not implemented")
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: unexpectedly None : the funded-claim model is not implemented
+
+======================================================================
+FAIL: test_expected_parent_revenue_is_not_child_backing (test_claim_model.ClaimModelTests.test_expected_parent_revenue_is_not_child_backing)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work-model/test_claim_model.py", line 14, in setUp
+    self.assertIsNotNone(ClaimLedger, "the funded-claim model is not implemented")
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: unexpectedly None : the funded-claim model is not implemented
+
+======================================================================
+FAIL: test_malformed_terms_or_foreign_authority_cannot_move_money (test_claim_model.ClaimModelTests.test_malformed_terms_or_foreign_authority_cannot_move_money)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work-model/test_claim_model.py", line 14, in setUp
+    self.assertIsNotNone(ClaimLedger, "the funded-claim model is not implemented")
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: unexpectedly None : the funded-claim model is not implemented
+
+======================================================================
+FAIL: test_refund_failure_is_atomic_and_does_not_resolve_unknown_execution (test_claim_model.ClaimModelTests.test_refund_failure_is_atomic_and_does_not_resolve_unknown_execution)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work-model/test_claim_model.py", line 14, in setUp
+    self.assertIsNotNone(ClaimLedger, "the funded-claim model is not implemented")
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: unexpectedly None : the funded-claim model is not implemented
+
+======================================================================
+FAIL: test_rejected_work_has_only_a_refund_terminal (test_claim_model.ClaimModelTests.test_rejected_work_has_only_a_refund_terminal)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work-model/test_claim_model.py", line 14, in setUp
+    self.assertIsNotNone(ClaimLedger, "the funded-claim model is not implemented")
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: unexpectedly None : the funded-claim model is not implemented
+
+======================================================================
+FAIL: test_transfer_failure_keeps_the_claim_due_and_execution_unknown (test_claim_model.ClaimModelTests.test_transfer_failure_keeps_the_claim_due_and_execution_unknown)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work-model/test_claim_model.py", line 14, in setUp
+    self.assertIsNotNone(ClaimLedger, "the funded-claim model is not implemented")
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: unexpectedly None : the funded-claim model is not implemented
+
+======================================================================
+FAIL: test_unsubmitted_or_uncertified_work_refunds_only_after_timeout (test_claim_model.ClaimModelTests.test_unsubmitted_or_uncertified_work_refunds_only_after_timeout)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work-model/test_claim_model.py", line 14, in setUp
+    self.assertIsNotNone(ClaimLedger, "the funded-claim model is not implemented")
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: unexpectedly None : the funded-claim model is not implemented
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.003s
+
+FAILED (failures=10)

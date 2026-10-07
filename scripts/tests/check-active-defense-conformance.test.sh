@@ -33,7 +33,7 @@ tests=(
   event_producer_trust
   truncated_lineage_no_containment
   overlapping_ttl_lift
-  partial_rollback_truth
+  partial_rollback::partial_rollback_truth
 )
 mode="${FAKE_ACTIVE_DEFENSE_MODE:-success}"
 case "${mode}" in
@@ -48,7 +48,7 @@ case "${mode}" in
     for ((index = 0; index < 9; index++)); do
       printf 'test %s ... ok\n' "${tests[$index]}"
     done
-    printf 'test %s ... ignored\n' "${tests[10]}"
+    printf 'test %s ... ignored\n' "${tests[9]}"
     printf 'test result: ok. 9 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s\n'
     exit 0
     ;;
@@ -58,6 +58,14 @@ case "${mode}" in
   duplicate)
     tests=("${tests[@]:0:9}")
     tests+=(slow_cumulative_exfiltration)
+    ;;
+  unscoped)
+    tests=("${tests[@]:0:9}")
+    tests+=(partial_rollback_truth)
+    ;;
+  wrong-namespace)
+    tests=("${tests[@]:0:9}")
+    tests+=(wrong_module::partial_rollback_truth)
     ;;
   success) ;;
   *)
@@ -90,10 +98,10 @@ run_gate() {
   printf '%s\n' "${status}"
 }
 
-for mode in zero removed ignored extra duplicate; do
+for mode in zero removed ignored extra duplicate unscoped wrong-namespace; do
   status="$(run_gate "${mode}")"
-  if [[ "${status}" -eq 0 ]]; then
-    echo "active-defense gate accepted invalid ${mode} evidence" >&2
+  if [[ "${status}" -ne 1 ]]; then
+    echo "active-defense gate failed to reject ${mode} evidence with its validation status" >&2
     exit 1
   fi
 done

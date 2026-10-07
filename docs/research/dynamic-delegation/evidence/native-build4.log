@@ -1,0 +1,40 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/chio-verifiable-work-paper/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/chio-verifiable-work-paper/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/chio-verifiable-work-paper/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-kernel v0.1.0 (/tmp/chio-verifiable-work-paper/crates/kernel/chio-kernel)
+    Finished `test` profile [unoptimized] target(s) in 14.24s
+     Running tests/dynamic_delegation.rs (/tmp/chio-paper-target/debug/deps/dynamic_delegation-9ff40172805672af)
+
+running 5 tests
+test output_transform_cannot_bypass_the_contract ... FAILED
+test output_must_satisfy_the_immutable_contract ... FAILED
+test receiver_executes_with_allocator_offline_and_rejects_another_receiver ... ok
+test dynamic_selection_recursion_and_native_replay ... ok
+test changed_native_identity_payload_and_ceiling_never_dispatch ... ok
+
+failures:
+
+---- output_transform_cannot_bypass_the_contract stdout ----
+Error: Internal("post-invocation hook output envelope is missing kind")
+
+---- output_must_satisfy_the_immutable_contract stdout ----
+Error: GuardDenied("guard output validation failed: guard denied the request: delegated work: result does not meet the agreed acceptance predicate")
+
+
+failures:
+    output_must_satisfy_the_immutable_contract
+    output_transform_cannot_bypass_the_contract
+
+test result: FAILED. 3 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.26s
+
+error: test failed, to rerun pass `-p chio-kernel --test dynamic_delegation`

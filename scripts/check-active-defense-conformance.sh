@@ -16,7 +16,7 @@ expected=(
   event_producer_trust
   truncated_lineage_no_containment
   overlapping_ttl_lift
-  partial_rollback_truth
+  partial_rollback::partial_rollback_truth
 )
 
 cd "${repo_root}"
@@ -32,7 +32,7 @@ if [[ "${status}" -ne 0 ]]; then
   exit "${status}"
 fi
 
-sed -nE 's/^test ([a-z0-9_]+) \.\.\. ok$/\1/p' "${output}" >"${observed_file}"
+sed -nE 's/^test ([a-z0-9_:]+) \.\.\. ok$/\1/p' "${output}" >"${observed_file}"
 observed_count="$(wc -l <"${observed_file}" | tr -d '[:space:]')"
 if [[ "${observed_count}" -ne "${#expected[@]}" ]]; then
   echo "active-defense conformance executed ${observed_count} passing tests;" \

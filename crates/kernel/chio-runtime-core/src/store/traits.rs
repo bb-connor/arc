@@ -61,11 +61,38 @@ pub trait RuntimeAdmissionStore: Send + Sync {
         Ok(None)
     }
 
+    /// Resolve only receiver-provisioned lease state. A revocation tombstone
+    /// dominates the immutable activation, including after a store reopens.
+    fn treaty_capability_lease(
+        &self,
+        lease_id: &str,
+    ) -> Result<Option<RuntimeTreatyLeaseRecord>, ChioRuntimeError> {
+        load_active_presentation_record(self, "capability_lease", lease_id)
+    }
+
+    fn treaty_governance_receipt(
+        &self,
+        receipt_id: &str,
+    ) -> Result<Option<RuntimeTreatyGovernanceRecord>, ChioRuntimeError> {
+        load_active_presentation_record(self, "governance_receipt", receipt_id)
+    }
+
     fn swarm_authority_bundle(
         &self,
         _task_graph_id: &str,
     ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
         Ok(None)
+    }
+
+    /// Resolve the exact signed graph version for an issued request. Backends
+    /// without version history retain their existing behavior; the admission
+    /// verifier still checks the requested graph hash before using any result.
+    fn swarm_authority_bundle_for_graph(
+        &self,
+        task_graph_id: &str,
+        _graph_sha256: &str,
+    ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
+        self.swarm_authority_bundle(task_graph_id)
     }
 
     fn consume_destructive_lease(
@@ -146,6 +173,40 @@ pub trait RuntimeAdmissionStore: Send + Sync {
     }
 }
 
+fn load_active_presentation_record<S, T>(
+    store: &S,
+    kind: &str,
+    id: &str,
+) -> Result<Option<T>, ChioRuntimeError>
+where
+    S: RuntimeAdmissionStore + ?Sized,
+    T: serde::de::DeserializeOwned,
+{
+    let record = store.treaty_runtime_artifact(kind, id)?;
+    // Read the tombstone after the activation. A subsequent dispatch
+    // revalidation resolves it again; this is not a cross-store transaction.
+    if store
+        .treaty_runtime_artifact(&format!("{kind}_revocation"), id)?
+        .is_some()
+    {
+        return Ok(None);
+    }
+    record
+        .map(|record| {
+            if record.evidence_kind != kind
+                || record.evidence_id != id
+                || record.artifact_sha256 != canonical_sha256(&record.raw_json)?
+            {
+                return rejected(
+                    "chio_treaty_unverified_required_evidence",
+                    "receiver presentation record identity or content hash does not match",
+                );
+            }
+            serde_json::from_value(record.raw_json).map_err(ChioRuntimeError::Json)
+        })
+        .transpose()
+}
+
 pub trait RuntimeTrustFloorStore: Send + Sync {
     fn runtime_trust_floor(
         &self,
@@ -220,6 +281,20 @@ impl<'a> LayeredRuntimeAdmissionStore<'a> {
 }
 
 impl RuntimeAdmissionStore for LayeredRuntimeAdmissionStore<'_> {
+    fn treaty_capability_lease(
+        &self,
+        lease_id: &str,
+    ) -> Result<Option<RuntimeTreatyLeaseRecord>, ChioRuntimeError> {
+        self.admission_store.treaty_capability_lease(lease_id)
+    }
+
+    fn treaty_governance_receipt(
+        &self,
+        receipt_id: &str,
+    ) -> Result<Option<RuntimeTreatyGovernanceRecord>, ChioRuntimeError> {
+        self.admission_store.treaty_governance_receipt(receipt_id)
+    }
+
     fn bundle(
         &self,
         admission_id: &str,
@@ -241,6 +316,15 @@ impl RuntimeAdmissionStore for LayeredRuntimeAdmissionStore<'_> {
         task_graph_id: &str,
     ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
         self.admission_store.swarm_authority_bundle(task_graph_id)
+    }
+
+    fn swarm_authority_bundle_for_graph(
+        &self,
+        task_graph_id: &str,
+        graph_sha256: &str,
+    ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
+        self.admission_store
+            .swarm_authority_bundle_for_graph(task_graph_id, graph_sha256)
     }
 
     fn consume_destructive_lease(

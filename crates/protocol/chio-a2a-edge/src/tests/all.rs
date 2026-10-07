@@ -158,7 +158,7 @@ mod tests {
         Keypair::from_seed(&[seed; 32]).public_key().to_hex()
     }
 
-    struct MockToolServer {
+    pub(super) struct MockToolServer {
         server_id: String,
         tools: Vec<String>,
         response: Value,
@@ -353,7 +353,7 @@ mod tests {
         }
     }
 
-    fn test_server() -> MockToolServer {
+    pub(super) fn test_server() -> MockToolServer {
         MockToolServer {
             server_id: "test-srv".to_string(),
             tools: vec!["echo".to_string(), "write".to_string()],
@@ -2664,7 +2664,7 @@ mod tests {
         let kernel_issuer = config.keypair.clone();
         let kernel = ChioKernel::new(config);
         let subject = Keypair::generate();
-        let execution = A2aKernelExecutionContext {
+        let mut execution = A2aKernelExecutionContext {
             capability: capability_for_tool(&kernel_issuer, &subject, "stream-srv", "stream"),
             agent_id: subject.public_key().to_hex(),
             dpop_proof: None,
@@ -2677,7 +2677,12 @@ mod tests {
             model_metadata: None,
         };
 
-        for index in 0..1_024 {
+        for index in 0..MAX_DEFERRED_A2A_TASKS {
+            if index % MAX_DEFERRED_A2A_TASKS_PER_SUBJECT == 0 {
+                let subject = Keypair::generate();
+                execution.capability = capability_for_tool(&kernel_issuer, &subject, "stream-srv", "stream");
+                execution.agent_id = subject.public_key().to_hex();
+            }
             let response = edge.handle_jsonrpc_value(
                 json!({
                     "jsonrpc": "2.0",
@@ -2696,6 +2701,9 @@ mod tests {
             assert_eq!(response["result"]["status"].as_str(), Some("working"));
         }
 
+        let subject = Keypair::generate();
+        execution.capability = capability_for_tool(&kernel_issuer, &subject, "stream-srv", "stream");
+        execution.agent_id = subject.public_key().to_hex();
         let rejected = edge.handle_jsonrpc_value(
             json!({
                 "jsonrpc": "2.0",
@@ -2772,7 +2780,7 @@ mod tests {
             let kernel_issuer = config.keypair.clone();
             let kernel = ChioKernel::new(config);
             let subject = Keypair::generate();
-            let execution = A2aKernelExecutionContext {
+            let mut execution = A2aKernelExecutionContext {
                 capability: capability_for_tool(&kernel_issuer, &subject, "stream-srv", "stream"),
                 agent_id: subject.public_key().to_hex(),
                 dpop_proof: None,
@@ -2786,6 +2794,11 @@ mod tests {
             };
 
             for index in 0..MAX_DEFERRED_A2A_TASKS {
+                if index % MAX_DEFERRED_A2A_TASKS_PER_SUBJECT == 0 {
+                    let subject = Keypair::generate();
+                    execution.capability = capability_for_tool(&kernel_issuer, &subject, "stream-srv", "stream");
+                    execution.agent_id = subject.public_key().to_hex();
+                }
                 let created = edge.handle_jsonrpc_value(
                     json!({
                         "jsonrpc": "2.0",
@@ -2814,6 +2827,11 @@ mod tests {
             }
 
             assert_eq!(edge.tasks.len(), MAX_DEFERRED_A2A_TASKS);
+
+            // A fresh subject still encounters the global memory bound.
+            let subject = Keypair::generate();
+            execution.capability = capability_for_tool(&kernel_issuer, &subject, "stream-srv", "stream");
+            execution.agent_id = subject.public_key().to_hex();
 
             let accepted = edge.handle_jsonrpc_value(
                 json!({

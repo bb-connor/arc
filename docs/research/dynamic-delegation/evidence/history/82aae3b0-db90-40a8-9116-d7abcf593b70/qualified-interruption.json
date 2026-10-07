@@ -1,0 +1,12 @@
+{
+  "status": "interrupted",
+  "reason": "Final operational review found the required CI caller still pinned to a superseded security workflow. Stop before rotating the caller and restart the source-bound package.",
+  "source": "dbb868e63ae87dacfe67ed84d65907ec96a965dd",
+  "completed_commands": [
+    "environment",
+    "workflow-tests",
+    "native-tests"
+  ],
+  "active_command": "native-regression",
+  "recorded_at": "2026-10-05T18:41:06.721776+00:00"
+}

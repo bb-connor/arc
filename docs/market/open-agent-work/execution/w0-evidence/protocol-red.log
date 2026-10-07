@@ -1,0 +1,156 @@
+test_each_joint_term_is_signed_and_rejects_substitution (test_protocol.ProtocolTests.test_each_joint_term_is_signed_and_rejects_substitution) ... ERROR
+test_exact_money_and_ordered_deadlines (test_protocol.ProtocolTests.test_exact_money_and_ordered_deadlines) ... ERROR
+test_joint_agreement_roundtrip_and_locally_configured_pins (test_protocol.ProtocolTests.test_joint_agreement_roundtrip_and_locally_configured_pins) ... ERROR
+test_signed_unsupported_terms_do_not_become_valid (test_protocol.ProtocolTests.test_signed_unsupported_terms_do_not_become_valid) ... ERROR
+test_wire_limits_duplicates_nonfinite_and_invalid_utf8 (test_protocol.ProtocolTests.test_wire_limits_duplicates_nonfinite_and_invalid_utf8) ... 
+  test_wire_limits_duplicates_nonfinite_and_invalid_utf8 (test_protocol.ProtocolTests.test_wire_limits_duplicates_nonfinite_and_invalid_utf8) (encoded=b'{"a":1,"a":2}') ... ERROR
+  test_wire_limits_duplicates_nonfinite_and_invalid_utf8 (test_protocol.ProtocolTests.test_wire_limits_duplicates_nonfinite_and_invalid_utf8) (encoded=b'{"a":NaN}') ... ERROR
+  test_wire_limits_duplicates_nonfinite_and_invalid_utf8 (test_protocol.ProtocolTests.test_wire_limits_duplicates_nonfinite_and_invalid_utf8) (encoded=b'{"a":Infinity}') ... ERROR
+  test_wire_limits_duplicates_nonfinite_and_invalid_utf8 (test_protocol.ProtocolTests.test_wire_limits_duplicates_nonfinite_and_invalid_utf8) (encoded=b'{"a":1e999}') ... ERROR
+  test_wire_limits_duplicates_nonfinite_and_invalid_utf8 (test_protocol.ProtocolTests.test_wire_limits_duplicates_nonfinite_and_invalid_utf8) (encoded=b'"\xff"') ... ERROR
+  test_wire_limits_duplicates_nonfinite_and_invalid_utf8 (test_protocol.ProtocolTests.test_wire_limits_duplicates_nonfinite_and_invalid_utf8) (encoded=b'"\\ud800"') ... ERROR
+  test_wire_limits_duplicates_nonfinite_and_invalid_utf8 (test_protocol.ProtocolTests.test_wire_limits_duplicates_nonfinite_and_invalid_utf8) (encoded=b'0                                       ') ... ERROR
+  test_wire_limits_duplicates_nonfinite_and_invalid_utf8 (test_protocol.ProtocolTests.test_wire_limits_duplicates_nonfinite_and_invalid_utf8) (encoded=b'[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]') ... ERROR
+test_wire_limits_duplicates_nonfinite_and_invalid_utf8 (test_protocol.ProtocolTests.test_wire_limits_duplicates_nonfinite_and_invalid_utf8) ... ERROR
+
+======================================================================
+ERROR: test_each_joint_term_is_signed_and_rejects_substitution (test_protocol.ProtocolTests.test_each_joint_term_is_signed_and_rejects_substitution)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/test_protocol.py", line 57, in test_each_joint_term_is_signed_and_rejects_substitution
+    value, pins = agreement()
+                  ^^^^^^^^^^^
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/test_protocol.py", line 30, in agreement
+    value = {"body": body, "buyerSignature": buyer.sign(p.canonical(body)).hex(),
+                                                        ^^^^^^^^^^^^^^^^^
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/protocol.py", line 5, in canonical
+    raise NotImplementedError("canonical funded work artifact boundary")
+NotImplementedError: canonical funded work artifact boundary
+
+======================================================================
+ERROR: test_exact_money_and_ordered_deadlines (test_protocol.ProtocolTests.test_exact_money_and_ordered_deadlines)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/test_protocol.py", line 90, in test_exact_money_and_ordered_deadlines
+    value, pins = agreement()
+                  ^^^^^^^^^^^
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/test_protocol.py", line 30, in agreement
+    value = {"body": body, "buyerSignature": buyer.sign(p.canonical(body)).hex(),
+                                                        ^^^^^^^^^^^^^^^^^
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/protocol.py", line 5, in canonical
+    raise NotImplementedError("canonical funded work artifact boundary")
+NotImplementedError: canonical funded work artifact boundary
+
+======================================================================
+ERROR: test_joint_agreement_roundtrip_and_locally_configured_pins (test_protocol.ProtocolTests.test_joint_agreement_roundtrip_and_locally_configured_pins)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/test_protocol.py", line 49, in test_joint_agreement_roundtrip_and_locally_configured_pins
+    value, pins = agreement()
+                  ^^^^^^^^^^^
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/test_protocol.py", line 30, in agreement
+    value = {"body": body, "buyerSignature": buyer.sign(p.canonical(body)).hex(),
+                                                        ^^^^^^^^^^^^^^^^^
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/protocol.py", line 5, in canonical
+    raise NotImplementedError("canonical funded work artifact boundary")
+NotImplementedError: canonical funded work artifact boundary
+
+======================================================================
+ERROR: test_signed_unsupported_terms_do_not_become_valid (test_protocol.ProtocolTests.test_signed_unsupported_terms_do_not_become_valid)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/test_protocol.py", line 79, in test_signed_unsupported_terms_do_not_become_valid
+    value, pins = agreement()
+                  ^^^^^^^^^^^
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/test_protocol.py", line 30, in agreement
+    value = {"body": body, "buyerSignature": buyer.sign(p.canonical(body)).hex(),
+                                                        ^^^^^^^^^^^^^^^^^
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/protocol.py", line 5, in canonical
+    raise NotImplementedError("canonical funded work artifact boundary")
+NotImplementedError: canonical funded work artifact boundary
+
+======================================================================
+ERROR: test_wire_limits_duplicates_nonfinite_and_invalid_utf8 (test_protocol.ProtocolTests.test_wire_limits_duplicates_nonfinite_and_invalid_utf8) (encoded=b'{"a":1,"a":2}')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/test_protocol.py", line 114, in test_wire_limits_duplicates_nonfinite_and_invalid_utf8
+    with self.subTest(encoded=encoded[:40]), self.assertRaises(p.ProtocolError):
+                                                               ^^^^^^^^^^^^^^^
+AttributeError: module 'protocol' has no attribute 'ProtocolError'
+
+======================================================================
+ERROR: test_wire_limits_duplicates_nonfinite_and_invalid_utf8 (test_protocol.ProtocolTests.test_wire_limits_duplicates_nonfinite_and_invalid_utf8) (encoded=b'{"a":NaN}')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/test_protocol.py", line 114, in test_wire_limits_duplicates_nonfinite_and_invalid_utf8
+    with self.subTest(encoded=encoded[:40]), self.assertRaises(p.ProtocolError):
+                                                               ^^^^^^^^^^^^^^^
+AttributeError: module 'protocol' has no attribute 'ProtocolError'
+
+======================================================================
+ERROR: test_wire_limits_duplicates_nonfinite_and_invalid_utf8 (test_protocol.ProtocolTests.test_wire_limits_duplicates_nonfinite_and_invalid_utf8) (encoded=b'{"a":Infinity}')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/test_protocol.py", line 114, in test_wire_limits_duplicates_nonfinite_and_invalid_utf8
+    with self.subTest(encoded=encoded[:40]), self.assertRaises(p.ProtocolError):
+                                                               ^^^^^^^^^^^^^^^
+AttributeError: module 'protocol' has no attribute 'ProtocolError'
+
+======================================================================
+ERROR: test_wire_limits_duplicates_nonfinite_and_invalid_utf8 (test_protocol.ProtocolTests.test_wire_limits_duplicates_nonfinite_and_invalid_utf8) (encoded=b'{"a":1e999}')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/test_protocol.py", line 114, in test_wire_limits_duplicates_nonfinite_and_invalid_utf8
+    with self.subTest(encoded=encoded[:40]), self.assertRaises(p.ProtocolError):
+                                                               ^^^^^^^^^^^^^^^
+AttributeError: module 'protocol' has no attribute 'ProtocolError'
+
+======================================================================
+ERROR: test_wire_limits_duplicates_nonfinite_and_invalid_utf8 (test_protocol.ProtocolTests.test_wire_limits_duplicates_nonfinite_and_invalid_utf8) (encoded=b'"\xff"')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/test_protocol.py", line 114, in test_wire_limits_duplicates_nonfinite_and_invalid_utf8
+    with self.subTest(encoded=encoded[:40]), self.assertRaises(p.ProtocolError):
+                                                               ^^^^^^^^^^^^^^^
+AttributeError: module 'protocol' has no attribute 'ProtocolError'
+
+======================================================================
+ERROR: test_wire_limits_duplicates_nonfinite_and_invalid_utf8 (test_protocol.ProtocolTests.test_wire_limits_duplicates_nonfinite_and_invalid_utf8) (encoded=b'"\\ud800"')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/test_protocol.py", line 114, in test_wire_limits_duplicates_nonfinite_and_invalid_utf8
+    with self.subTest(encoded=encoded[:40]), self.assertRaises(p.ProtocolError):
+                                                               ^^^^^^^^^^^^^^^
+AttributeError: module 'protocol' has no attribute 'ProtocolError'
+
+======================================================================
+ERROR: test_wire_limits_duplicates_nonfinite_and_invalid_utf8 (test_protocol.ProtocolTests.test_wire_limits_duplicates_nonfinite_and_invalid_utf8) (encoded=b'0                                       ')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/test_protocol.py", line 114, in test_wire_limits_duplicates_nonfinite_and_invalid_utf8
+    with self.subTest(encoded=encoded[:40]), self.assertRaises(p.ProtocolError):
+                                                               ^^^^^^^^^^^^^^^
+AttributeError: module 'protocol' has no attribute 'ProtocolError'
+
+======================================================================
+ERROR: test_wire_limits_duplicates_nonfinite_and_invalid_utf8 (test_protocol.ProtocolTests.test_wire_limits_duplicates_nonfinite_and_invalid_utf8) (encoded=b'[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/test_protocol.py", line 114, in test_wire_limits_duplicates_nonfinite_and_invalid_utf8
+    with self.subTest(encoded=encoded[:40]), self.assertRaises(p.ProtocolError):
+                                                               ^^^^^^^^^^^^^^^
+AttributeError: module 'protocol' has no attribute 'ProtocolError'
+
+======================================================================
+ERROR: test_wire_limits_duplicates_nonfinite_and_invalid_utf8 (test_protocol.ProtocolTests.test_wire_limits_duplicates_nonfinite_and_invalid_utf8)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/test_protocol.py", line 116, in test_wire_limits_duplicates_nonfinite_and_invalid_utf8
+    self.assertEqual(p.load(b'[' * 16 + b'0' + b']' * 16), [[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]])
+                     ^^^^^^
+AttributeError: module 'protocol' has no attribute 'load'
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.008s
+
+FAILED (errors=13)

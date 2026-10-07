@@ -1,0 +1,44 @@
+    Finished `test` profile [unoptimized] target(s) in 0.82s
+     Running tests/finding_pool_ledger.rs (target/debug/deps/finding_pool_ledger-bab6c9bedb88fa81)
+
+running 38 tests
+test cloned_receipt_database_cannot_reuse_the_ledger_sink_binding ... ok
+test cognition_market_allocation_binds_one_concrete_store_across_deployments ... ok
+test cognition_market_authenticated_pool_restart_never_exceeds_signed_amount ... ok
+test cognition_market_debit_rejects_non_ready_sessions_before_reservation ... ok
+test cognition_market_debit_resolves_tenant_from_authenticated_session_context ... ok
+test cognition_market_kernel_refuses_pool_ledger_replacement ... ok
+test cognition_market_ledger_rejects_an_in_place_rollback ... ok
+test cognition_market_pool_binds_one_purchaser_allocation_per_pool ... ok
+test cognition_market_pool_bounds_expired_reclamation_per_debit ... ok
+test cognition_market_pool_configuration_failure_is_atomic ... ok
+test cognition_market_pool_domain_excludes_a_second_live_store ... ok
+test cognition_market_pool_ledger_persists_its_authority_selected_domain ... ok
+test cognition_market_pool_receipt_authority_is_pinned_ledger_wide ... ok
+test cognition_market_pool_receipts_survive_ordinary_kernel_key_rotation ... ok
+test cognition_market_pool_reclaims_unclaimed_reservations_at_the_claim_deadline ... ok
+test cognition_market_pool_reclamation_progress_survives_a_capacity_rejection ... ok
+test cognition_market_pool_rejects_authority_purchaser_digest_and_pool_substitution ... ok
+test cognition_market_pool_replay_skips_mutable_purchase_admission ... ok
+test cognition_market_pool_replays_after_allocation_authority_rotation ... ok
+test cognition_market_pool_replays_after_expiry_and_clock_rollback_but_rejects_new_spend ... ok
+test cognition_market_pool_replays_after_purchase_verifier_rotation ... ok
+test cognition_market_pool_requires_live_status_before_new_debit_but_replays ... ok
+test cognition_market_qualified_pool_refuses_in_memory_storage ... ok
+test cognition_market_receipt_sink_rejects_an_in_place_rollback_after_acknowledgment ... ok
+test cognition_market_sqlite_clone_cannot_reuse_the_store_binding ... ok
+test finding_pool_receipt_sink_rejects_a_writable_parent_directory ... ok
+test finding_pool_receipt_sink_rejects_unsafe_file_permissions_and_links ... ok
+test in_memory_receipt_stores_never_advertise_a_durable_pool_sink ... ok
+test independent_receipt_anchors_produce_distinct_sink_identities ... ok
+test qualified_pool_creates_percent_decoded_uri_parent ... ok
+test qualified_pool_rejects_a_symlink_database_path ... ok
+test qualified_pool_rejects_group_or_world_writable_database_files ... ok
+test qualified_pool_rejects_percent_decoded_nul_uris ... ok
+test qualified_pool_rejects_read_only_sqlite_uris ... ok
+test qualified_pool_rejects_sqlite_uris_that_disable_file_locking ... ok
+test sqlite_outbox_claim_serializes_independent_ledger_instances ... ok
+test sqlite_outbox_restart_reclaims_a_prior_epoch_after_clock_rollback ... ok
+test sqlite_receipt_store_identity_survives_reopen ... ok
+
+test result: ok. 38 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 48.07s

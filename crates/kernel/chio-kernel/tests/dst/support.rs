@@ -1566,9 +1566,21 @@ pub fn oracle_conservation(
     capability_id: &str,
     grant_index: usize,
 ) -> Result<(), String> {
+    // Each episode is finite. Fetch a sentinel row past its explicit bound so
+    // truncation fails the oracle rather than hiding a conservation defect.
+    // usize::MAX cannot be represented by SQLite's signed LIMIT parameter.
+    const MAX_EPISODE_EVENTS: usize = 4096;
     let events = store
-        .list_mutation_events(usize::MAX, Some(capability_id), Some(grant_index))
+        .list_mutation_events(
+            MAX_EPISODE_EVENTS + 1,
+            Some(capability_id),
+            Some(grant_index),
+        )
         .map_err(|error| format!("load budget journal: {error}"))?;
+    require(
+        events.len() <= MAX_EPISODE_EVENTS,
+        "budget journal exceeds the episode bound",
+    )?;
     let mut invocations = 0u64;
     let mut reserved = 0u128;
     let mut outstanding = 0u128;

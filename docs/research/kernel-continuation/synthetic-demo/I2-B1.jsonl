@@ -1,0 +1,2 @@
+{"attempt_id": "I2-B1-failed", "status": "failed", "hands_on_hours": "1", "incident_id": null, "recoverable_incident": false, "recovered_without_repair": false, "database_edits": 0, "bespoke_repairs": 0}
+{"attempt_id": "I2-B1-succeeded", "status": "succeeded", "hands_on_hours": "3", "incident_id": "I2-B1-incident", "recoverable_incident": true, "recovered_without_repair": true, "database_edits": 0, "bespoke_repairs": 0}

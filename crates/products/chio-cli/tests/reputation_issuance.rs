@@ -2,18 +2,9 @@
 
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_test_support::loopback::{reserve_listen_addr, skip_when_loopback_bind_denied};
 use reqwest::blocking::Client;
-
-fn unique_dir(prefix: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}"))
-}
 
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -91,8 +82,8 @@ fn trust_service_enforces_reputation_gated_issuance_policy() {
         return;
     }
 
-    let dir = unique_dir("chio-cli-reputation-issuance");
-    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let fixture = chio_test_support::private_tempdir().expect("private test directory");
+    let dir = fixture.path();
     let receipt_db_path = dir.join("receipts.sqlite3");
     let revocation_db_path = dir.join("revocations.sqlite3");
     let authority_db_path = dir.join("authority.sqlite3");
@@ -201,6 +192,4 @@ fn trust_service_enforces_reputation_gated_issuance_policy() {
         .send()
         .expect("query lineage");
     assert_eq!(lineage_response.status(), reqwest::StatusCode::OK);
-
-    let _ = std::fs::remove_dir_all(dir);
 }

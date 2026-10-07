@@ -1,0 +1,27 @@
+workflow-tests: exit 0
+native-tests: exit 0
+native-regression: exit 0
+evolution-tests: exit 101
+missing or unexpected dynamic qualification commands
+dynamic qualification not terminal and passing: evolution-tests
+dynamic qualification not terminal and passing: workflow-clippy
+missing dynamic command stream: workflow-clippy/stdout
+missing dynamic command stream: workflow-clippy/stderr
+dynamic qualification not terminal and passing: native-clippy
+missing dynamic command stream: native-clippy/stdout
+missing dynamic command stream: native-clippy/stderr
+dynamic qualification not terminal and passing: evolution-clippy
+missing dynamic command stream: evolution-clippy/stdout
+missing dynamic command stream: evolution-clippy/stderr
+dynamic qualification not terminal and passing: evolution-format
+missing dynamic command stream: evolution-format/stdout
+missing dynamic command stream: evolution-format/stderr
+dynamic qualification not terminal and passing: format
+missing dynamic command stream: format/stdout
+missing dynamic command stream: format/stderr
+dynamic qualification not terminal and passing: example
+missing dynamic command stream: example/stdout
+missing dynamic command stream: example/stderr
+dynamic qualification not terminal and passing: artifact-tests
+missing dynamic command stream: artifact-tests/stdout
+missing dynamic command stream: artifact-tests/stderr

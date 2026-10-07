@@ -1,0 +1,15 @@
+{
+  "platform": "Linux-6.17.0-1020-oracle-aarch64-with-glibc2.39",
+  "packages": {
+    "cffi": "2.1.1",
+    "cryptography": "50.0.1",
+    "pycparser": "3.0",
+    "rfc8785": "0.1.4"
+  },
+  "versions": {
+    "rustc": "rustc 1.94.1 (e408947bf 2026-03-25)",
+    "cargo": "cargo 1.94.1 (29ea6fb6a 2026-03-24)",
+    "node": "v24.16.0",
+    "checkerPython": "Python 3.12.3"
+  }
+}

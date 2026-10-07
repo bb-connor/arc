@@ -1,0 +1,28 @@
+test_rust_denies_duplicates_unsupported_and_oversized_input (test_checker_command.CheckerCommandTests.test_rust_denies_duplicates_unsupported_and_oversized_input) ... ok
+test_rust_produces_hand_checked_observations (test_checker_command.CheckerCommandTests.test_rust_produces_hand_checked_observations) ... ok
+test_byte_capacity_denies_without_evicting_prior_custody (test_custody.CustodyTests.test_byte_capacity_denies_without_evicting_prior_custody) ... ok
+test_failed_custody_does_not_issue_a_receipt (test_custody.CustodyTests.test_failed_custody_does_not_issue_a_receipt) ... ok
+test_missing_or_tampered_bytes_fail (test_custody.CustodyTests.test_missing_or_tampered_bytes_fail) ... ok
+test_retained_bytes_and_receipt_survive_reopen (test_custody.CustodyTests.test_retained_bytes_and_receipt_survive_reopen) ... ok
+test_unsafe_paths_modes_and_changed_identity_fail (test_custody.CustodyTests.test_unsafe_paths_modes_and_changed_identity_fail) ... ok
+test_each_joint_term_is_signed_and_rejects_substitution (test_protocol.ProtocolTests.test_each_joint_term_is_signed_and_rejects_substitution) ... ok
+test_exact_money_and_ordered_deadlines (test_protocol.ProtocolTests.test_exact_money_and_ordered_deadlines) ... ok
+test_joint_agreement_roundtrip_and_locally_configured_pins (test_protocol.ProtocolTests.test_joint_agreement_roundtrip_and_locally_configured_pins) ... ok
+test_retained_canonical_and_malformed_vectors (test_protocol.ProtocolTests.test_retained_canonical_and_malformed_vectors) ... ok
+test_signed_unsupported_terms_do_not_become_valid (test_protocol.ProtocolTests.test_signed_unsupported_terms_do_not_become_valid) ... ok
+test_wire_limits_duplicates_nonfinite_and_invalid_utf8 (test_protocol.ProtocolTests.test_wire_limits_duplicates_nonfinite_and_invalid_utf8) ... ok
+test_authorization_requires_exact_observed_deployment_claim_and_window (test_verifier.ObserverBindingTests.test_authorization_requires_exact_observed_deployment_claim_and_window) ... ok
+test_checker_source_substitution_cannot_issue_a_decision (test_verifier.VerifierTests.test_checker_source_substitution_cannot_issue_a_decision) ... ok
+test_claim_capacity_denies_new_work_without_evicting_earned_authority (test_verifier.VerifierTests.test_claim_capacity_denies_new_work_without_evicting_earned_authority) ... ok
+test_conflicting_submission_cannot_replace_retained_claim (test_verifier.VerifierTests.test_conflicting_submission_cannot_replace_retained_claim) ... ok
+test_false_authentication_observation_is_signed_rejection (test_verifier.VerifierTests.test_false_authentication_observation_is_signed_rejection) ... ok
+test_malformed_output_is_rejection_and_not_success (test_verifier.VerifierTests.test_malformed_output_is_rejection_and_not_success) ... ok
+test_provider_custodian_verifier_and_allocation_substitutions_deny (test_verifier.VerifierTests.test_provider_custodian_verifier_and_allocation_substitutions_deny) ... ok
+test_real_predicate_accepts_and_decision_survives_reopen (test_verifier.VerifierTests.test_real_predicate_accepts_and_decision_survives_reopen) ... ok
+test_unavailable_custody_does_not_sign_a_financial_decision (test_verifier.VerifierTests.test_unavailable_custody_does_not_sign_a_financial_decision) ... ok
+test_validly_signed_decision_cannot_change_any_financial_or_work_binding (test_verifier.VerifierTests.test_validly_signed_decision_cannot_change_any_financial_or_work_binding) ... ok
+
+----------------------------------------------------------------------
+Ran 23 tests in 3.981s
+
+OK

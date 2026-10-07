@@ -29,6 +29,7 @@ use super::{ScenarioCategory, Verdict, VerdictTuple, SCENARIO_SCHEMA};
 pub const RUST_KERNEL_DRIVER: &str = "rust-kernel";
 const MATRIX_SERVER_ID: &str = "verdict-matrix";
 const MATRIX_INPUT_METADATA: &str = "verdict_matrix";
+const MATRIX_TIME_SECS: u64 = 1_700_000_000;
 pub const REASON_NONE: &str = "urn:chio:error:none";
 pub const REASON_SCOPE_EXCEEDED: &str = "urn:chio:error:capability:scope-exceeded";
 pub const REASON_REVOKED: &str = "urn:chio:error:capability:revoked";
@@ -458,7 +459,8 @@ fn evaluate_scenario(scenario: &VerdictScenario) -> Result<VerdictTuple, String>
         return Ok(evaluate_finding_purchase_scenario(scenario));
     }
 
-    let mut kernel = ChioKernel::new(kernel_config());
+    let _time = chio_test_support::clock::scope_unix_secs(MATRIX_TIME_SECS);
+    let mut kernel = ChioKernel::new_with_clock(kernel_config(), chio_test_support::clock::clock());
     configure_replay_store(&mut kernel, scenario);
     configure_redaction_hooks(&mut kernel, scenario);
     kernel.register_tool_server(Box::new(MatrixToolServer::new()));
@@ -642,12 +644,15 @@ fn configure_replay_store(kernel: &mut ChioKernel, scenario: &VerdictScenario) {
 
     let mut config = ExecutionNonceConfig::default();
     if scenario.script.replay_nonce_status == ReplayNonceStatus::Stale {
-        config.nonce_ttl_secs = 0;
+        config.nonce_ttl_secs = 1;
     }
     if scenario.script.replay_nonce_status == ReplayNonceStatus::TraceMissing {
         config.require_nonce = true;
     }
-    let store = InMemoryExecutionNonceStore::from_config(&config);
+    let store = InMemoryExecutionNonceStore::with_clock(
+        config.nonce_store_capacity,
+        kernel.authority_clock(),
+    );
     kernel.set_execution_nonce_store(config, Box::new(store));
 }
 
@@ -834,6 +839,9 @@ fn verify_stale_nonce(
     response: &chio_kernel::ToolCallResponse,
     scope_set: &[String],
 ) -> Result<VerdictTuple, String> {
+    // Issue a valid nonce first, then let its signed lifetime elapse. A zero
+    // lifetime must fail at issuance and cannot exercise stale verification.
+    let _expired = chio_test_support::clock::scope_unix_secs(MATRIX_TIME_SECS + 2);
     let nonce = response
         .execution_nonce
         .as_deref()
@@ -841,10 +849,13 @@ fn verify_stale_nonce(
     let binding = nonce_binding(request, capability, response);
     match kernel.verify_presented_execution_nonce(nonce, &binding) {
         Ok(()) => Err("stale execution nonce was accepted".to_string()),
-        Err(error) => Ok(tuple(
+        Err(error @ ExecutionNonceError::Expired { .. }) => Ok(tuple(
             Verdict::Deny,
             replay_reason_code(&error),
             scope_set.to_vec(),
+        )),
+        Err(error) => Err(format!(
+            "stale execution nonce failed for another reason: {error}"
         )),
     }
 }

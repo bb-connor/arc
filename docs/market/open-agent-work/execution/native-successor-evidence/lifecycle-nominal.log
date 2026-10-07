@@ -1,0 +1,6 @@
+test_payout_rejection_and_missing_work_timeouts (__main__.FundedLifecycle.test_payout_rejection_and_missing_work_timeouts) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 110.595s
+
+OK

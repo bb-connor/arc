@@ -10,6 +10,13 @@
 
 set -euo pipefail
 
+# ASan builds of the kernel feature graphs are memory intensive. Keep the
+# compiler budget explicit inside the nested builder, where job-level
+# environment settings are not propagated by the action. Dedicated builders
+# can opt into a different budget without changing target or sanitizer coverage.
+export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}"
+printf 'Chio fuzz compiler budget: %s parallel jobs\n' "$CARGO_BUILD_JOBS"
+
 # Move into the standalone fuzz workspace. cargo-fuzz emits binaries under
 # the workspace's target/ tree, namespaced by host triple; OSS-Fuzz builders
 # run on x86_64-unknown-linux-gnu.
@@ -37,7 +44,9 @@ TARGETS=(
     capability_receipt
     manifest_roundtrip
     federation_trust_establishment
+    bilateral_dsse_verify
     finding_worker_protocol
+    frost_round2_envelope
     response_authority_protocol
     response_lifecycle
     underwriting_policy_input

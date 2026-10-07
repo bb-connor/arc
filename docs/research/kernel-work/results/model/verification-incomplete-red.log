@@ -1,0 +1,8 @@
+{
+  "result": "pass",
+  "source_files": 18,
+  "commands": 1,
+  "variants": 57,
+  "transitions": 80115,
+  "scope": "retained source and artifact verification"
+}

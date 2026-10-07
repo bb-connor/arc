@@ -40,8 +40,31 @@ def failure_classes(text):
         "output_ceiling": "output_ceiling",
         "permission_denied": "permission denied",
         "connection_refused": "connection refused",
+        "worker_runtime_error": "chio worker: runtime_error",
+        "worker_transport_error": "chio worker: transport_error",
+        "worker_invalid_preparation": "chio worker: invalid_preparation",
+        "worker_incomplete_broker_response": "chio worker: incomplete_broker_response",
     }
     return sorted(name for name, phrase in known.items() if phrase in text)
+
+
+def mcp_deadlines(text):
+    if isinstance(text, bytes):
+        text = text[:65536].decode("utf-8", errors="replace")
+    text = (text or "")[:65536]
+    records = []
+    pattern = (
+        r"\bMCP (initialize|tools/list|tools/call) request "
+        r"(?:timed out after |exceeded its )([0-9]{1,7})(ms|s)\b"
+    )
+    for method, value, unit in re.findall(pattern, text):
+        timeout = int(value) * (1000 if unit == "s" else 1)
+        record = {"method": method, "timeout_ms": timeout}
+        if 1 <= timeout <= 3600000 and record not in records:
+            records.append(record)
+            if len(records) == 8:
+                break
+    return records
 
 
 def safe_run_report(text):
@@ -110,6 +133,7 @@ def save_failure_diagnostics(root, output, failure):
         "timed_out": isinstance(failure, subprocess.TimeoutExpired),
         "run_report": safe_run_report(failure.stdout),
         "host_failure_classes": failure_classes(failure.stderr),
+        "host_mcp_deadlines": mcp_deadlines(failure.stderr),
         "worker_logs": [],
     }
     if isinstance(failure, subprocess.CalledProcessError):
@@ -127,7 +151,10 @@ def save_failure_diagnostics(root, output, failure):
                         raise ValueError("Not a regular log")
                     data = incoming.read(65537)
                 record.update(
-                    available=True, truncated=len(data) > 65536, classes=failure_classes(data)
+                    available=True,
+                    truncated=len(data) > 65536,
+                    classes=failure_classes(data),
+                    mcp_deadlines=mcp_deadlines(data),
                 )
             except (OSError, ValueError):
                 record["available"] = False

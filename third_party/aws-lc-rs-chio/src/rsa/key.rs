@@ -756,9 +756,11 @@ pub(super) fn generate_rsa_key(size: c_int) -> Result<LcPtr<EVP_PKEY>, Unspecifi
 #[cfg(feature = "fips")]
 #[must_use]
 pub(super) fn is_valid_fips_key(key: &LcPtr<EVP_PKEY>) -> bool {
-    // This should always be an RSA key and must-never panic.
+    // Reject the wrong algorithm before calling the native RSA validator.
     let evp_pkey = key.as_const();
-    let rsa_key = evp_pkey.get_rsa().expect("RSA EVP_PKEY");
+    let Ok(rsa_key) = evp_pkey.get_rsa() else {
+        return false;
+    };
 
     1 == unsafe { RSA_check_fips((rsa_key.as_const_ptr()).cast_mut()) }
 }
@@ -766,6 +768,20 @@ pub(super) fn is_valid_fips_key(key: &LcPtr<EVP_PKEY>) -> bool {
 pub(super) fn is_rsa_key(key: &LcPtr<EVP_PKEY>) -> bool {
     let id = key.as_const().id();
     id == EVP_PKEY_RSA || id == EVP_PKEY_RSA_PSS
+}
+
+#[cfg(all(test, feature = "fips"))]
+mod fips_validation_tests {
+    use super::*;
+    use crate::aws_lc::EVP_PKEY_ED25519;
+    use crate::evp_pkey::No_EVP_PKEY_CTX_consumer;
+
+    #[test]
+    fn non_rsa_key_is_rejected_without_panicking() -> Result<(), Unspecified> {
+        let key = LcPtr::<EVP_PKEY>::generate(EVP_PKEY_ED25519, No_EVP_PKEY_CTX_consumer)?;
+        assert!(!is_valid_fips_key(&key));
+        Ok(())
+    }
 }
 
 pub(super) fn validate_rsa_key(key: &LcPtr<EVP_PKEY>) -> Result<(), KeyRejected> {

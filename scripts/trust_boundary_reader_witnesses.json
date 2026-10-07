@@ -1,0 +1,670 @@
+{
+  "schema": "chio.trust-boundary-reader-witnesses.v1",
+  "rules": [
+    {
+      "path": "crates/kernel/chio-kernel/src/tool_outcome/execution_evidence.rs",
+      "reader": "from_canonical_bytes",
+      "api_label": "ExecutionEvidenceRecordV1::bounded_canonical_readback",
+      "required_source_expressions": [
+        "\\bif\\s+bytes\\.is_empty\\(\\)\\s*\\|\\|\\s*bytes\\.len\\(\\)\\s*>\\s*MAX_BYTES\\s*\\{\\s*return\\s+Err\\([^;]*;\\s*\\}\\s*let\\s+record\\s*:\\s*Self\\s*=\\s*serde_json::from_slice\\(bytes\\)",
+        "\\bif\\s+record\\.canonical_bytes\\(\\)\\?\\s*!=\\s*bytes\\s*\\{\\s*return\\s+Err\\("
+      ],
+      "required_owner_witnesses": [
+        {
+          "path": "crates/kernel/chio-kernel/src/tool_outcome/execution_evidence.rs",
+          "owner": "@file",
+          "required_source_expressions": [
+            "\\bconst\\s+MAX_BYTES\\s*:\\s*usize\\s*=\\s*1024\\s*\\*\\s*1024\\s*;"
+          ]
+        },
+        {
+          "path": "crates/kernel/chio-kernel/src/tool_outcome/execution_evidence.rs",
+          "owner": "canonical_bytes",
+          "required_source_expressions": [
+            "\\bself\\.receipt\\(\\)\\?",
+            "\\bbounded\\([^;]*\\bself,\\s*MAX_BYTES\\s*\\)"
+          ]
+        },
+        {
+          "path": "crates/kernel/chio-kernel/src/tool_outcome/execution_evidence.rs",
+          "owner": "receipt",
+          "required_source_expressions": [
+            "\\bif\\s+self\\.receipt_canonical_json\\.len\\(\\)\\s*>\\s*MAX_BYTES\\s*\\{\\s*return\\s+Err\\(",
+            "\\blet\\s+receipt\\s*:\\s*ChioReceipt\\s*=\\s*serde_json::from_str\\(&self\\.receipt_canonical_json\\)",
+            "\\bif\\s+canonical\\(&receipt\\)\\?\\s*!=\\s*self\\.receipt_canonical_json\\.as_bytes\\(\\)\\s*\\{\\s*return\\s+Err\\("
+          ]
+        },
+        {
+          "path": "crates/kernel/chio-kernel/src/tool_outcome.rs",
+          "owner": "canonical",
+          "required_source_expressions": [
+            "\\bcanonical_json_bytes\\(value\\)\\.map_err\\("
+          ]
+        },
+        {
+          "path": "crates/kernel/chio-kernel/src/tool_outcome.rs",
+          "owner": "bounded",
+          "required_source_expressions": [
+            "\\blet\\s+bytes\\s*=\\s*canonical\\(value\\)\\?",
+            "\\bif\\s+bytes\\.len\\(\\)\\s*>\\s*maximum\\s*\\{\\s*return\\s+Err\\("
+          ]
+        }
+      ],
+      "producer_relationships": [],
+      "review_note": "Outer retained record is data only; this witness never qualifies a live signing/mutation token."
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/tool_outcome/execution_evidence.rs",
+      "reader": "receipt",
+      "api_label": "ExecutionEvidenceRecordV1::bounded_embedded_receipt_equality",
+      "required_source_expressions": [
+        "\\bif\\s+self\\.receipt_canonical_json\\.len\\(\\)\\s*>\\s*MAX_BYTES\\s*\\{\\s*return\\s+Err\\(",
+        "\\blet\\s+receipt\\s*:\\s*ChioReceipt\\s*=\\s*serde_json::from_str\\(&self\\.receipt_canonical_json\\)",
+        "\\bif\\s+canonical\\(&receipt\\)\\?\\s*!=\\s*self\\.receipt_canonical_json\\.as_bytes\\(\\)\\s*\\{\\s*return\\s+Err\\("
+      ],
+      "required_owner_witnesses": [
+        {
+          "path": "crates/kernel/chio-kernel/src/tool_outcome/execution_evidence.rs",
+          "owner": "@file",
+          "required_source_expressions": [
+            "\\bconst\\s+MAX_BYTES\\s*:\\s*usize\\s*=\\s*1024\\s*\\*\\s*1024\\s*;"
+          ]
+        },
+        {
+          "path": "crates/kernel/chio-kernel/src/tool_outcome.rs",
+          "owner": "canonical",
+          "required_source_expressions": [
+            "\\bcanonical_json_bytes\\(value\\)\\.map_err\\("
+          ]
+        }
+      ],
+      "producer_relationships": [],
+      "review_note": "Canonical decoding only; original signer and semantic checks remain in validate_against."
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/tool_outcome/execution_evidence.rs",
+      "reader": "execution_metadata",
+      "api_label": "execution_metadata::validated_resolution_hash_size_and_canonical_equality",
+      "required_source_expressions": [
+        "\\boutcome\\.validate_canonical_blob\\(operation,\\s*&raw\\.canonical_blob\\(\\)\\?\\)\\?",
+        "\\bevaluation\\.validate_against\\(operation,\\s*outcome\\)\\?",
+        "\\bu64::try_from\\(resolved\\.len\\(\\)\\)\\.ok\\(\\)\\s*!=\\s*Some\\(\\*resolved_output_size_bytes\\)",
+        "\\bsha256_hex\\(resolved\\)\\s*!=\\s*resolved_output\\.digest\\(\\)\\.as_str\\(\\)",
+        "\\blet\\s+value\\s*:\\s*Value\\s*=\\s*serde_json::from_slice\\(resolved\\)",
+        "\\bif\\s+canonical\\(&value\\)\\?\\s*!=\\s*resolved\\s*\\{\\s*return\\s+Err\\("
+      ],
+      "required_owner_witnesses": [
+        {
+          "path": "crates/kernel/chio-kernel/src/tool_outcome.rs",
+          "owner": "canonical",
+          "required_source_expressions": [
+            "\\bcanonical_json_bytes\\(value\\)\\.map_err\\("
+          ]
+        },
+        {
+          "path": "crates/kernel/chio-kernel/src/tool_outcome.rs",
+          "owner": "validate#5",
+          "required_source_expressions": [
+            "\\busize::try_from\\(\\*resolved_output_size_bytes\\)[\\s\\S]*?\\bsize\\s*>\\s*MAX_RESOLVED_OUTPUT_BYTES",
+            "\\breturn\\s+Err\\(ToolOutcomeError::Invalid\\("
+          ]
+        }
+      ],
+      "producer_relationships": [],
+      "review_note": "MAX_RESOLVED_OUTPUT_BYTES is carried by validated ToolOutcomeRecordV1; length and digest comparison happen before parsing resolved bytes."
+    },
+    {
+      "path": "crates/kernel/chio-runtime-core/src/store/sqlite/outcome_continuation.rs",
+      "reader": "decode_hashed",
+      "api_label": "private::outcome_slot_producers+canonical_sha256_readback",
+      "required_source_expressions": [
+        "\\bfn\\s+decode_hashed\\s*<T:\\s*DeserializeOwned\\s*\\+\\s*serde::Serialize>",
+        "\\blet\\s+value\\s*=\\s*serde_json::from_str\\(raw\\)",
+        "\\bif\\s+canonical_sha256\\(&value\\)\\?\\s*!=\\s*expected\\s*\\{\\s*return\\s+rejected\\("
+      ],
+      "required_owner_witnesses": [
+        {
+          "path": "crates/kernel/chio-runtime-core/src/hash.rs",
+          "owner": "canonical_sha256",
+          "required_source_expressions": [
+            "\\bcanonical_json_bytes\\(value\\)",
+            "\\bOk\\(sha256_hex\\(&bytes\\)\\)"
+          ]
+        },
+        {
+          "path": "crates/kernel/chio-runtime-core/src/store/sqlite/outcome_continuation.rs",
+          "owner": "load_slot",
+          "required_source_expressions": [
+            "\\blet\\s+rule\\s*:\\s*OutcomeEffectRule\\s*=\\s*decode_hashed\\(&rule_json,\\s*&rule_sha256\\)\\?",
+            "\\brule\\.validate\\(\\)\\?",
+            "\\brule\\.slot\\.sha256\\(\\)\\?\\s*!=\\s*slot_sha256",
+            "\\(Some\\(raw\\),\\s*Some\\(hash\\)\\)\\s*=>\\s*Some\\(decode_hashed\\(&raw,\\s*&hash\\)\\?\\)",
+            "\\bclaim\\.slot\\s*!=\\s*rule\\.slot\\s*\\|\\|\\s*claim\\.rule_sha256\\s*!=\\s*rule_sha256",
+            "\\bif\\s+claim\\.is_some\\(\\)\\s*=>\\s*Some\\(decode_hashed\\(&raw,\\s*&hash\\)\\?\\)"
+          ]
+        },
+        {
+          "path": "crates/kernel/chio-runtime-core/src/store/sqlite/outcome_continuation.rs",
+          "owner": "activate_outcome_effect",
+          "required_source_expressions": [
+            "\\brule\\.validate\\(\\)\\?",
+            "\\blet\\s+rule_sha256\\s*=\\s*canonical_sha256\\(rule\\)\\?",
+            "\\blet\\s+raw\\s*=\\s*serde_json::to_string\\(rule\\)",
+            "\\bparams!\\[slot_sha256,\\s*rule_sha256,\\s*raw\\]"
+          ]
+        },
+        {
+          "path": "crates/kernel/chio-runtime-core/src/store/sqlite/outcome_continuation.rs",
+          "owner": "claim_outcome_effect",
+          "required_source_expressions": [
+            "\\brow\\.verify_ready\\(request,\\s*server_id,\\s*tool_name,\\s*now_unix_ms\\)\\?",
+            "\\blet\\s+claim_sha256\\s*=\\s*canonical_sha256\\(&claim\\)\\?",
+            "\\blet\\s+raw\\s*=\\s*serde_json::to_string\\(&claim\\)",
+            "\\bparams!\\[slot_sha256,\\s*claim_sha256,\\s*raw\\]",
+            "\\btx\\.commit\\(\\)\\.map_err\\(sqlite_error\\)\\?"
+          ]
+        },
+        {
+          "path": "crates/kernel/chio-runtime-core/src/store/sqlite/outcome_continuation.rs",
+          "owner": "complete_outcome_effect",
+          "required_source_expressions": [
+            "\\bpermit\\s*:\\s*OutcomeDispatchPermit\\b",
+            "\\blet\\s+result_sha256\\s*=\\s*canonical_sha256\\(result\\)\\?",
+            "\\blet\\s+raw\\s*=\\s*serde_json::to_string\\(result\\)",
+            "\\bparams!\\[permit\\.slot_sha256,\\s*permit\\.claim_sha256,\\s*result_sha256,\\s*raw\\]"
+          ]
+        },
+        {
+          "path": "crates/kernel/chio-runtime-core/src/store/sqlite/outcome_continuation.rs",
+          "owner": "@file",
+          "required_source_expressions": [
+            "(?m)^fn\\s+decode_hashed\\s*<"
+          ]
+        }
+      ],
+      "producer_relationships": [
+        {
+          "path": "crates/kernel/chio-runtime-core/src/store/sqlite/outcome_continuation.rs",
+          "callee": "decode_hashed",
+          "expected_callers": [
+            "load_slot"
+          ],
+          "expected_call_count": 3,
+          "explanation": "Require the private reader to remain confined to the reviewed slot loader; status is not a deserialized dispatch permit."
+        }
+      ],
+      "review_note": "Protected receiver-owned state only. No independent raw row-size cap or original-byte canonical-equality claim; hashes are canonical typed hashes."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/contractual_resolution_read.rs",
+      "reader": "source",
+      "api_label": "private::capture_waiver_native_outcome_source",
+      "required_source_expressions": [
+        "\\blet\\s+operation\\s*=\\s*load_by_operation_id_without_terminal_projection_tx\\(",
+        "\\blet\\s+journal\\s*=\\s*crate::budget_store::load_original_payment_journal\\(connection,\\s*id\\)",
+        "\\blet\\s+retained\\s*=\\s*retained_request::load_retained_request_tx\\(connection,\\s*&operation\\)",
+        "\\blet\\s+\\(raw_output_digest,\\s*encoded\\)\\s*:\\s*\\(String,\\s*Vec<u8>\\)",
+        "\\blet\\s+persisted\\s*:\\s*chio_kernel::tool_outcome::PersistedToolOutcomeRecordV1\\s*=\\s*serde_json::from_slice\\(&encoded\\)",
+        "\\bchio_kernel::tool_outcome::ToolOutcomeRecordV1::from_persisted\\(persisted\\)",
+        "\\boutcome\\.validate_against\\(&operation\\)\\.map_err\\(error\\)\\?",
+        "\\bif\\s+outcome\\.raw_output_digest\\(\\)\\.as_str\\(\\)\\s*!=\\s*raw_output_digest\\s*\\{\\s*return\\s+Err\\("
+      ],
+      "required_owner_witnesses": [
+        {
+          "path": "crates/platform/chio-store-sqlite/src/tool_outcome_store.sql",
+          "owner": "@file",
+          "required_source_expressions": [
+            "\\boutcome_json\\s+BLOB\\s+NOT\\s+NULL\\s+CHECK\\s*\\(\\s*length\\(outcome_json\\)\\s+BETWEEN\\s+1\\s+AND\\s+1048576\\s*\\)"
+          ]
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store.rs",
+          "owner": "begin_read",
+          "required_source_expressions": [
+            "\\bverify_active_owner\\(&transaction,\\s*&self\\.serving_owner,\\s*None\\)\\?",
+            "\\.verify_authority_anchor\\(&transaction\\)"
+          ]
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store.rs",
+          "owner": "begin_write",
+          "required_source_expressions": [
+            "\\bverify_active_owner\\(&transaction,\\s*&self\\.serving_owner,\\s*fence\\)\\?",
+            "\\.verify_authority_anchor\\(&transaction\\)"
+          ]
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/contractual_resolution.rs",
+          "owner": "capture_waiver_source",
+          "required_source_expressions": [
+            "\\bself\\.begin_read\\(&mut\\s+connection\\)",
+            "\\bsource\\(&tx,\\s*id\\)"
+          ]
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/contractual_resolution.rs",
+          "owner": "begin_capture_waiver",
+          "required_source_expressions": [
+            "\\.begin_write\\(&mut\\s+connection,\\s*Some\\(fence\\)\\)",
+            "\\blet\\s+actual\\s*=\\s*source\\(&tx,\\s*id\\)\\?"
+          ]
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/contractual_resolution.rs",
+          "owner": "complete_capture_waiver",
+          "required_source_expressions": [
+            "\\.begin_write\\(&mut\\s+connection,\\s*Some\\(fence\\)\\)",
+            "\\blet\\s+actual\\s*=\\s*source\\(&tx,\\s*id\\)\\?"
+          ]
+        }
+      ],
+      "producer_relationships": [],
+      "review_note": "Internal native-state source. Size bound is schema-owned, not a local raw-byte cap. This does not assert original-byte canonical equality in source itself; native custody/producer invariants remain required."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/contractual_resolution_read.rs",
+      "reader": "load_record",
+      "api_label": "capture_waiver_history::bounded_canonical_original_sources",
+      "required_source_expressions": [
+        "\\bif\\s+rows\\.len\\(\\)\\s*>\\s*2\\s*\\{\\s*return\\s+Err\\(",
+        "\\blet\\s+actual\\s*=\\s*source\\(connection,\\s*id\\)\\?",
+        "\\bvalidate_budget\\(connection,\\s*&actual\\.journal\\)\\?",
+        "\\bif\\s+bytes\\.is_empty\\(\\)\\s*\\|\\|\\s*bytes\\.len\\(\\)\\s*>\\s*1024\\s*\\*\\s*1024\\s*\\{\\s*return\\s+Err\\([^;]*;\\s*\\}\\s*let\\s+record\\s*:\\s*ContractualCaptureWaiverRecordV1\\s*=\\s*serde_json::from_slice\\(&bytes\\)",
+        "\\brecord\\.validate\\(\\)\\?",
+        "\\boriginal\\.binding\\(\\)\\s*!=\\s*actual\\.operation\\.binding\\(\\)",
+        "\\boriginal\\.tool_outcome_id\\(\\)\\s*!=\\s*actual\\.operation\\.tool_outcome_id\\(\\)",
+        "\\brecord\\.original_journal\\(\\)\\s*!=\\s*&actual\\.journal",
+        "\\bsha256_hex\\(&bytes\\)\\s*!=\\s*digest\\s*\\|\\|\\s*canonical_json_bytes\\(&record\\)\\.map_err\\(error\\)\\?\\s*!=\\s*bytes\\s*\\{\\s*return\\s+Err\\(",
+        "\\bif\\s+covered\\s*!=\\s*1\\s*\\{\\s*return\\s+Err\\(",
+        "\\bif\\s+capture_waiver_digest\\(&previous\\.complete\\(at,\\s*f\\.clone\\(\\)\\)\\?\\)\\?\\s*!=\\s*digest\\s*\\{\\s*return\\s+Err\\("
+      ],
+      "required_owner_witnesses": [],
+      "producer_relationships": [],
+      "review_note": "Tight named compound-condition witness, not a generic canonical-call allowlist. Preserve record.validate signature validation and the independent native source/commit checks."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/unknown_release.rs",
+      "reader": "load_record",
+      "api_label": "unknown_release_history::bounded_canonical_original_sources",
+      "required_source_expressions": [
+        "\\bif\\s+rows\\.len\\(\\)\\s*>\\s*2\\s*\\{\\s*return\\s+Err\\(",
+        "\\blet\\s+\\(operation,\\s*original\\)\\s*=\\s*source\\(connection,\\s*id\\)\\?",
+        "\\bif\\s+bytes\\.is_empty\\(\\)\\s*\\|\\|\\s*bytes\\.len\\(\\)\\s*>\\s*1024\\s*\\*\\s*1024\\s*\\{\\s*return\\s+Err\\([^;]*;\\s*\\}\\s*let\\s+record\\s*:\\s*UnknownPaymentReleaseRecordV1\\s*=\\s*serde_json::from_slice\\(&bytes\\)",
+        "\\brecord\\.validate\\(\\)\\?",
+        "\\bif\\s+covered\\s*!=\\s*1\\s*\\|\\|\\s*!budget_matches\\s*\\{\\s*return\\s+Err\\(",
+        "\\brecord\\.original_operation\\(\\)\\s*!=\\s*&operation\\.to_persisted\\(\\)",
+        "\\bunknown_release_digest\\(record\\.original_journal\\(\\)\\)\\?\\s*!=\\s*unknown_release_digest\\(&original\\)\\?",
+        "\\bsha256_hex\\(&bytes\\)\\s*!=\\s*record_digest\\s*\\|\\|\\s*canonical_json_bytes\\(&record\\)\\.map_err\\(error\\)\\?\\s*!=\\s*bytes\\s*\\{\\s*return\\s+Err\\(",
+        "\\blet\\s+expected\\s*=\\s*prior\\.complete\\(transaction_id\\.into\\(\\),\\s*at,\\s*fence\\.clone\\(\\)\\)\\?",
+        "\\bif\\s+unknown_release_digest\\(&expected\\)\\?\\s*!=\\s*record_digest\\s*\\{\\s*return\\s+Err\\("
+      ],
+      "required_owner_witnesses": [],
+      "producer_relationships": [],
+      "review_note": "Each accepted/completed record stays bound to historical original sources; live owner-time authorization remains a separate mutation check."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs",
+      "reader": "export_outcome_unknown_projection",
+      "api_label": "private::verified_terminal_projection_same_transaction_reparse",
+      "required_source_expressions": [
+        "\\blet\\s+stored\\s*=\\s*load_by_operation_id_tx\\(transaction,\\s*operation_id\\)\\?",
+        "\\bif\\s+stored\\.operation\\.state\\(\\)\\s*!=\\s*AdmissionOperationState::OutcomeUnknownAfterDispatch\\s*\\{\\s*return\\s+Err\\(",
+        "\\blet\\s+retained\\s*=\\s*load_terminal_projection_tx\\(transaction,\\s*operation_id\\)\\?",
+        "\\blet\\s+body\\s*:\\s*StoredTerminalProjectionBody\\s*=\\s*serde_json::from_slice\\(&retained\\.projection_json\\)",
+        "\\bverify_exact_terminal_replay\\(transaction,\\s*&stored\\.operation,\\s*&projection,\\s*&canonical\\)\\?\\s*;\\s*let\\s+envelope\\s*=\\s*SignedAdmissionTerminalProjectionV1::from_verified\\(",
+        "\\bif\\s+envelope\\.verify\\(\\)\\?\\.terminal_operation\\(\\)\\s*!=\\s*&stored\\.operation\\s*\\{\\s*return\\s+Err\\("
+      ],
+      "required_owner_witnesses": [
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store.rs",
+          "owner": "load_by_operation_id_tx",
+          "required_source_expressions": [
+            "\\bload_by_operation_id_without_terminal_projection_tx\\(transaction,\\s*operation_id\\)\\?",
+            "\\bverify_stored_terminal_projection\\(transaction,\\s*stored\\)\\?"
+          ]
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs",
+          "owner": "verify_stored_terminal_projection",
+          "required_source_expressions": [
+            "\\bprojection\\.projection_json\\.len\\(\\)\\s*>\\s*MAX_TERMINAL_PROJECTION_BYTES",
+            "\\bmanifest\\.verify_projection_body\\(&projection\\.projection_json\\)\\?",
+            "\\bUntrustedJsonText::from_wire\\(\\s*&projection\\.projection_json,\\s*64\\s*\\*\\s*1024\\s*\\*\\s*1024,\\s*\\)\\s*\\.and_then\\(\\|input\\|\\s*input\\.decode_signed\\(\\)\\)"
+          ]
+        }
+      ],
+      "producer_relationships": [],
+      "review_note": "Reparse uses one native transaction and signs only reconstructed bytes that reproduce the retained terminal projection exactly."
+    },
+    {
+      "path": "crates/platform/chio-workflow/src/delegation/store.rs",
+      "reader": "read",
+      "api_label": "private::delegation_owner_canonical_producers+validated_slot_readback",
+      "required_source_expressions": [
+        "\\bfn\\s+read\\(connection:\\s*&Connection,\\s*id:\\s*&str\\)",
+        "\\blet\\s+slot\\s*:\\s*WorkSlot\\s*=\\s*serde_json::from_str\\(&body\\)",
+        "\\bslot\\.validate\\(\\)\\?",
+        "\\bif\\s+slot\\.id\\s*!=\\s*id\\s*\\|\\|\\s*dispatched\\s*>\\s*1\\s*\\{\\s*return\\s+invalid\\(",
+        "\\bif\\s+allocated\\s*>\\s*slot\\.contract\\.max_units\\s*\\{\\s*return\\s+invalid\\(",
+        "\\.map\\(\\|s\\|\\s*serde_json::from_str\\(&s\\)"
+      ],
+      "required_owner_witnesses": [
+        {
+          "path": "crates/platform/chio-workflow/src/delegation/types.rs",
+          "owner": "canonical",
+          "required_source_expressions": [
+            "\\blet\\s+bytes\\s*=\\s*canonical_json_bytes\\(value\\)",
+            "\\bif\\s+bytes\\.len\\(\\)\\s*>\\s*MAX_ENVELOPE_BYTES\\s*\\{\\s*return\\s+invalid\\("
+          ]
+        },
+        {
+          "path": "crates/platform/chio-workflow/src/delegation/store.rs",
+          "owner": "encode",
+          "required_source_expressions": [
+            "\\bString::from_utf8\\(canonical\\(value\\)\\?\\)"
+          ]
+        },
+        {
+          "path": "crates/platform/chio-workflow/src/delegation/types.rs",
+          "owner": "@file",
+          "required_source_expressions": [
+            "\\bpub\\s+const\\s+MAX_ENVELOPE_BYTES\\s*:\\s*usize\\s*=\\s*65_536\\s*;"
+          ]
+        },
+        {
+          "path": "crates/platform/chio-workflow/src/delegation/store.rs",
+          "owner": "insert",
+          "required_source_expressions": [
+            "\\bencode\\(slot\\)\\?"
+          ]
+        },
+        {
+          "path": "crates/platform/chio-workflow/src/delegation/store.rs",
+          "owner": "create_root",
+          "required_source_expressions": [
+            "\\bslot\\.validate\\(\\)\\?",
+            "\\binsert\\(&tx,\\s*&slot,\\s*None,\\s*&slot\\.id\\)\\?"
+          ]
+        },
+        {
+          "path": "crates/platform/chio-workflow/src/delegation/store.rs",
+          "owner": "subdivide",
+          "required_source_expressions": [
+            "\\brequest\\.verify\\(\\)\\?",
+            "\\brequest\\.body\\.child\\.validate\\(\\)\\?",
+            "\\binsert\\(\\s*&tx,\\s*&request\\.body\\.child,"
+          ]
+        },
+        {
+          "path": "crates/platform/chio-workflow/src/delegation/store.rs",
+          "owner": "select",
+          "required_source_expressions": [
+            "\\brequest\\.verify\\(\\)\\?",
+            "\\bselection\\.offer\\.verify\\(\\)\\?",
+            "\\brequest\\.signer\\s*!=\\s*row\\.slot\\.holder",
+            "!qualified\\.contains\\(&offer\\.receiver\\)",
+            "\\bencode\\(request\\)\\?"
+          ]
+        },
+        {
+          "path": "crates/platform/chio-workflow/src/delegation/store.rs",
+          "owner": "@file",
+          "required_source_expressions": [
+            "(?m)^fn\\s+read\\("
+          ]
+        }
+      ],
+      "producer_relationships": [
+        {
+          "path": "crates/platform/chio-workflow/src/delegation/store.rs",
+          "callee": "read",
+          "expected_callers": [
+            "create_root",
+            "subdivide",
+            "required"
+          ],
+          "explanation": "No new original-byte entry point; protect the finite internal read call graph and canonical owner producers."
+        }
+      ],
+      "review_note": "No read-side original-byte canonical check and no native rollback-custody claim. Protected owner-local database is an explicit API precondition; mutation/dispatch safety is separately reviewed."
+    },
+    {
+      "path": "crates/platform/chio-workflow/src/delegation/store.rs",
+      "reader": "seal_dispatch",
+      "api_label": "private::delegation_permit_canonical_producer+issuer_reverification",
+      "required_source_expressions": [
+        "\\btransaction_with_behavior\\(TransactionBehavior::Immediate\\)\\?",
+        "\\blet\\s+row\\s*=\\s*required\\(&tx,\\s*&binding\\.slot_id\\)\\?",
+        "\\blet\\s+allocation_hash\\s*=\\s*allocation_digest\\(&tx,\\s*&row\\)\\?",
+        "\\bvalidate_dispatch\\(&row\\.slot,\\s*&selection,\\s*binding,\\s*now\\)\\?",
+        "\\bserde_json::from_str::<Signed<DispatchPermit>>\\(&body\\)",
+        "\\blet\\s+permit\\s*=\\s*Signed::sign\\(",
+        "\\bencode\\(&permit\\)\\?",
+        "\\bif\\s+permit\\.body\\.allocation_hash\\s*!=\\s*allocation_hash\\s*\\{\\s*return\\s+Err\\(",
+        "\\bverify_dispatch_permit\\(&permit,\\s*binding,\\s*now,\\s*&\\[issuer\\.public_key\\(\\)\\]\\)\\?",
+        "\\bverify_dispatch_permit\\([^;]+\\)\\?;\\s*tx\\.execute\\(\\s*,\\s*\\[&binding\\.slot_id\\],\\s*\\)\\?;\\s*tx\\.commit\\(\\)\\?"
+      ],
+      "required_owner_witnesses": [
+        {
+          "path": "crates/platform/chio-workflow/src/delegation/types.rs",
+          "owner": "canonical",
+          "required_source_expressions": [
+            "\\blet\\s+bytes\\s*=\\s*canonical_json_bytes\\(value\\)",
+            "\\bif\\s+bytes\\.len\\(\\)\\s*>\\s*MAX_ENVELOPE_BYTES\\s*\\{\\s*return\\s+invalid\\("
+          ]
+        },
+        {
+          "path": "crates/platform/chio-workflow/src/delegation/store.rs",
+          "owner": "encode",
+          "required_source_expressions": [
+            "\\bString::from_utf8\\(canonical\\(value\\)\\?\\)"
+          ]
+        },
+        {
+          "path": "crates/platform/chio-workflow/src/delegation/types.rs",
+          "owner": "@file",
+          "required_source_expressions": [
+            "\\bpub\\s+const\\s+MAX_ENVELOPE_BYTES\\s*:\\s*usize\\s*=\\s*65_536\\s*;"
+          ]
+        },
+        {
+          "path": "crates/platform/chio-workflow/src/delegation/types.rs",
+          "owner": "verify_dispatch_permit",
+          "required_source_expressions": [
+            "\\bpermit\\.verify\\(\\)\\?",
+            "\\bif\\s*!accepted_issuers\\.contains\\(&permit\\.signer\\)\\s*\\{\\s*return\\s+Err\\(",
+            "\\bselection\\.verify\\(\\)\\?",
+            "\\bselection\\.body\\.offer\\.verify\\(\\)\\?",
+            "\\bvalidate_dispatch\\(&body\\.slot,\\s*selection,\\s*binding,\\s*now\\)\\?"
+          ]
+        }
+      ],
+      "producer_relationships": [],
+      "review_note": "Owner-local canonical permit readback still verifies allocation, signature and issuer. Signing, bounded encoding, verification and dispatch claim now share one immediate transaction; failure rolls back selection custody. The regression checks rejected oversized sealing, replacement and exact replay. These lexical anchors are not a transaction or authentication proof."
+    },
+    {
+      "path": "crates/trust/chio-federation-transport-iroh/src/lanes/bilateral.rs",
+      "reader": "receipt_exchange",
+      "api_label": "read_frame::capped_timed_receipt_reply+typed_schema",
+      "required_source_expressions": [
+        "\\blet\\s+reply_bytes\\s*=\\s*client_bounded\\(&self\\.limits,\\s*AcceptPhase::ReadFrame,\\s*read_frame\\(&mut\\s+recv\\)\\)\\s*\\.await\\?",
+        "\\blet\\s+reply\\s*:\\s*WireReply\\s*=\\s*serde_json::from_slice\\(&reply_bytes\\)",
+        "\\breply\\.into_receipt_result\\(\\)"
+      ],
+      "required_owner_witnesses": [
+        {
+          "path": "crates/trust/chio-federation-transport-iroh/src/lanes/bilateral.rs",
+          "owner": "read_frame",
+          "required_source_expressions": [
+            "\\blet\\s+len\\s*=\\s*u32::from_be_bytes\\(len_buf\\)\\s+as\\s+usize",
+            "\\bif\\s+len\\s*>\\s*MAX_WIRE_BYTES\\s*\\{\\s*return\\s+Err\\(WireError::FrameTooLarge\\(len\\)\\)\\s*;\\s*\\}\\s*const\\s+READ_CHUNK\\s*:\\s*usize\\s*=\\s*64\\s*\\*\\s*1024\\s*;\\s*let\\s+mut\\s+buf\\s*:\\s*Vec<u8>\\s*=\\s*Vec::with_capacity\\(len\\.min\\(READ_CHUNK\\)\\)",
+            "\\bVec::with_capacity\\(len\\.min\\(READ_CHUNK\\)\\)",
+            "\\bwhile\\s+remaining\\s*>\\s*0"
+          ]
+        },
+        {
+          "path": "crates/trust/chio-federation-transport-iroh/src/lanes/bilateral.rs",
+          "owner": "@file",
+          "required_source_expressions": [
+            "\\bconst\\s+MAX_WIRE_BYTES\\s*:\\s*usize\\s*=\\s*4\\s*\\*\\s*1024\\s*\\*\\s*1024\\s*;"
+          ]
+        },
+        {
+          "path": "crates/trust/chio-federation-transport-iroh/src/lanes/bilateral.rs",
+          "owner": "into_receipt_result",
+          "required_source_expressions": [
+            "\\bif\\s+schema\\s*!=\\s*BILATERAL_COSIGNING_SCHEMA\\s*\\{\\s*return\\s+Err\\("
+          ]
+        },
+        {
+          "path": "crates/trust/chio-federation-transport-iroh/src/lanes/bilateral.rs",
+          "owner": "client_bounded",
+          "required_source_expressions": [
+            "\\bmatch\\s+tokio::time::timeout\\(bound,\\s*fut\\)\\.await",
+            "\\bErr\\(_elapsed\\)\\s*=>\\s*Err\\("
+          ]
+        }
+      ],
+      "producer_relationships": [],
+      "review_note": "This is an unsigned bounded transport wrapper, not authority. co_sign_with_origin_inner independently verifies Org A's signature over the exact local preimage."
+    },
+    {
+      "path": "crates/trust/chio-federation-transport-iroh/src/lanes/bilateral.rs",
+      "reader": "serve",
+      "api_label": "read_frame::capped_timed_receipt_request+cosign_authority",
+      "required_source_expressions": [
+        "\\blet\\s+request_bytes\\s*=\\s*self\\s*\\.limiter\\s*\\.bounded\\(AcceptPhase::ReadFrame,\\s*read_frame\\(&mut\\s+recv\\)\\)\\s*\\.await\\?\\?",
+        "\\blet\\s+request\\s*:\\s*WireReceiptCoSigningRequest\\s*=\\s*serde_json::from_slice\\(&request_bytes\\)\\?",
+        "\\bmatch\\s+self\\.cosign\\(&remote,\\s*&request\\)"
+      ],
+      "required_owner_witnesses": [
+        {
+          "path": "crates/trust/chio-federation-transport-iroh/src/lanes/bilateral.rs",
+          "owner": "read_frame",
+          "required_source_expressions": [
+            "\\blet\\s+len\\s*=\\s*u32::from_be_bytes\\(len_buf\\)\\s+as\\s+usize",
+            "\\bif\\s+len\\s*>\\s*MAX_WIRE_BYTES\\s*\\{\\s*return\\s+Err\\(WireError::FrameTooLarge\\(len\\)\\)\\s*;\\s*\\}\\s*const\\s+READ_CHUNK\\s*:\\s*usize\\s*=\\s*64\\s*\\*\\s*1024\\s*;\\s*let\\s+mut\\s+buf\\s*:\\s*Vec<u8>\\s*=\\s*Vec::with_capacity\\(len\\.min\\(READ_CHUNK\\)\\)",
+            "\\bVec::with_capacity\\(len\\.min\\(READ_CHUNK\\)\\)",
+            "\\bwhile\\s+remaining\\s*>\\s*0"
+          ]
+        },
+        {
+          "path": "crates/trust/chio-federation-transport-iroh/src/lanes/bilateral.rs",
+          "owner": "@file",
+          "required_source_expressions": [
+            "\\bconst\\s+MAX_WIRE_BYTES\\s*:\\s*usize\\s*=\\s*4\\s*\\*\\s*1024\\s*\\*\\s*1024\\s*;"
+          ]
+        },
+        {
+          "path": "crates/trust/chio-federation-transport-iroh/src/lanes/bilateral.rs",
+          "owner": "cosign_inner#2",
+          "required_source_expressions": [
+            "\\bif\\s+request\\.schema\\s*!=\\s*BILATERAL_COSIGNING_SCHEMA\\s*\\{\\s*return\\s+Err\\(",
+            "\\bsigned_bytes:\\s*&request\\.body_bytes",
+            "\\bprofile:\\s*CoSignProfile::ReceiptCoSigningBody"
+          ]
+        },
+        {
+          "path": "crates/trust/chio-federation-transport-iroh/src/lanes/bilateral.rs",
+          "owner": "cosign_bytes",
+          "required_source_expressions": [
+            "\\blet\\s+directory\\s*=\\s*authority\\.gate\\.directory\\(\\)",
+            "\\.authorize\\(subject\\.remote\\)",
+            "\\bif\\s+resolved\\s*!=\\s*subject\\.org_b_kernel_id\\s*\\{\\s*return\\s+Err\\(",
+            "\\.resolve_passport_key\\(subject\\.org_b_kernel_id\\)",
+            "\\bif\\s+pinned_key\\s*!=\\s*\\*directory_key\\s*\\{\\s*return\\s+Err\\(",
+            "\\bif\\s*!directory_key\\.verify_strict\\(subject\\.signed_bytes,\\s*subject\\.org_b_signature\\)\\s*\\{\\s*return\\s+Err\\(",
+            "\\breconstruct_cosigning_body\\(\\s*subject\\.signed_bytes,\\s*subject\\.org_a_kernel_id,\\s*subject\\.org_b_kernel_id,\\s*\\)\\?",
+            "\\breconstruct_dsse_pae\\(",
+            "\\.sign_bytes\\(subject\\.signed_bytes\\)"
+          ]
+        }
+      ],
+      "producer_relationships": [],
+      "review_note": "The key is (path, serve); the closed WireReceiptCoSigningRequest type discriminates this body from serve#1. Do not apply by path or ordinal alone."
+    },
+    {
+      "path": "crates/trust/chio-federation/src/bilateral.rs",
+      "reader": "reconstruct_cosigning_body",
+      "api_label": "CoSigningBody::from_receipt+exact_canonical_preimage",
+      "required_source_expressions": [
+        "\\blet\\s+presented\\s*:\\s*CoSigningBody\\s*=\\s*serde_json::from_slice\\(signed_bytes\\)",
+        "\\bif\\s+presented\\.schema\\s*!=\\s*BILATERAL_COSIGNING_SCHEMA\\s*\\{\\s*return\\s+Err\\(",
+        "\\bif\\s+presented\\.org_a_kernel_id\\s*!=\\s*org_a_kernel_id\\s*\\|\\|\\s*presented\\.org_b_kernel_id\\s*!=\\s*org_b_kernel_id\\s*\\{\\s*return\\s+Err\\(",
+        "\\blet\\s+receipt\\s*:\\s*ChioReceipt\\s*=\\s*serde_json::from_str\\(&presented\\.receipt_canonical_json\\)",
+        "\\blet\\s+rebuilt\\s*=\\s*CoSigningBody::from_receipt\\(&receipt,\\s*org_a_kernel_id,\\s*org_b_kernel_id\\)\\?",
+        "\\bif\\s+rebuilt\\.canonical_bytes\\(\\)\\?\\s*!=\\s*signed_bytes\\s*\\{\\s*return\\s+Err\\("
+      ],
+      "required_owner_witnesses": [
+        {
+          "path": "crates/trust/chio-federation/src/bilateral.rs",
+          "owner": "from_receipt",
+          "required_source_expressions": [
+            "\\blet\\s+bytes\\s*=\\s*canonical_json_bytes\\(receipt\\)",
+            "\\blet\\s+receipt_canonical_json\\s*=\\s*String::from_utf8\\(bytes\\)"
+          ]
+        },
+        {
+          "path": "crates/trust/chio-federation/src/bilateral.rs",
+          "owner": "canonical_bytes",
+          "required_source_expressions": [
+            "\\bcanonical_json_bytes\\(self\\)"
+          ]
+        },
+        {
+          "path": "crates/trust/chio-federation/src/bilateral.rs",
+          "owner": "@file",
+          "required_source_expressions": [
+            "#\\[serde\\(rename_all\\s*=\\s*[^\\]]*,\\s*deny_unknown_fields\\)\\]\\s*pub\\s+struct\\s+CoSigningBody\\b"
+          ]
+        }
+      ],
+      "producer_relationships": [],
+      "review_note": "No independent size claim. Both inner receipt and outer body must reconstruct byte-for-byte; this closes cross-preimage signing oracles."
+    },
+    {
+      "path": "crates/trust/chio-federation/src/bilateral_dsse/preimage.rs",
+      "reader": "reconstruct_dsse_pae",
+      "api_label": "DsseStatement::canonical_bytes+exact_pae_and_peer_binding",
+      "required_source_expressions": [
+        "\\blet\\s+\\(payload_type,\\s*payload\\)\\s*=\\s*split_pae\\(signed_bytes\\)\\?",
+        "\\bif\\s+payload_type\\s*!=\\s*PAYLOAD_TYPE_IN_TOTO\\s*\\{\\s*return\\s+Err\\(",
+        "\\blet\\s+statement\\s*:\\s*DsseStatement\\s*=\\s*serde_json::from_slice\\(payload\\)",
+        "\\bif\\s+statement\\.statement_type\\s*!=\\s*STATEMENT_TYPE_V1\\s*\\{\\s*return\\s+Err\\(",
+        "\\bif\\s+statement\\.predicate_type\\s*!=\\s*PREDICATE_TYPE_BILATERAL\\s*&&\\s*statement\\.predicate_type\\s*!=\\s*PREDICATE_TYPE_CHIO_BILATERAL_INVOCATION\\s*\\{\\s*return\\s+Err\\(",
+        "\\bserver_a\\.kernel_id\\s*!=\\s*binding\\.org_a_kernel_id",
+        "\\bserver_b\\.kernel_id\\s*!=\\s*binding\\.org_b_kernel_id",
+        "\\bserver_a\\.passport_key_fingerprint\\s*!=\\s*Keyid::from_public_key\\(binding\\.org_a_public_key\\)",
+        "\\bserver_b\\.passport_key_fingerprint\\s*!=\\s*Keyid::from_public_key\\(binding\\.org_b_public_key\\)",
+        "\\bif\\s+pae\\(&payload_type,\\s*&statement\\.canonical_bytes\\(\\)\\?\\)\\s*!=\\s*signed_bytes\\s*\\{\\s*return\\s+Err\\("
+      ],
+      "required_owner_witnesses": [
+        {
+          "path": "crates/trust/chio-federation/src/bilateral_dsse/types.rs",
+          "owner": "canonical_bytes",
+          "required_source_expressions": [
+            "\\bcanonical_json_bytes\\(self\\)"
+          ]
+        },
+        {
+          "path": "crates/trust/chio-federation/src/bilateral_dsse/preimage.rs",
+          "owner": "split_pae",
+          "required_source_expressions": [
+            "\\bif\\s+rest\\.len\\(\\)\\s*<\\s*type_len\\s*\\{\\s*return\\s+Err\\(",
+            "\\bif\\s+payload\\.len\\(\\)\\s*!=\\s*payload_len\\s*\\{\\s*return\\s+Err\\("
+          ]
+        },
+        {
+          "path": "crates/trust/chio-federation/src/bilateral_dsse/preimage.rs",
+          "owner": "take_length",
+          "required_source_expressions": [
+            "\\bdigits\\.is_empty\\(\\)\\s*\\|\\|\\s*!digits\\.bytes\\(\\)\\.all\\(\\|byte\\|\\s*byte\\.is_ascii_digit\\(\\)\\)",
+            "\\blet\\s+length\\s*:\\s*usize\\s*=\\s*digits\\s*\\.parse\\(\\)"
+          ]
+        }
+      ],
+      "producer_relationships": [],
+      "review_note": "No independent size claim. Framing consumes exact bytes and rebuilt PAE must equal signed input; profile and both peer keys/IDs remain required."
+    }
+  ]
+}

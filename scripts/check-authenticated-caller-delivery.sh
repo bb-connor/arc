@@ -22,6 +22,7 @@ export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-1}"
   authenticated::negative_controls::unused_expired_reservation_cannot_publish_start_authority \
   authenticated::private_evidence::private_delivery_evidence_rejects_tampering_and_schema_confusion \
   authenticated::process_loss::process_loss_retains_capture_and_never_reexecutes_original_attempt \
+  authenticated::schema_migration::v34_waiting_report_migrates_without_replacing_custody_or_renewing_authority \
   authenticated::start_captures_before_publication_and_retries_original_authorization \
   caller_reservation_holds_the_budget_until_the_report_settles \
   delegated_share::an_expired_caller_share_stays_owned_until_recovery_compensates_it \

@@ -5,7 +5,7 @@
 use chio_core_types::capability::features::{
     CapabilityNegotiation, AGGREGATE_INVOCATION_BUDGET, CUMULATIVE_APPROVAL_BUDGET,
 };
-use chio_core_types::crypto::Keypair;
+use chio_core_types::crypto::{Keypair, PublicKey, Signature};
 use chio_federation::{
     trust_establishment::ConformanceEvidence, trust_establishment::ConformanceTier,
     trust_establishment::KernelTrustExchange, trust_establishment::KernelTrustExchangeConfig,
@@ -13,6 +13,36 @@ use chio_federation::{
     trust_establishment::PeerHandshakeError, trust_establishment::QuorumPolicy,
     trust_establishment::DEFAULT_HANDSHAKE_MAX_SKEW_SECS,
 };
+
+#[test]
+fn low_order_peer_cannot_complete_trust_establishment() -> Result<(), Box<dyn std::error::Error>> {
+    let now = 1_800_000_000;
+    let mut envelope = PeerHandshakeEnvelope::sign(
+        "kernel.org-b",
+        "kernel.org-a",
+        "nonce-b",
+        now,
+        &Keypair::generate(),
+    )?;
+    envelope.verify_signature()?;
+    let mut identity = [0; 32];
+    identity[0] = 1;
+    let weak_key = PublicKey::from_bytes(&identity)?;
+    let mut signature = [0; 64];
+    signature[0] = 1;
+    let forged = Signature::from_bytes(&signature);
+    assert!(weak_key.verify(&envelope.challenge.canonical_bytes()?, &forged));
+    envelope.declared_public_key = weak_key.clone();
+    envelope.signature = forged;
+    let exchange = KernelTrustExchange::new("kernel.org-a", Keypair::generate())
+        .with_trusted_peer("kernel.org-b", weak_key);
+    assert!(matches!(
+        exchange.accept_envelope(&envelope, "kernel.org-b", now),
+        Err(PeerHandshakeError::InvalidSignature)
+    ));
+    assert!(exchange.resolve("kernel.org-b", now).is_err());
+    Ok(())
+}
 
 #[test]
 fn handshake_succeeds_and_pins_both_sides() {

@@ -1,0 +1,62 @@
+{
+  "schema": "chio.paper.publication-gates.v1",
+  "requested_bar": "Completed publication-ready whitepaper supporting an evidence-based breakthrough judgment",
+  "publish_ready": false,
+  "breakthrough_established": false,
+  "gates": [
+    {
+      "id": "manuscript",
+      "status": "passed",
+      "acceptance": "Complete argument, exact sources, no unresolved scientific-review blockers.",
+      "evidence": "ARCHITECTURE-REVIEW.md",
+      "result": "The revision presents Chio as a kernel architecture, defining the boundary, local admission, programmable sovereignty and distributed program state before the work-commitment construction and evaluation. Fresh automated review found no Critical or Important defect; both Minor findings were repaired and checked by the coordinator. The conditional proposition, proof and qualification text retain their original scope. Independent foundational critique remains a separate gate."
+    },
+    {
+      "id": "artifact",
+      "status": "passed",
+      "acceptance": "PDF, bibliography, reproducibility commands, source hashes and derived results agree.",
+      "evidence": [
+        "paper.pdf",
+        "results.tex",
+        "ARTIFACT.md"
+      ],
+      "result": "All 21 terminal native commands pass against 37,341 unchanged inputs and 48 outputs. Current SDK/catalog/fixture/build-context/scanner controls and complete local integration preserve all 1177 prior raw records, failures and source scopes. Reproducible artifact readiness remains separate from final-head hosted production, signed Linux and independent research acceptance."
+    },
+    {
+      "id": "funded-security-integration",
+      "status": "passed",
+      "acceptance": "Semantic integration and fresh focused native evidence on pinned combined source.",
+      "evidence": "evidence/integration-summary.json",
+      "result": "Focused integrated research boundaries pass on declared v2/v3 sources. Broader security release gates remain open and are enumerated separately."
+    },
+    {
+      "id": "closest-prior-art",
+      "status": "passed",
+      "acceptance": "Pinned ERC-8183 behavior fairly compared, material overlap acknowledged.",
+      "evidence": "evidence/erc8183/REPORT.json",
+      "result": "76 upstream and 20 comparison tests passed; substantial overlap and stronger upstream partial settlement acknowledged."
+    },
+    {
+      "id": "independent-operation",
+      "status": "open",
+      "acceptance": "Separately operated participants and independently written provider complete the published contract.",
+      "result": "No partner available as of 2026-10-03; the requested external trial package now includes the composed receiver contract and public artifacts. No external trial executed.",
+      "evidence": "../../research/evolving-funded-work/RECEIVER-TRIAL.md"
+    },
+    {
+      "id": "useful-work-economics",
+      "status": "open",
+      "acceptance": "Held-out useful work and full cost/capital accounting meet preregistered criteria."
+    },
+    {
+      "id": "integration-advantage",
+      "status": "open",
+      "acceptance": "Competent matched baseline with same resources and measurable integration advantage."
+    },
+    {
+      "id": "foundational-claim",
+      "status": "open",
+      "acceptance": "Compact result survives independent expert critique and strong counterexamples."
+    }
+  ]
+}

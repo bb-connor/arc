@@ -1,0 +1,17 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.26
+   Compiling serde_core v1.0.229
+   Compiling zmij v1.0.23
+   Compiling serde v1.0.229
+   Compiling serde_json v1.0.151
+   Compiling memchr v2.8.3
+   Compiling itoa v1.0.18
+   Compiling syn v3.0.6
+   Compiling serde_derive v1.0.229
+   Compiling kernel-work-composition v0.1.0 (/tmp/chio-verifiable-work-paper/labs/kernel-work-composition)
+   Compiling kernel-work-families v0.1.0 (/tmp/chio-verifiable-work-paper/labs/kernel-work-families)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.64s
+     Running unittests src/lib.rs (/tmp/chio-paper-tooling-target/debug/deps/kernel_work_families-b94a17cb6dc76ec4)
+     Running tests/families.rs (/tmp/chio-paper-tooling-target/debug/deps/families-a9e52b747855b225)
+error: test failed, to rerun pass `--test families`

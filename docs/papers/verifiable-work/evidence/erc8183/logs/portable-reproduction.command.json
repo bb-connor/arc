@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "python3",
+    "/tmp/chio-paper-erc8183-artifact/portable-check/reproduce.py",
+    "--upstream",
+    "/tmp/chio-paper-erc8183",
+    "--forge",
+    "/tmp/chio-paper-erc8183-artifact/tools/forge",
+    "--label",
+    "portable"
+  ],
+  "cwd": "/tmp/chio-paper-erc8183-artifact",
+  "started_at": "2026-10-02T15:30:36.585341+00:00",
+  "elapsed_seconds": 4.083032354246825,
+  "exit_status": 0,
+  "log": "logs/portable-reproduction.log"
+}

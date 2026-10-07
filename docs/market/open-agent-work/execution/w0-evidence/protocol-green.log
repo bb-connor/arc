@@ -1,0 +1,10 @@
+test_each_joint_term_is_signed_and_rejects_substitution (test_protocol.ProtocolTests.test_each_joint_term_is_signed_and_rejects_substitution) ... ok
+test_exact_money_and_ordered_deadlines (test_protocol.ProtocolTests.test_exact_money_and_ordered_deadlines) ... ok
+test_joint_agreement_roundtrip_and_locally_configured_pins (test_protocol.ProtocolTests.test_joint_agreement_roundtrip_and_locally_configured_pins) ... ok
+test_signed_unsupported_terms_do_not_become_valid (test_protocol.ProtocolTests.test_signed_unsupported_terms_do_not_become_valid) ... ok
+test_wire_limits_duplicates_nonfinite_and_invalid_utf8 (test_protocol.ProtocolTests.test_wire_limits_duplicates_nonfinite_and_invalid_utf8) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.031s
+
+OK

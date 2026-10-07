@@ -87,6 +87,12 @@ serde_json = "1"
 # changing production crate features.
 openssl = { version = "0.10", features = ["vendored"] }
 
+[dev-dependencies]
+# Replay response corpora in the default smoke suite while keeping their
+# dependency graphs optional for individual cargo-fuzz binary builds.
+chio-control-plane = { path = "../crates/platform/chio-control-plane", features = ["fuzz"] }
+chio-quarantine = { path = "../crates/security/chio-quarantine", features = ["fuzz"] }
+
 # `unwrap_used`/`expect_used` denied so fuzz targets cannot mask panics
 # behind a hidden `.unwrap()`. Targets must use `if let Ok(_) = ...` or
 # `match` to consume `Result` values from the trust-boundary surface.
@@ -230,6 +236,13 @@ bench = false
 [[bin]]
 name = "federation_trust_establishment"
 path = "fuzz_targets/federation_trust_establishment.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "bilateral_dsse_verify"
+path = "fuzz_targets/bilateral_dsse_verify.rs"
 test = false
 doc = false
 bench = false

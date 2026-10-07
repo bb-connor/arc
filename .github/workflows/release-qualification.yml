@@ -18,7 +18,7 @@ env:
   # CI lane.
   CHIO_AENEAS_RELEASE_TAG: build-2026.04.22.215158-38d10a22642d75d051e14006cc6e45055381f10e
   CHIO_CREUSOT_REV: a12f3ac7f688c7b93cee2c2eb60282004a2bdb30
-  CHIO_KANI_VERSION: 0.67.0
+  CHIO_KANI_VERSION: 0.68.0
 
 jobs:
   qualify:
@@ -76,7 +76,7 @@ jobs:
         run: cargo install cargo-vet --locked --version 0.10.2
 
       - name: Install MSRV toolchain
-        run: rustup toolchain install 1.94.1 --profile minimal
+        run: rustup toolchain install 1.95.0 --profile minimal
 
       - name: Install Java runtime
         uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
@@ -162,6 +162,7 @@ jobs:
           set -euo pipefail
           cargo install kani-verifier --locked --version "${CHIO_KANI_VERSION}"
           cargo kani setup
+          python3 scripts/kani-toolchain.py install
           sudo apt-get update
           sudo apt-get install -y opam
           opam init --disable-sandboxing --bare -y
@@ -249,7 +250,7 @@ jobs:
         run: ./scripts/stage-web3-release-artifacts.sh
 
       - name: MSRV workspace lane
-        run: cargo +1.94.1 build --workspace && cargo +1.94.1 test --workspace
+        run: cargo +1.95.0 build --workspace && cargo +1.95.0 test --workspace
 
       - name: Upload qualification artifacts
         if: always()

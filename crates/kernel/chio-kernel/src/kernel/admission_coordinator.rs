@@ -23,6 +23,8 @@ mod caller_execution_checkpoint;
 pub use caller_execution_checkpoint::{CallerExecutionCheckpoint, CallerExecutionCheckpointHook};
 #[path = "admission_coordinator/collection_context.rs"]
 mod collection_context;
+#[path = "admission_coordinator/execution_evidence.rs"]
+mod execution_evidence;
 #[path = "admission_coordinator/execution_nonce.rs"]
 mod execution_nonce;
 pub(crate) use execution_nonce::require_live_nonce;
@@ -69,6 +71,8 @@ pub use native_egress::NativeSecurityDispatchCaptureAuthority;
 pub use native_egress::NativeSecurityEgressCheckpointHook;
 pub use native_egress::{AcquiredNativeSecurityEgress, PreparedNativeSecurityEgress};
 pub use runtime_acquisition::RuntimeParticipantClaimAuthority;
+#[path = "admission_coordinator/outcome_authority.rs"]
+mod outcome_authority;
 #[path = "admission_coordinator/security_release.rs"]
 mod security_release;
 #[path = "admission_coordinator/terminal.rs"]
@@ -82,6 +86,9 @@ mod return_context;
 pub(crate) use return_context::{
     DurableDispatchCommitError, DurableToolReturnContext, DurableToolReturnContextInput,
 };
+
+#[path = "admission_coordinator/before_dispatch_compensation.rs"]
+mod before_dispatch_compensation;
 
 use super::*;
 use crate::admission_operation::{
@@ -211,25 +218,6 @@ impl DurableAdmissionRuntime {
             lease_epoch: self.fence.owner_epoch,
         }
     }
-
-    fn qualified_terminal_records(
-        &self,
-        operation: &AdmissionOperationV1,
-    ) -> Result<(ToolOutcomeRecordV1, PostReturnEvaluationRecordV1), ToolOutcomeError> {
-        let unavailable =
-            || ToolOutcomeError::ReleaseAuthorityUnavailable("durable terminal outcome store");
-        let outcome = self
-            .outcome_store
-            .lookup_by_operation(operation.binding().operation_id())
-            .map_err(|_| unavailable())?
-            .ok_or_else(unavailable)?;
-        let evaluation = self
-            .outcome_store
-            .lookup_post_return_evaluation(operation.binding().operation_id())
-            .map_err(|_| unavailable())?
-            .ok_or_else(unavailable)?;
-        Ok((outcome, evaluation))
-    }
 }
 
 impl ChioKernel {
@@ -261,26 +249,6 @@ impl ChioKernel {
             return Err(crate::finding_pool::FindingPoolLedgerError::StartupAlreadyReconciled);
         }
         Ok(())
-    }
-}
-
-impl QualifiedDurableOutcomeAuthority for DurableAdmissionRuntime {
-    fn verify_terminal_outcome(
-        &self,
-        operation: &AdmissionOperationV1,
-        context: &AdmissionProjectionContext,
-    ) -> Result<ToolOutcomeTerminalEvidenceV1, ToolOutcomeError> {
-        let (outcome, evaluation) = self.qualified_terminal_records(operation)?;
-        ToolOutcomeTerminalEvidenceV1::from_records(operation, context, &outcome, &evaluation)
-    }
-
-    fn verify_contractual_zero_charge(
-        &self,
-        operation: &AdmissionOperationV1,
-        context: &AdmissionProjectionContext,
-    ) -> Result<VerifiedContractualZeroCharge, ToolOutcomeError> {
-        let (outcome, evaluation) = self.qualified_terminal_records(operation)?;
-        VerifiedContractualZeroCharge::from_records(operation, context, &outcome, &evaluation)
     }
 }
 
@@ -534,7 +502,29 @@ impl ChioKernel {
         // Only a grant that can serve this request may force the structured path. An
         // unrelated cumulative grant elsewhere in the capability must not withdraw an
         // otherwise exempt call.
-        let requires_structured_admission = aggregate_quota.is_some()
+        let mut checked_output_required = false;
+        for matching in matching_grants {
+            checked_output_required |= self.has_checked_output_contract(request, matching.index)?;
+        }
+        if checked_output_required
+            && matching_grants.iter().any(|matching| {
+                matching.grant.constraints.iter().any(|constraint| {
+                    matches!(
+                        constraint,
+                        Constraint::OutputDigestSha256(_)
+                            | Constraint::RequireFindingPurchase(_)
+                            | Constraint::RequireFindingRecovery(_)
+                    )
+                })
+            })
+        {
+            return Err(KernelError::DurableAdmission(
+                "checked-output pricing cannot combine with digest, Finding purchase or recovery contracts".to_owned(),
+            ));
+        }
+        let requires_structured_admission = checked_output_required
+            || self.require_durable_request_retention
+            || aggregate_quota.is_some()
             || request.supplemental_authorization.is_some()
             || cumulative_matching_grant_count != 0
             || recovery_matching_grant_count != 0
@@ -622,6 +612,13 @@ impl ChioKernel {
                     "output-digest delivery requires a reversible-hold payment rail".to_owned(),
                 ));
             }
+            if checked_output_required
+                && adapter.rail_mode() != Some(crate::payment::PaymentRailMode::ReversibleHold)
+            {
+                return Err(KernelError::DurableAdmission(
+                    "checked-output pricing requires a reversible-hold payment rail".to_owned(),
+                ));
+            }
         }
         let projection_capabilities = runtime.store.admission_projection_capabilities();
         let nonce_participant =
@@ -648,6 +645,7 @@ impl ChioKernel {
             });
         let authority_profile = (cumulative_matching_grant_count != 0
             || nonce_participant
+            || self.require_durable_request_retention
             || requires_authority_admission)
             .then_some(authority_profile);
         let immutable_request_hash = immutable_tool_admission_request_hash(
@@ -1442,7 +1440,18 @@ impl ChioKernel {
             let proposal_matches =
                 admission.operation.threshold_proposal_hash() == Some(&proposal_hash);
             let set_matches = admission.operation.approval_set_hash() == Some(&approval_set_hash);
-            if proposal_matches && set_matches {
+            // Older reservations retained only the two hashes. Preserve exact
+            // replay without backfilling or reinterpreting their commitments.
+            let body_matches = admission
+                .operation
+                .threshold_proposal()
+                .is_none_or(|proposal| {
+                    verified
+                        .threshold_replay
+                        .as_ref()
+                        .is_some_and(|replay| replay.proposal() == proposal)
+                });
+            if proposal_matches && set_matches && body_matches {
                 return Ok(());
             }
             return Err(KernelError::DurableAdmission(
@@ -1468,10 +1477,19 @@ impl ChioKernel {
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
-        let attachments = vec![
+        let mut attachments = vec![
             AdmissionAttachment::ThresholdProposalHash(proposal_hash),
             AdmissionAttachment::ApprovalSetHash(approval_set_hash),
         ];
+        if let Some(replay) = verified.threshold_replay.as_ref() {
+            // Freeze the verified approval kind for caller custody. Previously
+            // a configured single-approval owner rejected threshold callers
+            // before a caller frame could commit. Existing affected Ready
+            // reservations keep their fail-closed expiry/compensation path.
+            attachments.push(AdmissionAttachment::ThresholdProposal(Box::new(
+                replay.proposal().clone(),
+            )));
+        }
         admission.operation = if let Some(replay) = verified.threshold_replay.as_ref() {
             let expires_at_unix_ms = trusted_now_unix_ms
                 .checked_add(RECOVERY_LEASE_DURATION_MS)
@@ -1601,213 +1619,6 @@ impl ChioKernel {
             AdmissionOperationState::DispatchCommitted,
             trusted_now_unix_ms,
         )?;
-        Ok(())
-    }
-
-    pub(crate) fn compensate_durable_admission_before_dispatch(
-        &self,
-        operation: &AdmissionOperationV1,
-        verifier_policy: serde_json::Value,
-        trusted_now_unix_ms: u64,
-        confirmed_payment_unwind: Option<&PreDispatchPaymentUnwindEvidence>,
-    ) -> Result<(), KernelError> {
-        let runtime = self.durable_runtime()?;
-        let _mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
-        let current = runtime
-            .store
-            .load_by_operation_id(operation.binding().operation_id())
-            .map_err(durable_store_error)?
-            .ok_or_else(|| {
-                KernelError::DurableAdmission(
-                    "pre-dispatch admission disappeared during compensation".to_owned(),
-                )
-            })?;
-        if &current != operation
-            || current.state().is_terminal()
-            || current.dispatch_commit().is_some()
-        {
-            return Err(KernelError::DurableAdmission(
-                "pre-dispatch compensation operation changed".to_owned(),
-            ));
-        }
-        let lease = self.claim_admission_recovery(&current, trusted_now_unix_ms)?;
-        // Runtime replay custody must be physically released before any
-        // compensation can assert no effect or unwind a monetary participant.
-        self.release_retained_runtime_participants(&current, &lease, trusted_now_unix_ms)?;
-        self.release_retained_governed_approval(&current, &lease, trusted_now_unix_ms)?;
-        self.release_retained_dpop(&current, &lease, trusted_now_unix_ms)?;
-        let context = AdmissionProjectionContext {
-            operation_id: current.binding().operation_id().clone(),
-            request_id: current.binding().request_id().clone(),
-            expected_operation_version: current.version(),
-            trusted_time_unix_ms: trusted_now_unix_ms,
-            coordinator_lease_id: lease.coordinator_lease_id().clone(),
-            coordinator_lease_epoch: lease.coordinator_lease_epoch(),
-            store_fence: runtime.fence.clone(),
-        };
-        if current
-            .attachment(crate::admission_operation::AdmissionAttachmentKind::PaymentParticipant)
-            .is_some()
-        {
-            let mut journal = runtime
-                .store
-                .load_payment_journal(current.binding().operation_id().as_str(), &runtime.fence)
-                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?
-                .ok_or_else(|| {
-                    KernelError::DurableAdmission(
-                        "pre-dispatch payment journal disappeared".to_owned(),
-                    )
-                })?;
-            if journal.state == crate::payment::PaymentJournalState::HoldPlaced {
-                journal = runtime
-                    .store
-                    .advance_payment_journal(crate::receipt_store::AdmissionPaymentJournalAdvance {
-                        operation: &current,
-                        recovery_lease: &lease,
-                        expected: &journal,
-                        transition:
-                            &crate::payment::PaymentJournalTransition::CancelBeforeAuthorization,
-                        release_evidence: None,
-                        active_fence: &runtime.fence,
-                        trusted_now_unix_ms,
-                    })
-                    .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-            }
-            if journal.state == crate::payment::PaymentJournalState::Authorized {
-                // The rail hold was authorized before dispatch, so the tool never
-                // ran and the authorization must be released rather than left held.
-                // Drive the durable release the same way the live cleanup path does:
-                // record the no-effect release authority, advance the journal to
-                // Settling, release on the rail, then settle. The release proof is
-                // built from the acquired-participant snapshot, which the terminal
-                // compensation projection below also accepts.
-                let authorization_id = journal.authorization_id.clone().ok_or_else(|| {
-                    KernelError::DurableAdmission(
-                        "authorized payment journal omitted its authorization".to_owned(),
-                    )
-                })?;
-                let proof =
-                    crate::tool_outcome::VerifiedPreDispatchNoEffect::from_qualified_released_operation_snapshot(
-                        &current,
-                        &context,
-                        verifier_policy.clone(),
-                    )
-                    .map_err(tool_outcome_error)?;
-                let evidence = crate::tool_outcome::MonetaryReleaseAuthority::NoEffect(
-                    crate::tool_outcome::VerifiedNoEffectProof::BeforeDispatch(proof),
-                )
-                .evidence_bundle()
-                .map_err(tool_outcome_error)?;
-                let persisted = evidence.to_persisted();
-                let authority = crate::payment::PaymentReleaseAuthorityBinding {
-                    kind: crate::payment::PaymentReleaseAuthorityKind::PreDispatchNoEffect,
-                    operation_id: persisted.operation_id.as_str().to_owned(),
-                    operation_version: persisted.operation_version,
-                    evidence_id: persisted.evidence_id.as_str().to_owned(),
-                    evidence_digest: persisted.bundle_digest.as_str().to_owned(),
-                };
-                journal = runtime
-                    .store
-                    .advance_payment_journal(crate::receipt_store::AdmissionPaymentJournalAdvance {
-                        operation: &current,
-                        recovery_lease: &lease,
-                        expected: &journal,
-                        transition: &crate::payment::PaymentJournalTransition::BeginRelease {
-                            authority,
-                        },
-                        release_evidence: Some(&evidence),
-                        active_fence: &runtime.fence,
-                        trusted_now_unix_ms,
-                    })
-                    .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-                let transaction_id = if let Some(unwind) = confirmed_payment_unwind {
-                    if unwind.authorization_id != authorization_id
-                        || unwind.settlement_status
-                            != crate::payment::PreDispatchPaymentUnwindStatus::Released
-                    {
-                        return Err(KernelError::DurableAdmission(
-                            "confirmed pre-dispatch payment unwind does not match the journal"
-                                .to_owned(),
-                        ));
-                    }
-                    unwind.transaction_id.clone()
-                } else {
-                    let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
-                        KernelError::DurableAdmission(
-                            "authorized pre-dispatch hold has no configured payment adapter"
-                                .to_owned(),
-                        )
-                    })?;
-                    let result = adapter
-                        .release(&authorization_id, &journal.operation_id)
-                        .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-                    if result.settlement_status != crate::payment::RailSettlementStatus::Released {
-                        return Err(KernelError::DurableAdmission(
-                            "pre-dispatch rail release was not confirmed".to_owned(),
-                        ));
-                    }
-                    result.transaction_id
-                };
-                journal = runtime
-                    .store
-                    .advance_payment_journal(crate::receipt_store::AdmissionPaymentJournalAdvance {
-                        operation: &current,
-                        recovery_lease: &lease,
-                        expected: &journal,
-                        transition:
-                            &crate::payment::PaymentJournalTransition::SettlementCompleted {
-                                transaction_id,
-                            },
-                        release_evidence: None,
-                        active_fence: &runtime.fence,
-                        trusted_now_unix_ms,
-                    })
-                    .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-            }
-            let released = journal.state == crate::payment::PaymentJournalState::Settled
-                && journal.settle_action == Some(crate::payment::PaymentSettleAction::Release);
-            let cancelled_before_authorization = journal.state
-                == crate::payment::PaymentJournalState::Closed
-                && journal.authorization_id.is_none();
-            if !released && !cancelled_before_authorization {
-                return Err(KernelError::DurableAdmission(
-                    "pre-dispatch payment release is not durable".to_owned(),
-                ));
-            }
-        }
-        self.release_finding_pool_claim_before_dispatch(
-            current.binding().operation_id().as_str(),
-            trusted_now_unix_ms,
-        )
-        .map_err(|error| {
-            KernelError::DurableAdmission(format!(
-                "pre-dispatch finding pool claim release failed: {error}"
-            ))
-        })?;
-        // Every budget the operation still holds is internal until dispatch
-        // commits. Both the executable hold and an owned preflight hold must be
-        // physically reversed before the terminal projection can claim no effect.
-        self.release_retained_executable_hold(&current)?;
-        if let Some(preflight) = self.load_durable_nonce_preflight(&current, trusted_now_unix_ms)? {
-            self.release_durable_nonce_preflight_hold(&current, &preflight)?;
-        }
-        let projection = verified_released_pre_dispatch_compensation_projection(
-            &current,
-            context,
-            verifier_policy,
-        )?;
-        let terminal = runtime
-            .store
-            .commit_admission_projection(&projection)
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-        if terminal.operation_id != *current.binding().operation_id()
-            || terminal.state != AdmissionOperationState::CompensatedBeforeDispatch
-        {
-            return Err(KernelError::DurableAdmission(
-                "pre-dispatch compensation committed a different terminal operation".to_owned(),
-            ));
-        }
         Ok(())
     }
 

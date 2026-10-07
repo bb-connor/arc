@@ -85,12 +85,11 @@ pub(crate) use chio_test_support::loopback::{reserve_listen_addr, skip_when_loop
 pub(crate) use reqwest::blocking::Client;
 pub(crate) use rusqlite::Connection;
 
-pub(crate) fn unique_dir(prefix: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}"))
+// The PathBuf interface transfers cleanup ownership to the existing callers.
+pub(crate) fn unique_dir(_prefix: &str) -> PathBuf {
+    chio_test_support::private_tempdir()
+        .expect("create private receipt-query fixture")
+        .keep()
 }
 
 pub(crate) fn workspace_root() -> PathBuf {

@@ -2,11 +2,11 @@
 #
 # Default mode is changed-target sampling. Diffs the PR against its
 # merge base, looks up which fuzz targets each changed source-path glob in
-# fuzz/target-map.toml triggers, and runs only those targets at 60 seconds
-# each.
+# fuzz/target-map.toml triggers, and runs those targets with a 60-second
+# total smoke budget.
 #
 # Opt-in PR label `fuzz: full` switches the run to a full-corpus sweep at
-# 120 seconds per target. The trailing-30d budget check reports shared usage
+# a 120-second total budget. The trailing-30d budget check reports shared usage
 # without blocking changed-target sampling on an unrelated pull request.
 #
 # Required check name: cflite_pr / changed-target-sampling
@@ -36,6 +36,8 @@ on:
       - ".github/workflows/cflite_pr.yml"
       - ".clusterfuzzlite/**"
       - "scripts/check-fuzz-budget.sh"
+      - "scripts/tests/check-cflite-builder.test.py"
+      - "scripts/tests/check-fuzz-manifest-selection.test.py"
 
 permissions:
   contents: read
@@ -48,7 +50,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Default per-target wall budget for changed-target sampling. The
+  # ClusterFuzzLite's fuzz-seconds input is a total wall budget. The
   # `fuzz: full` PR label promotes this to 120s via a step-level override.
   CHIO_FUZZ_DURATION_SECONDS: "60"
   CHIO_FUZZ_DURATION_SECONDS_FULL: "120"
@@ -76,8 +78,9 @@ jobs:
     name: changed-target-sampling
     needs: budget-check
     runs-on: ubuntu-latest
-    # The 25-target full sweep has a 50-minute fuzz budget before build time.
-    timeout-minutes: 75
+    # Retained x86 evidence needs 66 minutes for a cold all-target ASan build.
+    # Preserve the configured fuzz budgets and allow build/setup headroom.
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
@@ -108,7 +111,7 @@ jobs:
               echo "cflite_mode=batch"
             } >> "${GITHUB_OUTPUT}"
           else
-            echo "default mode: changed-target sampling at 60s per target"
+            echo "default mode: changed-target sampling with a 60s total budget"
             {
               echo "full=false"
               echo "fuzz_seconds=${CHIO_FUZZ_DURATION_SECONDS}"
@@ -146,7 +149,7 @@ jobs:
           # can break changed-target sampling without matching a source
           # trigger. Every member manifest can change feature/dependency
           # unification, even without a lockfile edit, so it selects all targets.
-          if grep -qE '^(\.cargo/|\.clusterfuzzlite/|\.github/workflows/cflite_pr\.yml$|([^/]+/)*Cargo\.toml$|Cargo\.lock$|fuzz/target-map\.toml$|Makefile$|scripts/(ci-pr-tier|spec-drift-check|check-review-slices)\.(sh|py)$)' changed.txt; then
+          if grep -qE '^(\.cargo/|\.clusterfuzzlite/|\.github/workflows/cflite_pr\.yml$|([^/]+/)*Cargo\.toml$|Cargo\.lock$|fuzz/target-map\.toml$|Makefile$|scripts/(ci-pr-tier|spec-drift-check|check-review-slices)\.(sh|py)$|scripts/tests/check-(cflite-builder|fuzz-manifest-selection)\.test\.py$)' changed.txt; then
             echo "fuzz inventory edit detected; firing the full inventory"
             fired=("${targets[@]}")
           fi
@@ -163,6 +166,11 @@ jobs:
             printf 'targets<<EOF\n%s\nEOF\n' "$(cat fired.txt)"
           } >> "${GITHUB_OUTPUT}"
 
+      - name: Check builder selection and inventory
+        run: |
+          python3 scripts/tests/check-fuzz-manifest-selection.test.py
+          python3 scripts/tests/check-cflite-builder.test.py
+
       - name: Fail if no targets fired (changed-target mode)
         if: steps.mode.outputs.full == 'false' && steps.targets.outputs.count == '0'
         run: |
@@ -171,22 +179,27 @@ jobs:
           sed 's/^/  /' changed.txt >&2
           exit 1
 
-      - name: Build ClusterFuzzLite changed-target fuzzers
+      # The action's root container preserves an existing directory. Create it
+      # as the runner so subset selection can unlink unselected executables.
+      - name: Prepare writable fuzzer export
+        run: mkdir build-out
+
+      - name: Build ClusterFuzzLite inventory for changed-target sampling
         if: steps.mode.outputs.full == 'false' && steps.targets.outputs.count != '0'
         uses: google/clusterfuzzlite/actions/build_fuzzers@82652fb49e77bc29c35da1167bb286e93c6bcc05
-        env:
-          CHIO_CFLITE_TARGETS: ${{ steps.targets.outputs.targets }}
         with:
           language: rust
           sanitizer: address
           github-token: ${{ secrets.GITHUB_TOKEN }}
           keep-unaffected-fuzz-targets: true
 
+      - name: Verify build and select changed-target executables
+        if: steps.mode.outputs.full == 'false' && steps.targets.outputs.count != '0'
+        run: python3 .clusterfuzzlite/select-targets.py --output build-out --selection fired.txt
+
       - name: Run ClusterFuzzLite changed-target sampling without corpus storage
         if: steps.mode.outputs.full == 'false' && steps.targets.outputs.count != '0'
         uses: google/clusterfuzzlite/actions/run_fuzzers@82652fb49e77bc29c35da1167bb286e93c6bcc05
-        env:
-          CHIO_CFLITE_TARGETS: ${{ steps.targets.outputs.targets }}
         with:
           language: rust
           fuzz-seconds: ${{ steps.mode.outputs.fuzz_seconds }}
@@ -202,6 +215,11 @@ jobs:
           language: rust
           sanitizer: address
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          keep-unaffected-fuzz-targets: true
+
+      - name: Verify full-corpus build inventory
+        if: steps.mode.outputs.full == 'true'
+        run: python3 .clusterfuzzlite/select-targets.py --output build-out
 
       - name: "Run ClusterFuzzLite full-corpus sweep without corpus storage (fuzz-full label)"
         if: steps.mode.outputs.full == 'true'

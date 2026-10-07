@@ -1,5 +1,7 @@
 //! Proposal issuance through the real cumulative-budget admission path.
 
+#[cfg(feature = "pq")]
+use super::durable_admission::DurableAdmissionCheckingServer;
 use super::*;
 use crate::boot::{KernelSelfQuoteOutcome, KernelSelfQuoteVerifier};
 use chio_core::{SigningAlgorithm, SigningBackend};

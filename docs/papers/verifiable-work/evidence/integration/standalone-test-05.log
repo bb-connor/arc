@@ -1,0 +1,121 @@
+   Compiling chio-risk-comptroller v0.1.0 (/tmp/chio-paper-security-integration/crates/platform/chio-risk-comptroller)
+   Compiling chio-a2a-edge v0.1.0 (/tmp/chio-paper-security-integration/crates/protocol/chio-a2a-edge)
+   Compiling chio-commerce-order v0.1.0 (/tmp/chio-paper-security-integration/crates/platform/chio-commerce-order)
+   Compiling chio-agent-web-interop v0.1.0 (/tmp/chio-paper-security-integration/crates/platform/chio-agent-web-interop)
+   Compiling chio-store-sqlite v0.1.0 (/tmp/chio-paper-security-integration/crates/platform/chio-store-sqlite)
+error[E0061]: this function takes 3 arguments but 2 arguments were supplied
+  --> /tmp/chio-paper-security-integration/crates/platform/chio-store-sqlite/src/admission_operation_store/contractual_resolution.rs:73:29
+   |
+73 |         let authority_now = schema::authority_validation_time(&tx, now).map_err(error)?;
+   |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^---------- argument #3 of type `&serving_owner::SqliteServingOwner` is missing
+   |
+note: function defined here
+  --> /tmp/chio-paper-security-integration/crates/platform/chio-store-sqlite/src/admission_operation_store/schema/clock.rs:20:45
+   |
+20 | pub(in crate::admission_operation_store) fn authority_validation_time(
+   |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+23 |     owner: &SqliteServingOwner,
+   |     --------------------------
+help: provide the argument
+   |
+73 |         let authority_now = schema::authority_validation_time(&tx, now, /* &serving_owner::SqliteServingOwner */).map_err(error)?;
+   |                                                                       ++++++++++++++++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 3 arguments but 2 arguments were supplied
+   --> /tmp/chio-paper-security-integration/crates/platform/chio-store-sqlite/src/admission_operation_store/contractual_resolution.rs:128:29
+    |
+128 |         let authority_now = schema::authority_validation_time(&tx, now).map_err(error)?;
+    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^---------- argument #3 of type `&serving_owner::SqliteServingOwner` is missing
+    |
+note: function defined here
+   --> /tmp/chio-paper-security-integration/crates/platform/chio-store-sqlite/src/admission_operation_store/schema/clock.rs:20:45
+    |
+ 20 | pub(in crate::admission_operation_store) fn authority_validation_time(
+    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+ 23 |     owner: &SqliteServingOwner,
+    |     --------------------------
+help: provide the argument
+    |
+128 |         let authority_now = schema::authority_validation_time(&tx, now, /* &serving_owner::SqliteServingOwner */).map_err(error)?;
+    |                                                                       ++++++++++++++++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 3 arguments but 2 arguments were supplied
+   --> /tmp/chio-paper-security-integration/crates/platform/chio-store-sqlite/src/admission_operation_store/unknown_release.rs:187:9
+    |
+187 |         verify_trusted_time(&transaction, trusted_now_unix_ms).map_err(error)?;
+    |         ^^^^^^^^^^^^^^^^^^^----------------------------------- argument #3 of type `&serving_owner::SqliteServingOwner` is missing
+    |
+note: function defined here
+   --> /tmp/chio-paper-security-integration/crates/platform/chio-store-sqlite/src/admission_operation_store/schema/clock.rs:9:15
+    |
+  9 | pub(crate) fn verify_trusted_time(
+    |               ^^^^^^^^^^^^^^^^^^^
+...
+ 12 |     owner: &SqliteServingOwner,
+    |     --------------------------
+help: provide the argument
+    |
+187 |         verify_trusted_time(&transaction, trusted_now_unix_ms, /* &serving_owner::SqliteServingOwner */).map_err(error)?;
+    |                                                              ++++++++++++++++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 3 arguments but 2 arguments were supplied
+   --> /tmp/chio-paper-security-integration/crates/platform/chio-store-sqlite/src/admission_operation_store/unknown_release.rs:251:9
+    |
+251 |         verify_trusted_time(&transaction, trusted_now_unix_ms).map_err(error)?;
+    |         ^^^^^^^^^^^^^^^^^^^----------------------------------- argument #3 of type `&serving_owner::SqliteServingOwner` is missing
+    |
+note: function defined here
+   --> /tmp/chio-paper-security-integration/crates/platform/chio-store-sqlite/src/admission_operation_store/schema/clock.rs:9:15
+    |
+  9 | pub(crate) fn verify_trusted_time(
+    |               ^^^^^^^^^^^^^^^^^^^
+...
+ 12 |     owner: &SqliteServingOwner,
+    |     --------------------------
+help: provide the argument
+    |
+251 |         verify_trusted_time(&transaction, trusted_now_unix_ms, /* &serving_owner::SqliteServingOwner */).map_err(error)?;
+    |                                                              ++++++++++++++++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 3 arguments but 2 arguments were supplied
+   --> /tmp/chio-paper-security-integration/crates/platform/chio-store-sqlite/src/tool_outcome_execution_evidence.rs:199:9
+    |
+199 |         verify_trusted_time(&transaction, live_now).map_err(admission_error)?;
+    |         ^^^^^^^^^^^^^^^^^^^------------------------ argument #3 of type `&serving_owner::SqliteServingOwner` is missing
+    |
+note: function defined here
+   --> /tmp/chio-paper-security-integration/crates/platform/chio-store-sqlite/src/admission_operation_store/schema/clock.rs:9:15
+    |
+  9 | pub(crate) fn verify_trusted_time(
+    |               ^^^^^^^^^^^^^^^^^^^
+...
+ 12 |     owner: &SqliteServingOwner,
+    |     --------------------------
+help: provide the argument
+    |
+199 |         verify_trusted_time(&transaction, live_now, /* &serving_owner::SqliteServingOwner */).map_err(admission_error)?;
+    |                                                   ++++++++++++++++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 3 arguments but 2 arguments were supplied
+   --> /tmp/chio-paper-security-integration/crates/platform/chio-store-sqlite/src/tool_outcome_execution_evidence.rs:234:9
+    |
+234 |         verify_trusted_time(&transaction, live_now).map_err(admission_error)?;
+    |         ^^^^^^^^^^^^^^^^^^^------------------------ argument #3 of type `&serving_owner::SqliteServingOwner` is missing
+    |
+note: function defined here
+   --> /tmp/chio-paper-security-integration/crates/platform/chio-store-sqlite/src/admission_operation_store/schema/clock.rs:9:15
+    |
+  9 | pub(crate) fn verify_trusted_time(
+    |               ^^^^^^^^^^^^^^^^^^^
+...
+ 12 |     owner: &SqliteServingOwner,
+    |     --------------------------
+help: provide the argument
+    |
+234 |         verify_trusted_time(&transaction, live_now, /* &serving_owner::SqliteServingOwner */).map_err(admission_error)?;
+    |                                                   ++++++++++++++++++++++++++++++++++++++++++
+
+For more information about this error, try `rustc --explain E0061`.
+error: could not compile `chio-store-sqlite` (lib) due to 6 previous errors

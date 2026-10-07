@@ -92,10 +92,10 @@ and propagate the native Result. Also remove an erroneous field insertion from a
 separate example DTO; that file now has no semantic change. These compiler
 failures remain recorded in inbound-workspace-clippy-first.
 
-Workspace continuation also found the matching ACP stale caller. Review of the
+Workspace continuation also found the matching ACP-Client stale caller. Review of the
 three example readers found original duplicate MCP fields collapsed to Value and
 unbounded read-line allocation before validation. Four behavioral controls went
-RED: oversized whitespace frames on A2A/ACP/MCP and duplicate MCP fields. Bound
+RED: oversized whitespace frames on A2A/ACP-Client/MCP and duplicate MCP fields. Bound
 allocation first (including whitespace) and use original-byte protocol readers.
 The public example loops now propagate typed adapter errors rather than silently
 normalizing authority input. Native CLI session 43/43 and preset integration
@@ -104,7 +104,7 @@ normalizing authority input. Native CLI session 43/43 and preset integration
 All 19 example owner controls now pass. Full all-target Clippy additionally found
 preexisting generated-binding harness and fixture drift: UUID dependency missing
 from generated-type test crates, three old ProtectConfig literals lacking approval
-configuration, an unused ACP test import and two ACP proxy test-layout lints.
+configuration, an unused ACP-Client test import and two ACP-Client proxy test-layout lints.
 Use the existing UUID crate as a dev dependency, explicitly opt the SSRF read
 fixtures into anonymous reads (retain all redirect/oversize/no-target assertions),
 and repair module layout without lint allowances or production semantic changes.

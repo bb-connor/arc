@@ -10,6 +10,51 @@ upstream MCP server) and `chio-mcp-edge` (the MCP hosting runtime).
 
 ## Responsibilities
 
+The JSON-RPC handler accepts A2A 1.0 `SendMessage`, `GetTask`, and `CancelTask`
+with standard untagged message parts, task states, and result envelopes.
+`message.messageId` becomes the kernel request id. The caller's authenticated
+execution context supplies authority; message metadata cannot supply it.
+The older slash-form methods remain available for existing integrations.
+
+`SendMessage` blocks until the kernel returns a result. Terminal delivery releases
+its temporary task custody after projection. Both omitted and explicit `false`
+execution modes are supported. `configuration.returnImmediately: true` returns
+`UnsupportedOperationError` (`-32004`) before task creation or kernel dispatch:
+the borrowed-kernel edge has no owned background executor. `GetTask` observes
+stored state and never starts execution. Task lookups return the same
+`TaskNotFoundError` (`-32001`) for inaccessible and absent tasks; cancellation of
+a completed or failed task returns `TaskNotCancelableError` (`-32002`).
+
+Approval-blocked work returns `TASK_STATE_INPUT_REQUIRED` and retains its original
+task. The owner resumes it with `SendMessage`, the original `messageId`, and the
+returned `message.taskId`; an optional `message.contextId` must match the task.
+The authenticated execution context supplies the signed approval artifacts.
+The tool, arguments, capability, intent, other authority and output mode remain
+fixed. Continuation preserves the task deadline and does not allocate another
+slot. Polling with approvals remains observational. Cancellation and expiry
+prevent continuation. A retry of the original stable message without `taskId`
+uses the kernel's durable outcome replay after terminal delivery.
+Validation and preparation refusals preserve pending custody, including a
+transient authority clock failure at its final deadline check. A private completion
+marker records whether orchestration was entered. Once continuation enters evaluation,
+an execution or result-projection error retains a failed protocol task until the
+original deadline. It cannot restore the earlier approval response. An already
+projected terminal kernel response remains intact; otherwise failed-task status
+does not carry a kernel receipt or decision. Retrying the original stable message
+without `taskId` remains subject to kernel admission and replay.
+
+The older slash-form lifecycle retains its explicit execution-on-poll contract,
+capacity limits, result retrieval and cancellation within the in-memory TTL.
+Each edge instance generates a fresh task namespace, so a restarted provider
+rejects old identifiers rather than resolving them to unrelated work. Provider
+task recovery and repeated-send deduplication require a durable host lifecycle.
+
+The Agent Card advertises `text/plain` and `application/json`, and does not
+advertise SSE streaming. Arbitrary multi-turn contexts, tenant routing, history, file
+parts and message extensions are rejected by this bounded 1.0 projection.
+The HTTP host remains responsible for authentication, request size limits,
+TLS and protocol-version header enforcement.
+
 - Turn a set of Chio `ToolManifest`s into an A2A Agent Card: resolve each
   tool's target protocol, evaluate `BridgeFidelity`, assign collision-safe
   skill ids, and publish only skills whose fidelity resolves to
@@ -19,7 +64,8 @@ upstream MCP server) and `chio-mcp-edge` (the MCP hosting runtime).
   `chio-cross-protocol`'s `CrossProtocolOrchestrator`, mapping kernel
   verdicts to A2A `TaskResponse`s.
 - Bound and prune the deferred task table by capacity and TTL, and restrict
-  polling or cancelling a task to its owning `agent_id`. Retained terminal
+  polling or cancelling a task to its owning `agent_id` and capability subject.
+  Retained terminal
   results count toward capacity; expiry uses the shared wall and monotonic clock.
 - Parse and validate the inbound JSON-RPC envelope, method params, and
   identifier fields before any skill resolution or kernel dispatch runs.

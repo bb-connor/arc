@@ -14,6 +14,30 @@ fn compiled_catalog_digest_preserves_each_version_and_rejects_unsupported_versio
     }
     assert_ne!(digest_version(28)?, digest_version(29)?);
     assert_eq!(digest()?, digest_version(29)?);
+    let connection = Connection::open_in_memory()?;
+    connection.execute_batch(
+        "CREATE TABLE chio_store_schema_versions(store_key TEXT, version INTEGER);
+         INSERT INTO chio_store_schema_versions VALUES('admission_operation', 28);",
+    )?;
+    let supported = crate::admission_operation_store::ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION;
+    for version in 28..=supported {
+        connection.execute(
+            "UPDATE chio_store_schema_versions SET version = ?1",
+            [version],
+        )?;
+        let catalog_version = if version == 28 { 28 } else { 29 };
+        assert_eq!(
+            digest_version(recorded_version(&connection)?)?,
+            digest_version(catalog_version)?
+        );
+    }
+    for version in [-1, 0, 27, supported + 1, i32::MAX] {
+        connection.execute(
+            "UPDATE chio_store_schema_versions SET version = ?1",
+            [version],
+        )?;
+        assert!(recorded_version(&connection).is_err());
+    }
     for version in [-1, 0, 27, 30, 32, i32::MAX] {
         assert!(digest_version(version).is_err());
     }

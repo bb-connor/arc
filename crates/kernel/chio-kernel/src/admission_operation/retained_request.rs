@@ -253,6 +253,12 @@ impl RetainedToolAdmissionRequestV1 {
     }
 
     #[must_use]
+    /// Original frozen evaluation plan, retained with the admission binding.
+    pub fn post_return_steps(&self) -> &[FrozenEvaluationStepV1] {
+        &self.wire.post_return_steps
+    }
+
+    #[must_use]
     pub fn canonical_bytes(&self) -> &[u8] {
         &self.canonical
     }
@@ -330,6 +336,21 @@ impl RetainedToolAdmissionRequestV1 {
             self.retained_matching_grant(*index)
                 .is_some_and(|grant| grant.dpop_required == Some(true))
         })
+    }
+
+    /// Original cumulative profile, not a fresh approval decision. Admission
+    /// rejects disagreement among matching grants; unrelated grants cannot
+    /// exempt the selected operation from single-approval custody.
+    pub(crate) fn matching_grants_require_cumulative_approval(&self) -> bool {
+        !self.wire.matching_grant_indices.is_empty()
+            && self.wire.matching_grant_indices.iter().all(|index| {
+                self.retained_matching_grant(*index).is_some_and(|grant| {
+                    grant.constraints.iter().any(|constraint| matches!(
+                        constraint,
+                        chio_core::capability::scope::Constraint::RequireCumulativeApprovalAbove { .. }
+                    ))
+                })
+            })
     }
 
     /// Check immutable request equality using the original grant selection and

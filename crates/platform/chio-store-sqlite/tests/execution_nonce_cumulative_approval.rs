@@ -175,13 +175,14 @@ fn approved_retry_after_the_issuance_lifetime_still_executes() -> TestResult {
 #[test]
 fn unbound_issuance_still_expires_before_execution() -> TestResult {
     let fixture = nonce_fixture(1)?;
+    // Freeze time before the kernel and durable owner observe their first
+    // millisecond reading; truncating an observed timestamp would regress it.
+    let _issuance_clock = chio_test_support::clock::scope_unix_secs(now());
     let runtime = fixture.open()?;
     let request = fixture.request(&runtime, "expired-before-binding")?;
-    let issued_at = now();
-    let issuance_clock = chio_test_support::clock::scope_unix_secs(issued_at);
     let nonce = preflight(&runtime, &request)?;
-    drop(issuance_clock);
-    let _expired_clock = chio_test_support::clock::scope_unix_secs(issued_at + 2);
+    let _expired_clock =
+        chio_test_support::clock::scope_unix_secs(u64::try_from(nonce.expires_at())?);
     let denied = evaluate(&runtime, &with_nonce(&request, &nonce))?;
     assert_eq!(denied.verdict, Verdict::Deny, "{:?}", denied.reason);
     assert!(

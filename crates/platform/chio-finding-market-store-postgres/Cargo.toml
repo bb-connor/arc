@@ -31,6 +31,10 @@ chio-test-support = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
 
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+chio-secret-broker = { workspace = true }
+rustix = { workspace = true }
+
 [lints.clippy]
 undocumented_unsafe_blocks = "deny"
 multiple_unsafe_ops_per_block = "deny"

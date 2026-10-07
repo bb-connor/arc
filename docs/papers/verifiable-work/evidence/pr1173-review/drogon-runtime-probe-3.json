@@ -1,0 +1,8 @@
+{
+  "exit_code": 0,
+  "seconds": 7.63,
+  "artifacts": "/home/connor/backbay/arc-agentic-work-plan/examples/hello-drogon/.artifacts/runtime-probe-luw88mb9",
+  "source_sha256": "de809e60990046c1984601ed29fa310f632ae5b16801cefb8b7a1afd6d5eb44e",
+  "binary_sha256": "c229a8a89a19e772c1287fc8939df1603327f7f633877bed5bf9b7deaefe7a5d",
+  "scope": "Actual updated smoke runtime tail with existing C++ build and immutable CLI; not the complete build gate"
+}

@@ -1,0 +1,12 @@
+{
+  "argv": [
+    "git",
+    "status",
+    "--short"
+  ],
+  "cwd": "/tmp/chio-paper-erc8183",
+  "started_at": "2026-10-02T15:24:31.703416+00:00",
+  "elapsed_seconds": 0.05758220423012972,
+  "exit_status": 0,
+  "log": "logs/source-integrity.log"
+}

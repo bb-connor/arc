@@ -1,0 +1,116 @@
+{
+  "schema": "chio.paper.external-trial-plan.v1",
+  "status": "unfilled-template-not-a-trial",
+  "trial_id": null,
+  "manifest_version": null,
+  "frozen_at_utc": null,
+  "stage": null,
+  "profile_inputs": {
+    "examples/funded-work/PROFILE.md": "6c080365471cb6a5c06d36aae0233bfd15758fc8d0c969893ebf594f0017ea27",
+    "examples/funded-work/parser-vectors.json": "13730196269f3785efa1133320cd0dc378ae60e71c3fb333dbc4730e531253ea",
+    "examples/funded-work/checker-profile.json": "dbb11df4e9402024bd330cb39dc7fc484f062e278ca593986636d86d3101ad78",
+    "examples/federated-work/FUNDED.md": "7bdb65612e94891a7ba5760ab79deb5a80f861f27d223e2699c1c4c4267635b8",
+    "contracts/scripts/fixtures/work-claim-vectors.json": "43e40c4b99c9f15d5e0afe67a8aac9276fd7843251a52b65f9cc42aa3ffcbd80",
+    "contracts/src/experimental/ChioWorkClaimEscrow.sol": "b1def783516523cf58c2e60f9d541cdcc47ec07f80e9662e01f88c8cb77e1df9"
+  },
+  "candidate": {
+    "repository": null,
+    "commit": null,
+    "artifact_manifest_sha256": null,
+    "builds": [],
+    "dependency_locks": []
+  },
+  "operators": [],
+  "operator_record_fields": [
+    "operator_id",
+    "organization",
+    "jurisdiction",
+    "role",
+    "administrative_owner",
+    "host_account_owner",
+    "secret_access_principals",
+    "implementation_id",
+    "public_keys",
+    "shared_services",
+    "declared_assistance"
+  ],
+  "independent_implementations": [],
+  "implementation_record_fields": [
+    "implementation_id",
+    "authors",
+    "language",
+    "source_commit",
+    "copied_application_code",
+    "shared_libraries",
+    "supplied_assistance",
+    "conformance_evidence"
+  ],
+  "profiles": {
+    "artifact_version": null,
+    "native_version": null,
+    "wire_negotiation": null,
+    "work_and_checker": null,
+    "disclosure": null,
+    "custody": null,
+    "local_authority": null,
+    "sandbox": null,
+    "rollback_protection": null,
+    "capacity": null
+  },
+  "funding": {
+    "asset": null,
+    "test_or_real": null,
+    "settlement_domain": null,
+    "contract_address": null,
+    "runtime_hash": null,
+    "chain_id": null,
+    "finality_rule": null,
+    "observer_policy": null,
+    "max_per_operator": null,
+    "max_total": null,
+    "fee_reserves": null,
+    "capital_cost_policy": null
+  },
+  "evaluation": {
+    "arms": [
+      "C0",
+      "C1",
+      "C2",
+      "C3"
+    ],
+    "task_corpus_commitment": null,
+    "pilot_size": 30,
+    "provisional_held_out_instances": 150,
+    "provisional_repetitions": 3,
+    "final_sample_size": null,
+    "pilot_power_analysis": null,
+    "randomization_seed_commitment": null,
+    "ordering_rule": null,
+    "model_versions": null,
+    "budgets": null,
+    "primary_autonomous_choice_endpoint": null,
+    "minimum_effect": null,
+    "cluster_and_interval_method": null,
+    "multiplicity_rule": null,
+    "stopping_rule": null,
+    "exclusions": null,
+    "zero_cost_rule": null
+  },
+  "operations": {
+    "fault_schedule": null,
+    "newcomer_exercises": null,
+    "assistance_diary": null,
+    "incident_contacts": null,
+    "stop_and_recovery_policy": null,
+    "off_host_qualification": null
+  },
+  "evidence": {
+    "public_location": null,
+    "restricted_location": null,
+    "reviewer": null,
+    "retention": null,
+    "withheld_material": []
+  },
+  "operator_approvals": [],
+  "deviations_from_original_plan": []
+}

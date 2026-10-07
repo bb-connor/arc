@@ -73,7 +73,7 @@ assert "apalache-mc check" not in safety
 assert "apalache-mc check" not in temporal
 assert "  workflow_call:\n" in safety
 assert "  pull_request:\n" not in safety
-assert "\n  pull_request:\n    branches: [main]\n" in ci
+assert "\n  pull_request:\n    branches: [main, 'packet/**', 'integration/**']\n" in ci
 ci_call = job(ci, "apalache-full-contract", "threat-model-coverage-contract")
 assert "uses: ./.github/workflows/apalache-safety.yml" in ci_call
 assert "\n    if:" not in ci_call

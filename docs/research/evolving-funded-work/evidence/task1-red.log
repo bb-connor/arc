@@ -1,0 +1,64 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/chio-verifiable-work-paper/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/chio-verifiable-work-paper/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/chio-verifiable-work-paper/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-kernel v0.1.0 (/tmp/chio-verifiable-work-paper/crates/kernel/chio-kernel)
+error[E0433]: failed to resolve: could not find `DelegatedWorkLayout` in `delegated_work`
+   --> crates/kernel/chio-kernel/tests/../examples/dynamic_delegation_support/mod.rs:105:66
+    |
+105 |     open_with_layout(root, receiver, bad, clock, delegated_work::DelegatedWorkLayout::Arguments)
+    |                                                                  ^^^^^^^^^^^^^^^^^^^ could not find `DelegatedWorkLayout` in `delegated_work`
+    |
+help: a struct with a similar name exists
+    |
+105 -     open_with_layout(root, receiver, bad, clock, delegated_work::DelegatedWorkLayout::Arguments)
+105 +     open_with_layout(root, receiver, bad, clock, delegated_work::DelegatedWorkGuard::Arguments)
+    |
+
+error[E0433]: failed to resolve: could not find `DelegatedWorkLayout` in `delegated_work`
+   --> crates/kernel/chio-kernel/tests/dynamic_delegation.rs:284:29
+    |
+284 |             delegated_work::DelegatedWorkLayout::GovernedContext)?;
+    |                             ^^^^^^^^^^^^^^^^^^^ could not find `DelegatedWorkLayout` in `delegated_work`
+    |
+help: a struct with a similar name exists
+    |
+284 -             delegated_work::DelegatedWorkLayout::GovernedContext)?;
+284 +             delegated_work::DelegatedWorkGuard::GovernedContext)?;
+    |
+
+error[E0425]: cannot find type `DelegatedWorkLayout` in module `delegated_work`
+   --> crates/kernel/chio-kernel/tests/../examples/dynamic_delegation_support/mod.rs:112:29
+    |
+112 |     layout: delegated_work::DelegatedWorkLayout,
+    |                             ^^^^^^^^^^^^^^^^^^^
+    |
+   ::: crates/kernel/chio-kernel/src/delegated_work.rs:39:1
+    |
+ 39 | struct DelegatedWorkGuard {
+    | ------------------------- similarly named struct `DelegatedWorkGuard` defined here
+    |
+help: a struct with a similar name exists
+    |
+112 -     layout: delegated_work::DelegatedWorkLayout,
+112 +     layout: delegated_work::DelegatedWorkGuard,
+    |
+
+error[E0425]: cannot find function `install_delegated_work_with_layout` in module `delegated_work`
+   --> crates/kernel/chio-kernel/tests/../examples/dynamic_delegation_support/mod.rs:154:21
+    |
+154 |     delegated_work::install_delegated_work_with_layout(&mut kernel, vec![key(1).public_key()], layout)?;
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ not found in `delegated_work`
+
+Some errors have detailed explanations: E0425, E0433.
+For more information about an error, try `rustc --explain E0425`.
+error: could not compile `chio-kernel` (test "dynamic_delegation") due to 4 previous errors

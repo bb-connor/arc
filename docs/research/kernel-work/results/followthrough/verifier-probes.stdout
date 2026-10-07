@@ -1,0 +1,7 @@
+incomplete refused: incomplete verification record
+missing-command refused: incomplete verification record
+failed-command refused: failed or unexpected command: prior-provenance
+changed-source refused: source bytes differ from tested record
+unexpected-command refused: failed or unexpected command: native-process
+changed-output refused: changed output: native-process.stdout
+{"verified": true, "commands": 11, "scope": "local tested profile only"}

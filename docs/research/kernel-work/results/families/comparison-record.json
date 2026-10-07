@@ -1,0 +1,6 @@
+{
+  "exit_code": 0,
+  "retained_output": "../followthrough/family-comparison.stdout",
+  "sha256": "187d91226d051113c4c1cf1c7c0244ae4e9429dbb65f6d36ea03d670997f0cc5",
+  "note": "Initial green output is byte-identical to final qualification; retained once."
+}

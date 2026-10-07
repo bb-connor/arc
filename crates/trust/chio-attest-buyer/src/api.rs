@@ -257,6 +257,15 @@ fn replay_core_verifier(
     } else {
         report.accepted = false;
         report.failure_code = Some("chio_attest_buyer_review_verifier_report_rejected".to_string());
+        // The replayed report's code is drawn from a closed compile-time set,
+        // so naming it here keeps the review message non-data-bearing.
+        let message = match verifier_report.failure.as_ref() {
+            Some(failure) => format!(
+                "proof replay rejected the bundled proof package with code {}",
+                failure.code
+            ),
+            None => "proof replay rejected the bundled proof package".to_string(),
+        };
         report.checks.push(BuyerAttestationReviewCheck {
             code: "chio_attest_buyer.review.existing_verifier_replayed".to_string(),
             passed: false,
@@ -264,7 +273,7 @@ fn replay_core_verifier(
             artifact_role: "proof_package".to_string(),
             expected_sha256: None,
             observed_sha256: None,
-            message: "proof replay rejected the bundled proof package".to_string(),
+            message,
         });
     }
     Ok(())

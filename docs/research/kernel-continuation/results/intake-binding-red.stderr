@@ -1,0 +1,23 @@
+F...F.....
+======================================================================
+FAIL: test_adjudication_cannot_disagree_with_committed_artifact (test_trial_intake.IntakeTests.test_adjudication_cannot_disagree_with_committed_artifact)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/test_trial_intake.py", line 76, in test_adjudication_cannot_disagree_with_committed_artifact
+    with self.assertRaises(ValueError):analyze(self.package)
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_missing_matching_constraints_or_changed_pair_pins (test_trial_intake.IntakeTests.test_missing_matching_constraints_or_changed_pair_pins)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/test_trial_intake.py", line 54, in test_missing_matching_constraints_or_changed_pair_pins
+    with self.assertRaises(ValueError):analyze(self.package)
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.165s
+
+FAILED (failures=2)

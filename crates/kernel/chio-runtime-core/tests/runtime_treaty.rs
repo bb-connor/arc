@@ -25,12 +25,9 @@ fn emit_threat_matrix_code(code: &str) {
 }
 
 #[test]
-fn bilateral_dsse_consistency_models_use_wire_vocabulary() {
+fn bilateral_dsse_consistency_models_use_wire_vocabulary() -> Result<(), Box<dyn std::error::Error>>
+{
     for (runtime, wire) in [
-        ("crdt_commutative", "crdt-commutative"),
-        ("totally_ordered", "totally-ordered"),
-        ("single_kernel", "single-kernel"),
-        ("quorum_required", "quorum-required"),
         ("crdt-commutative", "crdt-commutative"),
         ("totally-ordered", "totally-ordered"),
         ("single-kernel", "single-kernel"),
@@ -42,7 +39,31 @@ fn bilateral_dsse_consistency_models_use_wire_vocabulary() {
         };
         assert_eq!(actual, wire);
     }
-    assert!(bilateral_dsse_consistency_model("unsupported").is_err());
+    for spelling in [
+        "unsupported",
+        "crdt_commutative",
+        "totally_ordered",
+        "single_kernel",
+    ] {
+        assert!(
+            bilateral_dsse_consistency_model(spelling).is_err(),
+            "{spelling}"
+        );
+        let manifest = treaty_manifest(
+            "kernel.buyer",
+            treaty_action_class("receipt_backed", false, spelling, vec![]),
+        );
+        assert!(
+            validate_governance_ladder_manifest(&manifest).is_err(),
+            "{spelling}"
+        );
+        let federated = serde_json::from_value(serde_json::to_value(&manifest)?)?;
+        assert!(
+            chio_federation::treaty::validate_governance_ladder_manifest(&federated).is_err(),
+            "{spelling}"
+        );
+    }
+    Ok(())
 }
 
 #[test]
@@ -52,7 +73,6 @@ fn ladder_co_sign_modes_use_wire_vocabulary() {
         ("bilateral_if_cross_org", "bilateral_if_cross_org"),
         ("bilateral_required", "bilateral_required"),
         ("n_of_m", "n_of_m"),
-        ("quorum_required", "n_of_m"),
     ] {
         let actual = match ladder_co_sign_mode(runtime) {
             Ok(actual) => actual,
@@ -61,6 +81,44 @@ fn ladder_co_sign_modes_use_wire_vocabulary() {
         assert_eq!(actual, wire);
     }
     assert!(ladder_co_sign_mode("unsupported").is_err());
+}
+
+#[test]
+fn retired_quorum_required_spelling_is_rejected() {
+    for mode in ["quorum_required", "quorum-required"] {
+        let manifest = treaty_manifest(
+            "kernel.buyer",
+            treaty_action_class(mode, false, "totally-ordered", vec![]),
+        );
+        let error = match validate_governance_ladder_manifest(&manifest) {
+            Ok(()) => panic!("{mode} must not be accepted as a ladder mode"),
+            Err(error) => error,
+        };
+        assert_eq!(error.code(), "chio_ladder_invalid_mode");
+
+        let mut manifest = treaty_manifest(
+            "kernel.buyer",
+            treaty_action_class("receipt_backed", false, "totally-ordered", vec![]),
+        );
+        manifest.destructive_floor = mode.to_string();
+        let error = match validate_governance_ladder_manifest(&manifest) {
+            Ok(()) => panic!("{mode} must not be accepted as a destructive floor"),
+            Err(error) => error,
+        };
+        assert_eq!(error.code(), "chio_ladder_invalid_mode");
+    }
+
+    let error = match ladder_co_sign_mode("quorum_required") {
+        Ok(mode) => panic!("quorum_required must not map to co-sign mode {mode}"),
+        Err(error) => error,
+    };
+    assert_eq!(error.code(), "chio_ladder_invalid_cosign_mode");
+
+    let error = match bilateral_dsse_consistency_model("quorum_required") {
+        Ok(model) => panic!("quorum_required must not map to consistency model {model}"),
+        Err(error) => error,
+    };
+    assert_eq!(error.code(), "chio_ladder_invalid_consistency_model");
 }
 
 #[test]
@@ -108,7 +166,7 @@ fn accepted_admission_report() -> CrossBoundaryAdmissionReport {
         accepted: true,
         failure_code: None,
         mode: "receipt_backed".to_string(),
-        consistency_model: "totally_ordered".to_string(),
+        consistency_model: "totally-ordered".to_string(),
         co_sign: "bilateral_required".to_string(),
         co_sign_quorum: None,
         required_evidence: vec!["governance_receipt".to_string()],
@@ -593,7 +651,7 @@ fn treaty_ladder_intersection_rejects_destructive_observation(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let manifest = treaty_manifest(
         "kernel.buyer",
-        treaty_action_class("observation", true, "totally_ordered", vec!["tool_receipt"]),
+        treaty_action_class("observation", true, "totally-ordered", vec!["tool_receipt"]),
     );
 
     let err = match validate_governance_ladder_manifest(&manifest) {
@@ -616,7 +674,7 @@ fn treaty_cross_boundary_admission_requires_intersection_and_evidence(
         treaty_action_class(
             "receipt_backed",
             true,
-            "totally_ordered",
+            "totally-ordered",
             vec![
                 "governance_receipt",
                 "bilateral_invocation",
@@ -629,7 +687,7 @@ fn treaty_cross_boundary_admission_requires_intersection_and_evidence(
         treaty_action_class(
             "receipt_backed",
             true,
-            "totally_ordered",
+            "totally-ordered",
             vec!["governance_receipt", "bilateral_invocation"],
         ),
     );
@@ -700,7 +758,7 @@ fn chio_federation_treaty_schema_is_accepted_and_emitted() -> Result<(), Box<dyn
         treaty_action_class(
             "receipt_backed",
             true,
-            "totally_ordered",
+            "totally-ordered",
             vec!["governance_receipt"],
         ),
     );
@@ -709,7 +767,7 @@ fn chio_federation_treaty_schema_is_accepted_and_emitted() -> Result<(), Box<dyn
         treaty_action_class(
             "receipt_backed",
             true,
-            "totally_ordered",
+            "totally-ordered",
             vec!["governance_receipt"],
         ),
     );
@@ -767,7 +825,7 @@ fn treaty_loaded_ladder_intersection_rejects_destructive_crdt_commutative(
         treaty_action_class(
             "receipt_backed",
             true,
-            "totally_ordered",
+            "totally-ordered",
             vec!["governance_receipt"],
         ),
     );
@@ -776,7 +834,7 @@ fn treaty_loaded_ladder_intersection_rejects_destructive_crdt_commutative(
         treaty_action_class(
             "receipt_backed",
             true,
-            "totally_ordered",
+            "totally-ordered",
             vec!["governance_receipt"],
         ),
     );
@@ -788,7 +846,7 @@ fn treaty_loaded_ladder_intersection_rejects_destructive_crdt_commutative(
     let mut intersection =
         compute_ladder_intersection(&treaty, &[buyer, vendor], 1_800_000_010_000)?;
     intersection.action_classes[0].destructive = true;
-    intersection.action_classes[0].consistency_model = "crdt_commutative".to_string();
+    intersection.action_classes[0].consistency_model = "crdt-commutative".to_string();
 
     let err = match validate_ladder_intersection(&intersection) {
         Ok(()) => {
@@ -812,7 +870,7 @@ fn treaty_cross_boundary_admission_rejects_accepted_failure_code(
         accepted: true,
         failure_code: Some("chio_treaty_forged_failure".to_string()),
         mode: "receipt_backed".to_string(),
-        consistency_model: "totally_ordered".to_string(),
+        consistency_model: "totally-ordered".to_string(),
         co_sign: "bilateral_required".to_string(),
         co_sign_quorum: None,
         required_evidence: vec!["governance_receipt".to_string()],
@@ -899,7 +957,7 @@ fn treaty_cross_boundary_admission_rejects_stale_treaty_or_future_intersection(
         treaty_action_class(
             "receipt_backed",
             true,
-            "totally_ordered",
+            "totally-ordered",
             vec!["bilateral_invocation", "receipt_lineage"],
         ),
     );
@@ -908,7 +966,7 @@ fn treaty_cross_boundary_admission_rejects_stale_treaty_or_future_intersection(
         treaty_action_class(
             "receipt_backed",
             true,
-            "totally_ordered",
+            "totally-ordered",
             vec!["bilateral_invocation", "receipt_lineage"],
         ),
     );
@@ -993,7 +1051,7 @@ fn treaty_cross_boundary_admission_injects_bilateral_requirement_for_cosign(
         treaty_action_class(
             "receipt_backed",
             true,
-            "totally_ordered",
+            "totally-ordered",
             vec!["governance_receipt"],
         ),
     );
@@ -1002,7 +1060,7 @@ fn treaty_cross_boundary_admission_injects_bilateral_requirement_for_cosign(
         treaty_action_class(
             "receipt_backed",
             true,
-            "totally_ordered",
+            "totally-ordered",
             vec!["governance_receipt"],
         ),
     );
@@ -1046,10 +1104,10 @@ fn treaty_cross_boundary_admission_requires_quorum_evidence_for_quorum_cosign(
     let mut buyer_action = treaty_action_class(
         "receipt_backed",
         true,
-        "quorum_required",
+        "quorum-required",
         vec!["governance_receipt"],
     );
-    buyer_action.co_sign = "quorum_required".to_string();
+    buyer_action.co_sign = "n_of_m".to_string();
     buyer_action.co_sign_quorum = Some(GovernanceLadderQuorum {
         n: 2,
         m: 3,
@@ -1058,10 +1116,10 @@ fn treaty_cross_boundary_admission_requires_quorum_evidence_for_quorum_cosign(
     let mut vendor_action = treaty_action_class(
         "receipt_backed",
         true,
-        "quorum_required",
+        "quorum-required",
         vec!["governance_receipt"],
     );
-    vendor_action.co_sign = "quorum_required".to_string();
+    vendor_action.co_sign = "n_of_m".to_string();
     vendor_action.co_sign_quorum = Some(GovernanceLadderQuorum {
         n: 2,
         m: 3,
@@ -1098,9 +1156,13 @@ fn treaty_cross_boundary_admission_requires_quorum_evidence_for_quorum_cosign(
         denied.failure_code.as_deref(),
         Some("chio_treaty_missing_required_evidence")
     );
-    assert!(denied
-        .required_evidence
-        .contains(&"quorum_signature".to_string()));
+    assert_eq!(
+        denied.required_evidence,
+        vec![
+            "governance_receipt".to_string(),
+            "quorum_signature".to_string()
+        ]
+    );
     Ok(())
 }
 
@@ -1112,7 +1174,7 @@ fn treaty_cross_boundary_admission_rejects_unverified_or_forged_intersection(
         treaty_action_class(
             "receipt_backed",
             true,
-            "totally_ordered",
+            "totally-ordered",
             vec![
                 "governance_receipt",
                 "bilateral_invocation",
@@ -1125,7 +1187,7 @@ fn treaty_cross_boundary_admission_rejects_unverified_or_forged_intersection(
         treaty_action_class(
             "receipt_backed",
             true,
-            "totally_ordered",
+            "totally-ordered",
             vec!["governance_receipt", "bilateral_invocation"],
         ),
     );
@@ -1182,7 +1244,7 @@ fn treaty_cross_boundary_admission_rejects_unverified_or_forged_intersection(
                 treaty_action_class(
                     "receipt_backed",
                     true,
-                    "totally_ordered",
+                    "totally-ordered",
                     vec![
                         "governance_receipt",
                         "bilateral_invocation",
@@ -1195,7 +1257,7 @@ fn treaty_cross_boundary_admission_rejects_unverified_or_forged_intersection(
                 treaty_action_class(
                     "receipt_backed",
                     true,
-                    "totally_ordered",
+                    "totally-ordered",
                     vec!["governance_receipt", "bilateral_invocation"],
                 ),
             ),
@@ -1249,7 +1311,7 @@ fn treaty_intersection_rejects_manifest_hash_mismatch_and_unknown_class(
         treaty_action_class(
             "receipt_backed",
             true,
-            "totally_ordered",
+            "totally-ordered",
             vec!["governance_receipt", "bilateral_invocation"],
         ),
     );
@@ -1258,7 +1320,7 @@ fn treaty_intersection_rejects_manifest_hash_mismatch_and_unknown_class(
         treaty_action_class(
             "receipt_backed",
             true,
-            "totally_ordered",
+            "totally-ordered",
             vec!["governance_receipt", "bilateral_invocation"],
         ),
     );
@@ -1292,5 +1354,143 @@ fn treaty_intersection_rejects_manifest_hash_mismatch_and_unknown_class(
         Err(error) => error,
     };
     assert_eq!(err.code(), "chio_treaty_action_class_not_allowed");
+    Ok(())
+}
+
+/// Both co-signing modes that produce a two-signature envelope force the
+/// invocation record into the required-evidence set. A class co-signed
+/// `bilateral_if_cross_org` that forced nothing would admit a cross-boundary
+/// call with no statement resolved and no continuation consumed, which is the
+/// opposite of what its name says.
+#[test]
+fn every_two_signature_co_sign_mode_requires_the_invocation_record(
+) -> Result<(), Box<dyn std::error::Error>> {
+    for mode in ["bilateral_required", "bilateral_if_cross_org"] {
+        let mut buyer_class = treaty_action_class(
+            "receipt_backed",
+            true,
+            "totally-ordered",
+            vec!["governance_receipt"],
+        );
+        buyer_class.co_sign = mode.to_string();
+        let mut vendor_class = treaty_action_class(
+            "receipt_backed",
+            true,
+            "totally-ordered",
+            vec!["governance_receipt"],
+        );
+        vendor_class.co_sign = mode.to_string();
+        let buyer = treaty_manifest("kernel.buyer", buyer_class);
+        let vendor = treaty_manifest("kernel.vendor-b", vendor_class);
+
+        let mut treaty = treaty_scope();
+        treaty.ladder_manifest_sha256s = vec![
+            chio_runtime_core::governance_ladder_manifest_sha256(&buyer)?,
+            chio_runtime_core::governance_ladder_manifest_sha256(&vendor)?,
+        ];
+        let intersection =
+            compute_ladder_intersection(&treaty, &[buyer, vendor], 1_800_000_010_000)?;
+        let expected = chio_runtime_core::ladder_intersection_sha256(&intersection)?;
+
+        let denied = evaluate_cross_boundary_admission(CrossBoundaryAdmissionInput {
+            treaty_scope: &treaty,
+            ladder_intersection: &intersection,
+            expected_ladder_intersection_sha256: Some(expected.clone()),
+            action_class_id: "workflow.destructive.vendor_call",
+            present_evidence: vec!["governance_receipt".to_string()],
+            verified_evidence: vec![CrossBoundaryEvidenceRef {
+                evidence_class: "governance_receipt".to_string(),
+                artifact_sha256: "0".repeat(64),
+                verified: true,
+            }],
+            now_unix_ms: 1_800_000_010_000,
+        })?;
+        assert!(
+            !denied.accepted,
+            "{mode} admitted a call that presented no invocation record"
+        );
+        assert_eq!(
+            denied.failure_code.as_deref(),
+            Some("chio_treaty_missing_required_evidence"),
+            "{mode} denied for the wrong reason"
+        );
+
+        let accepted = evaluate_cross_boundary_admission(CrossBoundaryAdmissionInput {
+            treaty_scope: &treaty,
+            ladder_intersection: &intersection,
+            expected_ladder_intersection_sha256: Some(expected),
+            action_class_id: "workflow.destructive.vendor_call",
+            present_evidence: vec![
+                "governance_receipt".to_string(),
+                "bilateral_invocation".to_string(),
+            ],
+            verified_evidence: vec![
+                CrossBoundaryEvidenceRef {
+                    evidence_class: "governance_receipt".to_string(),
+                    artifact_sha256: "0".repeat(64),
+                    verified: true,
+                },
+                CrossBoundaryEvidenceRef {
+                    evidence_class: "bilateral_invocation".to_string(),
+                    artifact_sha256: "1".repeat(64),
+                    verified: true,
+                },
+            ],
+            now_unix_ms: 1_800_000_010_000,
+        })?;
+        assert!(
+            accepted.accepted,
+            "{mode} refused a call that presented the invocation record"
+        );
+        assert_eq!(accepted.failure_code, None);
+        assert_eq!(
+            accepted.required_evidence,
+            vec![
+                "governance_receipt".to_string(),
+                "bilateral_invocation".to_string()
+            ]
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn no_cosign_admission_requires_only_declared_evidence() -> Result<(), Box<dyn std::error::Error>> {
+    let mut action = treaty_action_class(
+        "receipt_backed",
+        false,
+        "totally-ordered",
+        vec!["governance_receipt"],
+    );
+    action.co_sign = "none".to_string();
+    let buyer = treaty_manifest("kernel.buyer", action.clone());
+    let vendor = treaty_manifest("kernel.vendor-b", action);
+    let mut treaty = treaty_scope();
+    treaty.ladder_manifest_sha256s = vec![
+        chio_runtime_core::governance_ladder_manifest_sha256(&buyer)?,
+        chio_runtime_core::governance_ladder_manifest_sha256(&vendor)?,
+    ];
+    let intersection = compute_ladder_intersection(&treaty, &[buyer, vendor], 1_800_000_010_000)?;
+    let accepted = evaluate_cross_boundary_admission(CrossBoundaryAdmissionInput {
+        treaty_scope: &treaty,
+        ladder_intersection: &intersection,
+        expected_ladder_intersection_sha256: Some(chio_runtime_core::ladder_intersection_sha256(
+            &intersection,
+        )?),
+        action_class_id: "workflow.destructive.vendor_call",
+        present_evidence: vec!["governance_receipt".to_string()],
+        verified_evidence: vec![CrossBoundaryEvidenceRef {
+            evidence_class: "governance_receipt".to_string(),
+            artifact_sha256: "d".repeat(64),
+            verified: true,
+        }],
+        now_unix_ms: 1_800_000_010_000,
+    })?;
+    assert!(accepted.accepted, "{:?}", accepted.failure_code);
+    assert_eq!(accepted.failure_code, None);
+    assert_eq!(
+        accepted.required_evidence,
+        vec!["governance_receipt".to_string()]
+    );
     Ok(())
 }

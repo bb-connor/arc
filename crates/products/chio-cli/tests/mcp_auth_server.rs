@@ -1,7 +1,7 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use std::fs;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -163,6 +163,15 @@ fn spawn_http_server_with_local_auth(
     listen: SocketAddr,
     admin_token: &str,
 ) -> ServerGuard {
+    spawn_http_server_with_local_auth_and_proxy(dir, listen, admin_token, None)
+}
+
+fn spawn_http_server_with_local_auth_and_proxy(
+    dir: &Path,
+    listen: SocketAddr,
+    admin_token: &str,
+    proxy_token_path: Option<&Path>,
+) -> ServerGuard {
     let policy_path = write_policy(dir);
     let script_path = write_mock_server_script(dir);
     let receipt_db_path = dir.join("remote-receipts.sqlite3");
@@ -186,54 +195,69 @@ fn spawn_http_server_with_local_auth(
         &[],
     );
 
-    let child = Command::new(env!("CARGO_BIN_EXE_chio"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
+    command.args([
+        "--receipt-db",
+        receipt_db_path.to_str().expect("receipt db path"),
+        "--session-db",
+        session_db_path.to_str().expect("session db path"),
+        "--authority-seed-file",
+        authority_seed_path.to_str().expect("authority seed path"),
+        "mcp",
+        "serve-http",
+        "--policy",
+        policy_path.to_str().expect("policy path"),
+        "--resume-hmac-keyring",
+        resume_hmac_keyring_path
+            .to_str()
+            .expect("resume HMAC keyring path"),
+        "--server-id",
+        "wrapped-http-mock",
+        "--server-name",
+        "Wrapped HTTP Mock",
+        "--listen",
+        &listen.to_string(),
+        "--public-base-url",
+        &public_base_url,
+        "--auth-server-seed-file",
+        auth_server_seed_path
+            .to_str()
+            .expect("auth server seed path"),
+        "--auth-jwt-audience",
+        &audience,
+        "--auth-scope",
+        "mcp:invoke",
+        "--admin-token",
+        admin_token,
+        "--signed-manifest",
+        security
+            .signed_manifest_path
+            .to_str()
+            .expect("signed manifest path"),
+        "--manifest-public-key",
+        &security.manifest_public_key,
+        "--cage-policy",
+        security
+            .cage_policy_path
+            .to_str()
+            .expect("cage policy path"),
+        "--cage-policy-signer",
+        &security.cage_policy_signer,
+    ]);
+    if let Some(proxy_token_path) = proxy_token_path {
+        assert!(
+            listen.ip().is_loopback(),
+            "fixture proxy peer must be loopback"
+        );
+        command.args([
+            "--trusted-proxy-peer",
+            &listen.ip().to_string(),
+            "--trusted-proxy-token-file",
+            proxy_token_path.to_str().expect("proxy token path"),
+        ]);
+    }
+    let child = command
         .args([
-            "--receipt-db",
-            receipt_db_path.to_str().expect("receipt db path"),
-            "--session-db",
-            session_db_path.to_str().expect("session db path"),
-            "--authority-seed-file",
-            authority_seed_path.to_str().expect("authority seed path"),
-            "mcp",
-            "serve-http",
-            "--policy",
-            policy_path.to_str().expect("policy path"),
-            "--resume-hmac-keyring",
-            resume_hmac_keyring_path
-                .to_str()
-                .expect("resume HMAC keyring path"),
-            "--server-id",
-            "wrapped-http-mock",
-            "--server-name",
-            "Wrapped HTTP Mock",
-            "--listen",
-            &listen.to_string(),
-            "--public-base-url",
-            &public_base_url,
-            "--auth-server-seed-file",
-            auth_server_seed_path
-                .to_str()
-                .expect("auth server seed path"),
-            "--auth-jwt-audience",
-            &audience,
-            "--auth-scope",
-            "mcp:invoke",
-            "--admin-token",
-            admin_token,
-            "--signed-manifest",
-            security
-                .signed_manifest_path
-                .to_str()
-                .expect("signed manifest path"),
-            "--manifest-public-key",
-            &security.manifest_public_key,
-            "--cage-policy",
-            security
-                .cage_policy_path
-                .to_str()
-                .expect("cage policy path"),
-            "--cage-policy-signer",
-            &security.cage_policy_signer,
             "--",
             security
                 .target_command
@@ -1077,7 +1101,28 @@ fn mcp_serve_http_local_auth_server_enforces_mtls_and_attestation_bound_sender_c
     let listen = reserve_listen_addr();
     let base_url = format!("http://{listen}");
     let admin_token = "admin-token";
-    let mut server = spawn_http_server_with_local_auth(&dir, listen, admin_token);
+    // Model an explicitly trusted sanitizing proxy on the exact loopback peer.
+    // Identity headers alone never establish transport provenance.
+    let proxy_token = "dedicated-loopback-proxy-credential-for-mtls-test";
+    let proxy_token_path = dir.join("trusted-proxy.token");
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    options
+        .open(&proxy_token_path)
+        .expect("create private proxy token")
+        .write_all(proxy_token.as_bytes())
+        .expect("write proxy token");
+    let mut server = spawn_http_server_with_local_auth_and_proxy(
+        &dir,
+        listen,
+        admin_token,
+        Some(&proxy_token_path),
+    );
 
     let client = Client::builder()
         .timeout(Duration::from_secs(5))
@@ -1110,18 +1155,40 @@ fn mcp_serve_http_local_auth_server_enforces_mtls_and_attestation_bound_sender_c
         &[("chio_transaction_context", transaction_context.as_str())],
     );
 
+    let token_form = [
+        ("grant_type", "authorization_code"),
+        ("code", code.as_str()),
+        ("redirect_uri", redirect_uri),
+        ("client_id", "https://client.example/app"),
+        ("code_verifier", "chio-auth-verifier"),
+        ("resource", resource.as_str()),
+    ];
+    for credential in [None, Some("incorrect-loopback-proxy-credential")] {
+        let mut headers = vec![
+            ("x-chio-mtls-thumbprint-sha256", mtls_thumbprint.to_string()),
+            (
+                "x-chio-runtime-attestation-sha256",
+                attestation_hash.to_string(),
+            ),
+        ];
+        if let Some(credential) = credential {
+            headers.push(("x-chio-proxy-authorization", credential.to_string()));
+        }
+        let rejected = token_exchange_with_headers(&client, &base_url, &token_form, &headers);
+        assert_eq!(rejected.status(), reqwest::StatusCode::UNAUTHORIZED);
+        assert_eq!(
+            rejected.text().expect("untrusted proxy rejection"),
+            "urn:chio:error:transport:untrusted-proxy"
+        );
+    }
+
+    // Proxy authentication rejects before consuming the authorization code.
     let token_response: Value = token_exchange_with_headers(
         &client,
         &base_url,
+        &token_form,
         &[
-            ("grant_type", "authorization_code"),
-            ("code", code.as_str()),
-            ("redirect_uri", redirect_uri),
-            ("client_id", "https://client.example/app"),
-            ("code_verifier", "chio-auth-verifier"),
-            ("resource", resource.as_str()),
-        ],
-        &[
+            ("x-chio-proxy-authorization", proxy_token.to_string()),
             ("x-chio-mtls-thumbprint-sha256", mtls_thumbprint.to_string()),
             (
                 "x-chio-runtime-attestation-sha256",
@@ -1152,6 +1219,7 @@ fn mcp_serve_http_local_auth_server_enforces_mtls_and_attestation_bound_sender_c
         &base_url,
         &access_token,
         &[
+            ("x-chio-proxy-authorization", proxy_token.to_string()),
             ("x-chio-mtls-thumbprint-sha256", mtls_thumbprint.to_string()),
             (
                 "x-chio-runtime-attestation-sha256",
@@ -1181,7 +1249,10 @@ fn mcp_serve_http_local_auth_server_enforces_mtls_and_attestation_bound_sender_c
         &client,
         &base_url,
         &access_token,
-        &[("x-chio-mtls-thumbprint-sha256", mtls_thumbprint.to_string())],
+        &[
+            ("x-chio-proxy-authorization", proxy_token.to_string()),
+            ("x-chio-mtls-thumbprint-sha256", mtls_thumbprint.to_string()),
+        ],
         &json!({
             "jsonrpc": "2.0",
             "id": 2,

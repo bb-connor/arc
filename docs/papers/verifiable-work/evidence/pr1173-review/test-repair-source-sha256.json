@@ -1,0 +1,10 @@
+{
+  "base_head": "93a2552c3a6eb15ac2756129f199f5714390e794",
+  "files": {
+    "crates/kernel/chio-process/tests/crash_recovery.rs": "026636194c4ab2c9972a19ec3e48e1773fc750b421ba6c07ea16ecdb923133d4",
+    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission.rs": "531f53503fad74f4b9d8b9586795fd7a85ea18336f30cc4d118dc0d18945c9b2",
+    "crates/kernel/chio-kernel/src/kernel/tests/threshold_issuance.rs": "6645d30fc080c0dff4db12f03ae49d01d671c93f168e2fc0c0f8fd1f4e6f1aae",
+    ".github/workflows/chio-tee-fips.yml": "32a7cc1d4e7935c4fb5431503c1c55572c01246f1f5a27ff22485dabe0736084"
+  },
+  "source_set_sha256": "2abf3e925de17198939ec8a4801a47fd6c62aafe19031f88a3c5746e8879972a"
+}

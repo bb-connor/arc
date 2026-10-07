@@ -1,0 +1,12 @@
+
+running 6 tests
+test funded_work::tests::execution::native_execution_receipt_is_available_before_claim_or_payment ... ok
+test funded_work::tests::verifier_handoff::verifier_reobserves_claim_after_checker_before_minting_a_decision ... ok
+test funded_work::tests::resolution::refund_substitution_cannot_authorize_a_native_waiver ... ok
+test funded_work::tests::settlement::payout_rejects_altered_observations_and_adapter_identities ... ok
+test funded_work::tests::evidence::private_chain_pays_the_original_native_operation ... ok
+test funded_work::tests::wire::required_facet_failure_times_out_without_a_chain_decision_or_payment has been running for over 60 seconds
+test funded_work::tests::wire::required_facet_failure_times_out_without_a_chain_decision_or_payment ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 91 filtered out; finished in 85.11s
+

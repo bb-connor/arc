@@ -38,6 +38,12 @@ export class ProcessClient {
 
   inspect() { return this.#call({ op: "inspect" }); }
 
+  /** Retain the host-owned preparation under the original logical key. */
+  prepareInvocation(operationKey, serverId, toolName, args) {
+    return this.#call({ op: "prepare_invocation", operation_key: operationKey,
+      server_id: serverId, tool_name: toolName, arguments: args });
+  }
+
   async invoke(operationKey, serverId, toolName, args, { governedIntent } = {}) {
     if (governedIntent !== undefined && (governedIntent === null ||
         typeof governedIntent !== "object" || Array.isArray(governedIntent) ||

@@ -4,6 +4,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 export CARGO_INCREMENTAL=0
 export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-1}"
+# Match the native/flow gates: permission-sensitive startup fixtures must not
+# inherit group-writable ancestry from the invoking shell.
+umask 022
 
 # The whole target is an exact inventory. Adding, removing, ignoring or renaming
 # an acceptance case requires reviewing this gate, not merely changing a filter.
@@ -16,6 +19,14 @@ export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-1}"
   mcp_threshold_proposal_approval_and_restart_preserve_one_capture \
   native_aggregate_capture_survives_consumer_restart \
   native_threshold_proposal_approval_and_restart_preserve_one_capture \
+  support::a2a_continuation_clock::transient_deadline_clock_failure_preserves_the_original_task_for_retry \
+  support::a2a_v1::continuation_error_does_not_restore_pending_approval_after_terminal_dispatch \
+  support::a2a_v1::continuation_conceals_inaccessible_tasks_and_preserves_the_original_owner \
+  support::a2a_v1::continuation_refuses_frozen_authority_changes_without_losing_pending_custody \
+  support::a2a_v1::signed_approval_cannot_resume_a_cancelled_v1_task \
+  support::a2a_v1::signed_approval_continuation_completes_the_original_v1_task \
+  support::a2a_v1::pending_approval_preserves_caller_isolation_and_text_mode_through_cancel \
+  support::a2a_v1::pending_approval_remains_observable_without_dispatch_or_new_receipts \
   -- cargo test -p chio-conformance --test consumer_boundary --locked
 
 run_case() {

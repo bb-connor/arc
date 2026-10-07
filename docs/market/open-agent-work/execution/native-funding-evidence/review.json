@@ -1,0 +1,28 @@
+{
+  "scope": "Local uncommitted native funding slice and shared kernel retention/recovery changes",
+  "mode": "independent read-only code review",
+  "findings": [
+    {
+      "issue": "Committed rail authorization could be cancelled before native acknowledgement",
+      "disposition": "Recovered from authoritative rail lookup into original native journal"
+    },
+    {
+      "issue": "Failed second observation hid original native identity",
+      "disposition": "Definite pre-commit refusal and inspectable unbound original operation"
+    },
+    {
+      "issue": "Failed pre-dispatch release was not retried",
+      "disposition": "Resume persisted release intent and authority on original payment"
+    },
+    {
+      "issue": "Prepared admission without payment participant could not be reported",
+      "disposition": "Optional payment report only when participant and journal are both absent"
+    },
+    {
+      "issue": "Reopened rail mode was not checked",
+      "disposition": "Exact persisted rail name and mode required for lookup and release"
+    }
+  ],
+  "finalReview": "No remaining actionable findings in final read-only review; reviewer did not run Cargo",
+  "qualification": "Tests and tool results are recorded separately. No remote review or CI qualification is claimed."
+}

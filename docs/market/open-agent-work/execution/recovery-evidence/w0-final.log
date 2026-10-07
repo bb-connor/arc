@@ -1,0 +1,37 @@
+bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+✔ actual W0 payout recovers after SIGKILL before_broadcast (7951.617776ms)
+✔ actual W0 payout recovers after SIGKILL after_broadcast (6649.046738ms)
+✔ actual W0 payout recovers after SIGKILL after_observation (6576.952302ms)
+✔ actual W0 payout recovers after SIGKILL after_recorded (6349.104215ms)
+✔ an earned child recovers payout after parent refund and rail-worker loss (9222.356933ms)
+bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+✔ real W0 accepted has exact retained authority and balances (5868.959964ms)
+✔ real W0 rejected has exact retained authority and balances (4286.006461ms)
+✔ real W0 missing-custody has exact retained authority and balances (3302.276839ms)
+✔ real W0 child has exact retained authority and balances (8571.87276ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 47695.173777

@@ -44,7 +44,8 @@
     "vite": {
       ".": "7.3.5",
       "esbuild": "0.28.1"
-    }
+    },
+    "source-map-js": "1.2.2"
   },
   "publishConfig": {
     "access": "public"

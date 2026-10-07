@@ -1,3 +1,8 @@
+use super::*;
+
+#[path = "preparation.rs"]
+mod preparation;
+
 #[derive(Clone, Copy)]
 enum ReleaseFault {
     Error,

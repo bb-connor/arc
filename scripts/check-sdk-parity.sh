@@ -81,11 +81,10 @@ EOF
 ./scripts/check-chio-go.sh
 CHIO_CPP_REQUIRE_CBINDGEN="${CHIO_CPP_REQUIRE_CBINDGEN:-0}" ./scripts/check-chio-cpp.sh
 ./scripts/check-chio-drogon.sh
-CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test mcp_core_cpp_live -- --nocapture
-CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test tasks_cpp_live -- --nocapture
-CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test auth_cpp_live -- --nocapture
-CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test notifications_cpp_live -- --nocapture
-CHIO_CPP_LIVE_CONFORMANCE=1 cargo test -p chio-conformance --test nested_callbacks_cpp_live -- --nocapture
+# The HTTP example builds its CLI without native enforcement. Restore the
+# enforcing binary before the native consumers use the qualified host fixture.
+cargo build --locked -p chio-cli --features real-linux-enforcement --bin chio
+CHIO_CPP_LIVE_CONFORMANCE=1 cargo test --locked -p chio-conformance --no-fail-fast --test mcp_core_cpp_live --test tasks_cpp_live --test auth_cpp_live --test notifications_cpp_live --test nested_callbacks_cpp_live -- --nocapture
 
 echo "Python live parity is package-backed for the current conformance surface:"
 echo "  invariants, initialize/session, tools/resources/prompts, notifications, tasks, auth, nested callbacks"

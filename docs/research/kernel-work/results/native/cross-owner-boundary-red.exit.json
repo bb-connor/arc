@@ -1,0 +1,4 @@
+{
+  "exit_code": 101,
+  "cause": "unknown refusal receipts contain fresh observation time and signing identity"
+}

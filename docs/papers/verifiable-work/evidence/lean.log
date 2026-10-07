@@ -1,0 +1,4 @@
+'WorkClaims.all_moves_conserve' depends on axioms: [propext, Quot.sound]
+'WorkClaims.transfers_bounded' depends on axioms: [propext, Quot.sound]
+'WorkClaims.earned_never_refunded' depends on axioms: [propext]
+'WorkClaims.other_claim_unchanged' depends on axioms: [propext]

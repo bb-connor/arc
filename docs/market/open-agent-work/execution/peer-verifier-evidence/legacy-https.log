@@ -1,0 +1,27 @@
+{
+  "scenarios": [
+    {
+      "scenario": "normal",
+      "beforeRecovery": null,
+      "reviews": 1,
+      "payments": {
+        "captured": 1
+      },
+      "buyerExpenses": 1,
+      "workExecuted": true,
+      "buyerVerified": true,
+      "localCreditSettled": true,
+      "externalFundsTransferred": false
+    }
+  ],
+  "passed": 1,
+  "buyerImplementation": "Python",
+  "providerImplementation": "Rust",
+  "separateImplementations": true,
+  "independentAuthors": false,
+  "independentOperators": false,
+  "externalFundsTransferred": false,
+  "transport": "TLS 1.3",
+  "negotiationCredential": "proof of possession",
+  "enrollment": "provider-signed and locally activated"
+}

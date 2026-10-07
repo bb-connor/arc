@@ -1,0 +1,1 @@
+Exact input, output, submission, signed decision and original signed transaction survived process exit and reopened from local custody/outbox. This does not re-observe the ended private chain.

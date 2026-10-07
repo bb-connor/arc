@@ -1,11 +1,11 @@
 {
-  "benchmarkInputTreeSha256": "93c63ae08e9c71fedbfdbca7df5c5e839fe543906c60a475869fe974d90bfe33",
+  "benchmarkInputTreeSha256": "056df2983e69670bcd3a2e8ea9c7a74bff9ddc02836cce7417d94ecbe4ea9e98",
   "bilateralThreatMatrix": {
     "cases": 20,
-    "elapsedSeconds": 11,
+    "elapsedSeconds": 14,
     "explicitNonTestableAssumptions": 1
   },
-  "commit": "3dfd241e676ec26da06c41316b1251288341ce83",
+  "commit": "a7f48978523e74e045446419fcd6c117e2b1be84",
   "genericReplay": {
     "cases": 50,
     "elapsedSeconds": 1

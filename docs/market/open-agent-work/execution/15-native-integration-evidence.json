@@ -1,0 +1,1184 @@
+{
+  "schema": "chio.local-integration-evidence.v1",
+  "capturedUtc": "2026-09-14T20:34:48.701871+00:00",
+  "status": "selected_local_gates_passed",
+  "branch": "integration/funded-work-m4",
+  "parents": [
+    "5d1a9ec0d900bd03ce55de903919d972be852d79",
+    "926e1aa8411e3b516fe737988dd1a0989c447d08"
+  ],
+  "mergeBase": "f5566d9a765c21cb36652a99c79de64968a656bf",
+  "sourceObjects": {
+    "crates": "33035e38457c7868e7f075b745b32fd1844ca05a",
+    "contracts": "154e7ac1b657a09485492c11ba036abbb25081bb",
+    "examples": "fe3585a084ad4dbafd6d57e910b94d65ff25414c",
+    "formal": "fac5c8a81e3723213c6204af0e914218e2b65eb5",
+    "sdks": "8446666eeba97f1608c7ea66b0e24c843b7d1163",
+    "scripts": "df402aa28a82819d63fdc7d8bf055519b700c382",
+    "fuzz": "5fc396a603eccfd406026bbbdf02d769729f09bd",
+    "xtask": "82dde61cbe5b4c77858cc05e7d4ad859da151203",
+    "spec": "3667a614f205f4abf3bff40d07e920535822630b",
+    ".github": "b1eecdb5cf04d419a6cb83a305c71a5ec91b273a",
+    ".cargo": "3ab0b4e61603e925641340ceccacf359e10398ec",
+    "Cargo.toml": "f622b684573a9e01d2807f6eb95a8f74bfdb6b23",
+    "Cargo.lock": "3beee23ddc1b00265130dc87b135da0b1cc2a0a3",
+    "rust-toolchain.toml": "b1dd491cdce6f8b98cfe02f6807980c0dfe48784",
+    "Makefile": "03a52359322f25c13dbf7c9b5ab1301073ffebbe",
+    ".gitignore": "2fc0a5c02ae99142bff0d9afe2ded63ca6844b4f"
+  },
+  "sourceObjectsScope": "Final Git trees/blobs for selected executable source, tests, locks, formal models and build configuration; excludes self-referential evidence documents. Broad gates precede the caller-custody follow-up and have separately retained source objects.",
+  "preCallerCustodySource": {
+    "scope": "Combined source on which the full flow and consumer scripts passed, before selected caller custody hardening. Later affected checks are recorded separately.",
+    "sourceObjects": {
+      "crates": "5e326e295ea5cced407353daff2aea39771e0492",
+      "contracts": "154e7ac1b657a09485492c11ba036abbb25081bb",
+      "examples": "fe3585a084ad4dbafd6d57e910b94d65ff25414c",
+      "formal": "1b1d39d45f59861101a4a3984e29d3be42252c3b",
+      "sdks": "8446666eeba97f1608c7ea66b0e24c843b7d1163",
+      "scripts": "96495acacb367925698b7c4153bee7521f3a0e80",
+      "fuzz": "5fc396a603eccfd406026bbbdf02d769729f09bd",
+      "xtask": "82dde61cbe5b4c77858cc05e7d4ad859da151203",
+      "spec": "3667a614f205f4abf3bff40d07e920535822630b",
+      ".github": "b1eecdb5cf04d419a6cb83a305c71a5ec91b273a",
+      ".cargo": "3ab0b4e61603e925641340ceccacf359e10398ec",
+      "Cargo.toml": "f622b684573a9e01d2807f6eb95a8f74bfdb6b23",
+      "Cargo.lock": "3beee23ddc1b00265130dc87b135da0b1cc2a0a3",
+      "rust-toolchain.toml": "b1dd491cdce6f8b98cfe02f6807980c0dfe48784",
+      "Makefile": "03a52359322f25c13dbf7c9b5ab1301073ffebbe",
+      ".gitignore": "2fc0a5c02ae99142bff0d9afe2ded63ca6844b4f"
+    },
+    "indexTreeForReview": "4e1857d6c94832183ac891a5d0b04a8716f5d654"
+  },
+  "callerCustodyFollowup": {
+    "scope": "Require physical DPoP history only when the original matching grants required DPoP and selected an owned replay authority. Preserve configured but unused approval/DPoP sources and legacy absence.",
+    "qualification": "Full kernel library, updated exact frozen-context inventory, complete authenticated caller/native gate, physical DPoP caller expiry/restart regression, workspace all-target check and strict Clippy, formatting, hygiene, reviewed formal anchors and regenerated coverage.",
+    "unchangedGates": "The full 69-inventory flow script and 38-inventory consumer script passed before this follow-up. Only the changed flow inventory and affected caller/native checks were rerun, not both complete scripts.",
+    "commands": [
+      {
+        "path": "integration-evidence/caller-custody-inventory.sh",
+        "sha256": "b2aa383cbf9234b159ae4172cc0e7c39957e5ce5dbf9081149a70bd650b3d776",
+        "bytes": 4822
+      },
+      {
+        "path": "integration-evidence/caller-custody-qualification.sh",
+        "sha256": "0c08efb4ed1a1275c7abf044298496bd4da8497beedb187c1ca25f7f544ec73b",
+        "bytes": 1274
+      }
+    ],
+    "executedBinaries": [
+      {
+        "path": "target/debug/deps/chio_kernel-ece71a10790b9ed1",
+        "sha256": "ec879c0a03398a7f51accf80237d3556594a0a40035c4a54652656f769914d4e",
+        "bytes": 91043560,
+        "logs": [
+          "caller-custody-kernel.log",
+          "caller-custody-inventory.log"
+        ]
+      },
+      {
+        "path": "target/debug/deps/execution_nonce_caller_execution-71d6c8a702a53ef3",
+        "sha256": "3b995a206f96e43824212e1f604fdcf389de3c26700411985c76907ac9c5d705",
+        "bytes": 66147280,
+        "logs": [
+          "caller-custody-authenticated.log"
+        ]
+      },
+      {
+        "path": "target/debug/deps/caller_execution_ledger-3b40799109e52170",
+        "sha256": "ac4382cc39c62cc8b96dd86275817d0590ecf4e019f4ce1747fb10dc06e53e9c",
+        "bytes": 7138592,
+        "logs": [
+          "caller-custody-authenticated.log"
+        ]
+      },
+      {
+        "path": "target/debug/deps/chio_control_plane-c608ca76d0a26201",
+        "sha256": "04aad22d0251f51f8568587e7687be886adc57df47a007b4c59020d31adb361a",
+        "bytes": 238850368,
+        "logs": [
+          "caller-custody-authenticated.log"
+        ]
+      },
+      {
+        "path": "target/debug/deps/chio_store_sqlite-5a6ec1936384c61e",
+        "sha256": "02bb88f7e1ab5aba1243065c25e6a9f4da591419f06ee0eb6c334d950e68131f",
+        "bytes": 115277816,
+        "logs": [
+          "caller-custody-physical-dpop.log"
+        ]
+      }
+    ],
+    "sourcePatch": {
+      "path": "integration-evidence/caller-custody-followup.patch",
+      "sha256": "fcad800e10c27a37772b10e1862d2435e204cb43ec3d4590de41e41092a18c3c",
+      "bytes": 15253
+    },
+    "sourceScope": "Historical failures and the untouched M4 baseline predate both final snapshots. Source objects do not relabel those runs as final-source qualification."
+  },
+  "environment": {
+    "rust": "1.94.1",
+    "host": "aarch64-unknown-linux-gnu",
+    "CARGO_BUILD_JOBS": "3",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "RUST_TEST_THREADS": "1",
+    "CARGO_TARGET_DIR": "target (standalone examples and fuzz share the integration target)",
+    "coreDumps": "disabled",
+    "permissionSensitiveGateUmask": "022",
+    "prerequisites": [
+      "wasm32-unknown-unknown",
+      "Apalache",
+      "locked Lean toolchain",
+      "Node/npm",
+      "Go",
+      "pinned participant Python venv",
+      "separate uv-frozen adapter-base and Hermes dev environments",
+      "frozen Python SDK environment"
+    ]
+  },
+  "toolVersions": {
+    "rustc": "rustc 1.94.1 (e408947bf 2026-03-25)",
+    "node": "v24.16.0",
+    "go": "go version go1.26.4 linux/arm64",
+    "os": {
+      "system": "Linux",
+      "release": "6.17.0-1020-oracle",
+      "machine": "aarch64"
+    },
+    "participantPython": {
+      "python": "3.12.3",
+      "cryptography": "50.0.1",
+      "rfc8785": "0.1.4"
+    }
+  },
+  "commandScope": "Selection/reproduction commands accompany observed logs; they are not a verbatim shell transcript. Direct compiled-test execution is identified where used. Required script gates retain their exact inventory assertions.",
+  "runs": [
+    {
+      "path": "integration-evidence/security-baseline.log",
+      "sha256": "b763a62b455480bc070e99885ea5ee4cd310232452f8ed7651818aead71ff195",
+      "bytes": 21427,
+      "selection": "Untouched Security M4 native provisioning baseline",
+      "outcome": "passed",
+      "executionPhase": "untouched_security_m4_baseline",
+      "observedResults": [
+        "    Finished `test` profile [unoptimized] target(s) in 4m 57s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1655 filtered out; finished in 1.70s"
+      ]
+    },
+    {
+      "path": "integration-evidence/schema-v35-red.log",
+      "sha256": "f0b99d31b23b53e3414ad7787159a4a66549f5edae8e5beea5be1dce43c4e542",
+      "bytes": 1940,
+      "selection": "New native-v35 migration regressions before implementation",
+      "outcome": "expected_red",
+      "executionPhase": "historical_failure_or_baseline",
+      "observedResults": [
+        "    Finished `test` profile [unoptimized] target(s) in 1m 12s",
+        "test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 1660 filtered out; finished in 11.39s"
+      ]
+    },
+    {
+      "path": "integration-evidence/global-schema-red.log",
+      "sha256": "b7a3bf1c9424db7ccb899766c07f10fac04282c4e03b0802c83956f9a1b00bd1",
+      "bytes": 1020,
+      "selection": "New global predecessor regression before implementation",
+      "outcome": "expected_red",
+      "executionPhase": "historical_failure_or_baseline",
+      "observedResults": [
+        "test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 1660 filtered out; finished in 0.16s"
+      ]
+    },
+    {
+      "path": "integration-evidence/schema-green.log",
+      "sha256": "582a4e9cce91a81bd0e91d5312d458f500034e12600600e6dea864f854d9da10",
+      "bytes": 11832,
+      "selection": "cargo test -p chio-store-sqlite --lib schema",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": [
+        "    Finished `test` profile [unoptimized] target(s) in 1m 12s",
+        "test result: ok. 105 passed; 0 failed; 0 ignored; 0 measured; 1559 filtered out; finished in 104.13s"
+      ]
+    },
+    {
+      "path": "integration-evidence/admission-store.log",
+      "sha256": "419125cb20109f77b7a97c456f14ce4aca21eaa9036fb19310236f868e2b7bb0",
+      "bytes": 73135,
+      "selection": "cargo test -p chio-store-sqlite --lib admission_operation_store_tests",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": [
+        "test result: ok. 506 passed; 0 failed; 0 ignored; 0 measured; 1158 filtered out; finished in 2142.65s"
+      ]
+    },
+    {
+      "path": "integration-evidence/kernel-lib.log",
+      "sha256": "1ddf2642b295dca170dbc70d9b77a9c2087cfe31b2bc229d5e8dfb84a0453853",
+      "bytes": 139729,
+      "selection": "cargo test -p chio-kernel --lib (full compiled library inventory executed directly)",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": [
+        "test result: ok. 1440 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 64.01s"
+      ]
+    },
+    {
+      "path": "integration-evidence/kernel-sqlite.log",
+      "sha256": "94f1e617d4860458d2da7c012cddc2943e53a76c97e8e2419486e303c93e7c09",
+      "bytes": 1896,
+      "selection": "cargo test -p chio-kernel --test durable_admission_sqlite",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": [
+        "    Finished `test` profile [unoptimized] target(s) in 13.54s",
+        "test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 62.18s"
+      ]
+    },
+    {
+      "path": "integration-evidence/authenticated-caller.log",
+      "sha256": "f9a217436f2d70324afa705f53bfb1007b275371e280a862f4bcd5df63c70598",
+      "bytes": 22011,
+      "selection": "./scripts/check-authenticated-caller-delivery.sh",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": [
+        "    Finished `test` profile [unoptimized] target(s) in 4m 21s",
+        "    Finished `test` profile [unoptimized] target(s) in 0.87s",
+        "test result: ok. 34 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 178.99s",
+        "authenticated caller lifecycle passed (34 exact tests)",
+        "    Finished `test` profile [unoptimized] target(s) in 10.41s",
+        "    Finished `test` profile [unoptimized] target(s) in 0.88s",
+        "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.34s",
+        "durable authenticated executor passed (9 exact tests)",
+        "    Finished `test` profile [unoptimized] target(s) in 3m 30s",
+        "    Finished `test` profile [unoptimized] target(s) in 18m 47s",
+        "test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 1115 filtered out; finished in 1197.40s",
+        "native authenticated caller custody passed (19 exact tests)"
+      ]
+    },
+    {
+      "path": "integration-evidence/native-restart.log",
+      "sha256": "91e54b20188b8ca4b36f88129ec03e506bb50973fe8393c513f05fc1aa7404ca",
+      "bytes": 14207,
+      "selection": "./scripts/check-native-restart-safety.sh",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": [
+        "    Finished `test` profile [unoptimized] target(s) in 3m 27s",
+        "    Finished `test` profile [unoptimized] target(s) in 18m 47s",
+        "test result: ok. 47 passed; 0 failed; 0 ignored; 0 measured; 1087 filtered out; finished in 1201.31s",
+        "native process failure and restart passed (47 exact tests)",
+        "    Finished `test` profile [unoptimized] target(s) in 6m 39s",
+        "    Finished `test` profile [unoptimized] target(s) in 23.11s",
+        "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 1435 filtered out; finished in 0.06s",
+        "live admission ownership passed (5 exact tests)"
+      ]
+    },
+    {
+      "path": "integration-evidence/runtime-tests.log",
+      "sha256": "011bb6593b7cefadbce337e7b68bee140b1e21492f3bd6d2978a8e265fd5a88a",
+      "bytes": 17401,
+      "selection": "cargo test -p chio-runtime-core --test runtime_admission --test runtime_treaty_predicate_substitution",
+      "outcome": "predicate_failure_superseded",
+      "executionPhase": "historical_failure_or_baseline",
+      "observedResults": [
+        "    Finished `test` profile [unoptimized] target(s) in 27.25s",
+        "test result: ok. 88 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 146.07s",
+        "test result: FAILED. 9 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 203.19s"
+      ]
+    },
+    {
+      "path": "integration-evidence/predicate-final.log",
+      "sha256": "f97baf164cfdd1c7ca5eb3379d9a5ab4953b7156bc539e8e67a9cc296e2cb3e5",
+      "bytes": 937,
+      "selection": "cargo test -p chio-runtime-core --test runtime_treaty_predicate_substitution",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": [
+        "test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 260.60s"
+      ]
+    },
+    {
+      "path": "integration-evidence/runtime-extra-tests-final.log",
+      "sha256": "d8d984d4297f21ab8120d8b3350ab55f6a5379abf7e31a665bef1a2e8b9451bd",
+      "bytes": 4163,
+      "selection": "cargo test -p chio-runtime-core --test runtime_agreement_context_scan --test runtime_treaty_binding_substitution",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": [
+        "    Finished `test` profile [unoptimized] target(s) in 17.39s",
+        "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s",
+        "test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 29.03s"
+      ]
+    },
+    {
+      "path": "integration-evidence/a2a-tests.log",
+      "sha256": "e6cd252b708f2f11b588e541ced09a4af7f3fa1187c642509f2daf1343c8dfd2",
+      "bytes": 14679,
+      "selection": "cargo test -p chio-a2a-edge --lib",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": [
+        "    Finished `test` profile [unoptimized] target(s) in 2m 23s",
+        "test result: ok. 102 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.42s"
+      ]
+    },
+    {
+      "path": "integration-evidence/a2a-interop-v2.log",
+      "sha256": "f7db4d91cd8afee52a16cb0353daae836b44699c47744cefe10473a6195f0596",
+      "bytes": 591,
+      "selection": "cargo test -p chio-conformance --test a2a_client_edge_interop",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": [
+        "    Finished `test` profile [unoptimized] target(s) in 2m 51s",
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s"
+      ]
+    },
+    {
+      "path": "integration-evidence/federation-conformance.log",
+      "sha256": "e1dcae95ab844c56253e7dc5bf004ba7fa2adb58b1a45957c2da7958152f1dd5",
+      "bytes": 3091,
+      "selection": "cargo test -p chio-federation --test verifier_hook_conformance",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": [
+        "    Finished `test` profile [unoptimized] target(s) in 1m 10s",
+        "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.89s"
+      ]
+    },
+    {
+      "path": "integration-evidence/iroh-tests.log",
+      "sha256": "9de42f0904fd83d462637dd51ad166e887ac95e5efdb5d40d4de62dfee659c51",
+      "bytes": 30150,
+      "selection": "cargo test -p chio-federation-transport-iroh --lib",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": [
+        "    Finished `test` profile [unoptimized] target(s) in 5m 00s",
+        "test result: ok. 190 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.55s"
+      ]
+    },
+    {
+      "path": "integration-evidence/standalone-tests.log",
+      "sha256": "d9f8ee0be99f99b11963397aaa9f478b798db19b9569999ac0d0e5cd2c34d9f4",
+      "bytes": 1413,
+      "selection": "cargo test --manifest-path examples/federated-work/Cargo.toml --locked --offline",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": [
+        "    Finished `test` profile [unoptimized] target(s) in 1m 09s",
+        "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s"
+      ]
+    },
+    {
+      "path": "integration-evidence/standalone-build.log",
+      "sha256": "66da8c1f55a64eb2b21d585383c53e926e4af2f0599b5319c3d15b33a7c1fe5f",
+      "bytes": 228,
+      "selection": "cargo build --manifest-path examples/federated-work/Cargo.toml --locked --offline",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": [
+        "    Finished `dev` profile [unoptimized] target(s) in 32.68s"
+      ]
+    },
+    {
+      "path": "integration-evidence/standalone-clippy.log",
+      "sha256": "2669dc999666c142903bba8e2f4c67179ba4cadf50f1c5c541054ca9ee505c8f",
+      "bytes": 11978,
+      "selection": "cargo clippy --manifest-path examples/federated-work/Cargo.toml --all-targets --locked --offline -- -D warnings",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": [
+        "    Finished `dev` profile [unoptimized] target(s) in 20m 27s"
+      ]
+    },
+    {
+      "path": "integration-evidence/python-unit-final.log",
+      "sha256": "b4ee3e93ba3002d50313d387dcd90438d39a5761a96687cbf43345c58f044daf",
+      "bytes": 4637,
+      "selection": "/tmp/chio-python31-locked-venv/bin/python -B -m unittest discover -s examples/federated-work/python_buyer -p \"test_*.py\" -v (PYTHONPATH=examples/federated-work)",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": []
+    },
+    {
+      "path": "integration-evidence/composed-tests-v2.log",
+      "sha256": "938e5577c61ef543b98e21973ab2c4a9fdb0bcf1fc0717d412ae372001ccbbf3",
+      "bytes": 4433,
+      "selection": "cargo test --manifest-path examples/composed-baseline/Cargo.toml --locked --offline",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": [
+        "    Finished `test` profile [unoptimized] target(s) in 2m 49s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.60s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "path": "integration-evidence/composed-cli.log",
+      "sha256": "87c7665e03a83b3f25b425a7a5b94b7147dbb559112b6678825090235e466ab1",
+      "bytes": 110,
+      "selection": "target/debug/run-composed-baseline --work-dir <fresh-private-directory> --out <output-file> --calls 5 --warmup 1",
+      "outcome": "passed_smoke_only",
+      "executionPhase": "broad_integration",
+      "observedResults": []
+    },
+    {
+      "path": "integration-evidence/outcome-tests-v2.log",
+      "sha256": "b00788687a139a4e88026d436f3c8427c6a418656e0656a0ac74cf45455965ed",
+      "bytes": 4303,
+      "selection": "Outcome comparison before recovered Git-hook repair",
+      "outcome": "hook_failures_superseded",
+      "executionPhase": "historical_failure_or_baseline",
+      "observedResults": [
+        "    Finished `test` profile [unoptimized] target(s) in 18m 33s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: FAILED. 3 passed; 6 failed; 0 ignored; 0 measured; 0 filtered out; finished in 164.89s"
+      ]
+    },
+    {
+      "path": "integration-evidence/outcome-tests-green.log",
+      "sha256": "014d04bd5187dfa1d61649d24a86e6c2e8b380d71cfbf73377d5e5ebd3676e00",
+      "bytes": 927,
+      "selection": "target/debug/deps/experiment-a22e0919b558bbf8 --test-threads=1",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": [
+        "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 337.07s"
+      ]
+    },
+    {
+      "path": "integration-evidence/adapter-hooks-red.log",
+      "sha256": "72b4bee123b3462718335ef71cbcda59bf22cd3a71f1a0623d50b6c3674e67bd",
+      "bytes": 10337,
+      "selection": "Adapter actual-Git-hook regressions before recovered repair",
+      "outcome": "expected_red",
+      "executionPhase": "historical_failure_or_baseline",
+      "observedResults": [
+        "5 failed, 1 passed in 0.32s"
+      ]
+    },
+    {
+      "path": "integration-evidence/hermes-hooks-red.log",
+      "sha256": "301b6e6f5acd8a3f124e1d938c75b13f623c12b5e579a86290fcb9d404450abb",
+      "bytes": 5452,
+      "selection": "Hermes actual-Git-hook regressions before recovered repair",
+      "outcome": "expected_red",
+      "executionPhase": "historical_failure_or_baseline",
+      "observedResults": []
+    },
+    {
+      "path": "integration-evidence/adapter-tests-final.log",
+      "sha256": "9216b6f09def344f522af3efcfe5535264180c5db3b3053db0044497985933cb",
+      "bytes": 260,
+      "selection": "pytest sdks/python/chio-adapter-base/tests in its frozen dev environment",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": [
+        "205 passed in 7.76s"
+      ]
+    },
+    {
+      "path": "integration-evidence/hermes-tests.log",
+      "sha256": "449ffd5125889cfcf2460e87d9d9976b0152d6102f47b65f5d6ea29fa33a6ecd",
+      "bytes": 271,
+      "selection": "pytest sdks/python/chio-hermes/tests in its frozen dev environment",
+      "outcome": "passed_with_four_existing_skips",
+      "executionPhase": "broad_integration",
+      "observedResults": [
+        "196 passed, 4 skipped in 4.97s"
+      ]
+    },
+    {
+      "path": "integration-evidence/consumer-boundaries-umask002.log",
+      "sha256": "c6beca7c10ea9bc8310a4793d8a6f6d10824b4b1290da8f4e4fcda059b21f7a4",
+      "bytes": 55874,
+      "selection": "Initial consumer gate under inherited umask 002",
+      "outcome": "permission_fixture_failure_superseded",
+      "executionPhase": "historical_failure_or_baseline",
+      "observedResults": [
+        "    Finished `test` profile [unoptimized] target(s) in 17m 27s",
+        "    Finished `test` profile [unoptimized] target(s) in 17m 00s",
+        "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 32.80s",
+        "durable consumer boundaries passed (8 exact tests)",
+        "    Finished `test` profile [unoptimized] target(s) in 9m 50s",
+        "    Finished `test` profile [unoptimized] target(s) in 3m 04s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 112 filtered out; finished in 0.08s",
+        "MCP malformed profile before acquisition passed (1 exact tests)",
+        "    Finished `test` profile [unoptimized] target(s) in 2m 34s",
+        "    Finished `test` profile [unoptimized] target(s) in 10.96s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 112 filtered out; finished in 0.04s",
+        "MCP profile recovery without upgrade passed (1 exact tests)",
+        "    Finished `test` profile [unoptimized] target(s) in 8.19s",
+        "    Finished `test` profile [unoptimized] target(s) in 10.27s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 112 filtered out; finished in 0.04s",
+        "MCP bound target authority passed (1 exact tests)",
+        "    Finished `test` profile [unoptimized] target(s) in 3m 55s",
+        "    Finished `test` profile [unoptimized] target(s) in 7m 25s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 59 filtered out; finished in 1.72s",
+        "remote MCP early profile rejection passed (1 exact tests)",
+        "    Finished `test` profile [unoptimized] target(s) in 1.78s",
+        "    Finished `test` profile [unoptimized] target(s) in 1.46s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 59 filtered out; finished in 0.01s",
+        "remote MCP retained authorization passed (1 exact tests)",
+        "    Finished `test` profile [unoptimized] target(s) in 7m 12s",
+        "    Finished `test` profile [unoptimized] target(s) in 2.62s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 43 filtered out; finished in 34.90s",
+        "remote MCP ready-session restart passed (1 exact tests)",
+        "    Finished `test` profile [unoptimized] target(s) in 58.73s",
+        "    Finished `test` profile [unoptimized] target(s) in 1m 39s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 43 filtered out; finished in 34.28s",
+        "remote MCP restart policy tightening passed (1 exact tests)",
+        "    Finished `test` profile [unoptimized] target(s) in 1m 06s",
+        "    Finished `test` profile [unoptimized] target(s) in 1.30s",
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s"
+      ]
+    },
+    {
+      "path": "integration-evidence/consumer-startup-umask022.log",
+      "sha256": "beab3ab209b21c5603e07edbc80d8cdca164ae84331ecf14cf5185fa0dcfbb8f",
+      "bytes": 198,
+      "selection": "target/debug/deps/mcp_startup_security-1dbbef0f5623b02e --test-threads=1 (umask 022)",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.12s"
+      ]
+    },
+    {
+      "path": "integration-evidence/adapter-ruff.log",
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+      "bytes": 19,
+      "selection": "ruff check src/chio_adapter_base/security.py tests/test_git_hooks.py tests/test_security.py (adapter-base frozen environment)",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": []
+    },
+    {
+      "path": "integration-evidence/hermes-ruff.log",
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+      "bytes": 19,
+      "selection": "ruff check src/chio_hermes/executors.py tests/test_git_commit_hooks.py tests/test_security_fixes.py (Hermes frozen environment)",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": []
+    },
+    {
+      "path": "integration-evidence/sdk-parity.log",
+      "sha256": "229ca14a126a56ff51f8a6d2799191bca0c54598f79f2acedd5ab6fe446ec00e",
+      "bytes": 609,
+      "selection": "./scripts/check-consumer-sdk-parity.sh",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": [
+        "15 passed in 1.42s",
+        "Current consumer SDK gate passed (Python, TypeScript, Go; Rust is in the consumer boundary gate)"
+      ]
+    },
+    {
+      "path": "integration-evidence/workspace-check-v3.log",
+      "sha256": "726a9ff81c7ff3245ce3e8ccdfe1047a1b532f9fee93811978de5b70f0909bc2",
+      "bytes": 16618,
+      "selection": "cargo check --workspace --all-targets --locked --offline",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": [
+        "    Finished `dev` profile [unoptimized] target(s) in 2m 32s"
+      ]
+    },
+    {
+      "path": "integration-evidence/workspace-clippy.log",
+      "sha256": "b9aef2fa39c3282c084c46405bf1b5c6f0fca4b1fe2b02b8527d9e3a7b135fe2",
+      "bytes": 20522,
+      "selection": "cargo clippy --workspace --all-targets --locked --offline -- -D warnings",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": [
+        "    Finished `dev` profile [unoptimized] target(s) in 10m 10s"
+      ]
+    },
+    {
+      "path": "integration-evidence/fuzz-inventory-check.log",
+      "sha256": "4a3ff25bed2d161dec8503ab05e84fbbfbfa3f66868c6fca8fe1a3972b808caf",
+      "bytes": 26225,
+      "selection": "cargo check --manifest-path fuzz/Cargo.toml --bins --locked --offline",
+      "outcome": "passed_compilation_only",
+      "executionPhase": "broad_integration",
+      "observedResults": [
+        "    Finished `dev` profile [unoptimized] target(s) in 20m 07s"
+      ]
+    },
+    {
+      "path": "integration-evidence/codegen-check.log",
+      "sha256": "06617a9d67a03791008a6fc8ab0a1eae0370a5186abf08bca28256fe444c736b",
+      "bytes": 940,
+      "selection": "target/debug/xtask codegen --lang <rust|python|ts|go> --check (all four lanes)",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": []
+    },
+    {
+      "path": "integration-evidence/formal-proofs.log",
+      "sha256": "59b53e60d14d1c26aba063fe0e6577214c497cb2a9f5f962bcfb21bf6227822d",
+      "bytes": 100143,
+      "selection": "./scripts/check-formal-proofs.sh",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": []
+    },
+    {
+      "path": "integration-evidence/formal-mirrors-closeout.log",
+      "sha256": "e3bb3bef614ea322953e7aa8818cee8046ca3683a25c6da1946e87cd5202606b",
+      "bytes": 41,
+      "selection": "target/debug/xtask check formal-mirrors",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": [
+        "formal-mirrors: 225 mirror entries match"
+      ]
+    },
+    {
+      "path": "integration-evidence/adapter-no-bypass-final.log",
+      "sha256": "b515d6857fd514d0088e71961c58874a58d00b4bbc216d112e0f829c4fe361af",
+      "bytes": 57,
+      "selection": "Structured source-inventory and mediation check",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": []
+    },
+    {
+      "path": "integration-evidence/format-closeout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "selection": "cargo fmt --all -- --check",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": []
+    },
+    {
+      "path": "integration-evidence/hygiene-closeout.log",
+      "sha256": "ccaa0aa430cd567eccad5c862d49def01fd92f9bfe172ea2f28622d6bc94fb70",
+      "bytes": 43433,
+      "selection": "python3 scripts/check-rust-file-hygiene.py",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": [
+        "Rust file hygiene check passed"
+      ]
+    },
+    {
+      "path": "integration-evidence/coverage-closeout.log",
+      "sha256": "caa1f58a0fb4b5dce3569e0273bf4a472ae9f8e893b562b8938738597877d446",
+      "bytes": 103,
+      "selection": "target/debug/xtask gen proof-coverage",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": []
+    },
+    {
+      "path": "integration-evidence/caller-selected-custody-red.log",
+      "sha256": "db799baf473cd9bd6e574a35e6d748b7ef350a6148ee39f679318f54f9232b6f",
+      "bytes": 1577,
+      "selection": "cargo test -p chio-kernel --lib selected_custody --locked --offline before the required-DPoP guard",
+      "outcome": "expected_red",
+      "executionPhase": "caller_custody_followup_before_guard",
+      "observedResults": [
+        "    Finished `test` profile [unoptimized] target(s) in 1m 11s",
+        "test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 1440 filtered out; finished in 0.10s"
+      ]
+    },
+    {
+      "path": "integration-evidence/caller-custody-kernel.log",
+      "sha256": "cab70c69e5af60b07f19bea11364b832afa5b739b03d1bdb39045f853b0968b0",
+      "bytes": 141425,
+      "selection": "cargo test -p chio-kernel --lib --locked --offline",
+      "outcome": "passed",
+      "executionPhase": "caller_custody_followup",
+      "observedResults": [
+        "    Finished `test` profile [unoptimized] target(s) in 2m 37s",
+        "test result: ok. 1445 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 63.22s"
+      ]
+    },
+    {
+      "path": "integration-evidence/caller-custody-inventory.log",
+      "sha256": "131dfe45a9451d2d74a36c3a9ac09f4963ec2f205db99a091ba2367394a29d1e",
+      "bytes": 9696,
+      "selection": "Exact frozen dispatch participant context command retained in caller-custody-inventory.sh",
+      "outcome": "passed",
+      "executionPhase": "caller_custody_followup",
+      "observedResults": [
+        "    Finished `test` profile [unoptimized] target(s) in 55.34s",
+        "    Finished `test` profile [unoptimized] target(s) in 0.92s",
+        "test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 1410 filtered out; finished in 5.04s",
+        "frozen dispatch participant context passed (35 exact tests)"
+      ]
+    },
+    {
+      "path": "integration-evidence/caller-custody-authenticated.log",
+      "sha256": "6e366831af4d339b4edd7ed0ca8bf5685bee82d503d7b8c27227e7463aa87fef",
+      "bytes": 18685,
+      "selection": "./scripts/check-authenticated-caller-delivery.sh after the required-DPoP guard",
+      "outcome": "passed",
+      "executionPhase": "caller_custody_followup",
+      "observedResults": [
+        "    Finished `test` profile [unoptimized] target(s) in 1m 39s",
+        "    Finished `test` profile [unoptimized] target(s) in 0.90s",
+        "test result: ok. 34 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 181.14s",
+        "authenticated caller lifecycle passed (34 exact tests)",
+        "    Finished `test` profile [unoptimized] target(s) in 10.68s",
+        "    Finished `test` profile [unoptimized] target(s) in 0.85s",
+        "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.38s",
+        "durable authenticated executor passed (9 exact tests)",
+        "    Finished `test` profile [unoptimized] target(s) in 3m 21s",
+        "    Finished `test` profile [unoptimized] target(s) in 1.01s",
+        "test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 1115 filtered out; finished in 1139.32s",
+        "native authenticated caller custody passed (19 exact tests)"
+      ]
+    },
+    {
+      "path": "integration-evidence/caller-custody-physical-dpop.log",
+      "sha256": "2da3533d4242692f468e72f19c7a68b28735138f7bd78d620ba1fb02c1c9ddbd",
+      "bytes": 979,
+      "selection": "Exact original physical DPoP caller custody inventory retained in caller-custody-qualification.sh",
+      "outcome": "passed",
+      "executionPhase": "caller_custody_followup",
+      "observedResults": [
+        "    Finished `test` profile [unoptimized] target(s) in 1m 12s",
+        "    Finished `test` profile [unoptimized] target(s) in 0.84s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1663 filtered out; finished in 9.58s",
+        "original physical DPoP caller custody passed (1 exact tests)"
+      ]
+    },
+    {
+      "path": "integration-evidence/caller-custody-workspace-check.log",
+      "sha256": "b53ef7186cb790ca9d962ecf7a28fcd9e2ffedf8b495b14091dbe4e2e1378fc5",
+      "bytes": 8640,
+      "selection": "cargo check --workspace --all-targets --locked --offline after the required-DPoP guard",
+      "outcome": "passed",
+      "executionPhase": "caller_custody_followup",
+      "observedResults": [
+        "    Finished `dev` profile [unoptimized] target(s) in 4m 01s"
+      ]
+    },
+    {
+      "path": "integration-evidence/caller-custody-workspace-clippy.log",
+      "sha256": "9bed1a1ac5f4256b29bbb76c338f37fe055c6ac543fd887051c6e84c32382cdf",
+      "bytes": 8640,
+      "selection": "cargo clippy --workspace --all-targets --locked --offline -- -D warnings after the required-DPoP guard",
+      "outcome": "passed",
+      "executionPhase": "caller_custody_followup",
+      "observedResults": [
+        "    Finished `dev` profile [unoptimized] target(s) in 4m 58s"
+      ]
+    },
+    {
+      "path": "integration-evidence/caller-custody-formal.log",
+      "sha256": "e3bb3bef614ea322953e7aa8818cee8046ca3683a25c6da1946e87cd5202606b",
+      "bytes": 41,
+      "selection": "target/debug/xtask check formal-mirrors after reviewing the custody predicate",
+      "outcome": "passed",
+      "executionPhase": "caller_custody_followup",
+      "observedResults": [
+        "formal-mirrors: 225 mirror entries match"
+      ]
+    },
+    {
+      "path": "integration-evidence/caller-custody-whitespace.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "selection": "git diff --cached --check -- crates scripts formal sdks .gitignore Cargo.lock",
+      "outcome": "passed",
+      "executionPhase": "caller_custody_followup",
+      "observedResults": []
+    },
+    {
+      "path": "integration-evidence/caller-custody-format.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "selection": "cargo fmt --all -- --check after the required-DPoP guard",
+      "outcome": "passed",
+      "executionPhase": "caller_custody_followup",
+      "observedResults": []
+    },
+    {
+      "path": "integration-evidence/caller-custody-hygiene.log",
+      "sha256": "ccaa0aa430cd567eccad5c862d49def01fd92f9bfe172ea2f28622d6bc94fb70",
+      "bytes": 43433,
+      "selection": "python3 scripts/check-rust-file-hygiene.py after the required-DPoP guard",
+      "outcome": "passed",
+      "executionPhase": "caller_custody_followup",
+      "observedResults": [
+        "Rust file hygiene check passed"
+      ]
+    },
+    {
+      "path": "integration-evidence/caller-custody-coverage-final-check.log",
+      "sha256": "f6f7e4ae12d9b3e0a3a8053be9604fdeebda525034915e4aecdd99f11c985c60",
+      "bytes": 48,
+      "selection": "target/debug/xtask gen proof-coverage --check after staging the final source",
+      "outcome": "passed",
+      "executionPhase": "caller_custody_followup",
+      "observedResults": []
+    },
+    {
+      "path": "integration-evidence/caller-custody-coverage.log",
+      "sha256": "8c2689dbcb5852c2a13a9a9ca6d084aae179e7936d81fe18fbfe6c18cdaa3fd7",
+      "bytes": 151,
+      "selection": "target/debug/xtask gen proof-coverage followed by --check after the required-DPoP guard",
+      "outcome": "passed",
+      "executionPhase": "caller_custody_followup",
+      "observedResults": []
+    },
+    {
+      "path": "integration-evidence/consumer-boundaries.log",
+      "sha256": "476997b3afe97a3f1f985d93d93cf90c72edd6edb29a3a3fc64af468fff14072",
+      "bytes": 44951,
+      "selection": "./scripts/check-consumer-boundaries.sh",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": [
+        "durable consumer boundaries passed (8 exact tests)",
+        "MCP malformed profile before acquisition passed (1 exact tests)",
+        "MCP profile recovery without upgrade passed (1 exact tests)",
+        "MCP bound target authority passed (1 exact tests)",
+        "remote MCP early profile rejection passed (1 exact tests)",
+        "remote MCP retained authorization passed (1 exact tests)",
+        "remote MCP ready-session restart passed (1 exact tests)",
+        "remote MCP restart policy tightening passed (1 exact tests)",
+        "stdio MCP early profile rejection passed (1 exact tests)",
+        "supervisor HTTP readiness positive control passed (1 exact tests)",
+        "supervisor readiness redirect denial passed (1 exact tests)",
+        "supervisor readiness response bounds passed (1 exact tests)",
+        "supervisor readiness exact response limit passed (1 exact tests)",
+        "supervisor readiness invalid configuration passed (1 exact tests)",
+        "supervisor readiness private addresses passed (1 exact tests)",
+        "operator readiness DNS deadline passed (1 exact tests)",
+        "supervisor readiness rejects before child launch passed (1 exact tests)",
+        "current signed manifest corpus passed (1 exact tests)",
+        "Rust generated protocol corpus passed (1 exact tests)",
+        "authoritative protocol schema corpus passed (1 exact tests)",
+        "signed receipt origin vocabulary passed (1 exact tests)",
+        "retained caller attachment capacity passed (1 exact tests)",
+        "Tower peer boundary passed (1 exact tests)",
+        "OpenAI peer boundary passed (1 exact tests)",
+        "OpenAI ordinary host flow rejection passed (1 exact tests)",
+        "provider fabric bounded profile passed (1 exact tests)",
+        "native negotiated authorization preservation passed (1 exact tests)",
+        "native unnegotiated authorization denial passed (1 exact tests)",
+        "MCP bridge authorization preservation passed (1 exact tests)",
+        "MCP negotiated authorization preservation passed (1 exact tests)",
+        "MCP unnegotiated authorization denial passed (1 exact tests)",
+        "A2A negotiated authorization preservation passed (1 exact tests)",
+        "A2A unnegotiated authorization denial passed (1 exact tests)",
+        "ACP negotiated authorization preservation passed (1 exact tests)",
+        "ACP unnegotiated authorization denial passed (1 exact tests)",
+        "browser unnegotiated authorization denial passed (1 exact tests)",
+        "mobile unnegotiated authorization denial passed (1 exact tests)",
+        "C++ FFI unnegotiated authorization denial passed (1 exact tests)",
+        "Consumer boundary Rust gate passed (SDK, M3 and composed gates remain separate)"
+      ]
+    },
+    {
+      "path": "integration-evidence/flow-security.log",
+      "sha256": "c33c18f50654bd267c23b10e7cd90b4d47f182a2baa48b4dae99f05574dd9711",
+      "bytes": 311677,
+      "selection": "./scripts/check-flow-security.sh",
+      "outcome": "passed",
+      "executionPhase": "broad_integration",
+      "observedResults": [
+        "security types library passed (20 exact tests)",
+        "security capability-set suspension types passed (4 exact tests)",
+        "security egress-restriction types passed (2 exact tests)",
+        "security event types passed (3 exact tests)",
+        "security issuance-freeze types passed (4 exact tests)",
+        "security port contracts passed (7 exact tests)",
+        "security response-dispatch types passed (4 exact tests)",
+        "security response types passed (9 exact tests)",
+        "security session-throttle types passed (3 exact tests)",
+        "flow lattice and enforcement engine passed (46 exact tests)",
+        "strict manifest v2 passed (24 exact tests)",
+        "security kernel adapters passed (34 exact tests)",
+        "durable flow state passed (33 exact tests)",
+        "native compiled catalog identity passed (2 exact tests)",
+        "native flow custody passed (93 exact tests)",
+        "native dispatch ledger callbacks passed (3 exact tests)",
+        "public nested credential custody passed (5 exact tests)",
+        "native dispatch participant snapshots passed (3 exact tests)",
+        "native flow observation contracts passed (3 exact tests)",
+        "original security authority selection passed (22 exact tests)",
+        "original operation authority profile passed (8 exact tests)",
+        "runtime profile non-upgrade passed (1 exact tests)",
+        "native authority admission integration passed (12 exact tests)",
+        "physical dispatch hold ownership passed (3 exact tests)",
+        "qualified recovery lease boundary passed (5 exact tests)",
+        "runtime recovery lease containment passed (1 exact tests)",
+        "kernel-owned native preparation passed (11 exact tests)",
+        "kernel-owned native egress passed (8 exact tests)",
+        "native dispatch attachment contracts passed (4 exact tests)",
+        "live admission ownership passed (5 exact tests)",
+        "native post-join policy passed (133 exact tests)",
+        "native declassification row semantics passed (1 exact tests)",
+        "native declassification issuer window passed (1 exact tests)",
+        "native capture accounting deltas passed (2 exact tests)",
+        "native runtime validity contract passed (1 exact tests)",
+        "native runtime signed freshness passed (3 exact tests)",
+        "native policy clock bounds passed (1 exact tests)",
+        "prepared flow dispatch binding passed (13 exact tests)",
+        "security dispatch credential boundaries passed (8 exact tests)",
+        "durable release output binding passed (2 exact tests)",
+        "frozen dispatch participant context passed (30 exact tests)",
+        "durable caller participant persistence passed (3 exact tests)",
+        "frozen federation context passed (13 exact tests)",
+        "frozen durable receipt signing passed (9 exact tests)",
+        "durable security release recovery passed (25 exact tests)",
+        "dispatch rejection payment custody passed (8 exact tests)",
+        "security runtime composition passed (2 exact tests)",
+        "OpenAPI bridge canonical flow passed (1 exact tests)",
+        "MCP flow sidecar passed (1 exact tests)",
+        "A2A canonical flow passed (1 exact tests)",
+        "A2A rejected flow sidecar passed (1 exact tests)",
+        "ACP canonical flow passed (1 exact tests)",
+        "ACP rejected flow sidecar passed (1 exact tests)",
+        "OpenAI canonical flow passed (1 exact tests)",
+        "OpenAI rejected flow sidecar passed (1 exact tests)",
+        "Anthropic canonical round trip passed (1 exact tests)",
+        "cross-protocol canonical flow passed (1 exact tests)",
+        "cross-protocol rejects unadmitted sidecar passed (1 exact tests)",
+        "cross-protocol rejects forged sidecar passed (1 exact tests)",
+        "Bedrock canonical flow passed (1 exact tests)",
+        "Gemini canonical flow passed (1 exact tests)",
+        "Ollama canonical flow passed (1 exact tests)",
+        "Mistral canonical stream passed (1 exact tests)",
+        "Groq canonical stream passed (1 exact tests)",
+        "Cohere canonical stream passed (1 exact tests)",
+        "security schema vectors passed (2 exact tests)",
+        "native input intent contracts passed (6 exact tests)",
+        "native global journal migration passed (4 exact tests)",
+        "native nonce issuance custody passed (1 exact tests)",
+        "Flow security gate passed"
+      ]
+    }
+  ],
+  "processRuns": [
+    {
+      "profile": "paid",
+      "passedScenarios": 11,
+      "summary": {
+        "path": "integration-evidence/paid-summary.json",
+        "sha256": "aa3026861cb29a45b6686fe440b9e3cb1cadf826087bfbf6a285941df2c8744f",
+        "bytes": 3309
+      },
+      "log": {
+        "path": "integration-evidence/paid-smoke.log",
+        "sha256": "a6e36c11fb7c65d702daccfea9e469feb0fc7e8228d1d3b705af379e4434faa4",
+        "bytes": 3720
+      },
+      "reproduction": "python3 -B examples/federated-work/paid_smoke.py --binary target/debug/chio-federated-work --output <fresh-private-directory>"
+    },
+    {
+      "profile": "python",
+      "passedScenarios": 18,
+      "summary": {
+        "path": "integration-evidence/python-summary.json",
+        "sha256": "23a280fd7fcdc610c8e61aa8b4c88a5711c384676301e8d238af96fc0cce5344",
+        "bytes": 5749
+      },
+      "log": {
+        "path": "integration-evidence/python-smoke-final.log",
+        "sha256": "23a280fd7fcdc610c8e61aa8b4c88a5711c384676301e8d238af96fc0cce5344",
+        "bytes": 5749
+      },
+      "reproduction": "python3 -B examples/federated-work/python_smoke.py --binary target/debug/chio-federated-work --python-env /tmp/chio-python31-locked-venv --output <fresh-private-directory>"
+    },
+    {
+      "profile": "https",
+      "passedScenarios": 19,
+      "summary": {
+        "path": "integration-evidence/https-summary.json",
+        "sha256": "7c63aac629b3d0321e553439ccfb50a9fd74bef5be68e7c5b29002f819fb15af",
+        "bytes": 6247
+      },
+      "log": {
+        "path": "integration-evidence/https-smoke-final.log",
+        "sha256": "7c63aac629b3d0321e553439ccfb50a9fd74bef5be68e7c5b29002f819fb15af",
+        "bytes": 6247
+      },
+      "reproduction": "python3 -B examples/federated-work/https_smoke.py --binary target/debug/chio-federated-work --python-env /tmp/chio-python31-locked-venv --output <fresh-private-directory>"
+    },
+    {
+      "profile": "resolution",
+      "passedScenarios": 7,
+      "summary": {
+        "path": "integration-evidence/resolution-summary.json",
+        "sha256": "0dbb22f56bf6afc38d9c57ca7fe27a7c8008f0a8fbb9527cccc2cb624dcf0806",
+        "bytes": 3932
+      },
+      "log": {
+        "path": "integration-evidence/resolution-smoke-final.log",
+        "sha256": "5b858a4cd3a3e7a1352f70af97ff22c01c1c81f96c1f095b9bbf948d81457152",
+        "bytes": 2536
+      },
+      "reproduction": "python3 -B examples/federated-work/resolution_smoke.py --binary target/debug/chio-federated-work --python-env /tmp/chio-python31-locked-venv --output <fresh-private-directory>"
+    },
+    {
+      "profile": "subcontract",
+      "passedScenarios": 10,
+      "summary": {
+        "path": "integration-evidence/subcontract-summary.json",
+        "sha256": "92003361f48a02ee6523817fba02326fa5dd88dc3d19be182ea216aebd98a86f",
+        "bytes": 3626
+      },
+      "log": {
+        "path": "integration-evidence/subcontract-smoke-v3.log",
+        "sha256": "47ec178776dffc0f45f9fc44ffcef8eeb0057d9c55c6b2c0fffcf21e64d1e720",
+        "bytes": 2356
+      },
+      "reproduction": "python3 -B examples/federated-work/subcontract_smoke.py --binary target/debug/chio-federated-work --python-env /tmp/chio-python31-locked-venv --output <fresh-private-directory>"
+    }
+  ],
+  "executedBinaries": {
+    "target/debug/chio-federated-work": {
+      "sha256": "6b7ca597489c964a31ef81dee21dde49dc1e21ed7fac3bc696a8db46478b5821",
+      "bytes": 86803336
+    },
+    "target/debug/deps/experiment-a22e0919b558bbf8": {
+      "sha256": "65ade1f1429a35c3f32f0a9a25074c77aed698312e5a27fac6623513e2aaae4e",
+      "bytes": 1811656
+    },
+    "target/debug/run-composed-baseline": {
+      "sha256": "a2d558f06e8e4069c4f0981040035c733983641ba5b6ba66bb8726801d4ed89b",
+      "bytes": 5136632
+    }
+  },
+  "processScenarios": 65,
+  "pendingGates": [],
+  "sourcePreservation": {
+    "capturedUtc": "2026-09-14T20:02:08.976186+00:00",
+    "sourceHeadMatches": true,
+    "sourcePorcelainMatches": true,
+    "recordedFiles": 3688,
+    "changedHashesOrModes": [],
+    "researchHead": "926e1aa8411e3b516fe737988dd1a0989c447d08",
+    "researchClean": true,
+    "sourceHead": "2b3b5af8cbfbc6f16ce6005de3f97cd149803b81",
+    "sourceBranch": "paper/roadmap-phase-0-1",
+    "preservedSnapshotSha256": "506a104aa2b44b086f71792b7a6e1739314351226d40f1996f133dd7c8808ef1"
+  },
+  "historicalEvidencePreservation": {
+    "researchCommit": "926e1aa8411e3b516fe737988dd1a0989c447d08",
+    "historicalFilesChecked": 133,
+    "changed": []
+  },
+  "recoveredSource": {
+    "path": "integration-evidence/recovered-source.json",
+    "sha256": "755f29b8964760e48814d02725278be730a5c106f37017fb68e5ba80bc624ca5"
+  },
+  "concurrentSecurityWorktreeInitial": {
+    "head": "94ebe454e39535dcee1a40dfe5becb749ef4bbe2",
+    "changedPaths": 458,
+    "unmergedIndexEntries": 0,
+    "trackedChangesIncludeProcessImport": true
+  },
+  "concurrentSecurityWorktreeIntermediate": {
+    "capturedUtc": "2026-09-14T19:45:37.844934+00:00",
+    "path": "/tmp/arc-security-launch",
+    "head": "f3cfc890c39f01260cf353be6135172d298124c5",
+    "branch": "integration/process-security-m4",
+    "changedPaths": [
+      "M crates/products/chio-cli/src/cli/process_host/runner/child.rs",
+      " M crates/products/chio-cli/src/cli/process_host/runner/container.rs",
+      " M crates/products/chio-cli/src/cli/process_host/runner/container_tests.rs",
+      " M crates/products/chio-cli/src/cli/process_host/runner/mod.rs",
+      " M crates/products/chio-cli/tests/process_host/engine_double.py",
+      " M crates/products/chio-cli/tests/process_host/lifecycle.py"
+    ],
+    "unmergedEntries": [],
+    "access": "read_only",
+    "scope": "Observed committed process integration and follow-up repairs; not imported or qualified by funded-work evidence."
+  },
+  "concurrentSecurityWorktree": {
+    "capturedUtc": "2026-09-14T20:32:41.780968+00:00",
+    "path": "/tmp/arc-security-launch",
+    "head": "3b926837372f2a878169671911e613968455f553",
+    "branch": "integration/process-security-m4",
+    "changedPaths": [],
+    "unmergedEntries": [],
+    "access": "read_only",
+    "scope": "Committed worker-supervision follow-up; full process/security foundation qualification remains open. Not imported here."
+  },
+  "processSyncPathOverlap": {
+    "capturedUtc": "2026-09-14T20:02:38.295623+00:00",
+    "securityBase": "5d1a9ec0d900bd03ce55de903919d972be852d79",
+    "processHead": "f3cfc890c39f01260cf353be6135172d298124c5",
+    "processChangedPaths": 462,
+    "overlapPaths": [
+      ".clusterfuzzlite/build.sh",
+      ".github/workflows/fuzz.yml",
+      ".gitignore",
+      "Cargo.lock",
+      "README.md",
+      "crates/kernel/chio-kernel/README.md",
+      "crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs",
+      "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal.rs",
+      "crates/platform/chio-store-sqlite/src/admission_operation_store.rs",
+      "crates/platform/chio-store-sqlite/src/admission_operation_store_tests.rs",
+      "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/recovery.rs",
+      "docs/README.md",
+      "docs/formal/COVERAGE.md",
+      "formal/proof-manifest.toml",
+      "fuzz/Cargo.toml",
+      "fuzz/README.md",
+      "fuzz/corpus_metadata.toml",
+      "fuzz/oss-fuzz/build.sh",
+      "fuzz/owners.toml",
+      "fuzz/target-map.toml",
+      "fuzz/tests/smoke.rs"
+    ],
+    "codeOverlapPaths": [
+      ".clusterfuzzlite/build.sh",
+      "crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs",
+      "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal.rs",
+      "crates/platform/chio-store-sqlite/src/admission_operation_store.rs",
+      "crates/platform/chio-store-sqlite/src/admission_operation_store_tests.rs",
+      "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/recovery.rs",
+      "fuzz/oss-fuzz/build.sh",
+      "fuzz/tests/smoke.rs"
+    ],
+    "scope": "Path overlap only. This is not a merge rehearsal or qualification of the active process worktree."
+  },
+  "securityPullRequestRefresh": {
+    "capturedUtc": "2026-09-14T20:01:27.428717+00:00",
+    "source": "gh pr view 1117 --json number,title,state,isDraft,headRefName,headRefOid,baseRefName,mergeable,mergeStateStatus,url",
+    "number": 1117,
+    "url": "https://github.com/bb-connor/arc/pull/1117",
+    "state": "OPEN",
+    "isDraft": true,
+    "baseRefName": "main",
+    "headRefName": "security/launch-integration",
+    "headRefOid": "5d1a9ec0d900bd03ce55de903919d972be852d79",
+    "mergeable": "MERGEABLE",
+    "mergeStateStatus": "BLOCKED",
+    "scope": "Read-only identity and merge-state refresh, not an exact-head CI/review qualification."
+  },
+  "publicEvidenceSecretScan": {
+    "knownPrivateFixtureKeyFiles": 269,
+    "matchingFiles": [],
+    "privateFixtureDirectoriesCopied": false
+  },
+  "limits": [
+    "Native funding Task 4 has not started.",
+    "No operator database was opened or migrated; schema fixtures are disposable.",
+    "The research v10 database requires separate authoritative reconciliation.",
+    "No independent operators, public chain finality, live funds, release or upstream merge qualification.",
+    "Full workspace check and Clippy passed; this is not a full workspace test run or hosted serial/MSRV qualification.",
+    "Fuzz binaries compile; no new fuzz campaign was executed.",
+    "The four Hermes skips are existing live-sidecar cases gated by CHIO_INTEGRATION=1, which was not selected; they are not required native gate cases.",
+    "Historical paper and financial result archives remain unchanged and do not qualify this combined source."
+  ]
+}

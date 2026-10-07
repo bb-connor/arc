@@ -1,0 +1,133 @@
+   Compiling chio-core-types v0.1.0 (/home/connor/backbay/arc-funded-work/crates/core/chio-core-types)
+   Compiling regex-automata v0.4.14
+   Compiling chio-metrics-spec v0.1.0 (/home/connor/backbay/arc-funded-work/crates/observability/chio-metrics-spec)
+   Compiling ciborium-io v0.2.2
+   Compiling ciborium-ll v0.2.2
+   Compiling ciborium v0.2.2
+   Compiling chio-attest-verify v0.1.0 (/home/connor/backbay/arc-funded-work/crates/trust/chio-attest-verify)
+   Compiling chio-egress-contract v0.1.0 (/home/connor/backbay/arc-funded-work/crates/protocol/chio-egress-contract)
+   Compiling chio-web3-bindings v0.1.0 (/home/connor/backbay/arc-funded-work/crates/economy/chio-web3-bindings)
+   Compiling coset v0.4.2
+   Compiling regex v1.12.3
+   Compiling oci-spec v0.9.0
+   Compiling globset v0.4.18
+   Compiling tough v0.22.0
+   Compiling matchers v0.2.0
+   Compiling tracing-subscriber v0.3.23
+   Compiling chio-data-guards-redactors-default v0.1.0 (/home/connor/backbay/arc-funded-work/crates/guards/chio-data-guards/redactors/default)
+   Compiling oci-client v0.17.0
+   Compiling chio-log-redact v0.1.0 (/home/connor/backbay/arc-funded-work/crates/observability/chio-log-redact)
+   Compiling chio-supervisor v0.1.0 (/home/connor/backbay/arc-funded-work/crates/core/chio-supervisor)
+   Compiling chio-bounded v0.1.0 (/home/connor/backbay/arc-funded-work/crates/core/chio-bounded)
+   Compiling crossbeam-epoch v0.9.20
+   Compiling chio-workflow-preflight v0.1.0 (/home/connor/backbay/arc-funded-work/crates/platform/chio-workflow-preflight)
+   Compiling rayon-core v1.13.0
+   Compiling sigstore v0.14.0
+   Compiling crossbeam-deque v0.8.6
+   Compiling generator v0.8.8
+   Compiling clap_lex v1.1.0
+   Compiling anstyle v1.0.14
+   Compiling plotters-backend v0.3.7
+   Compiling clap_builder v4.6.0
+   Compiling plotters-svg v0.3.7
+   Compiling wait-timeout v0.2.1
+   Compiling quick-error v1.2.3
+   Compiling bit-vec v0.8.0
+   Compiling chio-listing v0.1.0 (/home/connor/backbay/arc-funded-work/crates/economy/chio-listing)
+   Compiling chio-revocation-oracle v0.1.0 (/home/connor/backbay/arc-funded-work/crates/trust/chio-revocation-oracle)
+   Compiling chio-finding v0.1.0 (/home/connor/backbay/arc-funded-work/crates/economy/chio-finding)
+   Compiling chio-fiscal v0.1.0 (/home/connor/backbay/arc-funded-work/crates/economy/chio-fiscal)
+   Compiling chio-governance v0.1.0 (/home/connor/backbay/arc-funded-work/crates/trust/chio-governance)
+   Compiling chio-pheromone v0.1.0 (/home/connor/backbay/arc-funded-work/crates/trust/chio-pheromone)
+   Compiling chio-open-market v0.1.0 (/home/connor/backbay/arc-funded-work/crates/economy/chio-open-market)
+   Compiling chio-appraisal v0.1.0 (/home/connor/backbay/arc-funded-work/crates/economy/chio-appraisal)
+   Compiling chio-fincred v0.1.0 (/home/connor/backbay/arc-funded-work/crates/economy/chio-fincred)
+   Compiling chio-did v0.1.0 (/home/connor/backbay/arc-funded-work/crates/trust/chio-did)
+   Compiling chio-lineage v0.1.0 (/home/connor/backbay/arc-funded-work/crates/observability/chio-lineage)
+   Compiling chio-underwriting v0.1.0 (/home/connor/backbay/arc-funded-work/crates/economy/chio-underwriting)
+   Compiling chio-federation v0.1.0 (/home/connor/backbay/arc-funded-work/crates/trust/chio-federation)
+   Compiling chio-weights v0.1.0 (/home/connor/backbay/arc-funded-work/crates/trust/chio-weights)
+   Compiling chio-custody-hw v0.1.0 (/home/connor/backbay/arc-funded-work/crates/trust/chio-custody-hw)
+   Compiling chio-kernel-core v0.1.0 (/home/connor/backbay/arc-funded-work/crates/kernel/chio-kernel-core)
+   Compiling chio-tool-call-fabric v0.1.0 (/home/connor/backbay/arc-funded-work/crates/protocol/chio-tool-call-fabric)
+   Compiling chio-swarm-authority v0.1.0 (/home/connor/backbay/arc-funded-work/crates/kernel/chio-swarm-authority)
+   Compiling chio-disclosure-lineage v0.1.0 (/home/connor/backbay/arc-funded-work/crates/trust/chio-disclosure-lineage)
+   Compiling cast v0.3.0
+   Compiling criterion-plot v0.5.0
+   Compiling clap v4.6.0
+   Compiling bit-set v0.8.0
+   Compiling rusty-fork v0.3.1
+   Compiling chio-credit v0.1.0 (/home/connor/backbay/arc-funded-work/crates/economy/chio-credit)
+   Compiling rayon v1.11.0
+   Compiling plotters v0.3.7
+   Compiling rand_xorshift v0.4.0
+   Compiling chio-sqlite-file-identity v0.1.0 (/home/connor/backbay/arc-funded-work/crates/platform/chio-sqlite-file-identity)
+   Compiling tinytemplate v1.2.1
+   Compiling is-terminal v0.4.17
+   Compiling scoped-tls v1.0.1
+   Compiling unarray v0.1.4
+   Compiling oorandom v11.1.5
+   Compiling anes v0.1.6
+   Compiling proptest v1.10.0
+   Compiling loom v0.7.2
+   Compiling criterion v0.5.1
+   Compiling chio-test-support v0.1.0 (/home/connor/backbay/arc-funded-work/crates/tooling/chio-test-support)
+   Compiling chio-web3 v0.1.0 (/home/connor/backbay/arc-funded-work/crates/economy/chio-web3)
+   Compiling chio-market v0.1.0 (/home/connor/backbay/arc-funded-work/crates/economy/chio-market)
+   Compiling chio-autonomy v0.1.0 (/home/connor/backbay/arc-funded-work/crates/economy/chio-autonomy)
+   Compiling chio-core v0.1.0 (/home/connor/backbay/arc-funded-work/crates/core/chio-core)
+   Compiling chio-settle v0.1.0 (/home/connor/backbay/arc-funded-work/crates/economy/chio-settle)
+   Compiling chio-link v0.1.0 (/home/connor/backbay/arc-funded-work/crates/economy/chio-link)
+   Compiling chio-workflow v0.1.0 (/home/connor/backbay/arc-funded-work/crates/platform/chio-workflow)
+   Compiling chio-selective-disclosure v0.1.0 (/home/connor/backbay/arc-funded-work/crates/trust/chio-selective-disclosure)
+   Compiling chio-attest-buyer-core v0.1.0 (/home/connor/backbay/arc-funded-work/crates/trust/chio-attest-buyer-core)
+   Compiling chio-federation-authority v0.1.0 (/home/connor/backbay/arc-funded-work/crates/trust/chio-federation-authority)
+   Compiling chio-kernel v0.1.0 (/home/connor/backbay/arc-funded-work/crates/kernel/chio-kernel)
+   Compiling chio-finding-verifier v0.1.0 (/home/connor/backbay/arc-funded-work/crates/trust/chio-finding-verifier)
+   Compiling chio-transaction-passport v0.1.0 (/home/connor/backbay/arc-funded-work/crates/platform/chio-transaction-passport)
+   Compiling chio-risk-comptroller v0.1.0 (/home/connor/backbay/arc-funded-work/crates/platform/chio-risk-comptroller)
+   Compiling chio-commerce-order v0.1.0 (/home/connor/backbay/arc-funded-work/crates/platform/chio-commerce-order)
+   Compiling chio-agent-web-interop v0.1.0 (/home/connor/backbay/arc-funded-work/crates/platform/chio-agent-web-interop)
+   Compiling chio-store-sqlite v0.1.0 (/home/connor/backbay/arc-funded-work/crates/platform/chio-store-sqlite)
+    Finished `test` profile [unoptimized] target(s) in 2m 33s
+     Running tests/finding_pool_ledger.rs (target/debug/deps/finding_pool_ledger-bab6c9bedb88fa81)
+cloned_receipt_database_cannot_reuse_the_ledger_sink_binding: test
+cognition_market_allocation_binds_one_concrete_store_across_deployments: test
+cognition_market_authenticated_pool_restart_never_exceeds_signed_amount: test
+cognition_market_debit_rejects_non_ready_sessions_before_reservation: test
+cognition_market_debit_resolves_tenant_from_authenticated_session_context: test
+cognition_market_kernel_refuses_pool_ledger_replacement: test
+cognition_market_ledger_rejects_an_in_place_rollback: test
+cognition_market_pool_binds_one_purchaser_allocation_per_pool: test
+cognition_market_pool_bounds_expired_reclamation_per_debit: test
+cognition_market_pool_configuration_failure_is_atomic: test
+cognition_market_pool_domain_excludes_a_second_live_store: test
+cognition_market_pool_ledger_persists_its_authority_selected_domain: test
+cognition_market_pool_receipt_authority_is_pinned_ledger_wide: test
+cognition_market_pool_receipts_survive_ordinary_kernel_key_rotation: test
+cognition_market_pool_reclaims_unclaimed_reservations_at_the_claim_deadline: test
+cognition_market_pool_reclamation_progress_survives_a_capacity_rejection: test
+cognition_market_pool_rejects_authority_purchaser_digest_and_pool_substitution: test
+cognition_market_pool_replay_skips_mutable_purchase_admission: test
+cognition_market_pool_replays_after_allocation_authority_rotation: test
+cognition_market_pool_replays_after_expiry_and_clock_rollback_but_rejects_new_spend: test
+cognition_market_pool_replays_after_purchase_verifier_rotation: test
+cognition_market_pool_requires_live_status_before_new_debit_but_replays: test
+cognition_market_qualified_pool_refuses_in_memory_storage: test
+cognition_market_receipt_sink_rejects_an_in_place_rollback_after_acknowledgment: test
+cognition_market_sqlite_clone_cannot_reuse_the_store_binding: test
+finding_pool_receipt_sink_rejects_a_writable_parent_directory: test
+finding_pool_receipt_sink_rejects_unsafe_file_permissions_and_links: test
+in_memory_receipt_stores_never_advertise_a_durable_pool_sink: test
+independent_receipt_anchors_produce_distinct_sink_identities: test
+qualified_pool_creates_percent_decoded_uri_parent: test
+qualified_pool_rejects_a_symlink_database_path: test
+qualified_pool_rejects_group_or_world_writable_database_files: test
+qualified_pool_rejects_percent_decoded_nul_uris: test
+qualified_pool_rejects_read_only_sqlite_uris: test
+qualified_pool_rejects_sqlite_uris_that_disable_file_locking: test
+sqlite_outbox_claim_serializes_independent_ledger_instances: test
+sqlite_outbox_restart_reclaims_a_prior_epoch_after_clock_rollback: test
+sqlite_receipt_store_identity_survives_reopen: test
+
+38 tests, 0 benchmarks

@@ -1,0 +1,92 @@
+EEEEEEEE
+======================================================================
+ERROR: test_complete_synthetic_package_cannot_pass_empirical_gate (test_trial_intake.IntakeTests.test_complete_synthetic_package_cannot_pass_empirical_gate)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/test_trial_intake.py", line 23, in test_complete_synthetic_package_cannot_pass_empirical_gate
+    result=analyze(self.package)
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/trial_intake.py", line 4, in analyze
+    raise NotImplementedError("trial intake not implemented")
+NotImplementedError: trial intake not implemented
+
+======================================================================
+ERROR: test_missing_duplicate_or_out_of_order_pair_is_rejected (test_trial_intake.IntakeTests.test_missing_duplicate_or_out_of_order_pair_is_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/test_trial_intake.py", line 34, in test_missing_duplicate_or_out_of_order_pair_is_rejected
+    with self.assertRaises(ValueError):analyze(self.package)
+                                       ~~~~~~~^^^^^^^^^^^^^^
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/trial_intake.py", line 4, in analyze
+    raise NotImplementedError("trial intake not implemented")
+NotImplementedError: trial intake not implemented
+
+======================================================================
+ERROR: test_missing_matching_constraints_or_changed_pair_pins (test_trial_intake.IntakeTests.test_missing_matching_constraints_or_changed_pair_pins)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/test_trial_intake.py", line 52, in test_missing_matching_constraints_or_changed_pair_pins
+    with self.assertRaises(ValueError):analyze(self.package)
+                                       ~~~~~~~^^^^^^^^^^^^^^
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/trial_intake.py", line 4, in analyze
+    raise NotImplementedError("trial intake not implemented")
+NotImplementedError: trial intake not implemented
+
+======================================================================
+ERROR: test_negative_nonfinite_fractional_counts_and_zero_denominator (test_trial_intake.IntakeTests.test_negative_nonfinite_fractional_counts_and_zero_denominator)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/test_trial_intake.py", line 40, in test_negative_nonfinite_fractional_counts_and_zero_denominator
+    with self.assertRaises(ValueError):analyze(self.package)
+                                       ~~~~~~~^^^^^^^^^^^^^^
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/trial_intake.py", line 4, in analyze
+    raise NotImplementedError("trial intake not implemented")
+NotImplementedError: trial intake not implemented
+
+======================================================================
+ERROR: test_omitted_failure_or_repair_is_rejected (test_trial_intake.IntakeTests.test_omitted_failure_or_repair_is_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/test_trial_intake.py", line 59, in test_omitted_failure_or_repair_is_rejected
+    with self.assertRaises(ValueError):analyze(self.package)
+                                       ~~~~~~~^^^^^^^^^^^^^^
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/trial_intake.py", line 4, in analyze
+    raise NotImplementedError("trial intake not implemented")
+NotImplementedError: trial intake not implemented
+
+======================================================================
+ERROR: test_repaired_success_cannot_be_counted_as_unassisted (test_trial_intake.IntakeTests.test_repaired_success_cannot_be_counted_as_unassisted)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/test_trial_intake.py", line 68, in test_repaired_success_cannot_be_counted_as_unassisted
+    with self.assertRaises(ValueError):analyze(self.package)
+                                       ~~~~~~~^^^^^^^^^^^^^^
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/trial_intake.py", line 4, in analyze
+    raise NotImplementedError("trial intake not implemented")
+NotImplementedError: trial intake not implemented
+
+======================================================================
+ERROR: test_tampered_missing_or_escaping_artifacts (test_trial_intake.IntakeTests.test_tampered_missing_or_escaping_artifacts)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/test_trial_intake.py", line 46, in test_tampered_missing_or_escaping_artifacts
+    with self.assertRaises(ValueError):analyze(self.package)
+                                       ~~~~~~~^^^^^^^^^^^^^^
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/trial_intake.py", line 4, in analyze
+    raise NotImplementedError("trial intake not implemented")
+NotImplementedError: trial intake not implemented
+
+======================================================================
+ERROR: test_unregistered_operator_and_claimed_independence_are_not_accepted (test_trial_intake.IntakeTests.test_unregistered_operator_and_claimed_independence_are_not_accepted)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/test_trial_intake.py", line 71, in test_unregistered_operator_and_claimed_independence_are_not_accepted
+    with self.assertRaises(ValueError):analyze(self.package)
+                                       ~~~~~~~^^^^^^^^^^^^^^
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/trial_intake.py", line 4, in analyze
+    raise NotImplementedError("trial intake not implemented")
+NotImplementedError: trial intake not implemented
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.093s
+
+FAILED (errors=8)

@@ -28,6 +28,11 @@ CHECKER = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = CHECKER
 SPEC.loader.exec_module(CHECKER)
 
+subprocess.run(
+    [sys.executable, str(ROOT / "scripts/tests/check-security-apk-closure.test.py")],
+    check=True,
+)
+
 
 stable_dump_fixture = ast.parse("def fixture(value=None):\n    return value\n").body[0]
 stable_dump = CHECKER.stable_ast_dump(stable_dump_fixture)
@@ -129,6 +134,7 @@ SECURITY_EXECUTION_BOUNDARY_FILES = (
     Path("scripts/check-security-adversarial-evidence.py"),
     Path("scripts/check-temporal-security.sh"),
     Path("scripts/run-security-execution-container.py"),
+    Path("scripts/aggregate-security-evidence-shards.py"),
     Path("scripts/security-execution-command-client.py"),
     Path("scripts/security-execution-container-entrypoint.py"),
     Path("scripts/tests/run-security-execution-container.test.py"),
@@ -560,6 +566,19 @@ assert_app_token_bootstrap(
     "Revoke exact Actions mirrors and dedicated App namespace",
 )
 assert_nonzero_bootstrap_accepted()
+
+assert_boundary_file_rejected(
+    "workspace lockfile digest ratchet",
+    Path("Cargo.lock"),
+    lambda original: original + "\n# altered workspace lockfile\n",
+    "workspace Cargo.lock digest ratchet changed",
+)
+assert_boundary_file_rejected(
+    "security image workspace lockfile pin",
+    Path("deploy/docker/Dockerfile.security-evidence-runner"),
+    replace_once(CHECKER.EXPECTED_CARGO_LOCK_SHA256, "0" * 64),
+    "security execution image authority graph changed",
+)
 
 # Full control-plane lanes must retain the same fixture isolation as the flow
 # security gate. Tests still exercise their explicit thread and process races.
@@ -1041,8 +1060,8 @@ assert_boundary_file_rejected(
     "security image loses digest-pinned Rust base",
     Path("deploy/docker/Dockerfile.security-evidence-runner"),
     replace_once(
-        "rust:1.94.1-alpine3.22@sha256:667605141d2be37e8a27b3e5368fa388fcd3065ed2dbc2fe64665bce7254fc67",
-        "rust:1.94.1-alpine3.22",
+        "rust:1.95.0-alpine3.22@sha256:2805e96db5234c9cfaf7ecb50f488693dab84d28ad30b6290cc1b707a18bf775",
+        "rust:1.95.0-alpine3.22",
     ),
     "image has an unpinned build stage",
 )
@@ -1050,18 +1069,29 @@ assert_boundary_file_rejected(
     "security image ignores a commented pinned-base decoy",
     Path("deploy/docker/Dockerfile.security-evidence-runner"),
     replace_once(
-        "FROM --platform=linux/amd64 rust:1.94.1-alpine3.22@sha256:667605141d2be37e8a27b3e5368fa388fcd3065ed2dbc2fe64665bce7254fc67",
-        "# FROM --platform=linux/amd64 rust:1.94.1-alpine3.22@sha256:667605141d2be37e8a27b3e5368fa388fcd3065ed2dbc2fe64665bce7254fc67\n"
-        "FROM --platform=linux/amd64 rust:1.94.1-alpine3.22",
+        "FROM --platform=linux/amd64 rust:1.95.0-alpine3.22@sha256:2805e96db5234c9cfaf7ecb50f488693dab84d28ad30b6290cc1b707a18bf775",
+        "# FROM --platform=linux/amd64 rust:1.95.0-alpine3.22@sha256:2805e96db5234c9cfaf7ecb50f488693dab84d28ad30b6290cc1b707a18bf775\n"
+        "FROM --platform=linux/amd64 rust:1.95.0-alpine3.22",
     ),
     "image has an unpinned build stage",
 )
 assert_boundary_file_rejected(
-    "security image rejects reordered APK closure",
+    "security image rejects floating transitive package installation",
     Path("deploy/docker/Dockerfile.security-evidence-runner"),
     replace_once(
-        "      bash=5.2.37-r0 \\\n      build-base=0.5-r3 \\\n",
-        "      build-base=0.5-r3 \\\n      bash=5.2.37-r0 \\\n",
+        "xargs -r apk add --no-cache /tmp/ca-certificates-20260909-r0.apk "
+        "< /tmp/security-evidence-apk.constraints",
+        "apk add --no-cache /tmp/ca-certificates-20260909-r0.apk bash=5.2.37-r0",
+    ),
+    "image APK closure changed",
+)
+assert_boundary_file_rejected(
+    "security image rejects unauthenticated inventory consumption",
+    Path("deploy/docker/Dockerfile.security-evidence-runner"),
+    replace_once(
+        f"RUN echo '{CHECKER.EXPECTED_APK_LOCK_SHA256}  "
+        "/tmp/security-evidence-apk.lock' | sha256sum -c -",
+        "RUN true",
     ),
     "image APK closure changed",
 )
@@ -1070,9 +1100,9 @@ assert_boundary_file_rejected(
     Path("deploy/docker/Dockerfile.security-evidence-runner"),
     replace_once(
         " && cmp \\\n"
-        "      /usr/local/rustup/toolchains/1.94.1-x86_64-unknown-linux-musl/"
+        "      /usr/local/rustup/toolchains/1.95.0-x86_64-unknown-linux-musl/"
         "bin/cargo-clippy \\\n"
-        "      /tmp/clippy-1.94.1-x86_64-unknown-linux-musl/clippy-preview/"
+        "      /tmp/clippy-1.95.0-x86_64-unknown-linux-musl/clippy-preview/"
         "bin/cargo-clippy \\\n",
         " && true \\\n",
     ),
@@ -1083,7 +1113,7 @@ assert_boundary_file_rejected(
     Path("deploy/docker/Dockerfile.security-evidence-runner"),
     replace_once(
         'test "$(cargo clippy --version)" = '
-        '"clippy 0.1.94 (e408947bfd 2026-03-25)"',
+        '"clippy 0.1.95 (59807616e1 2026-04-14)"',
         'test "$(cargo clippy --version | cut -d\' \' -f1)" = "clippy"',
     ),
     "image Rust component closure changed",
@@ -1317,7 +1347,7 @@ assert_boundary_file_rejected(
     "security entrypoint rejects unchecked candidate helper paths",
     Path("scripts/security-execution-container-entrypoint.py"),
     replace_once(
-        "if value != os.fspath(target / helper):",
+        "if value != os.fspath(helper_target / helper):",
         "if False:",
     ),
     "candidate environment forwarding changed",

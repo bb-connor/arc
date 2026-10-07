@@ -1,0 +1,6 @@
+{
+  "version": "v1.8.4",
+  "source_url": "https://github.com/foundry-rs/foundry/releases/download/v1.8.4/foundry_v1.8.4_linux_amd64.tar.gz",
+  "archive_sha256": "sha256:699e2207a6a9b27ca17c48c81e56f1677ed9c58b623b59128b4e15ec9da0625e",
+  "binary_sha256": "04a8d7a77bb789cf386f416450cd020a7db5826484ce3609610adb9b04d3d0a3"
+}

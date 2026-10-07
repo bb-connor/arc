@@ -71,22 +71,16 @@ use chio_revocation_oracle::{
     FINDING_STATUS_SPARSE_DEPTH,
 };
 
+#[path = "verifier/checkpoint_fixture.rs"]
+mod checkpoint_fixture;
+use checkpoint_fixture::checkpoint_at;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const HEX64: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
 fn keypair(seed: u8) -> Keypair {
     Keypair::from_seed(&[seed; 32])
-}
-
-fn checkpoint_at(
-    mut checkpoint: KernelCheckpoint,
-    issued_at: u64,
-    signer: &Keypair,
-) -> Result<KernelCheckpoint, Box<dyn Error>> {
-    checkpoint.body.issued_at = issued_at;
-    checkpoint.signature = signer.sign(&canonical_json_bytes(&checkpoint.body)?);
-    Ok(checkpoint)
 }
 
 fn receipt(
@@ -2215,5 +2209,7 @@ mod authority_regressions;
 mod bond_regressions;
 #[path = "verifier/checkpoint_status_regressions.rs"]
 mod checkpoint_status_regressions;
+#[path = "verifier/execution_profile.rs"]
+mod execution_profile;
 #[path = "verifier/receipt_security_regressions.rs"]
 mod receipt_security_regressions;

@@ -1,0 +1,4 @@
+{
+  "exit_code": 101,
+  "cause": "waiver race after injected future clock"
+}

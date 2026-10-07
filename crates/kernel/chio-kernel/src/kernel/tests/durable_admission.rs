@@ -16,12 +16,16 @@ use receipt_projection::AdmissionReceiptProjectionStore;
 mod authority_profile;
 #[path = "durable_admission/caller_budget_snapshot.rs"]
 mod caller_budget_snapshot;
+#[path = "durable_admission/checked_output.rs"]
+mod checked_output;
 #[path = "durable_admission/delivery_revalidation.rs"]
 mod delivery_revalidation;
 #[path = "durable_admission/dispatch_commit_failure.rs"]
 mod dispatch_commit_failure;
 #[path = "durable_admission/dpop_acquisition.rs"]
 mod dpop_acquisition;
+#[path = "durable_admission/execution_evidence.rs"]
+mod execution_evidence;
 #[path = "durable_admission/federation_context.rs"]
 mod federation_context;
 #[path = "durable_admission/governed_acquisition.rs"]
@@ -55,6 +59,7 @@ pub(super) struct TestAdmissionState {
     pub(super) retained_request: Option<crate::admission_operation::RetainedToolAdmissionRequestV1>,
     claim: Option<UntrustedAdmissionRecoveryClaim>,
     raw_outcome: Option<RawInvocationOutcomeV1>,
+    execution_evidence: Option<crate::tool_outcome::ExecutionEvidenceRecordV1>,
     tool_outcome: Option<ToolOutcomeRecordV1>,
     post_return_evaluation: Option<PostReturnEvaluationRecordV1>,
     resolved_output: Option<CanonicalResolvedOutputBlobV1>,
@@ -275,6 +280,13 @@ impl ReceiptStore for TestAdmissionOperationStore {
             .ok_or_else(|| ReceiptStoreError::Conflict("terminal replay is absent".to_owned()))?;
         if let AdmissionTerminalProjection::Completed(completed) = projection {
             state.receipt = Some(completed.receipt.receipt().clone());
+        }
+        if let AdmissionTerminalProjection::DeniedAfterDelivery { evidence, .. } = projection {
+            if let crate::admission_operation::AdmissionReceiptOrIncident::Receipt(receipt) =
+                evidence.as_ref()
+            {
+                state.receipt = Some(receipt.receipt().clone());
+            }
         }
         state.operation = Some(updated.clone());
         state.claim = None;
@@ -818,6 +830,26 @@ impl QualifiedAdmissionProjectionStore for TestAdmissionOperationStore {
 }
 
 impl ToolOutcomeStore for TestAdmissionOperationStore {
+    fn lookup_execution_evidence(
+        &self,
+        operation_id: &AdmissionOperationId,
+    ) -> Result<Option<crate::tool_outcome::ExecutionEvidenceRecordV1>, ToolOutcomeStoreError> {
+        let state = self.state.lock().expect("test admission state lock");
+        Ok(state
+            .execution_evidence
+            .as_ref()
+            .filter(|record| record.operation_id() == operation_id)
+            .cloned())
+    }
+
+    fn record_execution_evidence(
+        &self,
+        qualified: &crate::tool_outcome::QualifiedExecutionEvidenceV1,
+        lease: &crate::admission_operation::AdmissionRecoveryLease,
+    ) -> Result<crate::tool_outcome::ExecutionEvidenceRecordV1, ToolOutcomeStoreError> {
+        self.retain_execution_evidence(qualified, lease)
+    }
+
     fn record_tool_returned(
         &self,
         operation: &AdmissionOperationV1,
@@ -1084,7 +1116,7 @@ pub(super) fn admission_test_fence() -> StoreMutationFence {
     }
 }
 
-struct DurableAdmissionCheckingServer {
+pub(super) struct DurableAdmissionCheckingServer {
     pub(super) id: String,
     pub(super) tools: Vec<String>,
     pub(super) invocations: std::sync::Arc<AtomicU64>,

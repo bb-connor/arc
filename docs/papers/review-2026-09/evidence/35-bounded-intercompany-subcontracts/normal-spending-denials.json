@@ -1,0 +1,3859 @@
+[
+  {
+    "case": "second-job-without-permit",
+    "response": {
+      "task": {
+        "contextId": "context-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-5",
+        "id": "a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-5",
+        "metadata": {
+          "chio": {
+            "a2aSurface": "authoritative_blocking_send",
+            "authoritative": true,
+            "authorityPath": "cross_protocol_orchestrator",
+            "bridge": {
+              "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-5",
+              "capabilityEnvelope": {
+                "attenuatedScope": {
+                  "grants": [
+                    {
+                      "constraints": [
+                        {
+                          "type": "max_args_size",
+                          "value": 262144
+                        }
+                      ],
+                      "dpop_required": true,
+                      "operations": [
+                        "invoke"
+                      ],
+                      "server_id": "security-review-provider",
+                      "tool_name": "quote"
+                    }
+                  ]
+                },
+                "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-5",
+                "bridgedAt": 1789360792,
+                "capabilityRef": {
+                  "chioCapabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+                  "originProtocol": "a2a",
+                  "parentCapabilityHash": "63acf76e16c15c7bd324a6ec9b4c24a9db7607dc1159d60e693dc66891306fe3",
+                  "protocolContext": {
+                    "targetSkillId": "quote"
+                  }
+                },
+                "schema": "chio.cross-protocol-cap.v1",
+                "targetProtocol": "native"
+              },
+              "capabilityRef": {
+                "chioCapabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+                "originProtocol": "a2a",
+                "parentCapabilityHash": "63acf76e16c15c7bd324a6ec9b4c24a9db7607dc1159d60e693dc66891306fe3",
+                "protocolContext": {
+                  "targetSkillId": "quote"
+                }
+              },
+              "route": {
+                "multiHop": false,
+                "selectedProtocols": [
+                  "a2a",
+                  "native"
+                ],
+                "terminalProtocol": "native"
+              },
+              "sourceProtocol": "a2a",
+              "targetProtocol": "native",
+              "terminalProtocol": "native",
+              "trace": {
+                "hops": [
+                  {
+                    "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-5",
+                    "protocol": "a2a",
+                    "requestId": "a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-5",
+                    "timestamp": 1789360792
+                  },
+                  {
+                    "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-5",
+                    "protocol": "native",
+                    "receiptId": "b3d40ea478c01a5b52730b1b666f5c91ccda385076c668414a0aa6d21f57f979",
+                    "requestId": "b14f9bb0a62e996f7b60f47c9891dd1e",
+                    "timestamp": 1789360792
+                  }
+                ],
+                "sessionFingerprint": "2a48fc7b9bcc41fefe5c552d102a5dcaecb40559122a707adc263d56a25442f7",
+                "traceId": "09598a7503b6c274ca2b45f2f8b4901bc7d7ec4f2bbda68780a2e498feef6c9b"
+              }
+            },
+            "capabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+            "decision": "deny",
+            "executionNonce": null,
+            "lifecycle": {
+              "messageSend": "blocking_terminal_task",
+              "messageStream": "deferred_task_poll",
+              "taskCancel": "supported",
+              "taskGet": "supported"
+            },
+            "reason": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: procurement permit differs from receiver's activated delegation policy",
+            "receipt": {
+              "action": {
+                "parameter_hash": "0c3806e1d562765cb6e798835b05cc3b36ac6613c0935c6f0ba605b3245b9f22",
+                "parameters": {
+                  "agreement": {
+                    "buyer": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                    "checker": "openapi-explicit-auth-v1",
+                    "creditProfile": "provider-local-credit-checked-or-zero-v1",
+                    "deadline": 1789361381,
+                    "inputSha256": "2184a89310ecaddefb65643b02bea92b119e3fc31e03bdfbd4dc52271b65f1cc",
+                    "jobId": "unapproved-second-specialist-job",
+                    "priceCeiling": 100,
+                    "profile": "chio.example.security-review-agreement.v3",
+                    "provider": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+                    "subcontracting": false
+                  },
+                  "bid": {
+                    "body": {
+                      "agentId": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                      "issuedAt": 1789360792,
+                      "listingId": "security-review-v1",
+                      "maxPricePerCall": {
+                        "currency": "TST",
+                        "units": 100
+                      },
+                      "requestedScope": {
+                        "capabilityScopePrefix": "tools:security-review:c5f9f105f23fb520465c95afcc6e4907232f9df65f71c2b74a08afe30d555895",
+                        "maxInvocations": 1,
+                        "serverId": "security-review-provider",
+                        "toolName": "review"
+                      },
+                      "schema": "chio.marketplace.bid-request.v1",
+                      "windowSeconds": 589
+                    },
+                    "signature": "b88e5b217b23b43443978e838bc05eb922450333bf9a749ff57e5b34d711a1f8b4698737c1477020b7b4f7a854e812106c11718a2bbf316c047cc8f38c9e3204",
+                    "signerKey": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                  }
+                }
+              },
+              "boundary_class": "prevent",
+              "capability_id": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+              "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+              "decision": {
+                "guard": "kernel",
+                "reason": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: procurement permit differs from receiver's activated delegation policy",
+                "verdict": "deny"
+              },
+              "id": "b3d40ea478c01a5b52730b1b666f5c91ccda385076c668414a0aa6d21f57f979",
+              "kernel_key": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+              "metadata": {
+                "attribution": {
+                  "delegation_depth": 0,
+                  "issuer_key": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+                  "subject_key": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                },
+                "budget_authority": {
+                  "authority_profile": "authoritative_hold_event",
+                  "guarantee_level": "single_node_atomic",
+                  "metering_profile": "max_cost_preauthorize_then_reconcile_actual"
+                },
+                "chio_receipt_signing_nonce": "rcpt-01a09e36-e354-7b70-84e2-7d6cb0a0b8e2",
+                "receipt_context": {
+                  "request_id": "b14f9bb0a62e996f7b60f47c9891dd1e"
+                },
+                "route_selection": {
+                  "candidates": [
+                    {
+                      "available": true,
+                      "routeId": "native-route",
+                      "selectedProtocols": [
+                        "a2a",
+                        "native"
+                      ],
+                      "targetProtocol": "native"
+                    }
+                  ],
+                  "decision": "select",
+                  "requestedTargetProtocol": "native",
+                  "routeSelectionId": "06faa465f617df8ee987f468614aeeba601193818c72dccef33a5ac1eb3a03d2",
+                  "selectedProtocols": [
+                    "a2a",
+                    "native"
+                  ],
+                  "selectedRouteId": "native-route",
+                  "selectedTargetProtocol": "native",
+                  "sourceProtocol": "a2a"
+                }
+              },
+              "policy_hash": "e503dcdaee2a0ac92139f18cf50594237455c0408d78e50c1212ce75d5fc9ab1",
+              "receipt_kind": "mediated_decision",
+              "redaction_mode": "none",
+              "signature": "bab4999d68a1a8903cc2fc976a4bbcf81298daa3e82269fb75a26cfe5c157edec83971891d6e3cd5e95cff71f8de0599b3bf15dfeba9c97dc78d003fbfb3920b",
+              "timestamp": 1789360792,
+              "tool_name": "quote",
+              "tool_origin": "caller_executed",
+              "tool_server": "security-review-provider",
+              "trust_level": "mediated"
+            },
+            "receiptId": "b3d40ea478c01a5b52730b1b666f5c91ccda385076c668414a0aa6d21f57f979",
+            "receiptRef": {
+              "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-5",
+              "capabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+              "receiptId": "b3d40ea478c01a5b52730b1b666f5c91ccda385076c668414a0aa6d21f57f979",
+              "sourceProtocol": "a2a",
+              "targetProtocol": "native",
+              "traceId": "09598a7503b6c274ca2b45f2f8b4901bc7d7ec4f2bbda68780a2e498feef6c9b"
+            },
+            "routeSelection": {
+              "candidates": [
+                {
+                  "available": true,
+                  "routeId": "native-route",
+                  "selectedProtocols": [
+                    "a2a",
+                    "native"
+                  ],
+                  "targetProtocol": "native"
+                }
+              ],
+              "decision": "select",
+              "requestedTargetProtocol": "native",
+              "routeSelectionId": "06faa465f617df8ee987f468614aeeba601193818c72dccef33a5ac1eb3a03d2",
+              "selectedProtocols": [
+                "a2a",
+                "native"
+              ],
+              "selectedRouteId": "native-route",
+              "selectedTargetProtocol": "native",
+              "sourceProtocol": "a2a"
+            },
+            "runtimeLifecycle": {
+              "blockingEntrypoint": "message/send",
+              "cancelEntrypoint": "task/cancel",
+              "claimEligible": true,
+              "compatibilityOnly": false,
+              "followUpEntrypoint": "task/get",
+              "partialOutputDelivery": "collated_terminal_payload",
+              "streamDelivery": "collated_terminal_payload",
+              "streamEntrypoint": "message/stream",
+              "surface": "a2a_authoritative"
+            },
+            "targetExecution": {
+              "multiHop": false,
+              "notificationCount": 0,
+              "projectedResult": false,
+              "routeHopCount": 2,
+              "terminalProtocol": "native"
+            },
+            "terminalState": {
+              "state": "completed"
+            }
+          }
+        },
+        "status": {
+          "message": {
+            "messageId": "status-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-5",
+            "parts": [
+              {
+                "text": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: procurement permit differs from receiver's activated delegation policy"
+              }
+            ],
+            "role": "ROLE_AGENT"
+          },
+          "state": "TASK_STATE_FAILED"
+        }
+      }
+    }
+  },
+  {
+    "case": "original-job-without-permit",
+    "response": {
+      "task": {
+        "contextId": "context-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-6",
+        "id": "a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-6",
+        "metadata": {
+          "chio": {
+            "a2aSurface": "authoritative_blocking_send",
+            "authoritative": true,
+            "authorityPath": "cross_protocol_orchestrator",
+            "bridge": {
+              "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-6",
+              "capabilityEnvelope": {
+                "attenuatedScope": {
+                  "grants": [
+                    {
+                      "constraints": [
+                        {
+                          "type": "max_args_size",
+                          "value": 262144
+                        }
+                      ],
+                      "dpop_required": true,
+                      "operations": [
+                        "invoke"
+                      ],
+                      "server_id": "security-review-provider",
+                      "tool_name": "quote"
+                    }
+                  ]
+                },
+                "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-6",
+                "bridgedAt": 1789360792,
+                "capabilityRef": {
+                  "chioCapabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+                  "originProtocol": "a2a",
+                  "parentCapabilityHash": "63acf76e16c15c7bd324a6ec9b4c24a9db7607dc1159d60e693dc66891306fe3",
+                  "protocolContext": {
+                    "targetSkillId": "quote"
+                  }
+                },
+                "schema": "chio.cross-protocol-cap.v1",
+                "targetProtocol": "native"
+              },
+              "capabilityRef": {
+                "chioCapabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+                "originProtocol": "a2a",
+                "parentCapabilityHash": "63acf76e16c15c7bd324a6ec9b4c24a9db7607dc1159d60e693dc66891306fe3",
+                "protocolContext": {
+                  "targetSkillId": "quote"
+                }
+              },
+              "route": {
+                "multiHop": false,
+                "selectedProtocols": [
+                  "a2a",
+                  "native"
+                ],
+                "terminalProtocol": "native"
+              },
+              "sourceProtocol": "a2a",
+              "targetProtocol": "native",
+              "terminalProtocol": "native",
+              "trace": {
+                "hops": [
+                  {
+                    "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-6",
+                    "protocol": "a2a",
+                    "requestId": "a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-6",
+                    "timestamp": 1789360792
+                  },
+                  {
+                    "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-6",
+                    "protocol": "native",
+                    "receiptId": "8545c2418b86990d2395f0bdcae426fffc87ed90e121fcff034a3ac1e66e5a80",
+                    "requestId": "96dd22e4ee3b93419dcf193ab67517f5",
+                    "timestamp": 1789360792
+                  }
+                ],
+                "sessionFingerprint": "6b1b5ae5e0cd3b9250b5265c5123ae0e62b022ff79f5f97588a6aa60c30d2e9d",
+                "traceId": "ebd48b00f157b4c6ccc0f39e55800114d0cd1e124ab468dac80fccb1cd509a80"
+              }
+            },
+            "capabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+            "decision": "deny",
+            "executionNonce": null,
+            "lifecycle": {
+              "messageSend": "blocking_terminal_task",
+              "messageStream": "deferred_task_poll",
+              "taskCancel": "supported",
+              "taskGet": "supported"
+            },
+            "reason": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: procurement permit differs from receiver's activated delegation policy",
+            "receipt": {
+              "action": {
+                "parameter_hash": "cd1ea203caa53abece8195965b2bdbff98e23cfa2d38b9bb5e5b7bc71569540c",
+                "parameters": {
+                  "agreement": {
+                    "buyer": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                    "checker": "openapi-explicit-auth-v1",
+                    "creditProfile": "provider-local-credit-checked-or-zero-v1",
+                    "deadline": 1789361381,
+                    "inputSha256": "2184a89310ecaddefb65643b02bea92b119e3fc31e03bdfbd4dc52271b65f1cc",
+                    "jobId": "child-25eccf0fbd1714ca1f4d5005a9104a3ccd982b838157c0d6c8e20f6a32bca35e",
+                    "priceCeiling": 100,
+                    "profile": "chio.example.security-review-agreement.v3",
+                    "provider": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+                    "subcontracting": false
+                  },
+                  "bid": {
+                    "body": {
+                      "agentId": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                      "issuedAt": 1789360792,
+                      "listingId": "security-review-v1",
+                      "maxPricePerCall": {
+                        "currency": "TST",
+                        "units": 100
+                      },
+                      "requestedScope": {
+                        "capabilityScopePrefix": "tools:security-review:ed6a2eeffc281eeb1b4c8abcfd64a90b99dc1bd39ec30c82ad3e6a53b5632f31",
+                        "maxInvocations": 1,
+                        "serverId": "security-review-provider",
+                        "toolName": "review"
+                      },
+                      "schema": "chio.marketplace.bid-request.v1",
+                      "windowSeconds": 589
+                    },
+                    "signature": "b914c43a3b7f902a1e9116914770f682c237b7403bc05b1345b778e527757158f91e6fcbdbe1d92db6f4f397b791188674d9fd6ede98806e3444b6a9d4754806",
+                    "signerKey": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                  }
+                }
+              },
+              "boundary_class": "prevent",
+              "capability_id": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+              "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+              "decision": {
+                "guard": "kernel",
+                "reason": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: procurement permit differs from receiver's activated delegation policy",
+                "verdict": "deny"
+              },
+              "id": "8545c2418b86990d2395f0bdcae426fffc87ed90e121fcff034a3ac1e66e5a80",
+              "kernel_key": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+              "metadata": {
+                "attribution": {
+                  "delegation_depth": 0,
+                  "issuer_key": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+                  "subject_key": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                },
+                "budget_authority": {
+                  "authority_profile": "authoritative_hold_event",
+                  "guarantee_level": "single_node_atomic",
+                  "metering_profile": "max_cost_preauthorize_then_reconcile_actual"
+                },
+                "chio_receipt_signing_nonce": "rcpt-01a09e36-e3e5-7551-93ce-a03d3c7f82ea",
+                "receipt_context": {
+                  "request_id": "96dd22e4ee3b93419dcf193ab67517f5"
+                },
+                "route_selection": {
+                  "candidates": [
+                    {
+                      "available": true,
+                      "routeId": "native-route",
+                      "selectedProtocols": [
+                        "a2a",
+                        "native"
+                      ],
+                      "targetProtocol": "native"
+                    }
+                  ],
+                  "decision": "select",
+                  "requestedTargetProtocol": "native",
+                  "routeSelectionId": "ece2a3cf461875aeb06e8ed89e76d77d142f8b361d0a6c9a298185951cc4edb0",
+                  "selectedProtocols": [
+                    "a2a",
+                    "native"
+                  ],
+                  "selectedRouteId": "native-route",
+                  "selectedTargetProtocol": "native",
+                  "sourceProtocol": "a2a"
+                }
+              },
+              "policy_hash": "e503dcdaee2a0ac92139f18cf50594237455c0408d78e50c1212ce75d5fc9ab1",
+              "receipt_kind": "mediated_decision",
+              "redaction_mode": "none",
+              "signature": "f7afca4f291b6ce7c9e8b9cc6a216e9e0fff16085d1477c1bba54d53718b0c0047ab6455d9e763a0fed784794c698b6fd41718c2f62b2b76ad807834a4776b06",
+              "timestamp": 1789360792,
+              "tool_name": "quote",
+              "tool_origin": "caller_executed",
+              "tool_server": "security-review-provider",
+              "trust_level": "mediated"
+            },
+            "receiptId": "8545c2418b86990d2395f0bdcae426fffc87ed90e121fcff034a3ac1e66e5a80",
+            "receiptRef": {
+              "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-6",
+              "capabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+              "receiptId": "8545c2418b86990d2395f0bdcae426fffc87ed90e121fcff034a3ac1e66e5a80",
+              "sourceProtocol": "a2a",
+              "targetProtocol": "native",
+              "traceId": "ebd48b00f157b4c6ccc0f39e55800114d0cd1e124ab468dac80fccb1cd509a80"
+            },
+            "routeSelection": {
+              "candidates": [
+                {
+                  "available": true,
+                  "routeId": "native-route",
+                  "selectedProtocols": [
+                    "a2a",
+                    "native"
+                  ],
+                  "targetProtocol": "native"
+                }
+              ],
+              "decision": "select",
+              "requestedTargetProtocol": "native",
+              "routeSelectionId": "ece2a3cf461875aeb06e8ed89e76d77d142f8b361d0a6c9a298185951cc4edb0",
+              "selectedProtocols": [
+                "a2a",
+                "native"
+              ],
+              "selectedRouteId": "native-route",
+              "selectedTargetProtocol": "native",
+              "sourceProtocol": "a2a"
+            },
+            "runtimeLifecycle": {
+              "blockingEntrypoint": "message/send",
+              "cancelEntrypoint": "task/cancel",
+              "claimEligible": true,
+              "compatibilityOnly": false,
+              "followUpEntrypoint": "task/get",
+              "partialOutputDelivery": "collated_terminal_payload",
+              "streamDelivery": "collated_terminal_payload",
+              "streamEntrypoint": "message/stream",
+              "surface": "a2a_authoritative"
+            },
+            "targetExecution": {
+              "multiHop": false,
+              "notificationCount": 0,
+              "projectedResult": false,
+              "routeHopCount": 2,
+              "terminalProtocol": "native"
+            },
+            "terminalState": {
+              "state": "completed"
+            }
+          }
+        },
+        "status": {
+          "message": {
+            "messageId": "status-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-6",
+            "parts": [
+              {
+                "text": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: procurement permit differs from receiver's activated delegation policy"
+              }
+            ],
+            "role": "ROLE_AGENT"
+          },
+          "state": "TASK_STATE_FAILED"
+        }
+      }
+    }
+  },
+  {
+    "case": "second-job-with-permit",
+    "response": {
+      "task": {
+        "contextId": "context-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-7",
+        "id": "a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-7",
+        "metadata": {
+          "chio": {
+            "a2aSurface": "authoritative_blocking_send",
+            "authoritative": true,
+            "authorityPath": "cross_protocol_orchestrator",
+            "bridge": {
+              "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-7",
+              "capabilityEnvelope": {
+                "attenuatedScope": {
+                  "grants": [
+                    {
+                      "constraints": [
+                        {
+                          "type": "max_args_size",
+                          "value": 262144
+                        }
+                      ],
+                      "dpop_required": true,
+                      "operations": [
+                        "invoke"
+                      ],
+                      "server_id": "security-review-provider",
+                      "tool_name": "quote"
+                    }
+                  ]
+                },
+                "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-7",
+                "bridgedAt": 1789360792,
+                "capabilityRef": {
+                  "chioCapabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+                  "originProtocol": "a2a",
+                  "parentCapabilityHash": "63acf76e16c15c7bd324a6ec9b4c24a9db7607dc1159d60e693dc66891306fe3",
+                  "protocolContext": {
+                    "targetSkillId": "quote"
+                  }
+                },
+                "schema": "chio.cross-protocol-cap.v1",
+                "targetProtocol": "native"
+              },
+              "capabilityRef": {
+                "chioCapabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+                "originProtocol": "a2a",
+                "parentCapabilityHash": "63acf76e16c15c7bd324a6ec9b4c24a9db7607dc1159d60e693dc66891306fe3",
+                "protocolContext": {
+                  "targetSkillId": "quote"
+                }
+              },
+              "route": {
+                "multiHop": false,
+                "selectedProtocols": [
+                  "a2a",
+                  "native"
+                ],
+                "terminalProtocol": "native"
+              },
+              "sourceProtocol": "a2a",
+              "targetProtocol": "native",
+              "terminalProtocol": "native",
+              "trace": {
+                "hops": [
+                  {
+                    "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-7",
+                    "protocol": "a2a",
+                    "requestId": "a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-7",
+                    "timestamp": 1789360792
+                  },
+                  {
+                    "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-7",
+                    "protocol": "native",
+                    "receiptId": "cac7cc8237bd4c1bb78c2be58ce105be4881d3b0e1ce6e94b60a918ab2765cbd",
+                    "requestId": "dd077068a32b353d42c965b78d479f14",
+                    "timestamp": 1789360792
+                  }
+                ],
+                "sessionFingerprint": "f7ecbaf131a1b22c8709573625020b86481f6cfd95e0d6931dd6195cdaaf7781",
+                "traceId": "fcf16918792c3381e22c146aaae0f9456def4ad4e273b1aa5eee6541d687a05e"
+              }
+            },
+            "capabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+            "decision": "deny",
+            "executionNonce": null,
+            "lifecycle": {
+              "messageSend": "blocking_terminal_task",
+              "messageStream": "deferred_task_poll",
+              "taskCancel": "supported",
+              "taskGet": "supported"
+            },
+            "reason": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: subcontract permit does not authorize this exact child procurement",
+            "receipt": {
+              "action": {
+                "parameter_hash": "cf889c5a617dfdd339f887da1f7fb01d61ffbee886daa2b1545e3a42ca465807",
+                "parameters": {
+                  "agreement": {
+                    "buyer": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                    "checker": "openapi-explicit-auth-v1",
+                    "creditProfile": "provider-local-credit-checked-or-zero-v1",
+                    "deadline": 1789361381,
+                    "inputSha256": "2184a89310ecaddefb65643b02bea92b119e3fc31e03bdfbd4dc52271b65f1cc",
+                    "jobId": "unapproved-second-specialist-job",
+                    "priceCeiling": 100,
+                    "profile": "chio.example.security-review-agreement.v3",
+                    "provider": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+                    "subcontracting": false
+                  },
+                  "bid": {
+                    "body": {
+                      "agentId": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                      "issuedAt": 1789360792,
+                      "listingId": "security-review-v1",
+                      "maxPricePerCall": {
+                        "currency": "TST",
+                        "units": 100
+                      },
+                      "requestedScope": {
+                        "capabilityScopePrefix": "tools:security-review:c5f9f105f23fb520465c95afcc6e4907232f9df65f71c2b74a08afe30d555895",
+                        "maxInvocations": 1,
+                        "serverId": "security-review-provider",
+                        "toolName": "review"
+                      },
+                      "schema": "chio.marketplace.bid-request.v1",
+                      "windowSeconds": 589
+                    },
+                    "signature": "b88e5b217b23b43443978e838bc05eb922450333bf9a749ff57e5b34d711a1f8b4698737c1477020b7b4f7a854e812106c11718a2bbf316c047cc8f38c9e3204",
+                    "signerKey": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                  },
+                  "subcontractPermit": {
+                    "body": {
+                      "childAgreementSha256": "ed6a2eeffc281eeb1b4c8abcfd64a90b99dc1bd39ec30c82ad3e6a53b5632f31",
+                      "currency": "TST",
+                      "delegate": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                      "expiresAt": 1789361381,
+                      "parentAgreementSha256": "25eccf0fbd1714ca1f4d5005a9104a3ccd982b838157c0d6c8e20f6a32bca35e",
+                      "parentRequestSha256": "bf4ceceeb97d6584d924def7f7625c8c848d170c12e25caa51d0c1e5a27b7c2d",
+                      "priceCeiling": 100,
+                      "schema": "chio.example.subcontract-permit.v1",
+                      "specialist": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4"
+                    },
+                    "signature": "ace7bdd43791b7c1974f373200c3e599063d0da5ae4003e881608e57d9cfe78066bb7e3d86b3ab05c5aa938bd30fd812bd66931e04641255913db9b709d7ed0b",
+                    "signerKey": "61c20beab98234b1065c0737c677d3a5f6cdf6a2f8fca028c40dc2e1f7c9adc0"
+                  }
+                }
+              },
+              "boundary_class": "prevent",
+              "capability_id": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+              "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+              "decision": {
+                "guard": "kernel",
+                "reason": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: subcontract permit does not authorize this exact child procurement",
+                "verdict": "deny"
+              },
+              "id": "cac7cc8237bd4c1bb78c2be58ce105be4881d3b0e1ce6e94b60a918ab2765cbd",
+              "kernel_key": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+              "metadata": {
+                "attribution": {
+                  "delegation_depth": 0,
+                  "issuer_key": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+                  "subject_key": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                },
+                "budget_authority": {
+                  "authority_profile": "authoritative_hold_event",
+                  "guarantee_level": "single_node_atomic",
+                  "metering_profile": "max_cost_preauthorize_then_reconcile_actual"
+                },
+                "chio_receipt_signing_nonce": "rcpt-01a09e36-e481-70f2-8a16-78bb67371f96",
+                "receipt_context": {
+                  "request_id": "dd077068a32b353d42c965b78d479f14"
+                },
+                "route_selection": {
+                  "candidates": [
+                    {
+                      "available": true,
+                      "routeId": "native-route",
+                      "selectedProtocols": [
+                        "a2a",
+                        "native"
+                      ],
+                      "targetProtocol": "native"
+                    }
+                  ],
+                  "decision": "select",
+                  "requestedTargetProtocol": "native",
+                  "routeSelectionId": "0bfd38022c310184b9d45791a0e6eaf718bd207db8954478a3ab06c42fcc7fc2",
+                  "selectedProtocols": [
+                    "a2a",
+                    "native"
+                  ],
+                  "selectedRouteId": "native-route",
+                  "selectedTargetProtocol": "native",
+                  "sourceProtocol": "a2a"
+                }
+              },
+              "policy_hash": "e503dcdaee2a0ac92139f18cf50594237455c0408d78e50c1212ce75d5fc9ab1",
+              "receipt_kind": "mediated_decision",
+              "redaction_mode": "none",
+              "signature": "48f3b56b25329191c30701631321e8df307ca7da8eb8a62655582445bf0a3efe480d73859dc5e302c3c44b8f6ea4cdece8334c22457d31e57aec8f5f4f84280a",
+              "timestamp": 1789360792,
+              "tool_name": "quote",
+              "tool_origin": "caller_executed",
+              "tool_server": "security-review-provider",
+              "trust_level": "mediated"
+            },
+            "receiptId": "cac7cc8237bd4c1bb78c2be58ce105be4881d3b0e1ce6e94b60a918ab2765cbd",
+            "receiptRef": {
+              "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-7",
+              "capabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+              "receiptId": "cac7cc8237bd4c1bb78c2be58ce105be4881d3b0e1ce6e94b60a918ab2765cbd",
+              "sourceProtocol": "a2a",
+              "targetProtocol": "native",
+              "traceId": "fcf16918792c3381e22c146aaae0f9456def4ad4e273b1aa5eee6541d687a05e"
+            },
+            "routeSelection": {
+              "candidates": [
+                {
+                  "available": true,
+                  "routeId": "native-route",
+                  "selectedProtocols": [
+                    "a2a",
+                    "native"
+                  ],
+                  "targetProtocol": "native"
+                }
+              ],
+              "decision": "select",
+              "requestedTargetProtocol": "native",
+              "routeSelectionId": "0bfd38022c310184b9d45791a0e6eaf718bd207db8954478a3ab06c42fcc7fc2",
+              "selectedProtocols": [
+                "a2a",
+                "native"
+              ],
+              "selectedRouteId": "native-route",
+              "selectedTargetProtocol": "native",
+              "sourceProtocol": "a2a"
+            },
+            "runtimeLifecycle": {
+              "blockingEntrypoint": "message/send",
+              "cancelEntrypoint": "task/cancel",
+              "claimEligible": true,
+              "compatibilityOnly": false,
+              "followUpEntrypoint": "task/get",
+              "partialOutputDelivery": "collated_terminal_payload",
+              "streamDelivery": "collated_terminal_payload",
+              "streamEntrypoint": "message/stream",
+              "surface": "a2a_authoritative"
+            },
+            "targetExecution": {
+              "multiHop": false,
+              "notificationCount": 0,
+              "projectedResult": false,
+              "routeHopCount": 2,
+              "terminalProtocol": "native"
+            },
+            "terminalState": {
+              "state": "completed"
+            }
+          }
+        },
+        "status": {
+          "message": {
+            "messageId": "status-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-7",
+            "parts": [
+              {
+                "text": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: subcontract permit does not authorize this exact child procurement"
+              }
+            ],
+            "role": "ROLE_AGENT"
+          },
+          "state": "TASK_STATE_FAILED"
+        }
+      }
+    }
+  },
+  {
+    "case": "different-input",
+    "response": {
+      "task": {
+        "contextId": "context-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-8",
+        "id": "a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-8",
+        "metadata": {
+          "chio": {
+            "a2aSurface": "authoritative_blocking_send",
+            "authoritative": true,
+            "authorityPath": "cross_protocol_orchestrator",
+            "bridge": {
+              "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-8",
+              "capabilityEnvelope": {
+                "attenuatedScope": {
+                  "grants": [
+                    {
+                      "constraints": [
+                        {
+                          "type": "max_args_size",
+                          "value": 262144
+                        }
+                      ],
+                      "dpop_required": true,
+                      "operations": [
+                        "invoke"
+                      ],
+                      "server_id": "security-review-provider",
+                      "tool_name": "quote"
+                    }
+                  ]
+                },
+                "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-8",
+                "bridgedAt": 1789360792,
+                "capabilityRef": {
+                  "chioCapabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+                  "originProtocol": "a2a",
+                  "parentCapabilityHash": "63acf76e16c15c7bd324a6ec9b4c24a9db7607dc1159d60e693dc66891306fe3",
+                  "protocolContext": {
+                    "targetSkillId": "quote"
+                  }
+                },
+                "schema": "chio.cross-protocol-cap.v1",
+                "targetProtocol": "native"
+              },
+              "capabilityRef": {
+                "chioCapabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+                "originProtocol": "a2a",
+                "parentCapabilityHash": "63acf76e16c15c7bd324a6ec9b4c24a9db7607dc1159d60e693dc66891306fe3",
+                "protocolContext": {
+                  "targetSkillId": "quote"
+                }
+              },
+              "route": {
+                "multiHop": false,
+                "selectedProtocols": [
+                  "a2a",
+                  "native"
+                ],
+                "terminalProtocol": "native"
+              },
+              "sourceProtocol": "a2a",
+              "targetProtocol": "native",
+              "terminalProtocol": "native",
+              "trace": {
+                "hops": [
+                  {
+                    "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-8",
+                    "protocol": "a2a",
+                    "requestId": "a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-8",
+                    "timestamp": 1789360792
+                  },
+                  {
+                    "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-8",
+                    "protocol": "native",
+                    "receiptId": "cbe773929047f13041ee5bd56366204fd8acb8ca3a6a948b8ed8f8ba69a26afa",
+                    "requestId": "2815bbea5d2520b09ace260a1a9f5907",
+                    "timestamp": 1789360792
+                  }
+                ],
+                "sessionFingerprint": "3559a0ed9e2b6f033bfcfa45faf8a55310a89959a01f0e5d4b6204b893b17c2e",
+                "traceId": "29ebe05f2a0be7d6254e172ab769fc581ea69d4b2212ebce87525639729a0f2e"
+              }
+            },
+            "capabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+            "decision": "deny",
+            "executionNonce": null,
+            "lifecycle": {
+              "messageSend": "blocking_terminal_task",
+              "messageStream": "deferred_task_poll",
+              "taskCancel": "supported",
+              "taskGet": "supported"
+            },
+            "reason": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: subcontract permit does not authorize this exact child procurement",
+            "receipt": {
+              "action": {
+                "parameter_hash": "efbc44def8295e13830b07d568be994765a9358f450b019fe30b941889d8bd14",
+                "parameters": {
+                  "agreement": {
+                    "buyer": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                    "checker": "openapi-explicit-auth-v1",
+                    "creditProfile": "provider-local-credit-checked-or-zero-v1",
+                    "deadline": 1789361381,
+                    "inputSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                    "jobId": "child-25eccf0fbd1714ca1f4d5005a9104a3ccd982b838157c0d6c8e20f6a32bca35e",
+                    "priceCeiling": 100,
+                    "profile": "chio.example.security-review-agreement.v3",
+                    "provider": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+                    "subcontracting": false
+                  },
+                  "bid": {
+                    "body": {
+                      "agentId": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                      "issuedAt": 1789360792,
+                      "listingId": "security-review-v1",
+                      "maxPricePerCall": {
+                        "currency": "TST",
+                        "units": 100
+                      },
+                      "requestedScope": {
+                        "capabilityScopePrefix": "tools:security-review:a3afd87497902e5bd73a3c065b94c8bd329695830b107bc199a2d91ea0b85897",
+                        "maxInvocations": 1,
+                        "serverId": "security-review-provider",
+                        "toolName": "review"
+                      },
+                      "schema": "chio.marketplace.bid-request.v1",
+                      "windowSeconds": 589
+                    },
+                    "signature": "769edb16d13bc0ad6834dec23dddb90ac4932e00956c0350984dd5574c888689407c1c286434fba532d32d479f87cba8d32c41a5ce2218c13a65df56894c290b",
+                    "signerKey": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                  },
+                  "subcontractPermit": {
+                    "body": {
+                      "childAgreementSha256": "ed6a2eeffc281eeb1b4c8abcfd64a90b99dc1bd39ec30c82ad3e6a53b5632f31",
+                      "currency": "TST",
+                      "delegate": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                      "expiresAt": 1789361381,
+                      "parentAgreementSha256": "25eccf0fbd1714ca1f4d5005a9104a3ccd982b838157c0d6c8e20f6a32bca35e",
+                      "parentRequestSha256": "bf4ceceeb97d6584d924def7f7625c8c848d170c12e25caa51d0c1e5a27b7c2d",
+                      "priceCeiling": 100,
+                      "schema": "chio.example.subcontract-permit.v1",
+                      "specialist": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4"
+                    },
+                    "signature": "ace7bdd43791b7c1974f373200c3e599063d0da5ae4003e881608e57d9cfe78066bb7e3d86b3ab05c5aa938bd30fd812bd66931e04641255913db9b709d7ed0b",
+                    "signerKey": "61c20beab98234b1065c0737c677d3a5f6cdf6a2f8fca028c40dc2e1f7c9adc0"
+                  }
+                }
+              },
+              "boundary_class": "prevent",
+              "capability_id": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+              "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+              "decision": {
+                "guard": "kernel",
+                "reason": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: subcontract permit does not authorize this exact child procurement",
+                "verdict": "deny"
+              },
+              "id": "cbe773929047f13041ee5bd56366204fd8acb8ca3a6a948b8ed8f8ba69a26afa",
+              "kernel_key": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+              "metadata": {
+                "attribution": {
+                  "delegation_depth": 0,
+                  "issuer_key": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+                  "subject_key": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                },
+                "budget_authority": {
+                  "authority_profile": "authoritative_hold_event",
+                  "guarantee_level": "single_node_atomic",
+                  "metering_profile": "max_cost_preauthorize_then_reconcile_actual"
+                },
+                "chio_receipt_signing_nonce": "rcpt-01a09e36-e51d-79a3-9dc5-af0fb2a463e8",
+                "receipt_context": {
+                  "request_id": "2815bbea5d2520b09ace260a1a9f5907"
+                },
+                "route_selection": {
+                  "candidates": [
+                    {
+                      "available": true,
+                      "routeId": "native-route",
+                      "selectedProtocols": [
+                        "a2a",
+                        "native"
+                      ],
+                      "targetProtocol": "native"
+                    }
+                  ],
+                  "decision": "select",
+                  "requestedTargetProtocol": "native",
+                  "routeSelectionId": "8bc4825811f39bd5691079b96914fb3f5fdac7b5994d31fce041a8caeee170b4",
+                  "selectedProtocols": [
+                    "a2a",
+                    "native"
+                  ],
+                  "selectedRouteId": "native-route",
+                  "selectedTargetProtocol": "native",
+                  "sourceProtocol": "a2a"
+                }
+              },
+              "policy_hash": "e503dcdaee2a0ac92139f18cf50594237455c0408d78e50c1212ce75d5fc9ab1",
+              "receipt_kind": "mediated_decision",
+              "redaction_mode": "none",
+              "signature": "229a158ef7b8463bdd8735bcb6ffef484dd21a7490b19ffdafc1724386f3efdcd393f0753b72e7bd10f04a349b0258cc70abf29fa40f67d6aa013a77a8359106",
+              "timestamp": 1789360792,
+              "tool_name": "quote",
+              "tool_origin": "caller_executed",
+              "tool_server": "security-review-provider",
+              "trust_level": "mediated"
+            },
+            "receiptId": "cbe773929047f13041ee5bd56366204fd8acb8ca3a6a948b8ed8f8ba69a26afa",
+            "receiptRef": {
+              "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-8",
+              "capabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+              "receiptId": "cbe773929047f13041ee5bd56366204fd8acb8ca3a6a948b8ed8f8ba69a26afa",
+              "sourceProtocol": "a2a",
+              "targetProtocol": "native",
+              "traceId": "29ebe05f2a0be7d6254e172ab769fc581ea69d4b2212ebce87525639729a0f2e"
+            },
+            "routeSelection": {
+              "candidates": [
+                {
+                  "available": true,
+                  "routeId": "native-route",
+                  "selectedProtocols": [
+                    "a2a",
+                    "native"
+                  ],
+                  "targetProtocol": "native"
+                }
+              ],
+              "decision": "select",
+              "requestedTargetProtocol": "native",
+              "routeSelectionId": "8bc4825811f39bd5691079b96914fb3f5fdac7b5994d31fce041a8caeee170b4",
+              "selectedProtocols": [
+                "a2a",
+                "native"
+              ],
+              "selectedRouteId": "native-route",
+              "selectedTargetProtocol": "native",
+              "sourceProtocol": "a2a"
+            },
+            "runtimeLifecycle": {
+              "blockingEntrypoint": "message/send",
+              "cancelEntrypoint": "task/cancel",
+              "claimEligible": true,
+              "compatibilityOnly": false,
+              "followUpEntrypoint": "task/get",
+              "partialOutputDelivery": "collated_terminal_payload",
+              "streamDelivery": "collated_terminal_payload",
+              "streamEntrypoint": "message/stream",
+              "surface": "a2a_authoritative"
+            },
+            "targetExecution": {
+              "multiHop": false,
+              "notificationCount": 0,
+              "projectedResult": false,
+              "routeHopCount": 2,
+              "terminalProtocol": "native"
+            },
+            "terminalState": {
+              "state": "completed"
+            }
+          }
+        },
+        "status": {
+          "message": {
+            "messageId": "status-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-8",
+            "parts": [
+              {
+                "text": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: subcontract permit does not authorize this exact child procurement"
+              }
+            ],
+            "role": "ROLE_AGENT"
+          },
+          "state": "TASK_STATE_FAILED"
+        }
+      }
+    }
+  },
+  {
+    "case": "higher-price",
+    "response": {
+      "task": {
+        "contextId": "context-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-9",
+        "id": "a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-9",
+        "metadata": {
+          "chio": {
+            "a2aSurface": "authoritative_blocking_send",
+            "authoritative": true,
+            "authorityPath": "cross_protocol_orchestrator",
+            "bridge": {
+              "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-9",
+              "capabilityEnvelope": {
+                "attenuatedScope": {
+                  "grants": [
+                    {
+                      "constraints": [
+                        {
+                          "type": "max_args_size",
+                          "value": 262144
+                        }
+                      ],
+                      "dpop_required": true,
+                      "operations": [
+                        "invoke"
+                      ],
+                      "server_id": "security-review-provider",
+                      "tool_name": "quote"
+                    }
+                  ]
+                },
+                "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-9",
+                "bridgedAt": 1789360792,
+                "capabilityRef": {
+                  "chioCapabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+                  "originProtocol": "a2a",
+                  "parentCapabilityHash": "63acf76e16c15c7bd324a6ec9b4c24a9db7607dc1159d60e693dc66891306fe3",
+                  "protocolContext": {
+                    "targetSkillId": "quote"
+                  }
+                },
+                "schema": "chio.cross-protocol-cap.v1",
+                "targetProtocol": "native"
+              },
+              "capabilityRef": {
+                "chioCapabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+                "originProtocol": "a2a",
+                "parentCapabilityHash": "63acf76e16c15c7bd324a6ec9b4c24a9db7607dc1159d60e693dc66891306fe3",
+                "protocolContext": {
+                  "targetSkillId": "quote"
+                }
+              },
+              "route": {
+                "multiHop": false,
+                "selectedProtocols": [
+                  "a2a",
+                  "native"
+                ],
+                "terminalProtocol": "native"
+              },
+              "sourceProtocol": "a2a",
+              "targetProtocol": "native",
+              "terminalProtocol": "native",
+              "trace": {
+                "hops": [
+                  {
+                    "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-9",
+                    "protocol": "a2a",
+                    "requestId": "a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-9",
+                    "timestamp": 1789360792
+                  },
+                  {
+                    "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-9",
+                    "protocol": "native",
+                    "receiptId": "20a8880b7bed8e32efdb956a63eb2232f42d49fe8eebf3989f5ef6cfc27ec92f",
+                    "requestId": "c3a553e328983fe4aa3012ef541c1482",
+                    "timestamp": 1789360792
+                  }
+                ],
+                "sessionFingerprint": "26142b5d94055bbdd788255ba764fa7d845a7a93f3443b13512a4302a1718eec",
+                "traceId": "2c334ea7c61c01921dcef0058765b722788243551f03a2af548a94d3a084ace6"
+              }
+            },
+            "capabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+            "decision": "deny",
+            "executionNonce": null,
+            "lifecycle": {
+              "messageSend": "blocking_terminal_task",
+              "messageStream": "deferred_task_poll",
+              "taskCancel": "supported",
+              "taskGet": "supported"
+            },
+            "reason": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: subcontract permit does not authorize this exact child procurement",
+            "receipt": {
+              "action": {
+                "parameter_hash": "69c053b6b539af114626cf75fce98e8066301a02565e3638d49bc9d96f0535ae",
+                "parameters": {
+                  "agreement": {
+                    "buyer": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                    "checker": "openapi-explicit-auth-v1",
+                    "creditProfile": "provider-local-credit-checked-or-zero-v1",
+                    "deadline": 1789361381,
+                    "inputSha256": "2184a89310ecaddefb65643b02bea92b119e3fc31e03bdfbd4dc52271b65f1cc",
+                    "jobId": "child-25eccf0fbd1714ca1f4d5005a9104a3ccd982b838157c0d6c8e20f6a32bca35e",
+                    "priceCeiling": 200,
+                    "profile": "chio.example.security-review-agreement.v3",
+                    "provider": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+                    "subcontracting": false
+                  },
+                  "bid": {
+                    "body": {
+                      "agentId": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                      "issuedAt": 1789360792,
+                      "listingId": "security-review-v1",
+                      "maxPricePerCall": {
+                        "currency": "TST",
+                        "units": 200
+                      },
+                      "requestedScope": {
+                        "capabilityScopePrefix": "tools:security-review:1f616d0c1de2a67fd19b3887e3259cddc1a2f19749cbfc001f70674a792e4255",
+                        "maxInvocations": 1,
+                        "serverId": "security-review-provider",
+                        "toolName": "review"
+                      },
+                      "schema": "chio.marketplace.bid-request.v1",
+                      "windowSeconds": 589
+                    },
+                    "signature": "ab5f7322251d9f33793f6dc77f915449f6e3710b18a6659c87783292c3886ff29a39c29e6bf0a883471dc07d56159f929739b274b286befa5e86457f49bed001",
+                    "signerKey": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                  },
+                  "subcontractPermit": {
+                    "body": {
+                      "childAgreementSha256": "ed6a2eeffc281eeb1b4c8abcfd64a90b99dc1bd39ec30c82ad3e6a53b5632f31",
+                      "currency": "TST",
+                      "delegate": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                      "expiresAt": 1789361381,
+                      "parentAgreementSha256": "25eccf0fbd1714ca1f4d5005a9104a3ccd982b838157c0d6c8e20f6a32bca35e",
+                      "parentRequestSha256": "bf4ceceeb97d6584d924def7f7625c8c848d170c12e25caa51d0c1e5a27b7c2d",
+                      "priceCeiling": 100,
+                      "schema": "chio.example.subcontract-permit.v1",
+                      "specialist": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4"
+                    },
+                    "signature": "ace7bdd43791b7c1974f373200c3e599063d0da5ae4003e881608e57d9cfe78066bb7e3d86b3ab05c5aa938bd30fd812bd66931e04641255913db9b709d7ed0b",
+                    "signerKey": "61c20beab98234b1065c0737c677d3a5f6cdf6a2f8fca028c40dc2e1f7c9adc0"
+                  }
+                }
+              },
+              "boundary_class": "prevent",
+              "capability_id": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+              "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+              "decision": {
+                "guard": "kernel",
+                "reason": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: subcontract permit does not authorize this exact child procurement",
+                "verdict": "deny"
+              },
+              "id": "20a8880b7bed8e32efdb956a63eb2232f42d49fe8eebf3989f5ef6cfc27ec92f",
+              "kernel_key": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+              "metadata": {
+                "attribution": {
+                  "delegation_depth": 0,
+                  "issuer_key": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+                  "subject_key": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                },
+                "budget_authority": {
+                  "authority_profile": "authoritative_hold_event",
+                  "guarantee_level": "single_node_atomic",
+                  "metering_profile": "max_cost_preauthorize_then_reconcile_actual"
+                },
+                "chio_receipt_signing_nonce": "rcpt-01a09e36-e5db-77e0-afa3-807e8f7bab6a",
+                "receipt_context": {
+                  "request_id": "c3a553e328983fe4aa3012ef541c1482"
+                },
+                "route_selection": {
+                  "candidates": [
+                    {
+                      "available": true,
+                      "routeId": "native-route",
+                      "selectedProtocols": [
+                        "a2a",
+                        "native"
+                      ],
+                      "targetProtocol": "native"
+                    }
+                  ],
+                  "decision": "select",
+                  "requestedTargetProtocol": "native",
+                  "routeSelectionId": "966d60013279fc54a6f6079fd1fa45d11ce74a277e40323c80d0d8732d58b880",
+                  "selectedProtocols": [
+                    "a2a",
+                    "native"
+                  ],
+                  "selectedRouteId": "native-route",
+                  "selectedTargetProtocol": "native",
+                  "sourceProtocol": "a2a"
+                }
+              },
+              "policy_hash": "e503dcdaee2a0ac92139f18cf50594237455c0408d78e50c1212ce75d5fc9ab1",
+              "receipt_kind": "mediated_decision",
+              "redaction_mode": "none",
+              "signature": "384e817662707137e77553df81d759843c83abfe465c45b31ecd2591ec2e844df0b25c956946dfcc53cac6f0be32b23bc94e5213e5dd2fbb178137b89cfc4d08",
+              "timestamp": 1789360792,
+              "tool_name": "quote",
+              "tool_origin": "caller_executed",
+              "tool_server": "security-review-provider",
+              "trust_level": "mediated"
+            },
+            "receiptId": "20a8880b7bed8e32efdb956a63eb2232f42d49fe8eebf3989f5ef6cfc27ec92f",
+            "receiptRef": {
+              "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-9",
+              "capabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+              "receiptId": "20a8880b7bed8e32efdb956a63eb2232f42d49fe8eebf3989f5ef6cfc27ec92f",
+              "sourceProtocol": "a2a",
+              "targetProtocol": "native",
+              "traceId": "2c334ea7c61c01921dcef0058765b722788243551f03a2af548a94d3a084ace6"
+            },
+            "routeSelection": {
+              "candidates": [
+                {
+                  "available": true,
+                  "routeId": "native-route",
+                  "selectedProtocols": [
+                    "a2a",
+                    "native"
+                  ],
+                  "targetProtocol": "native"
+                }
+              ],
+              "decision": "select",
+              "requestedTargetProtocol": "native",
+              "routeSelectionId": "966d60013279fc54a6f6079fd1fa45d11ce74a277e40323c80d0d8732d58b880",
+              "selectedProtocols": [
+                "a2a",
+                "native"
+              ],
+              "selectedRouteId": "native-route",
+              "selectedTargetProtocol": "native",
+              "sourceProtocol": "a2a"
+            },
+            "runtimeLifecycle": {
+              "blockingEntrypoint": "message/send",
+              "cancelEntrypoint": "task/cancel",
+              "claimEligible": true,
+              "compatibilityOnly": false,
+              "followUpEntrypoint": "task/get",
+              "partialOutputDelivery": "collated_terminal_payload",
+              "streamDelivery": "collated_terminal_payload",
+              "streamEntrypoint": "message/stream",
+              "surface": "a2a_authoritative"
+            },
+            "targetExecution": {
+              "multiHop": false,
+              "notificationCount": 0,
+              "projectedResult": false,
+              "routeHopCount": 2,
+              "terminalProtocol": "native"
+            },
+            "terminalState": {
+              "state": "completed"
+            }
+          }
+        },
+        "status": {
+          "message": {
+            "messageId": "status-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-9",
+            "parts": [
+              {
+                "text": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: subcontract permit does not authorize this exact child procurement"
+              }
+            ],
+            "role": "ROLE_AGENT"
+          },
+          "state": "TASK_STATE_FAILED"
+        }
+      }
+    }
+  },
+  {
+    "case": "longer-deadline",
+    "response": {
+      "task": {
+        "contextId": "context-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-10",
+        "id": "a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-10",
+        "metadata": {
+          "chio": {
+            "a2aSurface": "authoritative_blocking_send",
+            "authoritative": true,
+            "authorityPath": "cross_protocol_orchestrator",
+            "bridge": {
+              "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-10",
+              "capabilityEnvelope": {
+                "attenuatedScope": {
+                  "grants": [
+                    {
+                      "constraints": [
+                        {
+                          "type": "max_args_size",
+                          "value": 262144
+                        }
+                      ],
+                      "dpop_required": true,
+                      "operations": [
+                        "invoke"
+                      ],
+                      "server_id": "security-review-provider",
+                      "tool_name": "quote"
+                    }
+                  ]
+                },
+                "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-10",
+                "bridgedAt": 1789360793,
+                "capabilityRef": {
+                  "chioCapabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+                  "originProtocol": "a2a",
+                  "parentCapabilityHash": "63acf76e16c15c7bd324a6ec9b4c24a9db7607dc1159d60e693dc66891306fe3",
+                  "protocolContext": {
+                    "targetSkillId": "quote"
+                  }
+                },
+                "schema": "chio.cross-protocol-cap.v1",
+                "targetProtocol": "native"
+              },
+              "capabilityRef": {
+                "chioCapabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+                "originProtocol": "a2a",
+                "parentCapabilityHash": "63acf76e16c15c7bd324a6ec9b4c24a9db7607dc1159d60e693dc66891306fe3",
+                "protocolContext": {
+                  "targetSkillId": "quote"
+                }
+              },
+              "route": {
+                "multiHop": false,
+                "selectedProtocols": [
+                  "a2a",
+                  "native"
+                ],
+                "terminalProtocol": "native"
+              },
+              "sourceProtocol": "a2a",
+              "targetProtocol": "native",
+              "terminalProtocol": "native",
+              "trace": {
+                "hops": [
+                  {
+                    "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-10",
+                    "protocol": "a2a",
+                    "requestId": "a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-10",
+                    "timestamp": 1789360793
+                  },
+                  {
+                    "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-10",
+                    "protocol": "native",
+                    "receiptId": "d3107daa7541aedb60c63c25200b8eff0b3a549eaf57ae9103ad2716d75c21ee",
+                    "requestId": "64a8ff7ffd9aba4eaf90a12a911846a7",
+                    "timestamp": 1789360793
+                  }
+                ],
+                "sessionFingerprint": "f627247b19e156026acaae5d7a15d2ca122cb016fe7f40e8460547a57a36b66f",
+                "traceId": "dcaa15cb051e609cc80553b86a1e7a6b5dcf7e9d037895ad463355dd74be614f"
+              }
+            },
+            "capabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+            "decision": "deny",
+            "executionNonce": null,
+            "lifecycle": {
+              "messageSend": "blocking_terminal_task",
+              "messageStream": "deferred_task_poll",
+              "taskCancel": "supported",
+              "taskGet": "supported"
+            },
+            "reason": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: subcontract permit does not authorize this exact child procurement",
+            "receipt": {
+              "action": {
+                "parameter_hash": "762c8a5513b394e07d6067f20c7469a0ba265eb16836f039379373dd3c5c06d2",
+                "parameters": {
+                  "agreement": {
+                    "buyer": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                    "checker": "openapi-explicit-auth-v1",
+                    "creditProfile": "provider-local-credit-checked-or-zero-v1",
+                    "deadline": 1789361391,
+                    "inputSha256": "2184a89310ecaddefb65643b02bea92b119e3fc31e03bdfbd4dc52271b65f1cc",
+                    "jobId": "child-25eccf0fbd1714ca1f4d5005a9104a3ccd982b838157c0d6c8e20f6a32bca35e",
+                    "priceCeiling": 100,
+                    "profile": "chio.example.security-review-agreement.v3",
+                    "provider": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+                    "subcontracting": false
+                  },
+                  "bid": {
+                    "body": {
+                      "agentId": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                      "issuedAt": 1789360793,
+                      "listingId": "security-review-v1",
+                      "maxPricePerCall": {
+                        "currency": "TST",
+                        "units": 100
+                      },
+                      "requestedScope": {
+                        "capabilityScopePrefix": "tools:security-review:3f45cc227cb148fbdaa0f9ec10f3e6d97f547a14e0d4475f7503ff2d0dd93af2",
+                        "maxInvocations": 1,
+                        "serverId": "security-review-provider",
+                        "toolName": "review"
+                      },
+                      "schema": "chio.marketplace.bid-request.v1",
+                      "windowSeconds": 598
+                    },
+                    "signature": "7e888a97eebece4b43bcd9e3dbb114b48eddd0e4c511d5460c715086db25798226e4f806fb92d3868d698e774cbd5b11bdd903a4e2b8e556215fcbd92ef79e04",
+                    "signerKey": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                  },
+                  "subcontractPermit": {
+                    "body": {
+                      "childAgreementSha256": "ed6a2eeffc281eeb1b4c8abcfd64a90b99dc1bd39ec30c82ad3e6a53b5632f31",
+                      "currency": "TST",
+                      "delegate": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                      "expiresAt": 1789361381,
+                      "parentAgreementSha256": "25eccf0fbd1714ca1f4d5005a9104a3ccd982b838157c0d6c8e20f6a32bca35e",
+                      "parentRequestSha256": "bf4ceceeb97d6584d924def7f7625c8c848d170c12e25caa51d0c1e5a27b7c2d",
+                      "priceCeiling": 100,
+                      "schema": "chio.example.subcontract-permit.v1",
+                      "specialist": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4"
+                    },
+                    "signature": "ace7bdd43791b7c1974f373200c3e599063d0da5ae4003e881608e57d9cfe78066bb7e3d86b3ab05c5aa938bd30fd812bd66931e04641255913db9b709d7ed0b",
+                    "signerKey": "61c20beab98234b1065c0737c677d3a5f6cdf6a2f8fca028c40dc2e1f7c9adc0"
+                  }
+                }
+              },
+              "boundary_class": "prevent",
+              "capability_id": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+              "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+              "decision": {
+                "guard": "kernel",
+                "reason": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: subcontract permit does not authorize this exact child procurement",
+                "verdict": "deny"
+              },
+              "id": "d3107daa7541aedb60c63c25200b8eff0b3a549eaf57ae9103ad2716d75c21ee",
+              "kernel_key": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+              "metadata": {
+                "attribution": {
+                  "delegation_depth": 0,
+                  "issuer_key": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+                  "subject_key": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                },
+                "budget_authority": {
+                  "authority_profile": "authoritative_hold_event",
+                  "guarantee_level": "single_node_atomic",
+                  "metering_profile": "max_cost_preauthorize_then_reconcile_actual"
+                },
+                "chio_receipt_signing_nonce": "rcpt-01a09e36-e6a0-7053-83e4-36832afe02cb",
+                "receipt_context": {
+                  "request_id": "64a8ff7ffd9aba4eaf90a12a911846a7"
+                },
+                "route_selection": {
+                  "candidates": [
+                    {
+                      "available": true,
+                      "routeId": "native-route",
+                      "selectedProtocols": [
+                        "a2a",
+                        "native"
+                      ],
+                      "targetProtocol": "native"
+                    }
+                  ],
+                  "decision": "select",
+                  "requestedTargetProtocol": "native",
+                  "routeSelectionId": "4d5e3ef4b1a91a17dfc465899539049e3484c783a94c4025d95fac4c6661bcf7",
+                  "selectedProtocols": [
+                    "a2a",
+                    "native"
+                  ],
+                  "selectedRouteId": "native-route",
+                  "selectedTargetProtocol": "native",
+                  "sourceProtocol": "a2a"
+                }
+              },
+              "policy_hash": "e503dcdaee2a0ac92139f18cf50594237455c0408d78e50c1212ce75d5fc9ab1",
+              "receipt_kind": "mediated_decision",
+              "redaction_mode": "none",
+              "signature": "99d74660b435cc103b106efd9c6de2c0bbc36952d287dd9b95d1cf7bdaaebb6c87c7003c560cea190abcd44bcaf671bcb663aebdd2d063a5e1775ef5ddbc5201",
+              "timestamp": 1789360793,
+              "tool_name": "quote",
+              "tool_origin": "caller_executed",
+              "tool_server": "security-review-provider",
+              "trust_level": "mediated"
+            },
+            "receiptId": "d3107daa7541aedb60c63c25200b8eff0b3a549eaf57ae9103ad2716d75c21ee",
+            "receiptRef": {
+              "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-10",
+              "capabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+              "receiptId": "d3107daa7541aedb60c63c25200b8eff0b3a549eaf57ae9103ad2716d75c21ee",
+              "sourceProtocol": "a2a",
+              "targetProtocol": "native",
+              "traceId": "dcaa15cb051e609cc80553b86a1e7a6b5dcf7e9d037895ad463355dd74be614f"
+            },
+            "routeSelection": {
+              "candidates": [
+                {
+                  "available": true,
+                  "routeId": "native-route",
+                  "selectedProtocols": [
+                    "a2a",
+                    "native"
+                  ],
+                  "targetProtocol": "native"
+                }
+              ],
+              "decision": "select",
+              "requestedTargetProtocol": "native",
+              "routeSelectionId": "4d5e3ef4b1a91a17dfc465899539049e3484c783a94c4025d95fac4c6661bcf7",
+              "selectedProtocols": [
+                "a2a",
+                "native"
+              ],
+              "selectedRouteId": "native-route",
+              "selectedTargetProtocol": "native",
+              "sourceProtocol": "a2a"
+            },
+            "runtimeLifecycle": {
+              "blockingEntrypoint": "message/send",
+              "cancelEntrypoint": "task/cancel",
+              "claimEligible": true,
+              "compatibilityOnly": false,
+              "followUpEntrypoint": "task/get",
+              "partialOutputDelivery": "collated_terminal_payload",
+              "streamDelivery": "collated_terminal_payload",
+              "streamEntrypoint": "message/stream",
+              "surface": "a2a_authoritative"
+            },
+            "targetExecution": {
+              "multiHop": false,
+              "notificationCount": 0,
+              "projectedResult": false,
+              "routeHopCount": 2,
+              "terminalProtocol": "native"
+            },
+            "terminalState": {
+              "state": "completed"
+            }
+          }
+        },
+        "status": {
+          "message": {
+            "messageId": "status-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-10",
+            "parts": [
+              {
+                "text": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: subcontract permit does not authorize this exact child procurement"
+              }
+            ],
+            "role": "ROLE_AGENT"
+          },
+          "state": "TASK_STATE_FAILED"
+        }
+      }
+    }
+  },
+  {
+    "case": "onward-subcontract",
+    "response": {
+      "task": {
+        "contextId": "context-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-11",
+        "id": "a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-11",
+        "metadata": {
+          "chio": {
+            "a2aSurface": "authoritative_blocking_send",
+            "authoritative": true,
+            "authorityPath": "cross_protocol_orchestrator",
+            "bridge": {
+              "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-11",
+              "capabilityEnvelope": {
+                "attenuatedScope": {
+                  "grants": [
+                    {
+                      "constraints": [
+                        {
+                          "type": "max_args_size",
+                          "value": 262144
+                        }
+                      ],
+                      "dpop_required": true,
+                      "operations": [
+                        "invoke"
+                      ],
+                      "server_id": "security-review-provider",
+                      "tool_name": "quote"
+                    }
+                  ]
+                },
+                "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-11",
+                "bridgedAt": 1789360793,
+                "capabilityRef": {
+                  "chioCapabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+                  "originProtocol": "a2a",
+                  "parentCapabilityHash": "63acf76e16c15c7bd324a6ec9b4c24a9db7607dc1159d60e693dc66891306fe3",
+                  "protocolContext": {
+                    "targetSkillId": "quote"
+                  }
+                },
+                "schema": "chio.cross-protocol-cap.v1",
+                "targetProtocol": "native"
+              },
+              "capabilityRef": {
+                "chioCapabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+                "originProtocol": "a2a",
+                "parentCapabilityHash": "63acf76e16c15c7bd324a6ec9b4c24a9db7607dc1159d60e693dc66891306fe3",
+                "protocolContext": {
+                  "targetSkillId": "quote"
+                }
+              },
+              "route": {
+                "multiHop": false,
+                "selectedProtocols": [
+                  "a2a",
+                  "native"
+                ],
+                "terminalProtocol": "native"
+              },
+              "sourceProtocol": "a2a",
+              "targetProtocol": "native",
+              "terminalProtocol": "native",
+              "trace": {
+                "hops": [
+                  {
+                    "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-11",
+                    "protocol": "a2a",
+                    "requestId": "a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-11",
+                    "timestamp": 1789360793
+                  },
+                  {
+                    "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-11",
+                    "protocol": "native",
+                    "receiptId": "c9a077530704f67d953c9a1912d68a0512c3005bace2ef83f4352f8326ef6618",
+                    "requestId": "0b5edcdd11e9d859389b50154ae6afa0",
+                    "timestamp": 1789360793
+                  }
+                ],
+                "sessionFingerprint": "bac229e95d3e57842d736dbd02587084a06cd12ad531226e411c6eceedaf6de2",
+                "traceId": "532a632fbc53069e81134a361e35354a32736d600970b7ec5cfe0e51d148a09b"
+              }
+            },
+            "capabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+            "decision": "deny",
+            "executionNonce": null,
+            "lifecycle": {
+              "messageSend": "blocking_terminal_task",
+              "messageStream": "deferred_task_poll",
+              "taskCancel": "supported",
+              "taskGet": "supported"
+            },
+            "reason": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: agreement violates local work profile",
+            "receipt": {
+              "action": {
+                "parameter_hash": "7a8c8f0eb746bf5f3bcd20912547de928bd30162b03a227794073839f2465052",
+                "parameters": {
+                  "agreement": {
+                    "buyer": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                    "checker": "openapi-explicit-auth-v1",
+                    "creditProfile": "provider-local-credit-checked-or-zero-v1",
+                    "deadline": 1789361381,
+                    "inputSha256": "2184a89310ecaddefb65643b02bea92b119e3fc31e03bdfbd4dc52271b65f1cc",
+                    "jobId": "child-25eccf0fbd1714ca1f4d5005a9104a3ccd982b838157c0d6c8e20f6a32bca35e",
+                    "priceCeiling": 100,
+                    "profile": "chio.example.security-review-agreement.v3",
+                    "provider": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+                    "subcontracting": true
+                  },
+                  "bid": {
+                    "body": {
+                      "agentId": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                      "issuedAt": 1789360793,
+                      "listingId": "security-review-v1",
+                      "maxPricePerCall": {
+                        "currency": "TST",
+                        "units": 100
+                      },
+                      "requestedScope": {
+                        "capabilityScopePrefix": "tools:security-review:b31a3bbb239458713c27b7d7006ceaa59896842fafbfbe1d5e24884556f5ec73",
+                        "maxInvocations": 1,
+                        "serverId": "security-review-provider",
+                        "toolName": "review"
+                      },
+                      "schema": "chio.marketplace.bid-request.v1",
+                      "windowSeconds": 588
+                    },
+                    "signature": "07f2cbc78fb470cadbcb688318804cbe4004ac3874874ecfe8531e396265b5927a46dce6162e8b4c336bfeeea25677181db63709bae242e0cb4b6ff4e7acb008",
+                    "signerKey": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                  },
+                  "subcontractPermit": {
+                    "body": {
+                      "childAgreementSha256": "ed6a2eeffc281eeb1b4c8abcfd64a90b99dc1bd39ec30c82ad3e6a53b5632f31",
+                      "currency": "TST",
+                      "delegate": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                      "expiresAt": 1789361381,
+                      "parentAgreementSha256": "25eccf0fbd1714ca1f4d5005a9104a3ccd982b838157c0d6c8e20f6a32bca35e",
+                      "parentRequestSha256": "bf4ceceeb97d6584d924def7f7625c8c848d170c12e25caa51d0c1e5a27b7c2d",
+                      "priceCeiling": 100,
+                      "schema": "chio.example.subcontract-permit.v1",
+                      "specialist": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4"
+                    },
+                    "signature": "ace7bdd43791b7c1974f373200c3e599063d0da5ae4003e881608e57d9cfe78066bb7e3d86b3ab05c5aa938bd30fd812bd66931e04641255913db9b709d7ed0b",
+                    "signerKey": "61c20beab98234b1065c0737c677d3a5f6cdf6a2f8fca028c40dc2e1f7c9adc0"
+                  }
+                }
+              },
+              "boundary_class": "prevent",
+              "capability_id": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+              "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+              "decision": {
+                "guard": "kernel",
+                "reason": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: agreement violates local work profile",
+                "verdict": "deny"
+              },
+              "id": "c9a077530704f67d953c9a1912d68a0512c3005bace2ef83f4352f8326ef6618",
+              "kernel_key": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+              "metadata": {
+                "attribution": {
+                  "delegation_depth": 0,
+                  "issuer_key": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+                  "subject_key": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                },
+                "budget_authority": {
+                  "authority_profile": "authoritative_hold_event",
+                  "guarantee_level": "single_node_atomic",
+                  "metering_profile": "max_cost_preauthorize_then_reconcile_actual"
+                },
+                "chio_receipt_signing_nonce": "rcpt-01a09e36-e737-79e1-bebb-0fb8d4e66cc1",
+                "receipt_context": {
+                  "request_id": "0b5edcdd11e9d859389b50154ae6afa0"
+                },
+                "route_selection": {
+                  "candidates": [
+                    {
+                      "available": true,
+                      "routeId": "native-route",
+                      "selectedProtocols": [
+                        "a2a",
+                        "native"
+                      ],
+                      "targetProtocol": "native"
+                    }
+                  ],
+                  "decision": "select",
+                  "requestedTargetProtocol": "native",
+                  "routeSelectionId": "6eeae2e7385d5a938e5b1bc8af4ca31a4778d7ad41c6fc7384f7c2befc63d137",
+                  "selectedProtocols": [
+                    "a2a",
+                    "native"
+                  ],
+                  "selectedRouteId": "native-route",
+                  "selectedTargetProtocol": "native",
+                  "sourceProtocol": "a2a"
+                }
+              },
+              "policy_hash": "e503dcdaee2a0ac92139f18cf50594237455c0408d78e50c1212ce75d5fc9ab1",
+              "receipt_kind": "mediated_decision",
+              "redaction_mode": "none",
+              "signature": "fed3b320356078c2f402a177f0acf029302ff54cf3218def0d919bde25273b53726a6f4ce46e292c27d11b524a3eab9d7921ba7cab49a5aa997e195e1a7e2805",
+              "timestamp": 1789360793,
+              "tool_name": "quote",
+              "tool_origin": "caller_executed",
+              "tool_server": "security-review-provider",
+              "trust_level": "mediated"
+            },
+            "receiptId": "c9a077530704f67d953c9a1912d68a0512c3005bace2ef83f4352f8326ef6618",
+            "receiptRef": {
+              "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-11",
+              "capabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+              "receiptId": "c9a077530704f67d953c9a1912d68a0512c3005bace2ef83f4352f8326ef6618",
+              "sourceProtocol": "a2a",
+              "targetProtocol": "native",
+              "traceId": "532a632fbc53069e81134a361e35354a32736d600970b7ec5cfe0e51d148a09b"
+            },
+            "routeSelection": {
+              "candidates": [
+                {
+                  "available": true,
+                  "routeId": "native-route",
+                  "selectedProtocols": [
+                    "a2a",
+                    "native"
+                  ],
+                  "targetProtocol": "native"
+                }
+              ],
+              "decision": "select",
+              "requestedTargetProtocol": "native",
+              "routeSelectionId": "6eeae2e7385d5a938e5b1bc8af4ca31a4778d7ad41c6fc7384f7c2befc63d137",
+              "selectedProtocols": [
+                "a2a",
+                "native"
+              ],
+              "selectedRouteId": "native-route",
+              "selectedTargetProtocol": "native",
+              "sourceProtocol": "a2a"
+            },
+            "runtimeLifecycle": {
+              "blockingEntrypoint": "message/send",
+              "cancelEntrypoint": "task/cancel",
+              "claimEligible": true,
+              "compatibilityOnly": false,
+              "followUpEntrypoint": "task/get",
+              "partialOutputDelivery": "collated_terminal_payload",
+              "streamDelivery": "collated_terminal_payload",
+              "streamEntrypoint": "message/stream",
+              "surface": "a2a_authoritative"
+            },
+            "targetExecution": {
+              "multiHop": false,
+              "notificationCount": 0,
+              "projectedResult": false,
+              "routeHopCount": 2,
+              "terminalProtocol": "native"
+            },
+            "terminalState": {
+              "state": "completed"
+            }
+          }
+        },
+        "status": {
+          "message": {
+            "messageId": "status-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-11",
+            "parts": [
+              {
+                "text": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: agreement violates local work profile"
+              }
+            ],
+            "role": "ROLE_AGENT"
+          },
+          "state": "TASK_STATE_FAILED"
+        }
+      }
+    }
+  },
+  {
+    "case": "agent-forged-permit",
+    "response": {
+      "task": {
+        "contextId": "context-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-12",
+        "id": "a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-12",
+        "metadata": {
+          "chio": {
+            "a2aSurface": "authoritative_blocking_send",
+            "authoritative": true,
+            "authorityPath": "cross_protocol_orchestrator",
+            "bridge": {
+              "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-12",
+              "capabilityEnvelope": {
+                "attenuatedScope": {
+                  "grants": [
+                    {
+                      "constraints": [
+                        {
+                          "type": "max_args_size",
+                          "value": 262144
+                        }
+                      ],
+                      "dpop_required": true,
+                      "operations": [
+                        "invoke"
+                      ],
+                      "server_id": "security-review-provider",
+                      "tool_name": "quote"
+                    }
+                  ]
+                },
+                "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-12",
+                "bridgedAt": 1789360793,
+                "capabilityRef": {
+                  "chioCapabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+                  "originProtocol": "a2a",
+                  "parentCapabilityHash": "63acf76e16c15c7bd324a6ec9b4c24a9db7607dc1159d60e693dc66891306fe3",
+                  "protocolContext": {
+                    "targetSkillId": "quote"
+                  }
+                },
+                "schema": "chio.cross-protocol-cap.v1",
+                "targetProtocol": "native"
+              },
+              "capabilityRef": {
+                "chioCapabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+                "originProtocol": "a2a",
+                "parentCapabilityHash": "63acf76e16c15c7bd324a6ec9b4c24a9db7607dc1159d60e693dc66891306fe3",
+                "protocolContext": {
+                  "targetSkillId": "quote"
+                }
+              },
+              "route": {
+                "multiHop": false,
+                "selectedProtocols": [
+                  "a2a",
+                  "native"
+                ],
+                "terminalProtocol": "native"
+              },
+              "sourceProtocol": "a2a",
+              "targetProtocol": "native",
+              "terminalProtocol": "native",
+              "trace": {
+                "hops": [
+                  {
+                    "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-12",
+                    "protocol": "a2a",
+                    "requestId": "a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-12",
+                    "timestamp": 1789360793
+                  },
+                  {
+                    "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-12",
+                    "protocol": "native",
+                    "receiptId": "02cd44206c57ff0b74f74bf02168e26ada61c2101f6a4340c069ecf2b90be616",
+                    "requestId": "6a3515f96f5e15cc72002c269ab1da9a",
+                    "timestamp": 1789360793
+                  }
+                ],
+                "sessionFingerprint": "aba8427cb1e27bc10a6c1640915f8a5028e7c2231a2b96580bdea19c2c6a9723",
+                "traceId": "3c36486cd2b441c396ea8958f2e7d21328445e4ba33492fc348a9928b6893958"
+              }
+            },
+            "capabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+            "decision": "deny",
+            "executionNonce": null,
+            "lifecycle": {
+              "messageSend": "blocking_terminal_task",
+              "messageStream": "deferred_task_poll",
+              "taskCancel": "supported",
+              "taskGet": "supported"
+            },
+            "reason": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: subcontract permit does not authorize this exact child procurement",
+            "receipt": {
+              "action": {
+                "parameter_hash": "b301e4e8d0614ec9af8d9323ef8a86193347d0a2f2a87a96f786f779c1f338a6",
+                "parameters": {
+                  "agreement": {
+                    "buyer": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                    "checker": "openapi-explicit-auth-v1",
+                    "creditProfile": "provider-local-credit-checked-or-zero-v1",
+                    "deadline": 1789361381,
+                    "inputSha256": "2184a89310ecaddefb65643b02bea92b119e3fc31e03bdfbd4dc52271b65f1cc",
+                    "jobId": "child-25eccf0fbd1714ca1f4d5005a9104a3ccd982b838157c0d6c8e20f6a32bca35e",
+                    "priceCeiling": 100,
+                    "profile": "chio.example.security-review-agreement.v3",
+                    "provider": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+                    "subcontracting": false
+                  },
+                  "bid": {
+                    "body": {
+                      "agentId": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                      "issuedAt": 1789360793,
+                      "listingId": "security-review-v1",
+                      "maxPricePerCall": {
+                        "currency": "TST",
+                        "units": 100
+                      },
+                      "requestedScope": {
+                        "capabilityScopePrefix": "tools:security-review:ed6a2eeffc281eeb1b4c8abcfd64a90b99dc1bd39ec30c82ad3e6a53b5632f31",
+                        "maxInvocations": 1,
+                        "serverId": "security-review-provider",
+                        "toolName": "review"
+                      },
+                      "schema": "chio.marketplace.bid-request.v1",
+                      "windowSeconds": 588
+                    },
+                    "signature": "8053f0b7f967b34c43f371e964e262c5f1179a9531bf00fed4c3dfadd6ec5784c7f710d0175ebfc95a3b1ef1648b3df5547db5c0baf64062743a8beb7daf1903",
+                    "signerKey": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                  },
+                  "subcontractPermit": {
+                    "body": {
+                      "childAgreementSha256": "ed6a2eeffc281eeb1b4c8abcfd64a90b99dc1bd39ec30c82ad3e6a53b5632f31",
+                      "currency": "TST",
+                      "delegate": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                      "expiresAt": 1789361381,
+                      "parentAgreementSha256": "25eccf0fbd1714ca1f4d5005a9104a3ccd982b838157c0d6c8e20f6a32bca35e",
+                      "parentRequestSha256": "bf4ceceeb97d6584d924def7f7625c8c848d170c12e25caa51d0c1e5a27b7c2d",
+                      "priceCeiling": 100,
+                      "schema": "chio.example.subcontract-permit.v1",
+                      "specialist": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4"
+                    },
+                    "signature": "52379e49c78df1d0be43c278822976c1a6be03dc684fa4de908392f1fc29863d34a94daa9fca1c2d6cce33229d9c1521433788c4f9241b18df3daf329b6aa70b",
+                    "signerKey": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                  }
+                }
+              },
+              "boundary_class": "prevent",
+              "capability_id": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+              "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+              "decision": {
+                "guard": "kernel",
+                "reason": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: subcontract permit does not authorize this exact child procurement",
+                "verdict": "deny"
+              },
+              "id": "02cd44206c57ff0b74f74bf02168e26ada61c2101f6a4340c069ecf2b90be616",
+              "kernel_key": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+              "metadata": {
+                "attribution": {
+                  "delegation_depth": 0,
+                  "issuer_key": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+                  "subject_key": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                },
+                "budget_authority": {
+                  "authority_profile": "authoritative_hold_event",
+                  "guarantee_level": "single_node_atomic",
+                  "metering_profile": "max_cost_preauthorize_then_reconcile_actual"
+                },
+                "chio_receipt_signing_nonce": "rcpt-01a09e36-e7c5-7810-b522-a430492a7ab6",
+                "receipt_context": {
+                  "request_id": "6a3515f96f5e15cc72002c269ab1da9a"
+                },
+                "route_selection": {
+                  "candidates": [
+                    {
+                      "available": true,
+                      "routeId": "native-route",
+                      "selectedProtocols": [
+                        "a2a",
+                        "native"
+                      ],
+                      "targetProtocol": "native"
+                    }
+                  ],
+                  "decision": "select",
+                  "requestedTargetProtocol": "native",
+                  "routeSelectionId": "9de93587674be38b7d84224439480e1042c0e2e0c010b0a192462cdeb425f645",
+                  "selectedProtocols": [
+                    "a2a",
+                    "native"
+                  ],
+                  "selectedRouteId": "native-route",
+                  "selectedTargetProtocol": "native",
+                  "sourceProtocol": "a2a"
+                }
+              },
+              "policy_hash": "e503dcdaee2a0ac92139f18cf50594237455c0408d78e50c1212ce75d5fc9ab1",
+              "receipt_kind": "mediated_decision",
+              "redaction_mode": "none",
+              "signature": "2aca24ca89140b3ba8306c3fa7c147873a8f2f3cbe6f91acf56a298a5758bd1d639fcf5f4fa4de51e65c41ef940496f2fddd66cb326e2ad113debc780051ca0b",
+              "timestamp": 1789360793,
+              "tool_name": "quote",
+              "tool_origin": "caller_executed",
+              "tool_server": "security-review-provider",
+              "trust_level": "mediated"
+            },
+            "receiptId": "02cd44206c57ff0b74f74bf02168e26ada61c2101f6a4340c069ecf2b90be616",
+            "receiptRef": {
+              "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-12",
+              "capabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+              "receiptId": "02cd44206c57ff0b74f74bf02168e26ada61c2101f6a4340c069ecf2b90be616",
+              "sourceProtocol": "a2a",
+              "targetProtocol": "native",
+              "traceId": "3c36486cd2b441c396ea8958f2e7d21328445e4ba33492fc348a9928b6893958"
+            },
+            "routeSelection": {
+              "candidates": [
+                {
+                  "available": true,
+                  "routeId": "native-route",
+                  "selectedProtocols": [
+                    "a2a",
+                    "native"
+                  ],
+                  "targetProtocol": "native"
+                }
+              ],
+              "decision": "select",
+              "requestedTargetProtocol": "native",
+              "routeSelectionId": "9de93587674be38b7d84224439480e1042c0e2e0c010b0a192462cdeb425f645",
+              "selectedProtocols": [
+                "a2a",
+                "native"
+              ],
+              "selectedRouteId": "native-route",
+              "selectedTargetProtocol": "native",
+              "sourceProtocol": "a2a"
+            },
+            "runtimeLifecycle": {
+              "blockingEntrypoint": "message/send",
+              "cancelEntrypoint": "task/cancel",
+              "claimEligible": true,
+              "compatibilityOnly": false,
+              "followUpEntrypoint": "task/get",
+              "partialOutputDelivery": "collated_terminal_payload",
+              "streamDelivery": "collated_terminal_payload",
+              "streamEntrypoint": "message/stream",
+              "surface": "a2a_authoritative"
+            },
+            "targetExecution": {
+              "multiHop": false,
+              "notificationCount": 0,
+              "projectedResult": false,
+              "routeHopCount": 2,
+              "terminalProtocol": "native"
+            },
+            "terminalState": {
+              "state": "completed"
+            }
+          }
+        },
+        "status": {
+          "message": {
+            "messageId": "status-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-12",
+            "parts": [
+              {
+                "text": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: subcontract permit does not authorize this exact child procurement"
+              }
+            ],
+            "role": "ROLE_AGENT"
+          },
+          "state": "TASK_STATE_FAILED"
+        }
+      }
+    }
+  },
+  {
+    "case": "different-promisor",
+    "response": {
+      "task": {
+        "contextId": "context-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-13",
+        "id": "a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-13",
+        "metadata": {
+          "chio": {
+            "a2aSurface": "authoritative_blocking_send",
+            "authoritative": true,
+            "authorityPath": "cross_protocol_orchestrator",
+            "bridge": {
+              "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-13",
+              "capabilityEnvelope": {
+                "attenuatedScope": {
+                  "grants": [
+                    {
+                      "constraints": [
+                        {
+                          "type": "max_args_size",
+                          "value": 262144
+                        }
+                      ],
+                      "dpop_required": true,
+                      "operations": [
+                        "invoke"
+                      ],
+                      "server_id": "security-review-provider",
+                      "tool_name": "quote"
+                    }
+                  ]
+                },
+                "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-13",
+                "bridgedAt": 1789360793,
+                "capabilityRef": {
+                  "chioCapabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+                  "originProtocol": "a2a",
+                  "parentCapabilityHash": "63acf76e16c15c7bd324a6ec9b4c24a9db7607dc1159d60e693dc66891306fe3",
+                  "protocolContext": {
+                    "targetSkillId": "quote"
+                  }
+                },
+                "schema": "chio.cross-protocol-cap.v1",
+                "targetProtocol": "native"
+              },
+              "capabilityRef": {
+                "chioCapabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+                "originProtocol": "a2a",
+                "parentCapabilityHash": "63acf76e16c15c7bd324a6ec9b4c24a9db7607dc1159d60e693dc66891306fe3",
+                "protocolContext": {
+                  "targetSkillId": "quote"
+                }
+              },
+              "route": {
+                "multiHop": false,
+                "selectedProtocols": [
+                  "a2a",
+                  "native"
+                ],
+                "terminalProtocol": "native"
+              },
+              "sourceProtocol": "a2a",
+              "targetProtocol": "native",
+              "terminalProtocol": "native",
+              "trace": {
+                "hops": [
+                  {
+                    "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-13",
+                    "protocol": "a2a",
+                    "requestId": "a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-13",
+                    "timestamp": 1789360793
+                  },
+                  {
+                    "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-13",
+                    "protocol": "native",
+                    "receiptId": "2976e4123e1131901788f4f684c528512986917a8c9e2d9a2d90511dc75148dc",
+                    "requestId": "22f7dc02738159d5e303cb50c3e5d60b",
+                    "timestamp": 1789360793
+                  }
+                ],
+                "sessionFingerprint": "22fd7430def6a47fc37cb30e142ed6dad78b259820d9e1a6a3a9aac0abb68454",
+                "traceId": "5076a389d66cefd4332c5cbc5ef0c7517d02dfde0f3971c94ede9bb5e5b69aa0"
+              }
+            },
+            "capabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+            "decision": "deny",
+            "executionNonce": null,
+            "lifecycle": {
+              "messageSend": "blocking_terminal_task",
+              "messageStream": "deferred_task_poll",
+              "taskCancel": "supported",
+              "taskGet": "supported"
+            },
+            "reason": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: subcontract permit does not authorize this exact child procurement",
+            "receipt": {
+              "action": {
+                "parameter_hash": "294da422d11a855df4f7625ae4740fe39ea48570ffb58ca665dbd2f0bcfdf0f3",
+                "parameters": {
+                  "agreement": {
+                    "buyer": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                    "checker": "openapi-explicit-auth-v1",
+                    "creditProfile": "provider-local-credit-checked-or-zero-v1",
+                    "deadline": 1789361381,
+                    "inputSha256": "2184a89310ecaddefb65643b02bea92b119e3fc31e03bdfbd4dc52271b65f1cc",
+                    "jobId": "child-25eccf0fbd1714ca1f4d5005a9104a3ccd982b838157c0d6c8e20f6a32bca35e",
+                    "priceCeiling": 100,
+                    "profile": "chio.example.security-review-agreement.v3",
+                    "provider": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+                    "subcontracting": false
+                  },
+                  "bid": {
+                    "body": {
+                      "agentId": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                      "issuedAt": 1789360793,
+                      "listingId": "security-review-v1",
+                      "maxPricePerCall": {
+                        "currency": "TST",
+                        "units": 100
+                      },
+                      "requestedScope": {
+                        "capabilityScopePrefix": "tools:security-review:ed6a2eeffc281eeb1b4c8abcfd64a90b99dc1bd39ec30c82ad3e6a53b5632f31",
+                        "maxInvocations": 1,
+                        "serverId": "security-review-provider",
+                        "toolName": "review"
+                      },
+                      "schema": "chio.marketplace.bid-request.v1",
+                      "windowSeconds": 588
+                    },
+                    "signature": "8053f0b7f967b34c43f371e964e262c5f1179a9531bf00fed4c3dfadd6ec5784c7f710d0175ebfc95a3b1ef1648b3df5547db5c0baf64062743a8beb7daf1903",
+                    "signerKey": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                  },
+                  "subcontractPermit": {
+                    "body": {
+                      "childAgreementSha256": "ed6a2eeffc281eeb1b4c8abcfd64a90b99dc1bd39ec30c82ad3e6a53b5632f31",
+                      "currency": "TST",
+                      "delegate": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                      "expiresAt": 1789361381,
+                      "parentAgreementSha256": "25eccf0fbd1714ca1f4d5005a9104a3ccd982b838157c0d6c8e20f6a32bca35e",
+                      "parentRequestSha256": "bf4ceceeb97d6584d924def7f7625c8c848d170c12e25caa51d0c1e5a27b7c2d",
+                      "priceCeiling": 100,
+                      "schema": "chio.example.subcontract-permit.v1",
+                      "specialist": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4"
+                    },
+                    "signature": "f4167631ec74e3da906687f47a75bb02e750739ecb5024f374f123a380c811e0679decc3de8841d9c08ac94cd826efb8a6dbeb2f198dc68080908c232d35a90a",
+                    "signerKey": "4fc04fd18c27f7375994075f970b441123db48f90b8bad879488ba29f28361f5"
+                  }
+                }
+              },
+              "boundary_class": "prevent",
+              "capability_id": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+              "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+              "decision": {
+                "guard": "kernel",
+                "reason": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: subcontract permit does not authorize this exact child procurement",
+                "verdict": "deny"
+              },
+              "id": "2976e4123e1131901788f4f684c528512986917a8c9e2d9a2d90511dc75148dc",
+              "kernel_key": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+              "metadata": {
+                "attribution": {
+                  "delegation_depth": 0,
+                  "issuer_key": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+                  "subject_key": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                },
+                "budget_authority": {
+                  "authority_profile": "authoritative_hold_event",
+                  "guarantee_level": "single_node_atomic",
+                  "metering_profile": "max_cost_preauthorize_then_reconcile_actual"
+                },
+                "chio_receipt_signing_nonce": "rcpt-01a09e36-e888-7191-9e68-fc87bdf03797",
+                "receipt_context": {
+                  "request_id": "22f7dc02738159d5e303cb50c3e5d60b"
+                },
+                "route_selection": {
+                  "candidates": [
+                    {
+                      "available": true,
+                      "routeId": "native-route",
+                      "selectedProtocols": [
+                        "a2a",
+                        "native"
+                      ],
+                      "targetProtocol": "native"
+                    }
+                  ],
+                  "decision": "select",
+                  "requestedTargetProtocol": "native",
+                  "routeSelectionId": "656dcb3709544df4c9dd7115867c32fd7266a543b40813521062bbcd55fb7fd3",
+                  "selectedProtocols": [
+                    "a2a",
+                    "native"
+                  ],
+                  "selectedRouteId": "native-route",
+                  "selectedTargetProtocol": "native",
+                  "sourceProtocol": "a2a"
+                }
+              },
+              "policy_hash": "e503dcdaee2a0ac92139f18cf50594237455c0408d78e50c1212ce75d5fc9ab1",
+              "receipt_kind": "mediated_decision",
+              "redaction_mode": "none",
+              "signature": "a79b2872488b3def5e7dc785eb7a849dd92828fcde61d9b9f68179c3bd9847ee49b493b32d30f424299e51a103c37ae28725379ee80a9dad61906cedcbf6e701",
+              "timestamp": 1789360793,
+              "tool_name": "quote",
+              "tool_origin": "caller_executed",
+              "tool_server": "security-review-provider",
+              "trust_level": "mediated"
+            },
+            "receiptId": "2976e4123e1131901788f4f684c528512986917a8c9e2d9a2d90511dc75148dc",
+            "receiptRef": {
+              "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-13",
+              "capabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+              "receiptId": "2976e4123e1131901788f4f684c528512986917a8c9e2d9a2d90511dc75148dc",
+              "sourceProtocol": "a2a",
+              "targetProtocol": "native",
+              "traceId": "5076a389d66cefd4332c5cbc5ef0c7517d02dfde0f3971c94ede9bb5e5b69aa0"
+            },
+            "routeSelection": {
+              "candidates": [
+                {
+                  "available": true,
+                  "routeId": "native-route",
+                  "selectedProtocols": [
+                    "a2a",
+                    "native"
+                  ],
+                  "targetProtocol": "native"
+                }
+              ],
+              "decision": "select",
+              "requestedTargetProtocol": "native",
+              "routeSelectionId": "656dcb3709544df4c9dd7115867c32fd7266a543b40813521062bbcd55fb7fd3",
+              "selectedProtocols": [
+                "a2a",
+                "native"
+              ],
+              "selectedRouteId": "native-route",
+              "selectedTargetProtocol": "native",
+              "sourceProtocol": "a2a"
+            },
+            "runtimeLifecycle": {
+              "blockingEntrypoint": "message/send",
+              "cancelEntrypoint": "task/cancel",
+              "claimEligible": true,
+              "compatibilityOnly": false,
+              "followUpEntrypoint": "task/get",
+              "partialOutputDelivery": "collated_terminal_payload",
+              "streamDelivery": "collated_terminal_payload",
+              "streamEntrypoint": "message/stream",
+              "surface": "a2a_authoritative"
+            },
+            "targetExecution": {
+              "multiHop": false,
+              "notificationCount": 0,
+              "projectedResult": false,
+              "routeHopCount": 2,
+              "terminalProtocol": "native"
+            },
+            "terminalState": {
+              "state": "completed"
+            }
+          }
+        },
+        "status": {
+          "message": {
+            "messageId": "status-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-13",
+            "parts": [
+              {
+                "text": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: subcontract permit does not authorize this exact child procurement"
+              }
+            ],
+            "role": "ROLE_AGENT"
+          },
+          "state": "TASK_STATE_FAILED"
+        }
+      }
+    }
+  },
+  {
+    "case": "permit-parent-substitution",
+    "response": {
+      "task": {
+        "contextId": "context-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-14",
+        "id": "a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-14",
+        "metadata": {
+          "chio": {
+            "a2aSurface": "authoritative_blocking_send",
+            "authoritative": true,
+            "authorityPath": "cross_protocol_orchestrator",
+            "bridge": {
+              "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-14",
+              "capabilityEnvelope": {
+                "attenuatedScope": {
+                  "grants": [
+                    {
+                      "constraints": [
+                        {
+                          "type": "max_args_size",
+                          "value": 262144
+                        }
+                      ],
+                      "dpop_required": true,
+                      "operations": [
+                        "invoke"
+                      ],
+                      "server_id": "security-review-provider",
+                      "tool_name": "quote"
+                    }
+                  ]
+                },
+                "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-14",
+                "bridgedAt": 1789360793,
+                "capabilityRef": {
+                  "chioCapabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+                  "originProtocol": "a2a",
+                  "parentCapabilityHash": "63acf76e16c15c7bd324a6ec9b4c24a9db7607dc1159d60e693dc66891306fe3",
+                  "protocolContext": {
+                    "targetSkillId": "quote"
+                  }
+                },
+                "schema": "chio.cross-protocol-cap.v1",
+                "targetProtocol": "native"
+              },
+              "capabilityRef": {
+                "chioCapabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+                "originProtocol": "a2a",
+                "parentCapabilityHash": "63acf76e16c15c7bd324a6ec9b4c24a9db7607dc1159d60e693dc66891306fe3",
+                "protocolContext": {
+                  "targetSkillId": "quote"
+                }
+              },
+              "route": {
+                "multiHop": false,
+                "selectedProtocols": [
+                  "a2a",
+                  "native"
+                ],
+                "terminalProtocol": "native"
+              },
+              "sourceProtocol": "a2a",
+              "targetProtocol": "native",
+              "terminalProtocol": "native",
+              "trace": {
+                "hops": [
+                  {
+                    "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-14",
+                    "protocol": "a2a",
+                    "requestId": "a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-14",
+                    "timestamp": 1789360793
+                  },
+                  {
+                    "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-14",
+                    "protocol": "native",
+                    "receiptId": "aa859aa601c9dd74d6fe821a485304df7ecc1d32a36730d2b21105d7de1144d2",
+                    "requestId": "a56a5e2e878f0e30e269ee982b73223a",
+                    "timestamp": 1789360793
+                  }
+                ],
+                "sessionFingerprint": "bb4985569839ba4c93eda94595e30a888a71732c90bc30752a918b2376d0805c",
+                "traceId": "8eb7652306698d5466a219cde065f363afc9651bc0753119c94f13eab71743eb"
+              }
+            },
+            "capabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+            "decision": "deny",
+            "executionNonce": null,
+            "lifecycle": {
+              "messageSend": "blocking_terminal_task",
+              "messageStream": "deferred_task_poll",
+              "taskCancel": "supported",
+              "taskGet": "supported"
+            },
+            "reason": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: subcontract permit does not authorize this exact child procurement",
+            "receipt": {
+              "action": {
+                "parameter_hash": "569e01fa4b5cb971260303cf01df7db867b73b80c6f3e9c28d5ea67966a32cda",
+                "parameters": {
+                  "agreement": {
+                    "buyer": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                    "checker": "openapi-explicit-auth-v1",
+                    "creditProfile": "provider-local-credit-checked-or-zero-v1",
+                    "deadline": 1789361381,
+                    "inputSha256": "2184a89310ecaddefb65643b02bea92b119e3fc31e03bdfbd4dc52271b65f1cc",
+                    "jobId": "child-25eccf0fbd1714ca1f4d5005a9104a3ccd982b838157c0d6c8e20f6a32bca35e",
+                    "priceCeiling": 100,
+                    "profile": "chio.example.security-review-agreement.v3",
+                    "provider": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+                    "subcontracting": false
+                  },
+                  "bid": {
+                    "body": {
+                      "agentId": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                      "issuedAt": 1789360793,
+                      "listingId": "security-review-v1",
+                      "maxPricePerCall": {
+                        "currency": "TST",
+                        "units": 100
+                      },
+                      "requestedScope": {
+                        "capabilityScopePrefix": "tools:security-review:ed6a2eeffc281eeb1b4c8abcfd64a90b99dc1bd39ec30c82ad3e6a53b5632f31",
+                        "maxInvocations": 1,
+                        "serverId": "security-review-provider",
+                        "toolName": "review"
+                      },
+                      "schema": "chio.marketplace.bid-request.v1",
+                      "windowSeconds": 588
+                    },
+                    "signature": "8053f0b7f967b34c43f371e964e262c5f1179a9531bf00fed4c3dfadd6ec5784c7f710d0175ebfc95a3b1ef1648b3df5547db5c0baf64062743a8beb7daf1903",
+                    "signerKey": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                  },
+                  "subcontractPermit": {
+                    "body": {
+                      "childAgreementSha256": "ed6a2eeffc281eeb1b4c8abcfd64a90b99dc1bd39ec30c82ad3e6a53b5632f31",
+                      "currency": "TST",
+                      "delegate": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                      "expiresAt": 1789361381,
+                      "parentAgreementSha256": "25eccf0fbd1714ca1f4d5005a9104a3ccd982b838157c0d6c8e20f6a32bca35e",
+                      "parentRequestSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                      "priceCeiling": 100,
+                      "schema": "chio.example.subcontract-permit.v1",
+                      "specialist": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4"
+                    },
+                    "signature": "ace7bdd43791b7c1974f373200c3e599063d0da5ae4003e881608e57d9cfe78066bb7e3d86b3ab05c5aa938bd30fd812bd66931e04641255913db9b709d7ed0b",
+                    "signerKey": "61c20beab98234b1065c0737c677d3a5f6cdf6a2f8fca028c40dc2e1f7c9adc0"
+                  }
+                }
+              },
+              "boundary_class": "prevent",
+              "capability_id": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+              "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+              "decision": {
+                "guard": "kernel",
+                "reason": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: subcontract permit does not authorize this exact child procurement",
+                "verdict": "deny"
+              },
+              "id": "aa859aa601c9dd74d6fe821a485304df7ecc1d32a36730d2b21105d7de1144d2",
+              "kernel_key": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+              "metadata": {
+                "attribution": {
+                  "delegation_depth": 0,
+                  "issuer_key": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+                  "subject_key": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                },
+                "budget_authority": {
+                  "authority_profile": "authoritative_hold_event",
+                  "guarantee_level": "single_node_atomic",
+                  "metering_profile": "max_cost_preauthorize_then_reconcile_actual"
+                },
+                "chio_receipt_signing_nonce": "rcpt-01a09e36-e931-7253-8e1e-7b46fc6535b9",
+                "receipt_context": {
+                  "request_id": "a56a5e2e878f0e30e269ee982b73223a"
+                },
+                "route_selection": {
+                  "candidates": [
+                    {
+                      "available": true,
+                      "routeId": "native-route",
+                      "selectedProtocols": [
+                        "a2a",
+                        "native"
+                      ],
+                      "targetProtocol": "native"
+                    }
+                  ],
+                  "decision": "select",
+                  "requestedTargetProtocol": "native",
+                  "routeSelectionId": "6ba1515149b3bc545ae346fd1cfb8f97a28c63be8f1ae158920925b26e76ba48",
+                  "selectedProtocols": [
+                    "a2a",
+                    "native"
+                  ],
+                  "selectedRouteId": "native-route",
+                  "selectedTargetProtocol": "native",
+                  "sourceProtocol": "a2a"
+                }
+              },
+              "policy_hash": "e503dcdaee2a0ac92139f18cf50594237455c0408d78e50c1212ce75d5fc9ab1",
+              "receipt_kind": "mediated_decision",
+              "redaction_mode": "none",
+              "signature": "03887593919426db6e826de5b8541adfb6e3dc9b43a646e199d1deaf84763e55601a67d519bb3f2c3ca1594f86375828ac596550b6956dbd4fe23dd9d72e140f",
+              "timestamp": 1789360793,
+              "tool_name": "quote",
+              "tool_origin": "caller_executed",
+              "tool_server": "security-review-provider",
+              "trust_level": "mediated"
+            },
+            "receiptId": "aa859aa601c9dd74d6fe821a485304df7ecc1d32a36730d2b21105d7de1144d2",
+            "receiptRef": {
+              "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-14",
+              "capabilityId": "negotiation-9887d0486fba31161f8937701a9ac54f39c6761a624a675e0f320ce2e19d94e9",
+              "receiptId": "aa859aa601c9dd74d6fe821a485304df7ecc1d32a36730d2b21105d7de1144d2",
+              "sourceProtocol": "a2a",
+              "targetProtocol": "native",
+              "traceId": "8eb7652306698d5466a219cde065f363afc9651bc0753119c94f13eab71743eb"
+            },
+            "routeSelection": {
+              "candidates": [
+                {
+                  "available": true,
+                  "routeId": "native-route",
+                  "selectedProtocols": [
+                    "a2a",
+                    "native"
+                  ],
+                  "targetProtocol": "native"
+                }
+              ],
+              "decision": "select",
+              "requestedTargetProtocol": "native",
+              "routeSelectionId": "6ba1515149b3bc545ae346fd1cfb8f97a28c63be8f1ae158920925b26e76ba48",
+              "selectedProtocols": [
+                "a2a",
+                "native"
+              ],
+              "selectedRouteId": "native-route",
+              "selectedTargetProtocol": "native",
+              "sourceProtocol": "a2a"
+            },
+            "runtimeLifecycle": {
+              "blockingEntrypoint": "message/send",
+              "cancelEntrypoint": "task/cancel",
+              "claimEligible": true,
+              "compatibilityOnly": false,
+              "followUpEntrypoint": "task/get",
+              "partialOutputDelivery": "collated_terminal_payload",
+              "streamDelivery": "collated_terminal_payload",
+              "streamEntrypoint": "message/stream",
+              "surface": "a2a_authoritative"
+            },
+            "targetExecution": {
+              "multiHop": false,
+              "notificationCount": 0,
+              "projectedResult": false,
+              "routeHopCount": 2,
+              "terminalProtocol": "native"
+            },
+            "terminalState": {
+              "state": "completed"
+            }
+          }
+        },
+        "status": {
+          "message": {
+            "messageId": "status-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-14",
+            "parts": [
+              {
+                "text": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: subcontract permit does not authorize this exact child procurement"
+              }
+            ],
+            "role": "ROLE_AGENT"
+          },
+          "state": "TASK_STATE_FAILED"
+        }
+      }
+    }
+  },
+  {
+    "case": "duplicate-child-work",
+    "response": {
+      "task": {
+        "contextId": "context-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-16",
+        "id": "a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-16",
+        "metadata": {
+          "chio": {
+            "a2aSurface": "authoritative_blocking_send",
+            "authoritative": true,
+            "authorityPath": "cross_protocol_orchestrator",
+            "bridge": {
+              "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-16",
+              "capabilityEnvelope": {
+                "attenuatedScope": {
+                  "grants": [
+                    {
+                      "dpop_required": true,
+                      "max_cost_per_invocation": {
+                        "currency": "TST",
+                        "units": 100
+                      },
+                      "max_invocations": 1,
+                      "max_total_cost": {
+                        "currency": "TST",
+                        "units": 100
+                      },
+                      "operations": [
+                        "invoke"
+                      ],
+                      "server_id": "security-review-provider",
+                      "tool_name": "review"
+                    }
+                  ]
+                },
+                "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-16",
+                "bridgedAt": 1789360794,
+                "capabilityRef": {
+                  "chioCapabilityId": "work-32f5f5152c926b140d93893e7177630c937176298e5eda9c3d2a4ec502c2bd85",
+                  "originProtocol": "a2a",
+                  "parentCapabilityHash": "c40f2cca679be1d3faf946bc803f006d15a1c8424241e0a557f7852191f32c2d",
+                  "protocolContext": {
+                    "targetSkillId": "review"
+                  }
+                },
+                "schema": "chio.cross-protocol-cap.v1",
+                "targetProtocol": "native"
+              },
+              "capabilityRef": {
+                "chioCapabilityId": "work-32f5f5152c926b140d93893e7177630c937176298e5eda9c3d2a4ec502c2bd85",
+                "originProtocol": "a2a",
+                "parentCapabilityHash": "c40f2cca679be1d3faf946bc803f006d15a1c8424241e0a557f7852191f32c2d",
+                "protocolContext": {
+                  "targetSkillId": "review"
+                }
+              },
+              "route": {
+                "multiHop": false,
+                "selectedProtocols": [
+                  "a2a",
+                  "native"
+                ],
+                "terminalProtocol": "native"
+              },
+              "sourceProtocol": "a2a",
+              "targetProtocol": "native",
+              "terminalProtocol": "native",
+              "trace": {
+                "hops": [
+                  {
+                    "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-16",
+                    "protocol": "a2a",
+                    "requestId": "a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-16",
+                    "timestamp": 1789360794
+                  },
+                  {
+                    "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-16",
+                    "protocol": "native",
+                    "receiptId": "ca2d72bc376b88a153164f9a5c0adb14af83ae81e23daac4593509b7f72fca7d",
+                    "requestId": "e03cea34616f8bdd1f39658539bf91c0",
+                    "timestamp": 1789360794
+                  }
+                ],
+                "sessionFingerprint": "496835875e3c31100fc340d02df88618e8b462380d6232610e3c6cfa31a703fd",
+                "traceId": "e6dd3a56a450fbb7a70a2466a273f56312c088e4129fcc3b4a13ab01429f181c"
+              }
+            },
+            "capabilityId": "work-32f5f5152c926b140d93893e7177630c937176298e5eda9c3d2a4ec502c2bd85",
+            "decision": "deny",
+            "executionNonce": null,
+            "lifecycle": {
+              "messageSend": "blocking_terminal_task",
+              "messageStream": "deferred_task_poll",
+              "taskCancel": "supported",
+              "taskGet": "supported"
+            },
+            "reason": "invocation budget exhausted for capability work-32f5f5152c926b140d93893e7177630c937176298e5eda9c3d2a4ec502c2bd85",
+            "receipt": {
+              "action": {
+                "parameter_hash": "bf3b0bf6ca30c6a3ab99cde6b539f0e52f5a6ecf4f0a1e8f2d5fcb47a71a76e4",
+                "parameters": {
+                  "acceptance": {
+                    "accepted": {
+                      "body": {
+                        "acceptedAt": 1789360788,
+                        "agentId": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                        "askDigest": "d92ba29536ef7df5a6fd94ba6b17e69cce24dc845693f44338e7a89690ccbe1a",
+                        "bidDigest": "96401f20bc9d545c44a5cbba27ef19057b698305bbbdd05fb68035a6300ddb37",
+                        "bidReceiptId": "hold-ed6a2eeffc281eeb1b4c8abcfd64a90b99dc1bd39ec30c82ad3e6a53b5632f31",
+                        "listingId": "security-review-v1",
+                        "quotedPrice": {
+                          "currency": "TST",
+                          "units": 100
+                        },
+                        "schema": "chio.marketplace.accepted-bid.v1",
+                        "tokenExpiresAt": 1789361381,
+                        "tokenId": "work-32f5f5152c926b140d93893e7177630c937176298e5eda9c3d2a4ec502c2bd85",
+                        "tokenSubject": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                      },
+                      "signature": "b6cf39bdb9ef1c50c558e02d395d69e3fce5d30aaac0c4fed0c4ac249d2f2b96e01e452105694250dd385a20f81e5068ffd462ad58906c7c37a56794c4ef3d02",
+                      "signerKey": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                    },
+                    "ask": {
+                      "body": {
+                        "agentId": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                        "bidDigest": "96401f20bc9d545c44a5cbba27ef19057b698305bbbdd05fb68035a6300ddb37",
+                        "expiresAt": 1789361381,
+                        "issuedAt": 1789360787,
+                        "listingId": "security-review-v1",
+                        "quotedPrice": {
+                          "currency": "TST",
+                          "units": 100
+                        },
+                        "schema": "chio.marketplace.ask-response.v1",
+                        "tokenOffer": {
+                          "expires_at": 1789361381,
+                          "id": "work-32f5f5152c926b140d93893e7177630c937176298e5eda9c3d2a4ec502c2bd85",
+                          "issued_at": 1789360787,
+                          "issuer": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+                          "schema": "chio.capability.v1",
+                          "scope": {
+                            "grants": [
+                              {
+                                "dpop_required": true,
+                                "max_cost_per_invocation": {
+                                  "currency": "TST",
+                                  "units": 100
+                                },
+                                "max_invocations": 1,
+                                "max_total_cost": {
+                                  "currency": "TST",
+                                  "units": 100
+                                },
+                                "operations": [
+                                  "invoke"
+                                ],
+                                "server_id": "security-review-provider",
+                                "tool_name": "review"
+                              }
+                            ]
+                          },
+                          "signature": "9583f21ffaab0a48623ea341cdb857674968d90b6cdcbcc4341a75366aa3d525016004462299629a503184a5b77a8259aa44dd393bd737488f50d4f7295d6c05",
+                          "subject": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                        }
+                      },
+                      "signature": "09adb0b83b6fa68fce5bd85876be5a2c841c119e45b4126a0d5aa46d8ae4e2ed2e1442a75bc958f66dd30d2c1bcae51ca2c9c44dd12b195cbd74a81d167afd03",
+                      "signerKey": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4"
+                    },
+                    "quote": {
+                      "agreement": {
+                        "buyer": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                        "checker": "openapi-explicit-auth-v1",
+                        "creditProfile": "provider-local-credit-checked-or-zero-v1",
+                        "deadline": 1789361381,
+                        "inputSha256": "2184a89310ecaddefb65643b02bea92b119e3fc31e03bdfbd4dc52271b65f1cc",
+                        "jobId": "child-25eccf0fbd1714ca1f4d5005a9104a3ccd982b838157c0d6c8e20f6a32bca35e",
+                        "priceCeiling": 100,
+                        "profile": "chio.example.security-review-agreement.v3",
+                        "provider": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+                        "subcontracting": false
+                      },
+                      "bid": {
+                        "body": {
+                          "agentId": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                          "issuedAt": 1789360787,
+                          "listingId": "security-review-v1",
+                          "maxPricePerCall": {
+                            "currency": "TST",
+                            "units": 100
+                          },
+                          "requestedScope": {
+                            "capabilityScopePrefix": "tools:security-review:ed6a2eeffc281eeb1b4c8abcfd64a90b99dc1bd39ec30c82ad3e6a53b5632f31",
+                            "maxInvocations": 1,
+                            "serverId": "security-review-provider",
+                            "toolName": "review"
+                          },
+                          "schema": "chio.marketplace.bid-request.v1",
+                          "windowSeconds": 594
+                        },
+                        "signature": "7e76c59ddf6b406ef8347cbc76b37efebcc84cedf5c7232a4b5c1e4e8f88163b866ad1a9ae05163b29923bd8d7213680f461c474b9a0d3e18b8338e99deb210b",
+                        "signerKey": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                      },
+                      "subcontractPermit": {
+                        "body": {
+                          "childAgreementSha256": "ed6a2eeffc281eeb1b4c8abcfd64a90b99dc1bd39ec30c82ad3e6a53b5632f31",
+                          "currency": "TST",
+                          "delegate": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                          "expiresAt": 1789361381,
+                          "parentAgreementSha256": "25eccf0fbd1714ca1f4d5005a9104a3ccd982b838157c0d6c8e20f6a32bca35e",
+                          "parentRequestSha256": "bf4ceceeb97d6584d924def7f7625c8c848d170c12e25caa51d0c1e5a27b7c2d",
+                          "priceCeiling": 100,
+                          "schema": "chio.example.subcontract-permit.v1",
+                          "specialist": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4"
+                        },
+                        "signature": "ace7bdd43791b7c1974f373200c3e599063d0da5ae4003e881608e57d9cfe78066bb7e3d86b3ab05c5aa938bd30fd812bd66931e04641255913db9b709d7ed0b",
+                        "signerKey": "61c20beab98234b1065c0737c677d3a5f6cdf6a2f8fca028c40dc2e1f7c9adc0"
+                      }
+                    },
+                    "reservation": {
+                      "body": {
+                        "agentId": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                        "askDigest": "d92ba29536ef7df5a6fd94ba6b17e69cce24dc845693f44338e7a89690ccbe1a",
+                        "listingId": "security-review-v1",
+                        "receiptId": "hold-ed6a2eeffc281eeb1b4c8abcfd64a90b99dc1bd39ec30c82ad3e6a53b5632f31",
+                        "reservedAmount": {
+                          "currency": "TST",
+                          "units": 100
+                        },
+                        "schema": "chio.marketplace.reservation-receipt.v1"
+                      },
+                      "signature": "d1abee6f4929052357b0242538a2c1b88e5c8eca2a51ed7476ad6d5a9a15f71569e64c61e051a6f48237f89e32a59c8506d6d6238341cd003f998a89e6377b01",
+                      "signerKey": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                    }
+                  },
+                  "input": "{\"components\":{\"securitySchemes\":{\"serviceToken\":{\"scheme\":\"bearer\",\"type\":\"http\"}}},\"openapi\":\"3.1.0\",\"paths\":{\"/accounts\":{\"get\":{\"security\":[{\"serviceToken\":[]}]}},\"/refunds\":{\"post\":{\"security\":[]}}}}"
+                }
+              },
+              "boundary_class": "prevent",
+              "capability_id": "work-32f5f5152c926b140d93893e7177630c937176298e5eda9c3d2a4ec502c2bd85",
+              "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+              "decision": {
+                "guard": "kernel",
+                "reason": "invocation budget exhausted for capability work-32f5f5152c926b140d93893e7177630c937176298e5eda9c3d2a4ec502c2bd85",
+                "verdict": "deny"
+              },
+              "id": "ca2d72bc376b88a153164f9a5c0adb14af83ae81e23daac4593509b7f72fca7d",
+              "kernel_key": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+              "metadata": {
+                "attribution": {
+                  "delegation_depth": 0,
+                  "grant_index": 0,
+                  "issuer_key": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+                  "subject_key": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                },
+                "budget_authority": {
+                  "authority_profile": "authoritative_hold_event",
+                  "guarantee_level": "single_node_atomic",
+                  "metering_profile": "max_cost_preauthorize_then_reconcile_actual"
+                },
+                "chio_receipt_signing_nonce": "rcpt-01a09e36-ec37-76e0-a1a4-805374133ec0",
+                "financial": {
+                  "attempted_cost": 100,
+                  "budget_remaining": 100,
+                  "budget_total": 100,
+                  "cost_charged": 0,
+                  "currency": "TST",
+                  "delegation_depth": 0,
+                  "grant_index": 0,
+                  "root_budget_holder": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+                  "settlement_status": "not_applicable"
+                },
+                "receipt_context": {
+                  "request_id": "e03cea34616f8bdd1f39658539bf91c0"
+                },
+                "route_selection": {
+                  "candidates": [
+                    {
+                      "available": true,
+                      "routeId": "native-route",
+                      "selectedProtocols": [
+                        "a2a",
+                        "native"
+                      ],
+                      "targetProtocol": "native"
+                    }
+                  ],
+                  "decision": "select",
+                  "requestedTargetProtocol": "native",
+                  "routeSelectionId": "9395c979ff9982a0d73a14ca31445e83a4b803234d849816fcfd3d5310783846",
+                  "selectedProtocols": [
+                    "a2a",
+                    "native"
+                  ],
+                  "selectedRouteId": "native-route",
+                  "selectedTargetProtocol": "native",
+                  "sourceProtocol": "a2a"
+                }
+              },
+              "policy_hash": "e503dcdaee2a0ac92139f18cf50594237455c0408d78e50c1212ce75d5fc9ab1",
+              "receipt_kind": "mediated_decision",
+              "redaction_mode": "none",
+              "signature": "559145ee5a54f62a3c4e6aed08843e2aa502db516e865d56f5745de1d5671637aeb6f5d5bd04d5079bf382fca05ae0fc822c68a4f01b74f1d50332d853886606",
+              "timestamp": 1789360794,
+              "tool_name": "review",
+              "tool_origin": "caller_executed",
+              "tool_server": "security-review-provider",
+              "trust_level": "mediated"
+            },
+            "receiptId": "ca2d72bc376b88a153164f9a5c0adb14af83ae81e23daac4593509b7f72fca7d",
+            "receiptRef": {
+              "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-16",
+              "capabilityId": "work-32f5f5152c926b140d93893e7177630c937176298e5eda9c3d2a4ec502c2bd85",
+              "receiptId": "ca2d72bc376b88a153164f9a5c0adb14af83ae81e23daac4593509b7f72fca7d",
+              "sourceProtocol": "a2a",
+              "targetProtocol": "native",
+              "traceId": "e6dd3a56a450fbb7a70a2466a273f56312c088e4129fcc3b4a13ab01429f181c"
+            },
+            "routeSelection": {
+              "candidates": [
+                {
+                  "available": true,
+                  "routeId": "native-route",
+                  "selectedProtocols": [
+                    "a2a",
+                    "native"
+                  ],
+                  "targetProtocol": "native"
+                }
+              ],
+              "decision": "select",
+              "requestedTargetProtocol": "native",
+              "routeSelectionId": "9395c979ff9982a0d73a14ca31445e83a4b803234d849816fcfd3d5310783846",
+              "selectedProtocols": [
+                "a2a",
+                "native"
+              ],
+              "selectedRouteId": "native-route",
+              "selectedTargetProtocol": "native",
+              "sourceProtocol": "a2a"
+            },
+            "runtimeLifecycle": {
+              "blockingEntrypoint": "message/send",
+              "cancelEntrypoint": "task/cancel",
+              "claimEligible": true,
+              "compatibilityOnly": false,
+              "followUpEntrypoint": "task/get",
+              "partialOutputDelivery": "collated_terminal_payload",
+              "streamDelivery": "collated_terminal_payload",
+              "streamEntrypoint": "message/stream",
+              "surface": "a2a_authoritative"
+            },
+            "targetExecution": {
+              "multiHop": false,
+              "notificationCount": 0,
+              "projectedResult": false,
+              "routeHopCount": 2,
+              "terminalProtocol": "native"
+            },
+            "terminalState": {
+              "state": "completed"
+            }
+          }
+        },
+        "status": {
+          "message": {
+            "messageId": "status-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-16",
+            "parts": [
+              {
+                "text": "invocation budget exhausted for capability work-32f5f5152c926b140d93893e7177630c937176298e5eda9c3d2a4ec502c2bd85"
+              }
+            ],
+            "role": "ROLE_AGENT"
+          },
+          "state": "TASK_STATE_FAILED"
+        }
+      }
+    }
+  },
+  {
+    "case": "expanded-child-input",
+    "response": {
+      "task": {
+        "contextId": "context-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-17",
+        "id": "a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-17",
+        "metadata": {
+          "chio": {
+            "a2aSurface": "authoritative_blocking_send",
+            "authoritative": true,
+            "authorityPath": "cross_protocol_orchestrator",
+            "bridge": {
+              "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-17",
+              "capabilityEnvelope": {
+                "attenuatedScope": {
+                  "grants": [
+                    {
+                      "dpop_required": true,
+                      "max_cost_per_invocation": {
+                        "currency": "TST",
+                        "units": 100
+                      },
+                      "max_invocations": 1,
+                      "max_total_cost": {
+                        "currency": "TST",
+                        "units": 100
+                      },
+                      "operations": [
+                        "invoke"
+                      ],
+                      "server_id": "security-review-provider",
+                      "tool_name": "review"
+                    }
+                  ]
+                },
+                "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-17",
+                "bridgedAt": 1789360794,
+                "capabilityRef": {
+                  "chioCapabilityId": "work-32f5f5152c926b140d93893e7177630c937176298e5eda9c3d2a4ec502c2bd85",
+                  "originProtocol": "a2a",
+                  "parentCapabilityHash": "c40f2cca679be1d3faf946bc803f006d15a1c8424241e0a557f7852191f32c2d",
+                  "protocolContext": {
+                    "targetSkillId": "review"
+                  }
+                },
+                "schema": "chio.cross-protocol-cap.v1",
+                "targetProtocol": "native"
+              },
+              "capabilityRef": {
+                "chioCapabilityId": "work-32f5f5152c926b140d93893e7177630c937176298e5eda9c3d2a4ec502c2bd85",
+                "originProtocol": "a2a",
+                "parentCapabilityHash": "c40f2cca679be1d3faf946bc803f006d15a1c8424241e0a557f7852191f32c2d",
+                "protocolContext": {
+                  "targetSkillId": "review"
+                }
+              },
+              "route": {
+                "multiHop": false,
+                "selectedProtocols": [
+                  "a2a",
+                  "native"
+                ],
+                "terminalProtocol": "native"
+              },
+              "sourceProtocol": "a2a",
+              "targetProtocol": "native",
+              "terminalProtocol": "native",
+              "trace": {
+                "hops": [
+                  {
+                    "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-17",
+                    "protocol": "a2a",
+                    "requestId": "a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-17",
+                    "timestamp": 1789360794
+                  },
+                  {
+                    "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-17",
+                    "protocol": "native",
+                    "receiptId": "661fa63f121e92d62f1f17eab40720a1f3587a244197af88229d63fb0360a23c",
+                    "requestId": "f21bd7ee659e61f81fd9ba0c8f640f96",
+                    "timestamp": 1789360794
+                  }
+                ],
+                "sessionFingerprint": "88b7d538f2c356931ccc16bb9490a3702edecd3cf7054d84d24bba692a7198df",
+                "traceId": "3a9e2dd39ecce7814b6da6d270987d65824bf2f32ed4eb2cc5fad1c08c8015f9"
+              }
+            },
+            "capabilityId": "work-32f5f5152c926b140d93893e7177630c937176298e5eda9c3d2a4ec502c2bd85",
+            "decision": "deny",
+            "executionNonce": null,
+            "lifecycle": {
+              "messageSend": "blocking_terminal_task",
+              "messageStream": "deferred_task_poll",
+              "taskCancel": "supported",
+              "taskGet": "supported"
+            },
+            "reason": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: input disclosure or work profile differs from accepted agreement",
+            "receipt": {
+              "action": {
+                "parameter_hash": "07a7ab48c99f843414f388bccb25d0eaa34c39066deece08ce92f87d0c48fd29",
+                "parameters": {
+                  "acceptance": {
+                    "accepted": {
+                      "body": {
+                        "acceptedAt": 1789360788,
+                        "agentId": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                        "askDigest": "d92ba29536ef7df5a6fd94ba6b17e69cce24dc845693f44338e7a89690ccbe1a",
+                        "bidDigest": "96401f20bc9d545c44a5cbba27ef19057b698305bbbdd05fb68035a6300ddb37",
+                        "bidReceiptId": "hold-ed6a2eeffc281eeb1b4c8abcfd64a90b99dc1bd39ec30c82ad3e6a53b5632f31",
+                        "listingId": "security-review-v1",
+                        "quotedPrice": {
+                          "currency": "TST",
+                          "units": 100
+                        },
+                        "schema": "chio.marketplace.accepted-bid.v1",
+                        "tokenExpiresAt": 1789361381,
+                        "tokenId": "work-32f5f5152c926b140d93893e7177630c937176298e5eda9c3d2a4ec502c2bd85",
+                        "tokenSubject": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                      },
+                      "signature": "b6cf39bdb9ef1c50c558e02d395d69e3fce5d30aaac0c4fed0c4ac249d2f2b96e01e452105694250dd385a20f81e5068ffd462ad58906c7c37a56794c4ef3d02",
+                      "signerKey": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                    },
+                    "ask": {
+                      "body": {
+                        "agentId": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                        "bidDigest": "96401f20bc9d545c44a5cbba27ef19057b698305bbbdd05fb68035a6300ddb37",
+                        "expiresAt": 1789361381,
+                        "issuedAt": 1789360787,
+                        "listingId": "security-review-v1",
+                        "quotedPrice": {
+                          "currency": "TST",
+                          "units": 100
+                        },
+                        "schema": "chio.marketplace.ask-response.v1",
+                        "tokenOffer": {
+                          "expires_at": 1789361381,
+                          "id": "work-32f5f5152c926b140d93893e7177630c937176298e5eda9c3d2a4ec502c2bd85",
+                          "issued_at": 1789360787,
+                          "issuer": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+                          "schema": "chio.capability.v1",
+                          "scope": {
+                            "grants": [
+                              {
+                                "dpop_required": true,
+                                "max_cost_per_invocation": {
+                                  "currency": "TST",
+                                  "units": 100
+                                },
+                                "max_invocations": 1,
+                                "max_total_cost": {
+                                  "currency": "TST",
+                                  "units": 100
+                                },
+                                "operations": [
+                                  "invoke"
+                                ],
+                                "server_id": "security-review-provider",
+                                "tool_name": "review"
+                              }
+                            ]
+                          },
+                          "signature": "9583f21ffaab0a48623ea341cdb857674968d90b6cdcbcc4341a75366aa3d525016004462299629a503184a5b77a8259aa44dd393bd737488f50d4f7295d6c05",
+                          "subject": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                        }
+                      },
+                      "signature": "09adb0b83b6fa68fce5bd85876be5a2c841c119e45b4126a0d5aa46d8ae4e2ed2e1442a75bc958f66dd30d2c1bcae51ca2c9c44dd12b195cbd74a81d167afd03",
+                      "signerKey": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4"
+                    },
+                    "quote": {
+                      "agreement": {
+                        "buyer": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                        "checker": "openapi-explicit-auth-v1",
+                        "creditProfile": "provider-local-credit-checked-or-zero-v1",
+                        "deadline": 1789361381,
+                        "inputSha256": "2184a89310ecaddefb65643b02bea92b119e3fc31e03bdfbd4dc52271b65f1cc",
+                        "jobId": "child-25eccf0fbd1714ca1f4d5005a9104a3ccd982b838157c0d6c8e20f6a32bca35e",
+                        "priceCeiling": 100,
+                        "profile": "chio.example.security-review-agreement.v3",
+                        "provider": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+                        "subcontracting": false
+                      },
+                      "bid": {
+                        "body": {
+                          "agentId": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                          "issuedAt": 1789360787,
+                          "listingId": "security-review-v1",
+                          "maxPricePerCall": {
+                            "currency": "TST",
+                            "units": 100
+                          },
+                          "requestedScope": {
+                            "capabilityScopePrefix": "tools:security-review:ed6a2eeffc281eeb1b4c8abcfd64a90b99dc1bd39ec30c82ad3e6a53b5632f31",
+                            "maxInvocations": 1,
+                            "serverId": "security-review-provider",
+                            "toolName": "review"
+                          },
+                          "schema": "chio.marketplace.bid-request.v1",
+                          "windowSeconds": 594
+                        },
+                        "signature": "7e76c59ddf6b406ef8347cbc76b37efebcc84cedf5c7232a4b5c1e4e8f88163b866ad1a9ae05163b29923bd8d7213680f461c474b9a0d3e18b8338e99deb210b",
+                        "signerKey": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                      },
+                      "subcontractPermit": {
+                        "body": {
+                          "childAgreementSha256": "ed6a2eeffc281eeb1b4c8abcfd64a90b99dc1bd39ec30c82ad3e6a53b5632f31",
+                          "currency": "TST",
+                          "delegate": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                          "expiresAt": 1789361381,
+                          "parentAgreementSha256": "25eccf0fbd1714ca1f4d5005a9104a3ccd982b838157c0d6c8e20f6a32bca35e",
+                          "parentRequestSha256": "bf4ceceeb97d6584d924def7f7625c8c848d170c12e25caa51d0c1e5a27b7c2d",
+                          "priceCeiling": 100,
+                          "schema": "chio.example.subcontract-permit.v1",
+                          "specialist": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4"
+                        },
+                        "signature": "ace7bdd43791b7c1974f373200c3e599063d0da5ae4003e881608e57d9cfe78066bb7e3d86b3ab05c5aa938bd30fd812bd66931e04641255913db9b709d7ed0b",
+                        "signerKey": "61c20beab98234b1065c0737c677d3a5f6cdf6a2f8fca028c40dc2e1f7c9adc0"
+                      }
+                    },
+                    "reservation": {
+                      "body": {
+                        "agentId": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                        "askDigest": "d92ba29536ef7df5a6fd94ba6b17e69cce24dc845693f44338e7a89690ccbe1a",
+                        "listingId": "security-review-v1",
+                        "receiptId": "hold-ed6a2eeffc281eeb1b4c8abcfd64a90b99dc1bd39ec30c82ad3e6a53b5632f31",
+                        "reservedAmount": {
+                          "currency": "TST",
+                          "units": 100
+                        },
+                        "schema": "chio.marketplace.reservation-receipt.v1"
+                      },
+                      "signature": "d1abee6f4929052357b0242538a2c1b88e5c8eca2a51ed7476ad6d5a9a15f71569e64c61e051a6f48237f89e32a59c8506d6d6238341cd003f998a89e6377b01",
+                      "signerKey": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                    }
+                  },
+                  "input": "{\"components\":{\"securitySchemes\":{\"serviceToken\":{\"scheme\":\"bearer\",\"type\":\"http\"}}},\"openapi\":\"3.1.0\",\"paths\":{\"/accounts\":{\"get\":{\"security\":[{\"serviceToken\":[]}]}},\"/refunds\":{\"post\":{\"security\":[]}}}} "
+                }
+              },
+              "boundary_class": "prevent",
+              "capability_id": "work-32f5f5152c926b140d93893e7177630c937176298e5eda9c3d2a4ec502c2bd85",
+              "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+              "decision": {
+                "guard": "kernel",
+                "reason": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: input disclosure or work profile differs from accepted agreement",
+                "verdict": "deny"
+              },
+              "id": "661fa63f121e92d62f1f17eab40720a1f3587a244197af88229d63fb0360a23c",
+              "kernel_key": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+              "metadata": {
+                "attribution": {
+                  "delegation_depth": 0,
+                  "grant_index": 0,
+                  "issuer_key": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+                  "subject_key": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                },
+                "budget_authority": {
+                  "authority_profile": "authoritative_hold_event",
+                  "guarantee_level": "single_node_atomic",
+                  "metering_profile": "max_cost_preauthorize_then_reconcile_actual"
+                },
+                "chio_receipt_signing_nonce": "rcpt-01a09e36-ed03-7e80-be42-a12db6e7d0bb",
+                "financial": {
+                  "attempted_cost": 100,
+                  "budget_remaining": 100,
+                  "budget_total": 100,
+                  "cost_charged": 0,
+                  "currency": "TST",
+                  "delegation_depth": 0,
+                  "grant_index": 0,
+                  "root_budget_holder": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+                  "settlement_status": "not_applicable"
+                },
+                "receipt_context": {
+                  "request_id": "f21bd7ee659e61f81fd9ba0c8f640f96"
+                },
+                "route_selection": {
+                  "candidates": [
+                    {
+                      "available": true,
+                      "routeId": "native-route",
+                      "selectedProtocols": [
+                        "a2a",
+                        "native"
+                      ],
+                      "targetProtocol": "native"
+                    }
+                  ],
+                  "decision": "select",
+                  "requestedTargetProtocol": "native",
+                  "routeSelectionId": "3f955cb750687b3e5d83c51e88ced9a5f500a73e88a13d1d512c9fef6297353e",
+                  "selectedProtocols": [
+                    "a2a",
+                    "native"
+                  ],
+                  "selectedRouteId": "native-route",
+                  "selectedTargetProtocol": "native",
+                  "sourceProtocol": "a2a"
+                }
+              },
+              "policy_hash": "e503dcdaee2a0ac92139f18cf50594237455c0408d78e50c1212ce75d5fc9ab1",
+              "receipt_kind": "mediated_decision",
+              "redaction_mode": "none",
+              "signature": "09813cc037a352e88a1091028d8eec0484b37378ec09e317b20a0fad28edea824118be4c588b5b631364d3e5405482bba537563a478b940ecd369b7e9f2cf201",
+              "timestamp": 1789360794,
+              "tool_name": "review",
+              "tool_origin": "caller_executed",
+              "tool_server": "security-review-provider",
+              "trust_level": "mediated"
+            },
+            "receiptId": "661fa63f121e92d62f1f17eab40720a1f3587a244197af88229d63fb0360a23c",
+            "receiptRef": {
+              "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-17",
+              "capabilityId": "work-32f5f5152c926b140d93893e7177630c937176298e5eda9c3d2a4ec502c2bd85",
+              "receiptId": "661fa63f121e92d62f1f17eab40720a1f3587a244197af88229d63fb0360a23c",
+              "sourceProtocol": "a2a",
+              "targetProtocol": "native",
+              "traceId": "3a9e2dd39ecce7814b6da6d270987d65824bf2f32ed4eb2cc5fad1c08c8015f9"
+            },
+            "routeSelection": {
+              "candidates": [
+                {
+                  "available": true,
+                  "routeId": "native-route",
+                  "selectedProtocols": [
+                    "a2a",
+                    "native"
+                  ],
+                  "targetProtocol": "native"
+                }
+              ],
+              "decision": "select",
+              "requestedTargetProtocol": "native",
+              "routeSelectionId": "3f955cb750687b3e5d83c51e88ced9a5f500a73e88a13d1d512c9fef6297353e",
+              "selectedProtocols": [
+                "a2a",
+                "native"
+              ],
+              "selectedRouteId": "native-route",
+              "selectedTargetProtocol": "native",
+              "sourceProtocol": "a2a"
+            },
+            "runtimeLifecycle": {
+              "blockingEntrypoint": "message/send",
+              "cancelEntrypoint": "task/cancel",
+              "claimEligible": true,
+              "compatibilityOnly": false,
+              "followUpEntrypoint": "task/get",
+              "partialOutputDelivery": "collated_terminal_payload",
+              "streamDelivery": "collated_terminal_payload",
+              "streamEntrypoint": "message/stream",
+              "surface": "a2a_authoritative"
+            },
+            "targetExecution": {
+              "multiHop": false,
+              "notificationCount": 0,
+              "projectedResult": false,
+              "routeHopCount": 2,
+              "terminalProtocol": "native"
+            },
+            "terminalState": {
+              "state": "completed"
+            }
+          }
+        },
+        "status": {
+          "message": {
+            "messageId": "status-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-17",
+            "parts": [
+              {
+                "text": "guard denied the request: guard \"accepted-security-review\" error (fail-closed): tool server error: input disclosure or work profile differs from accepted agreement"
+              }
+            ],
+            "role": "ROLE_AGENT"
+          },
+          "state": "TASK_STATE_FAILED"
+        }
+      }
+    }
+  },
+  {
+    "case": "permit-promisor-is-not-an-issuer",
+    "response": {
+      "task": {
+        "contextId": "context-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-18",
+        "id": "a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-18",
+        "metadata": {
+          "chio": {
+            "a2aSurface": "authoritative_blocking_send",
+            "authoritative": true,
+            "authorityPath": "cross_protocol_orchestrator",
+            "bridge": {
+              "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-18",
+              "capabilityEnvelope": {
+                "attenuatedScope": {
+                  "grants": [
+                    {
+                      "dpop_required": true,
+                      "max_cost_per_invocation": {
+                        "currency": "TST",
+                        "units": 100
+                      },
+                      "max_invocations": 1,
+                      "max_total_cost": {
+                        "currency": "TST",
+                        "units": 100
+                      },
+                      "operations": [
+                        "invoke"
+                      ],
+                      "server_id": "security-review-provider",
+                      "tool_name": "review"
+                    }
+                  ]
+                },
+                "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-18",
+                "bridgedAt": 1789360794,
+                "capabilityRef": {
+                  "chioCapabilityId": "foreign-promisor-capability",
+                  "originProtocol": "a2a",
+                  "parentCapabilityHash": "7deab6ffae4e1de9293486ec8b8f9e9e1c7fe4352676b34190dee83c153e9938",
+                  "protocolContext": {
+                    "targetSkillId": "review"
+                  }
+                },
+                "schema": "chio.cross-protocol-cap.v1",
+                "targetProtocol": "native"
+              },
+              "capabilityRef": {
+                "chioCapabilityId": "foreign-promisor-capability",
+                "originProtocol": "a2a",
+                "parentCapabilityHash": "7deab6ffae4e1de9293486ec8b8f9e9e1c7fe4352676b34190dee83c153e9938",
+                "protocolContext": {
+                  "targetSkillId": "review"
+                }
+              },
+              "route": {
+                "multiHop": false,
+                "selectedProtocols": [
+                  "a2a",
+                  "native"
+                ],
+                "terminalProtocol": "native"
+              },
+              "sourceProtocol": "a2a",
+              "targetProtocol": "native",
+              "terminalProtocol": "native",
+              "trace": {
+                "hops": [
+                  {
+                    "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-18",
+                    "protocol": "a2a",
+                    "requestId": "a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-18",
+                    "timestamp": 1789360794
+                  },
+                  {
+                    "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-18",
+                    "protocol": "native",
+                    "receiptId": "45111775e39b6d891fa7551be03d41dde5943b34524a9ae7f4d43d3bfa3f8353",
+                    "requestId": "d710d1714d65fe7ca76a823e86310ae0",
+                    "timestamp": 1789360794
+                  }
+                ],
+                "sessionFingerprint": "610de143615338fe3b56f70c254024da692ad12c1291e9d0861c57214e82e9ea",
+                "traceId": "db7be313089f1d97a1b3a95336d6cc971e668227448b71c498677f7d7ccc7c92"
+              }
+            },
+            "capabilityId": "foreign-promisor-capability",
+            "decision": "deny",
+            "executionNonce": null,
+            "lifecycle": {
+              "messageSend": "blocking_terminal_task",
+              "messageStream": "deferred_task_poll",
+              "taskCancel": "supported",
+              "taskGet": "supported"
+            },
+            "reason": "capability verification failed: capability issuer is not a trusted CA",
+            "receipt": {
+              "action": {
+                "parameter_hash": "bf3b0bf6ca30c6a3ab99cde6b539f0e52f5a6ecf4f0a1e8f2d5fcb47a71a76e4",
+                "parameters": {
+                  "acceptance": {
+                    "accepted": {
+                      "body": {
+                        "acceptedAt": 1789360788,
+                        "agentId": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                        "askDigest": "d92ba29536ef7df5a6fd94ba6b17e69cce24dc845693f44338e7a89690ccbe1a",
+                        "bidDigest": "96401f20bc9d545c44a5cbba27ef19057b698305bbbdd05fb68035a6300ddb37",
+                        "bidReceiptId": "hold-ed6a2eeffc281eeb1b4c8abcfd64a90b99dc1bd39ec30c82ad3e6a53b5632f31",
+                        "listingId": "security-review-v1",
+                        "quotedPrice": {
+                          "currency": "TST",
+                          "units": 100
+                        },
+                        "schema": "chio.marketplace.accepted-bid.v1",
+                        "tokenExpiresAt": 1789361381,
+                        "tokenId": "work-32f5f5152c926b140d93893e7177630c937176298e5eda9c3d2a4ec502c2bd85",
+                        "tokenSubject": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                      },
+                      "signature": "b6cf39bdb9ef1c50c558e02d395d69e3fce5d30aaac0c4fed0c4ac249d2f2b96e01e452105694250dd385a20f81e5068ffd462ad58906c7c37a56794c4ef3d02",
+                      "signerKey": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                    },
+                    "ask": {
+                      "body": {
+                        "agentId": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                        "bidDigest": "96401f20bc9d545c44a5cbba27ef19057b698305bbbdd05fb68035a6300ddb37",
+                        "expiresAt": 1789361381,
+                        "issuedAt": 1789360787,
+                        "listingId": "security-review-v1",
+                        "quotedPrice": {
+                          "currency": "TST",
+                          "units": 100
+                        },
+                        "schema": "chio.marketplace.ask-response.v1",
+                        "tokenOffer": {
+                          "expires_at": 1789361381,
+                          "id": "work-32f5f5152c926b140d93893e7177630c937176298e5eda9c3d2a4ec502c2bd85",
+                          "issued_at": 1789360787,
+                          "issuer": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+                          "schema": "chio.capability.v1",
+                          "scope": {
+                            "grants": [
+                              {
+                                "dpop_required": true,
+                                "max_cost_per_invocation": {
+                                  "currency": "TST",
+                                  "units": 100
+                                },
+                                "max_invocations": 1,
+                                "max_total_cost": {
+                                  "currency": "TST",
+                                  "units": 100
+                                },
+                                "operations": [
+                                  "invoke"
+                                ],
+                                "server_id": "security-review-provider",
+                                "tool_name": "review"
+                              }
+                            ]
+                          },
+                          "signature": "9583f21ffaab0a48623ea341cdb857674968d90b6cdcbcc4341a75366aa3d525016004462299629a503184a5b77a8259aa44dd393bd737488f50d4f7295d6c05",
+                          "subject": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                        }
+                      },
+                      "signature": "09adb0b83b6fa68fce5bd85876be5a2c841c119e45b4126a0d5aa46d8ae4e2ed2e1442a75bc958f66dd30d2c1bcae51ca2c9c44dd12b195cbd74a81d167afd03",
+                      "signerKey": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4"
+                    },
+                    "quote": {
+                      "agreement": {
+                        "buyer": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                        "checker": "openapi-explicit-auth-v1",
+                        "creditProfile": "provider-local-credit-checked-or-zero-v1",
+                        "deadline": 1789361381,
+                        "inputSha256": "2184a89310ecaddefb65643b02bea92b119e3fc31e03bdfbd4dc52271b65f1cc",
+                        "jobId": "child-25eccf0fbd1714ca1f4d5005a9104a3ccd982b838157c0d6c8e20f6a32bca35e",
+                        "priceCeiling": 100,
+                        "profile": "chio.example.security-review-agreement.v3",
+                        "provider": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+                        "subcontracting": false
+                      },
+                      "bid": {
+                        "body": {
+                          "agentId": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                          "issuedAt": 1789360787,
+                          "listingId": "security-review-v1",
+                          "maxPricePerCall": {
+                            "currency": "TST",
+                            "units": 100
+                          },
+                          "requestedScope": {
+                            "capabilityScopePrefix": "tools:security-review:ed6a2eeffc281eeb1b4c8abcfd64a90b99dc1bd39ec30c82ad3e6a53b5632f31",
+                            "maxInvocations": 1,
+                            "serverId": "security-review-provider",
+                            "toolName": "review"
+                          },
+                          "schema": "chio.marketplace.bid-request.v1",
+                          "windowSeconds": 594
+                        },
+                        "signature": "7e76c59ddf6b406ef8347cbc76b37efebcc84cedf5c7232a4b5c1e4e8f88163b866ad1a9ae05163b29923bd8d7213680f461c474b9a0d3e18b8338e99deb210b",
+                        "signerKey": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                      },
+                      "subcontractPermit": {
+                        "body": {
+                          "childAgreementSha256": "ed6a2eeffc281eeb1b4c8abcfd64a90b99dc1bd39ec30c82ad3e6a53b5632f31",
+                          "currency": "TST",
+                          "delegate": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                          "expiresAt": 1789361381,
+                          "parentAgreementSha256": "25eccf0fbd1714ca1f4d5005a9104a3ccd982b838157c0d6c8e20f6a32bca35e",
+                          "parentRequestSha256": "bf4ceceeb97d6584d924def7f7625c8c848d170c12e25caa51d0c1e5a27b7c2d",
+                          "priceCeiling": 100,
+                          "schema": "chio.example.subcontract-permit.v1",
+                          "specialist": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4"
+                        },
+                        "signature": "ace7bdd43791b7c1974f373200c3e599063d0da5ae4003e881608e57d9cfe78066bb7e3d86b3ab05c5aa938bd30fd812bd66931e04641255913db9b709d7ed0b",
+                        "signerKey": "61c20beab98234b1065c0737c677d3a5f6cdf6a2f8fca028c40dc2e1f7c9adc0"
+                      }
+                    },
+                    "reservation": {
+                      "body": {
+                        "agentId": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e",
+                        "askDigest": "d92ba29536ef7df5a6fd94ba6b17e69cce24dc845693f44338e7a89690ccbe1a",
+                        "listingId": "security-review-v1",
+                        "receiptId": "hold-ed6a2eeffc281eeb1b4c8abcfd64a90b99dc1bd39ec30c82ad3e6a53b5632f31",
+                        "reservedAmount": {
+                          "currency": "TST",
+                          "units": 100
+                        },
+                        "schema": "chio.marketplace.reservation-receipt.v1"
+                      },
+                      "signature": "d1abee6f4929052357b0242538a2c1b88e5c8eca2a51ed7476ad6d5a9a15f71569e64c61e051a6f48237f89e32a59c8506d6d6238341cd003f998a89e6377b01",
+                      "signerKey": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                    }
+                  },
+                  "input": "{\"components\":{\"securitySchemes\":{\"serviceToken\":{\"scheme\":\"bearer\",\"type\":\"http\"}}},\"openapi\":\"3.1.0\",\"paths\":{\"/accounts\":{\"get\":{\"security\":[{\"serviceToken\":[]}]}},\"/refunds\":{\"post\":{\"security\":[]}}}}"
+                }
+              },
+              "boundary_class": "prevent",
+              "capability_id": "foreign-promisor-capability",
+              "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+              "decision": {
+                "guard": "kernel",
+                "reason": "capability verification failed: capability issuer is not a trusted CA",
+                "verdict": "deny"
+              },
+              "id": "45111775e39b6d891fa7551be03d41dde5943b34524a9ae7f4d43d3bfa3f8353",
+              "kernel_key": "64ce3b4c71d6bc727db9d51f238b1cdebd383ee3d61af7399e05b15e903ddaf4",
+              "metadata": {
+                "attribution": {
+                  "delegation_depth": 0,
+                  "issuer_key": "61c20beab98234b1065c0737c677d3a5f6cdf6a2f8fca028c40dc2e1f7c9adc0",
+                  "subject_key": "a91cc523d00d03e3b5ac62f4fbcb4d6e22a0f3b50f4c9d3c0b92f2e39959aa1e"
+                },
+                "chio_receipt_signing_nonce": "rcpt-01a09e36-ed55-7da3-8cdb-42684bec6d59",
+                "receipt_context": {
+                  "request_id": "d710d1714d65fe7ca76a823e86310ae0"
+                },
+                "route_selection": {
+                  "candidates": [
+                    {
+                      "available": true,
+                      "routeId": "native-route",
+                      "selectedProtocols": [
+                        "a2a",
+                        "native"
+                      ],
+                      "targetProtocol": "native"
+                    }
+                  ],
+                  "decision": "select",
+                  "requestedTargetProtocol": "native",
+                  "routeSelectionId": "f39b4d4f29a75b365c5db8a23bffed0fa5e4f73553e14a8b26af4f4f6745b02e",
+                  "selectedProtocols": [
+                    "a2a",
+                    "native"
+                  ],
+                  "selectedRouteId": "native-route",
+                  "selectedTargetProtocol": "native",
+                  "sourceProtocol": "a2a"
+                }
+              },
+              "policy_hash": "e503dcdaee2a0ac92139f18cf50594237455c0408d78e50c1212ce75d5fc9ab1",
+              "receipt_kind": "mediated_decision",
+              "redaction_mode": "none",
+              "signature": "590903f17d7053dae1ff8542df18695c18d129591327042e2da1c63f6d4b6edf3224b1e345f0215927fb5284ac4b53c5c3abcd109c4d73172a6f70255b90ba09",
+              "timestamp": 1789360794,
+              "tool_name": "review",
+              "tool_origin": "caller_executed",
+              "tool_server": "security-review-provider",
+              "trust_level": "mediated"
+            },
+            "receiptId": "45111775e39b6d891fa7551be03d41dde5943b34524a9ae7f4d43d3bfa3f8353",
+            "receiptRef": {
+              "bridgeId": "chio-bridge-a2a-native-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-18",
+              "capabilityId": "foreign-promisor-capability",
+              "receiptId": "45111775e39b6d891fa7551be03d41dde5943b34524a9ae7f4d43d3bfa3f8353",
+              "sourceProtocol": "a2a",
+              "targetProtocol": "native",
+              "traceId": "db7be313089f1d97a1b3a95336d6cc971e668227448b71c498677f7d7ccc7c92"
+            },
+            "routeSelection": {
+              "candidates": [
+                {
+                  "available": true,
+                  "routeId": "native-route",
+                  "selectedProtocols": [
+                    "a2a",
+                    "native"
+                  ],
+                  "targetProtocol": "native"
+                }
+              ],
+              "decision": "select",
+              "requestedTargetProtocol": "native",
+              "routeSelectionId": "f39b4d4f29a75b365c5db8a23bffed0fa5e4f73553e14a8b26af4f4f6745b02e",
+              "selectedProtocols": [
+                "a2a",
+                "native"
+              ],
+              "selectedRouteId": "native-route",
+              "selectedTargetProtocol": "native",
+              "sourceProtocol": "a2a"
+            },
+            "runtimeLifecycle": {
+              "blockingEntrypoint": "message/send",
+              "cancelEntrypoint": "task/cancel",
+              "claimEligible": true,
+              "compatibilityOnly": false,
+              "followUpEntrypoint": "task/get",
+              "partialOutputDelivery": "collated_terminal_payload",
+              "streamDelivery": "collated_terminal_payload",
+              "streamEntrypoint": "message/stream",
+              "surface": "a2a_authoritative"
+            },
+            "targetExecution": {
+              "multiHop": false,
+              "notificationCount": 0,
+              "projectedResult": false,
+              "routeHopCount": 2,
+              "terminalProtocol": "native"
+            },
+            "terminalState": {
+              "state": "completed"
+            }
+          }
+        },
+        "status": {
+          "message": {
+            "messageId": "status-a2a-task-b68743ad9df78c39baa2504424c742ca68579da9ddf99f630e6dc312406e5215-18",
+            "parts": [
+              {
+                "text": "capability verification failed: capability issuer is not a trusted CA"
+              }
+            ],
+            "role": "ROLE_AGENT"
+          },
+          "state": "TASK_STATE_FAILED"
+        }
+      }
+    }
+  }
+]

@@ -1,0 +1,79 @@
+{
+  "schema": "chio.integration-intake-result.v1",
+  "mode": "synthetic",
+  "record_complete": true,
+  "pairs": [
+    {
+      "exercise": "I1",
+      "ratio": "0.5",
+      "exact_ratio": {
+        "numerator": "1",
+        "denominator": "2"
+      }
+    },
+    {
+      "exercise": "I2",
+      "ratio": "0.5",
+      "exact_ratio": {
+        "numerator": "1",
+        "denominator": "2"
+      }
+    },
+    {
+      "exercise": "I3",
+      "ratio": "0.5",
+      "exact_ratio": {
+        "numerator": "1",
+        "denominator": "2"
+      }
+    },
+    {
+      "exercise": "I4",
+      "ratio": "0.5",
+      "exact_ratio": {
+        "numerator": "1",
+        "denominator": "2"
+      }
+    },
+    {
+      "exercise": "I5",
+      "ratio": "0.5",
+      "exact_ratio": {
+        "numerator": "1",
+        "denominator": "2"
+      }
+    },
+    {
+      "exercise": "I6",
+      "ratio": "0.5",
+      "exact_ratio": {
+        "numerator": "1",
+        "denominator": "2"
+      }
+    }
+  ],
+  "median_paired_ratio": "0.5",
+  "median_paired_ratio_exact": {
+    "numerator": "1",
+    "denominator": "2"
+  },
+  "recovery_fractions": {
+    "Chio": "1",
+    "B1": "1"
+  },
+  "recovery_counts": {
+    "Chio": {
+      "scheduled_incidents": 6,
+      "recovered_without_repair": 6
+    },
+    "B1": {
+      "scheduled_incidents": 6,
+      "recovered_without_repair": 6
+    }
+  },
+  "matched_safety_progress_quality": true,
+  "numerical_thresholds_met": true,
+  "independence": "not_established",
+  "empirical_acceptance": false,
+  "limitation": "Mechanical validation cannot establish authentic effort, independence, completeness of supplied logs or adjudicator truth. Independent audit remains required."
+}

@@ -1300,6 +1300,12 @@ explicitly rather than collapsed into an undifferentiated error state.
 
 ### 6.2 Authoritative Spend (execution nonce, atomic hold, mediated-spend profile)
 
+The [Execution Evidence and Payment Successors supplement](EXECUTION_EVIDENCE_AND_PAYMENT_SUCCESSORS.md)
+specifies the execution-only receipt profile, immutable projection, explicit
+unknown-hold release, contractual capture waiver, and output-denial vocabulary.
+These profiles do not extend the authoritative-spend conjunction below.
+
+
 An authorization receipt for a spend-bearing tool call is authoritative only when
 it satisfies the structural conjunction of the `chio.mediated_spend.v1` profile:
 

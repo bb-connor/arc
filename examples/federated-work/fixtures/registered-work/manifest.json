@@ -1,0 +1,347 @@
+{
+  "schema": "chio.experimental.work-wire-vectors.v1",
+  "cases": [
+    {
+      "name": "agreement",
+      "file": "agreement.json",
+      "accepted": true,
+      "reason": "Current registered shape; no signer authority or chain proof is claimed"
+    },
+    {
+      "name": "agreement-whitespace",
+      "file": "agreement-whitespace.json",
+      "accepted": false,
+      "reason": "Noncanonical leading whitespace"
+    },
+    {
+      "name": "agreement-duplicate",
+      "file": "agreement-duplicate.json",
+      "accepted": false,
+      "reason": "Duplicate body key"
+    },
+    {
+      "name": "agreement-escaped-duplicate",
+      "file": "agreement-escaped-duplicate.json",
+      "accepted": false,
+      "reason": "Escaped duplicate body key"
+    },
+    {
+      "name": "agreement-unknown-field",
+      "file": "agreement-unknown-field.json",
+      "accepted": false,
+      "reason": "unknown-field"
+    },
+    {
+      "name": "agreement-null-signature",
+      "file": "agreement-null-signature.json",
+      "accepted": false,
+      "reason": "null-signature"
+    },
+    {
+      "name": "agreement-unknown-schema",
+      "file": "agreement-unknown-schema.json",
+      "accepted": false,
+      "reason": "Unknown schema"
+    },
+    {
+      "name": "agreement-unknown-body",
+      "file": "agreement-unknown-body.json",
+      "accepted": false,
+      "reason": "Unknown body field"
+    },
+    {
+      "name": "submission",
+      "file": "submission.json",
+      "accepted": true,
+      "reason": "Current registered shape; no signer authority or chain proof is claimed"
+    },
+    {
+      "name": "submission-whitespace",
+      "file": "submission-whitespace.json",
+      "accepted": false,
+      "reason": "Noncanonical leading whitespace"
+    },
+    {
+      "name": "submission-duplicate",
+      "file": "submission-duplicate.json",
+      "accepted": false,
+      "reason": "Duplicate body key"
+    },
+    {
+      "name": "submission-escaped-duplicate",
+      "file": "submission-escaped-duplicate.json",
+      "accepted": false,
+      "reason": "Escaped duplicate body key"
+    },
+    {
+      "name": "submission-unknown-field",
+      "file": "submission-unknown-field.json",
+      "accepted": false,
+      "reason": "unknown-field"
+    },
+    {
+      "name": "submission-null-signature",
+      "file": "submission-null-signature.json",
+      "accepted": false,
+      "reason": "null-signature"
+    },
+    {
+      "name": "submission-unknown-schema",
+      "file": "submission-unknown-schema.json",
+      "accepted": false,
+      "reason": "Unknown schema"
+    },
+    {
+      "name": "submission-unknown-body",
+      "file": "submission-unknown-body.json",
+      "accepted": false,
+      "reason": "Unknown body field"
+    },
+    {
+      "name": "dependency",
+      "file": "dependency.json",
+      "accepted": true,
+      "reason": "Current registered shape; no signer authority or chain proof is claimed"
+    },
+    {
+      "name": "dependency-whitespace",
+      "file": "dependency-whitespace.json",
+      "accepted": false,
+      "reason": "Noncanonical leading whitespace"
+    },
+    {
+      "name": "dependency-duplicate",
+      "file": "dependency-duplicate.json",
+      "accepted": false,
+      "reason": "Duplicate body key"
+    },
+    {
+      "name": "dependency-escaped-duplicate",
+      "file": "dependency-escaped-duplicate.json",
+      "accepted": false,
+      "reason": "Escaped duplicate body key"
+    },
+    {
+      "name": "dependency-unknown-field",
+      "file": "dependency-unknown-field.json",
+      "accepted": false,
+      "reason": "unknown-field"
+    },
+    {
+      "name": "dependency-null-signature",
+      "file": "dependency-null-signature.json",
+      "accepted": false,
+      "reason": "null-signature"
+    },
+    {
+      "name": "dependency-unknown-schema",
+      "file": "dependency-unknown-schema.json",
+      "accepted": false,
+      "reason": "Unknown schema"
+    },
+    {
+      "name": "dependency-unknown-body",
+      "file": "dependency-unknown-body.json",
+      "accepted": false,
+      "reason": "Unknown body field"
+    },
+    {
+      "name": "decision",
+      "file": "decision.json",
+      "accepted": true,
+      "reason": "Current registered shape; no signer authority or chain proof is claimed"
+    },
+    {
+      "name": "decision-whitespace",
+      "file": "decision-whitespace.json",
+      "accepted": false,
+      "reason": "Noncanonical leading whitespace"
+    },
+    {
+      "name": "decision-duplicate",
+      "file": "decision-duplicate.json",
+      "accepted": false,
+      "reason": "Duplicate body key"
+    },
+    {
+      "name": "decision-escaped-duplicate",
+      "file": "decision-escaped-duplicate.json",
+      "accepted": false,
+      "reason": "Escaped duplicate body key"
+    },
+    {
+      "name": "decision-unknown-field",
+      "file": "decision-unknown-field.json",
+      "accepted": false,
+      "reason": "unknown-field"
+    },
+    {
+      "name": "decision-null-signature",
+      "file": "decision-null-signature.json",
+      "accepted": false,
+      "reason": "null-signature"
+    },
+    {
+      "name": "decision-unknown-schema",
+      "file": "decision-unknown-schema.json",
+      "accepted": false,
+      "reason": "Unknown schema"
+    },
+    {
+      "name": "decision-unknown-body",
+      "file": "decision-unknown-body.json",
+      "accepted": false,
+      "reason": "Unknown body field"
+    },
+    {
+      "name": "agreement-null-waiver",
+      "file": "agreement-null-waiver.json",
+      "accepted": false,
+      "reason": "null-waiver"
+    },
+    {
+      "name": "agreement-uppercase-context",
+      "file": "agreement-uppercase-context.json",
+      "accepted": false,
+      "reason": "uppercase-context"
+    },
+    {
+      "name": "agreement-empty-floor",
+      "file": "agreement-empty-floor.json",
+      "accepted": false,
+      "reason": "empty-floor"
+    },
+    {
+      "name": "agreement-reversed-floor",
+      "file": "agreement-reversed-floor.json",
+      "accepted": false,
+      "reason": "reversed-floor"
+    },
+    {
+      "name": "agreement-duplicate-floor",
+      "file": "agreement-duplicate-floor.json",
+      "accepted": false,
+      "reason": "duplicate-floor"
+    },
+    {
+      "name": "agreement-unknown-facet",
+      "file": "agreement-unknown-facet.json",
+      "accepted": false,
+      "reason": "unknown-facet"
+    },
+    {
+      "name": "agreement-wide-identifier",
+      "file": "agreement-wide-identifier.json",
+      "accepted": false,
+      "reason": "wide-identifier"
+    },
+    {
+      "name": "agreement-identifier-control",
+      "file": "agreement-identifier-control.json",
+      "accepted": false,
+      "reason": "identifier-control"
+    },
+    {
+      "name": "agreement-deadline-order",
+      "file": "agreement-deadline-order.json",
+      "accepted": false,
+      "reason": "deadline-order"
+    },
+    {
+      "name": "agreement-amount-alternate",
+      "file": "agreement-amount-alternate.json",
+      "accepted": false,
+      "reason": "amount-alternate"
+    },
+    {
+      "name": "agreement-zero-amount",
+      "file": "agreement-zero-amount.json",
+      "accepted": false,
+      "reason": "zero-amount"
+    },
+    {
+      "name": "agreement-actor-collision",
+      "file": "agreement-actor-collision.json",
+      "accepted": false,
+      "reason": "actor-collision"
+    },
+    {
+      "name": "agreement-unsafe-integer",
+      "file": "agreement-unsafe-integer.json",
+      "accepted": false,
+      "reason": "Unsafe I-JSON integer"
+    },
+    {
+      "name": "agreement-missing-context",
+      "file": "agreement-missing-context.json",
+      "accepted": false,
+      "reason": "Missing mandatory original pin"
+    },
+    {
+      "name": "agreement-legacy-version",
+      "file": "agreement-legacy-version.json",
+      "accepted": false,
+      "reason": "Legacy agreement cannot acquire v2 meaning"
+    },
+    {
+      "name": "submission-nested-signature",
+      "file": "submission-nested-signature.json",
+      "accepted": false,
+      "reason": "nested-signature"
+    },
+    {
+      "name": "submission-null-finding",
+      "file": "submission-null-finding.json",
+      "accepted": false,
+      "reason": "null-finding"
+    },
+    {
+      "name": "submission-zero-allocation",
+      "file": "submission-zero-allocation.json",
+      "accepted": false,
+      "reason": "zero-allocation"
+    },
+    {
+      "name": "dependency-aliased-authority",
+      "file": "dependency-aliased-authority.json",
+      "accepted": false,
+      "reason": "Parent and child require separate native authority"
+    },
+    {
+      "name": "decision-facet-order",
+      "file": "decision-facet-order.json",
+      "accepted": false,
+      "reason": "facet-order"
+    },
+    {
+      "name": "decision-missing-facet",
+      "file": "decision-missing-facet.json",
+      "accepted": false,
+      "reason": "missing-facet"
+    },
+    {
+      "name": "decision-blank-reason",
+      "file": "decision-blank-reason.json",
+      "accepted": false,
+      "reason": "blank-reason"
+    },
+    {
+      "name": "decision-invalid-outcome",
+      "file": "decision-invalid-outcome.json",
+      "accepted": false,
+      "reason": "invalid-outcome"
+    },
+    {
+      "name": "decision-null-assessment",
+      "file": "decision-null-assessment.json",
+      "accepted": false,
+      "reason": "null-assessment"
+    },
+    {
+      "name": "decision-legacy-version",
+      "file": "decision-legacy-version.json",
+      "accepted": false,
+      "reason": "legacy-version"
+    }
+  ]
+}

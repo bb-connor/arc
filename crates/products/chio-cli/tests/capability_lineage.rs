@@ -66,14 +66,6 @@ fn conflicting_runtime_attestation() -> RuntimeAttestationEvidence {
     }
 }
 
-fn unique_dir(prefix: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}"))
-}
-
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .ancestors()
@@ -158,8 +150,8 @@ fn issue_capability_records_lineage_snapshot() {
     }
     let _test_guard = trust_service_test_guard();
 
-    let dir = unique_dir("chio-cli-lineage-test");
-    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let state = chio_test_support::private_tempdir().expect("create private state directory");
+    let dir = state.path().to_path_buf();
     let receipt_db_path = dir.join("receipts.sqlite3");
     let revocation_db_path = dir.join("revocations.sqlite3");
     let authority_db_path = dir.join("authority.sqlite3");
@@ -253,8 +245,6 @@ fn issue_capability_records_lineage_snapshot() {
         lineage_json["parent_capability_id"].is_null(),
         "root capability should have no parent"
     );
-
-    let _ = std::fs::remove_dir_all(dir);
 }
 
 #[test]
@@ -264,8 +254,8 @@ fn authority_endpoints_require_auth_and_rotate_generation() {
     }
     let _test_guard = trust_service_test_guard();
 
-    let dir = unique_dir("chio-cli-authority-http");
-    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let state = chio_test_support::private_tempdir().expect("create private state directory");
+    let dir = state.path().to_path_buf();
     let receipt_db_path = dir.join("receipts.sqlite3");
     let revocation_db_path = dir.join("revocations.sqlite3");
     let authority_db_path = dir.join("authority.sqlite3");
@@ -334,8 +324,6 @@ fn authority_endpoints_require_auth_and_rotate_generation() {
     assert_eq!(after.status(), reqwest::StatusCode::OK);
     let after: serde_json::Value = after.json().expect("parse post-rotation authority status");
     assert_eq!(after["generation"].as_u64(), Some(rotated_generation));
-
-    let _ = std::fs::remove_dir_all(dir);
 }
 
 #[test]
@@ -345,8 +333,8 @@ fn issue_capability_rejects_invalid_public_key() {
     }
     let _test_guard = trust_service_test_guard();
 
-    let dir = unique_dir("chio-cli-invalid-capability-key");
-    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let state = chio_test_support::private_tempdir().expect("create private state directory");
+    let dir = state.path().to_path_buf();
     let receipt_db_path = dir.join("receipts.sqlite3");
     let revocation_db_path = dir.join("revocations.sqlite3");
     let authority_db_path = dir.join("authority.sqlite3");
@@ -384,8 +372,6 @@ fn issue_capability_rejects_invalid_public_key() {
         .as_str()
         .expect("invalid key error string")
         .contains("hex"));
-
-    let _ = std::fs::remove_dir_all(dir);
 }
 
 #[test]
@@ -397,8 +383,8 @@ fn issue_capability_rejects_conflicting_runtime_attestation_binding() {
     }
     let _test_guard = trust_service_test_guard();
 
-    let dir = unique_dir("chio-cli-invalid-runtime-attestation");
-    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let state = chio_test_support::private_tempdir().expect("create private state directory");
+    let dir = state.path().to_path_buf();
     let receipt_db_path = dir.join("receipts.sqlite3");
     let revocation_db_path = dir.join("revocations.sqlite3");
     let authority_db_path = dir.join("authority.sqlite3");
@@ -440,6 +426,4 @@ fn issue_capability_rejects_conflicting_runtime_attestation_binding() {
         .as_str()
         .expect("runtime attestation error string")
         .contains("workload identity is invalid"));
-
-    let _ = std::fs::remove_dir_all(dir);
 }

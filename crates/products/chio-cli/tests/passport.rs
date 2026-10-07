@@ -4520,11 +4520,12 @@ fn passport_oid4vp_public_verifier_metadata_and_rotation_preserve_active_request
         return;
     }
 
-    let passport_path = unique_path("passport-oid4vp-rotation", ".json");
-    let authority_db_path = unique_path("passport-oid4vp-rotation-authority", ".sqlite3");
-    let issuance_registry_path = unique_path("passport-oid4vp-rotation-registry", ".json");
-    let verifier_db_path = unique_path("passport-oid4vp-rotation-verifier", ".sqlite3");
-    let status_registry_path = unique_path("passport-oid4vp-rotation-statuses", ".json");
+    let fixture = chio_test_support::private_tempdir().expect("private test directory");
+    let passport_path = fixture.path().join("passport.json");
+    let authority_db_path = fixture.path().join("authority.sqlite3");
+    let issuance_registry_path = fixture.path().join("issuance-registry.json");
+    let verifier_db_path = fixture.path().join("verifier.sqlite3");
+    let status_registry_path = fixture.path().join("statuses.json");
     let listen = reserve_listen_addr();
     let base_url = format!("http://{}", listen);
     let service_token = "passport-oid4vp-rotation-service-token";
@@ -4575,14 +4576,18 @@ fn passport_oid4vp_public_verifier_metadata_and_rotation_preserve_active_request
         .error_for_status()
         .expect("portable passport status publish status");
 
-    let metadata: Oid4vciCredentialIssuerMetadata = client
+    let metadata_response = client
         .get(format!("{base_url}/.well-known/openid-credential-issuer"))
         .send()
-        .expect("fetch issuer metadata")
-        .error_for_status()
-        .expect("issuer metadata status")
-        .json()
-        .expect("parse issuer metadata");
+        .expect("fetch issuer metadata");
+    assert_eq!(
+        metadata_response.status(),
+        reqwest::StatusCode::OK,
+        "issuer metadata failed: {}",
+        metadata_response.text().unwrap_or_default()
+    );
+    let metadata: Oid4vciCredentialIssuerMetadata =
+        metadata_response.json().expect("parse issuer metadata");
     let offer_response: serde_json::Value = client
         .post(format!("{base_url}/v1/passport/issuance/offers"))
         .bearer_auth(service_token)

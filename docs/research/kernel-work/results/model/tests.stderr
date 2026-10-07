@@ -1,0 +1,6 @@
+   Compiling kernel-work-composition v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/labs/kernel-work-composition)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.59s
+     Running unittests src/lib.rs (/home/connor/chio-pr1173-lab-target/debug/deps/kernel_work_composition-2fdb0dc7c172acda)
+     Running unittests src/bin/explore.rs (/home/connor/chio-pr1173-lab-target/debug/deps/explore-d0beaa4a2943d7c8)
+     Running tests/scenarios.rs (/home/connor/chio-pr1173-lab-target/debug/deps/scenarios-1159b68352557181)
+   Doc-tests kernel_work_composition

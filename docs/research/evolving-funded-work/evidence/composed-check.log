@@ -1,0 +1,278 @@
+     Locking 2 packages to latest compatible versions
+      Adding chio-runtime-core v0.1.0 (/tmp/chio-verifiable-work-paper/crates/kernel/chio-runtime-core)
+      Adding chio-runtime-proof-parity v0.1.0 (/tmp/chio-verifiable-work-paper/crates/kernel/chio-runtime-proof-parity)
+    Checking chio-security-types v0.1.0 (/tmp/chio-verifiable-work-paper/crates/security/chio-security-types)
+    Checking chio-metrics-spec v0.1.0 (/tmp/chio-verifiable-work-paper/crates/observability/chio-metrics-spec)
+    Checking chio-workflow-preflight v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-workflow-preflight)
+   Compiling chio-attest-verify v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-attest-verify)
+    Checking chio-web3-bindings v0.1.0 (/tmp/chio-verifiable-work-paper/crates/economy/chio-web3-bindings)
+    Checking chio-data-guards-redactors-default v0.1.0 (/tmp/chio-verifiable-work-paper/crates/guards/chio-data-guards/redactors/default)
+    Checking chio-log-redact v0.1.0 (/tmp/chio-verifiable-work-paper/crates/observability/chio-log-redact)
+    Checking chio-supervisor v0.1.0 (/tmp/chio-verifiable-work-paper/crates/core/chio-supervisor)
+    Checking chio-bounded v0.1.0 (/tmp/chio-verifiable-work-paper/crates/core/chio-bounded)
+    Checking chio-sqlite-file-identity v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-sqlite-file-identity)
+    Checking chio-core-types v0.1.0 (/tmp/chio-verifiable-work-paper/crates/core/chio-core-types)
+    Checking chio-listing v0.1.0 (/tmp/chio-verifiable-work-paper/crates/economy/chio-listing)
+    Checking chio-revocation-oracle v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-revocation-oracle)
+    Checking chio-finding v0.1.0 (/tmp/chio-verifiable-work-paper/crates/economy/chio-finding)
+    Checking chio-fiscal v0.1.0 (/tmp/chio-verifiable-work-paper/crates/economy/chio-fiscal)
+    Checking chio-governance v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-governance)
+    Checking chio-pheromone v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-pheromone)
+    Checking chio-appraisal v0.1.0 (/tmp/chio-verifiable-work-paper/crates/economy/chio-appraisal)
+    Checking chio-open-market v0.1.0 (/tmp/chio-verifiable-work-paper/crates/economy/chio-open-market)
+    Checking chio-underwriting v0.1.0 (/tmp/chio-verifiable-work-paper/crates/economy/chio-underwriting)
+    Checking chio-federation v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-federation)
+    Checking chio-did v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-did)
+    Checking chio-fincred v0.1.0 (/tmp/chio-verifiable-work-paper/crates/economy/chio-fincred)
+    Checking chio-egress-contract v0.1.0 (/tmp/chio-verifiable-work-paper/crates/protocol/chio-egress-contract)
+    Checking chio-cage-plan v0.1.0 (/tmp/chio-verifiable-work-paper/crates/security/chio-cage-plan)
+    Checking chio-lineage v0.1.0 (/tmp/chio-verifiable-work-paper/crates/observability/chio-lineage)
+    Checking chio-credit v0.1.0 (/tmp/chio-verifiable-work-paper/crates/economy/chio-credit)
+    Checking chio-weights v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-weights)
+    Checking chio-custody-hw v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-custody-hw)
+    Checking chio-swarm-authority v0.1.0 (/tmp/chio-verifiable-work-paper/crates/kernel/chio-swarm-authority)
+    Checking chio-response-model v0.1.0 (/tmp/chio-verifiable-work-paper/crates/core/chio-response-model)
+    Checking chio-kernel-core v0.1.0 (/tmp/chio-verifiable-work-paper/crates/kernel/chio-kernel-core)
+    Checking chio-disclosure-lineage v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-disclosure-lineage)
+    Checking chio-runtime-proof-parity v0.1.0 (/tmp/chio-verifiable-work-paper/crates/kernel/chio-runtime-proof-parity)
+    Checking chio-web3 v0.1.0 (/tmp/chio-verifiable-work-paper/crates/economy/chio-web3)
+    Checking chio-market v0.1.0 (/tmp/chio-verifiable-work-paper/crates/economy/chio-market)
+    Checking chio-autonomy v0.1.0 (/tmp/chio-verifiable-work-paper/crates/economy/chio-autonomy)
+    Checking chio-core v0.1.0 (/tmp/chio-verifiable-work-paper/crates/core/chio-core)
+    Checking chio-workflow v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-workflow)
+    Checking chio-manifest v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-manifest)
+    Checking chio-tool-call-fabric v0.1.0 (/tmp/chio-verifiable-work-paper/crates/protocol/chio-tool-call-fabric)
+    Checking chio-settle v0.1.0 (/tmp/chio-verifiable-work-paper/crates/economy/chio-settle)
+    Checking chio-link v0.1.0 (/tmp/chio-verifiable-work-paper/crates/economy/chio-link)
+    Checking chio-selective-disclosure v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-selective-disclosure)
+    Checking chio-attest-buyer-core v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-attest-buyer-core)
+    Checking chio-federation-authority v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-federation-authority)
+    Checking chio-kernel v0.1.0 (/tmp/chio-verifiable-work-paper/crates/kernel/chio-kernel)
+    Checking chio-finding-verifier v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-finding-verifier)
+    Checking chio-cross-protocol v0.1.0 (/tmp/chio-verifiable-work-paper/crates/protocol/chio-cross-protocol)
+    Checking chio-transaction-passport v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-transaction-passport)
+    Checking chio-edge-metrics v0.1.0 (/tmp/chio-verifiable-work-paper/crates/protocol/chio-edge-metrics)
+    Checking chio-mcp-edge v0.1.0 (/tmp/chio-verifiable-work-paper/crates/protocol/chio-mcp-edge)
+    Checking chio-a2a-edge v0.1.0 (/tmp/chio-verifiable-work-paper/crates/protocol/chio-a2a-edge)
+    Checking chio-runtime-core v0.1.0 (/tmp/chio-verifiable-work-paper/crates/kernel/chio-runtime-core)
+    Checking chio-risk-comptroller v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-risk-comptroller)
+    Checking chio-commerce-order v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-commerce-order)
+    Checking chio-agent-web-interop v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-agent-web-interop)
+    Checking chio-store-sqlite v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-store-sqlite)
+    Checking chio-a2a-adapter v0.1.0 (/tmp/chio-verifiable-work-paper/crates/protocol/chio-a2a-adapter)
+    Checking chio-federated-work v0.1.0 (/tmp/chio-verifiable-work-paper/examples/federated-work)
+error[E0603]: function `attach` is private
+   --> src/funded_work/evolving.rs:21:26
+    |
+ 21 |     composition::treaty::attach(state, native.policy.composition.as_ref().ok_or("composed policy absent")?,
+    |                          ^^^^^^ private function
+    |
+note: the function `attach` is defined here
+   --> src/funded_work/composition/treaty.rs:11:1
+    |
+ 11 | / pub(super) fn attach(state: &Path, config: &Config, request: &mut ToolCallRequest,
+ 12 | |     buyer: &Keypair, receiver: &Keypair) -> Result<()> {
+ 13 | |     if buyer.public_key() != config.peer.public_key || kernel_id(&receiver.public_key()) != config.profile.local_kernel_id {
+ 14 | |         return Err("operator treaty keys differ from protected receiver configuration".into());
+...   |
+135 | |     Ok(())
+136 | | }
+    | |_^
+
+warning: unused import: `AdmissionOperationStore`
+ --> src/funded_work/composition.rs:6:62
+  |
+6 | use chio_kernel::{admission_operation::{AdmissionIdentifier, AdmissionOperationStore,
+  |                                                              ^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0308]: mismatched types
+  --> src/funded_work/evolving.rs:76:82
+   |
+76 |     super::lifecycle::progress(state, &scenario.native, &scenario.request, mode, &Arc::new(|_| Ok(())), &|phase| {
+   |     -------------------------- arguments to this function are incorrect          ^^^^^^^^^^^^^^^^^^^^^ expected `&Arc<dyn Fn(&str) -> ... + Send + Sync>`, found `&Arc<{closure@evolving.rs:76:92}>`
+   |
+   = note: expected reference `&Arc<(dyn Fn(&'static str) -> std::result::Result<(), Box<(dyn StdError + Send + std::marker::Sync + 'static)>> + Send + std::marker::Sync + 'static)>`
+              found reference `&Arc<{closure@src/funded_work/evolving.rs:76:92: 76:95}>`
+note: function defined here
+  --> src/funded_work/lifecycle.rs:47:15
+   |
+47 | pub(super) fn progress(
+   |               ^^^^^^^^
+...
+52 |     checkpoint: &super::Checkpoint,
+   |     ------------------------------
+
+error[E0308]: mismatched types
+   --> src/funded_work/evolving.rs:189:84
+    |
+188 |     super::settlement::drive(&scout_entry, super::settlement::Action::Submit,
+    |     ------------------------ arguments to this function are incorrect
+189 |         &scout.native.policy, &scout.native.journal, scout.native.source.as_ref(), &Arc::new(|_| Ok(())))?;
+    |                                                                                    ^^^^^^^^^^^^^^^^^^^^^ expected `&Arc<dyn Fn(&str) -> ... + Send + Sync>`, found `&Arc<{closure@evolving.rs:189:94}>`
+    |
+    = note: expected reference `&Arc<(dyn Fn(&'static str) -> std::result::Result<(), Box<(dyn StdError + Send + std::marker::Sync + 'static)>> + Send + std::marker::Sync + 'static)>`
+               found reference `&Arc<{closure@src/funded_work/evolving.rs:189:94: 189:97}>`
+note: function defined here
+   --> src/funded_work/settlement.rs:249:8
+    |
+249 | pub fn drive(
+    |        ^^^^^
+...
+255 |     checkpoint: &super::Checkpoint,
+    |     ------------------------------
+
+error[E0277]: the trait bound `Evidence: serde::Serialize` is not satisfied
+   --> src/funded_work/evolving.rs:214:28
+    |
+214 |     let preserved = digest(&original_evidence)? == digest(&after_growth)?;
+    |                     ------ ^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+    |                     |
+    |                     required by a bound introduced by this call
+    |
+help: the trait `common::_::_serde::Serialize` is not implemented for `Evidence`
+   --> src/funded_work/evidence.rs:28:1
+    |
+ 28 | pub struct Evidence {
+    | ^^^^^^^^^^^^^^^^^^^
+    = note: for local types consider adding `#[derive(serde::Serialize)]` to your `Evidence` type
+    = note: for types from other crates check whether the crate offers a `serde` feature flag
+    = help: the following other types implement trait `common::_::_serde::Serialize`:
+              &'a T
+              &'a mut T
+              ()
+              (T,)
+              (T0, T1)
+              (T0, T1, T2)
+              (T0, T1, T2, T3)
+              (T0, T1, T2, T3, T4)
+            and 3153 others
+note: required by a bound in `common::digest`
+   --> src/common.rs:43:18
+    |
+ 43 | pub fn digest<T: Serialize>(value: &T) -> Result<String> {
+    |                  ^^^^^^^^^ required by this bound in `digest`
+    = note: the full name for the type has been written to '/tmp/chio-paper-target/debug/deps/chio_federated_work-f86559327dca0111.long-type-15296120517505767734.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+
+error[E0277]: the trait bound `Evidence: serde::Serialize` is not satisfied
+   --> src/funded_work/evolving.rs:214:59
+    |
+214 |     let preserved = digest(&original_evidence)? == digest(&after_growth)?;
+    |                                                    ------ ^^^^^^^^^^^^^ unsatisfied trait bound
+    |                                                    |
+    |                                                    required by a bound introduced by this call
+    |
+help: the trait `common::_::_serde::Serialize` is not implemented for `Evidence`
+   --> src/funded_work/evidence.rs:28:1
+    |
+ 28 | pub struct Evidence {
+    | ^^^^^^^^^^^^^^^^^^^
+    = note: for local types consider adding `#[derive(serde::Serialize)]` to your `Evidence` type
+    = note: for types from other crates check whether the crate offers a `serde` feature flag
+    = help: the following other types implement trait `common::_::_serde::Serialize`:
+              &'a T
+              &'a mut T
+              ()
+              (T,)
+              (T0, T1)
+              (T0, T1, T2)
+              (T0, T1, T2, T3)
+              (T0, T1, T2, T3, T4)
+            and 3153 others
+note: required by a bound in `common::digest`
+   --> src/common.rs:43:18
+    |
+ 43 | pub fn digest<T: Serialize>(value: &T) -> Result<String> {
+    |                  ^^^^^^^^^ required by this bound in `digest`
+    = note: the full name for the type has been written to '/tmp/chio-paper-target/debug/deps/chio_federated_work-f86559327dca0111.long-type-15296120517505767734.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+
+error[E0308]: mismatched types
+   --> src/funded_work/evolving.rs:215:98
+    |
+215 |     super::lifecycle::progress(&state.join("parent"), &parent_native, &parent_request, "absent", &Arc::new(|_| Ok(())), &|phase| {
+    |     -------------------------- arguments to this function are incorrect                          ^^^^^^^^^^^^^^^^^^^^^ expected `&Arc<dyn Fn(&str) -> ... + Send + Sync>`, found `&Arc<{closure@evolving.rs:215:108}>`
+    |
+    = note: expected reference `&Arc<(dyn Fn(&'static str) -> std::result::Result<(), Box<(dyn StdError + Send + std::marker::Sync + 'static)>> + Send + std::marker::Sync + 'static)>`
+               found reference `&Arc<{closure@src/funded_work/evolving.rs:215:108: 215:111}>`
+note: function defined here
+   --> src/funded_work/lifecycle.rs:47:15
+    |
+ 47 | pub(super) fn progress(
+    |               ^^^^^^^^
+...
+ 52 |     checkpoint: &super::Checkpoint,
+    |     ------------------------------
+
+error[E0277]: the trait bound `Evidence: serde::Serialize` is not satisfied
+   --> src/funded_work/evolving.rs:234:41
+    |
+234 |     let preserved = preserved && digest(&scout.evidence(&scout_request)?)? == digest(&original_evidence)?;
+    |                                  ------ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+    |                                  |
+    |                                  required by a bound introduced by this call
+    |
+help: the trait `common::_::_serde::Serialize` is not implemented for `Evidence`
+   --> src/funded_work/evidence.rs:28:1
+    |
+ 28 | pub struct Evidence {
+    | ^^^^^^^^^^^^^^^^^^^
+    = note: for local types consider adding `#[derive(serde::Serialize)]` to your `Evidence` type
+    = note: for types from other crates check whether the crate offers a `serde` feature flag
+    = help: the following other types implement trait `common::_::_serde::Serialize`:
+              &'a T
+              &'a mut T
+              ()
+              (T,)
+              (T0, T1)
+              (T0, T1, T2)
+              (T0, T1, T2, T3)
+              (T0, T1, T2, T3, T4)
+            and 3153 others
+note: required by a bound in `common::digest`
+   --> src/common.rs:43:18
+    |
+ 43 | pub fn digest<T: Serialize>(value: &T) -> Result<String> {
+    |                  ^^^^^^^^^ required by this bound in `digest`
+    = note: the full name for the type has been written to '/tmp/chio-paper-target/debug/deps/chio_federated_work-f86559327dca0111.long-type-15296120517505767734.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+
+error[E0277]: the trait bound `Evidence: serde::Serialize` is not satisfied
+   --> src/funded_work/evolving.rs:234:86
+    |
+234 |     let preserved = preserved && digest(&scout.evidence(&scout_request)?)? == digest(&original_evidence)?;
+    |                                                                               ------ ^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+    |                                                                               |
+    |                                                                               required by a bound introduced by this call
+    |
+help: the trait `common::_::_serde::Serialize` is not implemented for `Evidence`
+   --> src/funded_work/evidence.rs:28:1
+    |
+ 28 | pub struct Evidence {
+    | ^^^^^^^^^^^^^^^^^^^
+    = note: for local types consider adding `#[derive(serde::Serialize)]` to your `Evidence` type
+    = note: for types from other crates check whether the crate offers a `serde` feature flag
+    = help: the following other types implement trait `common::_::_serde::Serialize`:
+              &'a T
+              &'a mut T
+              ()
+              (T,)
+              (T0, T1)
+              (T0, T1, T2)
+              (T0, T1, T2, T3)
+              (T0, T1, T2, T3, T4)
+            and 3153 others
+note: required by a bound in `common::digest`
+   --> src/common.rs:43:18
+    |
+ 43 | pub fn digest<T: Serialize>(value: &T) -> Result<String> {
+    |                  ^^^^^^^^^ required by this bound in `digest`
+    = note: the full name for the type has been written to '/tmp/chio-paper-target/debug/deps/chio_federated_work-f86559327dca0111.long-type-15296120517505767734.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+
+Some errors have detailed explanations: E0277, E0308, E0603.
+For more information about an error, try `rustc --explain E0277`.
+warning: `chio-federated-work` (bin "chio-federated-work") generated 1 warning
+error: could not compile `chio-federated-work` (bin "chio-federated-work") due to 8 previous errors; 1 warning emitted

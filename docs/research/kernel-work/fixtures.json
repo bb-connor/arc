@@ -1,0 +1,7297 @@
+{
+  "schema": "chio.kernel-work.fixtures.v1",
+  "profile": "KW1",
+  "assumed_recovery_revision": "de84fc306efbb4c8dd6de748d0ad2a8d695fd30e",
+  "cases": [
+    {
+      "id": "F01",
+      "title": "Exact approved remedy",
+      "variants": [
+        {
+          "id": "F01_exact",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": null,
+          "expected_effects": {
+            "effects": [
+              1,
+              0,
+              0
+            ],
+            "outcomes": [
+              "applied",
+              "fresh",
+              "fresh"
+            ]
+          },
+          "expected_authority": {
+            "captures": [
+              1,
+              0,
+              0
+            ],
+            "nonces": [
+              1,
+              0,
+              0
+            ]
+          },
+          "expected_knowledge": {
+            "knowledge": 3
+          },
+          "expected_resources": {
+            "spent": 1,
+            "exposure": 1
+          },
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "F02",
+      "title": "Owner and authority substitution",
+      "variants": [
+        {
+          "id": "F02_partial",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F01_exact",
+          "expected_effects": {
+            "effects": [
+              0,
+              0,
+              0
+            ]
+          },
+          "expected_authority": {
+            "captures": [
+              0,
+              0,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              false,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F02_alias",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F01_exact",
+          "expected_effects": {
+            "effects": [
+              0,
+              0,
+              0
+            ]
+          },
+          "expected_authority": {
+            "captures": [
+              0,
+              0,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              false,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F02_endorsement",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F01_exact",
+          "expected_effects": {
+            "effects": [
+              0,
+              0,
+              0
+            ]
+          },
+          "expected_authority": {
+            "captures": [
+              0,
+              0,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              false,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F02_cross_operation",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F01_exact",
+          "expected_effects": {
+            "effects": [
+              0,
+              0,
+              0
+            ]
+          },
+          "expected_authority": {
+            "captures": [
+              0,
+              0,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              false,
+              false
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "F03",
+      "title": "Exact relevant basis",
+      "variants": [
+        {
+          "id": "F03_bytes",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "change",
+              "field": "bytes",
+              "value": 2
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F03_unrelated",
+          "expected_effects": {},
+          "expected_authority": {
+            "captures": [
+              0,
+              0,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F03_recipient",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "change",
+              "field": "recipient",
+              "value": 2
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F03_unrelated",
+          "expected_effects": {},
+          "expected_authority": {
+            "captures": [
+              0,
+              0,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F03_account",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "change",
+              "field": "account",
+              "value": 2
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F03_unrelated",
+          "expected_effects": {},
+          "expected_authority": {
+            "captures": [
+              0,
+              0,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F03_policy",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "change",
+              "field": "policy",
+              "value": 2
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F03_unrelated",
+          "expected_effects": {},
+          "expected_authority": {
+            "captures": [
+              0,
+              0,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F03_acl",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "change",
+              "field": "acl",
+              "value": 2
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F03_unrelated",
+          "expected_effects": {},
+          "expected_authority": {
+            "captures": [
+              0,
+              0,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F03_unrelated",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "change",
+              "field": "unrelated",
+              "value": 2
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": null,
+          "expected_effects": {
+            "effects": [
+              1,
+              0,
+              0
+            ]
+          },
+          "expected_authority": {},
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "F04",
+      "title": "Custody and issuance readback",
+      "variants": [
+        {
+          "id": "F04_original",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "crash"
+            },
+            {
+              "kind": "readback",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 2,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 99,
+              "envelope": 21
+            }
+          ],
+          "faults": [
+            {
+              "at": 3,
+              "drop_ack": true
+            }
+          ],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F01_exact",
+          "expected_effects": {
+            "effects": [
+              1,
+              0,
+              0
+            ]
+          },
+          "expected_authority": {
+            "issuances": [
+              11,
+              0,
+              0
+            ],
+            "envelopes": [
+              21,
+              0,
+              0
+            ],
+            "nonces": [
+              1,
+              0,
+              0
+            ],
+            "captures": [
+              1,
+              0,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F04_corrupt",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "readback",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 99
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F04_original",
+          "expected_effects": {},
+          "expected_authority": {
+            "issuances": [
+              11,
+              0,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F04_capture_crash",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "crash"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F04_original",
+          "expected_effects": {
+            "effects": [
+              0,
+              0,
+              0
+            ],
+            "outcomes": [
+              "unknown",
+              "fresh",
+              "fresh"
+            ]
+          },
+          "expected_authority": {},
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F04_readback_required",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            }
+          ],
+          "faults": [
+            {
+              "at": 3,
+              "drop_ack": true
+            }
+          ],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F04_original",
+          "expected_effects": {
+            "effects": [
+              0,
+              0,
+              0
+            ]
+          },
+          "expected_authority": {},
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F04_unknown_both",
+          "profile": "E2",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "refund_parent"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "crash"
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 1,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 1,
+              "epoch": 2,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 1
+            }
+          ],
+          "faults": [
+            {
+              "at": 5,
+              "applied": true,
+              "ack": false
+            }
+          ],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F04_unknown_distinct",
+          "expected_effects": {
+            "effects": [
+              1,
+              0,
+              0
+            ],
+            "outcomes": [
+              "unknown",
+              "fresh",
+              "fresh"
+            ]
+          },
+          "expected_authority": {
+            "nonces": [
+              1,
+              0,
+              0
+            ],
+            "issuances": [
+              11,
+              0,
+              0
+            ],
+            "envelopes": [
+              21,
+              0,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F04_unknown_issuance",
+          "profile": "E2",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "refund_parent"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "crash"
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 1,
+              "issuance": 11,
+              "envelope": 22
+            },
+            {
+              "kind": "capture",
+              "op": 1,
+              "epoch": 2,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 1
+            }
+          ],
+          "faults": [
+            {
+              "at": 5,
+              "applied": true,
+              "ack": false
+            }
+          ],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F04_unknown_distinct",
+          "expected_effects": {
+            "effects": [
+              1,
+              0,
+              0
+            ],
+            "outcomes": [
+              "unknown",
+              "fresh",
+              "fresh"
+            ]
+          },
+          "expected_authority": {
+            "nonces": [
+              1,
+              0,
+              0
+            ],
+            "issuances": [
+              11,
+              0,
+              0
+            ],
+            "envelopes": [
+              21,
+              0,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F04_unknown_envelope",
+          "profile": "E2",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "refund_parent"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "crash"
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 1,
+              "issuance": 12,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 1,
+              "epoch": 2,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 1
+            }
+          ],
+          "faults": [
+            {
+              "at": 5,
+              "applied": true,
+              "ack": false
+            }
+          ],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F04_unknown_distinct",
+          "expected_effects": {
+            "effects": [
+              1,
+              0,
+              0
+            ],
+            "outcomes": [
+              "unknown",
+              "fresh",
+              "fresh"
+            ]
+          },
+          "expected_authority": {
+            "nonces": [
+              1,
+              0,
+              0
+            ],
+            "issuances": [
+              11,
+              0,
+              0
+            ],
+            "envelopes": [
+              21,
+              0,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F04_unknown_distinct",
+          "profile": "E2",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "refund_parent"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "crash"
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 1,
+              "issuance": 12,
+              "envelope": 22
+            },
+            {
+              "kind": "capture",
+              "op": 1,
+              "epoch": 2,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 1
+            }
+          ],
+          "faults": [
+            {
+              "at": 5,
+              "applied": true,
+              "ack": false
+            }
+          ],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F04_unknown_distinct",
+          "expected_effects": {
+            "effects": [
+              1,
+              1,
+              0
+            ],
+            "outcomes": [
+              "unknown",
+              "applied",
+              "fresh"
+            ]
+          },
+          "expected_authority": {
+            "nonces": [
+              1,
+              1,
+              0
+            ],
+            "issuances": [
+              11,
+              12,
+              0
+            ],
+            "envelopes": [
+              21,
+              22,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          }
+        },
+        {
+          "id": "F04_closed_gc_both",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "gc",
+              "op": 0
+            },
+            {
+              "kind": "crash"
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 1,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 1,
+              "epoch": 2,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 1
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F04_closed_gc_distinct",
+          "expected_effects": {
+            "effects": [
+              1,
+              0,
+              0
+            ],
+            "outcomes": [
+              "applied",
+              "fresh",
+              "fresh"
+            ]
+          },
+          "expected_authority": {
+            "nonces": [
+              1,
+              0,
+              0
+            ],
+            "issuances": [
+              11,
+              0,
+              0
+            ],
+            "envelopes": [
+              21,
+              0,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F04_closed_gc_issuance",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "gc",
+              "op": 0
+            },
+            {
+              "kind": "crash"
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 1,
+              "issuance": 11,
+              "envelope": 22
+            },
+            {
+              "kind": "capture",
+              "op": 1,
+              "epoch": 2,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 1
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F04_closed_gc_distinct",
+          "expected_effects": {
+            "effects": [
+              1,
+              0,
+              0
+            ],
+            "outcomes": [
+              "applied",
+              "fresh",
+              "fresh"
+            ]
+          },
+          "expected_authority": {
+            "nonces": [
+              1,
+              0,
+              0
+            ],
+            "issuances": [
+              11,
+              0,
+              0
+            ],
+            "envelopes": [
+              21,
+              0,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F04_closed_gc_envelope",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "gc",
+              "op": 0
+            },
+            {
+              "kind": "crash"
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 1,
+              "issuance": 12,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 1,
+              "epoch": 2,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 1
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F04_closed_gc_distinct",
+          "expected_effects": {
+            "effects": [
+              1,
+              0,
+              0
+            ],
+            "outcomes": [
+              "applied",
+              "fresh",
+              "fresh"
+            ]
+          },
+          "expected_authority": {
+            "nonces": [
+              1,
+              0,
+              0
+            ],
+            "issuances": [
+              11,
+              0,
+              0
+            ],
+            "envelopes": [
+              21,
+              0,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F04_closed_gc_distinct",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "gc",
+              "op": 0
+            },
+            {
+              "kind": "crash"
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 1,
+              "issuance": 12,
+              "envelope": 22
+            },
+            {
+              "kind": "capture",
+              "op": 1,
+              "epoch": 2,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 1
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F04_closed_gc_distinct",
+          "expected_effects": {
+            "effects": [
+              1,
+              1,
+              0
+            ],
+            "outcomes": [
+              "applied",
+              "applied",
+              "fresh"
+            ]
+          },
+          "expected_authority": {
+            "nonces": [
+              1,
+              1,
+              0
+            ],
+            "issuances": [
+              11,
+              12,
+              0
+            ],
+            "envelopes": [
+              21,
+              22,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "F05",
+      "title": "Opaque indistinguishable outcomes",
+      "variants": [
+        {
+          "id": "F05_false",
+          "profile": "E2",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "refund_parent"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            }
+          ],
+          "faults": [
+            {
+              "at": 5,
+              "applied": false,
+              "ack": false
+            }
+          ],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F09_sibling",
+          "expected_effects": {
+            "effects": [
+              0,
+              0,
+              0
+            ],
+            "outcomes": [
+              "unknown",
+              "fresh",
+              "fresh"
+            ]
+          },
+          "expected_authority": {},
+          "expected_knowledge": {},
+          "expected_resources": {
+            "unresolved": 1
+          },
+          "expected_obligations": {
+            "parent_refund": 100
+          },
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F05_true",
+          "profile": "E2",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "refund_parent"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            }
+          ],
+          "faults": [
+            {
+              "at": 5,
+              "applied": true,
+              "ack": false
+            }
+          ],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F09_sibling",
+          "expected_effects": {
+            "effects": [
+              1,
+              0,
+              0
+            ],
+            "outcomes": [
+              "unknown",
+              "fresh",
+              "fresh"
+            ]
+          },
+          "expected_authority": {},
+          "expected_knowledge": {},
+          "expected_resources": {
+            "unresolved": 1
+          },
+          "expected_obligations": {
+            "parent_refund": 100
+          },
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "F06",
+      "title": "Qualified reconciliation",
+      "variants": [
+        {
+          "id": "F06_applied",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "lookup",
+              "op": 0
+            },
+            {
+              "kind": "evidence",
+              "op": 0,
+              "signer": 9,
+              "key": 1,
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ],
+              "outcome": "applied",
+              "complete": true,
+              "fenced": true,
+              "retained": true
+            },
+            {
+              "kind": "send",
+              "op": 0
+            }
+          ],
+          "faults": [
+            {
+              "at": 5,
+              "applied": true,
+              "ack": false,
+              "partial": false
+            }
+          ],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F01_exact",
+          "expected_effects": {
+            "effects": [
+              1,
+              0,
+              0
+            ],
+            "outcomes": [
+              "applied",
+              "fresh",
+              "fresh"
+            ]
+          },
+          "expected_authority": {},
+          "expected_knowledge": {},
+          "expected_resources": {
+            "exposure": 2
+          },
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F06_partial",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "evidence",
+              "op": 0,
+              "signer": 9,
+              "key": 1,
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ],
+              "outcome": "partial",
+              "complete": true,
+              "fenced": true,
+              "retained": true
+            },
+            {
+              "kind": "send",
+              "op": 0
+            }
+          ],
+          "faults": [
+            {
+              "at": 5,
+              "applied": true,
+              "ack": false,
+              "partial": true
+            }
+          ],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F01_exact",
+          "expected_effects": {
+            "effects": [
+              1,
+              0,
+              0
+            ],
+            "outcomes": [
+              "partial",
+              "fresh",
+              "fresh"
+            ]
+          },
+          "expected_authority": {},
+          "expected_knowledge": {},
+          "expected_resources": {
+            "exposure": 1
+          },
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F06_closed_absent",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "evidence",
+              "op": 0,
+              "signer": 9,
+              "key": 1,
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ],
+              "outcome": "none",
+              "complete": true,
+              "fenced": true,
+              "retained": true
+            },
+            {
+              "kind": "send",
+              "op": 0
+            }
+          ],
+          "faults": [
+            {
+              "at": 5,
+              "applied": false,
+              "ack": false,
+              "partial": false
+            }
+          ],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F01_exact",
+          "expected_effects": {
+            "effects": [
+              0,
+              0,
+              0
+            ],
+            "outcomes": [
+              "none",
+              "fresh",
+              "fresh"
+            ]
+          },
+          "expected_authority": {},
+          "expected_knowledge": {},
+          "expected_resources": {
+            "exposure": 0
+          },
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F06_unfenced",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "evidence",
+              "op": 0,
+              "signer": 9,
+              "key": 1,
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ],
+              "outcome": "none",
+              "complete": true,
+              "fenced": false,
+              "retained": true
+            },
+            {
+              "kind": "send",
+              "op": 0
+            }
+          ],
+          "faults": [
+            {
+              "at": 5,
+              "applied": false,
+              "ack": false,
+              "partial": false
+            }
+          ],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F06_applied",
+          "expected_effects": {
+            "effects": [
+              0,
+              0,
+              0
+            ],
+            "outcomes": [
+              "unknown",
+              "fresh",
+              "fresh"
+            ]
+          },
+          "expected_authority": {},
+          "expected_knowledge": {},
+          "expected_resources": {
+            "exposure": 1
+          },
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F06_incomplete",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "evidence",
+              "op": 0,
+              "signer": 9,
+              "key": 1,
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ],
+              "outcome": "applied",
+              "complete": false,
+              "fenced": true,
+              "retained": true
+            },
+            {
+              "kind": "send",
+              "op": 0
+            }
+          ],
+          "faults": [
+            {
+              "at": 5,
+              "applied": true,
+              "ack": false,
+              "partial": false
+            }
+          ],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F06_applied",
+          "expected_effects": {
+            "effects": [
+              1,
+              0,
+              0
+            ],
+            "outcomes": [
+              "unknown",
+              "fresh",
+              "fresh"
+            ]
+          },
+          "expected_authority": {},
+          "expected_knowledge": {},
+          "expected_resources": {
+            "exposure": 1
+          },
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F06_expired",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "evidence",
+              "op": 0,
+              "signer": 9,
+              "key": 1,
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ],
+              "outcome": "applied",
+              "complete": true,
+              "fenced": true,
+              "retained": false
+            },
+            {
+              "kind": "send",
+              "op": 0
+            }
+          ],
+          "faults": [
+            {
+              "at": 5,
+              "applied": true,
+              "ack": false,
+              "partial": false
+            }
+          ],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F06_applied",
+          "expected_effects": {
+            "effects": [
+              1,
+              0,
+              0
+            ],
+            "outcomes": [
+              "unknown",
+              "fresh",
+              "fresh"
+            ]
+          },
+          "expected_authority": {},
+          "expected_knowledge": {},
+          "expected_resources": {
+            "exposure": 1
+          },
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F06_lookup_budget",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "lookup",
+              "op": 0
+            },
+            {
+              "kind": "lookup",
+              "op": 0
+            },
+            {
+              "kind": "lookup",
+              "op": 0
+            },
+            {
+              "kind": "lookup",
+              "op": 0
+            }
+          ],
+          "faults": [
+            {
+              "at": 5,
+              "applied": true,
+              "ack": false
+            }
+          ],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F06_applied",
+          "expected_effects": {
+            "effects": [
+              1,
+              0,
+              0
+            ],
+            "exposure": 4
+          },
+          "expected_authority": {},
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "F07",
+      "title": "Settlement independent of initiator/read permission",
+      "variants": [
+        {
+          "id": "F07_internal",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "permission",
+              "name": "caller",
+              "value": false
+            },
+            {
+              "kind": "permission",
+              "name": "read",
+              "value": false
+            },
+            {
+              "kind": "settle",
+              "op": 0,
+              "epoch": 1
+            },
+            {
+              "kind": "read_result",
+              "op": 0
+            },
+            {
+              "kind": "permission",
+              "name": "read",
+              "value": true
+            },
+            {
+              "kind": "read_result",
+              "op": 0
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F07_internal",
+          "expected_effects": {
+            "effects": [
+              1,
+              0,
+              0
+            ]
+          },
+          "expected_authority": {
+            "settled": [
+              true,
+              false,
+              false
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "reads": 1,
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              true,
+              true
+            ]
+          }
+        },
+        {
+          "id": "F07_lookup_revoked",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "permission",
+              "name": "connector",
+              "value": false
+            },
+            {
+              "kind": "lookup",
+              "op": 0
+            }
+          ],
+          "faults": [
+            {
+              "at": 5,
+              "applied": true,
+              "ack": false
+            }
+          ],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F06_applied",
+          "expected_effects": {
+            "outcomes": [
+              "unknown",
+              "fresh",
+              "fresh"
+            ]
+          },
+          "expected_authority": {},
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F07_result_release_permission",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "permission",
+              "name": "read",
+              "value": false
+            },
+            {
+              "kind": "read_result",
+              "op": 0
+            },
+            {
+              "kind": "release",
+              "channel": "result",
+              "recipient": 5,
+              "bounded": true,
+              "claims": [
+                {
+                  "principal": 0,
+                  "channel": "result",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                },
+                {
+                  "principal": 1,
+                  "channel": "result",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                }
+              ]
+            },
+            {
+              "kind": "permission",
+              "name": "read",
+              "value": true
+            },
+            {
+              "kind": "release",
+              "channel": "result",
+              "recipient": 5,
+              "bounded": true,
+              "claims": [
+                {
+                  "principal": 0,
+                  "channel": "result",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                },
+                {
+                  "principal": 1,
+                  "channel": "result",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                }
+              ]
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F07_result_release_permission",
+          "expected_effects": {
+            "effects": [
+              1,
+              0,
+              0
+            ]
+          },
+          "expected_authority": {},
+          "expected_knowledge": {
+            "releases": 1
+          },
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false,
+              true,
+              true
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "F08",
+      "title": "All confined-child channels",
+      "variants": [
+        {
+          "id": "F08_seed",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "release",
+              "channel": "seed",
+              "recipient": 5,
+              "bounded": true,
+              "claims": [
+                {
+                  "principal": 0,
+                  "channel": "seed",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                }
+              ]
+            },
+            {
+              "kind": "release",
+              "channel": "seed",
+              "recipient": 5,
+              "bounded": true,
+              "claims": [
+                {
+                  "principal": 0,
+                  "channel": "seed",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                },
+                {
+                  "principal": 1,
+                  "channel": "seed",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                }
+              ]
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F08_seed",
+          "expected_effects": {},
+          "expected_authority": {},
+          "expected_knowledge": {
+            "releases": 1,
+            "knowledge": 3,
+            "child_knowledge": 3
+          },
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "id": "F08_return",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "release",
+              "channel": "return",
+              "recipient": 5,
+              "bounded": true,
+              "claims": [
+                {
+                  "principal": 0,
+                  "channel": "return",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                }
+              ]
+            },
+            {
+              "kind": "release",
+              "channel": "return",
+              "recipient": 5,
+              "bounded": true,
+              "claims": [
+                {
+                  "principal": 0,
+                  "channel": "return",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                },
+                {
+                  "principal": 1,
+                  "channel": "return",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                }
+              ]
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F08_return",
+          "expected_effects": {},
+          "expected_authority": {},
+          "expected_knowledge": {
+            "releases": 1,
+            "knowledge": 3,
+            "child_knowledge": 0
+          },
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "id": "F08_result",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "release",
+              "channel": "result",
+              "recipient": 5,
+              "bounded": true,
+              "claims": [
+                {
+                  "principal": 0,
+                  "channel": "result",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                }
+              ]
+            },
+            {
+              "kind": "release",
+              "channel": "result",
+              "recipient": 5,
+              "bounded": true,
+              "claims": [
+                {
+                  "principal": 0,
+                  "channel": "result",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                },
+                {
+                  "principal": 1,
+                  "channel": "result",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                }
+              ]
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F08_result",
+          "expected_effects": {},
+          "expected_authority": {},
+          "expected_knowledge": {
+            "releases": 1,
+            "knowledge": 3,
+            "child_knowledge": 0
+          },
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "id": "F08_error",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "release",
+              "channel": "error",
+              "recipient": 5,
+              "bounded": true,
+              "claims": [
+                {
+                  "principal": 0,
+                  "channel": "error",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                }
+              ]
+            },
+            {
+              "kind": "release",
+              "channel": "error",
+              "recipient": 5,
+              "bounded": true,
+              "claims": [
+                {
+                  "principal": 0,
+                  "channel": "error",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                },
+                {
+                  "principal": 1,
+                  "channel": "error",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                }
+              ]
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F08_error",
+          "expected_effects": {},
+          "expected_authority": {},
+          "expected_knowledge": {
+            "releases": 1,
+            "knowledge": 3,
+            "child_knowledge": 0
+          },
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "id": "F08_metadata",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "release",
+              "channel": "metadata",
+              "recipient": 5,
+              "bounded": true,
+              "claims": [
+                {
+                  "principal": 0,
+                  "channel": "metadata",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                }
+              ]
+            },
+            {
+              "kind": "release",
+              "channel": "metadata",
+              "recipient": 5,
+              "bounded": true,
+              "claims": [
+                {
+                  "principal": 0,
+                  "channel": "metadata",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                },
+                {
+                  "principal": 1,
+                  "channel": "metadata",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                }
+              ]
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F08_metadata",
+          "expected_effects": {},
+          "expected_authority": {},
+          "expected_knowledge": {
+            "releases": 1,
+            "knowledge": 3,
+            "child_knowledge": 0
+          },
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "id": "F08_log",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "release",
+              "channel": "log",
+              "recipient": 5,
+              "bounded": true,
+              "claims": [
+                {
+                  "principal": 0,
+                  "channel": "log",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                }
+              ]
+            },
+            {
+              "kind": "release",
+              "channel": "log",
+              "recipient": 5,
+              "bounded": true,
+              "claims": [
+                {
+                  "principal": 0,
+                  "channel": "log",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                },
+                {
+                  "principal": 1,
+                  "channel": "log",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                }
+              ]
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F08_log",
+          "expected_effects": {},
+          "expected_authority": {},
+          "expected_knowledge": {
+            "releases": 1,
+            "knowledge": 3,
+            "child_knowledge": 0
+          },
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "id": "F08_payment",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "release",
+              "channel": "payment",
+              "recipient": 5,
+              "bounded": true,
+              "claims": [
+                {
+                  "principal": 0,
+                  "channel": "payment",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                }
+              ]
+            },
+            {
+              "kind": "release",
+              "channel": "payment",
+              "recipient": 5,
+              "bounded": true,
+              "claims": [
+                {
+                  "principal": 0,
+                  "channel": "payment",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                },
+                {
+                  "principal": 1,
+                  "channel": "payment",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                }
+              ]
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F08_payment",
+          "expected_effects": {},
+          "expected_authority": {},
+          "expected_knowledge": {
+            "releases": 1,
+            "knowledge": 3,
+            "child_knowledge": 0
+          },
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "id": "F08_approval",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "release",
+              "channel": "approval",
+              "recipient": 5,
+              "bounded": true,
+              "claims": [
+                {
+                  "principal": 0,
+                  "channel": "approval",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                }
+              ]
+            },
+            {
+              "kind": "release",
+              "channel": "approval",
+              "recipient": 5,
+              "bounded": true,
+              "claims": [
+                {
+                  "principal": 0,
+                  "channel": "approval",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                },
+                {
+                  "principal": 1,
+                  "channel": "approval",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                }
+              ]
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F08_approval",
+          "expected_effects": {},
+          "expected_authority": {},
+          "expected_knowledge": {
+            "releases": 1,
+            "knowledge": 3,
+            "child_knowledge": 0
+          },
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "id": "F08_unbounded",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "release",
+              "channel": "return",
+              "recipient": 5,
+              "bounded": false,
+              "claims": [
+                {
+                  "principal": 0,
+                  "channel": "return",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                },
+                {
+                  "principal": 1,
+                  "channel": "return",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                }
+              ]
+            },
+            {
+              "kind": "release",
+              "channel": "return",
+              "recipient": 5,
+              "bounded": true,
+              "claims": [
+                {
+                  "principal": 0,
+                  "channel": "return",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                },
+                {
+                  "principal": 1,
+                  "channel": "return",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                }
+              ]
+            },
+            {
+              "kind": "clear_knowledge"
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F08_return",
+          "expected_effects": {},
+          "expected_authority": {},
+          "expected_knowledge": {
+            "releases": 1,
+            "knowledge": 3
+          },
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              false,
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F08_wrong_recipient",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "release",
+              "channel": "return",
+              "recipient": 5,
+              "bounded": true,
+              "claims": [
+                {
+                  "principal": 0,
+                  "channel": "return",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                },
+                {
+                  "principal": 1,
+                  "channel": "return",
+                  "recipient": 6,
+                  "version": 1,
+                  "role": "confidentiality"
+                }
+              ]
+            },
+            {
+              "kind": "release",
+              "channel": "return",
+              "recipient": 5,
+              "bounded": true,
+              "claims": [
+                {
+                  "principal": 0,
+                  "channel": "return",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                },
+                {
+                  "principal": 1,
+                  "channel": "return",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                }
+              ]
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F08_return",
+          "expected_effects": {},
+          "expected_authority": {},
+          "expected_knowledge": {
+            "releases": 1,
+            "knowledge": 3
+          },
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              false,
+              true
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "F09",
+      "title": "Independent sibling and retained shared consumption",
+      "variants": [
+        {
+          "id": "F09_sibling",
+          "profile": "E2",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 1,
+              "issuance": 12,
+              "envelope": 22
+            },
+            {
+              "kind": "capture",
+              "op": 1,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 1
+            },
+            {
+              "kind": "crash"
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 2,
+              "mode": "live"
+            },
+            {
+              "kind": "capture",
+              "op": 1,
+              "epoch": 2,
+              "mode": "live"
+            }
+          ],
+          "faults": [
+            {
+              "at": 5,
+              "applied": true,
+              "ack": false
+            }
+          ],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F09_sibling",
+          "expected_effects": {
+            "effects": [
+              1,
+              1,
+              0
+            ]
+          },
+          "expected_authority": {
+            "nonces": [
+              1,
+              1,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {
+            "unresolved": 1,
+            "spent": 1,
+            "exposure": 2,
+            "remaining": 8
+          },
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F09_parent_dependency_local",
+          "profile": "E2",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "dependency",
+              "dependency_kind": "current",
+              "revision": 1,
+              "until": 2
+            },
+            {
+              "kind": "advance_dependency",
+              "revision": 2,
+              "time": 3
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 1,
+              "issuance": 12,
+              "envelope": 22
+            },
+            {
+              "kind": "capture",
+              "op": 1,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 1
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F09_sibling",
+          "expected_effects": {
+            "effects": [
+              0,
+              1,
+              0
+            ]
+          },
+          "expected_authority": {},
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "F10",
+      "title": "Backed allocations and earned child independence",
+      "variants": [
+        {
+          "id": "F10_fork",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "fund",
+              "id": 1,
+              "amount": 60,
+              "beneficiary": 7,
+              "predicate": 1,
+              "op": 2
+            },
+            {
+              "kind": "fund",
+              "id": 2,
+              "amount": 60,
+              "beneficiary": 7,
+              "predicate": 1,
+              "op": 2
+            },
+            {
+              "kind": "fund",
+              "id": 2,
+              "amount": 40,
+              "beneficiary": 7,
+              "predicate": 1,
+              "op": 2
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F10_fork",
+          "expected_effects": {},
+          "expected_authority": {},
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {
+            "wallet_reserved": 100
+          },
+          "expected_progress": {
+            "accepted": [
+              true,
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "id": "F10_earned",
+          "profile": "E1",
+          "initial_state": {
+            "wallet": 30
+          },
+          "commands": [
+            {
+              "kind": "fund",
+              "id": 1,
+              "amount": 30,
+              "beneficiary": 7,
+              "predicate": 1,
+              "op": 2
+            },
+            {
+              "kind": "accept",
+              "id": 1,
+              "beneficiary": 7,
+              "predicate": 1,
+              "op": 2,
+              "signer": 8
+            },
+            {
+              "kind": "refund_parent"
+            },
+            {
+              "kind": "permission",
+              "name": "caller",
+              "value": false
+            },
+            {
+              "kind": "permission",
+              "name": "read",
+              "value": false
+            },
+            {
+              "kind": "pay",
+              "id": 1
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": null,
+          "expected_effects": {},
+          "expected_authority": {},
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {
+            "earned": 30,
+            "paid": 30,
+            "wallet_reserved": 30,
+            "parent_refund": 100
+          },
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          }
+        },
+        {
+          "id": "F10_payment_metadata",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "fund",
+              "id": 1,
+              "amount": 30,
+              "beneficiary": 7,
+              "predicate": 1,
+              "op": 2
+            },
+            {
+              "kind": "accept",
+              "id": 1,
+              "beneficiary": 7,
+              "predicate": 1,
+              "op": 2,
+              "signer": 8
+            },
+            {
+              "kind": "permission",
+              "name": "metadata",
+              "value": false
+            },
+            {
+              "kind": "pay",
+              "id": 1
+            },
+            {
+              "kind": "permission",
+              "name": "metadata",
+              "value": true
+            },
+            {
+              "kind": "pay",
+              "id": 1
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F10_earned",
+          "expected_effects": {},
+          "expected_authority": {},
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {
+            "earned": 30,
+            "paid": 30
+          },
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              false,
+              true,
+              true
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "F11",
+      "title": "Authentic evidence remains context bound",
+      "variants": [
+        {
+          "id": "F11_key",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "evidence",
+              "op": 0,
+              "signer": 9,
+              "key": 2,
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ],
+              "outcome": "applied",
+              "complete": true,
+              "fenced": true,
+              "retained": true
+            },
+            {
+              "kind": "evidence",
+              "op": 0,
+              "signer": 9,
+              "key": 1,
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ],
+              "outcome": "applied",
+              "complete": true,
+              "fenced": true,
+              "retained": true
+            }
+          ],
+          "faults": [
+            {
+              "at": 5,
+              "applied": true,
+              "ack": false
+            }
+          ],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F06_applied",
+          "expected_effects": {
+            "outcomes": [
+              "applied",
+              "fresh",
+              "fresh"
+            ]
+          },
+          "expected_authority": {},
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "id": "F11_signer",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "evidence",
+              "op": 0,
+              "signer": 8,
+              "key": 1,
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ],
+              "outcome": "applied",
+              "complete": true,
+              "fenced": true,
+              "retained": true
+            },
+            {
+              "kind": "evidence",
+              "op": 0,
+              "signer": 9,
+              "key": 1,
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ],
+              "outcome": "applied",
+              "complete": true,
+              "fenced": true,
+              "retained": true
+            }
+          ],
+          "faults": [
+            {
+              "at": 5,
+              "applied": true,
+              "ack": false
+            }
+          ],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F06_applied",
+          "expected_effects": {
+            "outcomes": [
+              "applied",
+              "fresh",
+              "fresh"
+            ]
+          },
+          "expected_authority": {},
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "id": "F11_account",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "evidence",
+              "op": 0,
+              "signer": 9,
+              "key": 1,
+              "basis": [
+                1,
+                1,
+                2,
+                1,
+                1
+              ],
+              "outcome": "applied",
+              "complete": true,
+              "fenced": true,
+              "retained": true
+            },
+            {
+              "kind": "evidence",
+              "op": 0,
+              "signer": 9,
+              "key": 1,
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ],
+              "outcome": "applied",
+              "complete": true,
+              "fenced": true,
+              "retained": true
+            }
+          ],
+          "faults": [
+            {
+              "at": 5,
+              "applied": true,
+              "ack": false
+            }
+          ],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F06_applied",
+          "expected_effects": {
+            "outcomes": [
+              "applied",
+              "fresh",
+              "fresh"
+            ]
+          },
+          "expected_authority": {},
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "id": "F11_acceptance",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "fund",
+              "id": 1,
+              "amount": 30,
+              "beneficiary": 7,
+              "predicate": 1,
+              "op": 2
+            },
+            {
+              "kind": "accept",
+              "id": 1,
+              "beneficiary": 7,
+              "predicate": 2,
+              "op": 2,
+              "signer": 8
+            },
+            {
+              "kind": "accept",
+              "id": 1,
+              "beneficiary": 7,
+              "predicate": 1,
+              "op": 2,
+              "signer": 8
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F10_earned",
+          "expected_effects": {},
+          "expected_authority": {},
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {
+            "earned": 30
+          },
+          "expected_progress": {
+            "accepted": [
+              true,
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "id": "F11_conflict",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "evidence",
+              "op": 0,
+              "signer": 9,
+              "key": 1,
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ],
+              "outcome": "none",
+              "complete": true,
+              "fenced": true,
+              "retained": true
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F06_applied",
+          "expected_effects": {
+            "outcomes": [
+              "applied",
+              "fresh",
+              "fresh"
+            ],
+            "quarantined": [
+              true,
+              false,
+              false
+            ],
+            "history": [
+              [
+                "applied",
+                "conflict"
+              ],
+              [],
+              []
+            ]
+          },
+          "expected_authority": {},
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "F12",
+      "title": "Policy components survive translation",
+      "variants": [
+        {
+          "id": "F12_map",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "translate",
+              "mapping": [
+                0,
+                0,
+                2,
+                3
+              ]
+            },
+            {
+              "kind": "translate",
+              "mapping": [
+                4,
+                1,
+                2,
+                3
+              ]
+            },
+            {
+              "kind": "translate",
+              "mapping": [
+                1,
+                0,
+                2,
+                3
+              ]
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F12_map",
+          "expected_effects": {},
+          "expected_authority": {},
+          "expected_knowledge": {
+            "translated": 3,
+            "knowledge": 3
+          },
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              false,
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "id": "F12_compartment",
+          "profile": "E1",
+          "initial_state": {
+            "extra_component": true
+          },
+          "commands": [
+            {
+              "kind": "release",
+              "channel": "return",
+              "recipient": 5,
+              "bounded": true,
+              "claims": [
+                {
+                  "principal": 0,
+                  "channel": "return",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                },
+                {
+                  "principal": 1,
+                  "channel": "return",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                }
+              ]
+            },
+            {
+              "kind": "release",
+              "channel": "return",
+              "recipient": 5,
+              "bounded": true,
+              "claims": [
+                {
+                  "principal": 0,
+                  "channel": "return",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                },
+                {
+                  "principal": 1,
+                  "channel": "return",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                },
+                {
+                  "principal": 3,
+                  "channel": "return",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                }
+              ]
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F12_compartment",
+          "expected_effects": {},
+          "expected_authority": {},
+          "expected_knowledge": {
+            "knowledge": 11,
+            "releases": 1
+          },
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              false,
+              true
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "F13",
+      "title": "Typed dependency lifetimes",
+      "variants": [
+        {
+          "id": "F13_historical",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "dependency",
+              "dependency_kind": "historical",
+              "revision": 1,
+              "until": 2
+            },
+            {
+              "kind": "advance_dependency",
+              "revision": 2,
+              "time": 3
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": null,
+          "expected_effects": {},
+          "expected_authority": {
+            "captures": [
+              1,
+              0,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          }
+        },
+        {
+          "id": "F13_current",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "dependency",
+              "dependency_kind": "current",
+              "revision": 1,
+              "until": 2
+            },
+            {
+              "kind": "advance_dependency",
+              "revision": 2,
+              "time": 3
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F13_fresh",
+          "expected_effects": {},
+          "expected_authority": {
+            "captures": [
+              0,
+              0,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F13_held",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "dependency",
+              "dependency_kind": "held",
+              "revision": 1,
+              "until": 2
+            },
+            {
+              "kind": "advance_dependency",
+              "revision": 2,
+              "time": 3
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F13_fresh",
+          "expected_effects": {},
+          "expected_authority": {
+            "captures": [
+              0,
+              0,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F13_fresh",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "dependency",
+              "dependency_kind": "held",
+              "revision": 1,
+              "until": 2
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": null,
+          "expected_effects": {
+            "effects": [
+              1,
+              0,
+              0
+            ]
+          },
+          "expected_authority": {},
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "F14",
+      "title": "Append-only history and repaired projections",
+      "variants": [
+        {
+          "id": "F14_refinement",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "evidence",
+              "op": 0,
+              "signer": 9,
+              "key": 1,
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ],
+              "outcome": "partial",
+              "complete": true,
+              "fenced": true,
+              "retained": true
+            },
+            {
+              "kind": "project",
+              "op": 0,
+              "outcome": "applied"
+            },
+            {
+              "kind": "project",
+              "op": 0,
+              "outcome": "partial"
+            }
+          ],
+          "faults": [
+            {
+              "at": 5,
+              "applied": true,
+              "ack": false,
+              "partial": true
+            }
+          ],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F14_refinement",
+          "expected_effects": {
+            "outcomes": [
+              "partial",
+              "fresh",
+              "fresh"
+            ],
+            "projection": [
+              "partial",
+              "fresh",
+              "fresh"
+            ],
+            "history": [
+              [
+                "unknown",
+                "partial"
+              ],
+              [],
+              []
+            ]
+          },
+          "expected_authority": {},
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              true
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "F15",
+      "title": "Tombstones, restart and serving fences",
+      "variants": [
+        {
+          "id": "F15_retention",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "gc",
+              "op": 0
+            },
+            {
+              "kind": "crash"
+            },
+            {
+              "kind": "rollback",
+              "epoch": 1
+            },
+            {
+              "kind": "settle",
+              "op": 0,
+              "epoch": 1
+            },
+            {
+              "kind": "settle",
+              "op": 0,
+              "epoch": 2
+            },
+            {
+              "kind": "send",
+              "op": 0
+            }
+          ],
+          "faults": [
+            {
+              "at": 5,
+              "applied": true,
+              "ack": false
+            }
+          ],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F15_retention",
+          "expected_effects": {
+            "effects": [
+              1,
+              0,
+              0
+            ]
+          },
+          "expected_authority": {
+            "epoch": 2,
+            "settled": [
+              true,
+              false,
+              false
+            ],
+            "nonces": [
+              1,
+              0,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              true,
+              false,
+              false,
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F15_closed_gc",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "gc",
+              "op": 0
+            },
+            {
+              "kind": "send",
+              "op": 0
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F15_closed_gc",
+          "expected_effects": {
+            "effects": [
+              1,
+              0,
+              0
+            ]
+          },
+          "expected_authority": {
+            "nonces": [
+              1,
+              0,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "F16",
+      "title": "Bounded advice never confers authority",
+      "variants": [
+        {
+          "id": "F16_advice",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "plan",
+              "limit": 0,
+              "registered": true
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "advisory"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "plan",
+              "limit": 16,
+              "registered": false
+            },
+            {
+              "kind": "plan",
+              "limit": 16,
+              "registered": true
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F01_exact",
+          "expected_effects": {
+            "effects": [
+              1,
+              0,
+              0
+            ]
+          },
+          "expected_authority": {
+            "captures": [
+              1,
+              0,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "advice": "feasible",
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false,
+              true,
+              true,
+              true,
+              true
+            ]
+          }
+        },
+        {
+          "id": "F16_blocked_advice",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "plan",
+              "limit": 16,
+              "registered": true
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F01_exact",
+          "expected_effects": {
+            "advice": "candidates"
+          },
+          "expected_authority": {},
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+test_parent_refund_cannot_erase_a_child_earned_right (test_comparison.ComparisonTests.test_parent_refund_cannot_erase_a_child_earned_right) ... FAIL
+test_replays_representative_traces_in_sql_transactions (test_comparison.ComparisonTests.test_replays_representative_traces_in_sql_transactions) ... FAIL
+test_unknown_execution_and_unavailable_verifier_do_not_become_rejection (test_comparison.ComparisonTests.test_unknown_execution_and_unavailable_verifier_do_not_become_rejection) ... FAIL
+
+======================================================================
+FAIL: test_parent_refund_cannot_erase_a_child_earned_right (test_comparison.ComparisonTests.test_parent_refund_cannot_erase_a_child_earned_right)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/papers/verifiable-work/tools/test_comparison.py", line 28, in test_parent_refund_cannot_erase_a_child_earned_right
+    self.assertIsNotNone(SqlEscrow, "ordinary SQL escrow is absent")
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: unexpectedly None : ordinary SQL escrow is absent
+
+======================================================================
+FAIL: test_replays_representative_traces_in_sql_transactions (test_comparison.ComparisonTests.test_replays_representative_traces_in_sql_transactions)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/papers/verifiable-work/tools/test_comparison.py", line 21, in test_replays_representative_traces_in_sql_transactions
+    self.assertIsNotNone(compare_corpus, "ordinary SQL comparison is absent")
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: unexpectedly None : ordinary SQL comparison is absent
+
+======================================================================
+FAIL: test_unknown_execution_and_unavailable_verifier_do_not_become_rejection (test_comparison.ComparisonTests.test_unknown_execution_and_unavailable_verifier_do_not_become_rejection)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/papers/verifiable-work/tools/test_comparison.py", line 45, in test_unknown_execution_and_unavailable_verifier_do_not_become_rejection
+    self.assertIsNotNone(SqlEscrow, "ordinary SQL escrow is absent")
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: unexpectedly None : ordinary SQL escrow is absent
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.001s
+
+FAILED (failures=3)

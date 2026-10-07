@@ -25,7 +25,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, 'packet/**', 'integration/**']
     types: [opened, synchronize, reopened, unlabeled]
 
 concurrency:
@@ -40,7 +40,7 @@ env:
   CARGO_BUILD_JOBS: "1"
   CARGO_TERM_COLOR: always
   CHIO_CI_RUSTFLAGS: "-D warnings -C link-arg=-Wl,--threads=1"
-  CHIO_KANI_VERSION: 0.67.0
+  CHIO_KANI_VERSION: 0.68.0
   # PR-tier proptest case count for the named invariants. The nightly tier
   # (4096) lives in .github/workflows/nightly.yml.
   PROPTEST_CASES: "256"
@@ -74,7 +74,10 @@ jobs:
           python-version: "3.12"
 
       - name: Install Python workflow validators
-        run: python -m pip install --disable-pip-version-check PyYAML==6.0.2 jsonschema==4.26.0 referencing==0.37.0
+        run: python -m pip install --disable-pip-version-check PyYAML==6.0.3 jsonschema==4.26.0 referencing==0.37.0
+
+      - name: Trusted security definition regressions
+        run: python3 scripts/tests/check-security-definitions.test.py
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
@@ -124,6 +127,8 @@ jobs:
           run_gate python3 ./scripts/check-rust-toolchain-parity.py
           run_gate bash ./scripts/tests/check-rust-toolchain-parity.test.sh
           run_gate bash ./deploy/docker/chio-workspace/regenerate.sh --check
+          run_gate bash ./deploy/docker/chio-workspace/regenerate.sh --proof-room --check
+          run_gate python3 scripts/tests/check-registered-work-schemas.py
           run_gate python3 scripts/check-docker-build-contexts.py
           run_gate python3 scripts/tests/check-docker-build-contexts.test.py
           run_gate bash ./scripts/tests/check-sidecar-docker-context.test.sh
@@ -187,6 +192,7 @@ jobs:
           run_gate python3 scripts/tests/check-security-clocks.test.py
           run_gate python3 scripts/check-trust-boundaries.py
           run_gate python3 scripts/tests/check-trust-boundaries.test.py
+          run_gate python3 scripts/tests/check-attest-build-context.test.py
           run_gate python3 scripts/check-negative-assertions.py
           run_gate bash scripts/tests/check-negative-assertions.test.sh
           run_gate python3 scripts/check-lint-parity.py
@@ -541,6 +547,7 @@ jobs:
           set -euo pipefail
           cargo install kani-verifier --locked --version "${CHIO_KANI_VERSION}"
           cargo kani setup
+          python3 scripts/kani-toolchain.py install
           cargo kani --version
 
       - name: Verify all PR Kani harnesses
@@ -602,8 +609,8 @@ jobs:
       contents: read
 
   enterprise-security-contract:
-    # CHIO_ENTERPRISE_HARDENING_BOOTSTRAP_SHA=eba8cdf3fb2e16501947c58415a4739a23cc12b3
-    uses: bb-connor/arc/.github/workflows/enterprise-hardening.yml@eba8cdf3fb2e16501947c58415a4739a23cc12b3
+    # CHIO_ENTERPRISE_HARDENING_BOOTSTRAP_SHA=c009aced79d69f01880b5f7c53ed3c1754e3b7da
+    uses: bb-connor/arc/.github/workflows/enterprise-hardening.yml@c009aced79d69f01880b5f7c53ed3c1754e3b7da
     permissions:
       actions: read
       artifact-metadata: write
@@ -660,7 +667,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       - uses: ./.github/actions/setup-rust
         with:
-          toolchain: "1.94.1"
+          toolchain: "1.95.0"
           cache: "false"
 
       - name: Resolve and check the MSRV cache target
@@ -692,7 +699,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install Python workflow validators
-        run: python -m pip install --disable-pip-version-check PyYAML==6.0.2 jsonschema==4.26.0 referencing==0.37.0
+        run: python -m pip install --disable-pip-version-check PyYAML==6.0.3 jsonschema==4.26.0 referencing==0.37.0
 
       - name: Qualify enforcing host and prepare native consumer fixture
         uses: ./.github/actions/enforced-native-fixture
@@ -717,17 +724,17 @@ jobs:
     name: cargo-vet (locked supply-chain audit)
     # owner: Chio maintainers
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       - name: Install Rust toolchain
         run: |
-          rustup toolchain install --profile minimal
+          rustup toolchain install --profile minimal --component clippy
           rustup show active-toolchain
       - name: Install cargo-vet
         run: cargo install cargo-vet --locked --version 0.10.2
-      - name: cargo vet --locked
-        run: cargo vet --locked
+      - name: Verify source-bound fork and locked supply-chain audits
+        run: bash scripts/check-supply-chain.sh
 
   cargo-deny:
     name: cargo-deny (supply-chain bans/advisories/licenses)

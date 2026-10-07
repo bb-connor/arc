@@ -1,0 +1,20 @@
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-work/verify_followthrough.py", line 122, in <module>
+    raise SystemExit(record())
+                     ~~~~~~^^
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-work/verify_followthrough.py", line 85, in record
+    "sources": sources(), "rustc": subprocess.check_output(["rustc", "-Vv"], cwd=ROOT, text=True), "commands": []}
+               ~~~~~~~^^
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-work/verify_followthrough.py", line 49, in sources
+    aggregate.update(str(path).encode() + b"\0" + digest(ROOT / path).encode() + b"\n")
+                                                  ~~~~~~^^^^^^^^^^^^^
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-work/verify_followthrough.py", line 37, in digest
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+                          ~~~~~~~~~~~~~~~^^
+  File "/home/connor/.local/share/mise/installs/python/3.13.13/lib/python3.13/pathlib/_abc.py", line 625, in read_bytes
+    with self.open(mode='rb') as f:
+         ~~~~~~~~~^^^^^^^^^^^
+  File "/home/connor/.local/share/mise/installs/python/3.13.13/lib/python3.13/pathlib/_local.py", line 537, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+IsADirectoryError: [Errno 21] Is a directory: '/tmp/chio-verifiable-work-paper/crates/tooling/chio-conformance/tests/conformance/fixtures'

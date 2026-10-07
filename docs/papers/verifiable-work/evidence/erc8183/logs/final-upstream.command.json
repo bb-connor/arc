@@ -1,0 +1,12 @@
+{
+  "argv": [
+    "/tmp/chio-paper-erc8183-artifact/tools/forge",
+    "test",
+    "-vv"
+  ],
+  "cwd": "/tmp/chio-paper-erc8183",
+  "started_at": "2026-10-02T15:26:25.163914+00:00",
+  "elapsed_seconds": 0.22371046291664243,
+  "exit_status": 0,
+  "log": "logs/final-upstream.log"
+}

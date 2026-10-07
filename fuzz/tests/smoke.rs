@@ -26,6 +26,7 @@ const CORPUS_SMOKE_TARGETS: &[&str] = &[
     "a2a_envelope_decode",
     "acp_envelope_decode",
     "anchor_bundle_verify",
+    "bilateral_dsse_verify",
     "chio_yaml_parse",
     "did_resolve",
     "eval_receipt_bundle",
@@ -38,6 +39,8 @@ const CORPUS_SMOKE_TARGETS: &[&str] = &[
     "openapi_ingest",
     "peers_lock_decode",
     "receipt_log_replay",
+    "response_authority_protocol",
+    "response_lifecycle",
     "rollback_anchor_slots",
     "underwriting_policy_input",
     "wasm_guard_escape",
@@ -334,9 +337,27 @@ fn federation_trust_establishment_smoke() {
 }
 
 #[test]
+fn bilateral_dsse_verify_smoke() {
+    use chio_fuzz::entries::bilateral_dsse_verify;
+    assert_seed_floor("bilateral_dsse_verify", bilateral_dsse_verify);
+}
+
+#[test]
 fn finding_worker_protocol_smoke() {
     use chio_fuzz::entries::finding_worker_protocol;
     assert_seed_floor("finding_worker_protocol", finding_worker_protocol);
+}
+
+#[test]
+fn response_authority_protocol_smoke() {
+    use chio_control_plane::security::response_authority_protocol;
+    assert_seed_floor("response_authority_protocol", response_authority_protocol);
+}
+
+#[test]
+fn response_lifecycle_smoke() {
+    use chio_quarantine::fuzz::response_lifecycle;
+    assert_seed_floor("response_lifecycle", response_lifecycle);
 }
 
 #[test]

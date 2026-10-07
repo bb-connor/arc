@@ -1,0 +1,9 @@
+{
+  "capturedUtc": "2026-09-14T11:00:40.856986+00:00",
+  "head": "6bb648b613b44ff5aaf1853768f2747bff166077",
+  "worktreeStatus": "",
+  "acceptanceOpening": "# M4 local consumer-boundary acceptance\n\nStatus: final qualification in progress on 2026-09-14 UTC. The completed rows below\nare local evidence, not a completed milestone, hosted CI result or release\nauthorization. Required running rows must finish successfully before closeout.\nThe complete workspace test command, normal build and strict all-target Clippy\npassed on the earlier `740f359ccc` source, followed by the explicit C++/Drogon\ngates, formatting, file hygiene and proof-coverage freshness. That serial driver\nexited zero. Final review then reproduced two additional defects: the receipt\nschemas and some SDK validators omitted the native `chio_internal` origin, and\nthe retained operation's independent 17-attachment limit rejected a valid\n18-attachment outcome append. These repairs change production source. Earlier\ngreen results are not final qualification for the repaired candidate; current\nM4/M3, composed flow, workspace and affected consumer gates must be refreshed.\nThe native caller restart/expiry test and two MCP ready-session restart tests\nfailed during qualification. Their corrections passed focused regressions; the\ncomplete final gates remain required. Hosted checks additionally exposed stale\ndependent proof fixtures; their repair passed local and hosted proof gates without\nweakening verification.\nM4 cannot close on this candidate's current evidence.",
+  "acceptanceSha256": "b9b679282505871c493df294ed2e6af32968d9e0f46fb94a6a094ff2a6df2804",
+  "selectedForIntegration": false,
+  "reason": "Acceptance report says qualification remains in progress and M4 cannot close on current evidence."
+}

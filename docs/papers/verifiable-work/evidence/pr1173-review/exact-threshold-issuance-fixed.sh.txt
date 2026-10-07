@@ -1,0 +1,54 @@
+set -euo pipefail
+ulimit -c 0
+umask 022
+export RUST_TEST_THREADS=1
+bash scripts/run-exact-cargo-test-inventory.sh \
+  --label "Boot-gated threshold issuance" --allow-filtered --expected \
+  kernel::tests::threshold_issuance::classical_boot_preserves_canonical_proposal \
+  kernel::tests::threshold_issuance::hybrid_signing_config_debug_omits_seed \
+  kernel::tests::threshold_issuance::cumulative_proposal_clock_refreshes_stale_admission_time \
+  kernel::tests::threshold_issuance::cumulative_proposal_clock_rechecks_expiry_after_policy_lookup \
+  kernel::tests::threshold_issuance::cumulative_proposal_clock_does_not_trust_future_artifact_time \
+  kernel::tests::threshold_issuance::installed_hybrid_backend_signs_cumulative_proposal \
+  kernel::tests::threshold_issuance::pq_required_proposal_uses_the_boot_verified_authority \
+  kernel::tests::threshold_issuance::classical_installed_proposal_dispatches_and_replays_once \
+  kernel::tests::threshold_issuance::hybrid_proposal_dispatches_and_replays_once \
+  kernel::tests::threshold_issuance::returned_backend_drop_keeps_installed_authority \
+  kernel::tests::threshold_issuance::failed_boot_reconfiguration_preserves_previous_authority_and_floor \
+  kernel::tests::threshold_issuance::missing_seed_preserves_previous_authority_and_floor \
+  kernel::tests::threshold_issuance::incompatible_installed_signer_denies_without_publishing_proposal \
+  kernel::tests::threshold_issuance::pending_retry_rechecks_crypto_floor_without_reissuing_proposal \
+  kernel::tests::threshold_issuance::pending_retry_rechecks_current_directory \
+  kernel::tests::threshold_issuance::reconstructed_kernel_preserves_pending_hybrid_artifact_and_dispatch_identity \
+  kernel::tests::threshold_issuance::reconstructed_kernel_without_signer_refuses_retained_hybrid_proposal \
+  kernel::tests::threshold_issuance::rotated_authority_does_not_resign_retained_proposal \
+  kernel::tests::threshold_issuance::pq_capability_without_boot_signer_cannot_publish_classical_proposal \
+  kernel::tests::threshold_issuance::retained_request::cumulative_admission_retains_the_original_request_and_capability \
+  kernel::tests::threshold_issuance::retained_request::rejected_capability_does_not_retain_original_request_material \
+  kernel::tests::threshold_issuance::retained_request::cumulative_retry_cannot_backfill_missing_original_authority \
+  kernel::tests::threshold_issuance::session_continuation::approved_session_retry_resumes_original_threshold_request \
+  kernel::tests::threshold_issuance::session_continuation::altered_session_operation_cannot_consume_threshold_wait \
+  kernel::tests::threshold_issuance::session_continuation::replacement_signed_proposal_cannot_take_over_session_wait \
+  kernel::tests::threshold_issuance::session_continuation::missing_proposal_cannot_restart_pending_session_request \
+  kernel::tests::threshold_issuance::session_continuation::changed_session_lineage_cannot_consume_threshold_wait \
+  kernel::tests::threshold_issuance::session_continuation::rotated_session_authentication_cannot_resume_threshold_wait \
+  kernel::tests::threshold_issuance::session_continuation::cancelled_session_cannot_resume_threshold_wait \
+  kernel::tests::threshold_issuance::session_continuation::draining_session_cannot_resume_threshold_wait \
+  kernel::tests::threshold_issuance::session_continuation::resumed_session_revalidates_revoked_capability \
+  kernel::tests::threshold_issuance::session_continuation::resumed_session_revalidates_current_threshold_policy \
+  kernel::tests::threshold_issuance::session_continuation::resumed_session_revalidates_approval_votes \
+  kernel::tests::threshold_issuance::session_continuation::nested_sync_session_resumes_threshold_request \
+  kernel::tests::threshold_issuance::session_continuation::nested_async_session_resumes_threshold_request \
+  kernel::tests::threshold_issuance::session_continuation::threshold_session_rejects_unsupported_durable_nonce_profile \
+  kernel::tests::threshold_issuance::session_continuation::concurrent_threshold_retry_cannot_claim_same_session_wait \
+  kernel::tests::threshold_issuance::session_continuation::scope_binding::ap23_session_below_threshold_needs_no_approval_resolver \
+  kernel::tests::threshold_issuance::session_continuation::scope_binding::ap23_session_bound_threshold_artifact_cannot_cross_same_tenant_sessions \
+  kernel::tests::threshold_issuance::session_continuation::scope_binding::ap23_session_bound_threshold_artifact_cannot_cross_sessions \
+  kernel::tests::threshold_issuance::session_continuation::scope_binding::ap23_session_bound_threshold_artifact_requires_owned_context_on_raw_entry \
+  kernel::tests::threshold_issuance::session_continuation::scope_binding::ap23_session_pending_threshold_debug_omits_original_arguments \
+  kernel::tests::threshold_issuance::session_continuation::session_reports::normalized_conflict_preserves_threshold_wait \
+  kernel::tests::threshold_issuance::session_continuation::session_reports::nested_sync_conflict_preserves_threshold_wait \
+  kernel::tests::threshold_issuance::session_continuation::session_reports::nested_async_conflict_preserves_threshold_wait \
+  kernel::tests::threshold_issuance::session_continuation::session_reports::failure_observation_preserves_pending_operation_and_approval_authority \
+  kernel::tests::threshold_issuance::session_continuation::session_reports::wire_and_normalized_approval_shape_checks_agree_for_all_combinations \
+  -- cargo test --locked -p chio-kernel --features pq --lib threshold_issuance

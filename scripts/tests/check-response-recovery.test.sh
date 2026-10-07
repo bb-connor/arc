@@ -49,7 +49,7 @@ required_mappings=(
   'cargo test -p chio-quarantine --test response_scheduler scheduler_fencing_broken_executor_cannot_complete_nonterminal_state -- --exact'
   'cargo test -p chio-quarantine --test response_scheduler scheduler_fencing_direct_process_rejects_clock_rollback -- --exact'
   'cargo test -p chio-quarantine --test response_scheduler scheduler_fencing_renewal_preserves_token_and_only_current_lease_releases -- --exact'
-  'cargo test -p chio-store-sqlite --test response_dispatch terminal_response_work_rejects_scheduler_lease_renewal -- --exact'
+  'cargo test -p chio-store-sqlite --test response_dispatch scheduler_lease::terminal_response_work_rejects_scheduler_lease_renewal -- --exact'
   'cargo test -p chio-quarantine --test response_executor executor_overlap_removes_contributions_in_reverse_application_order -- --exact'
   'cargo test -p chio-store-sqlite --test session_throttles overlapping_windows_are_a_conjunction_and_remove_out_of_order -- --exact'
   'cargo test -p chio-store-sqlite --test egress_restrictions restrictions_survive_restart_and_overlap_removes_out_of_order -- --exact'

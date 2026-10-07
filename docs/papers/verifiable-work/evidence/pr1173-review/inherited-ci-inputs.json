@@ -1,0 +1,95 @@
+{
+  "base": "ecb44791501c2aba671de2a967d2506f039ab42e",
+  "head": "93a2552c3a6eb15ac2756129f199f5714390e794",
+  "checks": [
+    {
+      "path": ".github/workflows/cargo-vet.yml",
+      "identical_to_base": true,
+      "sha256": "e0e5d99e8a21a2f8d858ec15c9b749fde303fbfaf44d877ad61ba34a40f3f900"
+    },
+    {
+      "path": ".github/workflows/cve-monitor.yml",
+      "identical_to_base": true,
+      "sha256": "cf573260e6f54636494cc771d33b6e229e2a78c526ed28e719b53287c40a6344"
+    },
+    {
+      "path": ".github/workflows/formal-pr-smoke.yml",
+      "identical_to_base": true,
+      "sha256": "04578f5f8cb8d20cd8f6a7171ea3386cd2b21e54117f27cd99f083e4d5379486"
+    },
+    {
+      "path": "Cargo.toml",
+      "identical_to_base": true,
+      "sha256": "5a675901d97c601b392d998cc70ef6f16fa46dfd4cf0b450b81de0d2ed7d97da"
+    },
+    {
+      "path": "bun.lock",
+      "identical_to_base": true,
+      "sha256": "1fce9ada485f0a4144592d7168d933541e5c9aa31db443d8c055b4a7d7981c70"
+    },
+    {
+      "path": "crates/core/chio-core-types/Cargo.toml",
+      "identical_to_base": true,
+      "sha256": "6d6d5d6903421ae1d021475a90dc5da1acaa6560c7946fe3ba5706383cb8d279"
+    },
+    {
+      "path": "crates/kernel/chio-kernel-core/Cargo.toml",
+      "identical_to_base": true,
+      "sha256": "fdeaa38098e4b758e12a57b446b6ac356e221890a5d7b9bcc9bd114a85b6c015"
+    },
+    {
+      "path": "crates/security/chio-security-types/Cargo.toml",
+      "identical_to_base": true,
+      "sha256": "38f1a68749754157bf164db3825de55e996445c61fa3f3a7ea6adba4fc47572e"
+    },
+    {
+      "path": "sdks/guard/chio-guard-ts/package-lock.json",
+      "identical_to_base": true,
+      "sha256": "e799beec95b8837f11e1cec3a668b60c19b7e393f37afadf2f24dad35ee87c82"
+    },
+    {
+      "path": "sdks/typescript/package-lock.json",
+      "identical_to_base": true,
+      "sha256": "6da9230a973a7d4c38eb8c5a5016428ee4bd369e5f74324806b893823313dedd"
+    },
+    {
+      "path": "sdks/typescript/packages/conformance/package-lock.json",
+      "identical_to_base": true,
+      "sha256": "6a1ad7aa220c430fcc3e347ad10a1da1b3950d7e7bce3cb86c03eae62881d013"
+    },
+    {
+      "path": "sdks/typescript/packages/fastify/package-lock.json",
+      "identical_to_base": true,
+      "sha256": "5494bb53f2b057b0586b6584d820ca9baadcb37f8de42a11f36c60fd535cedcf"
+    },
+    {
+      "path": "sdks/typescript/packages/node-http/package-lock.json",
+      "identical_to_base": true,
+      "sha256": "cdffec8a702606ba2968e5c2a15398c0f25e3d62fa8764f4b44c26af03a8a626"
+    },
+    {
+      "path": "supply-chain/audits.toml",
+      "identical_to_base": true,
+      "sha256": "c182bd3a85ec843133d90948506d58b1c655b01b8885ec255dfb793777cb680d"
+    },
+    {
+      "path": "supply-chain/config.toml",
+      "identical_to_base": true,
+      "sha256": "fa919def55b4120c171ba7b377136e58c5b111840f58dad4a2d148734133b76e"
+    },
+    {
+      "package": "wasmtime",
+      "identical_to_base": true,
+      "versions": [
+        "46.0.3"
+      ]
+    },
+    {
+      "package": "aws-lc-rs",
+      "identical_to_base": true,
+      "versions": [
+        "1.18.1"
+      ]
+    }
+  ]
+}

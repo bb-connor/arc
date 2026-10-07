@@ -38,12 +38,17 @@ at one kernel; the substrate gates revocation at the receipt-graph
 boundary between kernels.
 
 \paragraph{Endpoint detection and response.}
-Vendor EDR engines have shipped TTL fields and manual rollback
-workflows for a decade. CrowdStrike Falcon, SentinelOne, Microsoft
-Defender for Endpoint, and Sublime Security each record an action
-identifier, target host, action class, TTL duration, and rollback
-handle for response actions; auditors inspect the rollback handle by
-hand when something needs to be reverted~\cite{edrVendorSchemasPlaceholder}. The
+Vendor EDR engines have shipped time-bounded response actions and
+manual rollback workflows for a decade. Microsoft Defender for
+Endpoint is the case with public documentation: a response action on a
+device is recorded in an action centre with its history and current
+state, device isolation has an explicit release as its inverse, and
+time-limited isolation is undone automatically at the end of a defined
+window~\cite{microsoftDefenderResponseActions}. CrowdStrike Falcon,
+SentinelOne, and Sublime Security expose response actions of the same
+shape. What the vendor products do not carry is an admission predicate
+over the rollback: an operator inspects the rollback handle by hand
+when something needs to be reverted. The
 typed four-receipt grammar (request, execution, rollback,
 acknowledgement) is a normalization of existing vendor schemas; the
 constitutional admission predicate on the rollback receipt is the
@@ -109,8 +114,9 @@ cross-kernel admission; the TTL-bounded amendment chain theorem added
 here completes the shape on the response side.
 
 \paragraph{Agentic-AI safety.}
-The alignment-evaluation literature (METR, UK AI Safety Institute
-Inspect, ARC Evals)~\cite{alignmentEvalHarnessesPlaceholder} bounds what a model is likely
+The alignment-evaluation literature, such as the METR and ARC Evals
+autonomous-task suites~\cite{kinniment2023autonomous} and the UK AI
+Safety Institute's Inspect framework~\cite{aisiInspect2024}, bounds what a model is likely
 to do during pre-deployment evaluation; the reversible-action substrate
 gates whether a deployed agent's destructive action crosses the trust
 boundary at runtime. The two disciplines compose rather than compete:

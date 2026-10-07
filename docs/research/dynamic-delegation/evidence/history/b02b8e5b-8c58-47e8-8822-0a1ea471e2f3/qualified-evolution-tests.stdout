@@ -1,0 +1,49 @@
+
+running 19 tests
+test replay_source::tests::marker_identity_is_kind_and_resource_not_historical_admission ... ok
+test replay_source::tests::source_evidence_round_trips_exact_identity_without_exposing_marker_debug ... ok
+test schema::identity_fixture_tests::runtime_schema_identities_match_canonical_fixture ... ok
+test replay_source::tests::source_evidence_rejects_tampering_and_noncanonical_encodings ... ok
+test admission::preparation::tests::supplied_bundle_preparation_and_drop_do_not_call_store ... ok
+test admission::preparation::tests::destructive_preparation_and_drop_never_reserve_or_claim_the_lease ... ok
+test admission::preparation::tests::commit_rechecks_trust_floor_advanced_after_preparation ... ok
+test admission::preparation::tests::commit_uses_owned_inputs_after_preparation_locals_are_dropped ... ok
+test admission::preparation::tests::destructive_commit_releases_lease_when_trust_floor_advanced_after_preparation ... ok
+test types::presentation_window_tests::a_receiver_that_resolved_nothing_has_no_window ... ok
+test types::presentation_window_tests::each_counterparty_gets_the_intervals_resolved_for_it ... ok
+test types::presentation_window_tests::a_record_the_receiver_cannot_read_an_interval_out_of_is_refused ... ok
+test treaty::tests::ladder_mode_rank_agrees_with_federation_on_every_spelling ... ok
+test types::presentation_window_tests::intervals_that_do_not_overlap_close_the_window ... ok
+test types::presentation_window_tests::the_window_is_the_intersection_of_the_resolved_intervals ... ok
+test types::presentation_window_tests::the_window_owns_the_upper_bound_of_any_validity_presented_to_it ... ok
+test types::presentation_window_tests::withdrawing_one_counterparty_record_closes_that_counterparty_alone ... ok
+test validation::evidence::tests::relative_evidence_path_helper_accepts_only_safe_paths ... ok
+test replay_source::tests::source_bounds_reject_complete_input_without_truncation ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+
+running 8 tests
+test scheduler_fencing_exhaustion_rolls_back_an_earlier_claim ... ok
+test lease_expiry_checks_both_integer_ranges_before_publishing ... ok
+test a_late_scheduler_write_failure_rolls_back_expirations_claims_and_tick ... FAILED
+test competing_owners_fence_once_and_old_heartbeats_cannot_revive_after_reopen ... ok
+test heartbeat_zero_is_not_stale_until_the_timeout_has_elapsed ... ok
+test fencing_exhaustion_and_invalid_tokens_survive_reopen_without_replacement ... ok
+test refused_heartbeats_preserve_every_persisted_field ... ok
+test competing_schedulers_share_one_capacity_snapshot ... ok
+
+failures:
+
+---- a_late_scheduler_write_failure_rolls_back_expirations_claims_and_tick stdout ----
+
+thread 'a_late_scheduler_write_failure_rolls_back_expirations_claims_and_tick' (1925323) panicked at crates/kernel/chio-runtime-core/tests/lease_boundaries.rs:201:5:
+Err(ChioRuntimeError { code: "runtime_admission_store", .. })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    a_late_scheduler_write_failure_rolls_back_expirations_claims_and_tick
+
+test result: FAILED. 7 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+

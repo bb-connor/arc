@@ -1,0 +1,71 @@
+\documentclass[11pt]{article}
+\pdfinfoomitdate=1
+\pdftrailerid{}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern,microtype,amsmath,amssymb,amsthm,booktabs,tabularx,enumitem}
+\usepackage[margin=1in]{geometry}
+\usepackage{xcolor,tikz}
+\usetikzlibrary{arrows.meta,positioning}
+\definecolor{ink}{HTML}{172C42}
+\usepackage[colorlinks=true,linkcolor=ink,citecolor=ink,urlcolor=ink]{hyperref}
+\usepackage{url}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{titlesec,needspace}
+\titleformat{\section}{\large\bfseries\color{ink}}{\thesection}{0.7em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.6em}{}
+\setlist{nosep,leftmargin=*}
+\setlength{\parskip}{0.35em}
+\setlength{\parindent}{0pt}
+\setlength{\emergencystretch}{2em}
+\clubpenalty=10000
+\widowpenalty=10000
+\displaywidowpenalty=10000
+\newtheorem{proposition}{Proposition}
+\input{results.tex}
+\hypersetup{pdftitle={Chio: A Peer-to-Peer Economy of Verifiable Work},pdfauthor={The Chio Project}}
+\title{\vspace{-2em}\textbf{Chio: A Peer-to-Peer Economy\\of Verifiable Work}}
+\author{The Chio Project\\\small\url{https://github.com/bb-connor/arc}}
+\date{October 2026}
+\begin{document}
+\maketitle
+\begin{abstract}
+Autonomous agents must coordinate work across systems whose owners retain
+control of their tools, data and funds. We present Chio, a kernel architecture
+for peer-to-peer verifiable work. Chio separates agent planning from the
+authority and durable execution state governing its effects. Each resource
+owner admits work under locally controlled capabilities, policies and treaties.
+Linked commitments bind a selected invocation to its delegated resources,
+receiving authority and conditions of acceptance. A program grows by adding
+tasks while preserving the commitments of previously authorized work. Recovery
+retains the original execution history, and separately funded agreements
+preserve payments earned by accepted work. Signed receipts carry evidence of
+these decisions between participating domains. Under explicit trust assumptions,
+we establish preservation of resource bounds, invocation identity and earned
+claims through plan growth and recovery. Chio's kernel supplies the authority
+and recovery mechanisms; a fixed-profile adapter composes their work-admission
+bindings. Evaluation under one administrator exercises plan growth, process
+loss and settlement. The architecture provides an execution foundation for the
+agentic web: agents can select collaborators as their plans
+develop, while each owner enforces the conditions governing its resources and
+prior commitments.
+\end{abstract}
+\input{sections/01-problem}
+\input{sections/02-model}
+\input{sections/03-contract}
+\input{sections/04-execution}
+\input{sections/05-composition}
+\input{sections/06-evaluation}
+\input{sections/07-related}
+\input{sections/08-limits}
+\input{sections/09-conclusion}
+\clearpage
+{\raggedright
+\bibliographystyle{unsrtnat}
+\bibliography{bib}
+\par}
+\clearpage
+\appendix
+\input{sections/10-profile-details}
+\input{sections/11-evidence}
+\end{document}

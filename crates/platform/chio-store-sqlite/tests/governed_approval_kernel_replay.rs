@@ -100,6 +100,9 @@ fn governed_dispatch_replay_is_denied_after_store_reopen() {
         kernel_config(kernel_keypair.clone()),
         chio_test_support::clock::clock(),
     );
+    first_kernel
+        .set_governed_approval_policy("replay-test".into(), vec![kernel_keypair.public_key()])
+        .test_expect("explicit approval roster");
     first_kernel.enable_unsafe_ephemeral_financial_dispatch_for_development();
     first_kernel.set_governed_approval_replay_store(Box::new(
         SqliteGovernedApprovalReplayStore::open(&path).test_expect("replay store opens"),
@@ -149,23 +152,7 @@ fn governed_dispatch_replay_is_denied_after_store_reopen() {
         context: None,
         body: Default::default(),
     };
-    let now = now_secs();
-    let approval_token = GovernedApprovalToken::sign(
-        GovernedApprovalTokenBody {
-            id: format!("approval-{request_id}"),
-            approver: kernel_keypair.public_key(),
-            subject: capability.subject.clone(),
-            governed_intent_hash: intent.binding_hash().test_expect("intent hashes"),
-            request_id: request_id.to_string(),
-            threshold_proposal_hash: None,
-            issued_at: now.saturating_sub(1),
-            expires_at: now.saturating_add(300),
-            decision: GovernedApprovalDecision::Approved,
-        },
-        &kernel_keypair,
-    )
-    .test_expect("approval token signs");
-    let request = ToolCallRequest {
+    let mut request = ToolCallRequest {
         request_id: request_id.to_string(),
         capability,
         tool_name: tool.to_string(),
@@ -175,7 +162,7 @@ fn governed_dispatch_replay_is_denied_after_store_reopen() {
         dpop_proof: None,
         execution_nonce: None,
         governed_intent: Some(intent),
-        approval_token: Some(approval_token),
+        approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         supplemental_authorization: None,
@@ -183,6 +170,28 @@ fn governed_dispatch_replay_is_denied_after_store_reopen() {
         federated_origin_kernel_id: None,
         declassification_grant: None,
     };
+
+    let bound_intent = first_kernel
+        .bind_tool_approval_intent(&request)
+        .test_expect("bind exact tool approval");
+    let now = now_secs();
+    let approval_token = GovernedApprovalToken::sign(
+        GovernedApprovalTokenBody {
+            id: format!("approval-{request_id}"),
+            approver: kernel_keypair.public_key(),
+            subject: request.capability.subject.clone(),
+            governed_intent_hash: bound_intent.binding_hash().test_expect("intent hashes"),
+            request_id: request_id.to_string(),
+            threshold_proposal_hash: None,
+            issued_at: now.saturating_sub(1),
+            expires_at: now.saturating_add(300),
+            decision: GovernedApprovalDecision::Approved,
+        },
+        &kernel_keypair,
+    )
+    .test_expect("approval token signs");
+    request.governed_intent = Some(bound_intent);
+    request.approval_token = Some(approval_token);
 
     let pre_dispatch_denial = first_kernel
         .evaluate_tool_call_blocking(&request)
@@ -215,9 +224,12 @@ fn governed_dispatch_replay_is_denied_after_store_reopen() {
     drop(first_kernel);
 
     let mut reopened_kernel = ChioKernel::new_with_clock(
-        kernel_config(kernel_keypair),
+        kernel_config(kernel_keypair.clone()),
         chio_test_support::clock::clock(),
     );
+    reopened_kernel
+        .set_governed_approval_policy("replay-test".into(), vec![kernel_keypair.public_key()])
+        .test_expect("same approval roster after reopen");
     reopened_kernel.enable_unsafe_ephemeral_financial_dispatch_for_development();
     reopened_kernel.set_governed_approval_replay_store(Box::new(
         SqliteGovernedApprovalReplayStore::open(&path).test_expect("replay store reopens"),

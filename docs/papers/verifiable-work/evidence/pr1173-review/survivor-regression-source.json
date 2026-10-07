@@ -1,0 +1,62 @@
+{
+  "schema": "chio.pr1173.survivor-regression-source.v1",
+  "base_head": "93a2552c3a6eb15ac2756129f199f5714390e794",
+  "source_set_sha256": "aa0495c1e0cc320c8cfff21bd4556040125f28332d10bf332beb5b7df15be147",
+  "validation": {
+    "rustfmt": "passed",
+    "diff_check": "passed",
+    "cargo": "not run here; parent owns execution",
+    "hygiene_log": "/tmp/chio-pr1173-survivor-regression-hygiene.log",
+    "file_hygiene": "passed"
+  },
+  "files": [
+    {
+      "path": "crates/trust/chio-federation/tests/treaty.rs",
+      "sha256": "dbbfb4d03b67ece1af0dc72474793f5cc456d65987f50c0d2c3f5d818235af85",
+      "lines": 351,
+      "test_count": 10,
+      "added_tests": [
+        "chio_bilateral_modes_require_exact_verified_invocation_evidence",
+        "chio_bilateral_evidence_is_not_duplicated_when_manifest_requires_it",
+        "chio_no_cosign_admission_requires_only_declared_evidence",
+        "chio_quorum_admission_requires_exact_verified_quorum_evidence"
+      ]
+    },
+    {
+      "path": "crates/kernel/chio-runtime-core/tests/runtime_treaty.rs",
+      "sha256": "748cc263d613639a0ba73f2eddb6d978c6628ffd2deef3b995063c4fd2b0be8b",
+      "lines": 1474,
+      "test_count": 23,
+      "added_tests": [
+        "no_cosign_admission_requires_only_declared_evidence"
+      ]
+    },
+    {
+      "path": "crates/kernel/chio-runtime-core/tests/runtime_treaty_binding_substitution.rs",
+      "sha256": "9ac94f4e8894728d16195aaf9aa05c202dde5291b3680b56e68b3f25fdb7ebf5",
+      "lines": 1511,
+      "test_count": 41,
+      "added_tests": [
+        "mismatched_lease_record_id_denies_before_dispatch_after_store_reopen",
+        "matching_invalid_governance_algorithm_denies_before_dispatch_after_store_reopen",
+        "matching_invalid_governance_digest_denies_before_dispatch_after_store_reopen",
+        "matching_foreign_governance_kernel_denies_before_dispatch_after_store_reopen"
+      ]
+    },
+    {
+      "path": "crates/kernel/chio-runtime-core/tests/runtime_agreement_context_scan.rs",
+      "sha256": "1a4dde76a24589acb96210bc911680e73cba42a681cf499c14c4d2cdf0cb2792",
+      "lines": 414,
+      "test_count": 14,
+      "added_tests": [
+        "agreement_context_at_depth_limit_reaches_receiver_owned_lookup",
+        "agreement_context_beyond_depth_limit_is_refused_for_every_container_shape"
+      ]
+    }
+  ],
+  "existing_tests_strengthened": [
+    "treaty_cross_boundary_admission_requires_quorum_evidence_for_quorum_cosign",
+    "every_two_signature_co_sign_mode_requires_the_invocation_record"
+  ],
+  "production_changes": false
+}

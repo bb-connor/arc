@@ -3,8 +3,13 @@ mod support;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::Arc;
 
-use chio_kernel::{KernelError, NestedFlowBridge, ToolServerConnection, Verdict};
+use chio_core_types::capability::governance::{
+    GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
+    GovernedTransactionIntentBody,
+};
+use chio_kernel::{KernelError, NestedFlowBridge, ToolCallRequest, ToolServerConnection, Verdict};
 use chio_process::ProcessRuntime;
 use serde_json::{json, Value};
 use support::Result;
@@ -90,6 +95,76 @@ fn phase(dir: &std::path::Path, phase: &str) -> Result<std::process::ExitStatus>
         .env("CHIO_PROCESS_TEST_DIRECTORY", dir)
         .env("CHIO_PROCESS_TEST_PHASE", phase)
         .status()?)
+}
+
+fn sign_approval(request: &ToolCallRequest) -> Result<GovernedApprovalToken> {
+    let intent = request.governed_intent.as_ref().ok_or("approval intent")?;
+    Ok(GovernedApprovalToken::sign(
+        GovernedApprovalTokenBody {
+            id: "read-approval".into(),
+            approver: support::issuer().public_key(),
+            subject: request.capability.subject.clone(),
+            governed_intent_hash: intent.binding_hash()?,
+            request_id: request.request_id.clone(),
+            threshold_proposal_hash: None,
+            issued_at: request.capability.issued_at,
+            expires_at: request.capability.expires_at,
+            decision: GovernedApprovalDecision::Approved,
+        },
+        &support::issuer(),
+    )?)
+}
+
+#[tokio::test]
+async fn original_approval_rejects_unbound_changed_or_unlisted_authority_before_dispatch() -> Result
+{
+    for (mutation, reason) in [
+        ("unbound", "bound tool invocation is required"),
+        ("arguments", "parameter hash does not match"),
+        ("approver", "approval signer is not in configured roster"),
+    ] {
+        let dir = tempfile::tempdir()?;
+        let mut kernel = support::kernel(
+            dir.path(),
+            Box::new(AppendServer {
+                path: dir.path().join("external.log"),
+                crash_after_effect: false,
+            }),
+        )?;
+        let approver = if mutation == "approver" {
+            support::parent_key().public_key()
+        } else {
+            support::issuer().public_key()
+        };
+        Arc::get_mut(&mut kernel)
+            .ok_or("unique kernel")?
+            .set_governed_approval_policy("process-test-approval".into(), vec![approver])?;
+        let runtime = ProcessRuntime::open(dir.path().join("process.db"), kernel.clone())?;
+        support::root(&runtime, &kernel, 1)?;
+        let mut request = runtime.tool_request("root", "peek", "tools", "read", json!({}))?;
+        request.governed_intent = Some(kernel.bind_tool_approval_intent(&request)?);
+        if mutation == "unbound" {
+            request.governed_intent.as_mut().ok_or("intent")?.body =
+                GovernedTransactionIntentBody::ToolInvocation;
+        }
+        request.approval_token = Some(sign_approval(&request)?);
+        if mutation == "arguments" {
+            request.arguments = json!({"different": true});
+        }
+        let response = runtime.invoke("root", "peek", &request).await?;
+        assert_eq!(response.verdict, Verdict::Deny, "{mutation}");
+        assert!(
+            response
+                .reason
+                .as_deref()
+                .is_some_and(|value| value.contains(reason)),
+            "{mutation}: {:?}",
+            response.reason
+        );
+        assert!(!dir.path().join("reads.log").exists(), "{mutation}");
+        assert!(!dir.path().join("external.log").exists(), "{mutation}");
+    }
+    Ok(())
 }
 
 #[test]
@@ -247,7 +322,7 @@ async fn subprocess_worker() -> Result {
     };
     let dir = PathBuf::from(dir);
     let phase = std::env::var("CHIO_PROCESS_TEST_PHASE")?;
-    let kernel = support::kernel_with_artifacts(
+    let mut kernel = support::kernel_with_artifacts(
         &dir,
         Box::new(AppendServer {
             path: dir.join("external.log"),
@@ -267,6 +342,14 @@ async fn subprocess_worker() -> Result {
         phase.ends_with("artifact-nonce"),
         phase.ends_with("artifact-supplemental"),
     )?;
+    if phase.ends_with("artifact-approval") {
+        Arc::get_mut(&mut kernel)
+            .ok_or("unique kernel")?
+            .set_governed_approval_policy(
+                "process-test-approval".into(),
+                vec![support::issuer().public_key()],
+            )?;
+    }
     let runtime = ProcessRuntime::open(dir.join("process.db"), kernel.clone())?;
     if phase.contains("-artifact-") {
         let first = phase.starts_with("crash-");
@@ -304,26 +387,11 @@ async fn subprocess_worker() -> Result {
                     serde_json::from_value(
                         json!({"id": "read-intent", "server_id": "tools", "tool_name": "read", "purpose": "one recorded read"}),
                     )?;
-                if phase.ends_with("approval") {
-                    use chio_core_types::capability::governance::{
-                        GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
-                    };
-                    request.approval_token = Some(GovernedApprovalToken::sign(
-                        GovernedApprovalTokenBody {
-                            id: "read-approval".into(),
-                            approver: support::issuer().public_key(),
-                            subject: request.capability.subject.clone(),
-                            governed_intent_hash: intent.binding_hash()?,
-                            request_id: request.request_id.clone(),
-                            threshold_proposal_hash: None,
-                            issued_at: request.capability.issued_at,
-                            expires_at: request.capability.expires_at,
-                            decision: GovernedApprovalDecision::Approved,
-                        },
-                        &support::issuer(),
-                    )?);
-                }
                 request.governed_intent = Some(intent);
+                if phase.ends_with("approval") {
+                    request.governed_intent = Some(kernel.bind_tool_approval_intent(&request)?);
+                    request.approval_token = Some(sign_approval(&request)?);
+                }
             }
             let mut file = std::fs::File::create(&request_path)?;
             file.write_all(&serde_json::to_vec(&request)?)?;

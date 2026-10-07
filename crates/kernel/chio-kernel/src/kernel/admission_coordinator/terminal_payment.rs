@@ -29,7 +29,7 @@ fn payment_journal_matches_settlement(
         && match action {
             crate::payment::PaymentSettleAction::Capture => {
                 journal.settle_amount_units == Some(amount_units)
-                    && journal.release_authority.is_none()
+                    && (journal.release_authority.is_none() || (journal.state == crate::payment::PaymentJournalState::Resolved && journal.release_authority.as_ref().is_some_and(|a| a.kind == crate::payment::PaymentReleaseAuthorityKind::ContractualCaptureWaiver)))
             }
             crate::payment::PaymentSettleAction::Release => {
                 journal.settle_amount_units.is_none()
@@ -149,7 +149,11 @@ impl ChioKernel {
                 "payment settlement changed operation identity".to_owned(),
             ));
         }
-        if journal.state == crate::payment::PaymentJournalState::Settled {
+        if matches!(
+            journal.state,
+            crate::payment::PaymentJournalState::Settled
+                | crate::payment::PaymentJournalState::Resolved
+        ) {
             return Ok(Some(journal));
         }
         // A journal sealed as reconcile_failed still carries its settle action and
@@ -339,7 +343,8 @@ impl ChioKernel {
             (
                 crate::payment::PaymentRailMode::ReversibleHold,
                 crate::payment::PaymentJournalState::Settling
-                | crate::payment::PaymentJournalState::Settled,
+                | crate::payment::PaymentJournalState::Settled
+                | crate::payment::PaymentJournalState::Resolved,
             ) if payment_journal_matches_settlement(&journal, settle_action, amount_units) => {
                 (None, None)
             }
@@ -386,7 +391,9 @@ impl ChioKernel {
                 "payment journal conflicts with the pricing disposition".to_owned(),
             ));
         }
-        if settle_action == crate::payment::PaymentSettleAction::Capture {
+        if settle_action == crate::payment::PaymentSettleAction::Capture
+            && journal.state != crate::payment::PaymentJournalState::Resolved
+        {
             if let Some(purchase) = purchase {
                 let verifier = self.finding_purchase_verifier.as_ref().ok_or_else(|| {
                     KernelError::DurableAdmission(
@@ -413,7 +420,11 @@ impl ChioKernel {
             .ok_or_else(|| {
                 KernelError::DurableAdmission("payment settlement remains pending".to_owned())
             })?;
-        if journal.state != crate::payment::PaymentJournalState::Settled {
+        if !matches!(
+            journal.state,
+            crate::payment::PaymentJournalState::Settled
+                | crate::payment::PaymentJournalState::Resolved
+        ) {
             return Err(KernelError::DurableAdmission(
                 "payment journal did not reach a terminal settlement".to_owned(),
             ));

@@ -323,13 +323,6 @@ name = "pem-rfc7468"
 name = "rustls-platform-verifier"
 
 [[bans.skip]]
-# last-checked = 2026-09-03. nono directly resolves regress 0.11.1, while
-# its typify 0.6.1 build dependency resolves regress 0.10.5 through
-# typify-impl. Chio's pinned generator and core-types tests also use 0.10.5.
-name = "regress"
-version = "=0.11.1"
-
-[[bans.skip]]
 name = "spin"
 
 [[bans.skip]]
@@ -346,21 +339,6 @@ name = "strum_macros"
 
 [[bans.skip]]
 name = "toml_edit"
-
-[[bans.skip]]
-# last-checked = 2026-09-03. Chio pins typify 0.4.3 for stable generated API
-# bytes, while nono's build dependency resolves typify 0.6.1. Matching
-# typify-impl and typify-macro versions make all three skips necessary.
-name = "typify"
-version = "=0.6.1"
-
-[[bans.skip]]
-name = "typify-impl"
-version = "=0.6.1"
-
-[[bans.skip]]
-name = "typify-macro"
-version = "=0.6.1"
 
 [[bans.skip]]
 name = "wasm-streams"
@@ -393,6 +371,19 @@ name = "wit-bindgen"
 
 [[bans.skip]]
 name = "wit-parser"
+
+[[bans.skip]]
+# last-checked = 2026-10-04. zed_extension_api 0.7 uses wit-bindgen 0.41
+# and its 0.227 component ABI; patched Wasmtime 48 uses 0.254. These build
+# tools belong to separate editor-extension and runtime dependency graphs.
+# Remove when Zed's supported extension API adopts the runtime's tool family.
+name = "wit-component"
+version = "=0.227.1"
+
+[[bans.skip]]
+# Same Zed component-tooling closure as the exact wit-component entry above.
+name = "wasm-metadata"
+version = "=0.227.1"
 
 [[bans.skip]]
 name = "axum"

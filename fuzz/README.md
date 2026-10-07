@@ -28,7 +28,7 @@ the workflow under `.github/workflows/cflite_pr.yml` and
 
 ## Targets
 
-There are 27 targets. Each one drives a trust-boundary decode or
+There are 29 targets. Each one drives a trust-boundary decode or
 fail-closed-verification surface with arbitrary bytes. The full mapping
 (owning crate, source path, trigger globs, seed corpus) lives in
 `target-map.toml`; the summaries below are grouped by surface.
@@ -48,6 +48,8 @@ fail-closed-verification surface with arbitrary bytes. The full mapping
 - `a2a_envelope_decode` - A2A SSE parse plus per-event fan-out.
 - `acp_envelope_decode` - ACP NDJSON plus `handle_jsonrpc` dispatch.
 - `openapi_ingest` - `OpenApiMcpBridge::from_spec` ingest path.
+- `finding_worker_protocol` - hosted finding-worker capability, job, request,
+  transfer, result, and attestation protocol validation.
 
 ### Trust, identity, and credentials
 
@@ -58,6 +60,8 @@ fail-closed-verification surface with arbitrary bytes. The full mapping
 - `did_resolve` - `chio-did` parser plus resolver.
 - `federation_trust_establishment` - kernel trust-establishment envelopes,
   peer pins, freshness, and fail-closed resolution.
+- `bilateral_dsse_verify` - strict bilateral invocation DSSE envelope decode,
+  PAE, predicate validation, and two-key Ed25519 verification.
 - `anchor_bundle_verify` - anchor proof bundles plus checkpoint records.
 
 ### Kernel, ledger, and policy

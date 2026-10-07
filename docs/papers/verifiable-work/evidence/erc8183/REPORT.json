@@ -1,0 +1,288 @@
+{
+  "schema": "chio.erc8183-comparison.v1",
+  "created_at": "2026-10-02T15:29:53.390323+00:00",
+  "judgment": "ERC-8183 reproduces the independent-child economic outcome under the same capital and evaluator-honesty assumptions. This evidence does not establish a novel escrow or subcontracting primitive for Chio.",
+  "upstream": {
+    "repository": "https://github.com/erc-8183/base-contracts",
+    "commit": "142e669c1fd318486a4628395b629f033654dd06",
+    "source_unmodified": true,
+    "license": "MIT",
+    "suite": {
+      "passed": 76,
+      "failed": 0,
+      "skipped": 0
+    },
+    "source_pins": "provenance/source-pins.json"
+  },
+  "specification": {
+    "source_url": "https://raw.githubusercontent.com/ethereum/ERCs/365b4c02879f3e882b91281d42b4f57b406205e9/ERCS/erc-8183.md",
+    "git_commit": "365b4c02879f3e882b91281d42b4f57b406205e9",
+    "sha256": "257c35bbaecab58d0c36823fe8fb2d0fffc83d6f1fd7301d97674707784efa3a"
+  },
+  "chio": {
+    "repository_path": "/tmp/chio-verifiable-work-paper",
+    "head": "7755d3762baa5e0fda0d171835a9000c26de9033",
+    "source_sha256": "b1def783516523cf58c2e60f9d541cdcc47ec07f80e9662e01f88c8cb77e1df9",
+    "working_tree_status": ""
+  },
+  "environment": {
+    "forge": "1.8.4",
+    "forge_commit": "50af4efe189dc64bad2b75ed6990b835de66c4ae",
+    "solc": "0.8.28+commit.7893614a",
+    "evm": "cancun",
+    "optimizer_runs": 200,
+    "local_bytecode_execution": true,
+    "upstream_security_semantics_patched": false
+  },
+  "resources": {
+    "token": "upstream MockUSDC",
+    "units": "raw integer token units",
+    "fees": 0,
+    "buyer_initial": 100,
+    "intermediary_initial_for_pair": 60,
+    "worker_initial": 0,
+    "parent_budget": 100,
+    "child_budget": 60,
+    "evaluator": "distinct trusted third party",
+    "roles": "local test addresses, not independently operated businesses"
+  },
+  "balance_order": [
+    "buyer",
+    "intermediary",
+    "worker",
+    "escrow"
+  ],
+  "paired_results": [
+    {
+      "case": "both_succeed",
+      "erc8183": [
+        0,
+        100,
+        60,
+        0
+      ],
+      "chio": [
+        0,
+        100,
+        60,
+        0
+      ],
+      "supply": 160
+    },
+    {
+      "case": "child_paid_then_parent_rejected",
+      "erc8183": [
+        100,
+        0,
+        60,
+        0
+      ],
+      "chio": [
+        100,
+        0,
+        60,
+        0
+      ],
+      "supply": 160
+    },
+    {
+      "case": "parent_refunded_before_child_acceptance",
+      "erc8183": [
+        100,
+        0,
+        60,
+        0
+      ],
+      "chio": [
+        100,
+        0,
+        60,
+        0
+      ],
+      "supply": 160
+    },
+    {
+      "case": "two_60_jobs_from_100",
+      "erc8183": "second funding reverts",
+      "chio": "second funding reverts",
+      "balances_after_denial": [
+        40,
+        0,
+        0,
+        60
+      ]
+    },
+    {
+      "case": "child_from_unsettled_parent_without_working_capital",
+      "erc8183": "funding reverts",
+      "chio": "funding reverts",
+      "balances_after_denial": [
+        0,
+        0,
+        0,
+        100
+      ]
+    },
+    {
+      "case": "submitted_evaluator_outage",
+      "erc8183": "refund after expiry plus 1-hour grace",
+      "chio": "refund strictly after refundAfter"
+    }
+  ],
+  "stronger_upstream_counterexample": {
+    "case": "approved_milestone_then_job_rejection",
+    "initial_supply": 100,
+    "milestone_paid": 60,
+    "remaining_refund": 40,
+    "final_balances": [
+      40,
+      60,
+      0,
+      0
+    ],
+    "source": "contracts/ERC8183.sol approveClaim, _reject",
+    "test": "test_approvedMilestoneSurvivesJobRejectionWithRemainingRefund()"
+  },
+  "demonstrated_distinctions": [
+    {
+      "subject": "acceptance_and_payment",
+      "erc8183": "complete transfers payment immediately",
+      "chio": "recordDecision creates Payable; withdrawPayment transfers later",
+      "limit": "Immediate payment already preserves proceeds."
+    },
+    {
+      "subject": "new_acceptance_deadline",
+      "erc8183": "complete can execute after grace if refund has not executed; first terminal transaction wins",
+      "chio": "new decision fails strictly after resolveBy, even before refund"
+    },
+    {
+      "subject": "pause",
+      "erc8183": "claimRefund blocked while paused",
+      "chio": "earned withdrawal survives pause, token removal, verifier removal and 100-day delay",
+      "limit": "Specific implementations, not all ERC-8183 profiles."
+    }
+  ],
+  "additional_upstream_capabilities": {
+    "source_observed": [
+      "evaluator contracts",
+      "optional hooks",
+      "payout receivers",
+      "partial settlement",
+      "admin upgrade",
+      "admin fee change",
+      "admin emergency withdrawal",
+      "admin hook detachment"
+    ],
+    "upstream_tested": [
+      "EIP-712 relay authorization",
+      "authorization nonce replay rejection",
+      "ERC-1271 validation",
+      "partial claims",
+      "payout receivers"
+    ]
+  },
+  "scope_limits": [
+    "local EVM only",
+    "synthetic work commitments",
+    "trusted evaluator decisions",
+    "standard mock token",
+    "no contract audit",
+    "no deployed chain finality",
+    "no independent operators",
+    "no gas or performance superiority claim",
+    "does not prove absence of an ERC-8183 extension matching Chio"
+  ],
+  "checks": {
+    "verified-upstream": {
+      "argv": [
+        "/tmp/chio-paper-erc8183-artifact/tools/forge",
+        "test",
+        "-vv"
+      ],
+      "cwd": "/tmp/chio-paper-erc8183",
+      "started_at": "2026-10-02T15:26:49.911291+00:00",
+      "elapsed_seconds": 0.1871890421025455,
+      "exit_status": 0,
+      "log": "logs/verified-upstream.log"
+    },
+    "verified-comparison-traces": {
+      "argv": [
+        "/tmp/chio-paper-erc8183-artifact/tools/forge",
+        "test",
+        "--config-path",
+        "/tmp/chio-paper-erc8183-artifact/foundry.toml",
+        "-vvvv"
+      ],
+      "cwd": "/tmp/chio-paper-erc8183-artifact",
+      "started_at": "2026-10-02T15:26:50.144907+00:00",
+      "elapsed_seconds": 1.7010546210221946,
+      "exit_status": 0,
+      "log": "logs/verified-comparison-traces.log"
+    },
+    "verified-comparison-json": {
+      "argv": [
+        "/tmp/chio-paper-erc8183-artifact/tools/forge",
+        "test",
+        "--config-path",
+        "/tmp/chio-paper-erc8183-artifact/foundry.toml",
+        "--json"
+      ],
+      "cwd": "/tmp/chio-paper-erc8183-artifact",
+      "started_at": "2026-10-02T15:26:51.893591+00:00",
+      "elapsed_seconds": 0.18307086220011115,
+      "exit_status": 0,
+      "log": "logs/verified-comparison-json.log"
+    }
+  },
+  "comparison_test_count": 20,
+  "comparison_results": {
+    "test/ChioPaperComparison.t.sol:ChioPaperComparisonTest": {
+      "test_earnedChildRemainsWithdrawableAfterParentRefundAndAdminChanges()": "Success",
+      "test_evaluatorOutageRefundsSubmittedJobAfterDeadline()": "Success",
+      "test_independentChildCanCompleteAfterParentExpiryRefund()": "Success",
+      "test_independentChildPaymentSurvivesParentRejection()": "Success",
+      "test_newAcceptanceRejectedAfterResolveByEvenBeforeRefund()": "Success",
+      "test_sameOneHundredUnitsCannotFundTwoSixtyUnitJobs()": "Success",
+      "test_successfulParentAndChildExchangeSeparatesPayableAndPaid()": "Success",
+      "test_unsettledParentBudgetCannotFundChildWithoutWorkingCapital()": "Success"
+    },
+    "test/ERC8183PaperComparison.t.sol:ERC8183PaperComparisonTest": {
+      "test_adminPauseBlocksRefundUntilUnpause()": "Success",
+      "test_afterGraceCompletionCanWinIfRefundHasNotExecuted()": "Success",
+      "test_afterGraceRefundPreventsLaterCompletion()": "Success",
+      "test_approvedMilestoneSurvivesJobRejectionWithRemainingRefund()": "Success",
+      "test_clientCannotRejectFundedJobWhenEvaluatorIsDistinct()": "Success",
+      "test_evaluatorOutageRefundsSubmittedJobAfterGrace()": "Success",
+      "test_independentChildCanCompleteAfterParentExpiryRefund()": "Success",
+      "test_independentChildPaymentSurvivesParentRejection()": "Success",
+      "test_pendingMilestoneOutageClientCanClearThenRefund()": "Success",
+      "test_sameOneHundredUnitsCannotFundTwoSixtyUnitJobs()": "Success",
+      "test_successfulParentAndChildExchangePaysImmediately()": "Success",
+      "test_unsettledParentBudgetCannotFundChildWithoutWorkingCapital()": "Success"
+    }
+  },
+  "preserved_nonterminal_attempts": {
+    "logs/failed-amd64-launch.command.json": "wrong architecture binary",
+    "logs/focused-erc8183.command.json": "record.py argument ordering",
+    "logs/paired-comparison-r1.command.json": "test expectRevert before helper read call; no contract failure",
+    "logs/final-comparison-traces.command.json": "Foundry requires config-path basename foundry.toml"
+  },
+  "reproduce": "python3 reproduce.py --forge /path/to/forge --label rerun",
+  "portable_archive_reproduction": {
+    "argv": [
+      "python3",
+      "/tmp/chio-paper-erc8183-artifact/portable-check/reproduce.py",
+      "--upstream",
+      "/tmp/chio-paper-erc8183",
+      "--forge",
+      "/tmp/chio-paper-erc8183-artifact/tools/forge",
+      "--label",
+      "portable"
+    ],
+    "cwd": "/tmp/chio-paper-erc8183-artifact",
+    "started_at": "2026-10-02T15:30:36.585341+00:00",
+    "elapsed_seconds": 4.083032354246825,
+    "exit_status": 0,
+    "log": "logs/portable-reproduction.log"
+  }
+}

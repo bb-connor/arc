@@ -6,24 +6,44 @@ capability digest supplied by the Chio kernel. Worker tool arguments cannot
 select an owner. PostgreSQL checks owner, fence and expiry in the transaction
 that commits a result. The adapter adds no database tables or replay journal.
 
-The operator gets `assign`, `release` and `inspect` on `jobs-admin`.
-Child workers get only `task`, `complete` and `renew` on `jobs`. Both tool
-servers use the production worker database role. Migration and initial job
-creation use separate roles before the host starts.
+The operator gets `assign`, `release` and `inspect` through three installed
+routes: `jobs-admin-assign`, `jobs-admin-release` and `jobs-admin-inspect`.
+Child workers get only `jobs-task`, `jobs-complete` and `jobs-renew`. Each
+route uses the existing static `chio-broker-mcp` proxy in an enforced native
+cage and a prepared, caller-bound request. Separate authenticated host adapters
+fix the worker/operator role and tenant. Only those adapters receive the
+production worker database credential. Migration and initial job creation use
+separate roles before the host starts.
+
+The native qualification builds the enforcing CLI with the existing
+`docker-release` production profile. Preparation and dispatch retain their
+original deadlines; the unoptimized CLI can consume the policy window while
+revalidating signed state. The workflow stages that exact production binary.
+A bounded launch owner retains each caged child's creating thread through
+shutdown and terminal receipt persistence, including across async-runtime
+retirement. Linux parent-death protection remains armed.
 
 ## Run the native qualification
 
-Requires Docker, OpenSSL, Rust and uv. Run from the repository root.
+Requires Linux x86_64, Docker, OpenSSL, Rust and uv. Run from the repository root.
+The [PostgreSQL workflow](../../.github/workflows/postgres-job-swarm.yml) runs the
+complete fixture, including the
+[prepared broker build](../../.github/actions/prepared-native-broker/action.yml)
+and [enforced host qualification](../../.github/actions/enforced-native-fixture/action.yml).
+For a local run, prepare those same fixtures first. They supply
+`CHIO_BROKER_TEST_BINARY`, `CHIO_BROKER_MCP_TOOL`, `CHIO_CAGE_INIT` and
+`CHIO_RECEIPT_ANCHOR_ROOT`. The qualification helper uses deterministic fixture
+keys and is not a deployment provisioning authority.
 The example uses a dedicated PostgreSQL container and named volume. It never
 resets another database. Choose a private output directory with ancestry that
 passes Chio's native launch checks.
 
 ```sh
-cargo build --locked -p chio-cli --bin chio
+cargo build --locked --profile docker-release -p chio-cli --features real-linux-enforcement --bin chio
 cargo build --locked -p chio-finding-market-store-postgres --example agent_jobs
 umask 077
 job_root=$(mktemp -d)
-cp target/debug/chio "$job_root/chio"
+cp target/docker-release/chio "$job_root/chio"
 cp target/debug/examples/agent_jobs "$job_root/agent-jobs"
 chmod 700 "$job_root/chio" "$job_root/agent-jobs"
 uv build sdks/python/chio-process --wheel --out-dir "$job_root/wheels"
@@ -45,8 +65,8 @@ python3 examples/postgres-job-swarm/postgres.py stop \
   --state "$job_root/database/state.json"
 ```
 
-On macOS, use an OpenSSL 3 executable through `--openssl` if the system
-OpenSSL lacks the certificate options. The image's local content ID is frozen
+Database-only fixtures can run on macOS with OpenSSL 3 through `--openssl`.
+The enforced native trajectories require Linux x86_64. The image's local content ID is frozen
 before startup; the report records that ID and repository digests. Container
 stop preserves its data volume. Private state contains database credentials
 and signing material. Export only the qualification report, receipts and
@@ -75,13 +95,13 @@ performance improvement over an application already using correctly fenced
 PostgreSQL jobs.
 
 `qualify_claim_loss.py` exercises a different failure boundary. Its test-only
-stdio proxy receives a successful response from the real Rust claim API after
-PostgreSQL commits, then withholds that response. The driver kills the actual
+host adapter cut point records a successful response from the real Rust claim
+API after PostgreSQL commits, then withholds its HTTPS response. The driver kills the actual
 native host with SIGKILL. The installed SDK retains the unresolved request.
 After restarting with a fresh socket and rotated credential, two attempts to
 recover the identical request must return a verified signed denial retaining
 `outcome_unknown_after_dispatch`. The first job remains leased; a second queued
-job must remain pending, and the proxy must have delivered exactly one claim.
+job must remain pending, and the resource adapter must have received exactly one claim.
 
 A deliberately new operation then claims the second job. This control proves
 that an accidental redispatch could have caused an observable second effect.
@@ -89,7 +109,7 @@ It is new work in an isolated fixture, not a supported retry technique.
 The withheld gateway response is test evidence, not a recovered kernel receipt.
 This check proves refusal to repeat an uncertain claim. It does not recover
 the missing claim outcome or supply an atomic transaction across Chio and
-PostgreSQL. The test proxy is not part of the application deployment.
+PostgreSQL. The cut point is enabled only by a private qualification configuration, never by a worker request.
 
 The signed uncertainty response can have `terminal_state.state: completed`:
 the kernel has completed that evaluation with a denial. This is not evidence
@@ -128,33 +148,23 @@ synthetic assessment, and a passing run is not a population success rate.
 operation key, retains the request before invoking, and verifies the returned
 receipt against an operator-selected kernel public key.
 
-A request file has this shape:
+Prepare the resource arguments through the live host before calling
+`invoke_recorded`. For example, within the qualification's managed host lifetime:
 
-```json
-{
-  "operation_key": "assign-release-assessment-1",
-  "server_id": "jobs-admin",
-  "tool_name": "assign",
-  "arguments": {
-    "owner_capability_sha256": "<digest from the child's private connection descriptor>",
-    "lease_seconds": 600,
-    "limit": 1
-  },
-  "known_outcome_only": true
-}
+```python
+request = host.prepared_request(
+    connections["root"], "assign-release-assessment-1", "assign",
+    {"owner_capability_sha256": connections["replacement"]["caller_capability_sha256"],
+     "lease_seconds": 600, "limit": 1},
+)
+response = invoke_recorded(chio, connections["root"], key + "\n", request, output)
 ```
 
-```sh
-"$job_root/venv/bin/python" -m chio_process.invocation \
-  --chio "$job_root/chio" \
-  --connection "$job_root/qualification/root/connection.json" \
-  --trusted-kernel-pubkey "$job_root/qualification/kernel.pub" \
-  --request request.json --output "$job_root/operator-attempt-1"
-```
-
-This invocation requires the corresponding host to be running. The
-qualification starts and stops its host internally; retained credentials do
-not start a host.
+The retained request's `arguments` contain the original `chio.broker-execute.v1`
+envelope. Keep that complete request for recovery. Changing its signed body,
+nonce, route or key is a different invocation. The qualification owns its
+adapters, brokers and host through context managers and stops them at the end;
+retained connection files do not start those services.
 
 Keep the same key, arguments **and recovery policy** on every recovery
 attempt. `known_outcome_only` defaults to true here. It permits the first
@@ -170,10 +180,17 @@ transactions with an explicit pending intermediate state.
 
 ## Boundary and measured integration defect
 
-The metadata digest is an identity binding on a trusted kernel-owned pipe.
-It is neither a bearer credential nor an independently signed assertion.
-The demo's signed native launch policy does not provide OS containment.
-Arbitrary code running as the host's OS user is outside this qualification.
+The metadata digest identifies the original process capability. The host's
+prepared broker request binds it to the exact body, installed operation and
+original admission. The resource adapter trusts the authenticated broker's
+custody of that body. Worker-supplied `_meta` remains ordinary input and cannot
+replace it. The static proxy uses enforced native confinement; neither sockets,
+process creation nor database credentials are added to its cage. Arbitrary
+code running as the trusted host's OS user remains outside this boundary.
+
+The live Python and JavaScript workers expose the original resource schemas
+and decode broker application content for the model. Their signed response
+artifacts remain unchanged for independent receipt verification.
 
 The first actual worker-role invocation exposed a pre-existing Rust API
 mismatch: `begin_tenant` issued `SELECT ... FOR SHARE`, which requires an

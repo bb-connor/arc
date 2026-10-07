@@ -1,0 +1,12 @@
+
+running 5 tests
+test composition_worker ... ok
+test test_rail_cannot_spend_refundable_parent_backing_on_child_claims ... ok
+test approval_authority_cannot_replace_receiver_owned_capability ... ok
+test approved_artifacts_and_earned_child_survive_parent_finalization_loss has been running for over 60 seconds
+test mutated_approvals_and_artifact_handoffs_never_dispatch has been running for over 60 seconds
+test mutated_approvals_and_artifact_handoffs_never_dispatch ... ok
+test approved_artifacts_and_earned_child_survive_parent_finalization_loss ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 100.21s
+
