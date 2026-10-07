@@ -1737,9 +1737,21 @@ fn mcp_serve_http_streams_roots_request_after_initialized_when_client_supports_r
             "method": "notifications/initialized"
         }),
     );
-    assert_eq!(initialized.status(), reqwest::StatusCode::OK);
+    // MCP 2025-11-25 Streamable HTTP: an accepted notification gets 202 with
+    // no body. The roots request rides the next client request's stream.
+    assert_eq!(initialized.status(), reqwest::StatusCode::ACCEPTED);
+    assert!(initialized.text().expect("initialized body").is_empty());
 
-    let mut reader = BufReader::new(initialized);
+    let ping = post_json(
+        &client,
+        &base_url,
+        token,
+        Some(&session_id),
+        Some(&protocol_version),
+        &json!({"jsonrpc": "2.0", "id": 2, "method": "ping", "params": {}}),
+    );
+    assert_eq!(ping.status(), reqwest::StatusCode::OK);
+    let mut reader = BufReader::new(ping);
     let roots_request = read_next_sse_message(&mut reader).expect("roots/list request");
     assert_eq!(roots_request["method"], "roots/list");
     let roots_request_id = roots_request["id"]
@@ -1764,10 +1776,30 @@ fn mcp_serve_http_streams_roots_request_after_initialized_when_client_supports_r
             }
         }),
     );
-    assert!(matches!(
-        roots_response.status(),
-        reqwest::StatusCode::OK | reqwest::StatusCode::ACCEPTED
-    ));
+    assert_eq!(roots_response.status(), reqwest::StatusCode::ACCEPTED);
+    assert!(roots_response.text().expect("roots reply body").is_empty());
+    // Notifications related to the ping may precede its response; the roots
+    // refresh completes before the ping is answered.
+    let mut refreshed_roots = None;
+    let pong = loop {
+        let message = read_next_sse_message(&mut reader).expect("ping response");
+        if message.get("id") == Some(&json!(2)) && message.get("method").is_none() {
+            break message;
+        }
+        assert_eq!(
+            message.get("id"),
+            None,
+            "only notifications may precede the ping response: {message}"
+        );
+        if message["method"] == "notifications/message"
+            && message["params"]["logger"] == "chio.mcp.roots"
+            && message["params"]["data"]["event"] == "roots_refreshed"
+        {
+            refreshed_roots = Some(message["params"]["data"]["rootCount"].clone());
+        }
+    };
+    assert_eq!(refreshed_roots, Some(json!(1)));
+    assert_eq!(pong["result"], json!({}));
 }
 
 #[test]
