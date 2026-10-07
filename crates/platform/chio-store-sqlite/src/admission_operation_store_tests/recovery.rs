@@ -6,6 +6,8 @@ mod deferred_pages;
 mod deferred_status;
 #[path = "recovery/fused_security.rs"]
 mod fused_security;
+#[path = "recovery/history_pages.rs"]
+mod history_pages;
 
 #[test]
 fn recovery_claims_are_bounded_fenced_and_time_monotonic() {
