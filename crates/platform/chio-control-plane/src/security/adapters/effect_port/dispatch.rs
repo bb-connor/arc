@@ -1,13 +1,13 @@
 use super::{
     Arc, BTreeMap, BTreeSet, BlastRadiusPort, CapabilitySetSuspensionBackend,
-    CapabilitySetSuspensionStore, ContainmentOverlayStore, EffectExecutionStatus, EffectId,
+    CapabilitySetSuspensionStore, Clock, ContainmentOverlayStore, EffectExecutionStatus, EffectId,
     EffectPort, EffectRequest, EffectResult, EffectResultQuery, EgressRestrictionStore,
     EscalateAlertBackend, EscalateAlertStore, IssuanceFreezeBackend, IssuanceFreezeStore,
     LineageFence, LineageFenceMaintenanceOutcome, LineageFenceMaintenanceRequest,
     MaintainedLineageFence, PortError, PortResult, RecordId, ResponseEffectKind,
     ResponseSchedulerStore, ResponseTarget, RestrictEgressOverlayBackend,
     SessionSuspensionOverlayBackend, SessionThrottleBackend, SessionThrottleStore,
-    SqliteSecurityStateStore, SqliteSiemOutbox, TenantId, EFFECT_COMMAND_ID_PREFIX,
+    SqliteSecurityStateStore, SqliteSiemOutbox, SystemClock, TenantId, EFFECT_COMMAND_ID_PREFIX,
     LINEAGE_FENCE_MAX_LEASE_MS,
 };
 
@@ -76,11 +76,30 @@ pub struct ActiveResponseEffectPort {
 
 impl ActiveResponseEffectPort {
     /// Construct the complete production router from durable native
-    /// authorities and preflight all six closed effect kinds.
+    /// authorities and preflight all six closed effect kinds, reading time
+    /// from the host wall clock.
     pub fn production(
         security_store: Arc<SqliteSecurityStateStore>,
         alert_outbox: Arc<SqliteSiemOutbox>,
         blast_radius: Arc<dyn BlastRadiusPort>,
+    ) -> PortResult<Self> {
+        Self::production_with_clock(
+            security_store,
+            alert_outbox,
+            blast_radius,
+            Arc::new(SystemClock),
+        )
+    }
+
+    /// Construct the complete production router from durable native
+    /// authorities with the host's trusted clock and preflight all six
+    /// closed effect kinds. The clock judges issuance fence lease windows and
+    /// stamps escalation alerts.
+    pub fn production_with_clock(
+        security_store: Arc<SqliteSecurityStateStore>,
+        alert_outbox: Arc<SqliteSiemOutbox>,
+        blast_radius: Arc<dyn BlastRadiusPort>,
+        clock: Arc<dyn Clock>,
     ) -> PortResult<Self> {
         let alert_store: Arc<dyn EscalateAlertStore> = alert_outbox.clone();
         let throttle_store: Arc<dyn SessionThrottleStore> = security_store.clone();
@@ -91,7 +110,10 @@ impl ActiveResponseEffectPort {
         let issuance_freeze_store: Arc<dyn IssuanceFreezeStore> = security_store.clone();
         let scheduler_store: Arc<dyn ResponseSchedulerStore> = security_store.clone();
         let backends: Vec<Arc<dyn ResponseEffectBackend>> = vec![
-            Arc::new(EscalateAlertBackend::new(alert_store)),
+            Arc::new(EscalateAlertBackend::with_clock(
+                alert_store,
+                Arc::clone(&clock),
+            )),
             Arc::new(SessionThrottleBackend::new(throttle_store)),
             Arc::new(RestrictEgressOverlayBackend::new(egress_store)),
             Arc::new(SessionSuspensionOverlayBackend::new(
@@ -100,11 +122,14 @@ impl ActiveResponseEffectPort {
             Arc::new(CapabilitySetSuspensionBackend::new(
                 capability_suspension_store,
             )),
-            Arc::new(IssuanceFreezeBackend::new_with_scheduler(
-                issuance_freeze_store,
-                blast_radius,
-                scheduler_store,
-            )),
+            Arc::new(
+                IssuanceFreezeBackend::new_with_scheduler(
+                    issuance_freeze_store,
+                    blast_radius,
+                    scheduler_store,
+                )
+                .with_clock(clock),
+            ),
         ];
         let router = Self::from_backends(backends).map_err(|_| PortError::invalid_data())?;
         router.ensure_effects_ready()?;

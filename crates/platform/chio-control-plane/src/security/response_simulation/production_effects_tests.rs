@@ -221,6 +221,7 @@ impl ProductionEffectsFixture {
             Arc::clone(&self.store),
             Arc::clone(&self.outbox),
             blast,
+            Arc::clone(&self.trusted_clock),
         )
         .unwrap_or_else(|error| panic!("production response effects: {error}"))
     }

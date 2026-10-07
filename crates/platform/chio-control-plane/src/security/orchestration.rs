@@ -826,6 +826,7 @@ impl ProductionActiveDefenseOrchestrator {
             security_store,
             Arc::clone(&alert_outbox),
             blast_radius,
+            Arc::clone(&context.clock),
         )?;
         let alerts: Arc<dyn SecurityAlertPort> = alert_outbox;
         Self::new_with_lifecycle(context, effects, alerts)

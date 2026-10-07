@@ -396,13 +396,15 @@ pub(super) fn production_response_effects(
     security_store: Arc<SqliteSecurityStateStore>,
     alert_outbox: Arc<super::adapters::SqliteSiemOutbox>,
     blast_radius: Arc<dyn BlastRadiusPort>,
+    clock: Arc<dyn chio_security_types::clock::Clock>,
 ) -> PortResult<Arc<dyn EffectPort>> {
     match mode {
         ResponseExecutionMode::Live => Ok(Arc::new(
-            super::adapters::effect_port::ActiveResponseEffectPort::production(
+            super::adapters::effect_port::ActiveResponseEffectPort::production_with_clock(
                 security_store,
                 alert_outbox,
                 blast_radius,
+                clock,
             )?,
         )),
         ResponseExecutionMode::DryRun => Ok(Arc::new(SimulationOnlyEffects)),
