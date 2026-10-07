@@ -3,6 +3,9 @@ use super::*;
 #[path = "pricing_restart/fixture.rs"]
 mod fixture;
 use fixture::*;
+#[cfg(feature = "admission-test-support")]
+#[path = "pricing_restart/resolved_cutpoint.rs"]
+mod resolved_cutpoint;
 
 #[test]
 fn sqlite_review_frozen_pricing_restart_uses_original_fx_before_pending_capture(
