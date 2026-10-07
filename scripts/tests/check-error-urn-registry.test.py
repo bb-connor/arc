@@ -98,6 +98,40 @@ expect(
     1,
     "crates/kernel/demo/shared/codes.rs:1",
 )
+expect("percent-encoded suffix", {LIB: code("urn:chio:error:kernel:known%2Fextra")}, 1, "urn:chio:error:kernel:known%2Fextra")
+expect("slash suffix", {LIB: code("urn:chio:error:kernel:known/extra")}, 1, "urn:chio:error:kernel:known/extra")
+expect("plus suffix", {LIB: code("urn:chio:error:kernel:known+extra")}, 1, "urn:chio:error:kernel:known+extra")
+expect("hex escape forming a valid slug", {LIB: code("urn:chio:error:kernel:known\\x2dextra")}, 1, "urn:chio:error:kernel:known-extra")
+expect("unicode escape forming a valid slug", {LIB: code("urn:chio:error:kernel:known\\u{2d}extra")}, 1, "urn:chio:error:kernel:known-extra")
+expect("line continuation inside a code", {LIB: 'const X: &str = "urn:chio:error:kernel:kn\\\n        own";\n'}, 0)
+expect("escaped registered code", {LIB: code("urn:chio:error:kernel:know\\x6e")}, 0)
+expect("placeholder in an ordinary literal", {LIB: code("urn:chio:error:transport:family-{unknown}")}, 1, "urn:chio:error:transport:family-")
+expect("placeholder in a write! format string", {LIB: 'fn f(o: &mut String, r: &str) { let _ = write!(o, "urn:chio:error:transport:family-{r}"); }\n'}, 0)
+expect("placeholder in format_args!", {LIB: 'fn f(r: &str) { let _ = format_args!("urn:chio:error:transport:family-{}", r); }\n'}, 0)
+expect("placeholder in a non-format macro", {LIB: 'fn f() { let _ = vec!["urn:chio:error:transport:family-{x}"]; }\n'}, 1, "urn:chio:error:transport:family-")
+expect(
+    "raw include! outside src",
+    {LIB: 'include!(r#"../shared/codes.fragment"#);\n', "crates/kernel/demo/shared/codes.fragment": code("urn:chio:error:kernel:unknown")},
+    1,
+    "crates/kernel/demo/shared/codes.fragment:1",
+)
+expect(
+    "recursive include! outside src",
+    {
+        LIB: 'include!("../shared/chain.fragment");\n',
+        "crates/kernel/demo/shared/chain.fragment": 'include!("codes.fragment");\n',
+        "crates/kernel/demo/shared/codes.fragment": code("urn:chio:error:kernel:unknown"),
+    },
+    1,
+    "crates/kernel/demo/shared/codes.fragment:1",
+)
+expect(
+    "registered code through include!",
+    {LIB: 'include!("../shared/codes.fragment");\n', "crates/kernel/demo/shared/codes.fragment": code("urn:chio:error:kernel:known")},
+    0,
+)
+expect("missing include! target", {LIB: 'include!("../shared/absent.fragment");\n'}, 1, "absent.fragment")
+expect("include! target outside the repository", {LIB: 'include!("../../../../../outside.rs");\n'}, 1, "outside.rs")
 for test_only in (
     "crates/kernel/demo/src/tests.rs",
     "crates/kernel/demo/src/store_tests.rs",

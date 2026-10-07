@@ -3,19 +3,18 @@
 
 spec/errors/registry.yaml is the source of truth for stable error URNs, and
 clients resolve severity, help and string codes from it. This gate lexes the
-Rust sources under crates/*/*/src, plus the .inc fragments and include! targets
-they compile, and checks every string literal that names a
-`urn:chio:error:` URN. Comments and character literals are not literals.
+Rust sources under crates/*/*/src, the .inc fragments beside them, and every
+file reached through a literal include! path, and checks each string literal
+after decoding its escapes. Comments and character literals are not literals.
 
-Each URN token runs until the first character that cannot appear in a URN, and
-must equal a registered URN. Two uses name a family rather than one code, and
-for them the token must be the prefix of at least one registered URN: a token
-followed in the same literal by a format placeholder (`{`), and a literal that
-is the direct argument of `.starts_with(`.
-
-The bare namespace `urn:chio:error:` names no code and is not checked.
-Test-only files are skipped. Only the module generated from the registry,
-crates/core/chio-errors/src/_generated, is exempt.
+A URN token runs from `urn:chio:error:` to the next separator (whitespace,
+a quote, a bracket, a comma or a semicolon) and must equal a registered URN.
+Two uses name a family rather than one code, and for them the token must be
+the prefix of at least one registered URN: the format string of a formatting
+macro whose token is followed by a `{...}` placeholder, and a literal that is
+the direct argument of `.starts_with(`. The bare namespace `urn:chio:error:`
+names no code. Test-only files are skipped. Only the module generated from the
+registry, crates/core/chio-errors/src/_generated, is exempt.
 """
 
 from __future__ import annotations
@@ -26,10 +25,16 @@ import sys
 from pathlib import Path
 
 URN_PREFIX = "urn:chio:error:"
-URN_CHARACTER = re.compile(r"[A-Za-z0-9_.:\-]")
+SEPARATOR = re.compile(r"""[\s"'`()\[\]{}<>,;]""")
 REGISTERED_URN = re.compile(r'^\s*-\s*urn:\s*"(urn:chio:error:[^"]+)"\s*$')
-INCLUDE = re.compile(r'include!\s*\(\s*"([^"]+)"\s*\)')
+INCLUDE_CALL = re.compile(r"\binclude!\s*\(\s*$")
 PREFIX_TEST = re.compile(r"\.starts_with\(\s*$")
+FORMAT_STRING = re.compile(
+    r"\b(?:(?:format|format_args|panic|print|println|eprint|eprintln|unreachable|todo|unimplemented)!\s*\(\s*"
+    r"|(?:write|writeln)!\s*\(\s*[^,()]+,\s*)$"
+)
+ESCAPE = re.compile(r"\\(?:x([0-9A-Fa-f]{2})|u\{([0-9A-Fa-f]{1,6})\}|\n\s*|(.))", re.DOTALL)
+SIMPLE_ESCAPES = {"n": "\n", "r": "\r", "t": "\t", "\\": "\\", "0": "\0", "'": "'", '"': '"'}
 TEST_DIRECTORY = re.compile(r"(^|_)tests?$")
 REGISTRY_MODULE = Path("crates/core/chio-errors/src/_generated")
 SKIPPED_DIRECTORIES = {"benches", "examples", "target"}
@@ -50,12 +55,12 @@ STRING_OPENER = re.compile(r'(?:b|c)?"')
 
 
 def string_literals(source: str):
-    """Yield (line, start, contents) for each string literal in `source`.
+    """Yield (line, start, contents, raw) for each string literal in `source`.
 
-    `start` is the offset of the literal's first character, prefix included.
-    Handles line and nested block comments, character literals and lifetimes,
-    and normal, byte and raw string literals. Escapes are kept as written; a
-    URN contains no character that needs escaping.
+    `start` is the offset of the literal's first character, prefix included,
+    and `contents` is the text between the quotes as written. Handles line and
+    nested block comments, character literals and lifetimes, and normal, byte
+    and raw string literals.
     """
     length = len(source)
     index = 0
@@ -94,7 +99,7 @@ def string_literals(source: str):
             begin = opener.end()
             end = source.find(closer, begin)
             end = length if end < 0 else end
-            yield line, index, source[begin:end]
+            yield line, index, source[begin:end], True
             line += source.count("\n", index, end)
             index = end + len(closer)
         elif not identifier_before and (opener := STRING_OPENER.match(source, index)):
@@ -102,21 +107,36 @@ def string_literals(source: str):
             begin = cursor
             while cursor < length and source[cursor] != '"':
                 cursor += 2 if source[cursor] == "\\" else 1
-            yield line, index, source[begin:cursor]
+            yield line, index, source[begin:cursor], False
             line += source.count("\n", index, cursor)
             index = cursor + 1
         else:
             index += 1
 
 
+def decode_escapes(contents: str) -> str:
+    """Apply Rust string escapes, including line continuations."""
+
+    def replace(match: re.Match[str]) -> str:
+        if match.group(1):
+            return chr(int(match.group(1), 16))
+        if match.group(2):
+            return chr(int(match.group(2), 16))
+        if match.group(3) is None:
+            return ""
+        return SIMPLE_ESCAPES.get(match.group(3), match.group(0))
+
+    return ESCAPE.sub(replace, contents)
+
+
 def literal_tokens(contents: str):
-    """Yield (token, is_family_stem) for each URN token in a literal."""
+    """Yield (token, placeholder_follows) for each URN token in a literal."""
     position = contents.find(URN_PREFIX)
     while position >= 0:
-        end = position
-        while end < len(contents) and URN_CHARACTER.match(contents[end]):
-            end += 1
-        yield contents[position:end], contents.startswith("{", end) and not contents.startswith("{{", end)
+        separator = SEPARATOR.search(contents, position)
+        end = separator.start() if separator else len(contents)
+        placeholder = contents.startswith("{", end) and not contents.startswith("{{", end)
+        yield contents[position:end], placeholder
         position = contents.find(URN_PREFIX, end)
 
 
@@ -146,23 +166,36 @@ def shipped_sources(root: Path):
         if resolved.is_relative_to((root / REGISTRY_MODULE).resolve()):
             continue
         text = resolved.read_text(encoding="utf-8", errors="replace")
-        yield resolved, text
-        for target in INCLUDE.findall(text):
+        literals = list(string_literals(text))
+        yield resolved, text, literals
+        for _, start, contents, raw in literals:
+            if not INCLUDE_CALL.search(text, max(0, start - 64), start):
+                continue
+            target = contents if raw else decode_escapes(contents)
             included = (resolved.parent / target).resolve()
-            if included.is_file() and included.is_relative_to(root):
-                pending.append(included)
+            if not included.is_relative_to(root) or not included.is_file():
+                raise MissingInclude(
+                    f"{resolved.relative_to(root)}: include! target {target} is not a file in the repository"
+                )
+            pending.append(included)
+
+
+class MissingInclude(Exception):
+    pass
 
 
 def unregistered_tokens(root: Path, registry: Path) -> dict[str, list[str]]:
     urns = registered_urns(registry)
     missing: dict[str, list[str]] = {}
-    for path, text in shipped_sources(root):
-        for line, start, contents in string_literals(text):
+    for path, text, literals in shipped_sources(root):
+        for line, start, written, raw in literals:
+            contents = written if raw else decode_escapes(written)
             prefix_test = bool(PREFIX_TEST.search(text, max(0, start - 64), start))
-            for token, interpolated in literal_tokens(contents):
+            format_string = bool(FORMAT_STRING.search(text, max(0, start - 160), start))
+            for token, placeholder in literal_tokens(contents):
                 if token == URN_PREFIX:
                     continue
-                family = interpolated or (prefix_test and contents == token)
+                family = (format_string and placeholder) or (prefix_test and contents == token)
                 if family:
                     known = any(urn.startswith(token) for urn in urns)
                 else:
@@ -182,7 +215,11 @@ def main() -> int:
     if not registry.is_file():
         print(f"error registry not found: {registry}", file=sys.stderr)
         return 2
-    missing = unregistered_tokens(root, registry)
+    try:
+        missing = unregistered_tokens(root, registry)
+    except MissingInclude as error:
+        print(f"error URN registry: {error}", file=sys.stderr)
+        return 1
     if missing:
         print("shipped source names Chio error URNs absent from spec/errors/registry.yaml:", file=sys.stderr)
         for token in sorted(missing):
