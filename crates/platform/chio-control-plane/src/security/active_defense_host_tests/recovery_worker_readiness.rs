@@ -7,23 +7,17 @@ const OUTAGE_RECOVERY_TIMEOUT: Duration = Duration::from_secs(10);
 
 struct ToggleablePolicyPlanner {
     ready: AtomicBool,
-    refusals: AtomicU64,
 }
 
 impl ToggleablePolicyPlanner {
     fn new() -> Self {
         Self {
             ready: AtomicBool::new(true),
-            refusals: AtomicU64::new(0),
         }
     }
 
     fn set_ready(&self, ready: bool) {
         self.ready.store(ready, Ordering::Release);
-    }
-
-    fn refusals(&self) -> u64 {
-        self.refusals.load(Ordering::Acquire)
     }
 }
 
@@ -32,7 +26,6 @@ impl AttestedFindingResponsePolicyPlanner for ToggleablePolicyPlanner {
         if self.ready.load(Ordering::Acquire) {
             Ok(())
         } else {
-            self.refusals.fetch_add(1, Ordering::AcqRel);
             Err(PortError::unavailable())
         }
     }
@@ -65,7 +58,14 @@ async fn teardown_recovery_worker_lifts_an_expired_overlay_while_planning_is_una
     .unwrap_or_else(|_| panic!("primary worker did not crash"));
 
     planner.set_ready(false);
-    let refusals_before_teardown = planner.refusals();
+    let outage = ActiveDefenseServices::ensure_bootstrap_ready(host.orchestrator().as_ref());
+    assert!(
+        matches!(
+            &outage,
+            Err(ResponseWorkerTickError::Port(error)) if error.kind() == PortErrorKind::Unavailable
+        ),
+        "planning outage is not in effect when teardown starts: {outage:?}"
+    );
     fixture.clock.set(expires_at_unix_ms.saturating_add(1));
     drop(host);
     let lifted = tokio::time::timeout(OUTAGE_RECOVERY_TIMEOUT, async {
@@ -81,7 +81,6 @@ async fn teardown_recovery_worker_lifts_an_expired_overlay_while_planning_is_una
     )
     .await
     .is_ok_and(|vacancy| vacancy.is_ok());
-    let refusals_during_teardown = planner.refusals().saturating_sub(refusals_before_teardown);
     // Restore planning even when the regression fails so the retained
     // teardown finishes and does not hold the shared teardown supervisor.
     planner.set_ready(true);
@@ -93,10 +92,6 @@ async fn teardown_recovery_worker_lifts_an_expired_overlay_while_planning_is_una
     .unwrap_or_else(|_| panic!("teardown did not finish after planning recovered"))
     .unwrap_or_else(|error| panic!("wait for registry reclamation: {error}"));
 
-    assert!(
-        refusals_during_teardown > 0,
-        "teardown never observed the planning outage"
-    );
     assert!(
         lifted,
         "no recovery worker started while planning was unavailable; the expired overlay outlived its TTL"

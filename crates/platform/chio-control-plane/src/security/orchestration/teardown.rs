@@ -963,9 +963,7 @@ impl ProductionActiveDefenseHost {
     pub fn resume_incomplete_active_responses(
         &self,
     ) -> Result<(), ProductionActiveDefenseHostError> {
-        self.orchestrator
-            .resume_incomplete_until_drained()
-            .map_err(Into::into)
+        self.orchestrator.resume_incomplete_until_drained()
     }
 
     #[must_use]

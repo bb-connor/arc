@@ -332,6 +332,12 @@ impl ProductionRuntimeLeaseState {
         }
     }
 
+    fn admission_published(&self) -> bool {
+        self.control.lock().is_ok_and(|control| {
+            matches!(control.phase, ProductionRuntimeAdmissionPhase::Published)
+        })
+    }
+
     fn bound_worker(&self) -> Result<Arc<ProductionResponseWorker>, ResponseWorkerTickError> {
         self.worker
             .lock()
@@ -531,6 +537,14 @@ impl ProductionDeclassificationReceiptLifecycle {
         self.authority_claim.release();
     }
 
+    pub(super) fn ensure_runtime_admission_published(&self) -> Result<(), ResponseWorkerTickError> {
+        if self.runtime_leases.admission_published() {
+            Ok(())
+        } else {
+            Err(ResponseWorkerTickError::RuntimeAdmissionClosed)
+        }
+    }
+
     pub(super) fn ensure_runtime_admission_open(&self) -> Result<(), ResponseWorkerTickError> {
         let control = self
             .runtime_leases
@@ -669,6 +683,7 @@ struct PlanningRecoveryResponseWorkerPort {
     planner: Arc<DurableAttestedFindingBatchPlanner>,
     correlation_ingress: Arc<DurableCorrelationIngress>,
     recovery_limits: AttestedFindingResponseRecoveryLimits,
+    runtime_leases: Arc<ProductionRuntimeLeaseState>,
 }
 
 impl PlanningRecoveryResponseWorkerPort {
@@ -677,12 +692,14 @@ impl PlanningRecoveryResponseWorkerPort {
         planner: Arc<DurableAttestedFindingBatchPlanner>,
         correlation_ingress: Arc<DurableCorrelationIngress>,
         recovery_limits: AttestedFindingResponseRecoveryLimits,
+        runtime_leases: Arc<ProductionRuntimeLeaseState>,
     ) -> Self {
         Self {
             inner,
             planner,
             correlation_ingress,
             recovery_limits,
+            runtime_leases,
         }
     }
 }
@@ -709,9 +726,11 @@ impl ResponseWorkerPort for PlanningRecoveryResponseWorkerPort {
         // work, so a failed ingress or planner cannot strand an active overlay.
         // Planning errors still reach the worker and keep host readiness closed.
         // An ingress event that cannot be acknowledged never stalls outbox
-        // recovery.
+        // recovery. Only published runtime admission starts ingress or
+        // planning work; pending events and outbox records wait for restart.
         let tick = self.inner.tick(tick_sequence, shutdown_requested)?;
-        if self.planner.response_coordinator_is_ready() {
+        if self.runtime_leases.admission_published() && self.planner.response_coordinator_is_ready()
+        {
             let drained = self
                 .correlation_ingress
                 .drain_once(self.recovery_limits.max_records_per_pass());
@@ -881,6 +900,7 @@ impl ProductionActiveDefenseOrchestrator {
                 Arc::clone(&durable_planner),
                 Arc::clone(&correlation_ingress),
                 response_recovery_limits,
+                Arc::clone(&lifecycle.runtime_leases),
             ));
         let worker = Arc::new(ProductionResponseWorker::new(Arc::clone(&worker_port))?);
         lifecycle.bind_worker(&worker)?;
@@ -920,12 +940,16 @@ impl ProductionActiveDefenseOrchestrator {
         self.worker.start_parked(config).await
     }
 
-    pub(crate) fn resume_incomplete_until_drained(&self) -> Result<(), PortError> {
+    pub(crate) fn resume_incomplete_until_drained(
+        &self,
+    ) -> Result<(), ProductionActiveDefenseHostError> {
+        self.lifecycle.ensure_runtime_admission_published()?;
         self.correlation_ingress
             .drain_until_empty(self.response_recovery_limits)?;
+        self.lifecycle.ensure_runtime_admission_published()?;
         self.response_planner
-            .resume_incomplete_until_drained(self.response_recovery_limits)
-            .map(|_| ())
+            .resume_incomplete_until_drained(self.response_recovery_limits)?;
+        Ok(())
     }
 
     async fn start_teardown_recovery_worker(
