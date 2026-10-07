@@ -973,7 +973,8 @@ impl ChioKernel {
     ) -> Result<usize, KernelError> {
         self.ensure_receipt_persistence_ready()?;
         let mut recovered = 0usize;
-        let mut errors = Vec::new();
+        let mut failed = 0usize;
+        let mut first_failure: Option<(String, KernelError)> = None;
         let mut cursor: Option<String> = None;
         loop {
             let mut operation_ids = store.list_operations_with_pending_cleanup_action_page(
@@ -1055,34 +1056,43 @@ impl ChioKernel {
                             )
                         })?;
                     }
-                    Err(error) => errors.push(format!("operation {operation_id}: {error}")),
+                    Err(error) => {
+                        failed = failed.checked_add(1).ok_or_else(|| {
+                            KernelError::Internal(
+                                "terminal receipt recovery failure count overflowed usize"
+                                    .to_string(),
+                            )
+                        })?;
+                        if first_failure.is_none() {
+                            first_failure = Some((operation_id, error));
+                        }
+                    }
                 }
             }
             if !more_remaining {
                 break;
             }
         }
-        if errors.is_empty()
-            && !store
-                .list_operations_with_pending_cleanup_action_page(
-                    kind,
-                    AdmissionCleanupActionKind::TerminalReceipt,
-                    None,
-                    1,
-                )?
-                .is_empty()
+        if let Some((operation_id, error)) = first_failure {
+            return Err(KernelError::Internal(format!(
+                "one or more terminal receipt outboxes remain unfinished: {failed} failed, first operation {operation_id}: {error}"
+            )));
+        }
+        if !store
+            .list_operations_with_pending_cleanup_action_page(
+                kind,
+                AdmissionCleanupActionKind::TerminalReceipt,
+                None,
+                1,
+            )?
+            .is_empty()
         {
-            errors
-                .push("terminal receipt outboxes remain after the paged recovery pass".to_string());
+            return Err(KernelError::Internal(
+                "one or more terminal receipt outboxes remain after the paged recovery pass"
+                    .to_string(),
+            ));
         }
-        if errors.is_empty() {
-            Ok(recovered)
-        } else {
-            Err(KernelError::Internal(format!(
-                "one or more terminal receipt outboxes remain unfinished: {}",
-                errors.join("; ")
-            )))
-        }
+        Ok(recovered)
     }
 
     fn validate_terminal_receipt_payload_with_store(

@@ -88,6 +88,56 @@ fn receipt_state(
     }
 }
 
+fn stage_failing_heads(
+    kernel: &ChioKernel,
+    store: &InMemoryAdmissionOperationStore,
+    retained_authority: &str,
+    indexes: std::ops::Range<usize>,
+    heads: &mut Vec<String>,
+) -> TestResult {
+    for index in indexes {
+        let prepared = governed_response(kernel, retained_authority, &format!("retained-{index}"))?;
+        let head = compensated_with_pending_receipt(kernel, store, prepared)?;
+        heads.push(head.operation_id().to_string());
+    }
+    heads.sort_unstable();
+    Ok(())
+}
+
+fn stage_tail_after_heads(
+    kernel: &ChioKernel,
+    store: &InMemoryAdmissionOperationStore,
+    recovering_authority: &str,
+    label: &str,
+    heads: &[String],
+) -> TestResult<AdmissionOperation> {
+    let last_head = heads.last().ok_or("failing heads")?;
+    let tail = (0..1_000_000)
+        .find_map(|index| {
+            governed_response(kernel, recovering_authority, &format!("{label}-{index}"))
+                .ok()
+                .filter(|operation| operation.operation_id() > last_head.as_str())
+        })
+        .ok_or("healthy tail after every failing head")?;
+    compensated_with_pending_receipt(kernel, store, tail)
+}
+
+fn bounded_refusal(failed: usize, first_head: &str) -> String {
+    format!(
+        "one or more terminal receipt outboxes remain unfinished: {failed} failed, first operation {first_head}: {}",
+        KernelError::Internal(format!(
+            "terminal receipt operation {first_head} belongs to a different coordinator authority"
+        ))
+    )
+}
+
+fn refusal_detail(recovery: &Result<usize, KernelError>) -> TestResult<String> {
+    match recovery {
+        Err(KernelError::Internal(detail)) => Ok(detail.clone()),
+        other => Err(format!("{:.1024}", format!("{other:?}")).into()),
+    }
+}
+
 #[test]
 fn recovery_drains_a_healthy_outbox_behind_more_than_one_page_of_failing_heads() -> TestResult {
     let kernel = recovering_kernel();
@@ -95,26 +145,15 @@ fn recovery_drains_a_healthy_outbox_behind_more_than_one_page_of_failing_heads()
     let retained_authority = sha256_hex(b"retained-coordinator-authority");
     let recovering_authority = sha256_hex(b"recovering-coordinator-authority");
     let mut heads = Vec::with_capacity(FAILING_HEADS);
-    for index in 0..FAILING_HEADS {
-        let prepared =
-            governed_response(&kernel, &retained_authority, &format!("retained-{index}"))?;
-        let head = compensated_with_pending_receipt(&kernel, &store, prepared)?;
-        heads.push(head.operation_id().to_string());
-    }
-    heads.sort_unstable();
-    let last_head = heads.last().ok_or("failing heads")?.clone();
-    let tail = (0..1_000_000)
-        .find_map(|index| {
-            governed_response(
-                &kernel,
-                &recovering_authority,
-                &format!("recovering-{index}"),
-            )
-            .ok()
-            .filter(|operation| operation.operation_id() > last_head.as_str())
-        })
-        .ok_or("healthy tail after every failing head")?;
-    let tail = compensated_with_pending_receipt(&kernel, &store, tail)?;
+    stage_failing_heads(
+        &kernel,
+        &store,
+        &retained_authority,
+        0..FAILING_HEADS,
+        &mut heads,
+    )?;
+    let tail =
+        stage_tail_after_heads(&kernel, &store, &recovering_authority, "recovering", &heads)?;
     let mut inventory = heads.clone();
     inventory.push(tail.operation_id().to_string());
     assert_eq!(
@@ -144,25 +183,89 @@ fn recovery_drains_a_healthy_outbox_behind_more_than_one_page_of_failing_heads()
             AdmissionCleanupActionState::Pending
         );
     }
-    let expected = format!(
-        "one or more terminal receipt outboxes remain unfinished: {}",
-        heads
-            .iter()
-            .map(|head| {
-                format!(
-                    "operation {head}: {}",
-                    KernelError::Internal(format!(
-                        "terminal receipt operation {head} belongs to a different coordinator authority"
-                    ))
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("; ")
-    );
+    let first_head = heads.first().ok_or("failing heads")?;
+    let expected = bounded_refusal(FAILING_HEADS, first_head);
     assert!(
         matches!(&recovery, Err(KernelError::Internal(detail)) if detail == &expected),
         "{:.1024}",
         format!("{recovery:?}")
     );
+    Ok(())
+}
+
+#[test]
+fn recovery_refusal_keeps_one_failure_and_a_count_as_failing_heads_grow() -> TestResult {
+    let kernel = recovering_kernel();
+    let store = InMemoryAdmissionOperationStore::new();
+    let retained_authority = sha256_hex(b"retained-coordinator-authority");
+    let recovering_authority = sha256_hex(b"recovering-coordinator-authority");
+    let mut heads = Vec::new();
+    stage_failing_heads(
+        &kernel,
+        &store,
+        &retained_authority,
+        0..FAILING_HEADS,
+        &mut heads,
+    )?;
+    let first_tail =
+        stage_tail_after_heads(&kernel, &store, &recovering_authority, "first", &heads)?;
+    let first_recovery = kernel.recover_terminal_receipt_outboxes_with_store(
+        &store,
+        AdmissionOperationKind::GovernedActiveResponse,
+        Some(&recovering_authority),
+    );
+    let first_detail = refusal_detail(&first_recovery)?;
+    assert_eq!(
+        first_detail,
+        bounded_refusal(FAILING_HEADS, heads.first().ok_or("failing heads")?)
+    );
+
+    let grown = FAILING_HEADS + MAX_TERMINAL_RECEIPT_RECOVERY_OPERATIONS_PER_ACTIVATION;
+    stage_failing_heads(
+        &kernel,
+        &store,
+        &retained_authority,
+        FAILING_HEADS..grown,
+        &mut heads,
+    )?;
+    let second_tail =
+        stage_tail_after_heads(&kernel, &store, &recovering_authority, "second", &heads)?;
+    let mut inventory = heads.clone();
+    inventory.push(second_tail.operation_id().to_string());
+    assert_eq!(
+        store.list_operations_with_pending_cleanup_action(
+            AdmissionOperationKind::GovernedActiveResponse,
+            AdmissionCleanupActionKind::TerminalReceipt,
+            grown + 1,
+        )?,
+        inventory
+    );
+
+    let second_recovery = kernel.recover_terminal_receipt_outboxes_with_store(
+        &store,
+        AdmissionOperationKind::GovernedActiveResponse,
+        Some(&recovering_authority),
+    );
+    let second_detail = refusal_detail(&second_recovery)?;
+
+    assert_eq!(
+        second_detail,
+        bounded_refusal(grown, heads.first().ok_or("failing heads")?)
+    );
+    assert_eq!(second_detail.len(), first_detail.len());
+    for tail in [&first_tail, &second_tail] {
+        assert_eq!(
+            receipt_state(&store, tail.operation_id())?,
+            AdmissionCleanupActionState::Completed
+        );
+        assert_eq!(store.load(tail.operation_id())?, Some(tail.clone()));
+    }
+    assert_eq!(heads.len(), grown);
+    for head in &heads {
+        assert_eq!(
+            receipt_state(&store, head)?,
+            AdmissionCleanupActionState::Pending
+        );
+    }
     Ok(())
 }
