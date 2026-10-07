@@ -30,6 +30,8 @@ The first execution experience is one sealed work commitment: select an enrolled
 
 One C-layer controller serves the workbench, Omarchy QML and macOS clients through proposed `chio.operator.v1`. It runs outside the TCB and owns no signing keys, authority store, approval issuer, trusted fact assertions or independent execution journal. The gateway and process host remain separate processes inside their established trust boundaries. Omarchy supplies deployment and UI adapters for this same controller, not a platform fork.
 
+The first Linux delivery supports one explicitly enrolled graphical login session per UID. Bind that controller instance to the native-verified UID, boot identity and logind session, and bind each client to that same session through the qualified IPC/browser enrollment owner. A per-user systemd manager or socket is not proof of a login session. Refuse enrollment/connections from a second concurrent session, even for the same UID; no silent reassignment after logout or restart. A lingering manager does not preserve session authority. Lock, logout, unknown liveness and missed observations disable affected disclosures/actions; any requested closure is restricted to native owner references belonging to the bound session, never other sessions' work. Session replacement needs explicit enrollment and reconciliation of the original custody. Multiple independent sessions require a later per-session service design and qualification.
+
 | Omarchy integration need | Existing owner and required reuse |
 | --- | --- |
 | Tasks, fixed request, acceptance and projections | W1 `WorkHandleV1`/`WorkViewV1`; workbench task/worktree/review flows. |
