@@ -13,14 +13,18 @@
 ## Execution contract
 
 This is a dependency-gated integration plan. It does not invent code against
-unlanded APIs. Work packets 1-3 reconcile and qualify predecessor contracts;
-packet 3 may create generated candidate bindings and conformance probes; packets 4-6 create product runtime code after that candidate is approved. At each code packet, expand the
+unlanded APIs. Work packets 1-3 reconcile and qualify the selected profile's
+predecessor contracts. Packet 2's Observe lane independently permits a read-only
+packet 3 candidate and packet 4 client; its operator lane gates only the selected
+work/recovery/approval/stop capabilities. Packet 3 may create generated candidate
+bindings and conformance probes; packets 4-6 create product runtime code after
+the selected candidate is approved. At each code packet, expand the
 now-pinned owner API into a test-first patch plan with actual types and complete
 code before implementing it. A missing type or query stops that packet and
 returns the change to its named owner. It does not license a desktop substitute.
 
 The [program map](../../architecture/PROGRAM-MAP.md) contains exact source pins
-and existing paths. [OPERATOR](../../../spec/OPERATOR.md) and
+and existing paths. [OPERATOR](../specs/2026-10-07-desktop-integration/OPERATOR.md) and
 [QUALIFICATION](../specs/2026-10-07-desktop-integration/QUALIFICATION.md) define
 the required results. Platform plans cover their remaining lifecycle work.
 
@@ -28,7 +32,8 @@ the required results. Platform plans cover their remaining lifecycle work.
 
 | Location | Responsibility and availability |
 | --- | --- |
-| `spec/OPERATOR.md` | Proposed common projection; freeze only after owner schemas land |
+| `docs/superpowers/specs/2026-10-07-desktop-integration/OPERATOR.md` | Current proposed common projection; owner schemas and profile-specific acceptance govern promotion |
+| `spec/OPERATOR.md` and `spec/README.md` | Future normative projection and index entry, created only at packet 4's implemented-client wire freeze for the exposed profile |
 | `docs/architecture/PROGRAM-MAP.md` | Source owner register and dependency acceptance |
 | `crates/products/chio-operator/` | Proposed new crate for bounded view composition and owner dispatch; no native authority |
 | `crates/products/chio-workbench/` | Existing first client on the pinned workbench branch; review and worktree UX |
@@ -47,7 +52,7 @@ the required results. Platform plans cover their remaining lifecycle work.
 the exact paths in the map, not a desktop fork.
 
 - [ ] Read every pinned owner document using `git show <full-pin>:<path>` from the register. Record the landed successor commit or explicit unmet gate for each row.
-- [ ] Reconcile W1.0 against the actually landed recovery/process ABI. Record the real WorkClient/WorkTransport methods, work queries, preparation lookup and six observations before compiling a client.
+- [ ] Record the existing trust-control GET owners and host-plugin/bridge provenance before compiling the read-only client. Reconcile W1.0 against the actually landed recovery/process ABI before adding W1 capabilities; record the real WorkClient/WorkTransport methods, work queries, preparation lookup and six observations. Missing W1 does not block basic receipt/hook observation.
 - [ ] Open the foundation landing ledger and workbench inherited findings. Bind acceptance to the selected source/profile; do not copy historical M0-M4 counts into a release verdict.
 - [ ] Record owner handoffs for S9's narrowly sequenced M20 delta, S7 new kinds, S1 controller classification and the ADR-0023 thin-adapter/grant split. These are amendments required in those programs.
 - [ ] Record the approval utility's installed archive pin and Q05's deny/ID-mismatch cases with the host owner. Record missing production approval-path integration and S28 attribution separately.
@@ -57,35 +62,50 @@ the exact paths in the map, not a desktop fork.
 source. No uncommitted worktree is a predecessor. No open upstream branch alone
 counts as a design defect; missing required native acceptance still blocks use.
 
-## Packet 2: Qualify the event, recovery and operator lanes
+## Packet 2: Qualify Observe and selected operator lanes independently
 
 `boundary_class: prevent` for owner actions and `detect_only` for event views;
 `planning_status: ready_after_adr`.
 
-**Files:** Owner S3/S4/S5/S8/S9 design paths in PROGRAM-MAP; their owning crates;
+**Files:** Owner S3/S4/S5/S8/S9 design paths in PROGRAM-MAP; trust-control read
+handlers and host observation adapters; their owning crates;
 `docs/superpowers/evidence/desktop-operator/predecessors.md`.
 
-- [ ] Land and qualify S5 Part A, S3 phase 1 and the owner-reviewed M20 disposition delta. Verify terminal receipts and retained uncertainty with post-effect failures (Q02-Q04).
+### Observe lane
+
+- [ ] Land and qualify S5 Part A, then Part B with desktop as the explicit second wire consumer. Qualify stable subscription identity, gap/restore semantics, audience authorization and bounded non-persisting re-reads. Reproduce Q09/Q21 without spending the work's settlement reserve. Recovery projection waits for its landed event/read owner; work projection waits for the W1 query, matching S5's per-source gates.
+- [ ] Bind the existing trust-control receipt query/analytics/tool/child, lineage, budget-usage and revocation GETs through bounded authenticated read adapters. Preserve native read-principal rules and exclude mutation methods even where paths are shared. Qualify request/filter/pagination correlation (Q04) and explicit feature availability (Q16).
+- [ ] Qualify the host owner's session/capability/receipt joins and hook source attribution (Q11). Host-reported success remains unverified and `detect_only`; trust-control receipt presence is not proof of a live or complete hook session. Expose no session inventory until its bounded authenticated host adapter exists.
+- [ ] Qualify the selected native IPC and non-persisting read adapters, including wrong-session/stale-peer refusal and no quota-draining inspect polling (Q09-Q10/Q21). Missing recovery adapters disable recovery views, not unrelated receipt/hook reads.
+- [ ] Record Observe predecessor acceptance. This independently permits the read-only packet 3 candidate and packet 4 controller/workbench work. Its complete client acceptance is Q04, Q09-Q11, Q16-Q17 and Q21; Q01-Q03 are added only if the build exposes W1 views or recovery capability.
+
+### Selected operator/work/recovery lane
+
+- [ ] For selected effect paths, land and qualify S3 phase 1 and the owner-reviewed M20 disposition delta. Verify terminal receipts and retained uncertainty with post-effect failures (Q02-Q04). These are not prerequisites for basic receipt/hook observation.
 - [ ] Qualify S8 phase 1 kernel-scope stop and S30 reach. Keep tenant/recovery stop unavailable until phases 4/5. Record route authorization and restart evidence (Q08).
 - [ ] Qualify S4 phases 1/2 and process-host live cancel/revoke. Reuse `cargo test --locked -p chio-cli --test process_host` for the existing process-host suite, then add native Q07/Q19 regressions in that owner. Existing stopped-host tests alone do not prove live control.
-- [ ] Implement S5 Part B as the explicit second wire consumer. Qualify stable subscription identity, gap/restore semantics, authorization and non-persisting re-reads. Reproduce Q09/Q21 without spending the work's settlement reserve.
-- [ ] Qualify W1 preparation/command/work lookup with lost replies and missing handles; qualify recovery repairs at its current tree. Absence from one read is not proof no original effect occurred.
+- [ ] Qualify W1 preparation/command/work lookup with lost replies and missing handles before exposing those capabilities. Qualify recovery repairs at their current source, with complete dispositions for historical, merged/predecessor and later findings. Calling the old counts historical does not resolve them. Absence from one read is not proof no original effect occurred.
 - [ ] Qualify S28 roster plus the production endorsement path and installed native approval fix. Q05/Q06 must prove no retained approved artifact for deny or a mismatched approval ID.
 - [ ] Commit owner changes in their own programs, then update only the desktop dependency references. Do not use a green desktop mock to close any owner gate.
 
-## Packet 3: Prepare one wire candidate after its owners
+**Acceptance:** Each capability records its own predecessor evidence. Observe may
+advance while S4/S8/S28/M20/W1 or mutation recovery gates remain unmet; those
+capabilities stay explicitly unavailable. Passing one lane does not close another.
+
+## Packet 3: Prepare the selected wire candidate after its owners
 
 `boundary_class: advisory_only`; `planning_status: ready_after_adr`.
 
-**Files:** `spec/OPERATOR.md`; owner schemas; proposed
+**Files:** `docs/superpowers/specs/2026-10-07-desktop-integration/OPERATOR.md`;
+owner schemas; proposed
 `tests/integration/operator/` and qualification manifest.
 
-- [ ] Resolve work enumeration, scope/health views and authenticated recovery reads through their owners. W1's existing query inventory does not imply ListWork exists.
-- [ ] Import the landed work/recovery/event/stop types. Write one generated wire binding for `chio.operator.v1`; retire platform names with no compatibility fallback because neither was released.
+- [ ] After packet 2's Observe lane, resolve selected read, scope/health and host provenance views through their owners. Add authenticated recovery reads and work enumeration only after their independent gates pass. W1's existing query inventory does not imply ListWork exists.
+- [ ] Import landed read/event types for the read-only candidate, then work/recovery/stop types only for separately eligible capabilities. Write one generated wire binding for `chio.operator.v1`, with an explicit supported-capability set and unavailable results for absent owners; retire platform names with no compatibility fallback because neither was released.
 - [ ] Encode full request/response identity, native session/audience and intent correlation, including errors, retries and pagination. Run Q04 substitutions individually against valid controls.
-- [ ] Cover Q15/Q16: unique dimension budgets with exact units/bounds, missing values distinguished from unlimited, nonempty evaluated profiles and fresh evidence. Require the installed owner to enforce each claimed limit.
+- [ ] Cover Q16's nonempty evaluated profiles and fresh evidence. For any exposed typed budget/limit capability, also cover Q15: unique dimensions with exact units/bounds, missing values distinguished from unlimited and independent native enforcement of each claimed limit. A read-only usage row makes no new enforcement claim.
 - [ ] Freeze bounded frame/list/event limits and their refusal behavior from owner constraints and measurements. Unknown versions and unsupported owner capabilities fail explicitly.
-- [ ] Record provisional schema/binding approval with source hashes and owner-conformance probe results. Commit `feat(operator): add candidate owner projection`. This permits packet 4 development, not a frozen client ABI or release. Final wire freeze waits for the implemented-client acceptance at the end of packet 4.
+- [ ] Record provisional schema/binding approval for the exact supported capabilities with source hashes and owner-conformance probe results. Commit `feat(operator): add candidate owner projection`. This permits packet 4 development, not a frozen client ABI or release. A read-only candidate does not wait for unexposed mutations. Final wire freeze waits for implemented-client acceptance at the end of packet 4.
 
 **Acceptance:** No copied WorkPhase, retry enum, event store, capability issuer,
 receipt signer or approval state machine. Schema success alone cannot satisfy
@@ -96,17 +116,19 @@ the installed-owner correlation tests.
 `boundary_class: advisory_only` for the controller; `planning_status: ready_after_adr`.
 
 **Files:** Create `crates/products/chio-operator/{Cargo.toml,src/lib.rs,src/main.rs}`
-and `tests/integration/operator/` after packet 3; modify workspace `Cargo.toml`.
+and `tests/integration/operator/` after the selected packet 3 candidate; modify
+workspace `Cargo.toml`. At final wire freeze, promote the accepted projection to
+`spec/OPERATOR.md` and add its normative entry to `spec/README.md`.
 Adapt existing `crates/products/chio-workbench/src/{model.rs,engine.rs,web.rs}`,
 `web/{app.js,index.html,style.css}` and its `tests/{workbench.rs,git_tasks.rs,browser-smoke.mjs}`.
 
-- [ ] Write red tests for independent work observations, stale/error replies, absent owners and authority-bearing material in UI state. An unavailable owner must produce an explicit unavailable feature, not fixture data.
+- [ ] Write red tests for the selected observation surface, stale/error replies, absent owners and authority-bearing material in UI state. Add independent work-observation cases only when W1 is exposed. An unavailable owner must produce an explicit unavailable feature, not fixture data; an Observe build cannot dispatch unqualified mutations.
 - [ ] Implement authenticated owner connections and bounded in-memory projection only. Keep gateway/process host in separate processes. Bind browser sessions to local authenticated context; prohibit authority tokens in URLs and logs.
 - [ ] Adapt the workbench to this projection while preserving worktrees, patch SHA-256 and reviewable differences. Close its inherited findings before counting the workbench as accepted.
 - [ ] Run `cargo test --locked -p chio-operator` once the proposed crate exists; run the existing `cargo test --locked -p chio-workbench --test workbench` and `cargo test --locked -p chio-workbench --test git_tasks` against the reconciled workbench branch. Expected: all targeted owner/client cases pass, no skips masquerading as acceptance.
 - [ ] Execute the browser suite using the workbench's installed dependencies and documented fixture server. Exercise keyboard, screen reader, untrusted artifact content, revoked session and reconnect. Retain screenshots plus the native owner transcripts (Q17).
 - [ ] Measure idle/cold/warm resource use, event pressure and restart recovery. Freeze numeric release bounds and verify overload refuses new work without weakening a gate.
-- [ ] Run the protocol-freeze matrix against the implemented workbench client and the independent conformance client from packet 3. Freeze `chio.operator.v1` only after these cross-client/native results pass; schema changes during development return to packet 3 conformance.
+- [ ] Run the profile-specific protocol-freeze matrix against the implemented workbench client and the independent conformance client from packet 3. An Observe-only freeze requires Q04, Q09-Q11, Q16-Q17 and Q21; exposing W1 views/recovery adds Q01-Q03 and the applicable owner evidence. Freeze `chio.operator.v1` for the exact supported surface only after these cross-client/native results pass, promote it to `spec/OPERATOR.md`, and index it in `spec/README.md`. Unexposed mutation contracts remain proposed; later capability additions return to packet 3 conformance and owning qualification.
 - [ ] Commit `feat(operator): add workbench owner client` after code, security-boundary, final wire-freeze and native acceptance review.
 
 ## Packet 5: Deliver sealed work using the existing runner
@@ -118,6 +140,7 @@ Adapt existing `crates/products/chio-workbench/src/{model.rs,engine.rs,web.rs}`,
 `repository_review.py`, model/gateway owner paths; W1 owner; selected host
 integration; workbench client; S7 owner evidence registration.
 
+- [ ] Require packet 2's selected work/recovery/operator gates and the execution profile's foundation/S7 acceptance. A prior read-only packet 4 freeze provides no mutation or sealed-work qualification.
 - [ ] Bind the fixed recipe, project/base, artifact policy, evaluator, limits and acceptance contract to W1. Preserve original identity through every recovery action.
 - [ ] Reuse network-less container execution and restricted host tools. If native Seatbelt/bubblewrap is selected, require that exact launch/egress/descendant tuple and new S7 kind first; never run Node in the tool-server cage.
 - [ ] Place any external acceptance oracle in the runner/work owner. Bind its evidence to the original contract; keep artifact creation, acceptance, settlement and external delivery separate.

@@ -14,7 +14,7 @@ it does not create another runtime or authority.
 
 1. [Accepted decision](../../../adr/ADR-0038-desktop-operator-program.md).
 2. [Program map and pinned source owners](../../../architecture/PROGRAM-MAP.md).
-3. [Shared operator projection](../../../../spec/OPERATOR.md).
+3. [Shared operator projection](OPERATOR.md).
 4. [Qualification and acceptance](QUALIFICATION.md).
 5. [Delivery plan](../../plans/2026-10-07-desktop-integration.md).
 6. [Omarchy annex](../2026-10-07-omarchy-integration/ANNEX.md).

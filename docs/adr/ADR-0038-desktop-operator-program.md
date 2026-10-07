@@ -5,6 +5,7 @@
 - `boundary_class`: `advisory_only` for the controller and its displays; authority belongs to the referenced kernel owners.
 - `planning_status`: `ready_after_adr`; individual release gates below remain mandatory.
 - Scope: desktop integration only. This decision does not ratify unrelated NVIDIA strategy decisions or change Chio's public positioning.
+- Number allocation: ADR-0023 through ADR-0037 remain reserved for the strategy candidates indexed by input N in PROGRAM-MAP; choosing 0038 does not accept those candidates.
 
 ## Decision
 
@@ -68,7 +69,7 @@ insufficient.
 | Profile | `boundary_class` by operation | `planning_status` | Required owner evidence |
 | --- | --- | --- | --- |
 | Observe | `detect_only` for hook activity; `cannot_see` for uninstrumented activity | `ready_after_adr` | S5 Part B and source-attributed observations; gaps shown |
-| Approve and stop | `prevent` at the native pre-effect gate; display remains `advisory_only` | `ready_after_adr` | S28 identity, production endorsement verifier, exact decision binding, S4 closure and S8 durable stop |
+| Approve and stop | `prevent` at the native pre-effect gate; display remains `advisory_only` | `ready_after_adr` | Approval: S28 identity, production endorsement verifier and exact decision binding. Independently gate per-task stop through S4 and Kernel stop through S8 with their own native authorization; absent approval prerequisites do not disable a qualified stop. |
 | Sealed work | `prevent` for kernel-owned tools; isolation coverage separately attested | `ready_after_adr` | W1, recovery fixes, restricted host and runner, S7 backend evidence |
 | Protected interactive | `prevent` only for qualified mediated tools; native shell removed | `ready_after_adr` | Host-specific doc 19 I01-I08 acceptance |
 | Boundary interactive | `prevent` at qualified routed grant points; `cannot_see` for permitted local shell/file effects | `deferred` | Qualified isolation/egress/descendant coverage and S7 kind; no per-write receipt claim |
@@ -83,7 +84,7 @@ track, not a shortcut to complete mediation.
 ## Reference before redefine
 
 [PROGRAM-MAP](../architecture/PROGRAM-MAP.md) names the source owners and pinned
-inputs. [OPERATOR](../../spec/OPERATOR.md) defines the desktop projection and
+inputs. [OPERATOR](../superpowers/specs/2026-10-07-desktop-integration/OPERATOR.md) defines the desktop projection and
 the conditions for a future wire freeze. The owner contracts control task
 observations, recovery, events, stop, identity, IPC, processes, credentials,
 host qualification and confinement. Missing owner functionality is a dependency
@@ -121,7 +122,7 @@ validation records; the replacement is intentionally smaller.
 The shared-program/Omarchy change owns this ADR and the common documents. The
 macOS annex is reviewed as a dependent change on that branch. No merge or
 runtime rollout is authorized by documentation approval. The PRs remain open
-for review; bot approval is a documentation gate, not product qualification.
+for review; bot verdicts are documentation-review evidence, not product qualification.
 
 ## Positioning and alternatives
 

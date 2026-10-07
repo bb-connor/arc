@@ -8,7 +8,7 @@ This is a platform annex of the [shared desktop operator program](../2026-10-07-
 
 - [Platform design and qualification](ANNEX.md)
 - [Implementation plan](../../plans/2026-10-07-omarchy-integration/IMPLEMENTATION.md)
-- [Shared operator projection](../../../../spec/OPERATOR.md)
+- [Shared operator projection](../2026-10-07-desktop-integration/OPERATOR.md)
 - [Shared acceptance matrix](../2026-10-07-desktop-integration/QUALIFICATION.md)
 - [Upstream research](research/omarchy-upstream.md)
 - [Chio readiness and native approval handoff](research/chio-readiness.md)
