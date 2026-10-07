@@ -213,6 +213,7 @@ impl ChioKernel {
             credentials,
             metadata: metadata.as_ref(),
             attempted: false,
+            retained: false,
             store_entered: false,
             failed: false,
             return_input: Some(input),

@@ -380,19 +380,17 @@ impl PreparedNativeFlowDispatch<'_> {
             .egress_fence_plan
             .as_ref()
             .map(|plan| plan.expires_at_unix_ms);
-        let (prepared, egress, ledger) = match consumption.as_ref() {
-            Some(consumption) => self.custody.retain_for_declassified_capture(
-                deadline.ok_or(NativeFlowError::PolicyEvidence)?,
-                authority.grant_index()?,
-                self.policy_evidence.canonical_bytes(),
-                consumption,
-            )?,
-            None => self.custody.retain_for_capture(
-                deadline,
-                authority.grant_index()?,
-                self.policy_evidence.canonical_bytes(),
-            )?,
-        };
+        if consumption.is_some() && deadline.is_none() {
+            return Err(NativeFlowError::PolicyEvidence);
+        }
+        // The kernel verifies credentials and the recovery lease before any
+        // durable write, then treats every later failure as unconfirmed.
+        let (prepared, egress, ledger) = authority.retain_for_capture(
+            self.custody,
+            deadline,
+            self.policy_evidence.canonical_bytes(),
+            consumption.as_ref(),
+        )?;
         let admission = declassification::confirm_consumption(
             self.admission,
             consumption.as_ref(),

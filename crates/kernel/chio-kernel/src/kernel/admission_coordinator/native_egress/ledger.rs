@@ -49,7 +49,7 @@ impl<'a> PreparedNativeSecurityEgress<'a> {
         )
     }
 
-    fn retain_for_capture_inner(
+    pub(super) fn retain_for_capture_inner(
         self,
         egress_expires_at_unix_ms: Option<u64>,
         grant_index: usize,
@@ -63,12 +63,12 @@ impl<'a> PreparedNativeSecurityEgress<'a> {
         ),
         KernelError,
     > {
-        self.validate_ledger_input(grant_index, policy_json)?;
-        if consumption.is_some() != self.request.declassification_grant.is_some()
-            || (consumption.is_some() && egress_expires_at_unix_ms.is_none())
-        {
-            return Err(invalid("native capture declassification selection differs"));
-        }
+        self.validate_retention_input(
+            egress_expires_at_unix_ms,
+            grant_index,
+            policy_json,
+            consumption,
+        )?;
         let (prepared, history) = if let Some(expires) = egress_expires_at_unix_ms {
             let acquired = self.acquire(expires)?;
             let history = acquired.commit_current_with_declassification(consumption)?;
@@ -78,6 +78,23 @@ impl<'a> PreparedNativeSecurityEgress<'a> {
         };
         let ledger = prepared.retain_dispatch_ledger_current(grant_index, policy_json)?;
         Ok((prepared, history, ledger))
+    }
+
+    /// Validate immutable retention inputs without writing any custody.
+    pub(super) fn validate_retention_input(
+        &self,
+        egress_expires_at_unix_ms: Option<u64>,
+        grant_index: usize,
+        policy_json: &[u8],
+        consumption: Option<&chio_security_types::ports::DeclassificationConsumptionEvidenceCommit>,
+    ) -> Result<(), KernelError> {
+        self.validate_ledger_input(grant_index, policy_json)?;
+        if consumption.is_some() != self.request.declassification_grant.is_some()
+            || (consumption.is_some() && egress_expires_at_unix_ms.is_none())
+        {
+            return Err(invalid("native capture declassification selection differs"));
+        }
+        Ok(())
     }
 
     /// Validate immutable journal inputs before acquiring any egress custody.

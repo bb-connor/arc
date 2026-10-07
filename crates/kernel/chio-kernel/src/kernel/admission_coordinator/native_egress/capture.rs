@@ -18,6 +18,8 @@ pub struct NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
     credentials: &'a mut DispatchCredentialReservation<'kernel>,
     metadata: Option<&'a serde_json::Value>,
     attempted: bool,
+    retained: bool,
+    /// Set before the first durable custody write; later failures are unconfirmed.
     store_entered: bool,
     failed: bool,
     return_input: Option<DurableToolReturnContextInput<'a>>,
@@ -38,6 +40,109 @@ impl<'a, 'kernel: 'a> NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
             .durable_hold_result()
             .map(|hold| hold.grant_index)
             .ok_or_else(|| invalid("native capture requires the actual invocation hold"))
+    }
+
+    /// Retain the verified policy, optional egress fence and one-shot
+    /// declassification consumption for this authority's single capture.
+    /// Live credentials, the recovery lease and every deadline are checked
+    /// before the first durable write. From that write onward a failure leaves
+    /// dispatch unconfirmed for recovery, never a definite pre-commit rejection.
+    pub fn retain_for_capture<'p>(
+        &mut self,
+        prepared: PreparedNativeSecurityEgress<'p>,
+        egress_expires_at_unix_ms: Option<u64>,
+        policy_json: &[u8],
+        consumption: Option<&chio_security_types::ports::DeclassificationConsumptionEvidenceCommit>,
+    ) -> Result<
+        (
+            PreparedNativeSecurityEgress<'p>,
+            Option<NativeSecurityEgressHistoryV1>,
+            crate::admission_operation::NativeSecurityDispatchLedgerRecordV1,
+        ),
+        KernelError,
+    > {
+        let result = self.retain_once(
+            prepared,
+            egress_expires_at_unix_ms,
+            policy_json,
+            consumption,
+        );
+        if result.is_err() {
+            self.failed = true;
+        }
+        result
+    }
+
+    fn retain_once<'p>(
+        &mut self,
+        prepared: PreparedNativeSecurityEgress<'p>,
+        egress_expires_at_unix_ms: Option<u64>,
+        policy_json: &[u8],
+        consumption: Option<&chio_security_types::ports::DeclassificationConsumptionEvidenceCommit>,
+    ) -> Result<
+        (
+            PreparedNativeSecurityEgress<'p>,
+            Option<NativeSecurityEgressHistoryV1>,
+            crate::admission_operation::NativeSecurityDispatchLedgerRecordV1,
+        ),
+        KernelError,
+    > {
+        if self.attempted || self.failed || self.retained {
+            return Err(invalid(
+                "native capture authority already attempted capture",
+            ));
+        }
+        self.retained = true;
+        let grant_index = self.grant_index()?;
+        if !std::ptr::eq(prepared.kernel, self.kernel)
+            || !std::ptr::eq(prepared.request, self.request)
+            || prepared.operation != *self.admission.operation()
+        {
+            return Err(invalid(
+                "native capture preparation belongs to another live evaluation",
+            ));
+        }
+        if self
+            .return_input
+            .as_ref()
+            .is_some_and(|input| input.matched_grant_index != grant_index)
+        {
+            return Err(invalid("native lifecycle replaced the selected grant"));
+        }
+        prepared.validate_retention_input(
+            egress_expires_at_unix_ms,
+            grant_index,
+            policy_json,
+            consumption,
+        )?;
+        let credentials_until = self
+            .credentials
+            .verify_native_dispatch(self.admission, self.request, grant_index, self.metadata)?
+            .valid_until_unix_ms();
+        let runtime = self.kernel.durable_runtime()?;
+        {
+            let _guard = runtime.lock_mutations()?;
+            let now = runtime.refresh_trusted_time(0)?;
+            let lease = self
+                .kernel
+                .claim_admission_recovery(self.admission.operation(), now)?;
+            let valid_until = credentials_until
+                .min(lease.untrusted_claim().expires_at_unix_ms())
+                .min(lifecycle::policy_deadline(policy_json)?)
+                .min(egress_expires_at_unix_ms.unwrap_or(u64::MAX));
+            if valid_until <= now {
+                return Err(invalid("native capture authority expired before retention"));
+            }
+        }
+        // No custody has been retained for this capture before this point.
+        self.credentials.retain_if_dropped()?;
+        self.store_entered = true;
+        prepared.retain_for_capture_inner(
+            egress_expires_at_unix_ms,
+            grant_index,
+            policy_json,
+            consumption,
+        )
     }
 
     /// Retain on uncertain commit, then bind the real reservation and policy to
@@ -317,6 +422,7 @@ impl ChioKernel {
             credentials,
             metadata,
             attempted: false,
+            retained: false,
             store_entered: false,
             failed: false,
             return_input: None,
