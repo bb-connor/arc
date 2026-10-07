@@ -278,6 +278,39 @@ async fn next_message(body: &mut Body, expected: impl Fn(&Value) -> bool) -> Val
     .expect("SSE did not deliver its required message before the outer deadline")
 }
 
+/// Up to 2 KiB of a terminal POST body, read under `WAIT`, for a failed
+/// precondition message.
+async fn body_detail(response: Response) -> String {
+    tokio::time::timeout(WAIT, axum::body::to_bytes(response.into_body(), 64 * 1024))
+        .await
+        .ok()
+        .and_then(Result::ok)
+        .map(|bytes| String::from_utf8_lossy(&bytes).chars().take(2048).collect())
+        .unwrap_or_else(|| "no terminal POST body".into())
+}
+
+/// Subscribes to the signal the actual worker's `WorkerExit` guard publishes
+/// when its thread ends. Taken before dispatch, while the worker still serves.
+fn serving_worker(session: &RemoteSession) -> tokio::sync::watch::Receiver<bool> {
+    let worker = session.worker_serving_closed.subscribe();
+    assert!(
+        !*worker.borrow(),
+        "setup precondition: the worker stopped serving before dispatch"
+    );
+    worker
+}
+
+/// Whether the actual worker exited within `WAIT`. The worker's pre-exit work
+/// runs under this bound, so the closure and refusal checks each start their
+/// own `WAIT` only after the exit.
+async fn worker_exited(worker: &mut tokio::sync::watch::Receiver<bool>) -> bool {
+    match tokio::time::timeout(WAIT, worker.wait_for(|closed| *closed)).await {
+        Ok(Ok(_)) => true,
+        Ok(Err(_)) => panic!("setup precondition: the session dropped its worker exit signal"),
+        Err(_) => false,
+    }
+}
+
 #[tokio::test]
 async fn first_get_after_initialized_delivers_already_retained_roots_request() {
     let fixture = fixture(0, None);
@@ -340,6 +373,7 @@ async fn pending_post_and_get_close_when_projection_kills_actual_worker() {
     let fixture = fixture(WORKER_KILLING_OUTPUT_BYTES, None);
     let session = initialize(&fixture, false).await;
     initialized(&fixture, &session).await;
+    let mut worker = serving_worker(&session);
     let get = handle_get(
         State(fixture.state.clone()),
         get_request(&session.session_id),
@@ -348,23 +382,27 @@ async fn pending_post_and_get_close_when_projection_kills_actual_worker() {
     assert_eq!(get.status(), StatusCode::OK);
     let call = post(&fixture, Some(&session.session_id), &read_call(2)).await;
     assert_eq!(call.status(), StatusCode::OK);
+    // Both HTTP owners stay held and unpolled until the actual worker exits, so
+    // only the worker's `WorkerExit` guard can publish that exit.
+    let exited = worker_exited(&mut worker).await;
+    let calls = fixture.calls.load(Ordering::SeqCst);
+    if !exited {
+        let detail = body_detail(call).await;
+        panic!(
+            "setup timeout: the actual worker did not exit before the pre-exit deadline; \
+             calls={calls}; response={detail}"
+        );
+    }
+    if calls != 1 {
+        let detail = body_detail(call).await;
+        panic!(
+            "setup precondition: the worker exited after {calls} actual tool calls, not one; \
+             response={detail}"
+        );
+    }
     let (post_body, get_body) = tokio::join!(
         tokio::time::timeout(WAIT, axum::body::to_bytes(call.into_body(), 64 * 1024)),
         tokio::time::timeout(WAIT, axum::body::to_bytes(get.into_body(), 64 * 1024)),
-    );
-    assert_eq!(
-        fixture.calls.load(Ordering::SeqCst),
-        1,
-        "the actual tool call did not reach execution; response={}",
-        post_body
-            .as_ref()
-            .ok()
-            .and_then(|result| result.as_ref().ok())
-            .map(|bytes| String::from_utf8_lossy(bytes)
-                .chars()
-                .take(2048)
-                .collect::<String>())
-            .unwrap_or_else(|| "POST had no terminal body".into()),
     );
     let post_body = post_body
         .expect("POST stayed open after its worker died")
@@ -398,6 +436,7 @@ async fn waiting_post_owner_observes_actual_worker_death_before_enqueue() {
     let fixture = fixture(WORKER_KILLING_OUTPUT_BYTES, Some(gate.clone()));
     let session = initialize(&fixture, false).await;
     initialized(&fixture, &session).await;
+    let mut worker = serving_worker(&session);
     let pending = post(&fixture, Some(&session.session_id), &read_call(2)).await;
     assert_eq!(pending.status(), StatusCode::OK);
     let entered = tokio::time::timeout(WAIT, async {
@@ -407,21 +446,13 @@ async fn waiting_post_owner_observes_actual_worker_death_before_enqueue() {
     })
     .await;
     if entered.is_err() {
-        let body =
-            tokio::time::timeout(WAIT, axum::body::to_bytes(pending.into_body(), 64 * 1024)).await;
-        let detail = body
-            .as_ref()
-            .ok()
-            .and_then(|result| result.as_ref().ok())
-            .map(|bytes| {
-                String::from_utf8_lossy(bytes)
-                    .chars()
-                    .take(2048)
-                    .collect::<String>()
-            })
-            .unwrap_or_else(|| "no terminal POST body".into());
-        panic!("worker-death fixture did not enter actual dispatch: {detail}");
+        let detail = body_detail(pending).await;
+        panic!("setup timeout: the worker-death fixture did not enter actual dispatch: {detail}");
     }
+    assert!(
+        !*worker.borrow(),
+        "setup precondition: the worker stopped serving while its gated dispatch was held"
+    );
     // The first SSE body still owns the mutex. A dead actor cannot require a
     // client to drop that body before refusing the next request.
     let request = post_request(Some(&session.session_id), &read_call(3));
@@ -439,6 +470,15 @@ async fn waiting_post_owner_observes_actual_worker_death_before_enqueue() {
     );
     *gate.0.lock().unwrap() = true;
     gate.1.notify_all();
+    // Neither POST is polled again until the actual worker exits, so only the
+    // worker's `WorkerExit` guard can publish that exit.
+    if !worker_exited(&mut worker).await {
+        let calls = fixture.calls.load(Ordering::SeqCst);
+        panic!(
+            "setup timeout: the actual worker did not exit before the pre-exit deadline; \
+             calls={calls}"
+        );
+    }
     let waiting = tokio::time::timeout(WAIT, waiting)
         .await
         .expect("dead worker left the second POST waiting for the client-owned first stream");
