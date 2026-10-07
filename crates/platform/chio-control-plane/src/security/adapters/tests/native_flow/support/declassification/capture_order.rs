@@ -13,6 +13,8 @@ const RUNTIME_EXPIRED: &str =
 const RECONCILIATION_REQUIRED: &str = "security dispatch outcome requires reconciliation: security native dispatch capture callback failed; authoritative recovery required";
 const COMPENSATED_REPLAY: &str =
     "durable admission failed: request replay is retained in state CompensatedBeforeDispatch";
+const UNCONFIRMED_REPLAY: &str =
+    "durable admission failed: native preparation requires original pre-budget authority";
 
 struct Custody {
     state: AdmissionOperationState,
@@ -26,12 +28,16 @@ struct Custody {
 }
 
 fn custody(fixture: &Fixture) -> TestResult<Custody> {
+    custody_of(fixture, &fixture.request.request_id)
+}
+
+fn custody_of(fixture: &Fixture, request_id: &str) -> TestResult<Custody> {
     let store = fixture.authority.admission_operation_store();
     let fence = fixture.authority.mutation_fence();
     let now = fixture.clock.snapshot();
     let (operation, _) = store
         .load_unambiguous_retained_tool_request(
-            &AdmissionIdentifier::try_new("request", &fixture.request.request_id)?,
+            &AdmissionIdentifier::try_new("request", request_id)?,
             &fence,
             now,
         )?
@@ -57,15 +63,15 @@ fn custody(fixture: &Fixture) -> TestResult<Custody> {
                 u64::from(usage.captured_invocations),
             )
         });
-    let (_, runtime) = store
+    let runtime = store
         .load_runtime_participant_history(id, &fence, now)?
-        .ok_or("runtime history")?;
-    let (_, approval) = store
+        .map_or_else(Vec::new, |(_, history)| history);
+    let approval = store
         .load_governed_approval_claim_history(id, &fence, now)?
-        .ok_or("approval history")?;
-    let (_, dpop) = store
+        .map_or_else(Vec::new, |(_, history)| history);
+    let dpop = store
         .load_dpop_replay_claim_history(id, &fence, now)?
-        .ok_or("DPoP history")?;
+        .map_or_else(Vec::new, |(_, history)| history);
     let connection = rusqlite::Connection::open_with_flags(
         fixture._directory.path().join("admission.db"),
         rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
@@ -236,5 +242,83 @@ fn native_declassification_ledger_fault_after_consumption_remains_unconfirmed() 
         after.dpop,
         [DpopReplayClaimDisposition::ReservedBeforeDispatch]
     );
+
+    // Recovery resolves the unconfirmed capture without a second consumption.
+    let replay = fixture
+        .kernel
+        .evaluate_tool_call_blocking_with_security_context(&fixture.request, &fixture.context)?;
+    assert_eq!(replay.verdict, Verdict::Deny);
+    assert_eq!(replay.reason.as_deref(), Some(UNCONFIRMED_REPLAY));
+    assert!(replay.output.is_none());
+    let recovered = custody(&fixture)?;
+    assert_released(&recovered);
+    assert_eq!(recovered.uses, ["consumed_pending_dispatch"]);
+    assert!(recovered.declassified_egress);
+    assert!(!recovered.ledger);
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
+    Ok(())
+}
+
+#[test]
+fn native_declassification_unconfirmed_retention_refuses_grant_reuse() -> TestResult {
+    let (fixture, _) = profile(false, 300)?;
+    let store = fixture.authority.admission_operation_store();
+    store
+        .inject_native_dispatch_ledger_failure_for_test(NativeDispatchLedgerTestFault::AfterRow)?;
+    let response = fixture
+        .kernel
+        .evaluate_tool_call_blocking_with_security_context(&fixture.request, &fixture.context);
+    store.clear_native_dispatch_ledger_failure_for_test()?;
+    let response = response?;
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert_eq!(response.reason.as_deref(), Some(RECONCILIATION_REQUIRED));
+    let after = custody(&fixture)?;
+    assert_eq!(after.state, AdmissionOperationState::CapturePending);
+    assert_eq!(after.quota, (1, 0));
+    assert_eq!(after.uses, ["consumed_pending_dispatch"]);
+    assert!(after.declassified_egress);
+    assert!(!after.ledger);
+
+    let replay = fixture
+        .kernel
+        .evaluate_tool_call_blocking_with_security_context(&fixture.request, &fixture.context)?;
+    assert_eq!(replay.verdict, Verdict::Deny);
+    assert_eq!(replay.reason.as_deref(), Some(UNCONFIRMED_REPLAY));
+    let recovered = custody(&fixture)?;
+    assert_eq!(
+        recovered.state,
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    assert_eq!(recovered.quota, (0, 0));
+    assert_eq!(recovered.uses, ["consumed_pending_dispatch"]);
+
+    // The consumed grant cannot authorize another request after recovery.
+    let observed = store.observe_native_security_flow(
+        &fixture.binding,
+        &crate::security::adapters::flow_key(fixture.context.as_v1()),
+        &fixture.authority.mutation_fence(),
+        fixture.clock.snapshot(),
+    )?;
+    let context = SecurityInvocationContext::v1(
+        fixture.context.as_v1().clone().with_flow_state_generation(
+            observed
+                .stored_context_generation()
+                .ok_or("current generation")?,
+        ),
+    );
+    let mut reuse = fixture.request.clone();
+    reuse.request_id.push_str("-grant-reuse");
+    let reused = fixture
+        .kernel
+        .evaluate_tool_call_blocking_with_security_context(&reuse, &context)?;
+    assert_eq!(reused.verdict, Verdict::Deny);
+    assert_eq!(reused.reason.as_deref(), Some(RECONCILIATION_REQUIRED));
+    assert!(reused.output.is_none());
+    let refused = custody_of(&fixture, &reuse.request_id)?;
+    assert_eq!(refused.state, AdmissionOperationState::CapturePending);
+    assert!(!refused.declassified_egress);
+    assert!(!refused.ledger);
+    assert_eq!(refused.uses, ["consumed_pending_dispatch"]);
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
     Ok(())
 }
