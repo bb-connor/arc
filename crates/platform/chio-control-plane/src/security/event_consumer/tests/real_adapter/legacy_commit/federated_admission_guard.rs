@@ -327,12 +327,15 @@ fn enabled_legacy_federated_active_response_admission_still_reserves_and_cleans_
             GovernedApprovalToken::sign(body, approver).test_unwrap()
         })
         .collect();
-    assert!(runtime
-        .kernel
-        .admit_governed_active_response(&substituted)
-        .test_unwrap_err()
-        .to_string()
-        .contains("retained approval reservation"));
+    let substituted_result = runtime.kernel.admit_governed_active_response(&substituted);
+    assert!(
+        matches!(
+            &substituted_result,
+            Err(KernelError::DurableAdmission(reason))
+                if reason == "retained approval reservation does not match the verified approval set"
+        ),
+        "{substituted_result:?}"
+    );
     let replayed = runtime
         .kernel
         .admit_governed_active_response(&request)
@@ -345,7 +348,8 @@ fn enabled_legacy_federated_active_response_admission_still_reserves_and_cleans_
         runtime
             .kernel
             .commit_governed_active_response_dispatch(&mut admitted),
-        Err(KernelError::GovernedTransactionDenied(_))
+        Err(KernelError::GovernedTransactionDenied(reason))
+            if reason.starts_with("legacy governed active-response commitment is retired")
     ));
     assert_eq!(
         runtime.retained_state(&admitted),
