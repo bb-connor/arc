@@ -1,6 +1,6 @@
 //! Finite deterministic evaluation over supplied data, without ambient state.
 use alloc::vec::Vec;
-use chio_security_types::{InformationLabel, recovery::*};
+use chio_security_types::{recovery::*, InformationLabel};
 
 pub(crate) struct Work {
     used: u64,

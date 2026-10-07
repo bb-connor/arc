@@ -1,13 +1,13 @@
 //! Real authenticated HTTP submission through the contract-backed dispatcher.
 use super::*;
 use std::sync::{
-    Arc,
     atomic::{AtomicUsize, Ordering},
+    Arc,
 };
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 use tokio::sync::Notify;
-use tokio_rustls::{TlsAcceptor, rustls};
+use tokio_rustls::{rustls, TlsAcceptor};
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
 

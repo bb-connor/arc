@@ -5,10 +5,10 @@ use std::path::Path;
 use std::process::{Command, Output};
 
 use chio_core::{
-    crypto::{Keypair, canonical_json_bytes, sha256_hex},
+    crypto::{canonical_json_bytes, sha256_hex, Keypair},
     receipt::{body::ChioReceipt, decision::ToolCallAction},
 };
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -83,18 +83,14 @@ fn completed_run_binds_actual_worker_results_and_rejects_semantic_substitutions(
     assert_eq!(report["qualification_complete"], false);
     assert_eq!(report["m5_acceptance_complete"], false);
     for check in ["execution_nonces", "receipt_log_inclusion"] {
-        assert!(
-            report["checks"]
-                .as_array()
-                .ok_or("checks")?
-                .contains(&json!(check))
-        );
-        assert!(
-            !report["unchecked"]
-                .as_array()
-                .ok_or("unchecked")?
-                .contains(&json!(check))
-        );
+        assert!(report["checks"]
+            .as_array()
+            .ok_or("checks")?
+            .contains(&json!(check)));
+        assert!(!report["unchecked"]
+            .as_array()
+            .ok_or("unchecked")?
+            .contains(&json!(check)));
     }
     assert!(!verify(&artifact, "another-runtime")?.status.success());
     let original: ChioReceipt = serde_json::from_slice(&std::fs::read(&artifact)?)?;
@@ -307,10 +303,10 @@ fn modeled_completed_fanout() -> Result<(ChioReceipt, Keypair)> {
     use chio_core_types::{
         capability::{
             aggregate_invocation::{
-                AggregateBudgetDelegationMarker, verify_aggregate_invocation_budget,
+                verify_aggregate_invocation_budget, AggregateBudgetDelegationMarker,
             },
             attenuation::{
-                DelegationLink, DelegationLinkBody, compute_attenuation_witness, scope_hash,
+                compute_attenuation_witness, scope_hash, DelegationLink, DelegationLinkBody,
             },
             scope::{ChioScope, Operation, ToolGrant},
             token::{CapabilityToken, CapabilityTokenBody},
@@ -318,16 +314,16 @@ fn modeled_completed_fanout() -> Result<(ChioReceipt, Keypair)> {
         receipt::{body::ChioReceiptBody, decision::Decision, kinds::*},
     };
     use chio_kernel::admission_operation::{
-        AdmissionDigest, AdmissionIdentifier, AdmissionOperationBindingInputV1,
-        AdmissionOperationBindingV1, AdmissionOperationKind, AdmissionOperationV1,
-        AdmissionParticipantRequirements, AdmissionRequestBindingV1, AuthenticatedRequestNamespace,
-        RuntimeReplayParticipantKind, SideEffectClass,
         runtime_participant::{
             RuntimeParticipantClaimEvidenceV1, RuntimeParticipantClaimHistoryV1,
             RuntimeParticipantClaimIntentInput, RuntimeParticipantClaimIntentV1,
             RuntimeParticipantClaimReferenceV1, RuntimeParticipantDisposition,
             RuntimeParticipantPhase, RuntimeParticipantResourceV1,
         },
+        AdmissionDigest, AdmissionIdentifier, AdmissionOperationBindingInputV1,
+        AdmissionOperationBindingV1, AdmissionOperationKind, AdmissionOperationV1,
+        AdmissionParticipantRequirements, AdmissionRequestBindingV1, AuthenticatedRequestNamespace,
+        RuntimeReplayParticipantKind, SideEffectClass,
     };
     use chio_swarm_authority::*;
     use std::collections::BTreeMap;
@@ -776,20 +772,16 @@ fn current_abi_completed_run_reports_preserve_incomplete_qualification_aliases()
         "continuation_custody",
         "aggregate_usage",
     ] {
-        assert!(
-            report["checks"]
-                .as_array()
-                .ok_or("checks")?
-                .contains(&json!(check))
-        );
+        assert!(report["checks"]
+            .as_array()
+            .ok_or("checks")?
+            .contains(&json!(check)));
     }
     for unchecked in ["execution_nonces", "receipt_log_inclusion"] {
-        assert!(
-            report["unchecked"]
-                .as_array()
-                .ok_or("unchecked")?
-                .contains(&json!(unchecked))
-        );
+        assert!(report["unchecked"]
+            .as_array()
+            .ok_or("unchecked")?
+            .contains(&json!(unchecked)));
     }
     assert_eq!(report["qualification_complete"], false);
     assert_eq!(report["m5_acceptance_complete"], false);
@@ -851,12 +843,10 @@ fn completed_run_exports_preserve_incomplete_qualification_aliases() -> Result {
         "receipt_log_inclusion",
         "continuation_custody",
     ] {
-        assert!(
-            report["checks"]
-                .as_array()
-                .ok_or("checks")?
-                .contains(&json!(check))
-        );
+        assert!(report["checks"]
+            .as_array()
+            .ok_or("checks")?
+            .contains(&json!(check)));
     }
     let signed: ChioReceipt = serde_json::from_slice(&std::fs::read(&artifact)?)?;
     assert!(signed.verify_signature()?);

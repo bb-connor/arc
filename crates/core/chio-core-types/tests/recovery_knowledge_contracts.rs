@@ -165,7 +165,9 @@ fn shared_vectors() -> TestResult<serde_json::Value> {
         body["signature"] = serde_json::Value::String("00".repeat(64));
         output_cases.push(serde_json::json!({"name":format!("{schema}:invalid-signature"),"schema":schema,"body":body,"valid":false,"schema_valid":true}));
     }
-    Ok(serde_json::json!({"schema":"chio.recovery-knowledge-contract-vectors.v1","cases":output_cases}))
+    Ok(
+        serde_json::json!({"schema":"chio.recovery-knowledge-contract-vectors.v1","cases":output_cases}),
+    )
 }
 
 #[test]
@@ -183,10 +185,7 @@ fn write_shared_vectors() -> TestResult {
     let path = std::path::PathBuf::from(
         std::env::var_os("CHIO_KNOWLEDGE_VECTOR_OUT").ok_or("explicit vector output required")?,
     );
-    std::fs::write(
-        path,
-        serde_json::to_vec_pretty(&shared_vectors()?)?,
-    )?;
+    std::fs::write(path, serde_json::to_vec_pretty(&shared_vectors()?)?)?;
     Ok(())
 }
 

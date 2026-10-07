@@ -1,9 +1,9 @@
 //! Private immutable label storage has four bounded contiguous allocations.
 use crate::recovery::RecoveryRuntimeError;
-use chio_security_types::InformationLabel;
 use chio_security_types::flow::{
-    Compartment, DEFAULT_LABEL_LIMITS, MAX_FLOW_IDENTIFIER_BYTES, PrincipalId,
+    Compartment, PrincipalId, DEFAULT_LABEL_LIMITS, MAX_FLOW_IDENTIFIER_BYTES,
 };
+use chio_security_types::InformationLabel;
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Copy)]

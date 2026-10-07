@@ -1,6 +1,6 @@
 use super::transport::canonical_endpoint;
 use super::*;
-use chio_egress_contract::{HttpEgressContract, client_builder_with_contract, send_with_contract};
+use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
 use std::time::Duration;
 
 /// One bounded HTTP request. Credentials are selected by trusted host setup,

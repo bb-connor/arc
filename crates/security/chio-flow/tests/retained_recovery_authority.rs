@@ -1,18 +1,18 @@
 //! Modeled prior-verification compatibility, not a physical native capture.
 use chio_core_types::{
-    Keypair,
     canonical::CanonicalBytes,
     canonical_json_bytes,
     recovery::{
         RecoveryDigestDomain, RecoveryGrantBodyV2, SignedAuthorityCoverageAttestationV1,
         SignedRecoveryGrantV2,
     },
+    Keypair,
 };
 use chio_flow::{
-    DeclassificationError, RecoveryAuthorityAssignment, required_recovery_disclosure_obligations,
-    verify_historical_recovery_coverage_digest, verify_recovery_coverage,
+    required_recovery_disclosure_obligations, verify_historical_recovery_coverage_digest,
+    verify_recovery_coverage, DeclassificationError, RecoveryAuthorityAssignment,
 };
-use chio_security_types::{InformationLabel, flow::PrincipalId, recovery::*};
+use chio_security_types::{flow::PrincipalId, recovery::*, InformationLabel};
 use std::collections::{BTreeMap, BTreeSet};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;

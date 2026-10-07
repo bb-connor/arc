@@ -1,19 +1,20 @@
 //! The actual recovery CLI keeps a pinned local host, one attempt, and bounded output.
 use chio_core_types::{
-    Keypair, canonical_json_bytes,
+    canonical_json_bytes,
     capability::{
         scope::{ChioScope, Operation, ToolGrant},
         token::{CapabilityToken, CapabilityTokenBody},
     },
+    Keypair,
 };
 use std::{
     io::{Read, Write},
     net::{TcpListener, TcpStream},
     process::{Command, Output, Stdio},
     sync::{
-        Arc,
         atomic::{AtomicBool, Ordering},
         mpsc::{self, Receiver, Sender},
+        Arc,
     },
     thread::{self, JoinHandle},
     time::{Duration, Instant},
