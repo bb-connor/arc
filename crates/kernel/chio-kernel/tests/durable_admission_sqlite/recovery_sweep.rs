@@ -6,6 +6,8 @@ use std::sync::Mutex;
 
 #[path = "recovery_sweep/authority_time.rs"]
 mod authority_time;
+#[path = "recovery_sweep/signer_identity.rs"]
+mod signer_identity;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
