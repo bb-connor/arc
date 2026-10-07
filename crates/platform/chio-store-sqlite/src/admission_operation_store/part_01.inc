@@ -61,29 +61,6 @@ impl SqliteAdmissionOperationStore {
         )
     }
 
-    /// Open a durable admission-operation authority through one retained
-    /// trusted parent shared with its sibling authorities.
-    #[cfg(any())]
-    pub fn open_hardened(
-        path: impl AsRef<Path>,
-        directory: Arc<crate::durable_sqlite::TrustedSqliteDirectory>,
-    ) -> Result<Self, AdmissionOperationError> {
-        let database_identity_file = directory
-            .open_database(path, true)
-            .map_err(|error| AdmissionOperationError::Unavailable(error.to_string()))?;
-        let connection = database_identity_file
-            .open_connection(
-                rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE
-                    | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
-            )
-            .map_err(|error| AdmissionOperationError::Unavailable(error.to_string()))?;
-        Self::from_connection_with_identity(
-            connection,
-            AdmissionOperationStoreProfile::SingleNodeDurable,
-            Some(database_identity_file),
-        )
-    }
-
     pub fn open_in_memory() -> Result<Self, AdmissionOperationError> {
         let connection = Connection::open_in_memory().map_err(sqlite_error)?;
         Self::from_connection(connection, AdmissionOperationStoreProfile::EphemeralLocal)
