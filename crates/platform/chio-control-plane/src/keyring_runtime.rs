@@ -1885,4 +1885,14 @@ pub(crate) mod tests {
         assert_eq!(config.witness_public_keys.len(), 3);
         assert_eq!(config.audit_public_keys.len(), 2);
     }
+
+    #[test]
+    fn authority_seed_handoff_debug_redacts_the_seed() {
+        let keypair = Keypair::from_seed(&[0x5c; 32]);
+        let handoff = AuthoritySeedHandoff::new(&keypair, 4, 5).test_unwrap();
+        let rendered = format!("{handoff:?}");
+        assert!(!rendered.contains(&keypair.seed_hex()), "{rendered}");
+        assert!(rendered.contains("[REDACTED]"), "{rendered}");
+        assert!(rendered.contains(&handoff.key_id), "{rendered}");
+    }
 }
