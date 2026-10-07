@@ -129180,5 +129180,29 @@
     "sha256": "e4cd940646b501124e03ab5aeb7283738ade3e7c06683bc23346760ecb3b123f",
     "source_commit": "51bba770b4a134ed79003fd177845aef125b7b1a",
     "qualified_candidate": false
+  },
+  "latest_pr_review_followup_20261007": {
+    "path": "docs/security/audits/review-followup-20261007.json",
+    "sha256": "8d94d5a0f4d99fa6ad4a50fd5caf2082d5938e7cfa7b8bd4dd8e6479e8399cb4",
+    "reviewed_source": "1267f9bf31d81947eee5cad838b1e3b4332ab4ab",
+    "source_repairs": [
+      {
+        "comment_id": 4207094540,
+        "priority": "P1",
+        "repair_commit": "1b05245e0d",
+        "finding": "Ineligible terminal tail wrongly exhausts legacy recovery capacity",
+        "verification": "isolatedOriginal0/1 ->Green5; owningrecovery35; strict0",
+        "remaining": "finalcandidate native/trusted/hosted and protectedlanding"
+      },
+      {
+        "comment_id": 4207159552,
+        "priority": "P2",
+        "repair_commit": "e321568963",
+        "finding": "Reconcile rejects original unsigned decimal arguments",
+        "verification": "HTTPOriginal400vs200 ->Green2; APIowning276; strict0",
+        "remaining": "finalcandidate qualification and protectedlanding"
+      }
+    ],
+    "qualified_candidate": false
   }
 }

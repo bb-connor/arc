@@ -1,0 +1,714 @@
+{
+  "schema": "chio.security.published-independent-review.v1",
+  "reviewer": "published_repair_review",
+  "source_root": "/home/connor/lanes/integration",
+  "base_commit": "1aca76c4832425803980aaab6314d5f45c1bae87",
+  "reviewed_commit": "1267f9bf31d81947eee5cad838b1e3b4332ab4ab",
+  "branch": "integration/process-security-m4",
+  "review_mode": "Read-only static independent review; no Cargo, source edits, Git mutations, pushes, network messages, or subagents.",
+  "original_review_verdict": "No supported P0/P1/P2 production defect found in the scoped delta. This historical verdict is corrected by supplemental_terminal_tail_review.",
+  "verdict": "Supplemental review confirms P1 in the original published legacy lookahead. No further supported P0/P1/P2 defect found in the current bounded predicate repair; broader qualification remains pending.",
+  "findings": [
+    {
+      "priority": "P1",
+      "title": "Legacy lookahead counts excluded tail rows as unresolved recovery candidates",
+      "introduced_by": "e446a408ea69c7cbb5539dc15deb00da7f24d485",
+      "affected_published_commit": "1267f9bf31d81947eee5cad838b1e3b4332ab4ab",
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/page.rs",
+      "line": 70,
+      "trigger": "Exactly 256 lower-ID dormant candidates followed by a higher-ID committed terminal operation without recovery status. read_snapshot excludes that terminal operation, but the original raw operation-ID existence probe still counts it.",
+      "impact": "ListRecoverable incorrectly returns the bounded-capacity Unavailable error although the candidate stream ended. Legacy clients receive a false refusal and are forced to cursor recovery.",
+      "causal_difference": "The original lookahead used only operation_id > cursor; read_snapshot also filters creation time, terminal/quarantine eligibility, and active recovery lease/fence eligibility.",
+      "suggested_fix": "Use exactly the same candidate predicate and validated cutoff/fence values in the bounded same-snapshot existence probe, retaining the 256 decoded-candidate budget and refusal for unresolved candidate tails.",
+      "current_status": "The current uncommitted production repair matches the page candidate predicate and the retained same terminal-tail regression is GREEN; broader owning/strict qualification remains outside this review.",
+      "earlier_review_correction": "The original independent review missed this candidate-set mismatch. Its no-findings verdict is superseded for the original lookahead."
+    }
+  ],
+  "later_fixture_change_review": {
+    "scope": "Separate static review of root's later one-line uncommitted test-fixture constructor change; not an extension of the original clean 1267 source guard.",
+    "guard": {
+      "head": "1267f9bf31d81947eee5cad838b1e3b4332ab4ab",
+      "recorded_utc": "2026-10-07T13:00:09.764932+00:00",
+      "reviewed_file_hashes": {
+        "crates/kernel/chio-kernel/Cargo.toml": "56b4c8dda07ccd7572a9b1c0cd79d3bbe1325f5d6bb9a04c5f9abbde3e26af19",
+        "crates/kernel/chio-kernel/src/kernel/tests/automatic_active_response_fence.rs": "496cdc682371a8abd5c7b101d28ff8c0e0dfefe976b425446ddcb418d1546973",
+        "crates/tooling/chio-test-support/src/lib.rs": "ce786f44add5f9cbc0238182f7f7365e1a1a3fba1830c9290361e4fb58a4ff8e"
+      },
+      "worktree_status": " M crates/kernel/chio-kernel/src/kernel/tests/automatic_active_response_fence.rs\n"
+    },
+    "changed_line": "crates/kernel/chio-kernel/src/kernel/tests/automatic_active_response_fence.rs:399",
+    "change": "tempfile::tempdir() -> chio_test_support::private_tempdir()",
+    "helper": "crates/tooling/chio-test-support/src/lib.rs:34",
+    "existing_dev_dependency": "crates/kernel/chio-kernel/Cargo.toml:126",
+    "assessment": "No supported finding. The existing helper supplies Unix permissions 0700 at creation and preserves the same TempDir return type. The existing normal-build dev dependency already makes the helper available. The diff changes only the fixture constructor; strict store construction, native dispatch rejection cause/code, no-commit and no-effect assertions remain intact.",
+    "runtime_status": "Root reports the original broader kernel campaign ended 1577 passed / 1 failed in 82.55s at the strict store open. The one-case rebuild/runtime verification is active. This reviewer did not rerun it and makes no green claim.",
+    "qualified_candidate": false
+  },
+  "supplemental_terminal_tail_review": {
+    "scope": "Supplemental read-only review of the current bounded terminal-tail predicate repair and separate regression; no Source edits, Cargo or Git commands.",
+    "reported_base_head": "1267f9bf31d81947eee5cad838b1e3b4332ab4ab",
+    "source_status_boundary": "Only the listed filesystem bytes are pinned. No current whole-worktree clean or HEAD guard is claimed; the original clean 85-file guard remains historical.",
+    "start": {
+      "code_hashes": {
+        "crates/kernel/chio-kernel/src/kernel/tests/automatic_active_response_fence.rs": "e5fe730f79e8dc2c2bd4357aa88875fed9aeda0ff7d15a7a7bd7d5570a701ab6",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/page.rs": "52c23bb56a7af3da0a52580c183ce47ad520afa80a03e3ab42a1977d3e26dc73",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/recovery/legacy_continuation.rs": "2acdb2d6fc1220757a58d4241bcd983cfdd55c8eb1d5e3fb70a265b0b7a917a9",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/recovery/legacy_selection.rs": "8c00e96f4582ac7c248350a4a216bd80c949e41f4640e6019ce1a76dec0a3f10",
+        "docs/security/admission-recovery-pagination.md": "42b83285596883d166ac0fc234111219906a459be9e7cae0cab23803e20e8c46"
+      },
+      "original_controls_match_original_guard": true,
+      "original_controls_prefix_sha256": "a775f2ec2889d1bf17e0ad39ef4c2657c72f9506d186ab1c6dabce72ab5aeec5",
+      "predicate_tokens": [
+        "operation_id",
+        ">",
+        "?1",
+        "AND",
+        "created_at_unix_ms",
+        "<=",
+        "?2",
+        "AND",
+        "(",
+        "terminal",
+        "=",
+        "OR",
+        "EXISTS",
+        "(",
+        "SELECT",
+        "FROM",
+        "admission_operation_recovery_deferrals",
+        "d",
+        "WHERE",
+        "d",
+        "operation_id",
+        "=",
+        "o",
+        "operation_id",
+        "AND",
+        "d",
+        "quarantined",
+        "=",
+        ")",
+        ")",
+        "AND",
+        "(",
+        "recovery_expires_at_unix_ms",
+        "IS",
+        "NULL",
+        "OR",
+        "recovery_expires_at_unix_ms",
+        "<=",
+        "?2",
+        "OR",
+        "recovery_store_uuid",
+        "<>",
+        "?3",
+        "OR",
+        "recovery_store_lease_id",
+        "<>",
+        "?4",
+        "OR",
+        "recovery_store_owner_epoch",
+        "<>",
+        "?5",
+        "OR",
+        "terminal",
+        "=",
+        ")"
+      ],
+      "predicate_tokens_match": true,
+      "recorded_utc": "2026-10-07T13:25:11.674957+00:00"
+    },
+    "end": {
+      "code_hashes": {
+        "crates/kernel/chio-kernel/src/kernel/tests/automatic_active_response_fence.rs": "e5fe730f79e8dc2c2bd4357aa88875fed9aeda0ff7d15a7a7bd7d5570a701ab6",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/page.rs": "52c23bb56a7af3da0a52580c183ce47ad520afa80a03e3ab42a1977d3e26dc73",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/recovery/legacy_continuation.rs": "2acdb2d6fc1220757a58d4241bcd983cfdd55c8eb1d5e3fb70a265b0b7a917a9",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/recovery/legacy_selection.rs": "8c00e96f4582ac7c248350a4a216bd80c949e41f4640e6019ce1a76dec0a3f10",
+        "docs/security/admission-recovery-pagination.md": "42b83285596883d166ac0fc234111219906a459be9e7cae0cab23803e20e8c46"
+      },
+      "original_lookahead_bytes_reconstructed_match_prior_guard": true,
+      "original_statement_line": 70,
+      "recorded_utc": "2026-10-07T13:28:41.026093+00:00"
+    },
+    "pins_result": {
+      "changed_files": [],
+      "unchanged": true
+    },
+    "finding": {
+      "priority": "P1",
+      "title": "Legacy lookahead counts excluded tail rows as unresolved recovery candidates",
+      "introduced_by": "e446a408ea69c7cbb5539dc15deb00da7f24d485",
+      "affected_published_commit": "1267f9bf31d81947eee5cad838b1e3b4332ab4ab",
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/page.rs",
+      "line": 70,
+      "trigger": "Exactly 256 lower-ID dormant candidates followed by a higher-ID committed terminal operation without recovery status. read_snapshot excludes that terminal operation, but the original raw operation-ID existence probe still counts it.",
+      "impact": "ListRecoverable incorrectly returns the bounded-capacity Unavailable error although the candidate stream ended. Legacy clients receive a false refusal and are forced to cursor recovery.",
+      "causal_difference": "The original lookahead used only operation_id > cursor; read_snapshot also filters creation time, terminal/quarantine eligibility, and active recovery lease/fence eligibility.",
+      "suggested_fix": "Use exactly the same candidate predicate and validated cutoff/fence values in the bounded same-snapshot existence probe, retaining the 256 decoded-candidate budget and refusal for unresolved candidate tails.",
+      "current_status": "The current uncommitted production repair matches the page candidate predicate and the retained same terminal-tail regression is GREEN; broader owning/strict qualification remains outside this review.",
+      "earlier_review_correction": "The original independent review missed this candidate-set mismatch. Its no-findings verdict is superseded for the original lookahead."
+    },
+    "production_review": {
+      "same_sql_candidate_predicate_tokens": true,
+      "same_validated_cutoff_and_fence": true,
+      "same_authenticated_transaction": true,
+      "candidate_budget": 256,
+      "additional_decoded_operation": false,
+      "partial_result_on_capacity_refusal": false,
+      "authority_or_integrity_error_relaxation": false,
+      "original_production_file_reconstruction_matches_prior_guard": true,
+      "assessment": "No further supported P0/P1/P2 defect found in the current bounded repair. The predicate includes creation cutoff, terminal/quarantined status and the complete active recovery lease/fence eligibility condition, exactly as read_snapshot.",
+      "active_lease_evidence_boundary": "The full active-lease predicate is source-verified in both queries. The new runtime regression proves the terminal-tail case; it is not a separate runtime active-lease test."
+    },
+    "test_review": {
+      "new_case": "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/recovery/legacy_selection.rs:198",
+      "construction": "257 sorted actual operations; 256 dormant deferrals; finalizing tail reached through validated CAS and commit_terminal_projection. The test independently reads terminal OutcomeUnknownAfterDispatch and absent recovery status before ListRecoverable, then checks unchanged full rows/commit metadata/anchor and original terminal readback.",
+      "projection_label": "Real committed terminal projection through the trusted store API and authenticated history. This test does not construct or verify SignedAdmissionTerminalProjectionV1.",
+      "original_control_prefix_unchanged": true,
+      "original_control_prefix_sha256": "a775f2ec2889d1bf17e0ad39ef4c2657c72f9506d186ab1c6dabce72ab5aeec5",
+      "original_control_cases": [
+        "exact 256 end versus genuine unresolved tail and no partial output",
+        "owned dormant status corruption refuses before skip",
+        "external writer remains fatal and creates no result"
+      ],
+      "original_continuation_case_unchanged": true,
+      "root_fixture_seam_observed": "automatic_active_response_fence.rs:436 explicitly enables the private mapping seam and resets it at 440; code/cause/no-commit/no-effect assertions remain. This observation adds no public runtime readiness claim."
+    },
+    "retained_evidence": [
+      {
+        "path": "/tmp/chio-pr1160-qualification-20261007/terminal-tail-original-separate1.log",
+        "sha256": "fdc2ce6a2eb35a4c87df0f677b074d18e9f4c1fe377ef4baeccfb3db78245e53",
+        "test_results": [
+          "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2061 filtered out; finished in 12.57s"
+        ],
+        "terminal_case_present": true
+      },
+      {
+        "path": "/tmp/chio-pr1160-qualification-20261007/terminal-tail-green5.log",
+        "sha256": "caa58b0017085aa21039a351b97bd8c858a0731f5e229c9ad42ae20996dbb5f5",
+        "test_results": [
+          "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 2057 filtered out; finished in 37.48s"
+        ],
+        "terminal_case_present": true
+      }
+    ],
+    "reviewer_executions": [],
+    "pending": [
+      "Whole recovery owning family and affected strict qualification on the repair",
+      "Remaining whole owning/default/optional/PQ/native campaigns and benchmarks",
+      "Final whole-source/cold/trusted/hosted/landing acceptance"
+    ],
+    "qualification_verdict": "Bounded repair and its retained RED/GREEN evidence are accepted within this scope; whole-candidate qualification remains pending."
+  },
+  "source_guard": {
+    "start": {
+      "base": "1aca76c4832425803980aaab6314d5f45c1bae87",
+      "branch": "integration/process-security-m4",
+      "code_hashes": {
+        ".github/workflows/ci.yml": "22123e43af60948847b9e8b294165742f79d74b6f6d2af01898f4d685afed720",
+        ".github/workflows/spec-drift.yml": "4c44e4d35dcd1f7e859504a10d1d23d8a075325d9e7d4dcb7ab1c673d74a8795",
+        "crates/core/chio-errors/src/_generated/error_codes.rs": "883c531587436245d1ef2fb1f5bc55d08c5a3375cd1c9ba15f796050b588c0d8",
+        "crates/kernel/chio-kernel/src/caller_delivery/retained.rs": "a295b3e1aee4c35fea5e98e41768cc6a00eb7590de2dba42178340edd10dfd55",
+        "crates/kernel/chio-kernel/src/governed_active_response.rs": "c0073cc9b232213dc460813d49008dc60d1547a8ccc886d059dbf8db560dac13",
+        "crates/kernel/chio-kernel/src/kernel/active_response_coordinator.rs": "7f87b222e5d898278047b7ece48ef5a234adc03d9d0431232be1793a42d6107c",
+        "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/cancellation.rs": "f338d2de1943c12a2d3208fb87ff679b17740adab3bbf140aabe1ca66df07b66",
+        "crates/kernel/chio-kernel/src/kernel/active_response_policy.rs": "54545ec3428cb92533a7bd680c8faa8ca8edd9dd79f04a6a2e9cc4afc5dfbc92",
+        "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_acquisition.rs": "23921751732355525e6b46e60e0205507749bee57b34d634334baab88a4b03cd",
+        "crates/kernel/chio-kernel/src/kernel/admission_coordinator/recovery/deferral.rs": "5764c986aa008adff511c66262b8c356012c8b4bbc3a28931aef43b30db35d01",
+        "crates/kernel/chio-kernel/src/kernel/admission_coordinator/recovery/failure.rs": "4bf069eedbc1432750d604bae75d4e6007fe435e6423daa63bf0748e5828a166",
+        "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/native_egress.rs": "f568754598fa2a1ce7ff68067103f9622e749ba48400e8323c8a58506d36be72",
+        "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/native_egress/capture_once.rs": "4c502a75f90c4a93c55cfcbde3045971d200e57d6267c35249d3b45a86ac1014",
+        "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/payment_recovery.rs": "0652787728477c59e871281295abac0e9a14b30575fcc8c9fcfaecdfd953595a",
+        "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/payment_recovery/amount_and_rails.rs": "14860e5efa2ccd52aa3b264abfa8dca5b02254f334781375f3d52023f59fdd85",
+        "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/payment_recovery/authorization_window.rs": "18b9be9b712e552c5e57160e228887ff1e8793c1ae9c4d2043a3c8dada167835",
+        "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/payment_recovery/continuation_controls.rs": "a03464b6e9402b033f14f70a28a396238d7a9399a4a6f1ea4bc48f72ef20407f",
+        "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/payment_recovery/publication.rs": "2a31fd0b7455a5c78475ab633b484edcd71c26373b610d01780098f7f979ce0b",
+        "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/recovery.rs": "e16c1a27ba6b9ecd819b41742855983d74242d2711aeb98b214c4ab20959c9cf",
+        "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/recovery/returned_output_guard.rs": "0321e160a677d9cb7c5896ea494326eb82a9fed6c2c2cbd5776e06206588aebf",
+        "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/review_boundaries.rs": "8a41ebda8e1ace51ca63fa29876150118a67b7fef926467b59328f22c64abcdb",
+        "crates/kernel/chio-kernel/src/kernel/tests/prepared_dispatch_credentials.rs": "a59caad3b88399fda31fa57edf539722bcb65b1c513124f0f4e224b2cfc92e48",
+        "crates/kernel/chio-kernel/src/tool_outcome_tests/original_security_dispatch.rs": "db787bf6108588e9fa6edd53153a3e8613552022bc90bfd070e8ab885261abc2",
+        "crates/kernel/chio-kernel/src/tool_outcome_tests/terminal_snapshot.rs": "2aace8b20ba32b3092a05eec80e98223be884bf139fb241564bcee553a57115f",
+        "crates/kernel/chio-kernel/tests/durable_admission_sqlite/payment_recovery.rs": "83a934cd1acc60ae0e97c2756e62ca168de7cf79ece74c8184dbc8fcf1ee7a62",
+        "crates/kernel/chio-kernel/tests/durable_admission_sqlite/payment_recovery/advancing_clock.rs": "641146c100ac7aae821b6b546e0b98d88fc49990d4dcd8fc7e5eabfa02a98b5a",
+        "crates/kernel/chio-kernel/tests/durable_admission_sqlite/payment_recovery/caller_revocation.rs": "cd2be656aaeece8bb18f8d40d3339ed6500de7ba9217b99b2ae91b70cf31fb38",
+        "crates/kernel/chio-kernel/tests/durable_admission_sqlite/payment_recovery/caller_revocation/fixture.rs": "e458297da3f1446ca136d48e27e5c4b634297ed49e855e830ffbeb518d83910e",
+        "crates/kernel/chio-kernel/tests/durable_admission_sqlite/payment_recovery/pricing_restart.rs": "735845ebc77d40abf013dbcdcffc0246ff93e71bcae0e31896346a5ecf2b3504",
+        "crates/kernel/chio-kernel/tests/durable_admission_sqlite/payment_recovery/pricing_restart/resolved_cutpoint.rs": "c91db4b8c3d9d56ee1aa8dfa53d48e7fd3bb8069b045260536c9dfad1d66d8f5",
+        "crates/platform/chio-control-plane/src/evidence_export/tests/package_trust.rs": "b445db3a32c4dc72cd32068d8fa8f37c98d0fa8c52d6d0480444bb4b8479e1e3",
+        "crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/caller.rs": "4ce39d6712f9564e97370bbcbd9a5929fedb054708b7f1f3b4b2b0935c32348d",
+        "crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/caller/approval_wait.rs": "f5e787dbf7767f2b6c217280c7e6507a862c56f62953a4b72c4b1e94cf8aacf5",
+        "crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/capture/output/return_binding.rs": "3e3ddff940fa6c429f3000414fe5f002f8ee3e74228b0c8a69559ddaa1d3bcb9",
+        "crates/platform/chio-control-plane/src/security/event_consumer/tests/real_adapter/kernel_review.rs": "d0950212a2ade43eaec8a47fad4d78a5702376bbb69ee959f86be35d37d3701c",
+        "crates/platform/chio-control-plane/src/security/event_consumer/tests/real_adapter/kernel_review/operator_cancel.rs": "7df97a704d781c2da811d4adbb40f657d4636e6f12407b2d55b9afe2da521504",
+        "crates/platform/chio-control-plane/src/security/event_consumer/tests/real_adapter/legacy_commit.rs": "522a19258031ee973e6134c02f6d3128ac8e5efd5361385e588a3e6acddb99f6",
+        "crates/platform/chio-control-plane/src/security/event_consumer/tests/real_adapter/legacy_commit/federated_admission_guard.rs": "4c71b90d4e681ca215a0f99310842a0be3c4afa3d211282db03c8466e2b46e4e",
+        "crates/platform/chio-control-plane/src/security/scheduler_worker/tests/a_fatal_delivery_failure_keeps_the_outbox_closed_until_delivery.rs": "749619ff1fd05159dac653a07ac4885f972ef39647e8ef84a9fd1f2a28e0f8c4",
+        "crates/platform/chio-control-plane/src/security/scheduler_worker/tests/an_in_flight_tick_keeps_the_last_degraded_outcome.rs": "c4b9c2dc30ad8cabc31b0948ab9786725bc6d47baaf91a4157c1089ee25bd42c",
+        "crates/platform/chio-control-plane/src/security/scheduler_worker/tests/published_worker_with_failing_ticks_is_not_ready.rs": "30978b8a6fd73a6c4d67421b417c8d7d8ed44edf6b71c30e171b167a48398573",
+        "crates/platform/chio-store-sqlite/benches/support/authorization_composite.rs": "b06bc85b65c100247d4b79ff109a7b27f9ba728fbbb8311a6db6220ebd3e44b0",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store.rs": "0fc37fc3589a74b2f216551db2b7f4554ebfb3c54333dd6db5103cbd2f780bb4",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/caller_budget.rs": "a266e158cf8955cc36b15ff30c101aaa133559a6f8071f1ec4bab7152e844f91",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/history_scope.rs": "95c7051439f4b6e521c2c8f06acfa37147fad43208c697cba6bdd54e6e3a50bf",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/participant.rs": "4c442eaaab694d82cd9b2c26e3e2c02740eb0af3c3fdfa21da0d2b9aa80ed186",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs": "b8118f96195fa13016021362f7e56debd8ef76857b66c8bf27cb1061f72696e0",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/projection/terminal_time.rs": "cd4f019945f4b8778f0fd04990ac6857dcd56bb9bb49a2908ce9a22a7fe79f8d",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery.rs": "bb95619e35070c67ab8608db454ae62c370fd828a667427adb6b1cba74121d09",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/page.rs": "8caaf7e47c7909a0298ce13cf219da32f00818c02a971c54575657c4ed4d2584",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs": "c80cfaabd125163120ac00c1a0ae761d41b2636ffe21aba1e9daf5d15fae9e0e",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/schema/migration_v34.rs": "07e139094a6188e10997e965e6b4b33f12aa5baff095c0646b982f638ae09373",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/capture.rs": "e922451a5c4bf958d1c660e7a4aae18439cec53f74291a7c966857c1b87dbaab",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/store.rs": "69f2cf1e5da84e717fbc0700bc1ab978c15fd291b4d2237a411ed9ad1c33e9ba",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/threshold_approval.rs": "b686c43353cdb9a0ba09dac014ebca870e8e4e7e48e24b3122d9917eda6d2199",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/threshold_approval/nonce_capture.rs": "aa52ad0fa543722f01e5642d3512d59f8307829a846684e3984377bb16d154c5",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/threshold_approval/nonce_capture/witness_tests.rs": "65433b069ea226e2be17fd52172d5e46dba171b369d5f6544e5202428c339b99",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/execution_nonce/issuance/recovery.rs": "335b1f7282f951fa8cbbd72154f8f05670e42a1c659c497ee53fdd2226ba29fc",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/recovery.rs": "fe56572d9633d2a34894fd22156e355207eb2305799d221b0d8fe68a9fa99a74",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/recovery/deferred_status.rs": "0db07d1f03317d8fef842c3a3079da3c5450da40ba179f0481c612b446f30c26",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/recovery/legacy_continuation.rs": "2acdb2d6fc1220757a58d4241bcd983cfdd55c8eb1d5e3fb70a265b0b7a917a9",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/recovery/legacy_selection.rs": "a775f2ec2889d1bf17e0ad39ef4c2657c72f9506d186ab1c6dabce72ab5aeec5",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/recovery/terminal_chronology.rs": "270892dca5afbd7be6c10b21eaeeab9f655732bcb005da9866fd902bba5cf671",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/schema/caller_wait.rs": "9a011e5138fe902001fba89dfcf44a7194ed22b092667f7e790844bc5737b324",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/threshold_approval.rs": "c600634184125cd34e0287b332c19d849462c376676121dca10804788a829df7",
+        "crates/protocol/chio-mcp-remote/src/remote_mcp/tests/worker_lifecycle.rs": "fd4da7796d4c88bd8785acb115ecffaf238b4e92ec23bfcc08af97de01e6070f",
+        "crates/security/chio-cage-plan/src/seccomp_plan.rs": "8b53f90df788dc5e6b9def743d393b566e2fc3372942e3e360657e9ae3ab43d7",
+        "crates/security/chio-cage/tests/linux_compile.rs": "183c8d2817d263d74f53d921bc41eb5f6579c31a47ab230dd95059e6f4af10b6",
+        "crates/security/chio-keyring/src/darwin_acl.rs": "9d8e0316d97519728e32d83e51a5b7cec1ff00b1f7f358c7b5e52e0747588e90",
+        "crates/security/chio-keyring/tests/enterprise_receipt.rs": "17536db8cd6fbcecd2dc9655c46ff4621219c6fe679a8466d69a7ec25a2b1d6a",
+        "crates/security/chio-keyring/tests/event.rs": "9cc992112fc001f3f1f1ce59c7d267b8f5bf33d704e6b15ae6c6a5aebafa161f",
+        "crates/security/chio-keyring/tests/service_paths.rs": "80b26b3c4db65a9a26e777cfc42f0376b68b04dbccda202fb5bf0d89479a4352",
+        "crates/security/chio-keyring/tests/state.rs": "2e0c33cb1a7e4c6f7b30254c738ba1dbc0ec9fc31205d2a86fe5c917d3f1a751",
+        "crates/security/chio-keyring/tests/witness_sync.rs": "db10e69d4c8b92bc09160282ec0bbd05488399f41d8cd0e7b4a4a4b5cad18ee8",
+        "crates/security/chio-secret-broker/src/process_boundary_tests/native.rs": "0594f0a4fa27da803b733acf2363c16b7e4459ca9edfab8ca48ffe20c8daafa9",
+        "crates/security/chio-secret-broker/src/process_boundary_tests/native_upstream.rs": "16b3aced8b2cd71add592862c76d361993f13383e15b176cf93ffcaec6033467",
+        "crates/security/chio-secret-broker/src/service/tests/f053_legacy_custody_cases.rs": "719fa4ba3424305f527dd05289b4fbedbc3e10dc23d0690cf209f8030396d0f4",
+        "deploy/docker/chio-workspace/regenerate.sh": "8ccb1ddc9c8b4293e2ba834abfc7b7cb91a44ff47af15224473025d9e2a82a50",
+        "deploy/docker/proof-room-workspace/Cargo.toml": "35c6a0fe387868322e6a8e836f4cf90537bb56f20868b70ae181e2cb72e5194c",
+        "scripts/check-cargo-lock-unused-patches.py": "6f9c3050d4983e1b9df7c2c296bc54bbbf0dd8444aa69ebfe69dbeff59b6d7fe",
+        "scripts/check-error-urn-registry.py": "e6cbb352e6ada1f4476e9c025abd7fb000a8a4c89b177778dc6e1a4861dc5d39",
+        "scripts/check-security-ci-contract.py": "f293ce8a144463a24f40c942d4e421bdf70be90ace5a2ea9d1be833d9280c07d",
+        "scripts/spec-drift-check.sh": "5a1a74f40ad382fc0db9ab49800c92a0e05c00770851b19c642a06c701a3afb3",
+        "scripts/tests/check-cargo-lock-unused-patches.test.py": "780ebc3260c94eb13dd00a76f17e29e40767f3ac9e9300243324b6fa8c3a1e95",
+        "scripts/tests/check-error-urn-registry.test.py": "76c7c59a2fdd43880981759b52946b21530828ab1993c39ef17051f7c960a266"
+      },
+      "head": "1267f9bf31d81947eee5cad838b1e3b4332ab4ab",
+      "status": "",
+      "timestamp": "2026-10-07T12:52:29.371771+00:00"
+    },
+    "end": {
+      "base": "1aca76c4832425803980aaab6314d5f45c1bae87",
+      "branch": "integration/process-security-m4",
+      "code_hashes": {
+        ".github/workflows/ci.yml": "22123e43af60948847b9e8b294165742f79d74b6f6d2af01898f4d685afed720",
+        ".github/workflows/spec-drift.yml": "4c44e4d35dcd1f7e859504a10d1d23d8a075325d9e7d4dcb7ab1c673d74a8795",
+        "crates/core/chio-errors/src/_generated/error_codes.rs": "883c531587436245d1ef2fb1f5bc55d08c5a3375cd1c9ba15f796050b588c0d8",
+        "crates/kernel/chio-kernel/src/caller_delivery/retained.rs": "a295b3e1aee4c35fea5e98e41768cc6a00eb7590de2dba42178340edd10dfd55",
+        "crates/kernel/chio-kernel/src/governed_active_response.rs": "c0073cc9b232213dc460813d49008dc60d1547a8ccc886d059dbf8db560dac13",
+        "crates/kernel/chio-kernel/src/kernel/active_response_coordinator.rs": "7f87b222e5d898278047b7ece48ef5a234adc03d9d0431232be1793a42d6107c",
+        "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/cancellation.rs": "f338d2de1943c12a2d3208fb87ff679b17740adab3bbf140aabe1ca66df07b66",
+        "crates/kernel/chio-kernel/src/kernel/active_response_policy.rs": "54545ec3428cb92533a7bd680c8faa8ca8edd9dd79f04a6a2e9cc4afc5dfbc92",
+        "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_acquisition.rs": "23921751732355525e6b46e60e0205507749bee57b34d634334baab88a4b03cd",
+        "crates/kernel/chio-kernel/src/kernel/admission_coordinator/recovery/deferral.rs": "5764c986aa008adff511c66262b8c356012c8b4bbc3a28931aef43b30db35d01",
+        "crates/kernel/chio-kernel/src/kernel/admission_coordinator/recovery/failure.rs": "4bf069eedbc1432750d604bae75d4e6007fe435e6423daa63bf0748e5828a166",
+        "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/native_egress.rs": "f568754598fa2a1ce7ff68067103f9622e749ba48400e8323c8a58506d36be72",
+        "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/native_egress/capture_once.rs": "4c502a75f90c4a93c55cfcbde3045971d200e57d6267c35249d3b45a86ac1014",
+        "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/payment_recovery.rs": "0652787728477c59e871281295abac0e9a14b30575fcc8c9fcfaecdfd953595a",
+        "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/payment_recovery/amount_and_rails.rs": "14860e5efa2ccd52aa3b264abfa8dca5b02254f334781375f3d52023f59fdd85",
+        "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/payment_recovery/authorization_window.rs": "18b9be9b712e552c5e57160e228887ff1e8793c1ae9c4d2043a3c8dada167835",
+        "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/payment_recovery/continuation_controls.rs": "a03464b6e9402b033f14f70a28a396238d7a9399a4a6f1ea4bc48f72ef20407f",
+        "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/payment_recovery/publication.rs": "2a31fd0b7455a5c78475ab633b484edcd71c26373b610d01780098f7f979ce0b",
+        "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/recovery.rs": "e16c1a27ba6b9ecd819b41742855983d74242d2711aeb98b214c4ab20959c9cf",
+        "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/recovery/returned_output_guard.rs": "0321e160a677d9cb7c5896ea494326eb82a9fed6c2c2cbd5776e06206588aebf",
+        "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/review_boundaries.rs": "8a41ebda8e1ace51ca63fa29876150118a67b7fef926467b59328f22c64abcdb",
+        "crates/kernel/chio-kernel/src/kernel/tests/prepared_dispatch_credentials.rs": "a59caad3b88399fda31fa57edf539722bcb65b1c513124f0f4e224b2cfc92e48",
+        "crates/kernel/chio-kernel/src/tool_outcome_tests/original_security_dispatch.rs": "db787bf6108588e9fa6edd53153a3e8613552022bc90bfd070e8ab885261abc2",
+        "crates/kernel/chio-kernel/src/tool_outcome_tests/terminal_snapshot.rs": "2aace8b20ba32b3092a05eec80e98223be884bf139fb241564bcee553a57115f",
+        "crates/kernel/chio-kernel/tests/durable_admission_sqlite/payment_recovery.rs": "83a934cd1acc60ae0e97c2756e62ca168de7cf79ece74c8184dbc8fcf1ee7a62",
+        "crates/kernel/chio-kernel/tests/durable_admission_sqlite/payment_recovery/advancing_clock.rs": "641146c100ac7aae821b6b546e0b98d88fc49990d4dcd8fc7e5eabfa02a98b5a",
+        "crates/kernel/chio-kernel/tests/durable_admission_sqlite/payment_recovery/caller_revocation.rs": "cd2be656aaeece8bb18f8d40d3339ed6500de7ba9217b99b2ae91b70cf31fb38",
+        "crates/kernel/chio-kernel/tests/durable_admission_sqlite/payment_recovery/caller_revocation/fixture.rs": "e458297da3f1446ca136d48e27e5c4b634297ed49e855e830ffbeb518d83910e",
+        "crates/kernel/chio-kernel/tests/durable_admission_sqlite/payment_recovery/pricing_restart.rs": "735845ebc77d40abf013dbcdcffc0246ff93e71bcae0e31896346a5ecf2b3504",
+        "crates/kernel/chio-kernel/tests/durable_admission_sqlite/payment_recovery/pricing_restart/resolved_cutpoint.rs": "c91db4b8c3d9d56ee1aa8dfa53d48e7fd3bb8069b045260536c9dfad1d66d8f5",
+        "crates/platform/chio-control-plane/src/evidence_export/tests/package_trust.rs": "b445db3a32c4dc72cd32068d8fa8f37c98d0fa8c52d6d0480444bb4b8479e1e3",
+        "crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/caller.rs": "4ce39d6712f9564e97370bbcbd9a5929fedb054708b7f1f3b4b2b0935c32348d",
+        "crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/caller/approval_wait.rs": "f5e787dbf7767f2b6c217280c7e6507a862c56f62953a4b72c4b1e94cf8aacf5",
+        "crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/capture/output/return_binding.rs": "3e3ddff940fa6c429f3000414fe5f002f8ee3e74228b0c8a69559ddaa1d3bcb9",
+        "crates/platform/chio-control-plane/src/security/event_consumer/tests/real_adapter/kernel_review.rs": "d0950212a2ade43eaec8a47fad4d78a5702376bbb69ee959f86be35d37d3701c",
+        "crates/platform/chio-control-plane/src/security/event_consumer/tests/real_adapter/kernel_review/operator_cancel.rs": "7df97a704d781c2da811d4adbb40f657d4636e6f12407b2d55b9afe2da521504",
+        "crates/platform/chio-control-plane/src/security/event_consumer/tests/real_adapter/legacy_commit.rs": "522a19258031ee973e6134c02f6d3128ac8e5efd5361385e588a3e6acddb99f6",
+        "crates/platform/chio-control-plane/src/security/event_consumer/tests/real_adapter/legacy_commit/federated_admission_guard.rs": "4c71b90d4e681ca215a0f99310842a0be3c4afa3d211282db03c8466e2b46e4e",
+        "crates/platform/chio-control-plane/src/security/scheduler_worker/tests/a_fatal_delivery_failure_keeps_the_outbox_closed_until_delivery.rs": "749619ff1fd05159dac653a07ac4885f972ef39647e8ef84a9fd1f2a28e0f8c4",
+        "crates/platform/chio-control-plane/src/security/scheduler_worker/tests/an_in_flight_tick_keeps_the_last_degraded_outcome.rs": "c4b9c2dc30ad8cabc31b0948ab9786725bc6d47baaf91a4157c1089ee25bd42c",
+        "crates/platform/chio-control-plane/src/security/scheduler_worker/tests/published_worker_with_failing_ticks_is_not_ready.rs": "30978b8a6fd73a6c4d67421b417c8d7d8ed44edf6b71c30e171b167a48398573",
+        "crates/platform/chio-store-sqlite/benches/support/authorization_composite.rs": "b06bc85b65c100247d4b79ff109a7b27f9ba728fbbb8311a6db6220ebd3e44b0",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store.rs": "0fc37fc3589a74b2f216551db2b7f4554ebfb3c54333dd6db5103cbd2f780bb4",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/caller_budget.rs": "a266e158cf8955cc36b15ff30c101aaa133559a6f8071f1ec4bab7152e844f91",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/history_scope.rs": "95c7051439f4b6e521c2c8f06acfa37147fad43208c697cba6bdd54e6e3a50bf",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/participant.rs": "4c442eaaab694d82cd9b2c26e3e2c02740eb0af3c3fdfa21da0d2b9aa80ed186",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs": "b8118f96195fa13016021362f7e56debd8ef76857b66c8bf27cb1061f72696e0",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/projection/terminal_time.rs": "cd4f019945f4b8778f0fd04990ac6857dcd56bb9bb49a2908ce9a22a7fe79f8d",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery.rs": "bb95619e35070c67ab8608db454ae62c370fd828a667427adb6b1cba74121d09",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/page.rs": "8caaf7e47c7909a0298ce13cf219da32f00818c02a971c54575657c4ed4d2584",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs": "c80cfaabd125163120ac00c1a0ae761d41b2636ffe21aba1e9daf5d15fae9e0e",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/schema/migration_v34.rs": "07e139094a6188e10997e965e6b4b33f12aa5baff095c0646b982f638ae09373",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/capture.rs": "e922451a5c4bf958d1c660e7a4aae18439cec53f74291a7c966857c1b87dbaab",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/store.rs": "69f2cf1e5da84e717fbc0700bc1ab978c15fd291b4d2237a411ed9ad1c33e9ba",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/threshold_approval.rs": "b686c43353cdb9a0ba09dac014ebca870e8e4e7e48e24b3122d9917eda6d2199",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/threshold_approval/nonce_capture.rs": "aa52ad0fa543722f01e5642d3512d59f8307829a846684e3984377bb16d154c5",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/threshold_approval/nonce_capture/witness_tests.rs": "65433b069ea226e2be17fd52172d5e46dba171b369d5f6544e5202428c339b99",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/execution_nonce/issuance/recovery.rs": "335b1f7282f951fa8cbbd72154f8f05670e42a1c659c497ee53fdd2226ba29fc",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/recovery.rs": "fe56572d9633d2a34894fd22156e355207eb2305799d221b0d8fe68a9fa99a74",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/recovery/deferred_status.rs": "0db07d1f03317d8fef842c3a3079da3c5450da40ba179f0481c612b446f30c26",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/recovery/legacy_continuation.rs": "2acdb2d6fc1220757a58d4241bcd983cfdd55c8eb1d5e3fb70a265b0b7a917a9",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/recovery/legacy_selection.rs": "a775f2ec2889d1bf17e0ad39ef4c2657c72f9506d186ab1c6dabce72ab5aeec5",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/recovery/terminal_chronology.rs": "270892dca5afbd7be6c10b21eaeeab9f655732bcb005da9866fd902bba5cf671",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/schema/caller_wait.rs": "9a011e5138fe902001fba89dfcf44a7194ed22b092667f7e790844bc5737b324",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/threshold_approval.rs": "c600634184125cd34e0287b332c19d849462c376676121dca10804788a829df7",
+        "crates/protocol/chio-mcp-remote/src/remote_mcp/tests/worker_lifecycle.rs": "fd4da7796d4c88bd8785acb115ecffaf238b4e92ec23bfcc08af97de01e6070f",
+        "crates/security/chio-cage-plan/src/seccomp_plan.rs": "8b53f90df788dc5e6b9def743d393b566e2fc3372942e3e360657e9ae3ab43d7",
+        "crates/security/chio-cage/tests/linux_compile.rs": "183c8d2817d263d74f53d921bc41eb5f6579c31a47ab230dd95059e6f4af10b6",
+        "crates/security/chio-keyring/src/darwin_acl.rs": "9d8e0316d97519728e32d83e51a5b7cec1ff00b1f7f358c7b5e52e0747588e90",
+        "crates/security/chio-keyring/tests/enterprise_receipt.rs": "17536db8cd6fbcecd2dc9655c46ff4621219c6fe679a8466d69a7ec25a2b1d6a",
+        "crates/security/chio-keyring/tests/event.rs": "9cc992112fc001f3f1f1ce59c7d267b8f5bf33d704e6b15ae6c6a5aebafa161f",
+        "crates/security/chio-keyring/tests/service_paths.rs": "80b26b3c4db65a9a26e777cfc42f0376b68b04dbccda202fb5bf0d89479a4352",
+        "crates/security/chio-keyring/tests/state.rs": "2e0c33cb1a7e4c6f7b30254c738ba1dbc0ec9fc31205d2a86fe5c917d3f1a751",
+        "crates/security/chio-keyring/tests/witness_sync.rs": "db10e69d4c8b92bc09160282ec0bbd05488399f41d8cd0e7b4a4a4b5cad18ee8",
+        "crates/security/chio-secret-broker/src/process_boundary_tests/native.rs": "0594f0a4fa27da803b733acf2363c16b7e4459ca9edfab8ca48ffe20c8daafa9",
+        "crates/security/chio-secret-broker/src/process_boundary_tests/native_upstream.rs": "16b3aced8b2cd71add592862c76d361993f13383e15b176cf93ffcaec6033467",
+        "crates/security/chio-secret-broker/src/service/tests/f053_legacy_custody_cases.rs": "719fa4ba3424305f527dd05289b4fbedbc3e10dc23d0690cf209f8030396d0f4",
+        "deploy/docker/chio-workspace/regenerate.sh": "8ccb1ddc9c8b4293e2ba834abfc7b7cb91a44ff47af15224473025d9e2a82a50",
+        "deploy/docker/proof-room-workspace/Cargo.toml": "35c6a0fe387868322e6a8e836f4cf90537bb56f20868b70ae181e2cb72e5194c",
+        "scripts/check-cargo-lock-unused-patches.py": "6f9c3050d4983e1b9df7c2c296bc54bbbf0dd8444aa69ebfe69dbeff59b6d7fe",
+        "scripts/check-error-urn-registry.py": "e6cbb352e6ada1f4476e9c025abd7fb000a8a4c89b177778dc6e1a4861dc5d39",
+        "scripts/check-security-ci-contract.py": "f293ce8a144463a24f40c942d4e421bdf70be90ace5a2ea9d1be833d9280c07d",
+        "scripts/spec-drift-check.sh": "5a1a74f40ad382fc0db9ab49800c92a0e05c00770851b19c642a06c701a3afb3",
+        "scripts/tests/check-cargo-lock-unused-patches.test.py": "780ebc3260c94eb13dd00a76f17e29e40767f3ac9e9300243324b6fa8c3a1e95",
+        "scripts/tests/check-error-urn-registry.test.py": "76c7c59a2fdd43880981759b52946b21530828ab1993c39ef17051f7c960a266"
+      },
+      "head": "1267f9bf31d81947eee5cad838b1e3b4332ab4ab",
+      "status": "",
+      "timestamp": "2026-10-07T12:58:06.994952+00:00"
+    },
+    "result": {
+      "same_head": true,
+      "same_branch": true,
+      "clean_start": true,
+      "clean_end": true,
+      "checked_files": 85,
+      "changed_files": []
+    }
+  },
+  "reviewed_boundaries": [
+    {
+      "boundary": "Historical terminal projection and authenticated time",
+      "paths": [
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/history_scope.rs:9",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/projection/terminal_time.rs:13",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs:730"
+      ],
+      "assessment": "The terminal apply time binds one exact CAS for the same operation version, operation and claim digests, original fence, and absent participant digest. Complete chronology and chain verification qualify the shared immutable transaction scope; later authenticated recovery status does not replace sealed apply time."
+    },
+    {
+      "boundary": "F021 native caller approval resume, witness and delivery horizon",
+      "paths": [
+        "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_acquisition.rs:268",
+        "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_acquisition/input.rs:23",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/capture.rs:164",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/threshold_approval/nonce_capture.rs:64",
+        "crates/kernel/chio-kernel/src/caller_delivery/retained.rs:105"
+      ],
+      "assessment": "Parked resume requires the exact original issued nonce, retained proposal, hold, caller identity and classified-input join. Threshold witness qualification precedes lifecycle mutation, binds the original version/nonce/fence, and leaves only bounded signed-window comparisons after the final clock sample. Delivery reconstruction uses the approval deadline only for the original nonce bound within its issued window, capped by capability and retained custody."
+    },
+    {
+      "boundary": "F030 approval commitment, operator cancellation and expired commit retry",
+      "paths": [
+        "crates/kernel/chio-kernel/src/kernel/active_response_coordinator.rs:354",
+        "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/cancellation.rs:13",
+        "crates/kernel/chio-kernel/src/kernel/admission_cleanup.rs:517",
+        "crates/platform/chio-control-plane/src/security/event_consumer/tests/real_adapter/kernel_review/operator_cancel.rs:96"
+      ],
+      "assessment": "The public cancellation paths and commit retry reconcile an already committed exact approval before compensation or fresh validation. Missing, changed and faulted reservations remain errors. The extracted child preserves the separate compensation refusal after dispatch commitment."
+    },
+    {
+      "boundary": "Per-capability caller revocation isolation and global fatal faults",
+      "paths": [
+        "crates/kernel/chio-kernel/src/kernel/admission_coordinator/recovery/failure.rs:16",
+        "crates/kernel/chio-kernel/src/kernel/admission_coordinator/recovery/deferral.rs:36",
+        "crates/kernel/chio-kernel/src/kernel/admission_coordinator/recovery/page.rs:67",
+        "crates/kernel/chio-kernel/tests/durable_admission_sqlite/payment_recovery/caller_revocation.rs:126"
+      ],
+      "assessment": "Only the two explicit leaf/ancestor revocation error variants are added to item OutputDenied classification. Clock, view, fence, store and integrity error variants remain fatal. Regressions check both native causes, later healthy progress, original refused evidence and effect count, and fresh caller admission."
+    },
+    {
+      "boundary": "Bounded legacy recovery continuation",
+      "paths": [
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/page.rs:27",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/recovery/legacy_continuation.rs:6",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/recovery/legacy_selection.rs:37",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/recovery/legacy_selection.rs:134"
+      ],
+      "assessment": "One fenced snapshot shares a 256-candidate budget across immutable-ID cursor pages. Validation precedes each skip. Completed usable results or a proven physical end return normally; unresolved tails refuse without a partial vector. Deterministic low-ID dormant/high-ID usable, exact-end, tail, partial, owned-corruption and external-write controls distinguish the intended causes."
+    },
+    {
+      "boundary": "F018/F023/F004 regression coverage and adjacent repairs",
+      "paths": [
+        "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/native_egress/capture_once.rs:354",
+        "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/recovery/returned_output_guard.rs:180",
+        "crates/kernel/chio-kernel/tests/durable_admission_sqlite/payment_recovery/pricing_restart/resolved_cutpoint.rs:110",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/schema/migration_v34.rs:7",
+        "crates/platform/chio-store-sqlite/benches/support/authorization_composite.rs:199",
+        "crates/kernel/chio-kernel/src/governed_active_response.rs:209"
+      ],
+      "assessment": "The tests exercise actual double-capture attempts on ordinary/nested paths, durable return recording before guard denial, and exact Resolved cutpoint recovery with a changed pricing oracle but original settlement amount. Historical builders strip future recovery constraints canonically; the benchmark fixture uses the existing private directory helper. Local disabled legacy admission refuses before the first durable/replay write."
+    }
+  ],
+  "retained_evidence_inspected": [
+    {
+      "compiler_finishes": [],
+      "compressed_hash_matches": true,
+      "failures": [
+        "error: could not compile `chio-store-sqlite` (lib test) due to 1 previous error"
+      ],
+      "path": "docs/security/audits/production-repair-checkpoint-20261007/legacy-original3.log.gz",
+      "raw_hash_matches": true,
+      "test_results": []
+    },
+    {
+      "compiler_finishes": [
+        "Finished `test` profile [unoptimized] target(s) in 1m 22s"
+      ],
+      "compressed_hash_matches": true,
+      "failures": [
+        "error: None, terminal_replay: None }]",
+        "error: test failed, to rerun pass `-p chio-store-sqlite --lib`"
+      ],
+      "path": "docs/security/audits/production-repair-checkpoint-20261007/legacy-original3-runtime.log.gz",
+      "raw_hash_matches": true,
+      "test_results": [
+        "test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 2055 filtered out; finished in 6.46s"
+      ]
+    },
+    {
+      "compiler_finishes": [
+        "Finished `test` profile [unoptimized] target(s) in 1m 22s"
+      ],
+      "compressed_hash_matches": true,
+      "failures": [],
+      "path": "docs/security/audits/production-repair-checkpoint-20261007/legacy-green6.log.gz",
+      "raw_hash_matches": true,
+      "test_results": [
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 2055 filtered out; finished in 22.44s"
+      ]
+    },
+    {
+      "compiler_finishes": [
+        "Finished `test` profile [unoptimized] target(s) in 0.90s"
+      ],
+      "compressed_hash_matches": true,
+      "failures": [],
+      "path": "docs/security/audits/production-repair-checkpoint-20261007/recovery-owning.log.gz",
+      "raw_hash_matches": true,
+      "test_results": [
+        "test result: ok. 34 passed; 0 failed; 0 ignored; 0 measured; 2027 filtered out; finished in 117.74s"
+      ]
+    },
+    {
+      "compiler_finishes": [
+        "Finished `dev` profile [unoptimized] target(s) in 2m 38s"
+      ],
+      "compressed_hash_matches": true,
+      "failures": [],
+      "path": "docs/security/audits/production-repair-checkpoint-20261007/legacy-owning-strict.log.gz",
+      "raw_hash_matches": true,
+      "test_results": []
+    },
+    {
+      "compiler_finishes": [],
+      "compressed_hash_matches": true,
+      "failures": [],
+      "path": "docs/security/audits/production-repair-checkpoint-20261007/negative-gate.log.gz",
+      "raw_hash_matches": true,
+      "test_results": []
+    },
+    {
+      "compiler_finishes": [],
+      "compressed_hash_matches": true,
+      "failures": [],
+      "path": "docs/security/audits/production-repair-checkpoint-20261007/rust-hygiene.log.gz",
+      "raw_hash_matches": true,
+      "test_results": []
+    },
+    {
+      "failures": [],
+      "path": "/tmp/chio-pr1160-qualification-20261007/kernel-sqlite-owning.log",
+      "sha256": "18f6105e87d1b0e9bf0accc2a7f5b665c1f70f25c4de82c366e9b4d3c41e8200",
+      "test_results": [
+        "test result: ok. 38 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 173.14s"
+      ]
+    }
+  ],
+  "protocol_evidence_inspected": [
+    {
+      "compiler_finishes": [
+        "Finished `test` profile [unoptimized] target(s) in 3m 06s"
+      ],
+      "compressed_hash_matches": true,
+      "counts": {
+        "failed": 0,
+        "harnesses": 6,
+        "ignored": 0,
+        "passed": 626
+      },
+      "declared_counts_match": true,
+      "path": "docs/security/audits/protocol-owner-checkpoint-20261007/protocol-owning.log.gz",
+      "raw_hash_matches": true,
+      "scope": {
+        "command_kind": "lib and integration owning tests",
+        "features": "default",
+        "packages": [
+          "chio-acp-edge",
+          "chio-acp-proxy",
+          "chio-mcp-remote",
+          "chio-openapi",
+          "chio-openapi-mcp-bridge"
+        ]
+      }
+    },
+    {
+      "compiler_finishes": [
+        "Finished `test` profile [unoptimized] target(s) in 1m 57s"
+      ],
+      "compressed_hash_matches": true,
+      "counts": {
+        "failed": 0,
+        "harnesses": 6,
+        "ignored": 0,
+        "passed": 132
+      },
+      "declared_counts_match": true,
+      "path": "docs/security/audits/protocol-owner-checkpoint-20261007/openai-provider-owning.log.gz",
+      "raw_hash_matches": true,
+      "scope": {
+        "command_kind": "lib and integration owning tests",
+        "features": "provider-adapter",
+        "packages": [
+          "chio-openai-adapter"
+        ]
+      }
+    },
+    {
+      "compiler_finishes": [
+        "Finished `test` profile [unoptimized] target(s) in 1m 53s"
+      ],
+      "compressed_hash_matches": true,
+      "counts": {
+        "failed": 0,
+        "harnesses": 2,
+        "ignored": 0,
+        "passed": 337
+      },
+      "declared_counts_match": true,
+      "path": "docs/security/audits/protocol-owner-checkpoint-20261007/acp-otel-owning.log.gz",
+      "raw_hash_matches": true,
+      "scope": {
+        "command_kind": "lib and integration owning tests",
+        "features": "chio-acp-proxy/otel",
+        "packages": [
+          "chio-acp-edge",
+          "chio-acp-proxy"
+        ]
+      }
+    },
+    {
+      "compiler_finishes": [
+        "Finished `test` profile [unoptimized] target(s) in 10.31s"
+      ],
+      "compressed_hash_matches": true,
+      "counts": {
+        "failed": 0,
+        "harnesses": 5,
+        "ignored": 0,
+        "passed": 0
+      },
+      "declared_counts_match": true,
+      "path": "docs/security/audits/protocol-owner-checkpoint-20261007/protocol-doctests.log.gz",
+      "raw_hash_matches": true,
+      "scope": {
+        "command_kind": "doc tests; no cases declared",
+        "features": "default",
+        "packages": [
+          "chio-acp-edge",
+          "chio-acp-proxy",
+          "chio-mcp-remote",
+          "chio-openapi",
+          "chio-openapi-mcp-bridge"
+        ]
+      }
+    },
+    {
+      "compiler_finishes": [
+        "Finished `dev` profile [unoptimized] target(s) in 2m 22s"
+      ],
+      "compressed_hash_matches": true,
+      "counts": null,
+      "declared_counts_match": null,
+      "path": "docs/security/audits/protocol-owner-checkpoint-20261007/protocol-owning-strict.log.gz",
+      "raw_hash_matches": true,
+      "scope": {
+        "command_kind": "six protocol crates --all-targets dependency-inclusive clippy -- -D warnings",
+        "features": [
+          "chio-acp-proxy/otel",
+          "chio-openai-adapter/provider-adapter"
+        ]
+      }
+    },
+    {
+      "compiler_finishes": [],
+      "compressed_hash_matches": true,
+      "counts": null,
+      "declared_counts_match": null,
+      "path": "docs/security/audits/protocol-owner-checkpoint-20261007/ci-contract-selftest.log.gz",
+      "raw_hash_matches": true,
+      "scope": {
+        "command_kind": "python3 scripts/tests/check-security-ci-contract.test.py"
+      }
+    },
+    {
+      "compiler_finishes": [],
+      "compressed_hash_matches": true,
+      "counts": null,
+      "declared_counts_match": null,
+      "path": "docs/security/audits/protocol-owner-checkpoint-20261007/unused-patches-selftest.log.gz",
+      "raw_hash_matches": true,
+      "scope": {
+        "command_kind": "unused-patch self-tests"
+      }
+    },
+    {
+      "compiler_finishes": [],
+      "compressed_hash_matches": true,
+      "counts": null,
+      "declared_counts_match": null,
+      "path": "docs/security/audits/protocol-owner-checkpoint-20261007/unused-patches-gate.log.gz",
+      "raw_hash_matches": true,
+      "scope": {
+        "command_kind": "all eleven committed lockfiles"
+      }
+    }
+  ],
+  "test_execution_in_this_review": [],
+  "known_out_of_delta_issue": {
+    "path": "crates/kernel/chio-kernel/src/kernel/tests/automatic_active_response_fence.rs:399",
+    "status": "Existing ordinary-tempdir test fixture was reported failing by root under umask 0002; source location independently inspected. Not part of this delta and not a new production finding.",
+    "reported_cause": "The fixture calls tempfile::tempdir before SqliteSecurityStateStore::open; root reports actual directory mode 0775 fails the strict constructor and 0700 succeeds.",
+    "pending_action": "Root applied the one-constructor change after the original review guard closed. It is assessed separately in later_fixture_change_review; focused runtime verification remains outside this review."
+  },
+  "limitations": [
+    "Static review of the named delta and necessary surrounding callers, not an exhaustive audit of the complete PR or workspace.",
+    "No tests or benchmarks were rerun by this reviewer. Passing counts are independently read retained evidence, not fresh reviewer executions.",
+    "Root's broader default kernel campaign has a separately reported existing fixture failure; it is not represented as a green campaign.",
+    "Remaining owning/default/optional/PQ/native suites, full benchmarks, final whole-source schema/codegen/ledger/supply-chain checks, cold mutation, trusted-runner evidence, hosted exact-source CI, protected main landing and operational acceptance remain outside this verdict.",
+    "No hosted state, merge, release, native platform enforcement or external review service availability was queried.",
+    "The verdict applies only to the clean guarded 1267 source and must be refreshed for subsequent code changes."
+  ]
+}

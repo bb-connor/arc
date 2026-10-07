@@ -1796,3 +1796,10 @@ Remaining work is the unrun owning and optional-feature matrix, full benchmarks,
 ## Current protocol owner checkpoint (October 7)
 
 [Retained exact source and logs](audits/protocol-owner-checkpoint-20261007.json): default ACP/MCP/OpenAPI owning tests626/0; OpenAI provider feature132/0; ACP OpenTelemetry337/0; dependency-inclusive strict all-targets lint0. Five protocol doctest harnesses declare zero cases and are not counted as behavioral tests. The CI trust-boundary mutation contract and eleven-lockfile unused-patch gate/self-tests pass. Feature runs overlap and are not summed as unique cases. Broader default/PQ/native, full benchmarks, final review/trusted/hosted checks and protected landing remain pending.
+
+
+## Latest PR review fixes (October 7)
+
+[Retained reviews and exact logs](audits/review-followup-20261007.json) record Greptile P1 comment4207094540 repaired by1b05245e0d and Codex P2 comment4207159552 repaired bye321568963. Terminal-tail regression0/1 becomes5/0 with the existing capacity/partial/integrity controls preserved; owning recovery35 passes. Actual raw decimal evaluate/reconcile400vs200 regression becomes2/0, API owning276 passes, and strict combinedlint0. The terminal fixture uses a real committed projection without a signed-envelope claim.
+
+Kernel library original1577/1 and intermediate disabled-gate failure remain retained; corrected in-crate mapping fixtureb738c3571a produces exact1PASS and whole1578PASS. Full durable SQLite38 passes. Independent source reviews cover their explicit deltas, not exhaustive full-PR qualification. The latest source remains unmerged/unqualified; full benchmarks, remaining matrix/native/cold/trusted acceptance and terminal hosted/protected landing remain pending.
