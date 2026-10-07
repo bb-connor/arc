@@ -1295,5 +1295,6 @@ async fn cancelling_shutdown_transfers_retained_teardown_to_host_drop() {
     .unwrap_or_else(|_| panic!("cancelled shutdown did not finish detached teardown"));
 }
 
+mod admission_closed_response_work;
 mod recovery_worker_readiness;
 mod terminal_response_refusal;

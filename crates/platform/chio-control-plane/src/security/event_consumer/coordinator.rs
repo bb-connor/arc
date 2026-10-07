@@ -82,7 +82,7 @@ impl PreparedAttestedFindingResponse {
     }
 
     #[cfg(test)]
-    pub(super) fn synthetic(dispatch_id: RecordId) -> Self {
+    pub(crate) fn synthetic(dispatch_id: RecordId) -> Self {
         Self::Synthetic { dispatch_id }
     }
 }
@@ -156,7 +156,7 @@ impl AttestedFindingResponseCompletionProof {
     }
 
     #[cfg(test)]
-    pub(super) fn synthetic(
+    pub(crate) fn synthetic(
         dispatch_id: RecordId,
         outcome: AttestedFindingResponseCompletionOutcome,
         evidence_id: OpaqueReceiptRef,

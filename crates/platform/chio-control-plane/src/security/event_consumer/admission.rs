@@ -225,7 +225,7 @@ impl AttestedFindingAdmissionArtifacts {
     }
 
     #[cfg(test)]
-    pub(super) fn synthetic(digest: Digest32) -> Self {
+    pub(crate) fn synthetic(digest: Digest32) -> Self {
         Self {
             payload: AttestedFindingAdmissionArtifactPayload::Synthetic { digest },
         }
