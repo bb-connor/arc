@@ -939,3 +939,217 @@ fn successor_takeover_after_a_lost_local_persist_adopts_the_predecessor_fence() 
         "the successor takes over the live predecessor fence at its observed expiry"
     );
 }
+
+#[test]
+fn healthy_maintenance_keeps_the_projection_and_external_fence_in_step() {
+    let harness = FenceLapseHarness::new();
+    let scheduler = harness.scheduler();
+    harness.activate(&scheduler);
+    let synced = harness
+        .local_fence()
+        .unwrap_or_else(|| panic!("synced local fence missing"));
+
+    let horizon_at = synced.expires_at_unix_ms.saturating_sub(15_000);
+    let (work, outcome) = harness.tick(&scheduler, horizon_at, "fence-lapse-worker");
+    assert_eq!(
+        outcome,
+        SchedulerWorkOutcome::Completed {
+            action_id: action(),
+            state: ResponseState::Active,
+        }
+    );
+    let taken_over = harness
+        .local_fence()
+        .unwrap_or_else(|| panic!("maintained local fence missing"));
+    assert_eq!(harness.external_fence(), Some(taken_over.clone()));
+    assert_eq!(
+        (
+            taken_over.scheduler_lease_owner_id.clone(),
+            taken_over.scheduler_fencing_token,
+            taken_over.expires_at_unix_ms,
+        ),
+        (
+            work.lease_owner_id.clone(),
+            work.fencing_token,
+            horizon_at.saturating_add(LINEAGE_FENCE_MAX_LEASE_MS),
+        )
+    );
+    assert!(taken_over.fencing_token > synced.fencing_token);
+
+    let backend = harness.backend();
+    let renewer_at = taken_over.expires_at_unix_ms.saturating_sub(15_000);
+    let renewer = harness.claim(renewer_at, "fence-lapse-renewer");
+    let first = maintained_fence(
+        harness
+            .maintain(&backend, &renewer, renewer_at)
+            .unwrap_or_else(|error| panic!("healthy takeover: {error:?}")),
+    );
+    let renewed_at = renewer_at.saturating_add(1_000);
+    let renewed = maintained_fence(
+        harness
+            .maintain(&backend, &renewer, renewed_at)
+            .unwrap_or_else(|error| panic!("healthy same-epoch renewal: {error:?}")),
+    );
+    assert_eq!(
+        renewed,
+        LineageFence {
+            expires_at_unix_ms: renewed_at.saturating_add(LINEAGE_FENCE_MAX_LEASE_MS),
+            ..first
+        }
+    );
+    assert_eq!(harness.local_fence(), Some(renewed.clone()));
+    assert_eq!(harness.external_fence(), Some(renewed));
+}
+
+#[test]
+fn lapsed_projection_rebind_is_refused_while_the_projected_fence_is_live() {
+    let harness = FenceLapseHarness::new();
+    let scheduler = harness.scheduler();
+    harness.activate(&scheduler);
+    let synced = harness
+        .local_fence()
+        .unwrap_or_else(|| panic!("synced local fence missing"));
+    let effect = harness
+        .plan
+        .effects
+        .as_slice()
+        .first()
+        .unwrap_or_else(|| panic!("freeze effect missing"));
+
+    let probe_at = synced.expires_at_unix_ms.saturating_sub(15_000);
+    let successor = harness.claim(probe_at, "fence-lapse-rebind-probe");
+    let rebind = IssuanceFreezeFenceMaintenanceRequest {
+        key: key(),
+        action_id: action(),
+        effect_id: effect.effect_id.clone(),
+        expected_external_fence: synced.clone(),
+        maintained_external_fence: LineageFence {
+            scheduler_lease_owner_id: successor.lease_owner_id.clone(),
+            scheduler_fencing_token: successor.fencing_token,
+            ..synced.clone()
+        },
+        scheduler_work: successor,
+    };
+    let refused = harness
+        .store
+        .maintain_issuance_freeze_fence(&rebind)
+        .err()
+        .unwrap_or_else(|| panic!("a live projection was rebound without a takeover"));
+    assert_eq!(refused.kind(), PortErrorKind::InvalidData);
+    assert_eq!(harness.local_fence(), Some(synced.clone()));
+    assert_eq!(harness.external_fence(), Some(synced));
+}
+
+#[test]
+fn foreign_live_fences_are_refused_and_left_untouched() {
+    let freezes = Arc::new(FakeFreezeStore::default());
+    let blast = Arc::new(FakeBlastRadius::default());
+    let mut apply = apply_request();
+    let plan = maintenance_plan(&mut apply);
+    let work = scheduler_work(&apply);
+    let scheduler = Arc::new(FakeSchedulerStore::new(
+        work.clone(),
+        response_plan_record(&plan, &work),
+    ));
+    let freeze_port: Arc<dyn IssuanceFreezeStore> = freezes.clone();
+    let blast_port: Arc<dyn BlastRadiusPort> = blast.clone();
+    let scheduler_port: Arc<dyn ResponseSchedulerStore> = scheduler.clone();
+    let backend =
+        IssuanceFreezeBackend::new_with_scheduler(freeze_port, blast_port, scheduler_port);
+    let applied = backend
+        .execute(&apply)
+        .unwrap_or_else(|error| panic!("apply freeze: {error:?}"));
+    scheduler.mark_effect_applied(&apply.effect_id, applied.resulting_version_hash);
+    let installed = blast
+        .model
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .fence
+        .clone()
+        .unwrap_or_else(|| panic!("installed external fence missing"));
+    let local = freezes
+        .load_issuance_freezes(&key())
+        .unwrap_or_else(|error| panic!("load installed freeze: {error:?}"));
+    let effect = plan
+        .effects
+        .as_slice()
+        .first()
+        .unwrap_or_else(|| panic!("planned freeze effect missing"));
+    let observed_at_unix_ms = now_unix_ms();
+    let renewal = LineageFenceMaintenanceRequest {
+        plan: plan.clone(),
+        effect_ids: vec![effect.effect_id.clone()],
+        scheduler_work: work.clone(),
+        observed_at_unix_ms,
+        renewed_expires_at_unix_ms: observed_at_unix_ms.saturating_add(40_000),
+    };
+    let successor = ScheduledWork {
+        lease_owner_id: worker("freeze-foreign-successor"),
+        fencing_token: work.fencing_token.saturating_add(2),
+        ..work.clone()
+    };
+    let drifted_expiry = installed.expires_at_unix_ms.saturating_add(1_000);
+    let cases = [
+        (
+            "re-acquired epoch under the same scheduler identity",
+            LineageFence {
+                fencing_token: installed.fencing_token.saturating_add(7),
+                expires_at_unix_ms: drifted_expiry,
+                ..installed.clone()
+            },
+            renewal.clone(),
+        ),
+        (
+            "live fence for another commit index",
+            LineageFence {
+                commit_index: installed.commit_index.saturating_add(1),
+                expires_at_unix_ms: drifted_expiry,
+                ..installed.clone()
+            },
+            renewal.clone(),
+        ),
+        (
+            "intermediate scheduler epoch the successor does not own",
+            LineageFence {
+                fencing_token: installed.fencing_token.saturating_add(1),
+                scheduler_lease_owner_id: worker("freeze-foreign-intermediate"),
+                scheduler_fencing_token: work.fencing_token.saturating_add(1),
+                expires_at_unix_ms: drifted_expiry,
+                ..installed.clone()
+            },
+            LineageFenceMaintenanceRequest {
+                scheduler_work: successor.clone(),
+                ..renewal.clone()
+            },
+        ),
+    ];
+    for (label, foreign, request) in cases {
+        scheduler.install(request.scheduler_work.clone());
+        blast
+            .model
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .fence = Some(foreign.clone());
+        let refused = backend
+            .maintain_lineage_fence(effect, &request)
+            .err()
+            .unwrap_or_else(|| panic!("{label} was adopted"));
+        assert_eq!(refused.kind(), PortErrorKind::IntegrityFailure, "{label}");
+        assert_eq!(
+            blast
+                .model
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .fence,
+            Some(foreign),
+            "{label} was mutated"
+        );
+        assert_eq!(
+            freezes
+                .load_issuance_freezes(&key())
+                .unwrap_or_else(|error| panic!("load local freeze: {error:?}")),
+            local,
+            "{label} changed the local projection"
+        );
+    }
+}
