@@ -438,7 +438,7 @@
     },
     {
       "requirement_id": "OM-API-003",
-      "requirement": "ABI negotiation MUST precede every connection's requests.",
+      "requirement": "ABI negotiation MUST precede every connection's other requests and distinguish mismatched Hello identifiers from a matching unsupported ABI.",
       "spec": "05-operator-protocol.md",
       "planning_phase": "P1",
       "proposed_acceptance_test": "AT-API-003",

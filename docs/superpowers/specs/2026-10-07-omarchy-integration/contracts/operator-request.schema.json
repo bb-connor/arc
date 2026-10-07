@@ -6,7 +6,7 @@
       "type": "object",
       "properties": {
         "protocol": {
-          "const": "chio.omarchy.operator.v1"
+          "$ref": "common.schema.json#/$defs/protocol_identifier"
         },
         "request_id": {
           "$ref": "common.schema.json#/$defs/uuid"
@@ -23,7 +23,7 @@
               "maxLength": 64
             },
             "protocol": {
-              "const": "chio.omarchy.operator.v1"
+              "$ref": "common.schema.json#/$defs/protocol_identifier"
             }
           },
           "required": [

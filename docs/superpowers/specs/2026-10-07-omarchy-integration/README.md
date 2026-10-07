@@ -90,7 +90,7 @@ and the [verification record](reviews/validation.md) for this PR's actual checks
 python3 docs/superpowers/specs/2026-10-07-omarchy-integration/verify.py --self-test
 ```
 
-Requires Python 3.11+ and `jsonschema==4.21.1`; isolated setup is documented in
+Requires Python 3.11+ and the pinned format-validation dependencies; isolated setup is documented in
 [contracts](contracts/README.md). The validator checks local links, requirement
 coverage, closed example shapes and response substitution. It does not run any
 acceptance test named by an `AT-*` identifier.
@@ -98,5 +98,5 @@ acceptance test named by an `AT-*` identifier.
 When editing a normative requirement, regenerate its traceability explicitly:
 
 ```bash
-python3 docs/superpowers/specs/2026-10-07-omarchy-integration/verify.py --write-traceability --self-test
+python3 docs/superpowers/specs/2026-10-07-omarchy-integration/verify.py --write-traceability --self-test --write-validation
 ```

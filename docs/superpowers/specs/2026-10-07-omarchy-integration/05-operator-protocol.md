@@ -24,16 +24,30 @@ store. A shim protocol violation closes that connection without a mutation.
 Wire encoding is UTF-8 newline-delimited JSON. One frame is at most 65,536 bytes
 including its terminating LF. A literal LF within a string must be JSON escaped.
 Reject invalid UTF-8, duplicate keys, unpaired surrogates, NaN/infinity, unknown
-fields/methods/schema versions and nesting beyond 16 before dispatch. Integers
+fields/methods and nesting beyond 16 before dispatch. The first Hello version
+candidate is parsed as specified below before deciding ABI compatibility. Integers
 are nonnegative and at most 9,007,199,254,740,991 unless a field is more bounded.
 RFC 8785 canonicalization is used for semantic request digests; ordinary compact
 JSON serialization is sufficient for transport. Sorting JSON keys is not a
 substitute for JCS. [Canonicalization specification](https://www.rfc-editor.org/rfc/rfc8785)
 
 Only one selected ABI `chio.omarchy.operator.v1` is supported initially. A first
-`hello` request negotiates that exact ABI and returns the current journal epoch,
-release profile identifiers, backend component build identities and feature availability. Unknown ABI returns
-`unsupported_version` and closes the connection. Every reconnect renegotiates.
+`hello` request carries an envelope `protocol` and `params.protocol`, each a
+bounded ASCII identifier matching `[A-Za-z][A-Za-z0-9._-]{0,63}`. These Hello fields
+are candidates, so a well-formed unsupported ABI survives structural parsing.
+The two identifiers must match exactly before compatibility is considered:
+mismatch returns typed `invalid_request` with retry `never` and closes the
+connection. Matching identifiers other than the selected ABI return typed
+`unsupported_version` with retry `after_operator_repair` and close the connection.
+Both errors have a null operation reference and cause no native dispatch.
+
+Matching `chio.omarchy.operator.v1` identifiers select that exact ABI and return
+the current journal epoch, release profile identifiers, backend component build
+identities and feature availability. Every server reply, including a failed
+Hello reply before negotiation succeeds, uses the server's supported v1 response
+envelope, never the unselected candidate. All non-Hello request and event schemas
+retain the exact selected v1 constant; they require a successfully negotiated
+connection. Every reconnect renegotiates.
 
 ## Method inventory
 
@@ -45,10 +59,14 @@ converted to desktop UUIDs. Unrepresentable native identifiers block the adapter
 profile instead of being truncated or replaced. Project/profile IDs refer to
 operator-enrolled records; the API never accepts a command, executable, shell
 string, arbitrary destination URL or absolute project path as a substitute.
+Evidence in `task.get`, `tasks.list`, `task_changed` and operation responses uses
+the same `evidence_ref` definition: enrolled `owner_id`, bounded native identifier,
+nullable SHA-256 digest and explicit verification state. A native ID alone cannot
+select its owner. Projecting a reference does not verify the underlying evidence.
 
 | Method | Params | Result and authority |
 | --- | --- | --- |
-| `hello` | `client_version`, exact `protocol` | server epoch, profiles, features, limits; no execution |
+| `hello` | `client_version`, bounded `protocol` candidate matching the envelope | select exact supported ABI or typed refusal; server epoch, profiles, features, limits; no execution |
 | `health.get` | empty object | runtime availability, named prerequisite failures and bounded timestamped health observations |
 | `scope.get` | project/profile IDs | exact enrolled scope revision, digest, provider/governance/limit/recipe summary |
 | `tasks.list` | bounded `limit`, nullable cursor | task summaries plus snapshot watermark and next cursor |
@@ -195,7 +213,7 @@ review/export paths; no arbitrary file reader is added to bypass the limit.
 | --- | --- | --- |
 | OM-API-001 | Peers and socket paths MUST be validated, and operator transport MUST be absent from the guest. | AT-API-001 |
 | OM-API-002 | Wire limits and closed schemas MUST be enforced before dispatch. | AT-API-002 |
-| OM-API-003 | ABI negotiation MUST precede every connection's requests. | AT-API-003 |
+| OM-API-003 | ABI negotiation MUST precede every connection's other requests and distinguish mismatched Hello identifiers from a matching unsupported ABI. | AT-API-003 |
 | OM-API-004 | Idempotency lookup MUST preserve original mutations, including above capacity and after revision changes. | AT-API-004 |
 | OM-API-005 | Mutations MUST bind exact semantic params and enforce revision comparison on new requests. | AT-API-005 |
 | OM-API-006 | Snapshot and event cursors MUST prevent missing or duplicating projection changes across reconnect. | AT-API-006 |
@@ -222,9 +240,17 @@ maximal-evidence rows and maximally escaped labels: pagination preserves one
 snapshot, and indivisible overflow emits only the bounded typed refusal.
 
 ### AT-API-003: Negotiation failure
-Trigger: request before hello, wrong protocol and reconnect with changed backend.
-Expected: no unnegotiated mutation. Oracle: protocol transcript and native count.
-Artifact: `operator-negotiation.json`.
+Trigger: request before Hello, matching supported identifiers, matching bounded
+unsupported identifiers, mismatched identifiers, malformed/overlong identifiers,
+non-Hello wrong protocol and reconnect with changed backend. Expected: only the
+matching supported Hello selects an ABI; matching unsupported candidates return
+`unsupported_version`, mismatches return `invalid_request`, and both typed errors
+use the v1 response envelope and close the connection without native dispatch.
+Malformed identifiers fail structural validation; a valid Hello never admits a
+later request with a different ABI. Oracle: protocol transcript and native count.
+Artifact: `operator-negotiation.json`. Synthetic catalog `valid` records structural
+schema validity; `hello_outcome` separately records `selected`, `invalid_request`
+or `unsupported_version`. Static fixture checks do not execute these session rules.
 
 ### AT-API-004: Durable replay above capacity
 Trigger: replay completed and uncertain keys after restart, revision advance and

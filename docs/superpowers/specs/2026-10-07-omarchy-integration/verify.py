@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import json
 import re
 import sys
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
+from unittest.mock import patch
 
 from jsonschema import Draft202012Validator, FormatChecker
 from referencing import Registry, Resource
@@ -35,11 +37,44 @@ def unique_object(pairs):
 
 
 def read(path, overrides):
-    return overrides.get(path, path.read_text(encoding='utf-8'))
+    return overrides[path] if path in overrides else path.read_text(encoding='utf-8')
+
+
+def reject_constant(value):
+    raise ValueError(f'non-JSON constant: {value}')
 
 
 def decode(path, overrides):
-    return json.loads(read(path, overrides), object_pairs_hook=unique_object)
+    return json.loads(read(path, overrides), object_pairs_hook=unique_object,
+                      parse_constant=reject_constant)
+
+
+def package_files(root):
+    plans = root.parent.parent / 'plans' / root.name
+    files = set(root.rglob('*')) | set(plans.rglob('*'))
+    design = root.parent / (root.name + '-design.md')
+    if design.exists():
+        files.add(design)
+    return sorted(p for p in files if p.is_file() and p.suffix in {'.md', '.json', '.py', '.txt'})
+
+
+def source_digest(root, overrides):
+    digest = hashlib.sha256()
+    for path in package_files(root):
+        if path == root / 'reviews/document-validation.json':
+            continue
+        name = path.relative_to(root.parent.parent).as_posix().encode('utf-8')
+        content = read(path, overrides).encode('utf-8')
+        for value in (name, content):
+            digest.update(len(value).to_bytes(8, 'big'))
+            digest.update(value)
+    return digest.hexdigest()
+
+
+def validation_record(root, overrides, stats):
+    return {'scope': 'documents and synthetic schemas only', 'passed': True,
+            'source_digest_sha256': source_digest(root, overrides),
+            'counts': stats, 'errors': []}
 
 
 def markdown_body(text):
@@ -78,10 +113,18 @@ def traceability(root, overrides):
     }
 
 
-def validate(root=ROOT, overrides=None):
+def validate(root=ROOT, overrides=None, check_record=True):
     overrides = overrides or {}
     errors = []
     stats = {}
+    json_files = [p for p in package_files(root) if p.suffix == '.json']
+    for path in json_files:
+        try:
+            decode(path, overrides)
+        except (OSError, ValueError) as exc:
+            label = path.relative_to(root if path.is_relative_to(root) else root.parent.parent)
+            errors.append(f'{label}: invalid JSON: {exc}')
+    stats['json_files'] = len(json_files)
     plans = root.parent.parent / 'plans' / root.name
     markdown = sorted(root.rglob('*.md')) + sorted(plans.glob('*.md'))
     design = root.parent / (root.name + '-design.md')
@@ -135,6 +178,12 @@ def validate(root=ROOT, overrides=None):
     schemas = {}
     registry = Registry()
     try:
+        checker = FormatChecker()
+        if ('date-time' not in checker.checkers
+                or checker.conforms('not-a-date', 'date-time')
+                or checker.conforms('2026-02-30T12:00:00Z', 'date-time')
+                or not checker.conforms('2026-10-07T12:00:00Z', 'date-time')):
+            errors.append('date-time format validation unavailable; install requirements-validation.txt')
         for path in sorted((root / 'contracts').glob('*.schema.json')):
             value = decode(path, overrides)
             Draft202012Validator.check_schema(value)
@@ -142,13 +191,15 @@ def validate(root=ROOT, overrides=None):
             schemas[path.name] = value
             registry = registry.with_resource(path.as_uri(), Resource.from_contents(value))
         validators = {
-            name: Draft202012Validator(value, registry=registry, format_checker=FormatChecker())
+            name: Draft202012Validator(value, registry=registry, format_checker=checker)
             for name, value in schemas.items()
         }
         catalog = decode(root / 'contracts/fixture-catalog.json', overrides)
+        method_catalog = decode(root / 'contracts/method-catalog.json', overrides)
         fixtures = catalog['fixtures']
         paths = set()
         response_examples = []
+        request_coverage = {True: set(), False: set()}
         for fixture in fixtures:
             path = root / fixture['file']
             if path in paths:
@@ -158,14 +209,26 @@ def validate(root=ROOT, overrides=None):
             valid = validators[Path(fixture['schema']).name].is_valid(value)
             if valid != fixture['valid']:
                 errors.append(f'{fixture["file"]}: expected valid={fixture["valid"]}, got {valid}')
+            if Path(fixture['schema']).name == 'operator-request.schema.json':
+                request_coverage[fixture['valid']].add(value.get('method'))
+                if fixture['valid'] and value.get('method') == 'hello':
+                    outcome = ('invalid_request' if value['protocol'] != value['params']['protocol']
+                               else 'selected' if value['protocol'] == method_catalog['protocol']
+                               else 'unsupported_version')
+                    if fixture.get('hello_outcome') != outcome:
+                        errors.append(f'{fixture["file"]}: incorrect hello_outcome; expected {outcome}')
             if fixture['valid'] and path.name.startswith('response-') and value.get('ok') is True:
                 response_examples.append(value)
         if paths != set((root / 'examples').glob('*.json')):
             errors.append('fixture catalog does not cover every example exactly once')
-        methods = decode(root / 'contracts/method-catalog.json', overrides)['methods']
+        methods = method_catalog['methods']
         names = [item['method'] for item in methods]
         if len(names) != len(set(names)):
             errors.append('duplicate method catalog entry')
+        for valid, covered in request_coverage.items():
+            missing = set(names) - covered
+            if missing:
+                errors.append(f'missing valid={valid} request fixtures: {sorted(missing)}')
         requests = schemas['operator-request.schema.json']['oneOf']
         response_shapes = schemas['operator-response.schema.json']['oneOf']
         if set(names) != {item['properties']['method']['const'] for item in requests}:
@@ -189,6 +252,12 @@ def validate(root=ROOT, overrides=None):
     except Exception as exc:
         errors.append(f'contract validation failed: {type(exc).__name__}: {exc}')
     stats.update(specs=len(numbered), requirements=len(all_reqs), acceptance_cases=len(all_cases), markdown_files=len(markdown))
+    if check_record:
+        try:
+            if decode(root / 'reviews/document-validation.json', overrides) != validation_record(root, overrides, stats):
+                errors.append('document-validation.json is stale; run --self-test --write-validation')
+        except (OSError, ValueError) as exc:
+            errors.append(f'document-validation.json: {exc}')
     return errors, stats
 
 
@@ -201,33 +270,85 @@ def self_test():
     example = ROOT / 'examples/request-task-get.json'
     bad = json.loads(example.read_text())
     bad['params']['task_id'] = '/untrusted/path'
+    pins = ROOT / 'research/source-pins.json'
+    record = ROOT / 'reviews/document-validation.json'
+    old_record = decode(record, {})
+    stale_record = copy.deepcopy(old_record)
+    stale_record['counts']['fixtures'] = -1
+    changed_pins = decode(pins, {})
+    changed_pins['_freshness_probe'] = True
     mutants = {
         'missing acceptance': ({first: text.replace(heading, '### removed:', 1)}, 'missing acceptance definition'),
         'duplicate requirement': ({first: text + '\n' + row + '\n'}, 'duplicate requirements'),
         'broken local link': ({first: text + '\n[missing](definitely-absent.md)\n'}, 'broken local link'),
         'invalid positive fixture': ({example: json.dumps(bad)}, 'expected valid=True, got False'),
+        'malformed source pins': ({pins: '{'}, 'research/source-pins.json: invalid JSON'),
+        'duplicate source keys': ({pins: '{"source":1,"source":2}'}, 'duplicate JSON key'),
+        'non-JSON constant': ({pins: '{"source":NaN}'}, 'non-JSON constant'),
+        'malformed validation record': ({record: '{'}, 'reviews/document-validation.json: invalid JSON'),
+        'stale record counts': ({record: json.dumps(stale_record)}, 'document-validation.json is stale'),
+        'stale source digest': ({pins: json.dumps(changed_pins)}, 'document-validation.json is stale'),
     }
     failures = []
     for name, (overrides, expected) in mutants.items():
         errors, _ = validate(overrides=overrides)
         if not any(expected in error for error in errors):
             failures.append(f'self-test accepted mutant: {name}')
-    return failures, len(mutants)
+    catalog_path = ROOT / 'contracts/fixture-catalog.json'
+    catalog = decode(catalog_path, {})
+    methods = decode(ROOT / 'contracts/method-catalog.json', {})['methods']
+    hello_count = 0
+    for index, fixture in enumerate(catalog['fixtures']):
+        if 'hello_outcome' not in fixture:
+            continue
+        modified = copy.deepcopy(catalog)
+        modified['fixtures'][index]['hello_outcome'] = 'incorrect'
+        errors, _ = validate(overrides={catalog_path: json.dumps(modified)})
+        if not any('incorrect hello_outcome' in e for e in errors):
+            failures.append(f'self-test accepted invalid hello outcome: {fixture["file"]}')
+        hello_count += 1
+    for method in methods:
+        name = method['method']
+        modified = copy.deepcopy(catalog)
+        modified['fixtures'] = [f for f in modified['fixtures'] if not (
+            f['schema'].endswith('operator-request.schema.json') and not f['valid']
+            and decode(ROOT / f['file'], {}).get('method') == name)]
+        errors, _ = validate(overrides={catalog_path: json.dumps(modified)})
+        if not any('missing valid=False request fixtures' in e and name in e for e in errors):
+            failures.append(f'self-test accepted missing negative coverage: {name}')
+    missing_checker = FormatChecker()
+    missing_checker.checkers.pop('date-time', None)
+    with patch(__name__ + '.FormatChecker', return_value=missing_checker):
+        errors, _ = validate()
+    if not any('date-time format validation unavailable' in e for e in errors):
+        failures.append('self-test accepted missing date-time checker')
+    return failures, len(mutants) + len(methods) + hello_count + 1
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--write-traceability', action='store_true')
     parser.add_argument('--self-test', action='store_true')
+    parser.add_argument('--write-validation', action='store_true',
+                        help='refresh structural record after successful self-tests')
     args = parser.parse_args()
+    if args.write_validation and not args.self_test:
+        parser.error('--write-validation requires --self-test')
     if args.write_traceability:
         (ROOT / 'requirements.json').write_text(json.dumps(traceability(ROOT, {}), indent=2) + '\n')
-    errors, stats = validate()
+    errors, stats = validate(check_record=not args.write_validation)
+    count = None
     if args.self_test:
         extra, count = self_test()
         errors += extra
-        stats['validator_mutants'] = count
-    print(json.dumps({'scope': 'documents and synthetic schemas only', 'passed': not errors, 'counts': stats, 'errors': errors}, indent=2))
+    if args.write_validation and not errors:
+        (ROOT / 'reviews/document-validation.json').write_text(
+            json.dumps(validation_record(ROOT, {}, stats), indent=2) + '\n', encoding='utf-8')
+        errors, stats = validate()
+    report = {**validation_record(ROOT, {}, stats), 'passed': not errors, 'errors': errors}
+    if count is not None:
+        report['validator_mutants'] = count
+    print(json.dumps(report, indent=2))
     return 1 if errors else 0
 
 

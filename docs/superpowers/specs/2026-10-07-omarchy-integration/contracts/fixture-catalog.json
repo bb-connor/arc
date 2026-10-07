@@ -4,7 +4,8 @@
     {
       "file": "examples/request-hello.json",
       "schema": "contracts/operator-request.schema.json",
-      "valid": true
+      "valid": true,
+      "hello_outcome": "selected"
     },
     {
       "file": "examples/request-health-get.json",
@@ -235,6 +236,159 @@
       "file": "examples/request-native-v7.json",
       "schema": "contracts/operator-request.schema.json",
       "valid": true
+    },
+    {
+      "file": "examples/invalid-response-task-get-evidence-missing-owner.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-task-get-evidence-invalid-native-id.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-tasks-list-evidence-missing-owner.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-response-tasks-list-evidence-invalid-native-id.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-event-task_changed-evidence-missing-owner.json",
+      "schema": "contracts/operator-event.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-event-task_changed-evidence-invalid-native-id.json",
+      "schema": "contracts/operator-event.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-request-hello.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-request-health-get.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-request-tasks-list.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-request-task-get.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-request-events-subscribe.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-request-task-resume.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-request-review-open.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-request-receipts-export.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-request-scope-get.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/request-hello-unsupported-version.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": true,
+      "hello_outcome": "unsupported_version"
+    },
+    {
+      "file": "examples/request-hello-protocol-mismatch.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": true,
+      "hello_outcome": "invalid_request"
+    },
+    {
+      "file": "examples/invalid-request-nonhello-protocol.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/response-hello-unsupported-version.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/response-hello-invalid-request.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "examples/invalid-response-review-open-date-time.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/request-hello-identifier-boundary.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": true,
+      "hello_outcome": "unsupported_version"
+    },
+    {
+      "file": "examples/invalid-request-hello-overlong-protocol.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-request-hello-trailing-newline.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-request-native-id-trailing-newline.json",
+      "schema": "contracts/operator-request.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-evidence-native-id-trailing-newline.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-evidence-owner-trailing-newline.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-evidence-sha256-trailing-newline.json",
+      "schema": "contracts/operator-response.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-compatibility-sha256-trailing-newline.json",
+      "schema": "contracts/compatibility.schema.json",
+      "valid": false
+    },
+    {
+      "file": "examples/invalid-release-sha256-trailing-newline.json",
+      "schema": "contracts/release-evidence.schema.json",
+      "valid": false
     }
   ]
 }

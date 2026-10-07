@@ -34,7 +34,7 @@ The inspected ARM64 privileged-container results do not satisfy x86_64 Omarchy p
 | `integrations/omarchy/qualification/platform.py` | Host/boot/architecture/effective-feature observation and tuple comparison |
 | `integrations/omarchy/qualification/oracle.py` | Outside-guest sentinel/effect-count/process-census comparison |
 | `integrations/omarchy/tests/test_evidence.py` | False-green, missing, skipped, wrong tuple and altered artifact regressions |
-| `integrations/omarchy/tests/test_process.py` | Timeout/argv/output-limit harness behavior |
+| `integrations/omarchy/tests/test_process.py` | Launch-refusal/timeout/argv/output-limit harness behavior |
 | `integrations/omarchy/tests/test_platform.py` | Host facts and feature refusal behavior |
 | `integrations/omarchy/tests/test_oracle.py` | Unreachable fixture, outside mutation and descendant-survival detection |
 | `integrations/omarchy/tests/test_linux_cases.py` | Actual named Linux cases; real-host marker mandatory |
@@ -46,8 +46,10 @@ The inspected ARM64 privileged-container results do not satisfy x86_64 Omarchy p
 | `packaging/omarchy/PKGBUILD` | Controller/shim packaging from immutable public source archive with vendored locked build inputs |
 | `packaging/omarchy/units/chio-desktop.service` | User service intent, separately checked for actual effective protection |
 | `packaging/omarchy/units/chio-tasks.slice` | Task resource grouping |
+| `integrations/omarchy/fixtures/desktop/computer.chio.desktop.desktop` | Consume the controller plan's desktop entry for package-owned installation |
+| `integrations/omarchy/fixtures/desktop/menu-fragment.json` | Consume the controller plan's static menu fragment as package data for optional ownership-aware onboarding |
 | `packaging/omarchy/tests/test_release_lock.py` | Refuse floating/unverifiable/incomplete release inputs |
-| `packaging/omarchy/tests/test_package_contents.py` | Exact code/unit inventory, permissions and absence of self-install hooks |
+| `packaging/omarchy/tests/test_package_contents.py` | Exact code/unit/desktop-registration inventory, permissions and absence of self-install hooks |
 | `packaging/omarchy/README.md` | Signed install/upgrade/recovery instructions derived from delivered behavior |
 
 Controller runtime changes belong in `crates/products/chio-desktop/src/supervision/` and `src/store/` under the controller/state plans. This plan adds focused integration tests against those components and reports defects to their owners. Do not implement a parallel authority, journal or recovery engine in Python.
@@ -110,16 +112,45 @@ def require_cases(required, rows, tuple_digest):
 
 **Files:** Create `integrations/omarchy/qualification/process.py`, `integrations/omarchy/tests/test_process.py`.
 
-- [ ] Write the timeout, no-shell and wrapper-exit regression tests below. The regression child closes stdout/stderr before sleeping, so pipe EOF cannot masquerade as descendant termination.
+- [ ] Write the launch-refusal, timeout, no-shell and wrapper-exit regression tests below. The regression child closes stdout/stderr before sleeping, so pipe EOF cannot masquerade as descendant termination.
 
 ```python
+import errno
 import os
 import signal
 import sys
+import tempfile
 import unittest
+from pathlib import Path
 from integrations.omarchy.qualification.process import command_passed, run_bounded
 
 class ProcessTests(unittest.TestCase):
+    def assert_launch_refused(self, argv, expected_errno, reason):
+        result = run_bounded(argv, timeout=0.1, limit=64,
+                             prerequisite="AT-LNX-006.native-fixture")
+        self.assertEqual(result["launch_error"], {
+            "prerequisite": "AT-LNX-006.native-fixture",
+            "errno": expected_errno, "reason": reason})
+        self.assertFalse(result["launched"])
+        self.assertIsNone(result["returncode"])
+        self.assertEqual(result["stdout"], b"")
+        self.assertEqual(result["stderr"], b"")
+        self.assertFalse(result["wrapper_reaped"])
+        self.assertFalse(result["descendants_absent"])
+        self.assertFalse(command_passed(result))
+
+    def test_missing_fixture_retains_prerequisite_refusal(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.assert_launch_refused([str(Path(directory) / "missing-fixture")],
+                                       errno.ENOENT, "not_found")
+
+    def test_nonexecutable_fixture_retains_prerequisite_refusal(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = Path(directory) / "nonexecutable-fixture"
+            fixture.write_text("#!/bin/sh\nexit 0\n")
+            fixture.chmod(0o600)
+            self.assert_launch_refused([str(fixture)], errno.EACCES, "not_executable")
+
     def test_shell_metacharacters_are_data(self):
         result = run_bounded([sys.executable, "-c",
                               "import sys; print(sys.argv[1])", "$(touch nope)"],
@@ -172,6 +203,7 @@ class ProcessTests(unittest.TestCase):
 - [ ] Implement literal-argv process execution with a new session, no inherited secrets, pipe readers that terminate once the combined byte limit is exceeded, a monotonic deadline, TERM/KILL and observed wait. Use this exact result contract and failure condition in `process.py`. `wrapper_reaped` and `descendants_absent` are independent observations. This helper is restricted to reviewed harness fixtures whose complete descendant behavior excludes `setsid` and `setpgid`; `may_escape_group=False` is not an enforcement mechanism. Any command that may change process group/session, including arbitrary guest code, requires the qualified per-task cgroup executor and its independently observed unpopulated state. Such commands must set `may_escape_group=True` here and are refused before spawn. There is no process-group fallback for them:
 
 ```python
+import errno
 import os
 import selectors
 import signal
@@ -180,7 +212,8 @@ import time
 
 
 def command_passed(result):
-    return (result["returncode"] == 0 and not result["timed_out"]
+    return (result["launched"] and result["launch_error"] is None
+            and result["returncode"] == 0 and not result["timed_out"]
             and not result["overflow"] and result["wrapper_reaped"]
             and result["descendants_absent"] is True
             and not result["unexpected_descendants"]
@@ -224,22 +257,38 @@ def _stop_and_observe_group(process, result):
     result["descendants_absent"] = state is False
 
 
-def run_bounded(argv, *, timeout, limit, may_escape_group=False):
+def run_bounded(argv, *, timeout, limit, may_escape_group=False,
+                prerequisite="harness-fixture-executable"):
     if may_escape_group:
         raise ValueError("qualified cgroup executor required")
     if (not isinstance(argv, list) or not argv
             or any(not isinstance(a, str) or "\0" in a for a in argv)
-            or not 0 < timeout <= 600 or not 0 < limit <= 16 * 1024 * 1024):
+            or not 0 < timeout <= 600 or not 0 < limit <= 16 * 1024 * 1024
+            or not isinstance(prerequisite, str) or not 1 <= len(prerequisite) <= 128
+            or not prerequisite.isascii()
+            or any(not (c.isalnum() or c in "._-") for c in prerequisite)):
         raise ValueError("invalid bounded command")
+    result = {"launched": False, "launch_error": None,
+              "returncode": None, "stdout": b"", "stderr": b"",
+              "timed_out": False, "overflow": False, "wrapper_reaped": False,
+              "descendants_absent": False, "unexpected_descendants": False,
+              "cleanup_errors": [], "containment": "reviewed-fixture-process-group"}
     with selectors.DefaultSelector() as selector:
-        process = subprocess.Popen(
-            argv, shell=False, start_new_session=True,
-            env={"PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C"},
-            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        result = {"returncode": None, "stdout": b"", "stderr": b"",
-                  "timed_out": False, "overflow": False, "wrapper_reaped": False,
-                  "descendants_absent": False, "unexpected_descendants": False,
-                  "cleanup_errors": [], "containment": "reviewed-fixture-process-group"}
+        try:
+            process = subprocess.Popen(
+                argv, shell=False, start_new_session=True,
+                env={"PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C"},
+                stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except OSError as error:
+            # Fixed reason vocabulary and a bounded prerequisite ID retain evidence
+            # without copying arbitrary exception text, paths or command output.
+            reason = {errno.ENOENT: "not_found", errno.EACCES: "not_executable",
+                      errno.EPERM: "not_executable", errno.ENOEXEC: "invalid_executable"}
+            result["launch_error"] = {"prerequisite": prerequisite,
+                                      "errno": error.errno,
+                                      "reason": reason.get(error.errno, "launch_failed")}
+            return result
+        result["launched"] = True
         deadline = time.monotonic() + timeout
         total = 0
         try:
@@ -276,6 +325,7 @@ def run_bounded(argv, *, timeout, limit, may_escape_group=False):
     return result
 ```
 
+- [ ] Preserve launch refusals as failed command records with `launched=false`, `returncode=null`, empty output and the bounded `launch_error` object. No wrapper/group observation occurred, so neither observation flag becomes true. The case dispatcher supplies the checked-in fixture's prerequisite ID and retains this record alongside the literal argv/adapter identity before returning exit 2 for that named unavailable prerequisite. It records the case outcome as `unknown` with its blocker, never `pass`; an observation failure after launch returns exit 1. Do not let an uncaught `Popen` exception erase partial case evidence. Test missing file, denied execution, invalid executable format and a generic OS launch error; exception text must not enter the artifact.
 - [ ] Add executable tests for a 2 MiB stdout/stderr flood with a 64 KiB cap, nonzero exit, invalid argv, unverifiable group observation and a descendant that keeps stdout open. Retain the separate closed-pipe descendant regression above. Expected: captured bytes never exceed the cap; failures remain failures and all stoppable owned fixture processes disappear. Unverifiable absence returns `descendants_absent=false` and can never pass. An unexpected surviving child makes the command fail even when cleanup subsequently proves absence. Run `python3 -m unittest integrations.omarchy.tests.test_process -v`.
 - [ ] Commit with `test(omarchy): bound qualification command execution`. The product task cgroup implementation remains a separate prerequisite; this runner is not a substitute for it.
 
@@ -395,7 +445,15 @@ def require_denial(positive_control, before_count, after_count, absent):
 ```
 
 - [ ] Run `python3 -m unittest integrations.omarchy.tests.test_oracle -v` first with no implementation (red), then with the implementation (green).
-- [ ] Implement the thin `qualify.py` CLI with explicit options `--phase P0|P7 --profile --bundle --output`, repeatable `--case AT-...` and `--verify-only`. The selected-case path resolves IDs only from checked-in case definitions, refuses non-Linux/root/wrong architecture for real cases, requires an empty owned output directory and runs only exact fixture commands through Task 2. It imports the real host adapter installed by the selected-profile plans; it never invents a privileged/unconfined fallback. Command and adapter identities go into the artifact. Unknown IDs and missing prerequisites return nonzero.
+- [ ] Implement the thin `qualify.py` CLI with explicit options `--phase P0|P1|P2|P3|P4|P5|P6|P7 --profile --bundle --output`, repeatable `--case AT-...`, `--fixture-only` and `--verify-only`, matching the [shared harness ABI](README.md#proposed-qualification-harness-abi). Every phase dispatches to that phase's declared gates; a missing implementation is a named unavailable prerequisite, never a parser rejection of a valid phase or a fallback to P0/P7. The selected-case path resolves IDs only from checked-in case definitions, refuses non-Linux/root/wrong architecture for real cases, requires a new owned output directory and runs only exact fixture commands through Task 2. Verification-only reads an existing evidence directory without runtime effects. Fixture-only always records synthetic evidence. It imports the real host adapter installed by the selected-profile plans; it never invents a privileged/unconfined fallback. Command and adapter identities go into the artifact. Unknown IDs return exit 1; missing prerequisites, including recorded launch refusals, return exit 2. Preserve partial evidence in both cases.
+- [ ] Use the same closed phase choices in the real parser and component tests. Test acceptance of every P0 through P7, rejection of P8, lowercase and missing phase, and dispatch to the selected phase without substitution:
+
+```python
+def add_phase_argument(parser):
+    parser.add_argument("--phase", required=True,
+                        choices=[f"P{index}" for index in range(8)])
+```
+
 - [ ] Add one separately addressable actual case for each row. Each writes the exact AT artifact from the Linux spec. Expand the native probe with one named operation per additional syscall; do not accept JavaScript exceptions as syscall evidence.
 
 | Future exact case command suffix | Positive control | Negative trigger and outside oracle |
@@ -416,6 +474,8 @@ Future example after implementing the selected case: `python3 integrations/omarc
 ## Task 5: Lock public package inputs and produce a reproducible package
 
 **Files:** Create `packaging/omarchy/release-lock.json`, `packaging/omarchy/release_lock.py`, `packaging/omarchy/tests/test_release_lock.py`, `packaging/omarchy/PKGBUILD`, `packaging/omarchy/tests/test_package_contents.py`.
+
+Consume the controller plan's three explicitly declared binaries and its desktop entry/menu fixtures. Their source ownership remains with that plan; package their reviewed bytes without generating alternate registration assets here.
 
 - [ ] Define the release lock as strict data with required fields `version`, `architecture`, `source_url`, `source_sha256`, `public_revision`, `runtime_inventory_sha256`, `compatibility_sha256`, `profiles`, `state_read_abis`, `state_write_abi`, `signer_identity` and `native_prerequisites`. Populate only from publicly reachable pinned artifacts. An absent field is a hard error, not an empty default.
 - [ ] Add the first tests around the proposed parser `validate_release_lock` in `packaging/omarchy/release_lock.py`:
@@ -455,14 +515,32 @@ package() {
   cd "$srcdir/chio"
   install -Dm755 target/release/chio-desktop-controller "$pkgdir/usr/bin/chio-desktop-controller"
   install -Dm755 target/release/chio-desktop-client "$pkgdir/usr/bin/chio-desktop-client"
+  install -Dm755 target/release/chio-desktop-open "$pkgdir/usr/bin/chio-desktop-open"
   install -Dm644 packaging/omarchy/units/chio-desktop.service "$pkgdir/usr/lib/systemd/user/chio-desktop.service"
   install -Dm644 packaging/omarchy/units/chio-tasks.slice "$pkgdir/usr/lib/systemd/user/chio-tasks.slice"
+  install -Dm644 integrations/omarchy/fixtures/desktop/computer.chio.desktop.desktop "$pkgdir/usr/share/applications/computer.chio.desktop.desktop"
+  install -Dm644 integrations/omarchy/fixtures/desktop/menu-fragment.json "$pkgdir/usr/share/chio/omarchy/menu-fragment.json"
 }
 ```
 
 The `source`, `sha256sums`, version and dependency declarations must be literal reviewed values derived from `release-lock.json` when the release is cut; the package builder rejects disagreement. Bundle the helper/runtime through a separately reviewed runtime package according to the exact tuple. Do not add a post-install hook or network download to compensate for missing prerequisites.
+
+Require these exact package paths as root-owned regular files, with no setuid/setgid or group/other write bits. Include every additional delivered schema, diagnostic formatter, public document and optional icon in the reviewed complete package manifest; the following mandatory launcher/unit inventory is not permission to omit those selected deliverables.
+
+| Required installed path | Mode | Content assertion |
+|---|---|---|
+| `/usr/bin/chio-desktop-controller` | `0755` | Matches the reviewed controller build |
+| `/usr/bin/chio-desktop-client` | `0755` | Matches the reviewed protocol client build |
+| `/usr/bin/chio-desktop-open` | `0755` | Matches the reviewed navigation-only opener build |
+| `/usr/lib/systemd/user/chio-desktop.service` | `0644` | Literal controller path resolves within the package manifest |
+| `/usr/lib/systemd/user/chio-tasks.slice` | `0644` | Matches the reviewed task resource-group unit |
+| `/usr/share/applications/computer.chio.desktop.desktop` | `0644` | Exact P1 fixture bytes, `Exec=chio-desktop-open`, no shell or dynamic arguments |
+| `/usr/share/chio/omarchy/menu-fragment.json` | `0644` | Exact P1 fixture bytes, only the owned static `chio` menu action invoking the opener |
+
+The clean-install launcher check below observes whether the desktop-entry `Exec` basename resolves to the delivered `/usr/bin/chio-desktop-open`. If the desktop entry declares an `Icon`, its package-owned asset is required in the complete manifest or the entry must omit that optional field. The menu fragment is inert package data. Explicit optional onboarding applies it transactionally through P1's ownership-aware merge; package installation does not edit user menus or shortcuts.
+
 - [ ] On two independent clean Arch builders run `extra-x86_64-build` from `packaging/omarchy` after its devtools clean-chroot setup is explicitly recorded. Compare extracted files/digests and retain both `.BUILDINFO`, SBOM and license inventory. Expected first red can be a genuine public source/dependency gap; close the gap, do not bypass offline/locked flags. Expected green: matching package content and complete source correspondence.
-- [ ] Run `python3 -m unittest discover -s packaging/omarchy/tests -p test_package_contents.py -v` against both built archives, checking exact executable/unit inventory, ownership/modes, no credentials and no installer self-download or enable/linger side effects. Commit with `build(omarchy): package pinned desktop components`.
+- [ ] Run `python3 -m unittest discover -s packaging/omarchy/tests -p test_package_contents.py -v` against both built archives, checking every exact path/mode/content assertion above plus the complete release manifest, no credentials and no installer self-download or enable/linger side effects. Delete each mandatory member in turn, especially the opener and both registration files; every mutated archive must fail. Also reject altered desktop/menu bytes, an unresolved or shell-based `Exec`, a missing declared icon and wrong ownership/modes. A clean installed desktop entry must reach the navigation-only opener under the real launcher. Commit with `build(omarchy): package pinned desktop components`.
 
 ## Task 6: Ship and measure role-specific user services
 

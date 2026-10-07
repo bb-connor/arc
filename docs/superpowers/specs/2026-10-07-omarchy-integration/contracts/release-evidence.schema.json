@@ -24,11 +24,11 @@
     },
     "compatibility_sha256": {
       "type": "string",
-      "pattern": "^[0-9a-f]{64}$"
+      "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
     },
     "requirements_sha256": {
       "type": "string",
-      "pattern": "^[0-9a-f]{64}$"
+      "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
     },
     "tester": {
       "type": "string",
@@ -50,7 +50,7 @@
         "properties": {
           "acceptance_id": {
             "type": "string",
-            "pattern": "^AT-[A-Z]+-[0-9]{3}$"
+            "pattern": "^AT-[A-Z]+-[0-9]{3}(?![\\s\\S])"
           },
           "outcome": {
             "enum": [
@@ -73,7 +73,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "pattern": "^[0-9a-f]{64}$"
+                "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
               },
               {
                 "type": "null"
@@ -137,7 +137,7 @@
                 },
                 "artifact_sha256": {
                   "type": "string",
-                  "pattern": "^[0-9a-f]{64}$"
+                  "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
                 }
               }
             }

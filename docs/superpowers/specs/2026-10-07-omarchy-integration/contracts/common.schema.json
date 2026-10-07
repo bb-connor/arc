@@ -4,7 +4,7 @@
   "$defs": {
     "uuid": {
       "type": "string",
-      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(?![\\s\\S])"
     },
     "safe_integer": {
       "type": "integer",
@@ -37,14 +37,14 @@
     },
     "sha256": {
       "type": "string",
-      "pattern": "^[0-9a-f]{64}$"
+      "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
     },
     "cursor": {
       "type": "object",
       "properties": {
         "epoch": {
           "type": "string",
-          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(?![\\s\\S])"
         },
         "seq": {
           "type": "integer",
@@ -62,15 +62,13 @@
       "type": "object",
       "properties": {
         "native_id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 256
+          "$ref": "common.schema.json#/$defs/native_id"
         },
         "sha256": {
           "anyOf": [
             {
               "type": "string",
-              "pattern": "^[0-9a-f]{64}$"
+              "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
             },
             {
               "type": "null"
@@ -101,7 +99,7 @@
       "properties": {
         "task_id": {
           "type": "string",
-          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(?![\\s\\S])"
         },
         "revision": {
           "type": "integer",
@@ -134,7 +132,7 @@
         },
         "project_id": {
           "type": "string",
-          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(?![\\s\\S])"
         },
         "label": {
           "type": "string",
@@ -169,38 +167,7 @@
         "evidence": {
           "type": "array",
           "items": {
-            "type": "object",
-            "properties": {
-              "native_id": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 256
-              },
-              "sha256": {
-                "anyOf": [
-                  {
-                    "type": "string",
-                    "pattern": "^[0-9a-f]{64}$"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "verification": {
-                "enum": [
-                  "unavailable",
-                  "verified",
-                  "invalid"
-                ]
-              }
-            },
-            "required": [
-              "native_id",
-              "sha256",
-              "verification"
-            ],
-            "additionalProperties": false
+            "$ref": "common.schema.json#/$defs/evidence_ref"
           },
           "maxItems": 32
         },
@@ -243,11 +210,10 @@
       "properties": {
         "owner_id": {
           "type": "string",
-          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(?![\\s\\S])"
         },
         "native_id": {
-          "type": "string",
-          "pattern": "^[A-Za-z0-9][A-Za-z0-9:._-]{0,255}$"
+          "$ref": "common.schema.json#/$defs/native_id"
         }
       },
       "required": [
@@ -301,7 +267,13 @@
     },
     "native_id": {
       "type": "string",
-      "pattern": "^[A-Za-z0-9][A-Za-z0-9:._-]{0,255}$"
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9:._-]{0,255}(?![\\s\\S])"
+    },
+    "protocol_identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,63}(?![\\s\\S])"
     }
   }
 }

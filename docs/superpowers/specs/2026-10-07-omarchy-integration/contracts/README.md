@@ -44,7 +44,8 @@ Passing schema checks on a `qualified` shape alone does not qualify anything.
 The real gate must verify every required component/digest/prerequisite, complete
 profile-specific case coverage, evidence artifacts and unresolved native findings.
 
-Run from repository root with Python 3.11+ and `jsonschema==4.21.1`:
+Run from repository root with Python 3.11+ and the pinned
+[validation dependencies](requirements-validation.txt):
 
 ```bash
 python3 docs/superpowers/specs/2026-10-07-omarchy-integration/verify.py
@@ -55,6 +56,25 @@ Dependency installation, if needed, belongs in a temporary virtual environment:
 
 ```bash
 python3 -m venv /tmp/chio-omarchy-doc-validation
-/tmp/chio-omarchy-doc-validation/bin/pip install jsonschema==4.21.1
+/tmp/chio-omarchy-doc-validation/bin/pip install -r docs/superpowers/specs/2026-10-07-omarchy-integration/contracts/requirements-validation.txt
 /tmp/chio-omarchy-doc-validation/bin/python docs/superpowers/specs/2026-10-07-omarchy-integration/verify.py --self-test
 ```
+
+The `format-nongpl` extra supplies format validators; `rfc3339-validator` is also
+pinned explicitly because `date-time` checking otherwise silently becomes a
+no-op. The verifier probes valid, malformed and impossible-calendar timestamps
+before checking fixtures and fails if the required checker is unavailable. See
+the [jsonschema format documentation](https://python-jsonschema.readthedocs.io/en/stable/validate/#validating-formats).
+
+Every JSON document in the specification and plan package is decoded with
+duplicate-key and non-JSON-number rejection, including source pins and the
+committed validation record. That record must match the computed structural
+counts and SHA-256 of package paths and content (excluding the record itself).
+After intentional edits, regenerate it only after successful self-tests:
+
+```bash
+/tmp/chio-omarchy-doc-validation/bin/python docs/superpowers/specs/2026-10-07-omarchy-integration/verify.py --write-traceability --self-test --write-validation
+```
+
+Normal validation never refreshes stale evidence. The record covers document
+structure and synthetic examples only; it records no runtime acceptance.
