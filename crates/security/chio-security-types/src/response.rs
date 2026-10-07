@@ -278,6 +278,7 @@ impl ResponsePlan {
         }
         let mut effect_ids = Vec::with_capacity(self.effects.len());
         let mut lineage_scoped = false;
+        let mut issuance_fences = 0_usize;
         for (index, effect) in self.effects.as_slice().iter().enumerate() {
             if usize::from(effect.ordinal) != index {
                 return Err(ResponseShapeError::InvalidEffectOrdinal);
@@ -307,6 +308,9 @@ impl ResponsePlan {
                 effect.kind,
                 ResponseEffectKind::SuspendCapabilitySet | ResponseEffectKind::FreezeIssuance
             );
+            if effect.kind == ResponseEffectKind::FreezeIssuance {
+                issuance_fences = issuance_fences.saturating_add(1);
+            }
             effect_ids.push(effect.effect_id.as_str());
         }
         effect_ids.sort_unstable();
@@ -324,6 +328,11 @@ impl ResponsePlan {
                 .is_none_or(|effect| effect.kind != ResponseEffectKind::FreezeIssuance)
         {
             return Err(ResponseShapeError::MissingIssuanceFence);
+        }
+        // The external fence is keyed by tenant and action, so one plan can
+        // hold at most one issuance freeze.
+        if issuance_fences > 1 {
+            return Err(ResponseShapeError::DuplicateIssuanceFence);
         }
         Ok(())
     }
@@ -1413,6 +1422,7 @@ pub enum ResponseShapeError {
     InvalidTargetAffectedSetHash,
     InvalidTimeRange,
     MissingIssuanceFence,
+    DuplicateIssuanceFence,
 }
 
 impl fmt::Display for ResponseShapeError {
@@ -1440,6 +1450,7 @@ impl fmt::Display for ResponseShapeError {
             Self::InvalidTargetAffectedSetHash => "response capability-set target hash is zero",
             Self::InvalidTimeRange => "response plan time range is invalid",
             Self::MissingIssuanceFence => "lineage response does not begin with an issuance fence",
+            Self::DuplicateIssuanceFence => "response plan contains more than one issuance fence",
         };
         formatter.write_str(message)
     }
@@ -1465,7 +1476,8 @@ impl core::error::Error for ResponseShapeError {
             | Self::InvalidReasonHash
             | Self::InvalidTargetAffectedSetHash
             | Self::InvalidTimeRange
-            | Self::MissingIssuanceFence => None,
+            | Self::MissingIssuanceFence
+            | Self::DuplicateIssuanceFence => None,
         }
     }
 }
