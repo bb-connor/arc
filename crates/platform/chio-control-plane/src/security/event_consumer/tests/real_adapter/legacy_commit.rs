@@ -485,3 +485,6 @@ fn legacy_active_response_commit_refuses_without_consuming_approval() {
         AdmissionOperationState::CompensatedBeforeDispatch
     );
 }
+
+#[path = "legacy_commit/federated_admission_guard.rs"]
+mod federated_admission_guard;
