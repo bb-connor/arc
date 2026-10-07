@@ -28,6 +28,8 @@ use std::sync::{Arc, Mutex};
 mod channel_roots;
 #[path = "runtime_tests/request_identity.rs"]
 mod request_identity;
+#[path = "runtime_tests/roots_refresh_invalidation.rs"]
+mod roots_refresh_invalidation;
 #[path = "runtime_tests/swarm_required.rs"]
 mod swarm_required;
 

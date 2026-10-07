@@ -39,74 +39,34 @@ fn hosted_roots_wait_refuses_notification_accumulation_without_tool_calls() {
     );
     assert_eq!(initialized.status(), reqwest::StatusCode::ACCEPTED);
     assert!(initialized.bytes().unwrap().is_empty());
-    let mut reader = std::io::BufReader::new(roots_stream);
     let mut line = String::new();
-    let mut priming_event_id = None;
-    let mut current_event_id = None;
+    // The refresh rides the next client request's stream even with a GET
+    // attached, and the reply is withheld.
+    let ping = server.post_json(
+        Some(&session_id),
+        Some("2025-11-25"),
+        &json!({"jsonrpc":"2.0","id":2,"method":"ping","params":{}}),
+    );
+    assert_eq!(ping.status(), reqwest::StatusCode::OK);
+    let mut ping_reader = std::io::BufReader::new(ping);
     let roots_request_id = loop {
         use std::io::BufRead;
         line.clear();
-        assert!(reader.read_line(&mut line).unwrap() > 0);
-        if let Some(id) = line.strip_prefix("id:") {
-            current_event_id = Some(id.trim().to_owned());
-        }
-        if line.trim().is_empty() && priming_event_id.is_none() {
-            priming_event_id = current_event_id.clone();
-        }
-        if let Some(data) = line.strip_prefix("data:") {
-            let data = data.trim();
-            if data.is_empty() {
-                priming_event_id = current_event_id.clone();
-                continue;
-            }
-            let message: serde_json::Value = serde_json::from_str(data).unwrap();
-            if message["method"] == "roots/list" {
-                break message["id"].clone();
-            }
-        }
-    };
-    let roots_event_id = current_event_id.clone().unwrap();
-    assert!(
-        priming_event_id.is_some(),
-        "GET priming cursor was not observed"
-    );
-    drop(reader);
-    let reconnect_deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
-    let replay = loop {
-        let response =
-            server.get_session_stream(&session_id, Some("2025-11-25"), priming_event_id.as_deref());
-        if response.status() != reqwest::StatusCode::CONFLICT {
-            break response;
-        }
-        assert!(std::time::Instant::now() < reconnect_deadline);
-        std::thread::sleep(std::time::Duration::from_millis(10));
-    };
-    assert_eq!(replay.status(), reqwest::StatusCode::OK);
-    assert_eq!(
-        replay.headers()["x-chio-mcp-response-mode"],
-        "get_sse_replay"
-    );
-    let mut reader = std::io::BufReader::new(replay);
-    loop {
-        use std::io::BufRead;
-        line.clear();
-        assert!(reader.read_line(&mut line).unwrap() > 0);
-        if let Some(id) = line.strip_prefix("id:") {
-            current_event_id = Some(id.trim().to_owned());
-        }
+        assert!(ping_reader.read_line(&mut line).unwrap() > 0);
         if let Some(data) = line.strip_prefix("data:") {
             let data = data.trim();
             if data.is_empty() {
                 continue;
             }
             let message: serde_json::Value = serde_json::from_str(data).unwrap();
-            if message["method"] == "roots/list" {
-                assert_eq!(message["id"], roots_request_id);
-                assert_eq!(current_event_id.as_deref(), Some(roots_event_id.as_str()));
-                break;
-            }
+            assert_eq!(
+                message["method"], "roots/list",
+                "ping was answered before its roots refresh: {message}"
+            );
+            break message["id"].clone();
         }
-    }
+    };
+    let mut reader = std::io::BufReader::new(roots_stream);
     let mut rejected = false;
     for _ in 0..20 {
         let response = server.post_json(
@@ -152,6 +112,7 @@ fn hosted_roots_wait_refuses_notification_accumulation_without_tool_calls() {
                 continue;
             }
             let message: serde_json::Value = serde_json::from_str(data).unwrap();
+            assert_ne!(message["method"], "roots/list");
             assert_ne!(message["params"]["data"]["event"], "roots_refresh_failed");
             if message["method"] == "notifications/message"
                 && message["params"]["logger"] == "chio.mcp.roots"
@@ -163,6 +124,23 @@ fn hosted_roots_wait_refuses_notification_accumulation_without_tool_calls() {
         }
     }
     drop(reader);
+    loop {
+        use std::io::BufRead;
+        line.clear();
+        assert!(ping_reader.read_line(&mut line).unwrap() > 0);
+        if let Some(data) = line.strip_prefix("data:") {
+            let data = data.trim();
+            if data.is_empty() {
+                continue;
+            }
+            let message: serde_json::Value = serde_json::from_str(data).unwrap();
+            if message["id"] == 2 {
+                assert_eq!(message["result"], json!({}));
+                break;
+            }
+        }
+    }
+    drop(ping_reader);
     let recovery_deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
     let healthy = loop {
         let response = server.post_json(

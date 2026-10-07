@@ -312,27 +312,16 @@ async fn worker_exited(worker: &mut tokio::sync::watch::Receiver<bool>) -> bool 
 }
 
 #[tokio::test]
-async fn first_get_after_initialized_delivers_already_retained_roots_request() {
+async fn first_get_after_initialized_has_no_retained_roots_request() {
     let fixture = fixture(0, None);
     let session = initialize(&fixture, true).await;
-    let mut observer = session.subscribe();
     initialized(&fixture, &session).await;
-    let roots = tokio::time::timeout(WAIT, async {
-        loop {
-            let event = observer.recv().await.unwrap();
-            if event.message["method"] == "roots/list" {
-                break event;
-            }
-        }
-    })
-    .await
-    .expect("actual worker did not request roots");
-    assert!(session
+    assert!(!session
         .retained_notification_events
         .lock()
         .unwrap()
         .iter()
-        .any(|event| event.event_id == roots.event_id));
+        .any(|event| event.message["method"] == "roots/list"));
     assert!(!session.has_active_notification_stream());
     let response = handle_get(
         State(fixture.state.clone()),
@@ -341,19 +330,15 @@ async fn first_get_after_initialized_delivers_already_retained_roots_request() {
     .await;
     assert_eq!(response.status(), StatusCode::OK);
     let mut body = response.into_body();
-    let delivered = next_message(&mut body, |message| message["method"] == "roots/list").await;
-    assert_eq!(delivered["id"], roots.message["id"]);
-    let response = post(
-        &fixture,
-        Some(&session.session_id),
-        &json!({"jsonrpc":"2.0","id":delivered["id"],"result":{"roots":[]}}),
-    )
-    .await;
-    assert_eq!(response.status(), StatusCode::ACCEPTED);
-    assert!(axum::body::to_bytes(response.into_body(), 1024)
+    assert!(
+        tokio::time::timeout(
+            Duration::from_millis(300),
+            next_message(&mut body, |message| message["method"] == "roots/list"),
+        )
         .await
-        .unwrap()
-        .is_empty());
+        .is_err(),
+        "the first GET after initialized replayed a roots/list"
+    );
     let ping = post(
         &fixture,
         Some(&session.session_id),
@@ -361,7 +346,27 @@ async fn first_get_after_initialized_delivers_already_retained_roots_request() {
     )
     .await;
     assert_eq!(ping.status(), StatusCode::OK);
-    let ping = next_message(&mut ping.into_body(), |message| message["id"] == 9).await;
+    let mut ping_body = ping.into_body();
+    let roots = next_message(&mut ping_body, |message| {
+        message["method"] == "roots/list" || message["id"] == 9
+    })
+    .await;
+    assert_eq!(
+        roots["method"], "roots/list",
+        "ping was answered before its roots refresh: {roots}"
+    );
+    let response = post(
+        &fixture,
+        Some(&session.session_id),
+        &json!({"jsonrpc":"2.0","id":roots["id"],"result":{"roots":[]}}),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::ACCEPTED);
+    assert!(axum::body::to_bytes(response.into_body(), 1024)
+        .await
+        .unwrap()
+        .is_empty());
+    let ping = next_message(&mut ping_body, |message| message["id"] == 9).await;
     assert_eq!(ping["result"], json!({}));
     assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
     drop(body);
@@ -766,3 +771,6 @@ async fn new_post_after_completed_actor_id_reuse_excludes_old_owner_events() {
 async fn new_post_with_distinct_id_excludes_prior_owner_nested_request() {
     assert_only_own_outcome(&owner_hand_off(17, 18).await);
 }
+
+#[path = "worker_lifecycle/roots_next_request.rs"]
+mod roots_next_request;
