@@ -57,15 +57,6 @@ impl Default for ActiveDefenseTeardownRetry {
 }
 
 impl ActiveDefenseTeardownRetry {
-    #[cfg(test)]
-    pub(super) fn bounded_for_test(attempts_before_park: u32, parked_interval: Duration) -> Self {
-        Self {
-            attempts: 0,
-            attempts_before_park,
-            parked_interval,
-        }
-    }
-
     async fn wait(&mut self) {
         self.attempts = self.attempts.saturating_add(1);
         if self.attempts < self.attempts_before_park {
@@ -303,15 +294,6 @@ impl ActiveDefenseTeardownSupervisor {
 impl ActiveDefenseTeardownPermit {
     pub(super) fn enqueue(self, work: RetainedActiveDefenseCleanupWork) {
         self.enqueue_with_retry(work, ActiveDefenseTeardownRetry::default());
-    }
-
-    #[cfg(test)]
-    pub(super) fn enqueue_with_retry_for_test(
-        self,
-        work: RetainedActiveDefenseCleanupWork,
-        retry: ActiveDefenseTeardownRetry,
-    ) {
-        self.enqueue_with_retry(work, retry);
     }
 
     fn enqueue_with_retry(
@@ -1088,6 +1070,27 @@ impl ProductionActiveDefenseHost {
             },
         });
         Ok(())
+    }
+
+    /// Runs the detached teardown that dropping this host would schedule, on
+    /// the caller's task with a fresh retry budget, and returns the bounded
+    /// fault attempts it spent.
+    #[cfg(test)]
+    pub(in crate::security) async fn run_detached_teardown_inline_for_test(mut self) -> u32 {
+        let _ = self.declassification_lifecycle.close_runtime_admission();
+        self.retain_teardown()
+            .unwrap_or_else(|error| panic!("retain detached teardown: {error}"));
+        let Some(ProductionActiveDefenseTeardownOwnership::Retained { teardown, permit }) =
+            self.teardown_ownership.take()
+        else {
+            panic!("detached teardown ownership is unavailable");
+        };
+        self.published = false;
+        let mut teardown = *teardown;
+        let mut retry = ActiveDefenseTeardownRetry::default();
+        teardown.run(&mut retry).await;
+        drop(permit);
+        retry.attempts
     }
 
     pub(super) fn schedule_detached_teardown(

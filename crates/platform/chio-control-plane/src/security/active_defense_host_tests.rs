@@ -405,9 +405,12 @@ impl HostFixture {
     }
 
     fn install_ttl_containment_plan(&self) -> u64 {
+        self.install_containment_plan_with_ttl(1_000)
+    }
+
+    fn install_containment_plan_with_ttl(&self, ttl_ms: u64) -> u64 {
         let created_at_unix_ms = 50_000;
-        let ttl_ms = 1_000;
-        let expires_at_unix_ms = 51_000;
+        let expires_at_unix_ms = created_at_unix_ms + ttl_ms;
         let capability_expires_at_unix_ms = 120_000;
         self.clock.set(created_at_unix_ms);
         let tenant_id = TenantId::new("tenant-host-lifecycle")
@@ -1297,4 +1300,5 @@ async fn cancelling_shutdown_transfers_retained_teardown_to_host_drop() {
 
 mod admission_closed_response_work;
 mod recovery_worker_readiness;
+mod teardown_overlay_wait;
 mod terminal_response_refusal;

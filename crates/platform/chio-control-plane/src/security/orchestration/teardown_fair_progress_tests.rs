@@ -7,10 +7,13 @@ use chio_kernel::IndexedSecurityEvidenceStore;
 use chio_security_types::clock::FixedClock;
 use chio_security_types::ports::PortError;
 use chio_store_sqlite::SqliteReceiptStore;
+use tracing::field::{Field, Visit};
+use tracing_subscriber::{layer::Context, prelude::*, Layer, Registry};
 
 use super::{
-    ActiveDefenseTeardownRetry, ActiveDefenseTeardownSupervisor, ReservedActiveDefenseCleanup,
-    RetainedActiveDefenseCleanupWork,
+    ActiveDefenseTeardownRetry, ActiveDefenseTeardownSupervisor, InFlightActiveDefenseCleanup,
+    ReservedActiveDefenseCleanup, RetainedActiveDefenseCleanup, RetainedActiveDefenseCleanupWork,
+    ACTIVE_DEFENSE_TEARDOWN_ATTEMPTS_BEFORE_PARK, ACTIVE_DEFENSE_TEARDOWN_PARKED_RETRY_INTERVAL,
 };
 use crate::security::orchestration::{
     ProductionDeclassificationReceiptLifecycle, ProductionSecurityStateAuthority,
@@ -23,7 +26,9 @@ use crate::security::{
 
 const PROGRESS_TIMEOUT: Duration = Duration::from_secs(10);
 const INDEPENDENT_PROGRESS_TIMEOUT: Duration = Duration::from_secs(5);
-const PARKED_RETRY_INTERVAL: Duration = Duration::from_millis(1_500);
+const PARK_OBSERVATION_TIMEOUT: Duration = Duration::from_secs(30);
+const PARKED_AUDIT: &str = "active_defense_teardown_cleanup_parked";
+const SHUTDOWN_RETRY_AUDIT: &str = "active_defense_reserved_worker_shutdown_retry";
 
 struct ShutdownGatePort {
     released: AtomicBool,
@@ -234,8 +239,53 @@ async fn never_ending_reserved_cleanup_does_not_block_an_independent_queued_clea
     assert!(stuck_completed);
 }
 
+#[derive(Clone, Default)]
+struct AuditCapture {
+    faults: Arc<Mutex<Vec<(tracing::Level, String)>>>,
+}
+
+impl AuditCapture {
+    fn count(&self, level: tracing::Level, audit_fault: &str) -> usize {
+        self.faults
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .iter()
+            .filter(|(recorded, fault)| *recorded == level && fault == audit_fault)
+            .count()
+    }
+}
+
+struct AuditField(Option<String>);
+
+impl Visit for AuditField {
+    fn record_str(&mut self, field: &Field, value: &str) {
+        if field.name() == "audit_fault" {
+            self.0 = Some(value.to_string());
+        }
+    }
+
+    fn record_debug(&mut self, field: &Field, value: &dyn std::fmt::Debug) {
+        if field.name() == "audit_fault" {
+            self.0 = Some(format!("{value:?}"));
+        }
+    }
+}
+
+impl<S: tracing::Subscriber> Layer<S> for AuditCapture {
+    fn on_event(&self, event: &tracing::Event<'_>, _: Context<'_, S>) {
+        let mut field = AuditField(None);
+        event.record(&mut field);
+        if let Some(fault) = field.0 {
+            self.faults
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .push((*event.metadata().level(), fault));
+        }
+    }
+}
+
 #[tokio::test]
-async fn parked_cleanup_keeps_its_reservation_and_retries_at_the_parked_interval() {
+async fn failing_shutdown_parks_with_an_audit_after_its_bounded_attempts_and_keeps_its_ownership() {
     let supervisor = Arc::new(ActiveDefenseTeardownSupervisor::new());
     let ReservedCleanupFixture {
         _directory: _parked_directory,
@@ -243,37 +293,77 @@ async fn parked_cleanup_keeps_its_reservation_and_retries_at_the_parked_interval
         port,
         cleanup,
     } = reserved_cleanup(false, true).await;
-    supervisor
+    let permit = supervisor
         .acquire()
-        .unwrap_or_else(|error| panic!("acquire parked cleanup permit: {error}"))
-        .enqueue_with_retry_for_test(
-            RetainedActiveDefenseCleanupWork::Reserved(cleanup),
-            ActiveDefenseTeardownRetry::bounded_for_test(3, PARKED_RETRY_INTERVAL),
-        );
+        .unwrap_or_else(|error| panic!("acquire parked cleanup permit: {error}"));
+    let job = InFlightActiveDefenseCleanup {
+        supervisor: Arc::clone(&supervisor),
+        job: Some(RetainedActiveDefenseCleanup {
+            work: RetainedActiveDefenseCleanupWork::Reserved(cleanup),
+            retry: ActiveDefenseTeardownRetry::default(),
+            restarted: false,
+            _permit: permit,
+        }),
+    };
+    let capture = AuditCapture::default();
+    let _subscriber = tracing::subscriber::set_default(Registry::default().with(capture.clone()));
+    let run = job.run();
+    tokio::pin!(run);
 
-    wait_for("parked cleanup stopped retrying", || {
-        port.shutdown_attempts() >= 5
-    })
-    .await;
-    let gaps = port.attempt_gaps();
+    let started = Instant::now();
+    while capture.count(tracing::Level::ERROR, PARKED_AUDIT) == 0 {
+        assert!(
+            started.elapsed() < PARK_OBSERVATION_TIMEOUT,
+            "a failing shutdown never parked: attempts={}",
+            port.shutdown_attempts()
+        );
+        tokio::select! {
+            () = &mut run => panic!("a failing shutdown completed"),
+            () = tokio::time::sleep(Duration::from_millis(10)) => {}
+        }
+    }
+    let attempts_at_park = port.shutdown_attempts();
+    let shutdown_audits_at_park = capture.count(tracing::Level::WARN, SHUTDOWN_RETRY_AUDIT);
+    let parked_window = Instant::now();
+    while parked_window.elapsed() < Duration::from_secs(1) {
+        tokio::select! {
+            () = &mut run => panic!("a failing shutdown completed while parked"),
+            () = tokio::time::sleep(Duration::from_millis(10)) => {}
+        }
+    }
+    let attempts_while_parked = port.shutdown_attempts();
     let reservation_held = !released(&registry, Duration::from_millis(200)).await;
     let retained_while_parked = supervisor.lock_state().retained_owners;
     port.release();
+    tokio::time::timeout(PARK_OBSERVATION_TIMEOUT, &mut run)
+        .await
+        .unwrap_or_else(|_| panic!("the parked cleanup never completed after shutdown recovered"));
     let completed = released(&registry, PROGRESS_TIMEOUT).await;
-    wait_for("teardown permit was not returned", || {
-        supervisor.lock_state().retained_owners == 0
-    })
-    .await;
+    let retained_after_completion = supervisor.lock_state().retained_owners;
+    let gaps = port.attempt_gaps();
+    let bound = usize::try_from(ACTIVE_DEFENSE_TEARDOWN_ATTEMPTS_BEFORE_PARK)
+        .unwrap_or_else(|error| panic!("attempt bound: {error}"));
 
+    assert_eq!(
+        attempts_at_park,
+        u64::from(ACTIVE_DEFENSE_TEARDOWN_ATTEMPTS_BEFORE_PARK)
+    );
+    assert_eq!(shutdown_audits_at_park, bound);
+    assert_eq!(capture.count(tracing::Level::ERROR, PARKED_AUDIT), 1);
+    assert_eq!(attempts_while_parked, attempts_at_park);
     assert!(
-        gaps.len() >= 4 && gaps[..2].iter().all(|gap| *gap < PARKED_RETRY_INTERVAL),
+        gaps.len() >= bound
+            && gaps[..bound - 1]
+                .iter()
+                .all(|gap| *gap < ACTIVE_DEFENSE_TEARDOWN_PARKED_RETRY_INTERVAL),
         "bounded attempts were not at the retry interval: {gaps:?}"
     );
     assert!(
-        gaps[2..4].iter().all(|gap| *gap >= PARKED_RETRY_INTERVAL),
-        "cleanup was not parked after its bounded attempts: {gaps:?}"
+        gaps[bound - 1] >= ACTIVE_DEFENSE_TEARDOWN_PARKED_RETRY_INTERVAL,
+        "the cleanup did not wait the parked interval after parking: {gaps:?}"
     );
     assert!(reservation_held);
     assert_eq!(retained_while_parked, 1);
     assert!(completed);
+    assert_eq!(retained_after_completion, 0);
 }
