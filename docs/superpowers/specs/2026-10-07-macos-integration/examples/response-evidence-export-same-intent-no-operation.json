@@ -1,0 +1,31 @@
+{
+  "version": "chio.desktop.operator.v1",
+  "request_id": "synthetic-request-evidence-export",
+  "method": "evidence.export",
+  "ok": false,
+  "error": {
+    "code": "internal_unavailable",
+    "retry": "same_intent",
+    "message_key": "synthetic.capacity-before-dispatch",
+    "operation_ref": null,
+    "request_binding": {
+      "intent_id": "synthetic-export-intent",
+      "task_id": "synthetic-task",
+      "format": "redacted-bundle-v1",
+      "destination_ref": {
+        "kind": "resource",
+        "issuer": "synthetic-authority",
+        "native_id": "synthetic-resource-2",
+        "generation": "1",
+        "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "grant_ref": {
+        "kind": "grant",
+        "issuer": "synthetic-authority",
+        "native_id": "synthetic-grant-1",
+        "generation": "1",
+        "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    }
+  }
+}

@@ -51,3 +51,9 @@ The future semantic verifier must read and verify those referenced artifacts usi
 An inspection-only profile may use `restore_freshness_ref: null` only when its immutable applicability manifest excludes authority restoration and requires a test proving restored authority stays disabled. Any claimed authority restoration requires the independently verified native freshness reference. Likewise an empty permission-observation array is valid only when the selected profile requires no such grants; it cannot omit a permission required by the applied manifest. Missing native policy generation is represented as null in unavailable health, never an invented current generation.
 
 Even a structurally valid compatibility record with a fabricated `qualification_ref` is insufficient. Its signatures, applicability, current installation, permission observations and native freshness are runtime checks outside this validator. Source, component and historical evidence never enable execution through a shape-only branch.
+
+A mutation error using `same_intent` requires the full original request binding
+even when no operation reference was allocated. Both the schema and pair
+validator enforce exact parameters/intent correlation. A health result claiming
+`ready` requires a nonempty evaluated profile scope; an empty scope can report
+unavailable but cannot establish profile readiness.

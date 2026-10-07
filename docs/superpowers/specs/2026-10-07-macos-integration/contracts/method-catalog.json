@@ -48,7 +48,8 @@
         "invalid-health-get-binding-missing.json",
         "invalid-health-get-error-binding-missing.json",
         "invalid-health-get-binding-unexpected-authority.json",
-        "invalid-health-get-error-binding-unexpected-authority.json"
+        "invalid-health-get-error-binding-unexpected-authority.json",
+        "invalid-health-ready-empty-scope.json"
       ]
     },
     {
@@ -114,7 +115,10 @@
         "invalid-task-create-binding-input.json",
         "invalid-task-create-binding-grant.json",
         "invalid-task-create-binding-profile.json",
-        "invalid-task-create-binding-limits.json"
+        "invalid-task-create-binding-limits.json",
+        "invalid-task-create-same-intent-no-operation-binding-missing.json",
+        "invalid-task-create-same-intent-no-operation-binding-intent.json",
+        "invalid-task-create-same-intent-no-operation-binding-params.json"
       ]
     },
     {
@@ -145,7 +149,10 @@
         "invalid-task-stop-error-binding-missing.json",
         "invalid-task-stop-error-binding-intent.json",
         "invalid-task-stop-binding-task.json",
-        "invalid-task-stop-binding-scope.json"
+        "invalid-task-stop-binding-scope.json",
+        "invalid-task-stop-same-intent-no-operation-binding-missing.json",
+        "invalid-task-stop-same-intent-no-operation-binding-intent.json",
+        "invalid-task-stop-same-intent-no-operation-binding-params.json"
       ]
     },
     {
@@ -177,7 +184,10 @@
         "invalid-approval-submit-error-binding-intent.json",
         "invalid-approval-submit-binding-review.json",
         "invalid-approval-submit-binding-endorsement.json",
-        "invalid-approval-submit-binding-decision.json"
+        "invalid-approval-submit-binding-decision.json",
+        "invalid-approval-submit-same-intent-no-operation-binding-missing.json",
+        "invalid-approval-submit-same-intent-no-operation-binding-intent.json",
+        "invalid-approval-submit-same-intent-no-operation-binding-params.json"
       ]
     },
     {
@@ -228,7 +238,10 @@
         "invalid-evidence-export-error-binding-intent.json",
         "invalid-evidence-export-binding-task.json",
         "invalid-evidence-export-binding-destination.json",
-        "invalid-evidence-export-binding-grant.json"
+        "invalid-evidence-export-binding-grant.json",
+        "invalid-evidence-export-same-intent-no-operation-binding-missing.json",
+        "invalid-evidence-export-same-intent-no-operation-binding-intent.json",
+        "invalid-evidence-export-same-intent-no-operation-binding-params.json"
       ]
     }
   ]

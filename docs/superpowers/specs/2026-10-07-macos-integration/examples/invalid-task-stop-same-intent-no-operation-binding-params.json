@@ -11,7 +11,7 @@
     "request_binding": {
       "intent_id": "synthetic-stop-intent",
       "task_id": "synthetic-task",
-      "scope": "task_and_descendants"
+      "scope": "task"
     }
   }
 }

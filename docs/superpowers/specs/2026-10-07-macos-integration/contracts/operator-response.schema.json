@@ -415,6 +415,13 @@
                   },
                   "policy_generation": {
                     "$ref": "common.schema.json#/$defs/uint"
+                  },
+                  "observation_scope": {
+                    "properties": {
+                      "evaluated_profiles": {
+                        "minItems": 1
+                      }
+                    }
                   }
                 }
               }
@@ -1001,6 +1008,23 @@
                   "request_binding"
                 ]
               }
+            },
+            {
+              "if": {
+                "properties": {
+                  "retry": {
+                    "const": "same_intent"
+                  }
+                },
+                "required": [
+                  "retry"
+                ]
+              },
+              "then": {
+                "required": [
+                  "request_binding"
+                ]
+              }
             }
           ]
         }
@@ -1463,6 +1487,23 @@
                   "request_binding"
                 ]
               }
+            },
+            {
+              "if": {
+                "properties": {
+                  "retry": {
+                    "const": "same_intent"
+                  }
+                },
+                "required": [
+                  "retry"
+                ]
+              },
+              "then": {
+                "required": [
+                  "request_binding"
+                ]
+              }
             }
           ]
         }
@@ -1814,6 +1855,23 @@
                 },
                 "required": [
                   "operation_ref"
+                ]
+              },
+              "then": {
+                "required": [
+                  "request_binding"
+                ]
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "retry": {
+                    "const": "same_intent"
+                  }
+                },
+                "required": [
+                  "retry"
                 ]
               },
               "then": {
@@ -2304,6 +2362,23 @@
                 },
                 "required": [
                   "operation_ref"
+                ]
+              },
+              "then": {
+                "required": [
+                  "request_binding"
+                ]
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "retry": {
+                    "const": "same_intent"
+                  }
+                },
+                "required": [
+                  "retry"
                 ]
               },
               "then": {

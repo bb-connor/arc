@@ -6,7 +6,7 @@ Validated on 2026-10-07. This record concerns the specification package, its syn
 
 Updated after the fifth hosted review repair. Traceability now binds all 323 requirements to 712 retained task/action excerpts. Fresh isolated virtualenv setup, regeneration and revalidation passed with the pinned dependency. The coverage self-checks reject removed/missing/duplicate requirements, plans, tasks and actions, while correctly ignoring headings inside fenced code.
 
-- `python3 docs/superpowers/specs/2026-10-07-macos-integration/verify.py --write-traceability --self-test`: passed. The package contains 42 Markdown documents, 323 normative requirements with acceptance/plan mappings, six schemas, 221 synthetic fixtures, 161 correlated request/response pairs and 508 validator self-checks. The output explicitly reports `runtime_qualification: false`.
+- `python3 docs/superpowers/specs/2026-10-07-macos-integration/verify.py --write-traceability --self-test`: passed. The package contains 43 Markdown documents, 323 normative requirements with acceptance/plan mappings, six schemas, 238 synthetic fixtures, 178 correlated request/response pairs and 696 validator self-checks. The output explicitly reports `runtime_qualification: false`.
 - Embedded fenced examples: all 38 Python blocks parse with `ast.parse`, all 13 JSON blocks decode, and all ten Bash blocks pass `bash -n`. Parsing checks syntax only; future commands and product examples were not thereby executed.
 - `cargo fmt --all -- --check`: passed against the assembled worktree. This documentation change introduces no Rust product source.
 - Focused pure example checks were exercised during plan authoring: M0/M6 Python and Rust helpers, M4 host-side Rust oracle controls, and M3 guest descriptor C syntax/source-lock refusal helpers. These checks establish only the illustrated local logic, not integration, guest provenance, installed isolation or a qualified profile.
@@ -22,3 +22,12 @@ The package command for subsequent checks is:
 `python3 docs/superpowers/specs/2026-10-07-macos-integration/verify.py --self-test`
 
 Dependency setup is in [contracts](../contracts/README.md). All normative AT procedures remain `specified_not_executed`. Whole-repository build/test/clippy, signed application execution, Apple entitlement approval, provider activation, VM boot, native kernel qualification and public release were not performed. Hosted review and check results belong to the live PR at its current commit and must be read there after every push.
+
+The concurrent non-normative architecture review is retained as owner decision
+input. Its ES/NE, filesystem-boundary and approval-gate wording is corrected
+without adopting its proposed product or ABI changes.
+
+Latest bot repairs require full request bindings for `same_intent` mutation errors
+even with a null operation reference, and reject ready health with no evaluated
+profiles. Seventeen added fixtures and four independent guard-removal probes
+cover both schema and pair correlation behavior. All 696 self-checks pass.

@@ -85,12 +85,13 @@ def pair_matches(request: dict, response: dict) -> bool:
     if any(request.get(k) != response.get(k) for k in ("version", "request_id", "method")):
         return False
     if not response.get("ok"):
-        if response["error"].get("retry") == "same_intent" and "intent_id" not in request["params"]:
+        same_intent = response["error"].get("retry") == "same_intent"
+        if same_intent and "intent_id" not in request["params"]:
             return False
         original = request["params"].get("operation_ref")
         echoed = response["error"].get("operation_ref")
         binding = response["error"].get("request_binding")
-        if (echoed is not None or binding is not None) and binding != request["params"]:
+        if (same_intent or echoed is not None or binding is not None) and binding != request["params"]:
             return False
         return original is None or echoed is None or original == echoed
     params, result = request["params"], response["result"]
@@ -113,7 +114,10 @@ def pair_matches(request: dict, response: dict) -> bool:
         for observation in result["observations"].values():
             if observation["freshness"] == "fresh" and observation["age_ms"] > observation["max_age_ms"]:
                 return False
-        if not set(result["available_profiles"]).issubset(result["observation_scope"]["evaluated_profiles"]):
+        evaluated_profiles = result["observation_scope"]["evaluated_profiles"]
+        if result["state"] == "ready" and not evaluated_profiles:
+            return False
+        if not set(result["available_profiles"]).issubset(evaluated_profiles):
             return False
     if request["method"] == "tasks.list" and len(result["tasks"]) > params["limit"]:
         return False
@@ -427,8 +431,16 @@ def semantic_self_test(loaded: dict, methods: list[dict], entries: dict, values:
 
     for method in methods:
         request = values[method["request_example"]]
-        for location, filename in (("result", method["response_example"]),
-                                   ("error", "response-" + method["name"].replace(".", "-") + "-recovery.json")):
+        recovery_name = "response-" + method["name"].replace(".", "-") + "-recovery.json"
+        controls = [("result", method["response_example"]), ("error", recovery_name)]
+        if method["mutation"]:
+            retry_name = ("response-stop-same-intent.json" if method["name"] == "task.stop" else
+                          "response-" + method["name"].replace(".", "-") + "-same-intent-no-operation.json")
+            retry = values[retry_name]["error"]
+            if retry["retry"] != "same_intent" or retry["operation_ref"] is not None:
+                raise ValueError(f"Missing predispatch same-intent control: {method['name']}")
+            controls.append(("error", retry_name))
+        for location, filename in controls:
             response = values[filename]
             if not accepts(request, response):
                 raise ValueError(f"Invalid request binding positive control: {filename}")
@@ -444,6 +456,14 @@ def semantic_self_test(loaded: dict, methods: list[dict], entries: dict, values:
                 if accepts(request, mutant):
                     raise ValueError(f"Parameter correlation accepted {method['name']} {location} {path}")
                 checked += 1
+            # Transport correlation applies to errors before an operation has
+            # been allocated as well as original-operation recovery replies.
+            for field in ("version", "request_id", "method"):
+                mutant = copy.deepcopy(response)
+                mutant[field] = "synthetic-substitution"
+                if pair_matches(request, mutant):
+                    raise ValueError(f"Envelope correlation accepted {filename} {field}")
+                checked += 1
             mutant = copy.deepcopy(response)
             del mutant[location]["request_binding"]
             if response_schema.is_valid(mutant) or pair_matches(request, mutant):
@@ -454,14 +474,15 @@ def semantic_self_test(loaded: dict, methods: list[dict], entries: dict, values:
             if response_schema.is_valid(mutant):
                 raise ValueError(f"Open request binding shape: {method['name']} {location}")
             checked += 1
-        # A refusal without an operation reference can be returned before a
-        # request is valid; it asserts no recoverable operation or authority.
-        refusal = copy.deepcopy(values[filename])
-        refusal["error"]["operation_ref"] = None
-        del refusal["error"]["request_binding"]
-        if not accepts(request, refusal):
-            raise ValueError(f"Unbound no-operation refusal rejected: {method['name']}")
-        checked += 1
+        # Never/reread refusals can precede full request validation. A
+        # same-intent retry instead commits to the exact original parameters.
+        for disposition in ("never", "reread"):
+            refusal = copy.deepcopy(values[recovery_name])
+            refusal["error"].update(operation_ref=None, retry=disposition)
+            del refusal["error"]["request_binding"]
+            if not accepts(request, refusal):
+                raise ValueError(f"Unbound no-operation refusal rejected: {method['name']} {disposition}")
+            checked += 1
 
     # Limits constrain page size independently of the exact echoed request;
     # subscription rebasing changes the issued cursor, not the requested start.
@@ -502,6 +523,22 @@ def semantic_self_test(loaded: dict, methods: list[dict], entries: dict, values:
 
     health_request = values["request-health-get.json"]
     health = values["response-health-get-ready.json"]
+    for state, expected in (("ready", False), ("degraded", True), ("unavailable", True)):
+        mutant = copy.deepcopy(values["response-health-get-empty-scope-fresh.json"])
+        mutant["result"]["state"] = state
+        # Check schema and correlation independently so either missing guard
+        # fails even when the other would still reject the invalid response.
+        if response_schema.is_valid(mutant) != expected or pair_matches(health_request, mutant) != expected:
+            raise ValueError(f"Empty evaluated health scope accepted wrong readiness: {state}")
+        checked += 1
+    if not accepts(health_request, values["response-health-get-empty-scope.json"]):
+        raise ValueError("Unavailable unknown empty-scope health rejected")
+    checked += 1
+    ready = copy.deepcopy(health)
+    ready["result"]["available_profiles"] = []
+    if not accepts(health_request, ready):
+        raise ValueError("Nonempty evaluated health scope required an available profile")
+    checked += 1
     for dimension in health["result"]["observations"]:
         for age_delta in (0, 1):
             mutant = copy.deepcopy(health)

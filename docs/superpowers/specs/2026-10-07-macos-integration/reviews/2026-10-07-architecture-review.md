@@ -13,6 +13,17 @@ covered by the Greptile and Codex threads and are not repeated here.
 > (see [Decisions needed](#decisions-needed-from-the-owner)). Do not address them
 > piecemeal by adding requirements, fixtures or validator checks.
 
+## Governing status while decisions are pending
+
+The numbered specifications and matching plans remain the normative **proposal**
+for consistency review. This document is non-normative input and does not
+supersede them or authorize its alternative implementation. Product direction,
+shared ABI and implementation sequencing have `planning_status: blocked_by_adr`
+until the owner records the decisions below in an accepted ADR and updates or
+supersedes the affected specifications together. During that interval, only
+research and correctness repairs to the proposal proceed; neither implementation
+program is approved to start. Existing safety prerequisites remain mandatory.
+
 ## Verdict
 
 The authority model is right. The product shape, program structure and
@@ -134,8 +145,14 @@ and move the sealed runner to the third:
      provider allows it.
    - MCP servers are reachable only through `chio-mcp-adapter`.
 
-   This moves file and network effects from `cannot_see` to `prevent` for an
-   unmodified agent.
+   Classify the boundaries separately after qualification: gateway-routed
+   network requests and adapter-routed MCP calls can be `prevent` where Chio
+   authorizes before dispatch. Filesystem confinement restricts writes outside
+   the allowed workspace/state paths, but permitted in-sandbox writes do not
+   traverse a Chio decision point and remain `cannot_see` at this boundary.
+   Do not claim per-write mediation or receipts for those permitted writes.
+   Direct-route denial and descendant confinement require their own evidence;
+   gateway presence alone cannot establish them.
 3. **Sealed task (what these PRs specify today).** Pi's closed registry, a
    zero-NIC VM or strict cage, and an external test oracle form the
    high-assurance profile. It suits untrusted repositories and unattended runs.
@@ -247,8 +264,12 @@ code, and its known defects are recorded in
   toolchains, uses honest ADR-0011 wording and records the deprecation risk.
 - **`vm-sealed-v1`.** This is the current zero-NIC VZ design, for untrusted
   repositories and high assurance.
-- **ES/NE.** Keep these on the managed-endpoint track only, as the PR already
-  does.
+- **ES/NE.** Keep the managed-endpoint track separate. The current
+  `native-descendant-v1` profile also requires ES/NE restrictions and
+  independently qualified network containment. Those gates remain required
+  while that profile exists; this recommendation does not remove them. Whether
+  to retain that profile alongside the two proposed profiles is an explicit
+  owner decision. No new profile inherits qualification from this review.
 - **Entry points.** Lead with the CLI and the menu bar. Developers start agent
   work from terminals and editors, so Finder Services "Run with Chio" is a
   secondary affordance.
@@ -316,8 +337,15 @@ issues now:
    `research/chio-readiness.md` records that the bundled utility "can retain a
    signed approved credential despite requested denial because requested
    decision and approval ID are not compared before retention". This is a
-   security defect in a public package (`chio-pi-plugin`), not a P3
-   prerequisite.
+   security defect in the directly callable bridge utility bundled with the
+   reviewed `chio-pi-plugin` source. The current Pi wrapper already refuses the
+   action before native invocation; that mitigation does not repair the bundled
+   binary. Current-source verification confirms the distinction, and separate
+   native-owner issue tracking and remediation are still required. Independently
+   fixing it does not remove the P3 prerequisite: publication remains blocked
+   until the selected installed utility verifies both the requested decision
+   and approval ID before retaining a credential, with deny/mismatch regression
+   evidence. A filed issue or unrelated fixed revision does not close that gate.
 2. **Emergency stop is not durable.** `chio-kernel` holds `emergency_stopped`
    in memory, so it does not survive a restart. Any operator surface's kill
    switch inherits this.

@@ -9,7 +9,7 @@
     "message_key": "synthetic.capacity-before-dispatch",
     "operation_ref": null,
     "request_binding": {
-      "intent_id": "synthetic-stop-intent",
+      "intent_id": "synthetic-other-intent",
       "task_id": "synthetic-task",
       "scope": "task_and_descendants"
     }

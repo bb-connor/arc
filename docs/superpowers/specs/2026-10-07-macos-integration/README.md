@@ -8,6 +8,17 @@ The first workflow is **Run with Chio** through Finder/Services or the app: sele
 
 Confidence is high in the cited source findings and authority ownership requirements, moderate in the proposed integration design, and unknown for final installed platform qualification. The kernel north-star program remains a design dependency; current source does not implement all of its contracts. Apple's retrieved descendant-ES metadata has changed since the initial research and differs across documentation surfaces; the platform research preserves that evidence without claiming final runtime qualification.
 
+## Architecture review status
+
+The [cross-program architecture review](reviews/2026-10-07-architecture-review.md)
+is non-normative and awaits owner decisions. The numbered documents below remain
+the proposed baseline for checking internal consistency; they are not an approved
+implementation direction. Product/ABI/sequence choices have
+`planning_status: blocked_by_adr` until an accepted ADR records the decision
+and updates or supersedes the affected program together. Current work is limited
+to research and correctness repairs. No alternative architecture is selected by
+the review alone, and existing safety prerequisites remain in force.
+
 ## Read in this order
 
 1. [Scope](01-product-scope.md) and [native experience](02-native-experience.md).

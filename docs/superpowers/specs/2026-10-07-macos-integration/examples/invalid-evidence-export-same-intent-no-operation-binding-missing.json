@@ -1,0 +1,12 @@
+{
+  "version": "chio.desktop.operator.v1",
+  "request_id": "synthetic-request-evidence-export",
+  "method": "evidence.export",
+  "ok": false,
+  "error": {
+    "code": "internal_unavailable",
+    "retry": "same_intent",
+    "message_key": "synthetic.capacity-before-dispatch",
+    "operation_ref": null
+  }
+}
