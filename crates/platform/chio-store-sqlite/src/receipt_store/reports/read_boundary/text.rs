@@ -31,7 +31,8 @@ pub(crate) fn decoded_json_text_bytes(raw: &str) -> Result<u64, ReceiptStoreErro
                     } else {
                         u32::from(high)
                     };
-                    char::from_u32(code).ok_or_else(invalid)?.len_utf8() as u64
+                    u64::try_from(char::from_u32(code).ok_or_else(invalid)?.len_utf8())
+                        .map_err(|_| invalid())?
                 }
                 b'"' | b'\\' | b'/' | b'b' | b'f' | b'n' | b'r' | b't' => 1,
                 _ => return Err(invalid()),

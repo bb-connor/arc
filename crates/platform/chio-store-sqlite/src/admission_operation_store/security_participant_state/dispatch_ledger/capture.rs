@@ -417,5 +417,5 @@ pub(super) fn verify_capture_record(
         ));
     }
     record.validate_initialized(connection, initialized)?;
-    storage::verify_reference(connection, &record)
+    storage::verify_reference(connection, record)
 }
