@@ -54,7 +54,7 @@ The delivery plan covers the handoff and desktop tests after those contracts lan
 | Q19 | Process backend: timeout and descendants, unrelated exited child, unkillable/pending child | Bounded cleanup and complete custody evidence; do not reap another task's status or report false completion |
 | Q20 | Install/update: unsigned/tampered/wrong-arch artifact, downgrade, mid-update crash, reboot/uninstall | Reject invalid package, preserve recoverable state, revalidate profile before enablement; explicit custody cleanup |
 | Q21 | Observation/S5 owners, plus recovery when exposed: subscriber idle for long periods and sustained event traffic | No observation path spends recovery-command quota or drains settlement reserve; configured buffer and resource limits enforced; exposed recovery additionally passes native saturation/finality controls |
-| Q22 | Isolation profile: permit an in-workspace native-shell write | Boundary interactive labels it cannot_see with no per-write receipt; protected/sealed profiles do not silently admit native shell |
+| Q22 | Isolation profile: attempt an in-workspace write through the host's native shell, outside an explicitly granted runner operation | Boundary interactive labels a permitted write cannot_see with no per-write receipt; protected/sealed profiles reject the alternate native-shell route. An expressly granted sealed recipe's internal shell is a separate bounded execution and cannot qualify this negative. |
 
 ## Sealed-work safety without blanket keystone dependencies
 
@@ -107,9 +107,11 @@ a complete inventory of every predecessor obligation.
 | Profile | Mandatory acceptance | Runtime gate |
 | --- | --- | --- |
 | Observe | Q04, Q09-Q11, Q16-Q17, Q21; add Q01-Q03 only if the build exposes W1 views or recovery capability | S5 A/B, authenticated bounded non-persisting reads, selected trust-control GETs and truthful hook source attribution; W1/M20 are not basic receipt/hook observation gates |
-| Approve and stop | Q02-Q10, Q16-Q17, Q19 | Qualified owner actions; Q05/Q06 block approvals, Q07/Q08 independently gate stop scopes |
-| Sealed work | Q01-Q21 applicable to its concrete backend, with exclusions justified by owner | W1, recovery, restricted host, runner, S7 and installed release tuple |
-| Protected interactive | Q02-Q13, Q15-Q21 plus doc 19 I01-I08 | Each of six hosts individually qualified; shell removal enforced |
+| Approve | Q02-Q06, Q09-Q10, Q16-Q17 | Qualified native approval owner, S28 identity, production verifier and installed utility binding; no stop capability implied |
+| Per-task stop | Q02-Q04, Q07, Q09-Q10, Q16-Q17, Q19 | Qualified S4/process closure and its native route authorization; Q05/Q06 are not prerequisites when approval is absent |
+| Kernel stop | Q02-Q04, Q08-Q10, Q16-Q17; Q19 additionally for any claimed process cleanup | Qualified S8 phase-1 scope, durability and native route authorization; no S28 approval or per-task closure prerequisite and no implied process termination |
+| Sealed work | Q01-Q22 applicable to its concrete backend, with exclusions justified by owner; Q22's alternate native-shell negative is mandatory | W1, recovery, restricted host, runner, S7 and installed release tuple |
+| Protected interactive | Q02-Q13, Q15-Q22 plus doc 19 I01-I08 | Each of six hosts individually qualified; native-shell removal and Q22 alternate-access rejection enforced |
 | Boundary interactive | Q02-Q13, Q15-Q22 as applicable; no mediated-local-effect claim | Deferred; independent backend evidence required |
 | Managed endpoint | Platform annex's ES/NE matrix plus Q16-Q20 | Deferred; consent/entitlements and restrictive-only authority model |
 

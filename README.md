@@ -411,22 +411,24 @@ More ways in: [migrate a coding agent from MCP](docs/guides/MIGRATING-FROM-MCP.m
 
 ## Architecture
 
-Chio is layered around a single trusted core. External ecosystems enter through protocol
-edges that turn them into governed tool servers. The **Runtime Kernel** mediates calls routed through those edges
-and is the only trusted component. A **trust plane** (identity, credentials, federation,
+Chio centers authorization and signed receipts in the **Runtime Kernel**. External ecosystems enter through protocol
+edges that turn them into governed tool servers. The kernel and its authority-bearing services form the trusted path for calls routed through those edges.
+A **trust plane** (identity, credentials, federation,
 governance) and an **economy plane** (metering, budgets, settlement) draw on the receipts the
 kernel signs, and every decision is committed to the **Receipt Log**.
 
 <p align="center">
   <picture>
     <source media="(max-width: 500px)" srcset="docs/assets/architecture-mobile.svg" />
-    <img src="docs/assets/architecture.svg" alt="Chio system map: an untrusted agent and untrusted tool servers around a single trusted Runtime Kernel that verifies, guards, dispatches, and signs; capability authority and policy feed in, and receipts flow to the trust and economy planes" width="960" />
+    <img src="docs/assets/architecture.svg" alt="Chio system map: untrusted agents and tool servers around the kernel's authorization and receipt path, with authority and policy services; host isolation depends on the selected runtime profile, and receipts feed the trust and economy planes" width="960" />
   </picture>
 </p>
 
-Only the Runtime Kernel is trusted (the TCB). The agent and tool servers are untrusted and
-isolated, so a compromised agent or tool server cannot forge authorization or a receipt, and
-any registry or artifact mismatch fails closed.
+Agents and tool servers are untrusted. Their OS isolation depends on the selected
+host/runtime profile and its qualified enforcement components; ordinary stdio launch
+creates a child process without establishing sandboxing. The native authority path
+owns authorization and receipt signing, while the selected deployment must prevent
+alternate access to protected resources.
 
 ### Life of a kernel-routed tool call
 
