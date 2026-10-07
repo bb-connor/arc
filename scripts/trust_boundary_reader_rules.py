@@ -146,6 +146,42 @@ def special_apis(path, reader, body, supports):
 
 def private_producer_apis(path, reader, body, owners, calls, canonical_equality):
     """Pin the finite private producer/readback relationships reviewed in code."""
+    if path == "crates/security/chio-secret-broker/src/privileged_audit/open_custody.rs" and reader in {"typed", "seeded"}:
+        # These private span readers consume only the original frame bounded
+        # by decode_open_wire. Canonical readback precedes public projection;
+        # the seed side channel preserves the original custody/bound cause.
+        witnesses = {
+            "decode_open_wire": (
+                r"UntrustedJsonText::from_wire\(input,\s*MAX_AUDIT_OPEN_FRAME_BYTES\)\s*\.map_err\(BrokerError::UntrustedInput\)\?;\s*let\s+mut\s+fields\s*=\s*Fields\s*\{\s*input,\s*position:\s*0\s*\}",
+                r"if\s+fields\.position\s*!=\s*input\.len\(\)\s*\{\s*return\s+Err\(",
+                r"let\s+canonical\s*=\s*encode_private_open\(&value\)\?;\s*if\s+canonical\.as_slice\(\)\s*!=\s*input\s*\{\s*return\s+Err\(BrokerError::UntrustedInput\(",
+                r"UntrustedJsonError::NonCanonical",
+                r"Ok\(value\.into_public\(\)\)",
+            ),
+            "typed": (
+                r"self\s*\.input\s*\.get\(self\.position\.\.\)",
+                r"serde_json::Deserializer::from_slice\(rest\)\.into_iter::<T>\(\)",
+                r"UntrustedJsonError::Decode\(\s*error,?\s*\)",
+                r"\.checked_add\(values\.byte_offset\(\)\)",
+            ),
+            "seeded": (
+                r"self\s*\.input\s*\.get\(self\.position\.\.\)",
+                r"seed\.deserialize\(&mut\s+deserializer\)\.map_err\(",
+                r"UntrustedJsonError::Decode\(\s*error,?\s*\)",
+                r"self\.typed::<IgnoredAny>\(\)\?",
+            ),
+            "seed_result": (
+                r"\(Err\(_\),\s*Some\(failure\)\)\s*=>\s*Err\(failure\.into_error\(\)\)",
+                r"\(value,\s*None\)\s*=>\s*value",
+                r"\(Ok\(_\),\s*Some\(_\)\)\s*=>\s*Err\(BrokerError::Invariant\(",
+            ),
+            "encode_private_open": (
+                r"crate::private_request_wire::canonical_open_bytes\(",
+                r"MAX_AUDIT_OPEN_FRAME_BYTES,\s*\)",
+            ),
+        }
+        if all(re.search(pattern, owners.get(owner, "")) for owner, patterns in witnesses.items() for pattern in patterns):
+            return ["private::decode_open_wire::bounded_original+canonical_readback+seed_cause"]
     if path == "crates/protocol/chio-mcp-edge/src/ingress/budget/admission.rs" and reader == "measure":
         witnesses = {
             "measure": (

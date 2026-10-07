@@ -418,5 +418,35 @@ class ContractScopeCalibration(unittest.TestCase):
                 self.assertEqual(rows[0]["checked"], expected)
 
 
+class PrivateAuditCustodyCalibration(unittest.TestCase):
+    path = "crates/security/chio-secret-broker/src/privileged_audit/open_custody.rs"
+
+    def evidence(self, source):
+        code = gate._lexer.blank_rust_noise(source)
+        return gate._contracts.reader_evidence(
+            self.path, code, list(gate.json_decoders(code)),
+            gate._lexer.blank_test_scoped_items(code), {},
+        )
+
+    def test_private_readers_require_the_bounded_original_and_canonical_custody(self):
+        rows = self.evidence((ROOT / self.path).read_text())
+        self.assertEqual({row["reader"] for row in rows}, {"typed", "seeded"})
+        self.assertTrue(all(row["checked"] for row in rows))
+
+    def test_private_reader_witness_rejects_removed_bounds_equality_and_real_cause(self):
+        source = (ROOT / self.path).read_text()
+        for old, new in (
+            ("UntrustedJsonText::from_wire(input, MAX_AUDIT_OPEN_FRAME_BYTES)",
+             "UntrustedJsonText::from_wire(input, usize::MAX)"),
+            ("canonical.as_slice() != input", "canonical.as_slice() == input"),
+            ("Err(failure.into_error())", 'Err(invalid(0, "hidden cause"))'),
+            (".checked_add(values.byte_offset())", ".wrapping_add(values.byte_offset())"),
+        ):
+            with self.subTest(removed=old):
+                self.assertIn(old, source)
+                rows = self.evidence(source.replace(old, new, 1))
+                self.assertTrue(all(not row["checked"] for row in rows))
+
+
 if __name__ == "__main__":
     unittest.main()
