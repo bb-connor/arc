@@ -375,3 +375,48 @@ fn sqlite_second_page_clock_unavailable_aborts_before_the_page_is_read() -> Test
 fn sqlite_second_page_clock_regression_aborts_before_the_page_is_read() -> TestResult {
     second_page_clock_failure(Fault::Regress, ClockError::WallClockRegression)
 }
+
+fn first_item_clock_failure(fault: Fault, expected: ClockError) -> TestResult {
+    let sweep = Sweep::new(0, 2)?;
+    sweep.clock.arm(None)?;
+    sweep.clock.fail_kernel_read(2, fault)?;
+    let result = sweep.kernel.reconcile_recoverable_admissions();
+    let reads = sweep.clock.disarm()?;
+    assert!(
+        matches!(&result, Err(KernelError::Clock(error)) if *error == expected),
+        "item clock failure must abort the sweep: {result:?}"
+    );
+    let [(Role::Kernel, Some(_)), (Role::Store, Some(page_read)), (Role::Kernel, item)] =
+        reads.as_slice()
+    else {
+        return Err(
+            format!("the failed sample must precede the item status read: {reads:?}").into(),
+        );
+    };
+    match fault {
+        Fault::Unavailable => assert_eq!(*item, None),
+        Fault::Regress => assert!(item.is_some_and(|item| item < *page_read)),
+    }
+    for operation in &sweep.pending {
+        assert_eq!(sweep.state(operation)?, AdmissionOperationState::Prepared);
+        assert_eq!(
+            sweep.serving.operations.load_recovery_status(
+                operation.binding().operation_id(),
+                &sweep.serving.fence,
+                sweep.clock.now_ms()?,
+            )?,
+            None
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn sqlite_item_clock_unavailable_aborts_before_the_item_is_read() -> TestResult {
+    first_item_clock_failure(Fault::Unavailable, ClockError::Unavailable)
+}
+
+#[test]
+fn sqlite_item_clock_regression_aborts_before_the_item_is_read() -> TestResult {
+    first_item_clock_failure(Fault::Regress, ClockError::WallClockRegression)
+}
