@@ -7,17 +7,21 @@ use chio_kernel::{prepare_response_dispatch, ResponseDispatchPreparationRequest}
 use chio_quarantine::{build_response_plan, CausalBlastRadiusResolver};
 use chio_security_types::clock::{Clock, FixedClock};
 use chio_security_types::ports::{
-    empty_issuance_freeze_snapshot, issuance_freeze_version_hash, BlastRadiusFenceAcquisition,
+    capability_set_suspension_version_hash, empty_capability_set_suspension_snapshot,
+    empty_issuance_freeze_snapshot, empty_session_throttle_snapshot, issuance_freeze_version_hash,
+    response_affected_set_hash, session_throttle_version_hash, BlastRadiusFenceAcquisition,
     BlastRadiusPort, BlastRadiusQueryBounds, BlastRadiusRequest, BlastRadiusResult,
-    BlastRadiusSeeds, CanonicalBody, CausalLineageCommitMetadata, CausalLineageEdge,
-    CausalLineageEdgeKind, CausalLineageEdges, CausalLineageFenceRequest, CausalLineageFenceStore,
-    CausalLineageNode, CausalLineageNodeKind, CausalLineageNodes, CausalLineageSnapshot,
-    CausalLineageSnapshotRequest, CausalLineageStore, Digest32, EffectOperation, EffectPort,
-    EffectRequest, IssuanceFreezeKey, IssuanceFreezeSpec, LeaseOwnerId, LineageFence,
+    BlastRadiusSeeds, CanonicalBody, CapabilitySetSuspensionKey, CapabilitySetSuspensionSpec,
+    CausalLineageCommitMetadata, CausalLineageEdge, CausalLineageEdgeKind, CausalLineageEdges,
+    CausalLineageFenceRequest, CausalLineageFenceStore, CausalLineageNode, CausalLineageNodeKind,
+    CausalLineageNodes, CausalLineageSnapshot, CausalLineageSnapshotRequest, CausalLineageStore,
+    Digest32, EffectOperation, EffectPort, EffectRequest, EffectResultQuery,
+    EgressRestrictionSessionKey, IssuanceFreezeKey, IssuanceFreezeSpec, LeaseOwnerId, LineageFence,
     LineageFenceRelease, LineageFenceRenewal, LineageFenceRequest, LineageFenceStore,
-    LineageFenceTakeover, LineageId, OpaqueReceiptRef, PortError, PortResult, RecordId,
-    ResponseDispatchApproval, ResponseDispatchCommitOutcome, ResponseDispatchLease,
-    ResponseDispatchStore, ScheduledWork, TenantId, TenantScopedId,
+    LineageFenceTakeover, LineageId, OpaqueReceiptRef, PortError, PortErrorKind, PortResult,
+    RecordId, RecordIdSet, ResponseDispatchApproval, ResponseDispatchCommitOutcome,
+    ResponseDispatchLease, ResponseDispatchStore, ScheduledWork, SessionId, SessionThrottleKey,
+    SessionThrottleLimits, TenantId, TenantScopedId,
 };
 use chio_security_types::{
     FreshLiveAdmission, OperatorCapabilityBinding, PlannedResponseEffect,
@@ -28,6 +32,9 @@ use chio_siem::{Alert, AlertBackend, ExportError};
 use chio_store_sqlite::SqliteSecurityStateStore;
 
 use super::production_response_effects;
+use crate::security::adapters::effect_port::{
+    egress_restriction_version_hash, session_containment_target, session_overlay_version_hash,
+};
 use crate::security::adapters::{AlertOutboxConfig, SqliteSiemOutbox};
 
 /// Trusted time ten minutes ahead of the host wall clock.
@@ -46,6 +53,10 @@ fn tenant() -> TenantId {
 
 fn lineage() -> LineageId {
     LineageId::new("capability-root").unwrap_or_else(|error| panic!("lineage: {error}"))
+}
+
+fn session(value: &str) -> SessionId {
+    SessionId::new(value).unwrap_or_else(|error| panic!("session: {error}"))
 }
 
 fn record(value: impl Into<String>) -> RecordId {
@@ -291,6 +302,88 @@ impl ProductionEffectsFixture {
         }
     }
 
+    fn egress_spec(&self, session_id: &SessionId, destinations: &[&str]) -> ResponseEffectSpec {
+        let (canonical_contribution, contribution_hash) =
+            canonical(&serde_json::json!({ "destinations": destinations }));
+        ResponseEffectSpec {
+            kind: ResponseEffectKind::RestrictEgress,
+            target: ResponseTarget::Session {
+                session_id: session_id.clone(),
+            },
+            canonical_contribution,
+            contribution_hash,
+            observed_base_version_hash: egress_restriction_version_hash(
+                self.store.as_ref(),
+                &EgressRestrictionSessionKey {
+                    tenant_id: tenant(),
+                    session_id: session_id.clone(),
+                },
+            )
+            .unwrap_or_else(|error| panic!("egress base version: {error}")),
+        }
+    }
+
+    fn throttle_spec(&self, session_id: &SessionId) -> ResponseEffectSpec {
+        let (canonical_contribution, contribution_hash) = canonical(&SessionThrottleLimits {
+            window_ms: 5_000,
+            max_invocations: 3,
+        });
+        let empty = empty_session_throttle_snapshot(SessionThrottleKey {
+            tenant_id: tenant(),
+            session_id: session_id.clone(),
+        })
+        .unwrap_or_else(|error| panic!("empty throttle: {error}"));
+        ResponseEffectSpec {
+            kind: ResponseEffectKind::ThrottleSession,
+            target: ResponseTarget::Session {
+                session_id: session_id.clone(),
+            },
+            canonical_contribution,
+            contribution_hash,
+            observed_base_version_hash: session_throttle_version_hash(&empty)
+                .unwrap_or_else(|error| panic!("empty throttle version: {error}")),
+        }
+    }
+
+    fn capability_set_spec(&self, affected: &[&str]) -> ResponseEffectSpec {
+        let affected_ids = RecordIdSet::new(affected.iter().map(|id| record(*id)).collect())
+            .unwrap_or_else(|error| panic!("affected set: {error}"));
+        let affected_set_hash = response_affected_set_hash(&tenant(), &affected_ids)
+            .unwrap_or_else(|error| panic!("affected hash: {error}"));
+        let (canonical_contribution, contribution_hash) =
+            canonical(&CapabilitySetSuspensionSpec { affected_ids });
+        let empty = empty_capability_set_suspension_snapshot(CapabilitySetSuspensionKey {
+            tenant_id: tenant(),
+            affected_set_hash,
+        })
+        .unwrap_or_else(|error| panic!("empty capability suspension: {error}"));
+        ResponseEffectSpec {
+            kind: ResponseEffectKind::SuspendCapabilitySet,
+            target: ResponseTarget::CapabilitySet { affected_set_hash },
+            canonical_contribution,
+            contribution_hash,
+            observed_base_version_hash: capability_set_suspension_version_hash(&empty)
+                .unwrap_or_else(|error| panic!("empty capability version: {error}")),
+        }
+    }
+
+    fn session_suspension_spec(&self, session_id: &SessionId) -> ResponseEffectSpec {
+        let (canonical_contribution, contribution_hash) =
+            canonical(&serde_json::json!({ "posture_rank": 4 }));
+        let target = session_containment_target(&tenant(), session_id)
+            .unwrap_or_else(|error| panic!("session target: {error}"));
+        ResponseEffectSpec {
+            kind: ResponseEffectKind::SuspendSession,
+            target: ResponseTarget::Session {
+                session_id: session_id.clone(),
+            },
+            canonical_contribution,
+            contribution_hash,
+            observed_base_version_hash: session_overlay_version_hash(self.store.as_ref(), &target)
+                .unwrap_or_else(|error| panic!("session base version: {error}")),
+        }
+    }
+
     /// Commit a live automatic dispatch at trusted time and return the plan
     /// with the scheduler work that holds its lease.
     fn dispatch(
@@ -461,6 +554,49 @@ fn effect_request(
     }
 }
 
+fn unplanned_request(
+    plan: &ResponsePlan,
+    spec: ResponseEffectSpec,
+    work: &ScheduledWork,
+    command: &str,
+) -> EffectRequest {
+    EffectRequest {
+        tenant_id: plan.tenant_id.clone(),
+        action_id: plan.action_id.clone(),
+        plan_hash: plan.plan_hash,
+        effect_id: chio_security_types::ports::EffectId::new(format!("unplanned-{command}"))
+            .unwrap_or_else(|error| panic!("effect id: {error}")),
+        effect_kind: spec.kind,
+        target: spec.target,
+        plan_expires_at_unix_ms: plan.expires_at_unix_ms,
+        operation: EffectOperation::Apply,
+        idempotency_key: record(format!("response_effect_command:{command}")),
+        expected_version_hash: spec.observed_base_version_hash,
+        scheduler_lease_owner_id: work.lease_owner_id.clone(),
+        scheduler_fencing_token: work.fencing_token,
+        canonical_contribution: spec.canonical_contribution,
+        contribution_hash: spec.contribution_hash,
+    }
+}
+
+fn query(request: &EffectRequest) -> EffectResultQuery {
+    EffectResultQuery {
+        tenant_id: request.tenant_id.clone(),
+        action_id: request.action_id.clone(),
+        plan_hash: request.plan_hash,
+        effect_id: request.effect_id.clone(),
+        effect_kind: request.effect_kind,
+        target: request.target.clone(),
+        plan_expires_at_unix_ms: request.plan_expires_at_unix_ms,
+        operation: request.operation,
+        idempotency_key: request.idempotency_key.clone(),
+        expected_version_hash: request.expected_version_hash,
+        scheduler_lease_owner_id: request.scheduler_lease_owner_id.clone(),
+        scheduler_fencing_token: request.scheduler_fencing_token,
+        contribution_hash: request.contribution_hash,
+    }
+}
+
 #[test]
 fn production_effects_use_the_trusted_clock_for_freeze_leases_and_alert_time() {
     let fixture = ProductionEffectsFixture::new();
@@ -554,5 +690,112 @@ fn production_effects_refuse_a_freeze_lease_already_stale_in_trusted_time() {
         .map(|snapshot| snapshot.contributions.len())
         .unwrap_or(0),
         0
+    );
+}
+
+#[test]
+fn production_effects_refuse_effects_outside_the_live_plan() {
+    let fixture = ProductionEffectsFixture::new();
+    let planned_session = session("production-effects-planned-session");
+    let other_session = session("production-effects-other-session");
+    let (plan, work) = fixture.dispatch(
+        "production-effects-plan-action",
+        vec![record(planned_session.as_str())],
+        vec![fixture.egress_spec(&planned_session, &["server-a"])],
+    );
+    let effects = fixture.effects();
+    let planned = plan
+        .effects
+        .as_slice()
+        .first()
+        .unwrap_or_else(|| panic!("planned egress effect missing"));
+    let planned_request = effect_request(&plan, planned, &work, "planned-egress");
+    let unplanned = [
+        (
+            "egress",
+            unplanned_request(
+                &plan,
+                fixture.egress_spec(&other_session, &["server-b"]),
+                &work,
+                "unplanned-egress",
+            ),
+        ),
+        (
+            "throttle",
+            unplanned_request(
+                &plan,
+                fixture.throttle_spec(&planned_session),
+                &work,
+                "unplanned-throttle",
+            ),
+        ),
+        (
+            "capability-set suspension",
+            unplanned_request(
+                &plan,
+                fixture.capability_set_spec(&["capability-other"]),
+                &work,
+                "unplanned-capability-set",
+            ),
+        ),
+        (
+            "session suspension",
+            unplanned_request(
+                &plan,
+                fixture.session_suspension_spec(&planned_session),
+                &work,
+                "unplanned-session-suspension",
+            ),
+        ),
+        (
+            "alert",
+            unplanned_request(&plan, fixture.alert_spec(), &work, "unplanned-alert"),
+        ),
+    ];
+    let mut observed = vec![(
+        "planned egress",
+        effects
+            .execute(&planned_request)
+            .map(|result| result.applied)
+            .map_err(|error| error.kind()),
+        effects
+            .load_result(&query(&planned_request))
+            .map(|status| {
+                matches!(
+                    status,
+                    chio_security_types::ports::EffectExecutionStatus::Completed { .. }
+                )
+            })
+            .map_err(|error| error.kind()),
+    )];
+    for (label, request) in &unplanned {
+        observed.push((
+            *label,
+            effects
+                .execute(request)
+                .map(|result| result.applied)
+                .map_err(|error| error.kind()),
+            effects
+                .load_result(&query(request))
+                .map(|status| {
+                    matches!(
+                        status,
+                        chio_security_types::ports::EffectExecutionStatus::Completed { .. }
+                    )
+                })
+                .map_err(|error| error.kind()),
+        ));
+    }
+    let mut expected = vec![("planned egress", Ok(true), Ok(true))];
+    for (label, _) in &unplanned {
+        expected.push((
+            *label,
+            Err(PortErrorKind::IntegrityFailure),
+            Err(PortErrorKind::IntegrityFailure),
+        ));
+    }
+    assert_eq!(
+        observed, expected,
+        "a live lease for one action cannot execute or read effects outside its durable plan"
     );
 }
