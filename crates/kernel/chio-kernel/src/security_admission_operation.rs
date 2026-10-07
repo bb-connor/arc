@@ -7,3 +7,7 @@ include!("admission_operation.part3.inc");
 
 #[path = "security_admission_operation/recovery_pages.rs"]
 mod recovery_pages;
+
+#[cfg(test)]
+#[path = "security_admission_operation/review_tests.rs"]
+mod review_tests;
