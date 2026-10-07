@@ -100,16 +100,21 @@ jobs:
         with:
           bun-version: "1.3.3"
 
+      # Restore-only: this job runs on main's cache scope but executes lane code,
+      # so it reads the cache ci.yml's check job saves on main and never writes one.
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
         with:
-          shared-key: lane-test
+          shared-key: check
+          save-if: "false"
 
       - name: Test
         env:
           PACKAGES: ${{ inputs.packages }}
           FILTER: ${{ inputs.filter }}
           FEATURES: ${{ inputs.features }}
-          RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
+          # Host-scoped, not RUSTFLAGS: the linker flag would otherwise reach nested
+          # wasm32 builds (chio-wasm-guards fixtures), where rust-lld rejects it.
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
         run: |
           set -euo pipefail
           args=()
