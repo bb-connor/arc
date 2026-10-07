@@ -701,12 +701,18 @@ impl ResponseWorkerPort for PlanningRecoveryResponseWorkerPort {
         // expiry, rollback and receipt recovery before admitting new response
         // work, so a failed ingress or planner cannot strand an active overlay.
         // Planning errors still reach the worker and keep host readiness closed.
+        // An ingress event that cannot be acknowledged never stalls outbox
+        // recovery.
         let tick = self.inner.tick(tick_sequence, shutdown_requested)?;
         if self.planner.response_coordinator_is_ready() {
-            self.correlation_ingress
-                .drain_once(self.recovery_limits.max_records_per_pass())?;
-            self.planner
-                .resume_incomplete_pass(self.recovery_limits.max_records_per_pass())?;
+            let drained = self
+                .correlation_ingress
+                .drain_once(self.recovery_limits.max_records_per_pass());
+            let resumed = self
+                .planner
+                .resume_incomplete_pass(self.recovery_limits.max_records_per_pass());
+            drained?;
+            resumed?;
         }
         Ok(tick)
     }

@@ -152,13 +152,16 @@ impl DurableAttestedFindingBatchPlanner {
         let mut first_error = None;
         for (ordinal, binding) in publication.body.bindings.as_slice().iter().enumerate() {
             let ordinal = u32::try_from(ordinal).map_err(|_| PortError::integrity_failure())?;
-            if let Err(error) = self.resume_published_response(
+            let resumed = self.resume_published_response(
                 publication,
                 ordinal,
                 binding,
                 now_unix_ms,
                 &mut report,
-            ) {
+            );
+            if let Err(error) =
+                self.acknowledgeable_published_response(publication, ordinal, binding, resumed)
+            {
                 if first_error.is_none() {
                     first_error = Some(error);
                 }
@@ -168,6 +171,38 @@ impl DurableAttestedFindingBatchPlanner {
             Some(error) => Err(error),
             None => Ok(()),
         }
+    }
+
+    /// A published binding is acknowledgeable once its response row reads
+    /// back exactly and either holds a durable terminal outcome, including a
+    /// recorded refusal, or remains on the outbox retry path. A failure that
+    /// left no durable record keeps the event unacknowledged.
+    fn acknowledgeable_published_response(
+        &self,
+        publication: &AttestedFindingBatchPublication,
+        ordinal: u32,
+        binding: &AttestedFindingBatchBinding,
+        resumed: PortResult<()>,
+    ) -> PortResult<()> {
+        let current = self.load_exact_published_response(publication, ordinal, binding)?;
+        let Err(error) = resumed else {
+            return Ok(());
+        };
+        if current.is_complete() {
+            return match published_response_terminal_result(&current) {
+                Some(Ok(())) => Ok(()),
+                _ if current.last_error_code.is_some() => Ok(()),
+                _ => Err(PortError::integrity_failure()),
+            };
+        }
+        if matches!(
+            error.kind(),
+            PortErrorKind::Unavailable | PortErrorKind::Conflict
+        ) || current.last_error_code.as_ref() == Some(error.code())
+        {
+            return Ok(());
+        }
+        Err(error)
     }
 
     fn resume_published_response(

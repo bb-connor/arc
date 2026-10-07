@@ -42,17 +42,13 @@ fn synchronous_batch_recovery_processes_every_binding_and_preserves_the_first_er
         Arc::new(FixedClock(10_002)),
     );
 
-    let error = rejected(
-        planner.publish_attested_batch(&findings),
-        "the first terminal response error must fail the batch",
-    );
-    let replay_error = rejected(
-        planner.publish_attested_batch(&findings),
-        "terminal response replay must preserve the first batch error",
-    );
+    planner
+        .publish_attested_batch(&findings)
+        .unwrap_or_else(|error| panic!("durably refused bindings are acknowledgeable: {error}"));
+    planner
+        .publish_attested_batch(&findings)
+        .unwrap_or_else(|error| panic!("terminal response replay is acknowledgeable: {error}"));
 
-    assert_eq!(error.code(), &first_error_code);
-    assert_eq!(replay_error.code(), &first_error_code);
     for (ordinal, expected_error_code) in
         [(0_usize, &first_error_code), (1_usize, &second_error_code)]
     {

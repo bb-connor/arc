@@ -11,7 +11,7 @@ fn durable_production_planner_cannot_report_success_without_admission_artifacts(
     let coordinator = Arc::new(ArtifactEnforcingCoordinator::default());
     let planner = DurableAttestedFindingBatchPlanner::new(
         Arc::clone(&store) as Arc<dyn chio_security_types::ports::AttestedFindingBatchStore>,
-        store as Arc<dyn AttestedFindingResponseOutboxStore>,
+        Arc::clone(&store) as Arc<dyn AttestedFindingResponseOutboxStore>,
         Arc::new(TestFindingAuthority::new(std::slice::from_ref(
             &authoritative_finding(),
         ))),
@@ -23,20 +23,29 @@ fn durable_production_planner_cannot_report_success_without_admission_artifacts(
     let finding = authoritative_finding();
     let expected = build_attested_finding_batch_publication(std::slice::from_ref(&finding))
         .unwrap_or_else(|error| panic!("expected publication: {error}"));
-    let error = rejected(
-        planner.publish_attested_batch(std::slice::from_ref(&finding)),
-        "missing capability and approval artifacts must fail closed",
+    planner
+        .publish_attested_batch(std::slice::from_ref(&finding))
+        .unwrap_or_else(|error| panic!("a durable admission refusal is acknowledgeable: {error}"));
+    planner
+        .publish_attested_batch(std::slice::from_ref(&finding))
+        .unwrap_or_else(|error| panic!("a durable admission refusal replays as refused: {error}"));
+    assert!(!coordinator.effects_applied.load(Ordering::Acquire));
+    let refused = store
+        .load_attested_finding_response_outbox(&recovery_outbox_key(&expected, 0))
+        .unwrap_or_else(|error| panic!("refused response: {error}"))
+        .unwrap_or_else(|| panic!("refused response missing"));
+    assert_eq!(
+        refused.admission_state,
+        AttestedFindingResponseAdmissionState::Rejected
     );
     assert_eq!(
-        error.kind(),
-        chio_security_types::ports::PortErrorKind::IntegrityFailure
+        refused.completion_state,
+        AttestedFindingResponseCompletionState::NotStarted
     );
-    let replay_error = rejected(
-        planner.publish_attested_batch(std::slice::from_ref(&finding)),
-        "a durable terminal response failure must replay as failure",
+    assert_eq!(
+        refused.last_error_code.as_ref(),
+        Some(PortError::integrity_failure().code())
     );
-    assert_eq!(replay_error.code(), error.code());
-    assert!(!coordinator.effects_applied.load(Ordering::Acquire));
     assert_eq!(
         planner
             .load_published_attested_batch(&AttestedFindingBatchKey {
