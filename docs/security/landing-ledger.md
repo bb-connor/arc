@@ -1791,3 +1791,8 @@ The JSON current requirement view and [repair checkpoint](audits/production-repa
 - Private benchmark-directory creation is repaired after observed0775 refusal and same-directory0700 success. Full benchmark workloads remain pending.
 
 Remaining work is the unrun owning and optional-feature matrix, full benchmarks, final source inventory/codegen/supply-chain checks, exact-source independent review and available Greptile review, required cold/native/trusted evidence, terminal hosted checks and protected landing. Review-service quota or availability does not block execution. No scoped pass establishes main landing, release or activation.
+
+
+## Current protocol owner checkpoint (October 7)
+
+[Retained exact source and logs](audits/protocol-owner-checkpoint-20261007.json): default ACP/MCP/OpenAPI owning tests626/0; OpenAI provider feature132/0; ACP OpenTelemetry337/0; dependency-inclusive strict all-targets lint0. Five protocol doctest harnesses declare zero cases and are not counted as behavioral tests. The CI trust-boundary mutation contract and eleven-lockfile unused-patch gate/self-tests pass. Feature runs overlap and are not summed as unique cases. Broader default/PQ/native, full benchmarks, final review/trusted/hosted checks and protected landing remain pending.

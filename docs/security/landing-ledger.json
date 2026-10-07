@@ -129174,5 +129174,11 @@
     "path": "/home/connor/lanes/integration/docs/security/audits/production-repair-checkpoint-20261007.json",
     "sha256": "60bb17f6a66e89a38603b6cbe7c1e87c7769496494805682fea19fc00e335617",
     "scope": "Current scoped repair checkpoint, passing/failing/setup outcomes preserved; foundation remains unqualified/unmerged."
+  },
+  "protocol_owner_checkpoint_20261007": {
+    "path": "docs/security/audits/protocol-owner-checkpoint-20261007.json",
+    "sha256": "e4cd940646b501124e03ab5aeb7283738ade3e7c06683bc23346760ecb3b123f",
+    "source_commit": "51bba770b4a134ed79003fd177845aef125b7b1a",
+    "qualified_candidate": false
   }
 }

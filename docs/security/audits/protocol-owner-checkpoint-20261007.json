@@ -1,0 +1,146 @@
+{
+  "schema": "chio.security.protocol-owner-checkpoint.v1",
+  "source_commit": "51bba770b4a134ed79003fd177845aef125b7b1a",
+  "environment": {
+    "euid": 1000,
+    "umask": "0002",
+    "build_jobs": 4,
+    "locked": true,
+    "offline": true,
+    "test_threads": 1
+  },
+  "records": [
+    {
+      "log": "docs/security/audits/protocol-owner-checkpoint-20261007/protocol-owning.log.gz",
+      "raw_sha256": "2717cd4f20977c7accdc00c92b5e708fc2756576b3bc9ec69bab0220f56cf8ef",
+      "compressed_sha256": "21f5e4ddd3c32437260bd6fab548ab894f2e792f68216b31b01391f8f8342364",
+      "exit_code": 0,
+      "scope": {
+        "packages": [
+          "chio-acp-edge",
+          "chio-acp-proxy",
+          "chio-mcp-remote",
+          "chio-openapi",
+          "chio-openapi-mcp-bridge"
+        ],
+        "features": "default",
+        "command_kind": "lib and integration owning tests"
+      },
+      "counts": {
+        "passed": 626,
+        "failed": 0,
+        "ignored": 0,
+        "harnesses": 6
+      }
+    },
+    {
+      "log": "docs/security/audits/protocol-owner-checkpoint-20261007/openai-provider-owning.log.gz",
+      "raw_sha256": "895c0e6db7779509044a95244e712afa91e1169bd95ddca9147c073fec09972e",
+      "compressed_sha256": "a650b07d4846db0b08d8d05bc7c0d62e739f6b3a21a1aa50c12b5402ea84e82a",
+      "exit_code": 0,
+      "scope": {
+        "packages": [
+          "chio-openai-adapter"
+        ],
+        "features": "provider-adapter",
+        "command_kind": "lib and integration owning tests"
+      },
+      "counts": {
+        "passed": 132,
+        "failed": 0,
+        "ignored": 0,
+        "harnesses": 6
+      }
+    },
+    {
+      "log": "docs/security/audits/protocol-owner-checkpoint-20261007/acp-otel-owning.log.gz",
+      "raw_sha256": "ee641903bd931966f898afd0b0a5cbb9450755933ec6c9f9a6393b9c987dbca9",
+      "compressed_sha256": "72797a33ba6d84c26be0da138e43a87bcfc8bb634d9dc5888b5cb0cf8d450cc9",
+      "exit_code": 0,
+      "scope": {
+        "packages": [
+          "chio-acp-edge",
+          "chio-acp-proxy"
+        ],
+        "features": "chio-acp-proxy/otel",
+        "command_kind": "lib and integration owning tests"
+      },
+      "counts": {
+        "passed": 337,
+        "failed": 0,
+        "ignored": 0,
+        "harnesses": 2
+      }
+    },
+    {
+      "log": "docs/security/audits/protocol-owner-checkpoint-20261007/protocol-doctests.log.gz",
+      "raw_sha256": "5ba1782f2fdfd839c1fc1ebfad060f4b7dc99c795cfb4beb50d85312d195d38a",
+      "compressed_sha256": "9ab3679a8be2f9cd6ade4626681b5bc565a33c1db506c834a4ec8121cbbc4f41",
+      "exit_code": 0,
+      "scope": {
+        "packages": [
+          "chio-acp-edge",
+          "chio-acp-proxy",
+          "chio-mcp-remote",
+          "chio-openapi",
+          "chio-openapi-mcp-bridge"
+        ],
+        "features": "default",
+        "command_kind": "doc tests; no cases declared"
+      },
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "harnesses": 5
+      }
+    },
+    {
+      "log": "docs/security/audits/protocol-owner-checkpoint-20261007/protocol-owning-strict.log.gz",
+      "raw_sha256": "449138d56abc67d2f5ec89f2b5e7edbc2f065cea788ea875e47d5e8864e2c8e9",
+      "compressed_sha256": "f8737a5c00f2e0f066ca9a43445d0772b8399caec3e257c27dccae5a57de8d30",
+      "exit_code": 0,
+      "scope": {
+        "features": [
+          "chio-acp-proxy/otel",
+          "chio-openai-adapter/provider-adapter"
+        ],
+        "command_kind": "six protocol crates --all-targets dependency-inclusive clippy -- -D warnings"
+      }
+    },
+    {
+      "log": "docs/security/audits/protocol-owner-checkpoint-20261007/ci-contract-selftest.log.gz",
+      "raw_sha256": "cce007ca6adbdc404330bc1277b002c5b03d9a0fc2aea70bd57378b2e842c9cc",
+      "compressed_sha256": "b7639cc349462c98463bad8046e52490db83c915f6e94a8571fb630b77a0c076",
+      "exit_code": 0,
+      "scope": {
+        "command_kind": "python3 scripts/tests/check-security-ci-contract.test.py"
+      }
+    },
+    {
+      "log": "docs/security/audits/protocol-owner-checkpoint-20261007/unused-patches-selftest.log.gz",
+      "raw_sha256": "f4e19831d4a355f4a6ad79e5ffc5788ea18aa1a8b2cdc48c40a55c8a005cc0ce",
+      "compressed_sha256": "109f3955c91a8193d121f64f8890f495c485ff412d2bf7b834b59ec4f2ee4cbc",
+      "exit_code": 0,
+      "scope": {
+        "command_kind": "unused-patch self-tests"
+      }
+    },
+    {
+      "log": "docs/security/audits/protocol-owner-checkpoint-20261007/unused-patches-gate.log.gz",
+      "raw_sha256": "b88d3f6c56a40bfba00cfabda20779608a874122d13f6991753bb31a08779452",
+      "compressed_sha256": "b054f8d34d0f39d7055909dcf1b762a24d53805571d526c487328356ad14ed59",
+      "exit_code": 0,
+      "scope": {
+        "command_kind": "all eleven committed lockfiles"
+      }
+    }
+  ],
+  "qualified_candidate": false,
+  "merged": false,
+  "remaining": [
+    "Full remaining default consumer and kernel/control-plane owning matrices, PQ and required native platforms.",
+    "Full original benchmark workloads.",
+    "Final source review, cold/native/trusted evidence, terminal exact-source CI and protected landing."
+  ]
+}
