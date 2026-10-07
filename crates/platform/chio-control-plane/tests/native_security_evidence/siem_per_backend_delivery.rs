@@ -1,6 +1,5 @@
 use super::*;
 
-use chio_control_plane::security::AlertDispatchReport;
 use chio_security_types::ports::{PortError, PortResult};
 
 const DUE_AT_UNIX_MS: u64 = 1_000;
@@ -355,11 +354,18 @@ async fn when_every_backend_fails_backoff_and_parking_are_unchanged() {
         );
         assert_eq!((early.attempted, early.delivered), (0, 0));
 
-        let error = rejection(
-            fixture.deliver(now_unix_ms, 10).await,
-            "a row no backend accepted must not be reported delivered",
+        assert_eq!(
+            report(fixture.deliver(now_unix_ms, 10).await, "failed delivery"),
+            AlertDispatchReport {
+                attempted: 1,
+                delivered: 0,
+                failed: 1,
+                parked: usize::from(next_attempt_at_unix_ms == PARKED_AT_UNIX_MS),
+                backend_dispatches: 2,
+                backend_failures: 2,
+            },
+            "a row no backend accepted must not be reported delivered"
         );
-        assert_eq!(error.kind(), PortErrorKind::Unavailable);
         assert_eq!(
             fixture.status(&alerts[0]),
             Some(AlertDeliveryStatus::Pending {

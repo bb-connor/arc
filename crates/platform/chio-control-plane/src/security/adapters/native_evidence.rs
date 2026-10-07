@@ -24,7 +24,7 @@ use chio_security_types::ports::{
 use chio_siem::{Alert, AlertBackend, AlertSeverity};
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 use serde_json::json;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
 use tokio::sync::Mutex as AsyncMutex;
@@ -32,6 +32,7 @@ use tokio::sync::Mutex as AsyncMutex;
 const RECEIPT_READINESS_DOMAIN: &[u8] = b"chio.native-security-receipt-readiness.v1\0";
 const ALERT_OUTBOX_SCHEMA_VERSION: u8 = 1;
 const OUTBOX_TABLE: &str = "chio_security_alert_outbox";
+const BACKEND_DELIVERY_TABLE: &str = "chio_security_alert_outbox_backend";
 
 /// Signs validated Chio-native active-defense bodies and persists the signed
 /// Chio receipt through the configured authoritative receipt store.
@@ -684,12 +685,26 @@ impl AlertOutboxConfig {
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct AlertDispatchReport {
+    /// Due rows processed by the call; always `delivered + failed`.
     pub attempted: usize,
+    /// Rows confirmed by every configured backend.
     pub delivered: usize,
+    /// Rows left pending because at least one backend dispatch failed.
+    pub failed: usize,
+    /// Failed rows that reached `max_attempts` and are no longer due.
+    pub parked: usize,
+    /// Backend dispatches issued, at most one per row and unconfirmed backend.
+    pub backend_dispatches: usize,
+    /// Backend dispatches that failed.
+    pub backend_failures: usize,
 }
 
 /// SQLite-backed security paging outbox. `page` means durable admission only;
 /// actual backend delivery advances the row from pending to delivered.
+///
+/// A row becomes delivered only after every configured backend has confirmed
+/// it. Each backend outcome is recorded durably per row, so a retry dispatches
+/// only to the backends that have not confirmed the row.
 pub struct SqliteSiemOutbox {
     connection: Mutex<Connection>,
     backends: Vec<Arc<dyn AlertBackend>>,
@@ -725,7 +740,19 @@ impl SqliteSiemOutbox {
                        OR (status = 'delivered' AND delivered_at_unix_ms IS NOT NULL))
                  );
                  CREATE INDEX IF NOT EXISTS idx_chio_security_alert_outbox_due
-                 ON {OUTBOX_TABLE}(status, next_attempt_at_unix_ms, idempotency_key);"
+                 ON {OUTBOX_TABLE}(status, next_attempt_at_unix_ms, idempotency_key);
+                 CREATE TABLE IF NOT EXISTS {BACKEND_DELIVERY_TABLE} (
+                    idempotency_key TEXT NOT NULL
+                        REFERENCES {OUTBOX_TABLE}(idempotency_key),
+                    backend_name TEXT NOT NULL CHECK(length(backend_name) > 0),
+                    command_hash BLOB NOT NULL CHECK(length(command_hash) = 32),
+                    status TEXT NOT NULL CHECK(status IN ('pending', 'delivered')),
+                    attempts INTEGER NOT NULL CHECK(attempts > 0),
+                    delivered_at_unix_ms INTEGER,
+                    PRIMARY KEY (idempotency_key, backend_name),
+                    CHECK((status = 'pending' AND delivered_at_unix_ms IS NULL)
+                       OR (status = 'delivered' AND delivered_at_unix_ms IS NOT NULL))
+                 );"
             ))
             .map_err(|_| PortError::unavailable())?;
         Ok(Self {
@@ -751,12 +778,12 @@ impl SqliteSiemOutbox {
         }
         let exists: i64 = connection
             .query_row(
-                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?1",
-                [OUTBOX_TABLE],
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN (?1, ?2)",
+                [OUTBOX_TABLE, BACKEND_DELIVERY_TABLE],
                 |row| row.get(0),
             )
             .map_err(|_| PortError::unavailable())?;
-        if exists != 1 {
+        if exists != 2 {
             return Err(PortError::unavailable());
         }
         Ok(())
@@ -875,6 +902,61 @@ impl SqliteSiemOutbox {
         Ok(Some((alert, status)))
     }
 
+    /// Per-backend outcome of a paged alert, keyed by backend name. A backend
+    /// appears once it has been dispatched to: `Delivered` after it confirmed
+    /// the alert, otherwise `Pending` with its dispatch count and the row's next
+    /// attempt time (`i64::MAX` once the row is parked or no longer retried).
+    pub fn load_backend_deliveries(
+        &self,
+        query: &AlertDeliveryQuery,
+    ) -> PortResult<Option<BTreeMap<String, AlertDeliveryStatus>>> {
+        validate_alert(&query.alert)?;
+        let canonical =
+            canonical_json_bytes(&query.alert).map_err(|_| PortError::invalid_data())?;
+        let command_hash = chio_core::sha256(&canonical);
+        let idempotency_key = query.alert.idempotency_key.as_str();
+        let connection = self.connection()?;
+        let Some(status) = load_status(
+            &*connection,
+            idempotency_key,
+            &canonical,
+            command_hash.as_bytes(),
+        )?
+        else {
+            return Ok(None);
+        };
+        let retry_at_unix_ms = match status {
+            AlertDeliveryStatus::Pending {
+                next_attempt_at_unix_ms,
+                ..
+            } => next_attempt_at_unix_ms,
+            AlertDeliveryStatus::Delivered { .. } => parked_at_unix_ms()?,
+        };
+        let records = load_backend_records(&connection, idempotency_key, command_hash.as_bytes())?;
+        Ok(Some(
+            records
+                .into_iter()
+                .map(|(backend, record)| {
+                    let status = match record.delivered_at_unix_ms {
+                        Some(delivered_at_unix_ms) => AlertDeliveryStatus::Delivered {
+                            attempts: record.attempts,
+                            delivered_at_unix_ms,
+                        },
+                        None => AlertDeliveryStatus::Pending {
+                            attempts: record.attempts,
+                            next_attempt_at_unix_ms: retry_at_unix_ms,
+                        },
+                    };
+                    (backend, status)
+                })
+                .collect(),
+        ))
+    }
+
+    /// Dispatches up to `limit` due rows, each to every configured backend that
+    /// has not yet confirmed it. A failed dispatch leaves the row pending under
+    /// the row's retry backoff and does not stop the batch; `Err` means the
+    /// outbox itself failed.
     pub async fn deliver_due(
         &self,
         now_unix_ms: u64,
@@ -888,28 +970,130 @@ impl SqliteSiemOutbox {
         let due = self.load_due(now_unix_ms, limit)?;
         let mut report = AlertDispatchReport::default();
         for row in due {
-            report.attempted = report
-                .attempted
-                .checked_add(1)
-                .ok_or_else(PortError::integrity_failure)?;
+            increment(&mut report.attempted)?;
             let backend_alert = backend_alert(&row.alert)?;
+            let confirmed = self.load_confirmed_backends(&row)?;
             let mut delivery_failed = false;
             for backend in &self.backends {
-                if backend.dispatch(&backend_alert).await.is_err() {
+                if confirmed.contains(backend.name()) {
+                    continue;
+                }
+                increment(&mut report.backend_dispatches)?;
+                let accepted = backend.dispatch(&backend_alert).await.is_ok();
+                self.record_backend_outcome(&row, backend.name(), accepted, now_unix_ms)?;
+                if !accepted {
                     delivery_failed = true;
+                    increment(&mut report.backend_failures)?;
                 }
             }
             if delivery_failed {
-                self.record_failure(&row, now_unix_ms)?;
-                return Err(PortError::unavailable());
+                if self.record_failure(&row, now_unix_ms)? {
+                    increment(&mut report.parked)?;
+                }
+                increment(&mut report.failed)?;
+            } else {
+                self.record_delivery(&row, now_unix_ms)?;
+                increment(&mut report.delivered)?;
             }
-            self.record_delivery(&row, now_unix_ms)?;
-            report.delivered = report
-                .delivered
-                .checked_add(1)
-                .ok_or_else(PortError::integrity_failure)?;
         }
         Ok(report)
+    }
+
+    fn load_confirmed_backends(&self, row: &OutboxRow) -> PortResult<BTreeSet<String>> {
+        let connection = self.connection()?;
+        let records = load_backend_records(
+            &connection,
+            row.alert.idempotency_key.as_str(),
+            &row.command_hash,
+        )?;
+        Ok(records
+            .into_iter()
+            .filter_map(|(backend, record)| record.delivered_at_unix_ms.map(|_| backend))
+            .collect())
+    }
+
+    fn record_backend_outcome(
+        &self,
+        row: &OutboxRow,
+        backend: &str,
+        accepted: bool,
+        now_unix_ms: u64,
+    ) -> PortResult<()> {
+        let delivered_at = if accepted {
+            Some(sqlite_time(now_unix_ms)?)
+        } else {
+            None
+        };
+        let status = if accepted { "delivered" } else { "pending" };
+        let idempotency_key = row.alert.idempotency_key.as_str();
+        let mut connection = self.connection()?;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|_| PortError::unavailable())?;
+        let row_attempts: Option<i64> = transaction
+            .query_row(
+                &format!(
+                    "SELECT attempts FROM {OUTBOX_TABLE}
+                     WHERE idempotency_key = ?1 AND command_hash = ?2 AND status = 'pending'"
+                ),
+                params![idempotency_key, row.command_hash.as_slice()],
+                |stored| stored.get(0),
+            )
+            .optional()
+            .map_err(|_| PortError::unavailable())?;
+        if row_attempts != Some(i64::from(row.attempts)) {
+            return Err(PortError::integrity_failure());
+        }
+        let records = load_backend_records(&transaction, idempotency_key, &row.command_hash)?;
+        let changed = match records.get(backend) {
+            None => transaction
+                .execute(
+                    &format!(
+                        "INSERT INTO {BACKEND_DELIVERY_TABLE}
+                         (idempotency_key, backend_name, command_hash, status, attempts,
+                          delivered_at_unix_ms)
+                         VALUES (?1, ?2, ?3, ?4, 1, ?5)"
+                    ),
+                    params![
+                        idempotency_key,
+                        backend,
+                        row.command_hash.as_slice(),
+                        status,
+                        delivered_at
+                    ],
+                )
+                .map_err(|_| PortError::unavailable())?,
+            Some(previous) if previous.delivered_at_unix_ms.is_none() => {
+                let attempts = previous
+                    .attempts
+                    .checked_add(1)
+                    .ok_or_else(PortError::integrity_failure)?;
+                transaction
+                    .execute(
+                        &format!(
+                            "UPDATE {BACKEND_DELIVERY_TABLE}
+                             SET status = ?1, attempts = ?2, delivered_at_unix_ms = ?3
+                             WHERE idempotency_key = ?4 AND backend_name = ?5
+                               AND command_hash = ?6 AND status = 'pending' AND attempts = ?7"
+                        ),
+                        params![
+                            status,
+                            i64::from(attempts),
+                            delivered_at,
+                            idempotency_key,
+                            backend,
+                            row.command_hash.as_slice(),
+                            i64::from(previous.attempts)
+                        ],
+                    )
+                    .map_err(|_| PortError::unavailable())?
+            }
+            Some(_) => return Err(PortError::integrity_failure()),
+        };
+        if changed != 1 {
+            return Err(PortError::integrity_failure());
+        }
+        transaction.commit().map_err(|_| PortError::unavailable())
     }
 
     fn load_due(&self, now_unix_ms: u64, limit: usize) -> PortResult<Vec<OutboxRow>> {
@@ -960,7 +1144,9 @@ impl SqliteSiemOutbox {
         Ok(due)
     }
 
-    fn record_failure(&self, row: &OutboxRow, now_unix_ms: u64) -> PortResult<()> {
+    /// Records a failed attempt under the row backoff and returns whether the
+    /// row is now parked.
+    fn record_failure(&self, row: &OutboxRow, now_unix_ms: u64) -> PortResult<bool> {
         let attempts = row
             .attempts
             .checked_add(1)
@@ -968,8 +1154,9 @@ impl SqliteSiemOutbox {
         if attempts > self.config.max_attempts {
             return Err(PortError::integrity_failure());
         }
-        let next_attempt_at_unix_ms = if attempts == self.config.max_attempts {
-            u64::try_from(i64::MAX).map_err(|_| PortError::integrity_failure())?
+        let parked = attempts == self.config.max_attempts;
+        let next_attempt_at_unix_ms = if parked {
+            parked_at_unix_ms()?
         } else {
             now_unix_ms
                 .checked_add(retry_delay(self.config, attempts))
@@ -1010,7 +1197,7 @@ impl SqliteSiemOutbox {
         {
             return Err(PortError::integrity_failure());
         }
-        Ok(())
+        Ok(parked)
     }
 
     fn record_delivery(&self, row: &OutboxRow, now_unix_ms: u64) -> PortResult<()> {
@@ -1022,8 +1209,24 @@ impl SqliteSiemOutbox {
             return Err(PortError::integrity_failure());
         }
         let canonical = canonical_json_bytes(&row.alert).map_err(|_| PortError::invalid_data())?;
-        let connection = self.connection()?;
-        let changed = connection
+        let mut connection = self.connection()?;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|_| PortError::unavailable())?;
+        let records = load_backend_records(
+            &transaction,
+            row.alert.idempotency_key.as_str(),
+            &row.command_hash,
+        )?;
+        let unconfirmed = self.backends.iter().any(|backend| {
+            records
+                .get(backend.name())
+                .is_none_or(|record| record.delivered_at_unix_ms.is_none())
+        });
+        if unconfirmed {
+            return Err(PortError::integrity_failure());
+        }
+        let changed = transaction
             .execute(
                 &format!(
                     "UPDATE {OUTBOX_TABLE}
@@ -1048,7 +1251,7 @@ impl SqliteSiemOutbox {
             delivered_at_unix_ms: now_unix_ms,
         };
         if load_status(
-            &*connection,
+            &transaction,
             row.alert.idempotency_key.as_str(),
             &canonical,
             &row.command_hash,
@@ -1056,7 +1259,7 @@ impl SqliteSiemOutbox {
         {
             return Err(PortError::integrity_failure());
         }
-        Ok(())
+        transaction.commit().map_err(|_| PortError::unavailable())
     }
 }
 
@@ -1103,6 +1306,68 @@ struct OutboxRow {
     alert: SecurityAlert,
     command_hash: Vec<u8>,
     attempts: u32,
+}
+
+struct BackendRecord {
+    attempts: u32,
+    delivered_at_unix_ms: Option<u64>,
+}
+
+fn load_backend_records(
+    connection: &Connection,
+    idempotency_key: &str,
+    command_hash: &[u8],
+) -> PortResult<BTreeMap<String, BackendRecord>> {
+    let mut statement = connection
+        .prepare(&format!(
+            "SELECT backend_name, command_hash, status, attempts, delivered_at_unix_ms
+             FROM {BACKEND_DELIVERY_TABLE} WHERE idempotency_key = ?1"
+        ))
+        .map_err(|_| PortError::unavailable())?;
+    let mut rows = statement
+        .query([idempotency_key])
+        .map_err(|_| PortError::unavailable())?;
+    let mut records = BTreeMap::new();
+    while let Some(row) = rows.next().map_err(|_| PortError::unavailable())? {
+        let backend: String = row.get(0).map_err(|_| PortError::invalid_data())?;
+        let stored_hash: Vec<u8> = row.get(1).map_err(|_| PortError::invalid_data())?;
+        let status: String = row.get(2).map_err(|_| PortError::invalid_data())?;
+        let attempts: i64 = row.get(3).map_err(|_| PortError::invalid_data())?;
+        let delivered_at: Option<i64> = row.get(4).map_err(|_| PortError::invalid_data())?;
+        if stored_hash != command_hash {
+            return Err(PortError::integrity_failure());
+        }
+        let attempts = u32::try_from(attempts)
+            .ok()
+            .filter(|attempts| *attempts > 0)
+            .ok_or_else(PortError::integrity_failure)?;
+        let delivered_at_unix_ms = match (status.as_str(), delivered_at) {
+            ("pending", None) => None,
+            ("delivered", Some(delivered_at)) => {
+                Some(u64::try_from(delivered_at).map_err(|_| PortError::integrity_failure())?)
+            }
+            _ => return Err(PortError::integrity_failure()),
+        };
+        records.insert(
+            backend,
+            BackendRecord {
+                attempts,
+                delivered_at_unix_ms,
+            },
+        );
+    }
+    Ok(records)
+}
+
+fn parked_at_unix_ms() -> PortResult<u64> {
+    u64::try_from(i64::MAX).map_err(|_| PortError::integrity_failure())
+}
+
+fn increment(counter: &mut usize) -> PortResult<()> {
+    *counter = counter
+        .checked_add(1)
+        .ok_or_else(PortError::integrity_failure)?;
+    Ok(())
 }
 
 fn validate_backends(backends: &[Arc<dyn AlertBackend>]) -> PortResult<()> {

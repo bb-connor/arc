@@ -3,8 +3,8 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use chio_control_plane::security::{
-    AlertOutboxConfig, AttestedCorrelationWriter, NativeActiveResponseFindingAuthority,
-    NativeSecurityReceiptSink, SqliteSiemOutbox,
+    AlertDispatchReport, AlertOutboxConfig, AttestedCorrelationWriter,
+    NativeActiveResponseFindingAuthority, NativeSecurityReceiptSink, SqliteSiemOutbox,
 };
 use chio_core::crypto::{Ed25519Backend, Keypair};
 use chio_core::receipt::body::ChioReceipt;
@@ -1007,7 +1007,20 @@ async fn sqlite_siem_outbox_recovers_ack_loss_with_the_same_dedup_key_and_durabl
             next_attempt_at_unix_ms: 1_000,
         }
     );
-    assert!(outbox.deliver_due(1_000, 1).await.is_err());
+    assert_eq!(
+        outbox
+            .deliver_due(1_000, 1)
+            .await
+            .unwrap_or_else(|error| panic!("first delivery: {error}")),
+        AlertDispatchReport {
+            attempted: 1,
+            delivered: 0,
+            failed: 1,
+            parked: 0,
+            backend_dispatches: 1,
+            backend_failures: 1,
+        }
+    );
     assert_eq!(
         SecurityAlertPort::load_delivery(
             &outbox,

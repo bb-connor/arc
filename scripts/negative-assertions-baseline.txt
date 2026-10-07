@@ -699,7 +699,6 @@
 1	crates/platform/chio-control-plane/tests/native_security_evidence.rs	native_sink_signs_appends_idempotently_and_verifies_the_exact_stored_receipt	connection .execute( , [], ) .is_err()
 1	crates/platform/chio-control-plane/tests/native_security_evidence.rs	native_sink_signs_appends_idempotently_and_verifies_the_exact_stored_receipt	reopened .append_indexed_security_evidence(&request.evidence_id, &signed) .is_err()
 1	crates/platform/chio-control-plane/tests/native_security_evidence.rs	native_sink_signs_appends_idempotently_and_verifies_the_exact_stored_receipt	reopened .load_indexed_security_evidence(&request.evidence_id) .is_err()
-1	crates/platform/chio-control-plane/tests/native_security_evidence.rs	sqlite_siem_outbox_recovers_ack_loss_with_the_same_dedup_key_and_durable_status	outbox.deliver_due(1_000, 1).await.is_err()
 1	crates/security/chio-active-response-authority/src/config/tests.rs	combined_deployment_binds_processes_paths_keys_and_store	aliased.validate().is_err()
 1	crates/security/chio-active-response-authority/src/config/tests.rs	combined_deployment_binds_processes_paths_keys_and_store	changed.validate().is_err()
 1	crates/security/chio-active-response-authority/src/config/tests.rs	combined_deployment_binds_processes_paths_keys_and_store	shared_key.validate().is_err()
