@@ -21,6 +21,8 @@ mod host;
 mod keyring;
 #[path = "native_mcp.rs"]
 mod mcp;
+#[path = "native_observation_owner.rs"]
+mod observation_owner;
 #[cfg(feature = "real-linux-enforcement")]
 #[path = "native_process_host.rs"]
 mod process_host;
@@ -259,31 +261,43 @@ fn run_native_delivery_with_observer_delay(
         .env(FALLBACK_MARKER_ENV, &fixture.fallback_marker_path)
         .env(CANARY_LENGTH_ENV, probe.length.to_string())
         .env(CANARY_DIGEST_ENV, hex::encode(probe.sha256));
-    let observer = cutpoint
-        .as_ref()
-        .and_then(|control| control.start_observer(&mut upstream_command));
-    let mut upstream = if crash.is_some() {
+    let mut observer = match cutpoint.as_ref() {
+        Some(control) => control.start_observer(&mut upstream_command)?,
+        None => None,
+    };
+    let mut observation_owner = None;
+    let mut upstream = if matches!(
+        crash,
+        Some(cutpoints::Point::Registered | cutpoints::Point::Captured)
+    ) {
         // Zero-effect cutpoints observe the provider before any connection.
-        upstream::UpstreamObserver::immediate(spawn_with_stdin(
-            upstream_command,
-            OwnedFd::from(listener),
-            "native TLS observer",
-        ))
+        let (owner, child) =
+            observation_owner::ObservationOwner::spawn(upstream_command, listener)?;
+        observation_owner = Some(owner);
+        upstream::UpstreamObserver::immediate(child)
     } else {
-        upstream::UpstreamObserver::when_connected(upstream_command, listener)?
+        upstream::UpstreamObserver::when_connected_with_ready(
+            upstream_command,
+            listener,
+            observer
+                .as_mut()
+                .and_then(cutpoints::EffectObserver::take_ready_sender),
+        )?
     };
     if let Some(delay) = observer_delay {
         // The original ten-second helper startup window expires here. The
         // actual capability, proof, lease and dispatch checks are unchanged.
         thread::sleep(delay);
-        assert!(upstream.is_waiting_for_dispatch());
+        if observation_owner.is_some() {
+            assert!(upstream.try_wait().is_none());
+        } else {
+            assert!(upstream.is_waiting_for_dispatch());
+        }
     }
     let outcome = invoke();
     if let Some(control) = cutpoint.as_ref() {
         if let Some(observer) = observer {
-            observer
-                .join()
-                .map_err(|_| "provider cutpoint observer panicked")?;
+            observer.finish_after_invoke()?;
         }
         assert!(
             !matches!(&outcome, Ok(response) if response.verdict == Verdict::Allow),
@@ -298,6 +312,9 @@ fn run_native_delivery_with_observer_delay(
         assert_raw_absent(&canary, &broker_output.stdout, "killed broker stdout");
         assert_raw_absent(&canary, &broker_output.stderr, "killed broker stderr");
         write_private(&fixture.fallback_marker_path, b"complete");
+        if let Some(owner) = observation_owner.take() {
+            owner.complete_after_verified_reap()?;
+        }
         control.verify_provider(&upstream.wait_output(), &host.execute, &canary)?;
         #[cfg(feature = "real-linux-enforcement")]
         if control.was_captured() {

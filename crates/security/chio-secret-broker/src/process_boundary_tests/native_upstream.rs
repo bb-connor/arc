@@ -23,6 +23,14 @@ impl UpstreamObserver {
     }
 
     pub(super) fn when_connected(command: Command, listener: TcpListener) -> io::Result<Self> {
+        Self::when_connected_with_ready(command, listener, None)
+    }
+
+    pub(super) fn when_connected_with_ready(
+        command: Command,
+        listener: TcpListener,
+        ready: Option<std::sync::mpsc::Sender<()>>,
+    ) -> io::Result<Self> {
         let (owner, cancel) = UnixStream::pair()?;
         for stream in [&owner, &cancel] {
             if !fcntl_getfd(stream)?.contains(FdFlags::CLOEXEC) {
@@ -34,6 +42,11 @@ impl UpstreamObserver {
         let pending = thread::spawn(move || {
             if !wait_for_dispatch_or_cancel(&listener, &cancel)? {
                 return Ok(ObserverOutcome::Cancelled);
+            }
+            if let Some(ready) = ready {
+                ready
+                    .send(())
+                    .map_err(|_| io::Error::other("provider readiness owner was cancelled"))?;
             }
             Ok(ObserverOutcome::Started(spawn_with_stdin(
                 command,

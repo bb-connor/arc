@@ -6,6 +6,10 @@ use std::sync::Mutex;
 #[path = "native_cutpoint_adapters.rs"]
 mod adapters;
 pub(super) use adapters::{wrap_connection, wrap_participant};
+#[path = "native_effect_observation.rs"]
+mod effect;
+#[path = "native_no_effect_observation.rs"]
+mod no_effect;
 
 type TestResult = std::result::Result<(), Box<dyn std::error::Error>>;
 const NO_EFFECT_ENV: &str = "CHIO_BOUNDARY_EXPECT_NO_EFFECT";
@@ -26,6 +30,12 @@ pub(super) struct Control {
     triggered: AtomicBool,
     dispatch_calls: std::sync::atomic::AtomicUsize,
     quotas: Mutex<Vec<BudgetInvocationQuota>>,
+}
+
+pub(super) struct EffectObserver {
+    owner: Option<UnixStream>,
+    ready: Option<std::sync::mpsc::Sender<()>>,
+    task: Option<JoinHandle<io::Result<()>>>,
 }
 
 impl Control {
@@ -73,32 +83,13 @@ impl Control {
     pub(super) fn start_observer(
         self: &Arc<Self>,
         command: &mut Command,
-    ) -> Option<JoinHandle<()>> {
+    ) -> io::Result<Option<EffectObserver>> {
         if self.point != Point::ProviderEffect {
             command.env(NO_EFFECT_ENV, "1");
-            return None;
+            return Ok(None);
         }
         command.env(EFFECT_GATE_ENV, &self.effect_gate);
-        let control = Arc::clone(self);
-        Some(thread::spawn(move || {
-            let deadline = Instant::now() + Duration::from_secs(10);
-            while !control.effect_gate.exists() {
-                assert!(
-                    Instant::now() < deadline,
-                    "provider effect was never observed"
-                );
-                thread::sleep(Duration::from_millis(2));
-            }
-            assert_eq!(
-                fs::read(&control.effect_gate).test_expect("provider effect marker"),
-                b"observed"
-            );
-            control.kill_at(Point::ProviderEffect);
-            write_private(
-                &control.effect_gate.with_extension("release"),
-                b"broker-dead",
-            );
-        }))
+        EffectObserver::start(Arc::clone(self)).map(Some)
     }
 
     pub(super) fn verify_capture_and_replay(
@@ -225,26 +216,8 @@ pub(in super::super) fn observe_no_effect(listener: &TcpListener) -> bool {
         return false;
     }
     assert_eq!(required_environment(NO_EFFECT_ENV), "1");
-    let complete = PathBuf::from(required_environment(FALLBACK_MARKER_ENV));
-    let deadline = Instant::now() + Duration::from_secs(10);
-    let mut quiet_deadline = None;
-    loop {
-        match listener.accept() {
-            Ok(_) => panic!("broker death before send still reached the provider"),
-            Err(error) if error.kind() == io::ErrorKind::WouldBlock => {}
-            Err(error) => panic!("zero-effect provider observation failed: {error}"),
-        }
-        let now = Instant::now();
-        if complete.exists() && quiet_deadline.is_none() {
-            quiet_deadline = Some(now + Duration::from_millis(250));
-        }
-        if quiet_deadline.is_some_and(|quiet| now >= quiet) {
-            break;
-        }
-        assert!(now < deadline, "zero-effect observation did not complete");
-        thread::sleep(Duration::from_millis(2));
-    }
-    println!("{ZERO_EFFECT_REPORT}");
+    no_effect::observe_until_owned_done(listener)
+        .test_expect("zero-effect observation cancelled or failed before completion");
     true
 }
 
@@ -283,6 +256,19 @@ fn native_broker_death_after_provider_effect_retains_capture_and_refuses_replay(
         None,
         Some(Point::ProviderEffect),
     )
+}
+
+#[test]
+fn native_broker_cutpoint_observers_preserve_proofs_after_delayed_admission() -> TestResult {
+    for point in [Point::Captured, Point::ProviderEffect] {
+        run_native_delivery_with_observer_delay(
+            DeliveryRoute::ObservedMcp,
+            None,
+            Some(point),
+            Some(Duration::from_secs(11)),
+        )?;
+    }
+    Ok(())
 }
 
 #[cfg(feature = "real-linux-enforcement")]
