@@ -146,24 +146,42 @@ fn checkpoint_survives_authorized_payload_compaction_and_owner_rotation() -> Tes
         .acknowledged_at_unix_ms()
         .checked_add(1)
         .ok_or("cutoff")?;
+    // A raw outcome bound to a security context cannot replay from a compacted
+    // value, so an authorized compaction pass must retain its payload.
+    let raw = outcomes
+        .load_raw_invocation_by_operation(&operation)?
+        .ok_or("raw outcome")?;
+    assert!(!raw.supports_compacted_value_replay());
+    assert_eq!(
+        raw.to_persisted().security_invocation_context,
+        Some(context(&request)?)
+    );
+    let payload = raw.canonical_blob()?;
     let summary = outcomes.compact_retained_invocation_blobs(
         cutoff,
         &runtime.authority.mutation_fence(),
         cutoff,
     )?;
-    assert_eq!(summary.compacted, 1);
+    assert_eq!(summary.compacted, 0);
+    assert_eq!(summary.retained_unsupported, 1);
     assert_eq!(summary.retained_live, 0);
     assert_eq!(
         outcomes.lookup_security_release(&operation)?,
         Some(checkpoint.clone())
     );
-    assert!(outcomes
-        .load_raw_invocation_by_operation(&operation)
-        .is_err());
+    assert_eq!(
+        outcomes
+            .load_raw_invocation_by_operation(&operation)?
+            .ok_or("retained raw outcome")?
+            .canonical_blob()?,
+        payload
+    );
+    let before_rotation = runtime
+        .kernel
+        .evaluate_tool_call_blocking_with_security_context(&request, &context(&request)?)?;
+    assert_eq!(before_rotation.verdict, chio_kernel::Verdict::Allow);
     drop(outcomes);
     drop(runtime);
-    // Preserve the admitted security profile so the retry reaches the
-    // compacted-payload boundary, not the earlier configuration-drift denial.
     let releases = Arc::new(AtomicUsize::new(0));
     let runtime = open(
         &fixture,
@@ -180,15 +198,21 @@ fn checkpoint_survives_authorized_payload_compaction_and_owner_rotation() -> Tes
             .lookup_security_release(&operation)?,
         Some(checkpoint)
     );
-    // Retained release evidence is not a replacement for a compacted payload.
+    assert_eq!(
+        runtime
+            .authority
+            .tool_outcome_store()
+            .load_raw_invocation_by_operation(&operation)?
+            .ok_or("raw outcome after owner rotation")?
+            .canonical_blob()?,
+        payload
+    );
     runtime.kernel.reconcile_durable_admission_startup()?;
     let replay = runtime
         .kernel
-        .evaluate_tool_call_blocking_with_security_context(&request, &context(&request)?);
-    assert!(
-        replay.is_err(),
-        "compacted payload replay returned {replay:?}"
-    );
+        .evaluate_tool_call_blocking_with_security_context(&request, &context(&request)?)?;
+    assert_eq!(replay.verdict, chio_kernel::Verdict::Allow);
+    assert_eq!(replay.receipt.id, before_rotation.receipt.id);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
     assert_eq!(releases.load(Ordering::SeqCst), 0);
     Ok(())
