@@ -427,6 +427,45 @@ fn request_and_response_wire_golden_vectors_are_exact() {
     );
 }
 
+#[test]
+fn submission_proof_digest_text_must_be_nonzero_canonical_lowercase_hex() {
+    let valid = "0123456789abcdef".repeat(4);
+    let mut expected = [0_u8; 32];
+    for chunk in expected.chunks_exact_mut(8) {
+        chunk.copy_from_slice(&[0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef]);
+    }
+    assert_eq!(
+        nonzero_lower_hex_digest(&valid),
+        Ok(Digest32::new(expected))
+    );
+    assert_eq!(
+        nonzero_lower_hex_digest(&"ff".repeat(32)),
+        Ok(Digest32::new([0xff; 32]))
+    );
+    for text in [
+        "0".repeat(64),
+        String::new(),
+        valid[..62].to_string(),
+        valid[..63].to_string(),
+        format!("{valid}0"),
+        format!("{valid}00"),
+        valid.to_ascii_uppercase(),
+        format!("A{}", &valid[1..]),
+        format!("0x{}", &valid[2..]),
+        format!("0x{valid}"),
+        format!(" {}", &valid[1..]),
+        format!("{valid}\n"),
+        format!("g{}", &valid[1..]),
+        format!("\u{e9}{}", &valid[2..]),
+    ] {
+        assert_eq!(
+            nonzero_lower_hex_digest(&text),
+            Err(PortError::integrity_failure()),
+            "accepted {text:?}"
+        );
+    }
+}
+
 #[cfg(target_os = "linux")]
 mod linux_uds {
     use std::fs;

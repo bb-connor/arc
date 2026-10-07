@@ -163,3 +163,106 @@ fn rejects_oversized_execution_lease() {
         Err(DurableActiveResponseExecutorConfigError::LeaseDurationTooLong { .. })
     ));
 }
+
+#[test]
+fn execution_request_digest_text_must_be_canonical_lowercase_hex() {
+    let harness = Harness::new();
+    let rejection = |request: &RawActiveResponseExecutionRequest| {
+        require_error(harness.executor.execute_source(request))
+    };
+    let reason =
+        |message: &str| ActiveResponseExecutorError::RejectedBeforeCommit(message.to_string());
+
+    let mut request = harness.automatic_request();
+    let uppercase = request.plan_body_hash.to_ascii_uppercase();
+    assert_ne!(uppercase, request.plan_body_hash);
+    request.plan_body_hash = uppercase;
+    assert_eq!(
+        rejection(&request),
+        reason("response plan hash is not canonical lowercase hex")
+    );
+
+    let mut request = harness.automatic_request();
+    request.plan_body_hash = format!("0x{}", request.plan_body_hash);
+    assert_eq!(
+        rejection(&request),
+        reason("response plan hash is not canonical lowercase hex")
+    );
+
+    let mut request = harness.automatic_request();
+    request.authorization_capability_hash =
+        request.authorization_capability_hash.to_ascii_uppercase();
+    assert_eq!(
+        rejection(&request),
+        reason("authorization capability hash is not canonical lowercase hex")
+    );
+
+    let mut request = harness.automatic_request();
+    request.governed_intent_hash = format!(" {}", &request.governed_intent_hash[1..]);
+    assert_eq!(
+        rejection(&request),
+        reason("governed intent hash is not canonical lowercase hex")
+    );
+
+    let mut request = harness.automatic_request();
+    request.policy_decision_hash.truncate(63);
+    assert_eq!(
+        rejection(&request),
+        reason("policy decision hash is not canonical lowercase hex")
+    );
+
+    let mut request = harness.governed_request();
+    request.approval = ActiveResponseExecutionApproval::Governed {
+        admission_operation_id: "admission-operation-42".to_string(),
+        admission_operation_version: 3,
+        approval_set_hash: digest_hex(&digest(44)).to_ascii_uppercase(),
+    };
+    assert_eq!(rejection(&request), reason("approval set hash is invalid"));
+}
+
+#[test]
+fn zero_execution_request_digests_are_decoded_then_rejected_by_their_binding() {
+    let harness = Harness::new();
+    let rejection = |request: &RawActiveResponseExecutionRequest| {
+        require_error(harness.executor.execute_source(request))
+    };
+    let reason =
+        |message: &str| ActiveResponseExecutorError::RejectedBeforeCommit(message.to_string());
+    let zero = "0".repeat(64);
+
+    let mut request = harness.automatic_request();
+    request.plan_body_hash.clone_from(&zero);
+    assert_eq!(
+        rejection(&request),
+        reason("active-response digest binding is invalid")
+    );
+
+    let mut request = harness.automatic_request();
+    request.authorization_capability_hash.clone_from(&zero);
+    assert_eq!(
+        rejection(&request),
+        reason("active-response digest binding is invalid")
+    );
+
+    let mut request = harness.automatic_request();
+    request.governed_intent_hash.clone_from(&zero);
+    assert_eq!(
+        rejection(&request),
+        reason("active-response digest binding is invalid")
+    );
+
+    let mut request = harness.automatic_request();
+    request.policy_decision_hash.clone_from(&zero);
+    assert_eq!(
+        rejection(&request),
+        reason("active-response digest binding is invalid")
+    );
+
+    let mut request = harness.governed_request();
+    request.approval = ActiveResponseExecutionApproval::Governed {
+        admission_operation_id: "admission-operation-42".to_string(),
+        admission_operation_version: 3,
+        approval_set_hash: zero,
+    };
+    assert_eq!(rejection(&request), reason("approval set hash is invalid"));
+}
