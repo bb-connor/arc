@@ -757,7 +757,7 @@ fn verify_signature(
     if key.algorithm() != algorithm || signature.algorithm() != algorithm {
         return Err(KeyringError::AlgorithmMismatch);
     }
-    if !key.verify_strict(bytes, signature) {
+    if !key.verify(bytes, signature) {
         return Err(KeyringError::InvalidSignature);
     }
     Ok(())

@@ -40,9 +40,7 @@ pub(super) fn load_record(
         .optional()?
         .ok_or(RecordLoadError::Unknown)?;
     let signed: SignedRecord = decode_json(serialized.as_bytes(), MAX_SESSION_JSON_BYTES)?;
-    if signed.record.id != id
-        || !record_key.verify_canonical_strict(&signed.record, &signed.signature)?
-    {
+    if signed.record.id != id || !record_key.verify_canonical(&signed.record, &signed.signature)? {
         return Err(RecordLoadError::Integrity);
     }
     Ok(signed.record)

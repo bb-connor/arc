@@ -41,7 +41,7 @@ pub fn verify_pinned_envelope<T: Serialize>(
     if envelope.signer_key != *pinned_authority {
         return Err(FindingError::AuthorityMismatch(label));
     }
-    match pinned_authority.verify_canonical_strict(&envelope.body, &envelope.signature) {
+    match pinned_authority.verify_canonical(&envelope.body, &envelope.signature) {
         Ok(true) => Ok(()),
         _ => Err(FindingError::EnvelopeSignatureInvalid(label)),
     }

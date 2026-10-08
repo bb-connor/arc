@@ -163,7 +163,7 @@ impl FindingAuditEpoch {
         );
         if self
             .seed_witness
-            .verify_strict(&message, &self.seed_witness_signature)
+            .verify(&message, &self.seed_witness_signature)
         {
             Ok(())
         } else {

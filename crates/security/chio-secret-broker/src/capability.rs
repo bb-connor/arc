@@ -33,9 +33,7 @@ pub fn issue_capability(
     if signed.public_key != body.issuer
         || signed.algorithm != body.issuer.algorithm()
         || signed.signature.algorithm() != signed.algorithm
-        || !signed
-            .public_key
-            .verify_strict(&canonical, &signed.signature)
+        || !signed.public_key.verify(&canonical, &signed.signature)
     {
         return Err(BrokerError::Invariant(
             "capability signing backend returned a mismatched identity or signature".to_string(),
@@ -77,7 +75,7 @@ pub fn verify_capability(
         body: &capability.body,
     };
     let valid = trusted_issuer
-        .verify_canonical_strict(&input, &capability.signature)
+        .verify_canonical(&input, &capability.signature)
         .map_err(|error| {
             BrokerError::AuthorizationDenied(format!("capability verification failed: {error}"))
         })?;

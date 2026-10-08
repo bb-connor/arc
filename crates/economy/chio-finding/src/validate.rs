@@ -397,7 +397,7 @@ pub fn verify_finding_signature(finding: &Finding) -> Result<(), FindingError> {
         Signature::from_hex(&finding.signature).map_err(|_| FindingError::SignatureInvalid)?;
     let mut body = finding.clone();
     body.signature = String::new();
-    match finding.issuer.verify_canonical_strict(&body, &signature) {
+    match finding.issuer.verify_canonical(&body, &signature) {
         Ok(true) => Ok(()),
         _ => Err(FindingError::SignatureInvalid),
     }

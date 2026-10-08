@@ -1192,7 +1192,7 @@ fn evaluate_signed_canary_observation(
         || pinned_signer.is_weak_ed25519()
         || observation.signer_key != *pinned_signer
         || !matches!(
-            pinned_signer.verify_canonical_strict(&observation.body, &observation.signature),
+            pinned_signer.verify_canonical(&observation.body, &observation.signature),
             Ok(true)
         )
     {

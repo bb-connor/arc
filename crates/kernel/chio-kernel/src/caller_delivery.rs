@@ -172,7 +172,7 @@ impl SignedCallerDispatchAuthorizationV1 {
         {
             return Err(CallerDeliveryError::Binding);
         }
-        if !trusted_kernel.verify_strict(
+        if !trusted_kernel.verify(
             &bounded_canonical(&self.authorization, MAX_AUTHORIZATION_BYTES)?,
             &self.signature,
         ) {
@@ -284,7 +284,7 @@ impl SignedCallerDeliveryReportV1 {
         {
             return Err(CallerDeliveryError::Binding);
         }
-        if !expected_executor.public_key.verify_strict(
+        if !expected_executor.public_key.verify(
             &bounded_canonical(&self.report, MAX_REPORT_BYTES)?,
             &self.signature,
         ) {

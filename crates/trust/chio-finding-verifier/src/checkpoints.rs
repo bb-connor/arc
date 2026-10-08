@@ -26,7 +26,7 @@ fn has_strict_checkpoint_signature(checkpoint: &KernelCheckpoint) -> bool {
         checkpoint
             .body
             .kernel_key
-            .verify_canonical_strict(&checkpoint.body, &checkpoint.signature),
+            .verify_canonical(&checkpoint.body, &checkpoint.signature),
         Ok(true)
     )
 }

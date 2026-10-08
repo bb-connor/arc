@@ -1334,7 +1334,7 @@ fn verify_purchaser_authorization(
     if authorization.signer_key != *payer_key {
         return Err(FindingPoolDebitError::PurchaserMismatch);
     }
-    match payer_key.verify_canonical_strict(body, &authorization.signature) {
+    match payer_key.verify_canonical(body, &authorization.signature) {
         Ok(true) => {}
         _ => {
             return Err(FindingPoolDebitError::PurchaserAuthorization(

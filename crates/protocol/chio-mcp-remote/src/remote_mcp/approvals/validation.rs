@@ -90,7 +90,7 @@ pub(super) fn decision(
     }
     if !token
         .approver
-        .verify_canonical_strict(&token.body(), &token.signature)
+        .verify_canonical(&token.body(), &token.signature)
         .map_err(|error| failure(StatusCode::BAD_REQUEST, error))?
     {
         return Err(failure(

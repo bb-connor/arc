@@ -476,31 +476,12 @@ impl PublicKey {
         }
     }
 
-    /// Verify a signature against a message.
-    ///
-    /// Identical to [`PublicKey::verify`], which is always strict.
-    #[must_use]
-    pub fn verify_strict(&self, message: &[u8], signature: &Signature) -> bool {
-        self.verify(message, signature)
-    }
-
     /// Verify a signature over the canonical JSON form of a serializable value.
     ///
     /// Applies the strict rules of [`PublicKey::verify`].
     pub fn verify_canonical<T: Serialize>(&self, value: &T, signature: &Signature) -> Result<bool> {
         let canonical = canonical_json_shared_bytes(value)?;
         Ok(self.verify_shared_canonical(&canonical, signature))
-    }
-
-    /// Verify a signature over canonical JSON.
-    ///
-    /// Identical to [`PublicKey::verify_canonical`], which is always strict.
-    pub fn verify_canonical_strict<T: Serialize>(
-        &self,
-        value: &T,
-        signature: &Signature,
-    ) -> Result<bool> {
-        self.verify_canonical(value, signature)
     }
 
     /// Verify a signature over shared canonical JSON bytes.
@@ -1650,7 +1631,6 @@ mod tests {
 
         assert!(weak_key.is_weak_ed25519());
         assert!(!weak_key.verify(message, &forged));
-        assert!(!weak_key.verify_strict(message, &forged));
         let value = serde_json::json!({"authority": "forged"});
         assert!(!weak_key.verify_canonical(&value, &forged)?);
         assert!(!weak_key.verify_shared_canonical(&canonical_json_shared_bytes(&value)?, &forged));

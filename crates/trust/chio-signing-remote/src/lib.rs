@@ -395,7 +395,7 @@ impl SigningBackend for VaultTransitSigningBackend {
             .try_into()
             .map_err(|_| signing_error("Vault returned an invalid signature"))?;
         let signature = Signature::from_bytes(&bytes);
-        if !self.key.public_key.verify_strict(message, &signature) {
+        if !self.key.public_key.verify(message, &signature) {
             return Err(signing_error("Vault signature failed local verification"));
         }
         Ok(signature)
@@ -476,7 +476,7 @@ fn validate_message(message: &[u8]) -> Result<()> {
 
 fn verified_signature(public_key: &PublicKey, message: &[u8], raw: &str) -> Result<Signature> {
     let signature = Signature::from_hex(raw)?;
-    if !public_key.verify_strict(message, &signature) {
+    if !public_key.verify(message, &signature) {
         return Err(signing_error("remote signature failed local verification"));
     }
     Ok(signature)
@@ -563,7 +563,7 @@ mod tests {
         .test_unwrap();
 
         let signature = backend.sign_bytes(message).test_unwrap();
-        assert!(backend.public_key().verify_strict(message, &signature));
+        assert!(backend.public_key().verify(message, &signature));
         let request = request_rx.recv().test_unwrap();
         assert!(request.starts_with("POST /v1/signing-keys/finding-listing/sign HTTP/1.1"));
         assert!(request.contains("Authorization: Bearer remote-secret"));
@@ -674,7 +674,7 @@ mod tests {
         .test_unwrap();
 
         let signature = backend.sign_bytes(message).test_unwrap();
-        assert!(backend.public_key().verify_strict(message, &signature));
+        assert!(backend.public_key().verify(message, &signature));
         let request = request_rx.recv().test_unwrap();
         assert!(request.starts_with("POST /v1/transit/sign/finding-status HTTP/1.1"));
         assert!(request.contains("X-Vault-Token: vault-token"));

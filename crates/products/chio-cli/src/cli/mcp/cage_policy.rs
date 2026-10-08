@@ -893,7 +893,7 @@ fn decode_cage_policy(
     }
     if &policy.signer_public_key != trusted_policy_signer
         || !trusted_policy_signer
-            .verify_canonical_strict(&policy.body, &policy.signature)
+            .verify_canonical(&policy.body, &policy.signature)
             .map_err(|error| {
                 CliError::cli_other_error(format!(
                     "cage launch policy signature verification failed: {error}"

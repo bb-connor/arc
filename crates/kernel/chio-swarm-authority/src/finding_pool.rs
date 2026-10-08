@@ -253,7 +253,7 @@ pub fn verify_finding_pool_allocation(
             "finding pool allocation validity window is invalid",
         ));
     }
-    match pinned_authority.verify_canonical_strict(body, &signed.signature) {
+    match pinned_authority.verify_canonical(body, &signed.signature) {
         Ok(true) => {}
         Ok(false) => return Err(rejected("finding pool allocation signature is invalid")),
         Err(error) => {

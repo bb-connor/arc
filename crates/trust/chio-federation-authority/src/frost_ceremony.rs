@@ -877,7 +877,7 @@ fn validate_package(
         canonical_prefixed_bytes(DKG_PACKAGE_SIGNING_PREFIX, &package.signing_preimage())?;
     if !sender
         .transport_public_key
-        .verify_strict(&signing_bytes, &signature)
+        .verify(&signing_bytes, &signature)
     {
         return Err(package_authentication_error(
             &package.sender_participant_id,

@@ -609,7 +609,7 @@ fn validate_current_listing(
             "current listing assertion is not signed by the pinned registry authority".to_owned(),
         ));
     }
-    match registry_key.verify_canonical_strict(&assertion.body, &assertion.signature) {
+    match registry_key.verify_canonical(&assertion.body, &assertion.signature) {
         Ok(true) => {}
         Ok(false) => {
             return Err(FindingPheromoneError::Listing(
@@ -678,7 +678,7 @@ fn validate_current_listing(
             "finding listing authority key is weak".to_owned(),
         ));
     }
-    match owner_key.verify_canonical_strict(&listing.listing.body, &listing.listing.signature) {
+    match owner_key.verify_canonical(&listing.listing.body, &listing.listing.signature) {
         Ok(true) => {}
         Ok(false) => {
             return Err(FindingPheromoneError::Listing(
@@ -704,7 +704,7 @@ fn validate_current_listing(
             "pricing hint is not bound to the current listing authority".to_string(),
         ));
     }
-    match owner_key.verify_canonical_strict(&listing.pricing.body, &listing.pricing.signature) {
+    match owner_key.verify_canonical(&listing.pricing.body, &listing.pricing.signature) {
         Ok(true) => {}
         Ok(false) => {
             return Err(FindingPheromoneError::Listing(

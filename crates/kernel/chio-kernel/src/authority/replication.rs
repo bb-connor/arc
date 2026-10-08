@@ -236,7 +236,7 @@ pub fn verify_authority_chain(
             state.public_key_hex.as_str()
         };
         let key = canonical_key(signer)?;
-        if !key.verify_canonical_strict(body, &transition.signature)? {
+        if !key.verify_canonical(body, &transition.signature)? {
             return Err(refused("authority transition signature invalid"));
         }
         require_distinct_recovery_root(anchor, &body.public_key_hex)?;
@@ -380,7 +380,7 @@ impl SignedAuthoritySnapshot {
             snapshot: &self.snapshot,
         };
         if !canonical_key(&self.snapshot.public_key_hex)?
-            .verify_canonical_strict(&body, &proof.signature)?
+            .verify_canonical(&body, &proof.signature)?
         {
             return Err(refused("authority envelope signature invalid"));
         }

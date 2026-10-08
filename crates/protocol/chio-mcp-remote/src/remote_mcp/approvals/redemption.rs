@@ -96,7 +96,7 @@ impl ApprovalRedemption {
         }
         if !token
             .approver
-            .verify_canonical_strict(&token.body(), &token.signature)
+            .verify_canonical(&token.body(), &token.signature)
             .map_err(denied)?
         {
             return Err(denied("approval signature is invalid"));

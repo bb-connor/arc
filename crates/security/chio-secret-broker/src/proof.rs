@@ -151,7 +151,7 @@ pub fn verify_request_proof(
     let valid = proof
         .body
         .authority_key
-        .verify_canonical_strict(&signing, &proof.signature)
+        .verify_canonical(&signing, &proof.signature)
         .map_err(|error| {
             BrokerError::AuthorizationDenied(format!("proof verification failed: {error}"))
         })?;

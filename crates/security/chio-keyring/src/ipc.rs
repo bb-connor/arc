@@ -288,8 +288,7 @@ impl WitnessServiceReadinessProof {
             || self.body.started_at == 0
             || self.algorithm != expected_public_key.algorithm()
             || self.signature.algorithm() != self.algorithm
-            || !expected_public_key
-                .verify_strict(&readiness_signing_bytes(&self.body)?, &self.signature)
+            || !expected_public_key.verify(&readiness_signing_bytes(&self.body)?, &self.signature)
         {
             return Err(KeyringError::InvalidSignature);
         }
@@ -521,7 +520,7 @@ impl AuditServiceReadinessProof {
         if self.algorithm != expected_public_key.algorithm()
             || self.signature.algorithm() != self.algorithm
             || !expected_public_key
-                .verify_strict(&audit_readiness_signing_bytes(&self.body)?, &self.signature)
+                .verify(&audit_readiness_signing_bytes(&self.body)?, &self.signature)
         {
             return Err(KeyringError::InvalidSignature);
         }

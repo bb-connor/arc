@@ -90,11 +90,7 @@ impl<'a> SenderConstraintVerifier<'a> {
             return Err(ClockError::Expired.into());
         }
         let message = canonical_json_bytes(&proof.body)?;
-        if !proof
-            .body
-            .agent_key
-            .verify_strict(&message, &proof.signature)
-        {
+        if !proof.body.agent_key.verify(&message, &proof.signature) {
             return Err(SenderConstraintError::InvalidSignature);
         }
         match self.nonce_store.check_and_insert_through(

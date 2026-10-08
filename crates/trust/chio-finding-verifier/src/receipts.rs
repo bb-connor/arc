@@ -44,7 +44,7 @@ pub fn verify_receipt_strict(receipt: &ChioReceipt) -> Result<(), ReceiptStrictE
         ChioReceiptSigningBody::from_body_and_bbs(&body, receipt.bbs_signature.as_ref());
     match receipt
         .kernel_key
-        .verify_canonical_strict(&signing_body, &receipt.signature)
+        .verify_canonical(&signing_body, &receipt.signature)
     {
         Ok(true) => Ok(()),
         _ => Err(ReceiptStrictError::SignatureInvalid),

@@ -71,7 +71,7 @@ pub fn verify_signed_hosted_api_key_lifecycle_event(
         return Err(HostedEdgeError::AuthenticationFailed);
     }
     validate_event(&receipt.body)?;
-    match pinned_signer.verify_canonical_strict(&receipt.body, &receipt.signature) {
+    match pinned_signer.verify_canonical(&receipt.body, &receipt.signature) {
         Ok(true) => Ok(()),
         _ => Err(HostedEdgeError::AuthenticationFailed),
     }
@@ -285,7 +285,7 @@ impl HostedApiKeyManager {
             .map_err(|_| HostedEdgeError::DependencyUnavailable)?;
         match receipt
             .signer_key
-            .verify_canonical_strict(&receipt.body, &receipt.signature)
+            .verify_canonical(&receipt.body, &receipt.signature)
         {
             Ok(true) => Ok(receipt),
             _ => Err(HostedEdgeError::DependencyUnavailable),

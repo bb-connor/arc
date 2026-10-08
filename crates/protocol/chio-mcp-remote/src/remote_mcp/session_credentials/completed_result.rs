@@ -104,7 +104,7 @@ fn verified_nonce(
                 || now >= nonce.nonce.expires_at
                 || !receipt
                     .kernel_key
-                    .verify_canonical_strict(&nonce.nonce, &nonce.signature)
+                    .verify_canonical(&nonce.nonce, &nonce.signature)
                     .ok()?
             {
                 return None;

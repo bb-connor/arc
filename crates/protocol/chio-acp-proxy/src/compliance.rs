@@ -604,7 +604,7 @@ fn verify_compliance_certificate_at_time(
             }
         }
     };
-    let sig_valid = cert.signer_key.verify_strict(&body_bytes, &cert.signature);
+    let sig_valid = cert.signer_key.verify(&body_bytes, &cert.signature);
     let signer_trusted = config
         .trusted_kernel_keys
         .contains(&cert.signer_key.to_hex());

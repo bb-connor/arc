@@ -412,8 +412,8 @@ fn assert_signed_round_trip(backend: &dyn chio_core_types::SigningBackend) -> Te
     let signature_wire = signature.to_hex();
     let decoded_key = PublicKey::from_hex(&key_wire)?;
     let decoded_signature = Signature::from_hex(&signature_wire)?;
-    assert!(decoded_key.verify_strict(message, &decoded_signature));
-    assert!(!decoded_key.verify_strict(b"changed message", &decoded_signature));
+    assert!(decoded_key.verify(message, &decoded_signature));
+    assert!(!decoded_key.verify(b"changed message", &decoded_signature));
     let key_json = serde_json::to_string(&key)?;
     let signature_json = serde_json::to_string(&signature)?;
     assert_eq!(serde_json::from_str::<PublicKey>(&key_json)?, key);
