@@ -1,4 +1,6 @@
 use super::*;
+use chio_security_types::ports::{ResponseSchedulerStore, SchedulerRetryState, SchedulerWorkKey};
+use chio_security_types::{ResponseMutationRecord, ResponseRollbackOutcome, ResponseSnapshot};
 use std::sync::Mutex;
 use std::time::Instant;
 use tracing::field::{Field, Visit};
@@ -14,6 +16,12 @@ const ATTEMPTS_BEFORE_PARK: usize = 50;
 const PARK_OBSERVATION_TIMEOUT: Duration = Duration::from_secs(30);
 const PARKED_AUDIT: &str = "active_defense_teardown_cleanup_parked";
 const DRAIN_RETRY_AUDIT: &str = "active_defense_detached_pre_stop_drain_retry";
+const ROLLBACK_PARTIAL_RETRY: &str = "response.rollback_partial";
+/// A durable typed refusal of every overlay contribution removal. Apply and
+/// every read path are untouched.
+const REFUSE_OVERLAY_ROLLBACK: &str = "CREATE TRIGGER test_refuse_overlay_rollback \
+     BEFORE DELETE ON security_effect_contributions \
+     BEGIN SELECT RAISE(ABORT, 'injected overlay rollback refusal'); END;";
 
 #[derive(Clone, Default)]
 struct AuditCapture {
@@ -108,13 +116,60 @@ impl LongTtlHost {
         );
     }
 
-    fn remaining_ttl_ms(&self) -> u64 {
-        let now_unix_ms = self
-            .fixture
+    fn now_unix_ms(&self) -> u64 {
+        self.fixture
             .clock
             .read_now_unix_ms()
-            .unwrap_or_else(|error| panic!("fixture clock: {error}"));
-        self.expires_at_unix_ms.saturating_sub(now_unix_ms)
+            .unwrap_or_else(|error| panic!("fixture clock: {error}"))
+    }
+
+    fn remaining_ttl_ms(&self) -> u64 {
+        self.expires_at_unix_ms.saturating_sub(self.now_unix_ms())
+    }
+
+    /// Advances the trusted clock with wall time from the expiry instant.
+    fn follow_wall_clock_after_expiry(&self, expired_at: Instant) {
+        let elapsed_ms = u64::try_from(expired_at.elapsed().as_millis())
+            .unwrap_or_else(|error| panic!("elapsed since expiry: {error}"));
+        self.fixture.clock.set(
+            self.expires_at_unix_ms
+                .saturating_add(1)
+                .saturating_add(elapsed_ms),
+        );
+    }
+
+    fn tenant_and_action(&self) -> (TenantId, ActionId) {
+        (
+            TenantId::new("tenant-host-lifecycle")
+                .unwrap_or_else(|error| panic!("tenant: {error}")),
+            ActionId::new("host-lifecycle-ttl-action")
+                .unwrap_or_else(|error| panic!("action: {error}")),
+        )
+    }
+
+    fn response(&self) -> ResponseSnapshot {
+        let (tenant_id, action_id) = self.tenant_and_action();
+        let record = self
+            .fixture
+            .security_store
+            .load_plan(&ResponsePlanKey {
+                tenant_id,
+                action_id,
+            })
+            .unwrap_or_else(|error| panic!("load response: {error}"))
+            .unwrap_or_else(|| panic!("response is missing"));
+        decode_response_record(&record).unwrap_or_else(|error| panic!("decode response: {error}"))
+    }
+
+    fn scheduler_retry(&self) -> Option<SchedulerRetryState> {
+        let (tenant_id, action_id) = self.tenant_and_action();
+        self.fixture
+            .security_store
+            .load_retry(&SchedulerWorkKey {
+                tenant_id,
+                action_id,
+            })
+            .unwrap_or_else(|error| panic!("load scheduler retry: {error}"))
     }
 
     fn expire(&self) {
@@ -122,6 +177,25 @@ impl LongTtlHost {
             .clock
             .set(self.expires_at_unix_ms.saturating_add(1));
     }
+}
+
+fn rollback_failure_codes(response: &ResponseSnapshot) -> Vec<String> {
+    response
+        .mutations
+        .as_slice()
+        .iter()
+        .filter_map(|mutation| match mutation {
+            ResponseMutationRecord::Rollback(record) => match &record.outcome {
+                ResponseRollbackOutcome::Failed { error_code } => {
+                    Some(error_code.as_str().to_string())
+                }
+                ResponseRollbackOutcome::Requested | ResponseRollbackOutcome::Restored { .. } => {
+                    None
+                }
+            },
+            _ => None,
+        })
+        .collect()
 }
 
 async fn released_within(ttl: &LongTtlHost, timeout: Duration) -> bool {
@@ -144,6 +218,28 @@ async fn hold_while_ttl_live<F: Future<Output = u32>>(
         tokio::select! {
             attempts = teardown.as_mut() => {
                 panic!("teardown finished while the TTL overlay was held: attempts={attempts}")
+            }
+            () = tokio::time::sleep(Duration::from_millis(100)) => {}
+        }
+    }
+}
+
+/// Polls a teardown that must stay pending after its TTL expired, with the
+/// trusted clock following wall time from expiry, until `done` holds or
+/// `limit` passes.
+async fn hold_after_expiry<F: Future<Output = u32>>(
+    teardown: &mut Pin<&mut F>,
+    ttl: &LongTtlHost,
+    expired_at: Instant,
+    limit: Duration,
+    mut done: impl FnMut() -> bool,
+) {
+    let started = Instant::now();
+    while started.elapsed() < limit && !done() {
+        ttl.follow_wall_clock_after_expiry(expired_at);
+        tokio::select! {
+            attempts = teardown.as_mut() => {
+                panic!("teardown finished while the expired overlay was held: attempts={attempts}")
             }
             () = tokio::time::sleep(Duration::from_millis(100)) => {}
         }
@@ -351,4 +447,128 @@ async fn recovery_worker_crash_during_a_ttl_wait_still_spends_the_fault_budget()
     assert!(!capture.parked());
     assert!(!ttl.fixture.has_active_overlay_contributions());
     assert!(ttl.fixture.registry.snapshot().is_none());
+}
+
+#[tokio::test]
+async fn expired_overlay_whose_rollback_keeps_failing_spends_the_fault_budget() {
+    let mut faulted = LongTtlHost::new();
+    // Every retry backoff exceeds the clock steps below, so no retry is ever
+    // recorded at or before trusted time.
+    let policy = &mut faulted
+        .fixture
+        .config
+        .active_defense
+        .scheduler
+        .scheduler_policy;
+    policy.base_backoff_ms = 1_000;
+    policy.max_backoff_ms = 1_000;
+    policy.operator_page_threshold_ms = 2_000;
+    let healthy = LongTtlHost::new();
+    let faulted_host = faulted.start().await;
+    let healthy_host = healthy.start().await;
+    let worker = Arc::clone(faulted_host.orchestrator().worker());
+    let connection = rusqlite::Connection::open(&faulted.fixture.security_path)
+        .unwrap_or_else(|error| panic!("open rollback fault connection: {error}"));
+    connection
+        .execute_batch(REFUSE_OVERLAY_ROLLBACK)
+        .unwrap_or_else(|error| panic!("inject overlay rollback refusal: {error}"));
+    let capture = AuditCapture::default();
+    let _subscriber = tracing::subscriber::set_default(Registry::default().with(capture.clone()));
+
+    let teardown = faulted_host.run_detached_teardown_inline_for_test();
+    tokio::pin!(teardown);
+    drop(healthy_host);
+    faulted.expire();
+    let expired_at = Instant::now();
+    hold_after_expiry(
+        &mut teardown,
+        &faulted,
+        expired_at,
+        PARK_OBSERVATION_TIMEOUT,
+        || {
+            rollback_failure_codes(&faulted.response()).len() >= 2
+                && faulted.scheduler_retry().is_some_and(|retry| {
+                    retry.health_event_id.is_some()
+                        && retry.last_error.as_str() == ROLLBACK_PARTIAL_RETRY
+                })
+        },
+    )
+    .await;
+    let durable_failure_after = expired_at.elapsed();
+
+    healthy.expire();
+    let healthy_started = Instant::now();
+    hold_after_expiry(
+        &mut teardown,
+        &faulted,
+        expired_at,
+        HOST_LIFECYCLE_TEST_TIMEOUT,
+        || healthy.fixture.registry.snapshot().is_none(),
+    )
+    .await;
+    let healthy_elapsed = healthy_started.elapsed();
+    let healthy_released = healthy.fixture.registry.snapshot().is_none()
+        && !healthy.fixture.has_active_overlay_contributions();
+
+    hold_after_expiry(&mut teardown, &faulted, expired_at, HEALTHY_WAIT, || {
+        capture.parked()
+    })
+    .await;
+    let response = faulted.response();
+    let failure_codes = rollback_failure_codes(&response);
+    let retry = faulted.scheduler_retry();
+    let now_unix_ms = faulted.now_unix_ms();
+    let health = worker.health();
+    let overlay_held = faulted.fixture.has_active_overlay_contributions();
+    let owner_held = faulted.fixture.registry.snapshot().is_some();
+    let parked = capture.parked();
+    let drain_faults = capture.count(tracing::Level::WARN, DRAIN_RETRY_AUDIT);
+    let fault_audits = capture.snapshot().len();
+    drop(teardown);
+
+    assert!(
+        now_unix_ms > response.plan.expires_at_unix_ms,
+        "the TTL had not expired: now={now_unix_ms} expires={}",
+        response.plan.expires_at_unix_ms
+    );
+    assert_eq!(
+        response.state,
+        ResponseState::RollbackPartial,
+        "the expired response did not hold a durable rollback failure after {durable_failure_after:?}"
+    );
+    assert!(
+        failure_codes.len() >= 2
+            && failure_codes
+                .iter()
+                .all(|code| code.as_str() == PortError::conflict().code().as_str()),
+        "the rollback failure was not the injected typed refusal: {failure_codes:?}"
+    );
+    let retry = retry.unwrap_or_else(|| {
+        panic!("the scheduler retry evidence was not retained: worker={health:?}")
+    });
+    assert!(
+        retry.attempts >= 2
+            && retry.last_error.as_str() == ROLLBACK_PARTIAL_RETRY
+            && retry.health_event_id.is_some(),
+        "the scheduler retry and page evidence was not retained: {retry:?}"
+    );
+    assert_eq!(
+        health.lifecycle,
+        ResponseWorkerLifecycle::Ready,
+        "worker ticks did not keep returning cleanly: {health:?}"
+    );
+    assert!(
+        healthy_released && healthy_elapsed < EXPIRY_CLEANUP_BOUND,
+        "a healthy second teardown did not progress beside the failing rollback: released={healthy_released} after {healthy_elapsed:?}"
+    );
+    assert!(
+        overlay_held && owner_held,
+        "the failing teardown released its overlay or ownership: overlay_held={overlay_held} owner_held={owner_held}"
+    );
+    assert!(
+        parked && drain_faults >= ATTEMPTS_BEFORE_PARK,
+        "an expired overlay whose rollback keeps failing was paced as an expected wait: parked={parked} drain_faults={drain_faults} fault_audits={fault_audits} retry_attempts={} rollback_failures={}",
+        retry.attempts,
+        failure_codes.len()
+    );
 }
