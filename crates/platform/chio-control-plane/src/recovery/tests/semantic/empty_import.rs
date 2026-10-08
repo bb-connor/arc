@@ -125,13 +125,11 @@ async fn native_fixture_from_empty_import_with_optional_retention(
     );
     assert!(operation.dispatch_commit().is_none());
     assert!(operation.native_dispatch_ledger_digest().is_none());
-    assert!(
-        fixture
-            .authority
-            .tool_outcome_store()
-            .load_raw_invocation_by_operation(operation.binding().operation_id())?
-            .is_none()
-    );
+    assert!(fixture
+        .authority
+        .tool_outcome_store()
+        .load_raw_invocation_by_operation(operation.binding().operation_id())?
+        .is_none());
     let input = store
         .load_security_participant_flow_join(operation.binding().operation_id(), &fence, now_ms()?)?
         .ok_or("genuine native first-input journal absent")?;
@@ -261,11 +259,9 @@ async fn native_nonempty_import_holds_fresh_influence_reads_without_rewriting_hi
 {
     let fixture = native_fixture("trusted-history")?;
     let inventory = retained_import_inventory(&fixture)?;
-    assert!(
-        inventory
-            .iter()
-            .any(|(table, rows)| table != "security_declassification_lifecycle" && *rows != 0)
-    );
+    assert!(inventory
+        .iter()
+        .any(|(table, rows)| table != "security_declassification_lifecycle" && *rows != 0));
     let before = fixture
         .kernel
         .observe_recovery_source(fixture.runtime.scope())?;

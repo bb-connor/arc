@@ -141,6 +141,39 @@ boundary. Independent Source review approved those corrections. Their actual
 affected execution and the store-initialization failure remain under diagnosis;
 the reader has not been installed in the working tree.
 
+The subsequent isolated composition compiled all five libraries and passed 29
+history-reader controls, 11 connection-authorizer controls, three attached-state
+controls, the original raw canonical-output contract and four retained-envelope
+controls. The attached-state parent test also executed its otherwise ignored
+subprocess helper. These 48 scoped passes retain their exact source manifest
+`366fc5d02d2837a29c367f0c785f9adf4e2228f300f1d0a6be8cd9d730204bb4`.
+Independent Source review approved the bounded sentinel and its exact-query
+coverage. The full owning store library is being tested separately; the scoped
+passes do not establish that library's result.
+
+A third genuine old-build capture exposed a missing `zeroblob(0)` builtin in the
+bounded retained-output projection. Its startup failure remains retained. After
+that repair, a fourth independently created capture still timed out at the
+unchanged 90-second consumer limit. A fifth fresh diagnostic capture reached
+private terminal custody under the changed signer, completed a genuine current
+denied call and then timed out during repeated reconciliation. Both processes
+were reaped. The diagnostic run does not establish the uninstrumented gate.
+Every original root remains retained without replay. Current evidence and logs
+are under
+`target/recovery-pr/current-review-followup/linux-current/connection-authorizer-sentinel-20261008T1718/`.
+Historical-authority acceptance remains open.
+
+Commit `491bd01b5683315b8c6d347f132ee71fb64428f5` was pushed to the draft recovery
+PR. Hosted CI on its merge subject reported failures in the owned JavaScript
+source gate, strict file-identity Clippy and the actual Process admitted-return
+Source test. The JavaScript failure exposed nine reviewed browser distribution
+files excluded by the SDK's `dist/` ignore rule; their bytes match the existing
+review manifest and all 22 local security controls passed. The file-identity
+Clippy repair passed strict Clippy and its four owning tests. Their successor
+hosted results remain pending. The Process Source failure is an open integration
+obligation, not a fixture assertion to remove. Workspace formatting was also
+repaired; none of these checks qualifies the complete recovery runtime.
+
 The original build and first capture export is retained under
 `target/recovery-pr/current-review-followup/linux-current/current-baseline-source-package-20261008T1253/`.
 The observer build, all nine control records, original parser failure and second
