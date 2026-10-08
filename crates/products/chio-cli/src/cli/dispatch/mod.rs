@@ -152,23 +152,28 @@ mod redacted_format_tests {
     }
 
     #[test]
-    fn native_capture_fixed_stage_uses_the_production_redaction_formatter() {
-        use std::sync::{Arc, Mutex};
+    fn native_capture_fixed_stage_uses_the_production_redaction_formatter(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use std::sync::{Arc, Mutex, PoisonError};
         use tracing_subscriber::prelude::*;
         let lines = Arc::new(Mutex::new(Vec::new()));
         let retained = lines.clone();
         let layer = chio_log_redact::RedactionLayer::new(move |event| {
-            retained.lock().expect("test trace mutex").push(format_redacted_event_line(&event));
-        }).expect("test redaction layer");
+            retained
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .push(format_redacted_event_line(&event));
+        })?;
         let subscriber = tracing_subscriber::registry().with(layer);
         tracing::subscriber::with_default(subscriber, || {
             tracing::warn!(target: "chio::native_capture",
                 native_capture_stage = "commit_runtime_expired",
                 native_capture_category = "invariant", "native capture refused");
         });
-        assert_eq!(lines.lock().expect("test trace mutex").as_slice(), &[
+        assert_eq!(lines.lock().map_err(|_| "test trace mutex")?.as_slice(), &[
             "WARN chio::native_capture message=native capture refused native_capture_stage=commit_runtime_expired native_capture_category=invariant"
         ]);
+        Ok(())
     }
 }
 
@@ -451,19 +456,21 @@ pub(crate) fn run() {
             receipt_retention,
             allow_ephemeral_receipts,
             print_config,
-        } => receipt_retention.into_config().and_then(|policy| cmd_start(
-            transport.into(),
-            &listen,
-            receipt_store.as_deref().or(receipt_db.as_deref()),
-            policy,
-            authority_seed_file.as_deref(),
-            budget_db.as_deref(),
-            revocation_db.as_deref(),
-            control_url.as_deref(),
-            control_token.as_deref(),
-            allow_ephemeral_receipts,
-            print_config,
-        )),
+        } => receipt_retention.into_config().and_then(|policy| {
+            cmd_start(
+                transport.into(),
+                &listen,
+                receipt_store.as_deref().or(receipt_db.as_deref()),
+                policy,
+                authority_seed_file.as_deref(),
+                budget_db.as_deref(),
+                revocation_db.as_deref(),
+                control_url.as_deref(),
+                control_token.as_deref(),
+                allow_ephemeral_receipts,
+                print_config,
+            )
+        }),
     };
 
     if let Err(e) = result {

@@ -39,6 +39,30 @@ NATIVE_DISPATCH_FAULT = re.compile(
     r"|handoff_flow|handoff_deadline_after_readback|handoff_custody)\n",
     re.MULTILINE,
 )
+NATIVE_CAPTURE_STAGES = (
+    "store_callback", "connection", "transaction_begin", "authority", "preflight_hold",
+    "native_evidence", "native_binding", "native_policy", "native_owner", "budget_selection",
+    "budget_replay", "budget_credentials", "budget_hold", "budget_identity", "budget_revocation",
+    "budget_mutation", "admission_advance", "commit_policy", "commit_clock", "commit_lease_expired",
+    "commit_capability_expired", "commit_runtime_expired", "commit_nonce_expired", "commit_approval",
+    "commit_dpop", "policy_not_yet_valid", "policy_expired", "declassification_not_yet_valid",
+    "declassification_expired", "observation_changed", "commit", "anchor_sync",
+)
+NATIVE_CAPTURE_FAILURE = re.compile(
+    r"^warn chio::native_capture message=native capture refused native_capture_stage=("
+    + "|".join(NATIVE_CAPTURE_STAGES)
+    + r") native_capture_category=(fenced|outcome_unknown|invariant|unavailable|operation"
+    r"|not_found|clock|sqlite|io|overflow)\n",
+    re.MULTILINE,
+)
+
+
+def native_capture_failures(text):
+    if isinstance(text, bytes):
+        text = text[:65536].decode("utf-8", errors="replace")
+    text = (text or "")[:65536].lower()
+    pairs = sorted({(match[1], match[2]) for match in NATIVE_CAPTURE_FAILURE.finditer(text)})
+    return [{"stage": stage, "category": category} for stage, category in pairs[:32]]
 
 
 def failure_classes(text, host=False):
@@ -70,6 +94,7 @@ def failure_classes(text, host=False):
     if host:
         # Worker logs can contain arbitrary lines; only the host stream maps here.
         classes.update("native_dispatch_" + m[1] for m in NATIVE_DISPATCH_FAULT.finditer(text))
+        classes.update("native_capture_" + item["stage"] for item in native_capture_failures(text))
     return sorted(classes)
 
 
@@ -141,6 +166,21 @@ def save_failure_diagnostics(root, output, failure):
         "host_failure_classes": failure_classes(failure.stderr, host=True),
         "worker_logs": [],
     }
+    fixed_capture = native_capture_failures(failure.stderr)
+    if fixed_capture:
+        try:
+            descriptor = os.open(
+                root / "native-capture-failures.json",
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                0o600,
+            )
+            with os.fdopen(descriptor, "w") as retained:
+                json.dump({"schema": "chio.native-capture-failures.v1", "failures": fixed_capture}, retained)
+                retained.write("\n")
+        except OSError:
+            diagnostic["host_failure_classes"] = sorted(
+                set(diagnostic["host_failure_classes"]) | {"native_capture_artifact_unavailable"}
+            )
     if isinstance(failure, subprocess.CalledProcessError):
         diagnostic["returncode"] = failure.returncode
     for attempt in (1, 2):

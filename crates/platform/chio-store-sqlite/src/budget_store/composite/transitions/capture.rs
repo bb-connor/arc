@@ -1,5 +1,6 @@
 #![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use super::*;
+use crate::admission_operation_store::{NativeCaptureDiagnostic, NativeCaptureStage as Stage};
 use chio_kernel::admission_operation::{AdmissionOperationStoreError, AdmissionOperationV1};
 
 pub(crate) struct AdmissionCaptureBinding<'a, 'l> {
@@ -46,6 +47,27 @@ impl SqliteBudgetStore {
         ),
         BudgetStoreError,
     > {
+        let diagnostic = NativeCaptureDiagnostic::new(
+            admission
+                .as_ref()
+                .is_some_and(|binding| binding.native.is_some()),
+        );
+        self.capture_composite_invocation_with_diagnostic(request, admission, &diagnostic)
+            .inspect_err(|error| diagnostic.budget_refused(error))
+    }
+
+    fn capture_composite_invocation_with_diagnostic(
+        &self,
+        request: BudgetCaptureInvocationRequest,
+        admission: Option<AdmissionCaptureBinding<'_, '_>>,
+        diagnostic: &NativeCaptureDiagnostic,
+    ) -> Result<
+        (
+            BudgetInvocationCaptureDecision,
+            Option<AdmissionOperationV1>,
+        ),
+        BudgetStoreError,
+    > {
         request.validate()?;
         validate_budget_grant_index(request.grant_index)?;
         if let Some(authority) = request.authority.as_ref() {
@@ -58,10 +80,15 @@ impl SqliteBudgetStore {
             ));
         }
 
+        diagnostic.at(Stage::Connection);
         let mut connection = self.connection()?;
+        diagnostic.at(Stage::TransactionBegin);
         let transaction = self.begin_write(&mut connection)?;
+        diagnostic.at(Stage::Authority);
         self.validate_joint_authority(request.authority.as_ref())?;
+        diagnostic.at(Stage::PreflightHold);
         super::super::preflight::reject_preflight_capture(&transaction, &request.hold_id)?;
+        diagnostic.at(Stage::NativeEvidence);
         let native = admission
             .as_ref()
             .and_then(|binding| binding.native.as_ref())
@@ -76,10 +103,15 @@ impl SqliteBudgetStore {
                     owner,
                     input,
                     request.grant_index,
+                    diagnostic,
                 )
-                .map_err(|error| map_admission_error(self, error))
+                .map_err(|error| {
+                    diagnostic.admission_error(&error);
+                    map_admission_error(self, error)
+                })
             })
             .transpose()?;
+        diagnostic.at(Stage::NativeOwner);
         if self.serving_owner.is_some() {
             let expected = admission.as_ref().map(|binding| binding.operation);
             if let Some(native) = native.as_ref() {
@@ -96,27 +128,41 @@ impl SqliteBudgetStore {
                     expected,
                 )
             }
-            .map_err(|error| map_admission_error(self, error))?;
+            .map_err(|error| {
+                diagnostic.admission_error(&error);
+                map_admission_error(self, error)
+            })?;
         }
+        diagnostic.at(Stage::BudgetSelection);
         if let Some(binding) = admission.as_ref() {
             crate::admission_operation_store::verify_runtime_budget_selection_tx(
                 &transaction,
                 binding.operation,
                 request.grant_index,
                 chio_kernel::admission_operation::runtime_participant::RuntimeParticipantPhase::Dispatch,
-            ).map_err(|error| map_admission_error(self, error))?;
+            ).map_err(|error| {
+                    diagnostic.admission_error(&error);
+                    map_admission_error(self, error)
+                })?;
             crate::admission_operation_store::verify_approval_budget_selection_tx(
                 &transaction, binding.operation, request.grant_index,
                 chio_kernel::admission_operation::governed_approval_claim::GovernedApprovalClaimPhase::Dispatch,
-            ).map_err(|error| map_admission_error(self, error))?;
+            ).map_err(|error| {
+                    diagnostic.admission_error(&error);
+                    map_admission_error(self, error)
+                })?;
             crate::admission_operation_store::verify_dpop_budget_selection_tx(
                 &transaction,
                 binding.operation,
                 request.grant_index,
                 chio_kernel::admission_operation::dpop_claim::DpopReplayClaimPhase::Dispatch,
             )
-            .map_err(|error| map_admission_error(self, error))?;
+            .map_err(|error| {
+                diagnostic.admission_error(&error);
+                map_admission_error(self, error)
+            })?;
         }
+        diagnostic.at(Stage::BudgetReplay);
         if let Some(decision) = replay_transition(
             self,
             &transaction,
@@ -132,6 +178,7 @@ impl SqliteBudgetStore {
             None,
         )? {
             let decision = BudgetInvocationCaptureDecision::AlreadyCaptured(decision);
+            diagnostic.at(Stage::AdmissionAdvance);
             let operation = match admission {
                 Some(binding) => {
                     let participant_digest = budget_projection_digest(
@@ -151,7 +198,10 @@ impl SqliteBudgetStore {
                             binding.recovery,
                             binding.trusted_now_unix_ms,
                         )
-                        .map_err(|error| map_admission_error(self, error))?;
+                        .map_err(|error| {
+                            diagnostic.admission_error(&error);
+                            map_admission_error(self, error)
+                        })?;
                     Some(
                         crate::admission_operation_store::advance_budget_capture_tx(
                             &transaction,
@@ -165,19 +215,25 @@ impl SqliteBudgetStore {
                                 native: native.as_ref(),
                             },
                         )
-                        .map_err(|error| map_admission_error(self, error))?,
+                        .map_err(|error| {
+                            diagnostic.admission_error(&error);
+                            map_admission_error(self, error)
+                        })?,
                     )
                 }
                 None => None,
             };
             if operation.is_some() {
+                diagnostic.at(Stage::Commit);
                 self.commit_joint_transaction(transaction)?;
+                diagnostic.at(Stage::AnchorSync);
                 self.sync_joint_anchor(&connection)?;
             } else {
                 transaction.rollback()?;
             }
             return Ok((decision, operation));
         }
+        diagnostic.at(Stage::BudgetCredentials);
         if let Some(binding) = admission.as_ref() {
             let owner = self.serving_owner.as_deref().ok_or_else(|| {
                 BudgetStoreError::Invariant("admission capture requires a serving owner".to_owned())
@@ -188,21 +244,29 @@ impl SqliteBudgetStore {
                 binding.trusted_now_unix_ms,
                 owner,
             )
-            .map_err(|error| map_admission_error(self, error))?;
+            .map_err(|error| {
+                diagnostic.admission_error(&error);
+                map_admission_error(self, error)
+            })?;
             crate::admission_operation_store::verify_fresh_approval_tx(
                 &transaction,
                 binding.operation,
                 binding.trusted_now_unix_ms,
                 owner,
             )
-            .map_err(|error| map_admission_error(self, error))?;
+            .map_err(|error| {
+                diagnostic.admission_error(&error);
+                map_admission_error(self, error)
+            })?;
         }
+        diagnostic.at(Stage::BudgetHold);
         let hold = load_structured_hold(&transaction, &request.hold_id)?.ok_or_else(|| {
             BudgetStoreError::Invariant(format!(
                 "unknown composite budget hold `{}`",
                 request.hold_id
             ))
         })?;
+        diagnostic.at(Stage::BudgetIdentity);
         validate_transition_identity(
             self,
             &transaction,
@@ -215,6 +279,7 @@ impl SqliteBudgetStore {
         // every original parent, ancestor and supplemental member inside the
         // same write transaction as capture. Exact historical replay above
         // retains its original decision and never creates another effect.
+        diagnostic.at(Stage::BudgetRevocation);
         if self.serving_owner.is_some() {
             let mut statement = transaction.prepare(
                 "SELECT EXISTS(SELECT 1 FROM revoked_capabilities WHERE capability_id = ?1)",
@@ -229,14 +294,19 @@ impl SqliteBudgetStore {
                 }
             }
         }
+        diagnostic.at(Stage::CommitClock);
         let trusted_time = if let Some(owner) = self.serving_owner.as_deref() {
             let observed =
                 crate::admission_operation_store::observe_authority_time(&transaction, owner)
-                    .map_err(|error| map_admission_error(self, error))?;
+                    .map_err(|error| {
+                        diagnostic.admission_error(&error);
+                        map_admission_error(self, error)
+                    })?;
             Some(chio_security_types::clock::UnixMillis::new(observed).as_secs())
         } else {
             request.trusted_time
         };
+        diagnostic.at(Stage::BudgetHold);
         if hold.invocation_state != BudgetInvocationState::Authorized {
             return Err(BudgetStoreError::Invariant(format!(
                 "budget hold `{}` invocation reservations are not capturable",
@@ -269,6 +339,7 @@ impl SqliteBudgetStore {
             }
         }
 
+        diagnostic.at(Stage::BudgetMutation);
         let quota_before = load_quota_states(&transaction, &hold)?;
         let mut quota_after = quota_before.clone();
         for state in &mut quota_after {
@@ -448,6 +519,7 @@ impl SqliteBudgetStore {
             &request.event_id,
             event_seq,
         )?;
+        diagnostic.at(Stage::AdmissionAdvance);
         let operation = match admission {
             Some(binding) => {
                 let participant_digest =
@@ -463,7 +535,10 @@ impl SqliteBudgetStore {
                     binding.recovery,
                     binding.trusted_now_unix_ms,
                 )
-                .map_err(|error| map_admission_error(self, error))?;
+                .map_err(|error| {
+                    diagnostic.admission_error(&error);
+                    map_admission_error(self, error)
+                })?;
                 Some(
                     crate::admission_operation_store::advance_budget_capture_tx(
                         &transaction,
@@ -477,7 +552,10 @@ impl SqliteBudgetStore {
                             native: native.as_ref(),
                         },
                     )
-                    .map_err(|error| map_admission_error(self, error))?,
+                    .map_err(|error| {
+                        diagnostic.admission_error(&error);
+                        map_admission_error(self, error)
+                    })?,
                 )
             }
             None => None,
@@ -490,7 +568,10 @@ impl SqliteBudgetStore {
             })?;
             native
                 .verify_deadline(&transaction, owner)
-                .map_err(|error| map_admission_error(self, error))?;
+                .map_err(|error| {
+                    diagnostic.admission_error(&error);
+                    map_admission_error(self, error)
+                })?;
         }
         #[cfg(feature = "admission-test-support")]
         if native_capture {
@@ -499,6 +580,7 @@ impl SqliteBudgetStore {
                 crate::admission_operation_store::NativeDispatchCaptureTransactionTestCutpoint::BeforeCommit,
             )?;
         }
+        diagnostic.at(Stage::Commit);
         self.commit_joint_transaction(transaction)?;
         #[cfg(feature = "admission-test-support")]
         if native_capture {
@@ -507,6 +589,7 @@ impl SqliteBudgetStore {
                 crate::admission_operation_store::NativeDispatchCaptureTransactionTestCutpoint::CommittedBeforeAnchor,
             )?;
         }
+        diagnostic.at(Stage::AnchorSync);
         self.sync_joint_anchor(&connection)?;
         Ok((
             BudgetInvocationCaptureDecision::Captured(decision),

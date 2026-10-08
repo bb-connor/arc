@@ -68,6 +68,8 @@ pub(crate) use dpop_claim::{verify_dpop_budget_selection_tx, verify_fresh_dpop_t
 mod governed_approval_replay;
 mod native_capture_readback;
 pub use native_capture_readback::NativeDispatchCaptureWitness;
+mod native_capture_diagnostic;
+pub(crate) use native_capture_diagnostic::{NativeCaptureDiagnostic, NativeCaptureStage};
 #[cfg(feature = "admission-test-support")]
 mod native_capture_test_support;
 pub(crate) use governed_approval_claim::{
@@ -639,6 +641,9 @@ impl SqliteAdmissionOperationStore {
                 .budget_hold_id()
                 .is_none_or(|hold_id| hold_id.as_str() != request.hold_id)
         {
+            if binding.native.is_some() {
+                NativeCaptureDiagnostic::store_fenced();
+            }
             return Err(AdmissionCaptureError::Fenced);
         }
         let budget = crate::budget_store::SqliteBudgetStore::open_alongside(

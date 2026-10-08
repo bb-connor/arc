@@ -229,6 +229,35 @@ NATIVE_DISPATCH_FAULTS = [
 ]
 
 
+def test_native_capture_markers_require_complete_fixed_host_lines(qualifier):
+    marker = (
+        "WARN chio::native_capture message=native capture refused "
+        "native_capture_stage=commit_runtime_expired native_capture_category=invariant\n"
+    )
+    assert qualifier.native_capture_failures(marker.encode()) == [
+        {"stage": "commit_runtime_expired", "category": "invariant"}
+    ]
+    assert qualifier.failure_classes(marker, host=False) == []
+    for stage, category in (
+        ("budget_mutation", "sqlite"),
+        ("admission_advance", "unavailable"),
+    ):
+        typed_marker = marker.replace("commit_runtime_expired", stage).replace("invariant", category)
+        assert qualifier.native_capture_failures(typed_marker) == [
+            {"stage": stage, "category": category}
+        ]
+    for rejected in (
+        marker[:-1],
+        "worker prefix " + marker,
+        marker.replace("commit_runtime_expired", "private-request-id"),
+        marker.replace("category=invariant", "category=private-credential"),
+        marker[:-1] + " private=credential\n",
+        "x" * 65536 + marker,
+    ):
+        assert qualifier.native_capture_failures(rejected) == []
+        assert qualifier.failure_classes(rejected, host=True) == []
+
+
 def test_failure_artifact_maps_each_native_dispatch_line_to_its_fixed_class(qualifier, tmp_path):
     secret = "never-publish-this-native-credential"
     output = tmp_path / "output"
@@ -329,3 +358,30 @@ def test_native_capture_fixed_marker_survives_captured_host_stderr_privately(qua
     report = json.loads((output / "operator-failure.json").read_text())
     assert report["host_failure_classes"] == ["native_capture_commit_nonce_expired"]
     assert list(output.iterdir()) == [output / "operator-failure.json"]
+
+
+@pytest.mark.parametrize("symlink", [False, True])
+def test_native_capture_private_export_refusal_preserves_original_report(qualifier, tmp_path, symlink):
+    retained = tmp_path / "retained-private"
+    retained.write_bytes(b"preserved-private-custody")
+    private = tmp_path / "native-capture-failures.json"
+    if symlink:
+        private.symlink_to(retained)
+    else:
+        private.write_bytes(b"preserved-private-custody")
+    output = tmp_path / "output"
+    output.mkdir()
+    marker = (
+        "WARN chio::native_capture message=native capture refused "
+        "native_capture_stage=commit_runtime_expired native_capture_category=invariant\n"
+    )
+    failure = subprocess.CalledProcessError(1, ["native-host"], output="", stderr=marker)
+    qualifier.save_failure_diagnostics(tmp_path, output, failure)
+    assert private.read_bytes() == b"preserved-private-custody"
+    assert retained.read_bytes() == b"preserved-private-custody"
+    assert private.is_symlink() is symlink
+    diagnostic = json.loads((output / "operator-failure.json").read_text())
+    assert diagnostic["returncode"] == 1 and diagnostic["timed_out"] is False
+    assert diagnostic["host_failure_classes"] == [
+        "native_capture_artifact_unavailable", "native_capture_commit_runtime_expired"
+    ]

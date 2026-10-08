@@ -1,6 +1,7 @@
 //! Bind retained policy material to the physical operation and observed state.
 //! This validates storage provenance, not classifier or manifest trust roots.
 use super::*;
+use crate::admission_operation_store::{NativeCaptureDiagnostic, NativeCaptureStage as Stage};
 use chio_security_types::flow::NATIVE_FLOW_DECLASSIFIED_DISPATCH_POLICY_SCHEMA;
 use chio_security_types::flow::NATIVE_FLOW_DISPATCH_POLICY_SCHEMA;
 use chio_security_types::ports::{Digest32, FlowJoinRequest, FlowStateSnapshot};
@@ -178,7 +179,16 @@ impl Policy {
         connection: &Transaction<'_>,
         now: u64,
     ) -> Result<(), AdmissionOperationStoreError> {
-        self.validate_at(now)?;
+        self.validate_current_for_capture(connection, now, None)
+    }
+
+    pub(super) fn validate_current_for_capture(
+        &self,
+        connection: &Transaction<'_>,
+        now: u64,
+        diagnostic: Option<&NativeCaptureDiagnostic>,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        self.validate_at_for_capture(now, diagnostic)?;
         let (snapshot, generation) = crate::security_state::observe_native_flow_state(
             connection,
             self.inputs
@@ -191,6 +201,9 @@ impl Policy {
         if snapshot.as_ref() != Some(&self.inputs.observation)
             || generation != self.inputs.stored_context_generation
         {
+            if let Some(diagnostic) = diagnostic {
+                diagnostic.at(Stage::ObservationChanged);
+            }
             return Err(invalid(
                 "native dispatch observation changed before retention",
             ));
@@ -199,13 +212,39 @@ impl Policy {
     }
 
     pub(super) fn validate_at(&self, now: u64) -> Result<(), AdmissionOperationStoreError> {
-        if now < self.inputs.prepared_at_unix_ms || now >= self.inputs.valid_until_unix_ms {
+        self.validate_at_for_capture(now, None)
+    }
+
+    pub(super) fn validate_at_for_capture(
+        &self,
+        now: u64,
+        diagnostic: Option<&NativeCaptureDiagnostic>,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        if now < self.inputs.prepared_at_unix_ms {
+            if let Some(diagnostic) = diagnostic {
+                diagnostic.at(Stage::PolicyNotYetValid);
+            }
+            return Err(invalid("native dispatch policy is stale or expired"));
+        }
+        if now >= self.inputs.valid_until_unix_ms {
+            if let Some(diagnostic) = diagnostic {
+                diagnostic.at(Stage::PolicyExpired);
+            }
             return Err(invalid("native dispatch policy is stale or expired"));
         }
         if let Some(grant) = &self.inputs.declassification {
-            if now / 1000 < grant.body.issued_at_unix_seconds()
-                || now / 1000 >= grant.body.expires_at_unix_seconds()
-            {
+            if now / 1000 < grant.body.issued_at_unix_seconds() {
+                if let Some(diagnostic) = diagnostic {
+                    diagnostic.at(Stage::DeclassificationNotYetValid);
+                }
+                return Err(invalid(
+                    "native declassification grant is not currently valid",
+                ));
+            }
+            if now / 1000 >= grant.body.expires_at_unix_seconds() {
+                if let Some(diagnostic) = diagnostic {
+                    diagnostic.at(Stage::DeclassificationExpired);
+                }
                 return Err(invalid(
                     "native declassification grant is not currently valid",
                 ));

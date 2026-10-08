@@ -3,6 +3,7 @@ use super::*;
 use crate::admission_operation_store::threshold_approval::{
     reserved_nonce_capture_approval, ReservedThresholdApproval,
 };
+use crate::admission_operation_store::{NativeCaptureDiagnostic, NativeCaptureStage as Stage};
 use chio_kernel::admission_operation::{
     dpop_claim::DpopReplayCredentialV1, governed_approval_claim::GovernedApprovalCredentialV1,
 };
@@ -21,6 +22,7 @@ pub(crate) struct NativeCaptureBinding<'a> {
 /// The connection borrow prevents use across transactions or owner handles.
 pub(crate) struct VerifiedNativeCapture<'tx> {
     connection: &'tx Connection,
+    diagnostic: &'tx NativeCaptureDiagnostic,
     operation: AdmissionOperationV1,
     ledger: AdmissionDigest,
     policy: policy::Policy,
@@ -40,6 +42,7 @@ impl<'tx> VerifiedNativeCapture<'tx> {
         owner: &SqliteServingOwner,
         input: &NativeCaptureBinding<'_>,
         grant_index: usize,
+        diagnostic: &'tx NativeCaptureDiagnostic,
     ) -> Result<Self, AdmissionOperationStoreError> {
         let custody = &input.custody;
         let operation = custody.operation;
@@ -73,6 +76,7 @@ impl<'tx> VerifiedNativeCapture<'tx> {
                 return Err(invalid("native capture capability or ancestor is revoked"));
             }
         }
+        diagnostic.at(Stage::NativeBinding);
         original.validate_native_security_authority(custody.binding)?;
         original.validate_native_security_context(custody.security_context)?;
         storage::verify_coverage(tx)?;
@@ -95,6 +99,7 @@ impl<'tx> VerifiedNativeCapture<'tx> {
         }
         record.validate(tx)?;
         storage::verify_reference(tx, &record)?;
+        diagnostic.at(Stage::NativePolicy);
         let (value, policy) = policy::decode(input.policy_json)?;
         if value != record.policy {
             return Err(invalid("native capture changed its live policy evidence"));
@@ -121,11 +126,14 @@ impl<'tx> VerifiedNativeCapture<'tx> {
             )
             .map_err(invalid)?;
         }
-        policy.validate_current(tx, now).map_err(|error| {
-            invalid(format!(
-                "native capture policy at transaction entry: {error}"
-            ))
-        })?;
+        policy
+            .validate_current_for_capture(tx, now, Some(diagnostic))
+            .map_err(|error| {
+                invalid(format!(
+                    "native capture policy at transaction entry: {error}"
+                ))
+            })?;
+        diagnostic.at(Stage::NativeEvidence);
         let runtime = runtime_participant::dispatch_snapshot(tx, operation, grant_index)?;
         let approval = governed_approval_claim::dispatch_snapshot(tx, operation, grant_index)?;
         let dpop = dpop_claim::dispatch_snapshot(tx, operation, grant_index)?;
@@ -214,6 +222,7 @@ impl<'tx> VerifiedNativeCapture<'tx> {
             .transpose()?;
         Ok(Self {
             connection: tx,
+            diagnostic,
             operation: operation.clone(),
             ledger: record.digest()?,
             policy,
@@ -300,6 +309,7 @@ impl<'tx> VerifiedNativeCapture<'tx> {
         tx: &Transaction<'_>,
         owner: &SqliteServingOwner,
     ) -> Result<(), AdmissionOperationStoreError> {
+        self.diagnostic.at(Stage::CommitPolicy);
         if !std::ptr::eq(self.connection, &**tx) {
             return Err(invalid("native capture witness changed transactions"));
         }
@@ -311,15 +321,21 @@ impl<'tx> VerifiedNativeCapture<'tx> {
                 "native capture lost its reserved threshold approval witness",
             ));
         }
+        self.diagnostic.at(Stage::CommitClock);
         let now = observed_time(tx, self.observed_at, owner)?;
         self.validate_time(now)?;
+        self.diagnostic.at(Stage::CommitApproval);
         governed_approval_claim::verify_fresh_approval_tx(tx, &self.operation, now, owner)?;
+        self.diagnostic.at(Stage::CommitDpop);
         dpop_claim::verify_fresh_dpop_tx(tx, &self.operation, now, owner)?;
-        self.policy.validate_current(tx, now).map_err(|error| {
-            invalid(format!(
-                "native capture policy before physical commit: {error}"
-            ))
-        })?;
+        self.diagnostic.at(Stage::CommitPolicy);
+        self.policy
+            .validate_current_for_capture(tx, now, Some(self.diagnostic))
+            .map_err(|error| {
+                invalid(format!(
+                    "native capture policy before physical commit: {error}"
+                ))
+            })?;
         #[cfg(feature = "admission-test-support")]
         let delayed = expiry_test_support::wait_after_verification(
             tx,
@@ -336,11 +352,13 @@ impl<'tx> VerifiedNativeCapture<'tx> {
         // above and the captured credentials name the same immutable episodes
         // in this write transaction. Sample again after state verification,
         // followed only by bounded time checks and the physical commit.
+        self.diagnostic.at(Stage::CommitClock);
         let commit_now = super::super::super::schema::observe_authority_time(tx, owner)?;
         if commit_now < now {
             return Err(invalid("native capture clock regressed before commit"));
         }
         if let Some(threshold) = &self.threshold {
+            self.diagnostic.at(Stage::CommitApproval);
             threshold.validate_at(commit_now)?;
         }
         #[cfg(feature = "admission-test-support")]
@@ -355,15 +373,18 @@ impl<'tx> VerifiedNativeCapture<'tx> {
 
     fn validate_time(&self, now: u64) -> Result<(), AdmissionOperationStoreError> {
         if now >= self.lease_expires_at {
+            self.diagnostic.at(Stage::CommitLeaseExpired);
             return Err(AdmissionOperationStoreError::Fenced);
         }
         if now / 1000 >= self.capability_expires_at_secs {
+            self.diagnostic.at(Stage::CommitCapabilityExpired);
             return Err(invalid("native capture capability expired before commit"));
         }
         if self
             .runtime_valid_until_unix_ms
             .is_some_and(|until| now >= until)
         {
+            self.diagnostic.at(Stage::CommitRuntimeExpired);
             return Err(invalid(
                 "native capture runtime evidence expired before commit",
             ));
@@ -372,21 +393,28 @@ impl<'tx> VerifiedNativeCapture<'tx> {
             .nonce_valid_until_unix_ms
             .is_some_and(|until| now >= until)
         {
+            self.diagnostic.at(Stage::CommitNonceExpired);
             return Err(invalid(
                 "native capture execution nonce expired before commit",
             ));
         }
         if let Some(credential) = &self.approval_credential {
-            credential.validate_at(now)?;
+            credential.validate_at(now).inspect_err(|_| {
+                self.diagnostic.at(Stage::CommitApproval);
+            })?;
         }
         if let Some(credential) = &self.dpop_credential {
-            credential.validate_at(now)?;
+            credential.validate_at(now).inspect_err(|_| {
+                self.diagnostic.at(Stage::CommitDpop);
+            })?;
         }
-        self.policy.validate_at(now).map_err(|error| {
-            invalid(format!(
-                "native capture policy before physical commit: {error}"
-            ))
-        })
+        self.policy
+            .validate_at_for_capture(now, Some(self.diagnostic))
+            .map_err(|error| {
+                invalid(format!(
+                    "native capture policy before physical commit: {error}"
+                ))
+            })
     }
 }
 
