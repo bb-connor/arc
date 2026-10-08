@@ -1927,7 +1927,8 @@
       "requirement_ids": [
         "incoming-pr1160-review-20261007:resume:AR-TERM-EVIDENCE"
       ]
-    }
+    },
+    {"path":"docs/security/audits/native-attachment-diagnostic-20261008.json","commit":"24e97760481275a824a3572bab1b8eed24da5b63","sha256":"90bffa7e29b954c759691c53652128dfa5a254ee6d99fc94bc8afc89b1a2078f","requirement_ids":["incoming-pr1160-review-20261008:native:MINISW-PDEATH","incoming-pr1160-review-20261008:native:MINISW-NATIVE-DENY","incoming-pr1160-review-20261008:native:BROKER-SELECT"]}
   ],
   "pull_requests": [
     {
@@ -7949,7 +7950,10 @@
       "work_status": "source-integrated",
       "owner": "codex",
       "review_thread_urls": []
-    }
+    },
+    {"id":"incoming-pr1160-review-20261008:native:MINISW-PDEATH","label":"MINISW-PDEATH","priority":"P1","requirement":"Keep the child spawning thread alive for the exact supervised process while preserving parent-death termination, cancellation, at-most-once reaping and concurrency bounds.","source":{"path":"docs/security/audits/native-attachment-diagnostic-20261008.json","line":45,"line_sha256":"20c38d57eff8b168693caa03d91941287bdf5d476b4772b77ac25daadf6ea6bf","checkpoint":"24e97760481275a824a3572bab1b8eed24da5b63","reviewed_source":"f41e8928d9baf5e722801146fef7e20b2921ed10"},"disposition":"confirmed-native-counterexample-original-first-repair-assigned","source_repair":null,"verification_evidence":[{"path":"docs/security/audits/native-attachment-diagnostic-20261008.json","sha256":"90bffa7e29b954c759691c53652128dfa5a254ee6d99fc94bc8afc89b1a2078f","scope":"Verified diagnostic failure or explicitly suspected source defect; not repair evidence."}],"remaining_acceptance":["Actual Original-first repair and focused controls for the process lifetime defect.","Bounded non-secret diagnostics and causal Original for the separate native capture denial.","Broker collision runtime reproduction before accepting a producer change.","Exact final source native/cold/trusted/hosted qualification and protected landing."],"landing_unit":"foundation","landing_pr":1160,"main_ancestry_verified":false,"review_scope":"now","work_status":"in-progress","owner":"claude","review_thread_urls":[]},
+    {"id":"incoming-pr1160-review-20261008:native:MINISW-NATIVE-DENY","label":"MINISW-NATIVE-DENY","priority":"P1","requirement":"Identify and repair the native dispatch capture or lifecycle-handoff denial reached on the third sandbox execution without weakening custody, trusted-time or recovery-required behavior.","source":{"path":"docs/security/audits/native-attachment-diagnostic-20261008.json","line":52,"line_sha256":"00673813f045cca9232dc3223925646200e36376ee2c3b59c46def035a1797ed","checkpoint":"24e97760481275a824a3572bab1b8eed24da5b63","reviewed_source":"f41e8928d9baf5e722801146fef7e20b2921ed10"},"disposition":"native-failure-confirmed-cause-unidentified-diagnostic-proposal-pending","source_repair":null,"verification_evidence":[{"path":"docs/security/audits/native-attachment-diagnostic-20261008.json","sha256":"90bffa7e29b954c759691c53652128dfa5a254ee6d99fc94bc8afc89b1a2078f","scope":"Verified diagnostic failure or explicitly suspected source defect; not repair evidence."}],"remaining_acceptance":["Actual Original-first repair and focused controls for the process lifetime defect.","Bounded non-secret diagnostics and causal Original for the separate native capture denial.","Broker collision runtime reproduction before accepting a producer change.","Exact final source native/cold/trusted/hosted qualification and protected landing."],"landing_unit":"foundation","landing_pr":1160,"main_ancestry_verified":false,"review_scope":"now","work_status":"in-progress","owner":"claude","review_thread_urls":[]},
+    {"id":"incoming-pr1160-review-20261008:native:BROKER-SELECT","label":"BROKER-SELECT","priority":"P2","requirement":"Select the broker execution original through authenticated operation custody despite another operation sharing the request identifier.","source":{"path":"docs/security/audits/native-attachment-diagnostic-20261008.json","line":59,"line_sha256":"d5647558d8444f2d29a62afa33974bee35f410c9062334006900ce46252a462c","checkpoint":"24e97760481275a824a3572bab1b8eed24da5b63","reviewed_source":"f41e8928d9baf5e722801146fef7e20b2921ed10"},"disposition":"source-suspected-liveness-defect-original-and-selector-proposal-pending","source_repair":null,"verification_evidence":[{"path":"docs/security/audits/native-attachment-diagnostic-20261008.json","sha256":"90bffa7e29b954c759691c53652128dfa5a254ee6d99fc94bc8afc89b1a2078f","scope":"Verified diagnostic failure or explicitly suspected source defect; not repair evidence."}],"remaining_acceptance":["Actual Original-first repair and focused controls for the process lifetime defect.","Bounded non-secret diagnostics and causal Original for the separate native capture denial.","Broker collision runtime reproduction before accepting a producer change.","Exact final source native/cold/trusted/hosted qualification and protected landing."],"landing_unit":"foundation","landing_pr":1160,"main_ancestry_verified":false,"review_scope":"now","work_status":"in-progress","owner":"claude","review_thread_urls":[]}
   ],
   "incoming_review_execution": {
     "snapshot_date": "2026-10-06",
@@ -130320,12 +130324,13 @@
       "merged": false
     },
     "incoming-pr1160-review-20261007:resume:MINISW-ATTACH": {
-      "state": "diagnostic-source-integrated12Rust5Python-green-realnativeattachmentrepairOPEN",
+      "state": "diagnostic-repair-integrated-native-thread-lifetime-cause-confirmed-producer-pending",
       "source_checkpoint": "f41e8928d9baf5e722801146fef7e20b2921ed10",
       "qualified": false,
       "merged": false,
       "evidence_checkpoint": "759bb100ccfb16d1e37fe8b48db96cb40f5197fe",
-      "audit_path": "docs/security/audits/mcp-and-diagnostic-integration-checkpoint-20261008.json"
+      "audit_path": "docs/security/audits/mcp-and-diagnostic-integration-checkpoint-20261008.json",
+      "native_diagnostic_checkpoint": "24e97760481275a824a3572bab1b8eed24da5b63"
     },
     "incoming-pr1160-review-20261007:resume:F016-TC": {
       "state": "claude-composed-original-first-and-internal-consumer-proposal-pending",
@@ -130488,6 +130493,36 @@
       "source_checkpoint": "2488df7f780d59e92ff5312d42159f15ccdb02b5",
       "evidence_checkpoint": "759bb100ccfb16d1e37fe8b48db96cb40f5197fe",
       "audit_path": "docs/security/audits/mcp-and-diagnostic-integration-checkpoint-20261008.json",
+      "qualified": false,
+      "merged": false
+    },
+    "incoming-pr1160-review-20261008:native:MINISW-PDEATH": {
+      "state": "confirmed-native-counterexample-original-first-repair-assigned",
+      "source_checkpoint": "f41e8928d9baf5e722801146fef7e20b2921ed10",
+      "audit_checkpoint": "24e97760481275a824a3572bab1b8eed24da5b63",
+      "audit_path": "docs/security/audits/native-attachment-diagnostic-20261008.json",
+      "source_repair": null,
+      "focused_green": false,
+      "qualified": false,
+      "merged": false
+    },
+    "incoming-pr1160-review-20261008:native:MINISW-NATIVE-DENY": {
+      "state": "native-failure-confirmed-cause-unidentified-diagnostic-proposal-pending",
+      "source_checkpoint": "f41e8928d9baf5e722801146fef7e20b2921ed10",
+      "audit_checkpoint": "24e97760481275a824a3572bab1b8eed24da5b63",
+      "audit_path": "docs/security/audits/native-attachment-diagnostic-20261008.json",
+      "source_repair": null,
+      "focused_green": false,
+      "qualified": false,
+      "merged": false
+    },
+    "incoming-pr1160-review-20261008:native:BROKER-SELECT": {
+      "state": "source-suspected-liveness-defect-original-and-selector-proposal-pending",
+      "source_checkpoint": "f41e8928d9baf5e722801146fef7e20b2921ed10",
+      "audit_checkpoint": "24e97760481275a824a3572bab1b8eed24da5b63",
+      "audit_path": "docs/security/audits/native-attachment-diagnostic-20261008.json",
+      "source_repair": null,
+      "focused_green": false,
       "qualified": false,
       "merged": false
     }
@@ -131820,5 +131855,12 @@
     "requirements": 1783,
     "qualified": false,
     "merged": false
+  },
+  "native_attachment_diagnostic_20261008": {
+    "audit_path": "docs/security/audits/native-attachment-diagnostic-20261008.json",
+    "checkpoint": "24e97760481275a824a3572bab1b8eed24da5b63",
+    "qualified": false,
+    "merged": false,
+    "requirements": 1786
   }
 }
