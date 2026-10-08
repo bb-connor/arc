@@ -268,3 +268,100 @@ async fn mcp_projection_original_unsigned_result_extensions_cannot_be_delivered_
     assert_eq!(captured.fixture.calls.load(Ordering::SeqCst), 1);
     Ok(())
 }
+
+#[cfg(target_os = "linux")]
+#[tokio::test]
+async fn mcp_projection_control_valid_v2_nonce_is_preserved_through_delivery_and_replay(
+) -> TestResult {
+    use chio_kernel::admission_operation::{
+        AdmissionExecutionNonceReservationV1, AdmissionOperationBindingInputV1,
+        AdmissionOperationBindingV1, AdmissionOperationId, AdmissionOperationStore,
+        AdmissionOperationV1, AdmissionRequestBindingV1, AuthenticatedRequestNamespace,
+    };
+
+    let captured = capture("projection-valid-operation-nonce").await?;
+    let runtime = captured
+        .fixture
+        .state
+        .factory
+        .durable_admission
+        .as_ref()
+        .ok_or("runtime")?;
+    let (store, fence) = runtime
+        .local_runtime_participant()
+        .ok_or("local existing owner")?;
+    let now = captured.fixture.state.factory.config.clock.millis()?;
+    let receipt: ChioReceipt = serde_json::from_value(
+        captured.terminal["result"]["_meta"]["chioEvidence"]["receipt"].clone(),
+    )?;
+    let original_id = AdmissionOperationId::from_persisted(
+        receipt.metadata.as_ref().ok_or("receipt metadata")?["admission_operation"]["operation_id"]
+            .as_str()
+            .ok_or("operation id")?,
+    )?;
+    let (base, original) = store
+        .load_retained_tool_request(&original_id, &fence, now)?
+        .ok_or("fenced original request")?;
+    let binding = base.binding();
+    let mut requirements = binding.participant_requirements();
+    requirements.execution_nonce = true;
+    let nonce_binding = AdmissionOperationBindingV1::new(AdmissionOperationBindingInputV1 {
+        kind: binding.kind(),
+        namespace: AuthenticatedRequestNamespace::for_local_system(
+            binding.coordinator_authority_id().clone(),
+        )?,
+        request_id: binding.request_id().clone(),
+        capability_id: binding.capability_id().clone(),
+        authorization_capability_hash: binding.authorization_capability_hash().clone(),
+        request_binding: AdmissionRequestBindingV1::new_with_action_parameter_hash(
+            binding.immutable_request_hash().clone(),
+            binding.action_parameter_hash().clone(),
+            requirements,
+        )?,
+        policy_hash: binding.policy_hash().clone(),
+        effect_class: binding.effect_class(),
+    })?;
+    let operation = AdmissionOperationV1::prepare(nonce_binding, base.coordinator_lease_epoch())?;
+    // This public API mints checked metadata. It neither reserves a nonce nor
+    // commits a new operation, and this control dispatches no additional tool.
+    let keypair = runtime.kernel_keypair();
+    let issuance = AdmissionExecutionNonceReservationV1::mint_for_operation(
+        &operation,
+        &original,
+        &keypair,
+        &chio_kernel::ExecutionNonceConfig::default(),
+        now,
+    )?;
+    issuance.require_operation_bound_profile()?;
+    let signed = issuance.signed_nonce().clone();
+    let mut body = receipt.body();
+    let admission = &mut body.metadata.as_mut().ok_or("receipt metadata")?["admission_operation"];
+    admission["operation_id"] = json!(operation.binding().operation_id().as_str());
+    admission["trusted_time_unix_ms"] = json!(now);
+    let timed_receipt = ChioReceipt::sign(body, &keypair)?;
+    let mut message = captured.terminal.clone();
+    message["result"]["_meta"]["chioEvidence"]["receipt"] = serde_json::to_value(timed_receipt)?;
+    message["result"]["_meta"]["chioExecutionNonce"] = serde_json::to_value(&signed)?;
+    let finished = remote_mcp_session_credentials::finish_call(
+        &captured.fixture.state,
+        &captured.pending,
+        &message,
+    );
+    let replayed = replay(&captured).await?;
+    cleanup(&captured).await?;
+    let finished =
+        finished.map_err(|response| format!("v2 finish returned {}", response.status()))?;
+    assert_eq!(
+        finished["result"]["_meta"]["chioExecutionNonce"],
+        serde_json::to_value(&signed)?
+    );
+    assert_eq!(
+        visible_result(&finished),
+        visible_result(&captured.terminal)
+    );
+    assert!(finished["result"]["_meta"]["chioDelivery"]["acknowledgement"].is_string());
+    assert_eq!(replayed.0, StatusCode::OK);
+    assert_eq!(serde_json::from_slice::<Value>(&replayed.1)?, finished);
+    assert_eq!(captured.fixture.calls.load(Ordering::SeqCst), 1);
+    Ok(())
+}
