@@ -37,6 +37,13 @@ pub enum KeyringError {
     DuplicateIdentifier,
     #[error("key-log state invariant failed: {0}")]
     StateInvariant(&'static str),
+    #[error(
+        "key-log service peer runs as user {observed_uid}, not the authorized user {expected_uid}"
+    )]
+    UnauthorizedPeer {
+        expected_uid: u32,
+        observed_uid: u32,
+    },
     #[error("unknown key identifier")]
     UnknownKey,
     #[error("trusted artifact-time evidence is invalid")]

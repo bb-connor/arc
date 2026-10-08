@@ -169,13 +169,10 @@ fn run() -> chio_keyring::Result<()> {
             return Err(KeyringError::Storage(error));
         }
         match listener.accept() {
-            Ok((stream, _)) => {
+            Ok(connection) => {
                 let result = (|| {
-                    chio_keyring::require_service_peer(&stream)?;
-                    let mut stream = chio_keyring::DeadlineUnixStream::new(
-                        stream,
-                        chio_keyring::KEY_LOG_IPC_REQUEST_DEADLINE,
-                    )?;
+                    let mut stream =
+                        connection.authenticate(chio_keyring::KEY_LOG_IPC_REQUEST_DEADLINE)?;
                     handle_connection(
                         &mut stream,
                         AuditConnectionContext {

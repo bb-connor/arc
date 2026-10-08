@@ -961,7 +961,14 @@ fn a_same_user_client_completes_a_witness_exchange_and_a_foreign_expectation_is_
         .with_service_uid(other_user)
         .readiness("foreign-expectation");
     assert!(
-        matches!(result, Err(chio_keyring::KeyringError::StateInvariant(_))),
+        matches!(
+            result,
+            Err(chio_keyring::KeyringError::UnauthorizedPeer {
+                expected_uid,
+                observed_uid,
+            }) if expected_uid == other_user
+                && observed_uid == rustix::process::geteuid().as_raw()
+        ),
         "{result:?}"
     );
     wait_for_witness(&client, "after-foreign-expectation");

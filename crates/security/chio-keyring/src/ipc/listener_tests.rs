@@ -368,18 +368,85 @@ fn the_listener_directory_and_lock_close_on_exec() {
 #[test]
 fn a_peer_running_as_the_service_user_is_accepted() {
     let (client, server) = std::os::unix::net::UnixStream::pair().test_unwrap();
-    super::require_service_peer(&server).test_unwrap();
-    super::require_service_peer(&client).test_unwrap();
+    let service_user = rustix::process::geteuid().as_raw();
+    super::require_peer_uid(&server, service_user).test_unwrap();
+    super::require_peer_uid(&client, service_user).test_unwrap();
 }
 
 #[test]
 fn a_peer_running_as_another_user_is_refused() {
     let (_client, server) = std::os::unix::net::UnixStream::pair().test_unwrap();
-    let other_user = rustix::process::geteuid().as_raw().wrapping_add(1);
+    let service_user = rustix::process::geteuid().as_raw();
+    let other_user = service_user.wrapping_add(1);
     let result = super::require_peer_uid(&server, other_user);
     assert!(
-        matches!(result, Err(KeyringError::StateInvariant(_))),
+        matches!(
+            result,
+            Err(KeyringError::UnauthorizedPeer {
+                expected_uid,
+                observed_uid,
+            }) if expected_uid == other_user && observed_uid == service_user
+        ),
         "{result:?}"
+    );
+}
+
+#[test]
+fn a_connection_from_the_service_user_is_authenticated_before_its_request_is_read() {
+    let (_directory, root) = private_root();
+    let socket = root.join("witness.sock");
+    let listener = bind_listener(&socket).test_unwrap();
+    let mut client = std::os::unix::net::UnixStream::connect(&socket).test_unwrap();
+    super::write_canonical_frame(&mut client, &serde_json::json!({"request": 1})).test_unwrap();
+    client.shutdown(std::net::Shutdown::Write).test_unwrap();
+
+    let mut stream = listener
+        .accept()
+        .test_unwrap()
+        .authenticate(std::time::Duration::from_secs(5))
+        .test_unwrap();
+    let request: serde_json::Value = super::read_single_canonical_frame(&mut stream).test_unwrap();
+    assert_eq!(request, serde_json::json!({"request": 1}));
+}
+
+#[test]
+fn a_connection_from_another_user_is_refused_with_its_request_unread() {
+    use std::io::Read as _;
+
+    let (_directory, root) = private_root();
+    let socket = root.join("witness.sock");
+    let mut listener = bind_listener(&socket).test_unwrap();
+    let service_user = rustix::process::geteuid().as_raw();
+    let other_user = service_user.wrapping_add(1);
+    listener.authorize_only_peer_uid(other_user);
+    let mut client = std::os::unix::net::UnixStream::connect(&socket).test_unwrap();
+    super::write_canonical_frame(&mut client, &serde_json::json!({"request": 1})).test_unwrap();
+    client.shutdown(std::net::Shutdown::Write).test_unwrap();
+
+    let result = listener
+        .accept()
+        .test_unwrap()
+        .authenticate(std::time::Duration::from_secs(5));
+    assert!(
+        matches!(
+            &result,
+            Err(KeyringError::UnauthorizedPeer {
+                expected_uid,
+                observed_uid,
+            }) if *expected_uid == other_user && *observed_uid == service_user
+        ),
+        "{:?}",
+        result.as_ref().map(|_| ())
+    );
+    drop(result);
+    // The refused connection is closed without a response. Linux reports the
+    // request still queued at the service when it closed as a reset.
+    let mut response = [0_u8; 1];
+    let read = client.read(&mut response);
+    assert!(
+        matches!(&read, Ok(0))
+            || matches!(&read, Err(error) if error.kind() == std::io::ErrorKind::ConnectionReset),
+        "{read:?}"
     );
 }
 

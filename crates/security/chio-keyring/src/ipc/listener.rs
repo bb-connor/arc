@@ -5,7 +5,7 @@ use std::ffi::{OsStr, OsString};
 use std::io::Read as _;
 use std::os::unix::ffi::OsStrExt as _;
 use std::os::unix::fs::FileExt as _;
-use std::os::unix::net::{SocketAddr, UnixListener, UnixStream};
+use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::Path;
 
 use chio_core_types::Hash;
@@ -24,6 +24,9 @@ const GENERATION_RECORD_BYTES: usize = 65;
 /// holder can keep the socket listening after it releases the lock. Dropping
 /// the listener removes the socket name only while the name still holds this
 /// generation, then closes the listener and releases the lock.
+///
+/// Every accepted connection is an [`AcceptedServiceConnection`], whose bytes
+/// are reachable only after its peer is authenticated as the service user.
 ///
 /// The listener cannot be cloned or turned into a raw descriptor:
 ///
@@ -46,15 +49,26 @@ pub struct PrivateUnixListener {
     socket_name: OsString,
     generation: Hash,
     lifecycle_lock: std::fs::File,
+    authorized_peer_uid: u32,
 }
 
 impl PrivateUnixListener {
-    pub fn accept(&self) -> std::io::Result<(UnixStream, SocketAddr)> {
-        self.listener.accept()
+    /// Accept one connection. Nothing is read from it here.
+    pub fn accept(&self) -> std::io::Result<AcceptedServiceConnection> {
+        let (stream, _) = self.listener.accept()?;
+        Ok(AcceptedServiceConnection {
+            stream,
+            authorized_peer_uid: self.authorized_peer_uid,
+        })
     }
 
     pub fn set_nonblocking(&self, nonblocking: bool) -> std::io::Result<()> {
         self.listener.set_nonblocking(nonblocking)
+    }
+
+    #[cfg(test)]
+    pub(super) fn authorize_only_peer_uid(&mut self, uid: u32) {
+        self.authorized_peer_uid = uid;
     }
 
     #[cfg(test)]
@@ -71,6 +85,32 @@ impl PrivateUnixListener {
             close_on_exec(self.parent.as_fd())?,
             close_on_exec(self.lifecycle_lock.as_fd())?,
         ])
+    }
+}
+
+/// A connection accepted from a service socket. It exposes no I/O: the only
+/// way to read its request is [`Self::authenticate`], which checks the peer
+/// first.
+///
+/// ```compile_fail
+/// use std::io::Read as _;
+///
+/// fn escape(mut connection: chio_keyring::AcceptedServiceConnection) {
+///     let _ = connection.read(&mut [0_u8; 4]);
+/// }
+/// ```
+pub struct AcceptedServiceConnection {
+    stream: UnixStream,
+    authorized_peer_uid: u32,
+}
+
+impl AcceptedServiceConnection {
+    /// Require the kernel's record of the connecting process to name the
+    /// service user, then start the exchange deadline. A refused connection
+    /// is closed with its request unread.
+    pub fn authenticate(self, budget: std::time::Duration) -> Result<super::DeadlineUnixStream> {
+        super::require_peer_uid(&self.stream, self.authorized_peer_uid)?;
+        super::DeadlineUnixStream::new(self.stream, budget).map_err(KeyringError::Io)
     }
 }
 
@@ -210,6 +250,7 @@ pub(super) fn bind_private_unix_listener_with(
         socket_name: socket_name.to_os_string(),
         generation,
         lifecycle_lock,
+        authorized_peer_uid: rustix::process::geteuid().as_raw(),
     };
     run_hook(hooks.before_publication)?;
     publish_generation(&listener.lifecycle_lock, &listener.parent, generation)?;
