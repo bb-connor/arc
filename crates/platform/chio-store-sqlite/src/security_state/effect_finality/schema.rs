@@ -1,3 +1,4 @@
+// tenant-read-contract: security_response_effect_finality; class=tenant-predicate; principal=security-runtime
 use super::*;
 
 pub(super) const TABLE: &str = "security_response_effect_finality";

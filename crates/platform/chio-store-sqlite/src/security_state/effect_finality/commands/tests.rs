@@ -15,7 +15,7 @@ fn authenticated_snapshot_over_two_mib_keeps_its_existing_canonical_reader_contr
     let ids = RecordIdSet::new(
         (0..4096)
             .map(|index| {
-                RecordId::new(format!("{index:04}-{}", "x".repeat(251)))
+                RecordId::new(format!("{index:04}-{}", "x".repeat(230)))
                     .unwrap_or_else(|error| panic!("bounded full-width ID: {error}"))
             })
             .collect(),
@@ -27,6 +27,7 @@ fn authenticated_snapshot_over_two_mib_keeps_its_existing_canonical_reader_contr
     })
     .unwrap_or_else(|error| panic!("canonical contribution: {error}"));
     let contribution_hash = Digest32::new(body_hash(&spec_bytes));
+    assert!(spec_bytes.len() <= chio_security_types::ports::MAX_CANONICAL_BODY_BYTES);
     let key = CapabilitySetSuspensionKey {
         tenant_id: tenant.clone(),
         affected_set_hash: response_affected_set_hash(&tenant, &ids)
