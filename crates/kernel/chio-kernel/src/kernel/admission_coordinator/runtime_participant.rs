@@ -139,5 +139,5 @@ pub(super) fn validate_recovery_history(
 }
 
 fn custody_error(reason: &str) -> KernelError {
-    KernelError::DurableAdmission(reason.to_owned())
+    KernelError::admission_record(reason.to_owned())
 }

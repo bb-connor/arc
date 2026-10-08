@@ -19,7 +19,7 @@ impl ChioKernel {
             .as_ref()
             .is_none_or(|verifier| !binding.matches_verifier(verifier.binding()))
         {
-            return Err(invalid(
+            return Err(KernelError::admission_unsupported(
                 "supplemental participant requires its configured verifier",
             ));
         }
@@ -44,10 +44,9 @@ impl ChioKernel {
         let Some(participant) = self.supplemental_admission_participant.as_ref() else {
             return Ok(());
         };
-        let original = admission
-            .retained_request
-            .as_ref()
-            .ok_or_else(|| invalid("supplemental registration has no original request"))?;
+        let original = admission.retained_request.as_ref().ok_or_else(|| {
+            KernelError::admission_record("supplemental registration has no original request")
+        })?;
         original
             .validate_binding(admission.operation.binding())
             .map_err(durable_store_error)?;
@@ -58,9 +57,13 @@ impl ChioKernel {
                     .participant
                     .requires_registration(&request.server_id, &request.tool_name)
             }))
-            .map_err(|_| invalid("supplemental route selection panicked (fail-closed)"))?;
+            .map_err(|_| {
+                KernelError::admission_panicked(
+                    "supplemental route selection panicked (fail-closed)",
+                )
+            })?;
             return if required {
-                Err(invalid(
+                Err(KernelError::admission_refused(
                     "tool route requires verified supplemental authority",
                 ))
             } else {
@@ -74,7 +77,7 @@ impl ChioKernel {
             || claim.operation_id() != admission.operation.binding().operation_id().as_str()
             || budget.capability_id != admission.operation.binding().capability_id().as_str()
         {
-            return Err(invalid(
+            return Err(KernelError::admission_record(
                 "supplemental registration differs from original admission",
             ));
         }
@@ -88,21 +91,26 @@ impl ChioKernel {
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             participant.participant.register_original(&context)
         }))
-        .map_err(|_| invalid("supplemental registration panicked (fail-closed)"))?
-        .map_err(|_| invalid("supplemental registration was not durably acknowledged"))?;
+        .map_err(|_| {
+            KernelError::admission_panicked("supplemental registration panicked (fail-closed)")
+        })?
+        .map_err(|error| {
+            KernelError::admission_participant(
+                "supplemental registration was not durably acknowledged",
+                error,
+            )
+        })?;
         self.validate_live_admission_authority_profile(Some(admission))?;
         let retained = self
             .load_original_request_for_finalization(&admission.operation, observed_at)?
-            .ok_or_else(|| invalid("supplemental registration lost its original request"))?;
+            .ok_or_else(|| {
+                KernelError::admission_record("supplemental registration lost its original request")
+            })?;
         if retained.canonical_bytes() != original.canonical_bytes() {
-            return Err(invalid(
+            return Err(KernelError::admission_record(
                 "supplemental registration changed its original request",
             ));
         }
         Ok(())
     }
-}
-
-fn invalid(message: &str) -> KernelError {
-    KernelError::DurableAdmission(message.into())
 }

@@ -103,6 +103,14 @@ pub enum DurableAdmissionError {
     /// A cause with no classification of its own.
     #[error("{0}")]
     Dependency(#[source] Box<dyn std::error::Error + Send + Sync>),
+    /// A participant failed. Only the fixed reason is reported; the
+    /// participant's own error stays private as the source.
+    #[error("{reason}")]
+    Participant {
+        reason: &'static str,
+        #[source]
+        source: Box<dyn std::error::Error + Send + Sync>,
+    },
     /// `context` names the step that failed with `source`.
     #[error("{context}: {source}")]
     Context {
@@ -139,7 +147,8 @@ impl DurableAdmissionError {
             Self::Invariant(_)
             | Self::Unsupported(_)
             | Self::Panicked(_)
-            | Self::Dependency(_) => Disposition::Fatal,
+            | Self::Dependency(_)
+            | Self::Participant { .. } => Disposition::Fatal,
             Self::Operation(error) => error.disposition(),
             Self::Store(error) => error.disposition(),
             Self::Capture(error) => error.disposition(),
@@ -227,6 +236,18 @@ impl KernelError {
 
     pub fn admission_panicked(reason: &'static str) -> Self {
         Self::from(DurableAdmissionError::Panicked(reason))
+    }
+
+    /// A participant failure reported only by `reason`, keeping the
+    /// participant's error as the private source.
+    pub fn admission_participant(
+        reason: &'static str,
+        source: impl std::error::Error + Send + Sync + 'static,
+    ) -> Self {
+        Self::from(DurableAdmissionError::Participant {
+            reason,
+            source: Box::new(source),
+        })
     }
 
     /// The typed durable admission failure this error carries, if any.

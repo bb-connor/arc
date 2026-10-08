@@ -280,3 +280,49 @@ fn durable_pre_dispatch_denial_commits_terminal_compensation() {
     );
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
 }
+
+#[test]
+fn supplemental_participant_requires_its_configured_verifier() {
+    struct Registrar;
+    impl crate::supplemental_admission::SupplementalAdmissionParticipant for Registrar {
+        fn register_original(
+            &self,
+            _: &crate::supplemental_admission::SupplementalAdmissionRegistrationContext<'_>,
+        ) -> Result<(), crate::SupplementalQuotaVerifierError> {
+            Ok(())
+        }
+    }
+    let identifier = |value: &str| {
+        crate::admission_operation::AdmissionIdentifier::try_new("participant_identity", value)
+            .expect("bounded identifier")
+    };
+    let digest = crate::admission_operation::AdmissionDigest::try_new(
+        "participant_configuration_digest",
+        chio_core::sha256_hex(b"registrar"),
+    )
+    .expect("canonical digest");
+    let binding = crate::supplemental_admission::SupplementalAdmissionAuthorityBindingV1::new(
+        identifier("registrar"),
+        digest.clone(),
+        identifier("verifier"),
+        digest,
+    );
+    let mut kernel = make_kernel(make_config());
+
+    let refused =
+        kernel.set_supplemental_admission_participant(std::sync::Arc::new(Registrar), binding);
+
+    assert!(
+        matches!(
+            refused.as_ref().map_err(KernelError::durable_admission),
+            Err(Some(crate::DurableAdmissionError::Unsupported(
+                "supplemental participant requires its configured verifier"
+            )))
+        ),
+        "{refused:?}"
+    );
+    assert!(matches!(
+        refused.as_ref().map_err(KernelError::disposition),
+        Err(crate::Disposition::Fatal)
+    ));
+}

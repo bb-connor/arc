@@ -94,7 +94,7 @@ impl ChioKernel {
             peer,
             treaty_evidence: material.verification_evidence,
         };
-        let bytes = canonical_json_bytes(&wire).map_err(|error| invalid(&error.to_string()))?;
+        let bytes = canonical_json_bytes(&wire).map_err(KernelError::admission)?;
         // Exercise the same binding and signature checks before the effect.
         self.decode_retained_federation_context(
             &bytes,
@@ -102,7 +102,8 @@ impl ChioKernel {
             request,
             admitted_at_unix_ms,
         )?;
-        let canonical = String::from_utf8(bytes).map_err(|error| invalid(&error.to_string()))?;
+        let canonical = String::from_utf8(bytes)
+            .map_err(|error| KernelError::admission(DurableAdmissionError::dependency(error)))?;
         Ok(Some(FrozenFederationContext { canonical }))
     }
 
@@ -190,5 +191,5 @@ impl ChioKernel {
 }
 
 fn invalid(reason: &str) -> KernelError {
-    KernelError::DurableAdmission(reason.to_owned())
+    KernelError::admission_record(reason.to_owned())
 }
