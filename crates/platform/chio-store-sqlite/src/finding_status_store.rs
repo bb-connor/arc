@@ -1816,7 +1816,14 @@ fn reject_epoch_clock_rollback(
     })
 }
 
-include!("finding_status_store/persistence.rs");
+mod persistence;
+mod records;
+mod schema;
+
+use persistence::*;
+use records::*;
+pub(crate) use schema::initialize_finding_status_schema;
+use schema::*;
 
 #[cfg(test)]
 #[path = "finding_status_store_tests.rs"]
