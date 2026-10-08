@@ -70,6 +70,7 @@ libc = "0.2"
 
 [dev-dependencies]
 async-trait = { workspace = true }
+chio-core-types = { workspace = true, features = ["legacy-permissive-verification"] }
 chio-cage = { workspace = true }
 chio-control-plane = { workspace = true }
 chio-flow = { workspace = true }

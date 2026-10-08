@@ -175,9 +175,14 @@ mod tests {
             domain: CAPABILITY_SIGNATURE_DOMAIN,
             body: &capability.body,
         };
-        assert!(weak
-            .verify_canonical(&input, &capability.signature)
-            .test_expect("canonical signing input"));
+        let canonical = canonical_json_bytes(&input).test_expect("canonical signing input");
+        #[allow(
+            clippy::disallowed_methods,
+            reason = "forgery fixtures prove that loose verification accepts the forgery"
+        )]
+        let loosely_verified = weak.verify_legacy_permissive(&canonical, &capability.signature);
+        assert!(loosely_verified);
+        assert!(!weak.verify(&canonical, &capability.signature));
         assert!(matches!(
             verify_capability(&capability, &weak, "broker-service", 20, true),
             Err(BrokerError::InvalidRequest(_))

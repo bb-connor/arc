@@ -308,11 +308,20 @@ mod tests {
             domain: PROOF_SIGNATURE_DOMAIN,
             body: &proof.body,
         };
-        assert!(proof
+        let canonical = canonical_json_bytes(&signing).test_expect("canonical signing input");
+        #[allow(
+            clippy::disallowed_methods,
+            reason = "forgery fixtures prove that loose verification accepts the forgery"
+        )]
+        let loosely_verified = proof
             .body
             .authority_key
-            .verify_canonical(&signing, &proof.signature)
-            .test_expect("canonical signing input"));
+            .verify_legacy_permissive(&canonical, &proof.signature);
+        assert!(loosely_verified);
+        assert!(!proof
+            .body
+            .authority_key
+            .verify(&canonical, &proof.signature));
         assert!(matches!(
             verify_request_proof(&proof, &capability, &request, 21, 2),
             Err(BrokerError::AuthorizationDenied(_))
