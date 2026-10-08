@@ -1,5 +1,4 @@
-use std::fs::{self, File, OpenOptions};
-use std::io::Write;
+use std::fs::{self, File};
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 
@@ -606,6 +605,17 @@ fn normalize_private_directory_path(path: &Path) -> Result<PathBuf, std::io::Err
     Ok(normalized)
 }
 
+/// Authority seed and identity files are created at mode 0600. The staged
+/// file is not checked further, so filesystems without Unix modes still accept
+/// the write.
+#[cfg(unix)]
+const AUTHORITY_FILE_POLICY: chio_secure_fs::OwnerPolicy = chio_secure_fs::OwnerPolicy {
+    owner: chio_secure_fs::Owner::Unchecked,
+    forbidden_mode: 0,
+    require_single_link: false,
+    reject_acl: false,
+};
+
 pub(super) fn write_private_file_atomically(path: &Path, contents: &[u8]) -> Result<(), CliError> {
     let parent = path
         .parent()
@@ -615,32 +625,46 @@ pub(super) fn write_private_file_atomically(path: &Path, contents: &[u8]) -> Res
     let file_name = path
         .file_name()
         .ok_or_else(|| CliError::cli_other_error("private file path must name a file"))?;
-    let temporary = parent.join(format!(
-        ".{}.{}.tmp",
-        file_name.to_string_lossy(),
-        uuid::Uuid::now_v7()
-    ));
-    let mut options = OpenOptions::new();
-    options.create_new(true).write(true);
     #[cfg(unix)]
     {
-        use std::os::unix::fs::OpenOptionsExt;
+        let directory = File::open(parent)?;
+        chio_secure_fs::publish_at(
+            &directory,
+            file_name,
+            contents,
+            0o600,
+            chio_secure_fs::Expect::Replace,
+            &AUTHORITY_FILE_POLICY,
+        )?;
+        Ok(())
+    }
+    #[cfg(not(unix))]
+    {
+        use std::fs::OpenOptions;
+        use std::io::Write;
 
-        options.mode(0o600);
-    }
-    let mut staged = options.open(&temporary)?;
-    if let Err(error) = staged.write_all(contents).and_then(|()| staged.sync_all()) {
+        let temporary = parent.join(format!(
+            ".{}.{}.tmp",
+            file_name.to_string_lossy(),
+            uuid::Uuid::now_v7()
+        ));
+        let mut staged = OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&temporary)?;
+        if let Err(error) = staged.write_all(contents).and_then(|()| staged.sync_all()) {
+            drop(staged);
+            let _ = fs::remove_file(&temporary);
+            return Err(CliError::Io(error));
+        }
         drop(staged);
-        let _ = fs::remove_file(&temporary);
-        return Err(CliError::Io(error));
+        if let Err(error) = fs::rename(&temporary, path) {
+            let _ = fs::remove_file(&temporary);
+            return Err(CliError::Io(error));
+        }
+        File::open(parent)?.sync_all()?;
+        Ok(())
     }
-    drop(staged);
-    if let Err(error) = fs::rename(&temporary, path) {
-        let _ = fs::remove_file(&temporary);
-        return Err(CliError::Io(error));
-    }
-    File::open(parent)?.sync_all()?;
-    Ok(())
 }
 
 pub(super) fn durable_admission_kernel_seed_path(path: &Path) -> Result<PathBuf, CliError> {
@@ -1419,6 +1443,33 @@ mod tests {
             .write_new_secret(Path::new("README.md"), b"secret")
             .is_err());
         assert_eq!(fs::read(&outside)?, b"outside");
+        Ok(())
+    }
+
+    #[test]
+    fn authority_files_replace_entries_without_following_or_leaving_temporaries(
+    ) -> Result<(), CliError> {
+        use std::os::unix::fs::{symlink, PermissionsExt};
+
+        let directory = private_directory_test_root()?;
+        let outside = directory.path().join("outside");
+        let state = directory.path().join("state");
+        let seed = state.join("authority.seed");
+        fs::write(&outside, b"outside")?;
+        write_private_file_atomically(&seed, b"first\n")?;
+        fs::remove_file(&seed)?;
+        symlink(&outside, &seed)?;
+
+        write_private_file_atomically(&seed, b"second\n")?;
+
+        assert_eq!(fs::read(&seed)?, b"second\n");
+        assert_eq!(fs::read(&outside)?, b"outside");
+        assert!(fs::symlink_metadata(&seed)?.file_type().is_file());
+        assert_eq!(fs::metadata(&seed)?.permissions().mode() & 0o777, 0o600);
+        let entries = fs::read_dir(&state)?
+            .map(|entry| entry.map(|entry| entry.file_name()))
+            .collect::<Result<Vec<_>, _>>()?;
+        assert_eq!(entries, [std::ffi::OsString::from("authority.seed")]);
         Ok(())
     }
 
