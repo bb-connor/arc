@@ -418,6 +418,7 @@ mod tests {
             loaded_policy(),
             &Keypair::generate(),
             runtime(&directory, Arc::new(ReadyRuntime)),
+            chio_test_support::clock::clock(),
         )
         .expect("build active-defense kernel");
 
@@ -459,6 +460,7 @@ mod tests {
             loaded_policy(),
             &Keypair::generate(),
             runtime(&directory, Arc::new(UnreadyRuntime)),
+            chio_test_support::clock::clock(),
         );
         let error = match result {
             Ok(_) => panic!("unready runtime must fail closed"),

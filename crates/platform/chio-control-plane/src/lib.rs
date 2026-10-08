@@ -122,19 +122,16 @@ pub fn build_kernel_with_clock(
 /// The runtime is checked before any kernel is returned. Security guards are
 /// installed before the default and configured guards, the raw-output
 /// tripwire runs before existing post-invocation hooks, and the flow join runs
-/// after them against the final representation.
+/// after them against the final representation. The clock is the kernel's
+/// authority time owner, shared with the enclosing service.
 pub fn build_kernel_with_active_defense(
     loaded_policy: policy::LoadedPolicy,
     kernel_kp: &Keypair,
     runtime: security::ActiveDefenseRuntime,
+    clock: Arc<dyn chio_security_types::clock::Clock>,
 ) -> Result<ChioKernel, security::ActiveDefenseInstallError> {
     runtime.ensure_ready()?;
-    let mut kernel = build_kernel_components(
-        loaded_policy,
-        kernel_kp,
-        Some(&runtime),
-        Arc::new(chio_security_types::clock::SystemClock),
-    );
+    let mut kernel = build_kernel_components(loaded_policy, kernel_kp, Some(&runtime), clock);
     runtime.install_dispatch_and_issuance(&mut kernel)?;
     Ok(kernel)
 }
