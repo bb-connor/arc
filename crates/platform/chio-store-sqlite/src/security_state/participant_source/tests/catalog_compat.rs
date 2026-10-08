@@ -128,3 +128,134 @@ fn critical_catalog_keeps_the_immutable_revision0_bytes_and_seal() -> TestResult
     }
     Ok(())
 }
+
+#[test]
+fn source_refuses_revision_and_finality_schema_combinations_without_repair() -> TestResult {
+    for damage in ["zero-with-marker", "one-without-marker", "future-version"] {
+        let directory = chio_test_support::private_tempdir()?;
+        let path = directory.path().join("security.db");
+        drop(seeded_security_history(&path)?);
+        let connection = Connection::open(&path)?;
+        let stamp: i32 = connection.query_row(
+            "SELECT version FROM chio_store_schema_versions WHERE store_key = 'security_state'",
+            [],
+            |row| row.get(0),
+        )?;
+        assert_eq!(
+            stamp, 1,
+            "this is a forward revision1 compatibility control"
+        );
+        match damage {
+            "zero-with-marker" => {
+                connection.execute(
+                "UPDATE chio_store_schema_versions SET version = 0 WHERE store_key = 'security_state'", [],
+            )?;
+            }
+            "one-without-marker" => connection.execute_batch(
+                "DROP TRIGGER security_response_effect_finality_immutable; \
+                 DROP TRIGGER security_response_effect_finality_delete_rejected; \
+                 DROP TABLE security_response_effect_finality;",
+            )?,
+            "future-version" => {
+                connection.execute(
+                "UPDATE chio_store_schema_versions SET version = 2 WHERE store_key = 'security_state'", [],
+            )?;
+            }
+            _ => return Err("unknown compatibility damage".into()),
+        }
+        let schema_before: i64 =
+            connection.query_row("PRAGMA schema_version", [], |row| row.get(0))?;
+        let data_before: i64 = connection.query_row("PRAGMA data_version", [], |row| row.get(0))?;
+        let version_before: i32 = connection.query_row(
+            "SELECT version FROM chio_store_schema_versions WHERE store_key = 'security_state'",
+            [],
+            |row| row.get(0),
+        )?;
+        assert!(
+            SqliteSecurityParticipantSource::open(&path).is_err(),
+            "{damage}"
+        );
+        assert_eq!(
+            connection.query_row("PRAGMA schema_version", [], |row| row.get::<_, i64>(0))?,
+            schema_before
+        );
+        assert_eq!(
+            connection.query_row("PRAGMA data_version", [], |row| row.get::<_, i64>(0))?,
+            data_before
+        );
+        assert_eq!(
+            connection.query_row(
+                "SELECT version FROM chio_store_schema_versions WHERE store_key = 'security_state'",
+                [],
+                |row| row.get::<_, i32>(0),
+            )?,
+            version_before
+        );
+        assert!(!schema::has_evidence(&connection)?);
+    }
+    Ok(())
+}
+
+#[test]
+fn revision1_seal_cannot_be_laundered_into_legacy0_by_removing_marker_schema() -> TestResult {
+    let directory = chio_test_support::private_tempdir()?;
+    let path = directory.path().join("security.db");
+    drop(seeded_security_history(&path)?);
+    let source = SqliteSecurityParticipantSource::open(&path)?;
+    let expected = source.preview(&binding()?)?;
+    source.seal_exact(&expected)?;
+    let connection = Connection::open(&path)?;
+    let version: i32 = connection.query_row(
+        "SELECT version FROM chio_store_schema_versions WHERE store_key = 'security_state'",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(version, 1, "this is a forward revision1 seal control");
+    let original_seal: Vec<u8> = connection.query_row(
+        "SELECT canonical_bytes FROM chio_security_participant_source_seal WHERE singleton = 1",
+        [],
+        |row| row.get(0),
+    )?;
+    let version_trigger: String = connection.query_row(
+        "SELECT sql FROM sqlite_schema WHERE type = 'trigger' AND name = 'chio_security_participant_source_version_no_update'",
+        [], |row| row.get(0),
+    )?;
+    connection.execute_batch(
+        "DROP TRIGGER chio_security_participant_source_version_no_update; \
+         DROP TRIGGER security_response_effect_finality_immutable; \
+         DROP TRIGGER security_response_effect_finality_delete_rejected; \
+         DROP TABLE security_response_effect_finality; \
+         UPDATE chio_store_schema_versions SET version = 0 WHERE store_key = 'security_state';",
+    )?;
+    connection.execute_batch(&version_trigger)?;
+    assert_eq!(
+        canonical_json_bytes(&critical_catalog(&connection)?)?,
+        LEGACY_CATALOG,
+        "the attack restored the complete genuine old critical catalog"
+    );
+    let before_schema: i64 = connection.query_row("PRAGMA schema_version", [], |row| row.get(0))?;
+    let before_data: i64 = connection.query_row("PRAGMA data_version", [], |row| row.get(0))?;
+    assert!(source.verify_seal(&expected).is_err());
+    drop(source);
+    assert!(
+        SqliteSecurityParticipantSource::open(&path).is_err(),
+        "a revision1 seal authenticated under the restored old schema/version"
+    );
+    assert_eq!(
+        connection.query_row(
+            "SELECT canonical_bytes FROM chio_security_participant_source_seal WHERE singleton = 1",
+            [],
+            |row| row.get::<_, Vec<u8>>(0),
+        )?,
+        original_seal
+    );
+    assert_eq!(
+        connection.query_row("PRAGMA schema_version", [], |row| row.get::<_, i64>(0))?,
+        before_schema
+    );
+    assert_eq!(
+        connection.query_row("PRAGMA data_version", [], |row| row.get::<_, i64>(0))?,
+        before_data
+    );
+    Ok(())
+}

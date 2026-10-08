@@ -8,6 +8,9 @@ use crate::security_state::SqliteSecurityParticipantSource;
 #[path = "security_participant_migration/cutpoints.rs"]
 mod cutpoints;
 #[cfg(unix)]
+#[path = "security_participant_migration/catalog_compat.rs"]
+mod catalog_compat;
+#[cfg(unix)]
 #[path = "security_participant_migration/integrity.rs"]
 mod integrity;
 #[cfg(unix)]
