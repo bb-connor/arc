@@ -65,7 +65,7 @@ fn a_byte_copy_cannot_recreate_the_original_physical_source_seal() -> TestResult
 fn unqualified_source_open_never_normalizes_catalog_or_version_evidence() -> TestResult {
     for mutation in [
         "PRAGMA application_id = 0",
-        "UPDATE chio_store_schema_versions SET version = 1 WHERE store_key = 'security_state'",
+        "UPDATE chio_store_schema_versions SET version = 2 WHERE store_key = 'security_state'",
         "UPDATE chio_store_schema_versions SET store_key = 'SECURITY_STATE' WHERE store_key = 'security_state'",
         "DELETE FROM chio_store_schema_versions WHERE store_key = 'security_state'",
         "CREATE TABLE security_flow_future (value BLOB)",

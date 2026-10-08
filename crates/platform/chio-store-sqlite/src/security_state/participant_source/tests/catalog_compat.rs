@@ -98,6 +98,41 @@ fn critical_catalog_keeps_the_immutable_revision0_bytes_and_seal() -> TestResult
         seal_before
     );
 
+    // The acceptance driver may additionally verify the ACTUAL prechange
+    // capture after upgrade. Any configured missing/mismatched evidence fails;
+    // the source is only read through its existing physical-identity API.
+    if let Some(capture) = std::env::var_os("CHIO_PR1160_VERIFY_LEGACY_SOURCE_CAPTURE_DIR") {
+        let capture = std::path::PathBuf::from(capture);
+        let original_path =
+            std::path::PathBuf::from(std::fs::read_to_string(capture.join("source-path.txt"))?);
+        let expectation_bytes = std::fs::read(capture.join("source-expectation.json"))?;
+        let original_seal = std::fs::read(capture.join("source-seal.json"))?;
+        assert_eq!(expectation_bytes, original_seal);
+        let old = SecurityParticipantSourceSnapshot::from_canonical_bytes(&expectation_bytes)?;
+        let old_value: serde_json::Value = serde_json::from_slice(&expectation_bytes)?;
+        assert_eq!(
+            old_value["catalog_digest"].as_str(),
+            Some(LEGACY_SCHEMA_DIGEST)
+        );
+        let file_before = sha256_hex(&std::fs::read(&original_path)?);
+        let original = SqliteSecurityParticipantSource::open(&original_path)?;
+        original.verify_seal(&old)?;
+        let actual_seal = original.load_seal()?.ok_or("retained old seal is absent")?;
+        assert_eq!(actual_seal.snapshot().canonical_bytes()?, original_seal);
+        let retained = original.read_sealed_rows(&old)?;
+        assert!(retained.tables.iter().any(|(_, rows)| !rows.is_empty()));
+        drop(original);
+        assert_eq!(sha256_hex(&std::fs::read(&original_path)?), file_before);
+        assert_eq!(
+            std::fs::read(capture.join("source-expectation.json"))?,
+            expectation_bytes
+        );
+        assert_eq!(
+            std::fs::read(capture.join("source-seal.json"))?,
+            original_seal
+        );
+    }
+
     // Root may explicitly retain the genuine prechange inode and expectation
     // for an old-seal read/import capture after the producer changes. This does
     // not synthesize or copy a seal, and never overwrites an earlier capture.
