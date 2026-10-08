@@ -1851,7 +1851,10 @@ mod tests {
             "private key destination already exists"
         );
         assert_eq!(stale.kind(), std::io::ErrorKind::InvalidData);
-        assert_eq!(stale.to_string(), "private key destination identity changed");
+        assert_eq!(
+            stale.to_string(),
+            "private key destination identity changed"
+        );
         assert_eq!(bytes.as_slice(), b"second");
         assert_eq!(read_identity, second);
         assert_eq!(broad.kind(), std::io::ErrorKind::PermissionDenied);
