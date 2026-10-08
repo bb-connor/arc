@@ -1739,3 +1739,25 @@ fn session_throttle_composition_keeps_its_refusals() {
         CompositionRefusals::kept(&first)
     );
 }
+
+#[test]
+fn capability_set_suspension_composition_keeps_its_refusals() {
+    let fixture = ProductionEffectsFixture::new();
+    let effects = fixture.effects();
+    let shared = SharedCapabilitySet::frozen(&fixture, effects.as_ref(), "capability-controls");
+    let (first, second) = (shared.first(), shared.second());
+    let version = || capability_set_version(&fixture.store, &shared.key);
+    let installed = || capability_set_effect_ids(&fixture.store, &shared.key);
+    assert_eq!(
+        composition_refusals(
+            effects.as_ref(),
+            &SharedKey {
+                version: &version,
+                installed: &installed,
+            },
+            &first,
+            &second,
+        ),
+        CompositionRefusals::kept(&first)
+    );
+}
