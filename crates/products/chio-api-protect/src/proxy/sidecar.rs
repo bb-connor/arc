@@ -35,10 +35,18 @@ pub(crate) async fn sidecar_evaluate_handler(
         return response;
     }
 
-    let result = match state
-        .evaluator
-        .evaluate_chio_request(chio_request, presented_capability.as_deref())
-    {
+    // Evaluation reaches the kernel's blocking bridge and the durable stores.
+    let evaluated = blocking({
+        let state = Arc::clone(&state);
+        move || {
+            state
+                .evaluator
+                .evaluate_chio_request(chio_request, presented_capability.as_deref())
+        }
+    })
+    .await
+    .unwrap_or_else(|error| Err(ProtectError::Evaluation(error.to_string())));
+    let result = match evaluated {
         Ok(result) => result,
         Err(error) => {
             warn!("sidecar evaluation error: {error}");
@@ -333,15 +341,26 @@ pub(crate) async fn sidecar_release_handler(
     // dispatch in-process and, when durable, for a sibling replica sharing the
     // volume without waiting for a restart. Fail closed: a release that cannot be
     // recorded must not report success.
-    let Some(revocation_store) = &state.revocation_store else {
+    let Some(revocation_store) = state.revocation_store.clone() else {
         return internal_json_error_response(
             "chio_capability_release_failed",
             "no revocation store is configured for capability release",
         );
     };
-    if let Err(error) = revocation_store.revoke(&capability_id) {
+    let recorded = blocking({
+        let capability_id = capability_id.clone();
+        move || {
+            revocation_store
+                .revoke(&capability_id)
+                .map(drop)
+                .map_err(|error| error.to_string())
+        }
+    })
+    .await
+    .unwrap_or_else(|error| Err(error.to_string()));
+    if let Err(error) = recorded {
         warn!("failed to record capability revocation: {error}");
-        return internal_json_error_response("chio_capability_release_failed", &error.to_string());
+        return internal_json_error_response("chio_capability_release_failed", &error);
     }
     state
         .revoked_capability_ids

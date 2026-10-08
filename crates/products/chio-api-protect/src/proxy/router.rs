@@ -206,15 +206,25 @@ pub(crate) async fn proxy_handler(
         return response;
     }
 
-    let result = match state.evaluator.evaluate_with_execution_nonce(
-        method,
-        &path,
-        &query,
-        &headers,
-        body_hash,
-        body_length,
-        execution_nonce.as_ref(),
-    ) {
+    // Evaluation reaches the kernel's blocking bridge and the durable stores.
+    let evaluated = blocking({
+        let state = Arc::clone(&state);
+        let path = path.clone();
+        move || {
+            state.evaluator.evaluate_with_execution_nonce(
+                method,
+                &path,
+                &query,
+                &headers,
+                body_hash,
+                body_length,
+                execution_nonce.as_ref(),
+            )
+        }
+    })
+    .await
+    .unwrap_or_else(|error| Err(ProtectError::Evaluation(error.to_string())));
+    let result = match evaluated {
         Ok(r) => r,
         Err(e) => {
             warn!("evaluation error: {e}");
