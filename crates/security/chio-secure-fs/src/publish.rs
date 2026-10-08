@@ -39,6 +39,28 @@ pub fn open_directory_nofollow(path: &Path) -> io::Result<File> {
     )?))
 }
 
+/// Opens a lock file in `directory` read-write, creating it with `mode`
+/// (subject to the process umask) when missing, without following a symlink
+/// or truncating it, and checks it against `policy`.
+pub fn open_lock_at(
+    directory: &File,
+    name: &OsStr,
+    mode: u32,
+    policy: &OwnerPolicy,
+) -> io::Result<File> {
+    single_component(name)?;
+    let mode = walk::permission_mode(mode)?;
+    let file = File::from(openat(
+        directory,
+        name,
+        OFlags::RDWR | OFlags::CREATE | OFlags::CLOEXEC | OFlags::NOFOLLOW | OFlags::NONBLOCK,
+        mode,
+    )?);
+    let metadata = file.metadata()?;
+    policy.check_file(&metadata, &file)?;
+    Ok(file)
+}
+
 /// Atomically replaces `name` in `directory` with a new file holding
 /// `contents`.
 ///

@@ -6,7 +6,8 @@ use std::path::Path;
 
 use super::*;
 use crate::{
-    open_directory_nofollow, publish_at, refusal, Expect, OwnerPolicy, PrivateDirectory, Refusal,
+    open_directory_nofollow, open_lock_at, publish_at, refusal, Expect, Owner, OwnerPolicy,
+    PrivateDirectory, Refusal,
 };
 
 fn entries(directory: &Path) -> Result<Vec<String>, Box<dyn Error>> {
@@ -217,5 +218,33 @@ fn locks_refuse_links_and_symlinks() -> TestResult {
 
     assert_eq!(symlinked, io::ErrorKind::FilesystemLoop);
     assert_eq!(refusal_of(linked)?, Refusal::LinkCount);
+    Ok(())
+}
+
+#[test]
+fn locks_open_relative_to_any_directory_descriptor() -> TestResult {
+    let root = private_root()?;
+    let directory = open_directory_nofollow(root.path())?;
+    let outside = root.path().join("outside");
+    fs::create_dir(&outside)?;
+    symlink(outside.join("target.lock"), root.path().join("redirected.lock"))?;
+    let any_regular_file = OwnerPolicy {
+        owner: Owner::Unchecked,
+        forbidden_mode: 0,
+        require_single_link: false,
+        reject_acl: false,
+    };
+
+    let lock = open_lock_at(&directory, name("jobs.lock"), 0o600, &any_regular_file)?;
+    let redirected = os_error_kind(open_lock_at(
+        &directory,
+        name("redirected.lock"),
+        0o600,
+        &any_regular_file,
+    ))?;
+
+    assert!(lock.metadata()?.file_type().is_file());
+    assert_eq!(redirected, io::ErrorKind::FilesystemLoop);
+    assert!(!outside.join("target.lock").exists());
     Ok(())
 }

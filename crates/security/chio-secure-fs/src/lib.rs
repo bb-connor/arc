@@ -51,7 +51,7 @@ pub use file::{
 #[cfg(unix)]
 pub use policy::{effective_uid, Owner, OwnerPolicy};
 #[cfg(unix)]
-pub use publish::{open_directory_nofollow, publish_at, Expect};
+pub use publish::{open_directory_nofollow, open_lock_at, publish_at, Expect};
 
 #[cfg(all(test, unix))]
 #[path = "tests/mod.rs"]

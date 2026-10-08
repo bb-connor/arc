@@ -11,7 +11,7 @@ use zeroize::Zeroizing;
 use crate::error::{refuse, Refusal};
 use crate::file::{changed_while_reading, entry_metadata, FileIdentity, PrivateFile};
 use crate::policy::OwnerPolicy;
-use crate::publish::{publish_at, single_component, Expect};
+use crate::publish::{open_lock_at, publish_at, Expect};
 use crate::walk::{self, Existing};
 
 /// A private directory pinned by a descriptor.
@@ -215,17 +215,7 @@ impl PrivateDirectory {
     ///
     /// The file is never truncated, so an existing lock keeps its contents.
     pub fn open_lock(&self, name: &OsStr, mode: u32, policy: &OwnerPolicy) -> io::Result<File> {
-        single_component(name)?;
-        let mode = walk::permission_mode(mode)?;
-        let file = File::from(openat(
-            &self.directory,
-            name,
-            OFlags::RDWR | OFlags::CREATE | OFlags::CLOEXEC | OFlags::NOFOLLOW | OFlags::NONBLOCK,
-            mode,
-        )?);
-        let metadata = file.metadata()?;
-        policy.check_file(&metadata, &file)?;
-        Ok(file)
+        open_lock_at(&self.directory, name, mode, policy)
     }
 
     /// Atomically replaces `name` with a new file holding `contents`.
