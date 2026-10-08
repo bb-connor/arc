@@ -9,6 +9,18 @@ fn weak_sender_key() -> PublicKey {
     PublicKey::from_bytes(&identity).expect("encoded Ed25519 identity point")
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "forgery fixtures prove that loose verification accepts the forgery"
+)]
+fn loosely_verifies(
+    key: &PublicKey,
+    message: &[u8],
+    signature: &chio_core::crypto::Signature,
+) -> bool {
+    key.verify_legacy_permissive(message, signature)
+}
+
 #[test]
 fn sender_confirmation_rejects_weak_key_registration() {
     let key = weak_sender_key().to_hex();
@@ -39,9 +51,10 @@ fn sender_dpop_rejects_weak_key_forgery_without_consuming_nonce() {
     forged.signature = chio_core::crypto::Signature::from_bytes(&signature);
     let message = canonical_json_bytes(&forged.body).unwrap();
     assert!(
-        forged.body.agent_key.verify(&message, &forged.signature),
+        loosely_verifies(&forged.body.agent_key, &message, &forged.signature),
         "fixture must reproduce permissive verification of a forged proof"
     );
+    assert!(!forged.body.agent_key.verify(&message, &forged.signature));
     assert!(matches!(
         verify(&forged, &store, &config),
         Err(SenderConstraintError::InvalidSignature)

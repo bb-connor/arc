@@ -52,6 +52,7 @@ zeroize = { workspace = true }
 workspace = true
 
 [dev-dependencies]
+chio-core = { package = "chio-core-types", path = "../../core/chio-core-types", features = ["legacy-permissive-verification"] }
 chio-errors = { workspace = true }
 tempfile = { workspace = true }
 rcgen = "0.13.2"

@@ -103,6 +103,14 @@ fn weak_transport_forgery() -> Result<(PublicKey, Signature), FrostCeremonyError
     ))
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "forgery fixtures prove that loose verification accepts the forgery"
+)]
+fn loosely_verifies(key: &PublicKey, message: &[u8], signature: &Signature) -> bool {
+    key.verify_legacy_permissive(message, signature)
+}
+
 #[test]
 fn ceremony_roster_rejects_weak_transport_keys() -> TestResult {
     let n = network()?;
@@ -133,10 +141,16 @@ fn round_one_authentication_rejects_weak_transport_forgery() -> TestResult {
     let message =
         canonical_prefixed_bytes(DKG_PACKAGE_SIGNING_PREFIX, &package.signing_preimage())?;
     assert!(
-        key.verify(&message, &signature),
+        loosely_verifies(&key, &message, &signature),
         "fixture must reproduce permissive verification"
     );
-    assert!(validate_package(&context, &package, FrostDkgRound::Round1).is_err());
+    assert!(!key.verify(&message, &signature));
+    assert!(matches!(
+        validate_package(&context, &package, FrostDkgRound::Round1),
+        Err(FrostCeremonyError::PackageAuthentication { ref participant_id, detail })
+            if participant_id == &package.sender_participant_id
+                && detail == "transport signature does not verify"
+    ));
     Ok(())
 }
 
@@ -153,10 +167,12 @@ fn sealed_round_two_authentication_rejects_weak_transport_forgery() -> TestResul
     };
     let mut package = n.round2[0].clone();
     package.transport_signature = signature.to_hex();
+    let signing_bytes = package.signing_bytes()?;
     assert!(
-        key.verify(&package.signing_bytes()?, &signature),
+        loosely_verifies(&key, &signing_bytes, &signature),
         "fixture must reproduce permissive verification"
     );
+    assert!(!key.verify(&signing_bytes, &signature));
     assert!(matches!(
         package.verify_context(&context, false),
         Err(FrostCeremonyError::Sealing(FrostSealingError::Signature))

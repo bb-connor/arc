@@ -29,6 +29,14 @@ fn identity_key_and_universal_signature() -> (PublicKey, Signature) {
     )
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "forgery fixtures prove that loose verification accepts the forgery"
+)]
+fn loosely_verifies(key: &PublicKey, message: &[u8], signature: &Signature) -> bool {
+    key.verify_legacy_permissive(message, signature)
+}
+
 #[test]
 fn review_rotation_rejects_identity_key_and_universal_proof() {
     let bootstrap = backend(1);
@@ -44,7 +52,9 @@ fn review_rotation_rejects_identity_key_and_universal_proof() {
         algorithm: key.algorithm(),
         signature: signature.clone(),
     });
-    assert!(key.verify(&event.body.signing_bytes().test_unwrap(), &signature));
+    let signing_bytes = event.body.signing_bytes().test_unwrap();
+    assert!(loosely_verifies(&key, &signing_bytes, &signature));
+    assert!(!key.verify(&signing_bytes, &signature));
     let common = event.validate_common(
         1,
         Some(&previous.envelope_hash().test_unwrap()),

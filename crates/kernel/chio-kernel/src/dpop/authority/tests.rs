@@ -91,13 +91,28 @@ fn weak_key_forgery() -> (CapabilityToken, DpopProof) {
     (cap, proof)
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "forgery fixtures prove that loose verification accepts the forgery"
+)]
+fn loosely_verifies(
+    key: &chio_core::crypto::PublicKey,
+    message: &[u8],
+    signature: &chio_core::crypto::Signature,
+) -> bool {
+    key.verify_legacy_permissive(message, signature)
+}
+
 #[test]
 fn durable_dpop_rejects_weak_key_forgery() {
     let (cap, proof) = weak_key_forgery();
-    assert!(proof.body.agent_key.verify(
-        &canonical_json_bytes(&proof.body).unwrap(),
+    let message = canonical_json_bytes(&proof.body).unwrap();
+    assert!(loosely_verifies(
+        &proof.body.agent_key,
+        &message,
         &proof.signature
     ));
+    assert!(!proof.body.agent_key.verify(&message, &proof.signature));
     assert!(matches!(
         verify(&proof, &cap, &authority(), NOW),
         Err(KernelError::Dpop(crate::dpop::DpopError::Signature))

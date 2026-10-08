@@ -118,6 +118,7 @@ libc = "0.2"
 # pull the hyper-util-bearing graph and are unused by the loom models, so they
 # are gated to normal builds. See the runtime-deps note above.
 [dev-dependencies]
+chio-core-types = { workspace = true, features = ["legacy-permissive-verification"] }
 loom = { workspace = true }
 
 [target.'cfg(not(loom))'.dev-dependencies]

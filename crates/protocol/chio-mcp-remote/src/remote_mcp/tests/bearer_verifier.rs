@@ -651,7 +651,14 @@ fn inbound_authority_jwt_rejects_weak_key_forgery() {
         |_| signature.to_vec(),
     );
     let signed_input = token.rsplit_once('.').unwrap().0.as_bytes();
-    assert!(key.verify(signed_input, &Ed25519Signature::from_bytes(&signature)));
+    let forged = Ed25519Signature::from_bytes(&signature);
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "forgery fixtures prove that loose verification accepts the forgery"
+    )]
+    let loosely_verified = key.verify_legacy_permissive(signed_input, &forged);
+    assert!(loosely_verified);
+    assert!(!key.verify(signed_input, &forged));
     for key_source in [
         JwtVerificationKeySource::Static(key.clone()),
         JwtVerificationKeySource::Jwks(JwtJwksKeySet {
