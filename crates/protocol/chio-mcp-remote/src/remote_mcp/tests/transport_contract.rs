@@ -29,7 +29,9 @@ fn sampling_and_terminal_reply_keep_the_actual_post_owner_and_skip_get_replay() 
     let (sender, _) = broadcast::channel(8);
     let retained = Arc::new(StdMutex::new(VecDeque::new()));
     let (inbox, receiver) = mcp_inbox();
-    let request = inbox.account(json!({"jsonrpc":"2.0","id":7,"method":"ping"})).unwrap();
+    let request = inbox
+        .account(json!({"jsonrpc":"2.0","id":7,"method":"ping"}))
+        .unwrap();
     let writer = BroadcastJsonRpcWriter::new(
         sender,
         retained.clone(),

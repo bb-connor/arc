@@ -1,8 +1,8 @@
 //! One ingress reservation follows each message through inbox and deferred storage.
 //! The reserved control share is part of the original aggregate ceiling.
 use super::budget::{
-    AccountedMessage, Footprint, FrameReservation, IngressBudget, IngressUsage,
-    McpResponseContext, McpResponseScope,
+    AccountedMessage, Footprint, FrameReservation, IngressBudget, IngressUsage, McpResponseContext,
+    McpResponseScope,
 };
 use crate::AdapterError;
 use serde::Deserialize;
