@@ -776,3 +776,5 @@ async fn new_post_with_distinct_id_excludes_prior_owner_nested_request() {
 mod initialize_session_header;
 #[path = "worker_lifecycle/roots_next_request.rs"]
 mod roots_next_request;
+#[path = "worker_lifecycle/generation_original.rs"]
+mod generation_original;
