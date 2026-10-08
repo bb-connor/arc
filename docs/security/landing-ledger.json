@@ -113260,7 +113260,7 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "source-integrated-PARTIAL-older-focused-evidence-current-financial6_12-open",
+      "current_state": "source-integrated-current-financial29-green-final-acceptance-pending",
       "source_repair": {
         "commit": "de519d7776d8c9ea101d1aec271fd0be54dca632",
         "commits": [
@@ -113355,16 +113355,17 @@
           "sha256": "01c4188eb877d3d686126db744e19b6e52dc632b793277c3f2e1c0436dc93b02",
           "category": "closed-finite20-19_1-current-runtime",
           "scope": "Actual5 scopes:financial17/1+nativeclock1+router1; true trusted-time failure retained. No fullcrate/currentall18Green claim."
+        },
+        {
+          "path": "docs/security/audits/pipeline-and-recovery-integration-checkpoint-20261008.json",
+          "sha256": "75ba3ba59bb3f6549c8031dac3fe04580c2d4916edb50842b81f6bd116dad598",
+          "source": "3beb954ac0c233a271d1ae98f4d3c5b949e51aaf",
+          "scope": "Original-first pipeline composition, current scoped runtime and strict checks; full candidate unqualified"
         }
       ],
       "remaining_acceptance": [
-        "Retain finite20 financial17/1: true trusted operation time regressed failure in missing-original-adapter recovery isolation. No currentall18Green/fullcrate claim; root/owner diagnoses production clock gap without synthetic clock/effect waiver.",
-        "Resolve actual financial18 current6/12 failures at native error/source and signed metadata locator; preserve original18 and earlier30 failure provenance. No advancing-clock/effect closure inferred.",
-        "Current financial18 and advancing/native-clock residual remain open: actual temporary diagnostic returnedOk(0) but failed unchanged predicate, no production closure inferred.",
-        "Actual amount/FX/refund/overreported/unconvertible controls mapped; no real-funds or full owning/native qualification.",
-        "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
-        "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
-        "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+        "Complete remaining now source repairs and the exact combined-source owning/default/PQ matrix.",
+        "Obtain final native, cold, trusted and hosted evidence plus protected landing; scoped results do not qualify the foundation."
       ],
       "historical_source_claim": {
         "source": {
@@ -113400,7 +113401,24 @@
         "Codex_quota_blocker": false,
         "review_acceptance_established": false
       },
-      "current_financial18_runtime": "CLOSED17pass1fail; missing-original-adapter other-request isolation still fails real trusted-time invariant"
+      "current_financial18_runtime": "CLOSED17pass1fail; missing-original-adapter other-request isolation still fails real trusted-time invariant",
+      "prior_acceptance_observations": [
+        {
+          "current_state": "source-integrated-PARTIAL-older-focused-evidence-current-financial6_12-open",
+          "remaining_acceptance": [
+            "Retain finite20 financial17/1: true trusted operation time regressed failure in missing-original-adapter recovery isolation. No currentall18Green/fullcrate claim; root/owner diagnoses production clock gap without synthetic clock/effect waiver.",
+            "Resolve actual financial18 current6/12 failures at native error/source and signed metadata locator; preserve original18 and earlier30 failure provenance. No advancing-clock/effect closure inferred.",
+            "Current financial18 and advancing/native-clock residual remain open: actual temporary diagnostic returnedOk(0) but failed unchanged predicate, no production closure inferred.",
+            "Actual amount/FX/refund/overreported/unconvertible controls mapped; no real-funds or full owning/native qualification.",
+            "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
+            "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
+            "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+          ],
+          "focused_green": true
+        }
+      ],
+      "source_checkpoint": "de519d7776d8c9ea101d1aec271fd0be54dca632",
+      "qualified": false
     },
     "incoming-pr1160-review-20261006:F003": {
       "requirement_id": "incoming-pr1160-review-20261006:F003",
@@ -114404,7 +114422,7 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "source-integrated-PARTIAL-older-focused-evidence-current-financial6_12-open",
+      "current_state": "source-integrated-current-financial29-green-final-acceptance-pending",
       "source_repair": {
         "commit": "de519d7776d8c9ea101d1aec271fd0be54dca632",
         "commits": [
@@ -114499,16 +114517,17 @@
           "sha256": "01c4188eb877d3d686126db744e19b6e52dc632b793277c3f2e1c0436dc93b02",
           "category": "closed-finite20-19_1-current-runtime",
           "scope": "Actual5 scopes:financial17/1+nativeclock1+router1; true trusted-time failure retained. No fullcrate/currentall18Green claim."
+        },
+        {
+          "path": "docs/security/audits/pipeline-and-recovery-integration-checkpoint-20261008.json",
+          "sha256": "75ba3ba59bb3f6549c8031dac3fe04580c2d4916edb50842b81f6bd116dad598",
+          "source": "3beb954ac0c233a271d1ae98f4d3c5b949e51aaf",
+          "scope": "Original-first pipeline composition, current scoped runtime and strict checks; full candidate unqualified"
         }
       ],
       "remaining_acceptance": [
-        "Retain finite20 financial17/1: true trusted operation time regressed failure in missing-original-adapter recovery isolation. No currentall18Green/fullcrate claim; root/owner diagnoses production clock gap without synthetic clock/effect waiver.",
-        "Resolve actual financial18 current6/12 failures at native error/source and signed metadata locator; preserve original18 and earlier30 failure provenance. No advancing-clock/effect closure inferred.",
-        "Current financial18 and advancing/native-clock residual remain open: actual temporary diagnostic returnedOk(0) but failed unchanged predicate, no production closure inferred.",
-        "Actual amount/FX/refund/overreported/unconvertible controls mapped; no real-funds or full owning/native qualification.",
-        "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
-        "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
-        "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+        "Complete remaining now source repairs and the exact combined-source owning/default/PQ matrix.",
+        "Obtain final native, cold, trusted and hosted evidence plus protected landing; scoped results do not qualify the foundation."
       ],
       "historical_source_claim": {
         "source": {
@@ -114541,7 +114560,24 @@
         "Codex_quota_blocker": false,
         "review_acceptance_established": false
       },
-      "current_financial18_runtime": "CLOSED17pass1fail; missing-original-adapter other-request isolation still fails real trusted-time invariant"
+      "current_financial18_runtime": "CLOSED17pass1fail; missing-original-adapter other-request isolation still fails real trusted-time invariant",
+      "prior_acceptance_observations": [
+        {
+          "current_state": "source-integrated-PARTIAL-older-focused-evidence-current-financial6_12-open",
+          "remaining_acceptance": [
+            "Retain finite20 financial17/1: true trusted operation time regressed failure in missing-original-adapter recovery isolation. No currentall18Green/fullcrate claim; root/owner diagnoses production clock gap without synthetic clock/effect waiver.",
+            "Resolve actual financial18 current6/12 failures at native error/source and signed metadata locator; preserve original18 and earlier30 failure provenance. No advancing-clock/effect closure inferred.",
+            "Current financial18 and advancing/native-clock residual remain open: actual temporary diagnostic returnedOk(0) but failed unchanged predicate, no production closure inferred.",
+            "Actual amount/FX/refund/overreported/unconvertible controls mapped; no real-funds or full owning/native qualification.",
+            "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
+            "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
+            "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+          ],
+          "focused_green": true
+        }
+      ],
+      "source_checkpoint": "de519d7776d8c9ea101d1aec271fd0be54dca632",
+      "qualified": false
     },
     "incoming-pr1160-review-20261006:F006": {
       "requirement_id": "incoming-pr1160-review-20261006:F006",
@@ -117729,7 +117765,7 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "source-integrated-focused-green-final-acceptance-pending",
+      "current_state": "source-integrated-current-monetary-cancel-controls-green-final-acceptance-pending",
       "source_repair": {
         "commit": "de519d7776d8c9ea101d1aec271fd0be54dca632",
         "commits": [
@@ -117771,13 +117807,17 @@
           "runtime_exit": null,
           "source_footprint_unchanged": null,
           "original_artifact_path": "/home/connor/.cache/chio-security-landing-20261004/sprawl-execution/ci-feedback-20261005/integration-session9-green-packet.json"
+        },
+        {
+          "path": "docs/security/audits/pipeline-and-recovery-integration-checkpoint-20261008.json",
+          "sha256": "75ba3ba59bb3f6549c8031dac3fe04580c2d4916edb50842b81f6bd116dad598",
+          "source": "3beb954ac0c233a271d1ae98f4d3c5b949e51aaf",
+          "scope": "Original-first pipeline composition, current scoped runtime and strict checks; full candidate unqualified"
         }
       ],
       "remaining_acceptance": [
-        "Exact session metadata/cancellation behavior scoped; legacy diagnostic and Loom/current owning remain separate.",
-        "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
-        "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
-        "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+        "Complete remaining now source repairs and the exact combined-source owning/default/PQ matrix.",
+        "Obtain final native, cold, trusted and hosted evidence plus protected landing; scoped results do not qualify the foundation."
       ],
       "historical_source_claim": {
         "source": {
@@ -117809,7 +117849,21 @@
         "Codex_required": false,
         "Codex_quota_blocker": false,
         "review_acceptance_established": false
-      }
+      },
+      "prior_acceptance_observations": [
+        {
+          "current_state": "source-integrated-focused-green-final-acceptance-pending",
+          "remaining_acceptance": [
+            "Exact session metadata/cancellation behavior scoped; legacy diagnostic and Loom/current owning remain separate.",
+            "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
+            "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
+            "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+          ],
+          "focused_green": true
+        }
+      ],
+      "source_checkpoint": "3beb954ac0c233a271d1ae98f4d3c5b949e51aaf",
+      "qualified": false
     },
     "incoming-pr1160-review-20261006:F027": {
       "requirement_id": "incoming-pr1160-review-20261006:F027",
@@ -118528,7 +118582,7 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "source-integrated-requirement-focused-acceptance-pending",
+      "current_state": "source-integrated-current-transient-read-controls-green-final-acceptance-pending",
       "source_repair": {
         "commit": "de519d7776d8c9ea101d1aec271fd0be54dca632",
         "commits": [
@@ -118540,7 +118594,7 @@
         "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
       },
       "source_integrated": true,
-      "focused_green": false,
+      "focused_green": true,
       "owning_pending": true,
       "native_pending": true,
       "trusted_pending": true,
@@ -118649,14 +118703,17 @@
           "sha256": "aa2d0fa4367378f004680bfe660963afb31b868461b40f2ea12a6deb1e78ab55",
           "category": "actual-CP14-list-or-run-log",
           "scope": "Exact14PASS actual0002/EUID1000; no generic fullowner upgrade."
+        },
+        {
+          "path": "docs/security/audits/pipeline-and-recovery-integration-checkpoint-20261008.json",
+          "sha256": "75ba3ba59bb3f6549c8031dac3fe04580c2d4916edb50842b81f6bd116dad598",
+          "source": "3beb954ac0c233a271d1ae98f4d3c5b949e51aaf",
+          "scope": "Original-first pipeline composition, current scoped runtime and strict checks; full candidate unqualified"
         }
       ],
       "remaining_acceptance": [
-        "Exact owner and independent assessment establish this source repair; no invented focused count or broad ownership closure.",
-        "Establish current exact requirement-focused behavioral qualification; shared/older component evidence is bounded.",
-        "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
-        "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
-        "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+        "Complete remaining now source repairs and the exact combined-source owning/default/PQ matrix.",
+        "Obtain final native, cold, trusted and hosted evidence plus protected landing; scoped results do not qualify the foundation."
       ],
       "historical_source_claim": {
         "source": {
@@ -118769,7 +118826,22 @@
         "no_no_deps_allow_or_PQ_alltargets_claim": true,
         "later576_F022_kernel_targets_pending": true,
         "whole_owning_native_trusted_hosted_pending": true
-      }
+      },
+      "prior_acceptance_observations": [
+        {
+          "current_state": "source-integrated-requirement-focused-acceptance-pending",
+          "remaining_acceptance": [
+            "Exact owner and independent assessment establish this source repair; no invented focused count or broad ownership closure.",
+            "Establish current exact requirement-focused behavioral qualification; shared/older component evidence is bounded.",
+            "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
+            "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
+            "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+          ],
+          "focused_green": false
+        }
+      ],
+      "source_checkpoint": "3beb954ac0c233a271d1ae98f4d3c5b949e51aaf",
+      "qualified": false
     },
     "incoming-pr1160-review-20261006:F029": {
       "requirement_id": "incoming-pr1160-review-20261006:F029",
@@ -118786,7 +118858,7 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "source-integrated-requirement-focused-acceptance-pending",
+      "current_state": "source-integrated-current-deactivation-controls-green-final-acceptance-pending",
       "source_repair": {
         "commit": "de519d7776d8c9ea101d1aec271fd0be54dca632",
         "commits": [
@@ -118798,7 +118870,7 @@
         "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
       },
       "source_integrated": true,
-      "focused_green": false,
+      "focused_green": true,
       "owning_pending": true,
       "native_pending": true,
       "trusted_pending": true,
@@ -118907,14 +118979,17 @@
           "sha256": "aa2d0fa4367378f004680bfe660963afb31b868461b40f2ea12a6deb1e78ab55",
           "category": "actual-CP14-list-or-run-log",
           "scope": "Exact14PASS actual0002/EUID1000; no generic fullowner upgrade."
+        },
+        {
+          "path": "docs/security/audits/pipeline-and-recovery-integration-checkpoint-20261008.json",
+          "sha256": "75ba3ba59bb3f6549c8031dac3fe04580c2d4916edb50842b81f6bd116dad598",
+          "source": "3beb954ac0c233a271d1ae98f4d3c5b949e51aaf",
+          "scope": "Original-first pipeline composition, current scoped runtime and strict checks; full candidate unqualified"
         }
       ],
       "remaining_acceptance": [
-        "Exact owner and independent assessment establish this source repair; no invented focused count or broad ownership closure.",
-        "Establish current exact requirement-focused behavioral qualification; shared/older component evidence is bounded.",
-        "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
-        "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
-        "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+        "Complete remaining now source repairs and the exact combined-source owning/default/PQ matrix.",
+        "Obtain final native, cold, trusted and hosted evidence plus protected landing; scoped results do not qualify the foundation."
       ],
       "historical_source_claim": {
         "source": {
@@ -119037,7 +119112,22 @@
         "no_no_deps_allow_or_PQ_alltargets_claim": true,
         "later576_F022_kernel_targets_pending": true,
         "whole_owning_native_trusted_hosted_pending": true
-      }
+      },
+      "prior_acceptance_observations": [
+        {
+          "current_state": "source-integrated-requirement-focused-acceptance-pending",
+          "remaining_acceptance": [
+            "Exact owner and independent assessment establish this source repair; no invented focused count or broad ownership closure.",
+            "Establish current exact requirement-focused behavioral qualification; shared/older component evidence is bounded.",
+            "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
+            "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
+            "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+          ],
+          "focused_green": false
+        }
+      ],
+      "source_checkpoint": "3beb954ac0c233a271d1ae98f4d3c5b949e51aaf",
+      "qualified": false
     },
     "incoming-pr1160-review-20261006:F030": {
       "requirement_id": "incoming-pr1160-review-20261006:F030",
@@ -120861,22 +120951,27 @@
       "scope": "now-control-mutex-and-attributed-native-history; later-broad-audit-split",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "pipeline-mutex-source-ready-composition-and-final-acceptance-pending",
+      "current_state": "mutex-source-integrated-focused-green-complete-history-audit-split-later",
       "source_repair": null,
       "source_integrated": null,
-      "focused_green": null,
+      "focused_green": true,
       "owning_pending": true,
       "native_pending": true,
       "trusted_pending": true,
       "hosted_pending": true,
       "merged": false,
       "full_qualified": false,
-      "verification_evidence": [],
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/pipeline-and-recovery-integration-checkpoint-20261008.json",
+          "sha256": "75ba3ba59bb3f6549c8031dac3fe04580c2d4916edb50842b81f6bd116dad598",
+          "source": "3beb954ac0c233a271d1ae98f4d3c5b949e51aaf",
+          "scope": "Original-first pipeline composition, current scoped runtime and strict checks; full candidate unqualified"
+        }
+      ],
       "remaining_acceptance": [
-        "Establish the exact current requirement-to-source repair and hash-bound behavioral/source evidence; no absence of repair or loss of historical established work is inferred.",
-        "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
-        "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
-        "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+        "Complete remaining now source repairs and the exact combined-source owning/default/PQ matrix.",
+        "Obtain final native, cold, trusted and hosted evidence plus protected landing; scoped results do not qualify the foundation."
       ],
       "historical_source_claim": {
         "source": {
@@ -120912,7 +121007,20 @@
       },
       "current_source_checkpoint": "61b4272bf929f205db2bc3a38130e89c8f8a8ea1",
       "qualified": false,
-      "preserved_followup": "Health caching and broad audit split remain later; the attributed native participant-history deadline is PG-HISTORY now."
+      "preserved_followup": "Health caching and broad audit split remain later; the attributed native participant-history deadline is PG-HISTORY now.",
+      "prior_acceptance_observations": [
+        {
+          "current_state": "pipeline-mutex-source-ready-composition-and-final-acceptance-pending",
+          "remaining_acceptance": [
+            "Establish the exact current requirement-to-source repair and hash-bound behavioral/source evidence; no absence of repair or loss of historical established work is inferred.",
+            "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
+            "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
+            "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+          ],
+          "focused_green": null
+        }
+      ],
+      "source_checkpoint": "c9c846cfbe51b5e737c972e65bebe262f0d8b009"
     },
     "incoming-pr1160-review-20261006:F044": {
       "requirement_id": "incoming-pr1160-review-20261006:F044",
@@ -129800,7 +129908,7 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "confirmed-review-obligation-pending-integration-and-final-acceptance",
+      "current_state": "source-integrated-focused-green-final-acceptance-pending",
       "source_repair": {
         "checkpoint": "89d79ac6ab79de5d55b99a7c8ec611bc8b021cb2",
         "files": [
@@ -129809,19 +129917,38 @@
         "application": "This pins the original review record only. It does not establish an implemented repair; current owner handoffs must be integrated and verified separately."
       },
       "source_integrated": false,
-      "focused_green": false,
+      "focused_green": true,
       "owning_pending": true,
       "native_pending": true,
       "trusted_pending": true,
       "hosted_pending": true,
       "merged": false,
       "full_qualified": false,
-      "verification_evidence": [],
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/pipeline-and-recovery-integration-checkpoint-20261008.json",
+          "sha256": "75ba3ba59bb3f6549c8031dac3fe04580c2d4916edb50842b81f6bd116dad598",
+          "source": "3beb954ac0c233a271d1ae98f4d3c5b949e51aaf",
+          "scope": "Original-first pipeline composition, current scoped runtime and strict checks; full candidate unqualified"
+        }
+      ],
       "remaining_acceptance": [
-        "Review the exact Original-first owner handoff against the current integration candidate; retain genuine failures and separate existing-green coverage.",
-        "Integrate only reviewed repairs and run their current focused/owning strict and required native checks without baseline, resource, isolation or assertion waivers.",
-        "Complete independent full-candidate, cold/trusted and exact hosted/merge qualification before protected #1160 landing."
-      ]
+        "Complete remaining now source repairs and the exact combined-source owning/default/PQ matrix.",
+        "Obtain final native, cold, trusted and hosted evidence plus protected landing; scoped results do not qualify the foundation."
+      ],
+      "prior_acceptance_observations": [
+        {
+          "current_state": "confirmed-review-obligation-pending-integration-and-final-acceptance",
+          "remaining_acceptance": [
+            "Review the exact Original-first owner handoff against the current integration candidate; retain genuine failures and separate existing-green coverage.",
+            "Integrate only reviewed repairs and run their current focused/owning strict and required native checks without baseline, resource, isolation or assertion waivers.",
+            "Complete independent full-candidate, cold/trusted and exact hosted/merge qualification before protected #1160 landing."
+          ],
+          "focused_green": false
+        }
+      ],
+      "source_checkpoint": "aa322dfff51c85724b0374a79e3ba31aec037aaf",
+      "qualified": false
     },
     "incoming-pr1160-review-20261007:effects:trusted-clock": {
       "requirement_id": "incoming-pr1160-review-20261007:effects:trusted-clock",
@@ -129948,7 +130075,7 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "confirmed-review-obligation-pending-integration-and-final-acceptance",
+      "current_state": "source-integrated-focused-green-final-acceptance-pending",
       "source_repair": {
         "checkpoint": "89d79ac6ab79de5d55b99a7c8ec611bc8b021cb2",
         "files": [
@@ -129957,19 +130084,38 @@
         "application": "This pins the original review record only. It does not establish an implemented repair; current owner handoffs must be integrated and verified separately."
       },
       "source_integrated": false,
-      "focused_green": false,
+      "focused_green": true,
       "owning_pending": true,
       "native_pending": true,
       "trusted_pending": true,
       "hosted_pending": true,
       "merged": false,
       "full_qualified": false,
-      "verification_evidence": [],
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/pipeline-and-recovery-integration-checkpoint-20261008.json",
+          "sha256": "75ba3ba59bb3f6549c8031dac3fe04580c2d4916edb50842b81f6bd116dad598",
+          "source": "3beb954ac0c233a271d1ae98f4d3c5b949e51aaf",
+          "scope": "Original-first pipeline composition, current scoped runtime and strict checks; full candidate unqualified"
+        }
+      ],
       "remaining_acceptance": [
-        "Review the exact Original-first owner handoff against the current integration candidate; retain genuine failures and separate existing-green coverage.",
-        "Integrate only reviewed repairs and run their current focused/owning strict and required native checks without baseline, resource, isolation or assertion waivers.",
-        "Complete independent full-candidate, cold/trusted and exact hosted/merge qualification before protected #1160 landing."
-      ]
+        "Complete remaining now source repairs and the exact combined-source owning/default/PQ matrix.",
+        "Obtain final native, cold, trusted and hosted evidence plus protected landing; scoped results do not qualify the foundation."
+      ],
+      "prior_acceptance_observations": [
+        {
+          "current_state": "confirmed-review-obligation-pending-integration-and-final-acceptance",
+          "remaining_acceptance": [
+            "Review the exact Original-first owner handoff against the current integration candidate; retain genuine failures and separate existing-green coverage.",
+            "Integrate only reviewed repairs and run their current focused/owning strict and required native checks without baseline, resource, isolation or assertion waivers.",
+            "Complete independent full-candidate, cold/trusted and exact hosted/merge qualification before protected #1160 landing."
+          ],
+          "focused_green": false
+        }
+      ],
+      "source_checkpoint": "10a37ad9eac8709466392c7f7abb679a109fcb20",
+      "qualified": false
     },
     "incoming-pr1160-review-20261007:pipeline:teardown-fairness": {
       "requirement_id": "incoming-pr1160-review-20261007:pipeline:teardown-fairness",
@@ -129985,7 +130131,7 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "confirmed-review-obligation-pending-integration-and-final-acceptance",
+      "current_state": "source-integrated-focused-green-final-acceptance-pending",
       "source_repair": {
         "checkpoint": "89d79ac6ab79de5d55b99a7c8ec611bc8b021cb2",
         "files": [
@@ -129994,19 +130140,38 @@
         "application": "This pins the original review record only. It does not establish an implemented repair; current owner handoffs must be integrated and verified separately."
       },
       "source_integrated": false,
-      "focused_green": false,
+      "focused_green": true,
       "owning_pending": true,
       "native_pending": true,
       "trusted_pending": true,
       "hosted_pending": true,
       "merged": false,
       "full_qualified": false,
-      "verification_evidence": [],
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/pipeline-and-recovery-integration-checkpoint-20261008.json",
+          "sha256": "75ba3ba59bb3f6549c8031dac3fe04580c2d4916edb50842b81f6bd116dad598",
+          "source": "3beb954ac0c233a271d1ae98f4d3c5b949e51aaf",
+          "scope": "Original-first pipeline composition, current scoped runtime and strict checks; full candidate unqualified"
+        }
+      ],
       "remaining_acceptance": [
-        "Review the exact Original-first owner handoff against the current integration candidate; retain genuine failures and separate existing-green coverage.",
-        "Integrate only reviewed repairs and run their current focused/owning strict and required native checks without baseline, resource, isolation or assertion waivers.",
-        "Complete independent full-candidate, cold/trusted and exact hosted/merge qualification before protected #1160 landing."
-      ]
+        "Complete remaining now source repairs and the exact combined-source owning/default/PQ matrix.",
+        "Obtain final native, cold, trusted and hosted evidence plus protected landing; scoped results do not qualify the foundation."
+      ],
+      "prior_acceptance_observations": [
+        {
+          "current_state": "confirmed-review-obligation-pending-integration-and-final-acceptance",
+          "remaining_acceptance": [
+            "Review the exact Original-first owner handoff against the current integration candidate; retain genuine failures and separate existing-green coverage.",
+            "Integrate only reviewed repairs and run their current focused/owning strict and required native checks without baseline, resource, isolation or assertion waivers.",
+            "Complete independent full-candidate, cold/trusted and exact hosted/merge qualification before protected #1160 landing."
+          ],
+          "focused_green": false
+        }
+      ],
+      "source_checkpoint": "d736632268db606576ca1a626ba15777cc7b0cab",
+      "qualified": false
     },
     "incoming-pr1160-review-20261007:resume:AR-OUT": {
       "state": "source-integrated-scoped-green-final-acceptance-pending",
@@ -130094,16 +130259,59 @@
       "merged": false
     },
     "incoming-pr1160-review-20261007:resume:PIPC": {
-      "state": "pipeline-source-reviewed-one-ttl-amendment-pending",
-      "source_checkpoint": "61b4272bf929f205db2bc3a38130e89c8f8a8ea1",
+      "state": "source-integrated-focused-green-final-acceptance-pending",
+      "source_checkpoint": "84ef80f309d2398bfc1ecd4236d9756f91007133",
       "qualified": false,
-      "merged": false
+      "merged": false,
+      "prior_acceptance_observations": [
+        {
+          "state": "pipeline-source-reviewed-one-ttl-amendment-pending",
+          "source_checkpoint": "61b4272bf929f205db2bc3a38130e89c8f8a8ea1"
+        }
+      ],
+      "current_state": "source-integrated-focused-green-final-acceptance-pending",
+      "focused_green": true,
+      "full_qualified": false,
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/pipeline-and-recovery-integration-checkpoint-20261008.json",
+          "sha256": "75ba3ba59bb3f6549c8031dac3fe04580c2d4916edb50842b81f6bd116dad598",
+          "source": "3beb954ac0c233a271d1ae98f4d3c5b949e51aaf",
+          "scope": "Original-first pipeline composition, current scoped runtime and strict checks; full candidate unqualified"
+        }
+      ],
+      "remaining_acceptance": [
+        "Complete remaining now source repairs and the exact combined-source owning/default/PQ matrix.",
+        "Obtain final native, cold, trusted and hosted evidence plus protected landing; scoped results do not qualify the foundation."
+      ]
     },
     "incoming-pr1160-review-20261007:resume:TEARDOWN-TTL": {
-      "state": "independent-source-confirmed-original-first-amendment-pending",
-      "source_checkpoint": "61b4272bf929f205db2bc3a38130e89c8f8a8ea1",
+      "state": "healthy-TTL-repair-integrated-green-expired-rollback-P2-open",
+      "source_checkpoint": "3beb954ac0c233a271d1ae98f4d3c5b949e51aaf",
       "qualified": false,
-      "merged": false
+      "merged": false,
+      "prior_acceptance_observations": [
+        {
+          "state": "independent-source-confirmed-original-first-amendment-pending",
+          "source_checkpoint": "61b4272bf929f205db2bc3a38130e89c8f8a8ea1"
+        }
+      ],
+      "current_state": "healthy-TTL-repair-integrated-green-expired-rollback-P2-open",
+      "focused_green": true,
+      "full_qualified": false,
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/pipeline-and-recovery-integration-checkpoint-20261008.json",
+          "sha256": "75ba3ba59bb3f6549c8031dac3fe04580c2d4916edb50842b81f6bd116dad598",
+          "source": "3beb954ac0c233a271d1ae98f4d3c5b949e51aaf",
+          "scope": "Original-first pipeline composition, current scoped runtime and strict checks; full candidate unqualified"
+        }
+      ],
+      "remaining_acceptance": [
+        "Repair and verify the separate expired-overlay rollback fault-accounting P2.",
+        "Complete remaining now source repairs and the exact combined-source owning/default/PQ matrix.",
+        "Obtain final native, cold, trusted and hosted evidence plus protected landing; scoped results do not qualify the foundation."
+      ]
     },
     "incoming-pr1160-review-20261007:resume:PG-HISTORY": {
       "state": "genuine-native-growth-attributed-checkpoint-original-pending",
@@ -130152,12 +130360,33 @@
       "audit_path": "docs/security/audits/mcp-and-diagnostic-integration-checkpoint-20261008.json"
     },
     "incoming-pr1160-review-20261007:resume:FUZZ-FRAMING": {
-      "state": "source-integrated-currentcompilerRED-toGREEN-andstrict0-lockedcorpuspending",
+      "state": "source-integrated-compiler-and-strict-green-locked-workspace35-green-final-acceptance-pending",
       "source_checkpoint": "3f3dc21b45",
       "qualified": false,
       "merged": false,
       "evidence_checkpoint": "759bb100ccfb16d1e37fe8b48db96cb40f5197fe",
-      "audit_path": "docs/security/audits/mcp-and-diagnostic-integration-checkpoint-20261008.json"
+      "audit_path": "docs/security/audits/mcp-and-diagnostic-integration-checkpoint-20261008.json",
+      "prior_acceptance_observations": [
+        {
+          "state": "source-integrated-currentcompilerRED-toGREEN-andstrict0-lockedcorpuspending",
+          "source_checkpoint": "3f3dc21b45"
+        }
+      ],
+      "current_state": "source-integrated-compiler-and-strict-green-locked-workspace35-green-final-acceptance-pending",
+      "focused_green": true,
+      "full_qualified": false,
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/pipeline-and-recovery-integration-checkpoint-20261008.json",
+          "sha256": "75ba3ba59bb3f6549c8031dac3fe04580c2d4916edb50842b81f6bd116dad598",
+          "source": "3beb954ac0c233a271d1ae98f4d3c5b949e51aaf",
+          "scope": "Original-first pipeline composition, current scoped runtime and strict checks; full candidate unqualified"
+        }
+      ],
+      "remaining_acceptance": [
+        "Complete remaining now source repairs and the exact combined-source owning/default/PQ matrix.",
+        "Obtain final native, cold, trusted and hosted evidence plus protected landing; scoped results do not qualify the foundation."
+      ]
     },
     "incoming-pr1160-review-20261007:resume:F042-CURRENT": {
       "state": "promoted-current-genuine-original-red-claude-repair-pending",
@@ -131582,5 +131811,14 @@
     "qualified": false,
     "merged": false,
     "boundary": "scoped localMCP/diagnostic/source gates; nativepreflightfailure retained and realattachmentrepair open"
+  },
+  "pipeline_and_recovery_integration_checkpoint_20261008": {
+    "path": "docs/security/audits/pipeline-and-recovery-integration-checkpoint-20261008.json",
+    "sha256": "75ba3ba59bb3f6549c8031dac3fe04580c2d4916edb50842b81f6bd116dad598",
+    "source": "3beb954ac0c233a271d1ae98f4d3c5b949e51aaf",
+    "scope": "Original-first pipeline composition, current scoped runtime and strict checks; full candidate unqualified",
+    "requirements": 1783,
+    "qualified": false,
+    "merged": false
   }
 }

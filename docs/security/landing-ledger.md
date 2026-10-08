@@ -2,6 +2,8 @@
 
 ## Latest integration checkpoint (2026-10-08)
 
+The [pipeline and recovery checkpoint](audits/pipeline-and-recovery-integration-checkpoint-20261008.json) records the Original-first composition at `e6384ebe44`: terminal rejection/outbox progress, recovery-only readiness, independent bounded teardown, closed-admission refusal, and readiness probes outside the control mutex. Healthy TTL waits have passing local controls; the separate expired-overlay rollback accounting defect remains open. The local payment recovery module passes 29 cases, and the locked fuzz workspace passes 35. Earlier failed and setup campaigns remain retained. Full candidate and landing acceptance are still open.
+
 The authoritative [JSON ledger](landing-ledger.json) has 1,783 requirements. The additive [MCP and diagnostic checkpoint](audits/mcp-and-diagnostic-integration-checkpoint-20261008.json) records MCP source `2488df7f78`, fuzz repair `3f3dc21b45`, and diagnostics `f41e8928d9`. Current MCP libraries pass 478 cases; the diagnostics pass 12 Rust and five Python cases. Strict lint for MCP, CLI, and the fuzz feature, the source inventory, and 42 existing plus 21 new mutation controls pass within their recorded scope. The native CLI attempt remains failed at preflight on ARM (43 HTTP failures and conformance three passed, one failed). Earlier native evidence from `8060ded996` binds a separate source.
 
 Published PR #1160 is still `89d79ac6ab`, with 118 successful, 21 failed, and 12 skipped hosted checks. Local source is unpublished, unqualified, and unmerged. Remaining production repairs, exact-source native, cold and trusted evidence, the full test matrix, and protected landing are open. The real mini-SWE attachment defect remains open despite the diagnostic repair. The active landing queue contains #1160; #1167, #1168, and #1176 are merged.
@@ -115,17 +117,17 @@ readiness records stay historical pending the root final candidate K.
 | F016 | P2 | codex | now | in-progress | not established |
 | F017 | P2 | codex | now | in-progress | not established |
 | F018 | P2 | codex | now | in-progress | not established |
-| F019 | P2 | codex | now | in-progress | not established |
+| F019 | P2 | codex | now | integrated | `de519d7776`; current source reverified, final qualification pending |
 | F020 | P2 | codex | later | open | not established |
 | F021 | P2 | codex | now | in-progress | not established |
 | F022 | P2 | codex | now | in-progress | not established |
 | F023 | P2 | codex | now | in-progress | not established |
 | F024 | P2 | codex | now | in-progress | not established |
-| F025 | P2 | codex | now | in-progress | not established |
+| F025 | P2 | codex | now | integrated | `de519d7776`; current source reverified, final qualification pending |
 | F026 | P2 | codex | now | in-progress | not established |
 | F027 | P2 | codex | now | in-progress | not established |
-| F028 | P2 | codex | now | in-progress | not established |
-| F029 | P2 | codex | now | in-progress | not established |
+| F028 | P2 | codex | now | integrated | `de519d7776`; current source reverified, final qualification pending |
+| F029 | P2 | codex | now | integrated | `de519d7776`; current source reverified, final qualification pending |
 | F030 | P2 | codex | now | in-progress | not established |
 | F031 | P2 | codex | now | in-progress | not established |
 | F032 | P2 | claude | now | open | not established |
