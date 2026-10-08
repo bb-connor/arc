@@ -3849,24 +3849,24 @@ assert_rejected(
     "later-CI revocation loses failure-only, definition, source, PR/E/M, or evidence-variable binding",
 )
 assert_rejected(
-    "failure projector crosses pull-request heads",
+    "failure projector substitutes title evidence for the API head",
     "security-contract-revocation.yml",
     replace_in_named_step(
         "Bind later failed CI rerun to existing authority",
-        'test "$(jq -r \'.head.sha\' <<< "${live_pr}")" = "${evidence_sha}"',
-        "true",
+        'evidence_sha="$(jq -r \'.head_sha\' <<< "${upstream}")"',
+        'evidence_sha="${BASH_REMATCH[2]}"',
     ),
-    "later-CI revocation loses failure-only, definition, source, PR/E/M, or evidence-variable binding",
+    "denial-only CI listener restores title, M or PR gating or loses E scope",
 )
 assert_rejected(
-    "failure projector creates new tombstones after pull-request drift",
+    "failure projector creates tombstones for a non-committed evidence head",
     "security-contract-revocation.yml",
     replace_in_named_step(
         "Bind later failed CI rerun to existing authority",
-        "          create_missing=false\n",
-        "          create_missing=true\n",
+        'if test "${COMMITTED_EVIDENCE_SHA}" = "${evidence_sha}"; then',
+        'if true; then',
     ),
-    "later-CI revocation loses failure-only, definition, source, PR/E/M, or evidence-variable binding",
+    "denial-only CI listener restores title, M or PR gating or loses E scope",
 )
 assert_rejected(
     "failure projector derives source authority from an App variable",
@@ -4189,7 +4189,7 @@ for label, old, new in (
     ),
     (
         "revocation contract drops all-attempt reconciliation and max-advance fail closure",
-        "For every matching run it reads the current\nmaximum attempt, retrieves every exact historical attempt from one through that\nmaximum, and fails closed before GitHub's 1,000-result filtered-search ceiling.",
+        "For every matching run it reads the current\nmaximum attempt, retrieves exact historical attempts within the first100, and\nfails closed before GitHub's 1,000-result filtered-search ceiling.",
         "For every matching run it reads only the latest attempt and permits truncated search results.",
     ),
 ):
@@ -4427,8 +4427,8 @@ assert_rejected(
     "enterprise-evidence-finalizer.yml",
     replace_in_named_step(
         "Reconcile exact five-context merge authority",
-        "for ((run_attempt = 1; run_attempt <= max_attempt; run_attempt++)); do",
-        "for ((run_attempt = max_attempt; run_attempt <= max_attempt; run_attempt++)); do",
+        "for ((run_attempt = 1; run_attempt <= attempt_limit; run_attempt++)); do",
+        "for ((run_attempt = attempt_limit; run_attempt <= attempt_limit; run_attempt++)); do",
     ),
     "weakens App, main-ref, binding, or check payload authentication",
 )
@@ -5005,14 +5005,14 @@ assert_rejected(
     "weakens App, main-ref, binding, or check payload authentication",
 )
 assert_rejected(
-    "publisher late-CI reconciler ignores explicit merge-ref drift",
+    "publisher late-CI reconciler creates tombstones for a non-committed head",
     "enterprise-evidence-finalizer.yml",
     replace_in_named_step(
         "Reconcile exact five-context merge authority",
-        'test "$(jq -r \'.object.sha\' <<< "${live_bad_ci_merge_ref}")" = "${MERGE_COMMIT_SHA}"',
-        "true",
+        'if test "${COMMITTED_EVIDENCE_SHA}" = "${EVIDENCE_SHA}"; then',
+        'if true; then',
     ),
-    "weakens App, main-ref, binding, or check payload authentication",
+    "complete E history loses dual census, authenticated-bad precedence or bounded attempts",
 )
 assert_rejected(
     "publisher late-CI tombstone POST drops immediate E-scope revalidation",
@@ -6015,5 +6015,39 @@ for label, old, new, error in (
     ("revoker restores M payload placement", '--arg head_sha "${EVIDENCE_SHA}"', '--arg head_sha "${MERGE_COMMIT_SHA}"', "negative canonical member is not the oldest preserved member"),
 ):
     assert_rejected(label, "security-contract-revocation.yml", replace_in_named_step("Revoke exact Actions mirrors and dedicated App namespace", old, new), error)
+
+for label, old, new in (
+    ("H auditor loses repository-wide discovery", 'actions/runs?event=pull_request&head_sha={evidence}&exclude_pull_requests=true', 'actions/workflows/ci.yml/runs?event=pull_request&head_sha={evidence}'),
+    ("H auditor loses A subset Z", 'workflow_run_ids <= repository_ci_ids', 'True'),
+    ("H auditor skips final A re-list", 'api.pages(workflow_query, "workflow_runs") == workflow_runs', 'True'),
+):
+    assert_auditor_transport_rejected(label, old, new, "trusted landing v3 boundary changed")
+
+for label, function, old, new in (
+    ("H publisher loses repository CI census", "reconcile_bad_ci", 'repository_runs="$(list_ci_inventory actions/runs)" || return 1', 'repository_runs="${workflow_runs}"'),
+    ("H publisher loses A subset Z", "reconcile_bad_ci", '$workflow - $repository | length', '0'),
+    ("H publisher masks retired workflow negatives", "reconcile_bad_ci", '(.workflow_id | type == "number" and . > 0 and floor == .)', '(.workflow_id | tostring) == $workflow_id'),
+    ("H publisher exits before observed-bad precedence", "reconcile_bad_ci", 'if ! current_ci_run="$(get_current_ci_run "${run_id}")" ||', 'if current_ci_run="$(get_current_ci_run "${run_id}")" ||'),
+    ("H publisher increases bounded attempt window", "reconcile_bad_ci", 'attempt_limit=100', 'attempt_limit=101'),
+    ("H publisher drops the over-limit refusal", "reconcile_bad_ci", 'test "${#max_attempt}" -gt 3 || test "${max_attempt}" -gt 100', 'false'),
+):
+    assert_rejected(label, "enterprise-evidence-finalizer.yml", replace_in_named_shell_function("Reconcile exact five-context merge authority", function, old, new), "weakens App, main-ref, binding, or check payload authentication" if label == "H publisher increases bounded attempt window" else "complete E history")
+
+for label, step, old, new, error in (
+    ("P5 listener restores historical M read", "Bind later failed CI rerun to existing authority", '          title_valid=false\n', '          title_valid=false\n          gh api "repos/${GITHUB_REPOSITORY}/git/commits/${merge_commit_sha}"\n', "denial-only CI listener restores title, M or PR gating or loses E scope"),
+    ("P5 listener reuses title as eligibility", "Bind later failed CI rerun to existing authority", '          title_valid=false\n', '          title_valid=false\n          echo "eligible=false" >> "${GITHUB_OUTPUT}"\n', "denial-only CI listener restores title, M or PR gating or loses E scope"),
+    ("P5 listener ignores the merged-head exception", "Bind later failed CI rerun to existing authority", 'test "$(jq -r \'.merged\' <<< "${live_pr}" 2>/dev/null)" = true', 'true', "denial-only CI listener restores title, M or PR gating or loses E scope"),
+    ("P5 manual denial requires an open PR", "Bind frozen manual revocation", '          base_sha=\'\'\n', '          test "$(jq -r \'.state\' <<< "${observed_pr}")" = open\n          base_sha=\'\'\n', "manual denial restores live PR or M gating"),
+    ("P5 revoker skips E revalidation before POST", "Revoke exact Actions mirrors and dedicated App namespace", 'revalidate_denial_scope\n              created="$(curl', 'true\n              created="$(curl', "denial-only revoker does not revalidate authenticated E around every write"),
+):
+    assert_rejected(label, "security-contract-revocation.yml", replace_in_named_step(step, old, new), error)
+
+for label, replacement in (
+    ("removed", ""),
+    ("commented", "          # run_gate python3 ./scripts/tests/trusted-ci-revocation-regressions.test.py\n"),
+    ("soft-failed", "          run_gate python3 ./scripts/tests/trusted-ci-revocation-regressions.test.py || true\n"),
+    ("conditional", "          if false; then\n          run_gate python3 ./scripts/tests/trusted-ci-revocation-regressions.test.py\n          fi\n"),
+):
+    assert_rejected(f"CI revocation-regression entry {label}", "ci.yml", replace_in_named_step("Workspace structural gates", "          run_gate python3 ./scripts/tests/trusted-ci-revocation-regressions.test.py\n", replacement), "revocation regression gate is not exact and adjacent")
 
 print("security CI contract rejects trust-boundary and evidence mutations")

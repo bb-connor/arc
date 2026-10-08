@@ -127,37 +127,35 @@ jobs:
             ci-regression|source-authority-withdrawn|evidence-authority-withdrawn|policy-authority-withdrawn|app-authority-withdrawn|operator-security-revocation) ;;
             *) echo "invalid revocation reason" >&2; exit 1 ;;
           esac
-          live_pr="$({
-            gh api \
-              -H "Accept: application/vnd.github+json" \
-              -H "X-GitHub-Api-Version: 2026-03-10" \
-              "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}"
-          })"
-          test "$(jq -r '.state' <<< "${live_pr}")" = open
-          test "$(jq -r '.head.repo.full_name' <<< "${live_pr}")" = "${GITHUB_REPOSITORY}"
-          test "$(jq -r '.head.sha' <<< "${live_pr}")" = "${EVIDENCE_SHA}"
-          test "$(jq -r '.base.repo.full_name' <<< "${live_pr}")" = "${GITHUB_REPOSITORY}"
-          test "$(jq -r '.base.ref' <<< "${live_pr}")" = main
-          base_sha="$(jq -r '.base.sha' <<< "${live_pr}")"
-          [[ "${base_sha}" =~ ^[0-9a-f]{40}$ ]]
-          merge_ref="$({
-            gh api \
-              -H "Accept: application/vnd.github+json" \
-              -H "X-GitHub-Api-Version: 2026-03-10" \
-              "repos/${GITHUB_REPOSITORY}/git/ref/pull/${PR_NUMBER}/merge"
-          })"
-          test "$(jq -r '.ref' <<< "${merge_ref}")" = "refs/pull/${PR_NUMBER}/merge"
-          test "$(jq -r '.object.type' <<< "${merge_ref}")" = commit
-          test "$(jq -r '.object.sha' <<< "${merge_ref}")" = "${MERGE_COMMIT_SHA}"
-          merge_commit="$({
-            gh api \
-              -H "Accept: application/vnd.github+json" \
-              -H "X-GitHub-Api-Version: 2026-03-10" \
-              "repos/${GITHUB_REPOSITORY}/git/commits/${MERGE_COMMIT_SHA}"
-          })"
-          test "$(jq -cS '[.parents[].sha]' <<< "${merge_commit}")" = "[\"${base_sha}\",\"${EVIDENCE_SHA}\"]"
-          merge_tree_sha="$(jq -r '.tree.sha' <<< "${merge_commit}")"
-          [[ "${merge_tree_sha}" =~ ^[0-9a-f]{40}$ ]]
+          evidence_commit="$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/git/commits/${EVIDENCE_SHA}")"
+          test "$(jq -r '.sha' <<< "${evidence_commit}")" = "${EVIDENCE_SHA}"
+          base_sha=''
+          merge_tree_sha=''
+          if recorded_merge="$(timeout 15s gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/git/commits/${MERGE_COMMIT_SHA}" 2>/dev/null)" &&
+             test "$(jq -r '.sha' <<< "${recorded_merge}" 2>/dev/null)" = "${MERGE_COMMIT_SHA}"; then
+            observed_base="$(jq -r '.parents[0].sha // ""' <<< "${recorded_merge}" 2>/dev/null)" || observed_base=''
+            observed_tree="$(jq -r '.tree.sha // ""' <<< "${recorded_merge}" 2>/dev/null)" || observed_tree=''
+            if [[ "${observed_base}" =~ ^[0-9a-f]{40}$ ]]; then base_sha="${observed_base}"; fi
+            if [[ "${observed_tree}" =~ ^[0-9a-f]{40}$ ]]; then merge_tree_sha="${observed_tree}"; fi
+          fi
+          if [[ "${PR_NUMBER}" =~ ^[1-9][0-9]*$ ]] &&
+             observed_pr="$(timeout 15s gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" 2>/dev/null)"; then
+            observed_state="$(jq -r '.state // "unavailable"' <<< "${observed_pr}" 2>/dev/null)" || observed_state=unavailable
+            observed_head="$(jq -r '.head.sha // ""' <<< "${observed_pr}" 2>/dev/null)" || observed_head=''
+            [[ "${observed_head}" =~ ^[0-9a-f]{40}$ ]] || observed_head=unavailable
+            case "${observed_state}" in open|closed) ;; *) observed_state=unavailable ;; esac
+            printf 'Observed PR state=%s head=%s; denial remains scoped to %s.\n' "${observed_state}" "${observed_head}" "${EVIDENCE_SHA}" >> "${GITHUB_STEP_SUMMARY}"
+            if test "${observed_state}" = open &&
+               observed_ref="$(timeout 15s gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/git/ref/pull/${PR_NUMBER}/merge" 2>/dev/null)"; then
+              observed_sha="$(jq -r '.object.sha // ""' <<< "${observed_ref}" 2>/dev/null)" || observed_sha=''
+              if [[ "${observed_sha}" =~ ^[0-9a-f]{40}$ ]] &&
+                 observed_object="$(timeout 15s gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/git/commits/${observed_sha}" 2>/dev/null)"; then
+                observed_matches=false
+                if test "${observed_sha}" = "${MERGE_COMMIT_SHA}"; then observed_matches=true; fi
+                printf 'Observed live merge=%s recorded_match=%s (observation only).\n' "${observed_sha}" "${observed_matches}" >> "${GITHUB_STEP_SUMMARY}"
+              fi
+            fi
+          fi
           {
             echo "authorized_source_sha=${AUTHORIZED_SOURCE_SHA}"
             echo "base_sha=${base_sha}"
@@ -289,21 +287,27 @@ jobs:
           upstream_conclusion="$(jq -r '.conclusion // ""' <<< "${upstream}")"
           test "${upstream_conclusion}" = "${EVENT_CONCLUSION}"
           test "$(jq -r '.head_repository.full_name' <<< "${upstream}")" = "${GITHUB_REPOSITORY}"
+          test "$(jq -r '.repository.full_name' <<< "${upstream}")" = "${GITHUB_REPOSITORY}"
+          test "$(jq -r '.repository.id' <<< "${upstream}")" = "${REPOSITORY_ID}"
+          test "$(jq -r '.head_repository.id' <<< "${upstream}")" = "${REPOSITORY_ID}"
           evidence_sha="$(jq -r '.head_sha' <<< "${upstream}")"
           run_attempt="${EVENT_RUN_ATTEMPT}"
           [[ "${evidence_sha}" =~ ^[0-9a-f]{40}$ ]]
           test "$(jq -r '.run_attempt' <<< "${upstream}")" = "${run_attempt}"
-          run_name="$(jq -r '.display_title' <<< "${upstream}")"
+          run_name="$(jq -r '.display_title // ""' <<< "${upstream}")"
+          pr_number=''
+          base_sha=''
+          merge_commit_sha=''
+          merge_tree_sha=''
+          title_valid=false
           if [[ "${run_name}" =~ ^CI\ N=([1-9][0-9]*)\ E=([0-9a-f]{40})\ B=([0-9a-f]{40})\ M=([0-9a-f]{40})$ ]]; then
-            pr_number="${BASH_REMATCH[1]}"
-            run_name_evidence_sha="${BASH_REMATCH[2]}"
-            base_sha="${BASH_REMATCH[3]}"
-            merge_commit_sha="${BASH_REMATCH[4]}"
-          else
-            echo "eligible=false" >> "${GITHUB_OUTPUT}"
-            exit 0
+            if test "${BASH_REMATCH[2]}" = "${evidence_sha}"; then
+              pr_number="${BASH_REMATCH[1]}"
+              base_sha="${BASH_REMATCH[3]}"
+              merge_commit_sha="${BASH_REMATCH[4]}"
+              title_valid=true
+            fi
           fi
-          test "${run_name_evidence_sha}" = "${evidence_sha}"
 
           authorized_ci_blob="$({
             gh api \
@@ -319,27 +323,8 @@ jobs:
               "repos/${GITHUB_REPOSITORY}/contents/.github/workflows/ci.yml?ref=${evidence_sha}" \
               --jq '.sha'
           })"
-          merge_ci_blob="$({
-            gh api \
-              -H "Accept: application/vnd.github+json" \
-              -H "X-GitHub-Api-Version: 2026-03-10" \
-              "repos/${GITHUB_REPOSITORY}/contents/.github/workflows/ci.yml?ref=${merge_commit_sha}" \
-              --jq '.sha'
-          })"
           [[ "${authorized_ci_blob}" =~ ^[0-9a-f]{40}$ ]]
           test "${evidence_ci_blob}" = "${authorized_ci_blob}"
-          test "${merge_ci_blob}" = "${authorized_ci_blob}"
-          [[ "${merge_commit_sha}" =~ ^[0-9a-f]{40}$ ]]
-          [[ "${base_sha}" =~ ^[0-9a-f]{40}$ ]]
-          merge_commit="$({
-            gh api \
-              -H "Accept: application/vnd.github+json" \
-              -H "X-GitHub-Api-Version: 2026-03-10" \
-              "repos/${GITHUB_REPOSITORY}/git/commits/${merge_commit_sha}"
-          })"
-          test "$(jq -cS '[.parents[].sha]' <<< "${merge_commit}")" = "[\"${base_sha}\",\"${evidence_sha}\"]"
-          merge_tree_sha="$(jq -r '.tree.sha' <<< "${merge_commit}")"
-          [[ "${merge_tree_sha}" =~ ^[0-9a-f]{40}$ ]]
 
           jobs="$({
             gh api \
@@ -350,7 +335,7 @@ jobs:
               --jq '.jobs[]'
           } | jq -s '.')"
           builder_jobs="$(jq -c '[.[] | select(.name == "attest exact pull request merge binding" or (.name | endswith(" / attest exact pull request merge binding")))]' <<< "${jobs}")"
-          test "$(jq -r 'length' <<< "${builder_jobs}")" = 1
+          test "$(jq -r 'length' <<< "${builder_jobs}")" -le 1
           builder_conclusion="$(jq -r '.[0].conclusion // ""' <<< "${builder_jobs}")"
           artifact_name="ci-merge-binding-${EVENT_RUN_ID}-${run_attempt}"
           artifacts="$({
@@ -368,7 +353,7 @@ jobs:
             test "${artifact_count}" = 1
           fi
 
-          if test "${artifact_count}" = 1; then
+          if test "${title_valid}" = true && test "${artifact_count}" = 1; then
             artifact="$(jq -c '.[0]' <<< "${artifact_matches}")"
             artifact_id="$(jq -r '.id' <<< "${artifact}")"
             artifact_size="$(jq -r '.size_in_bytes' <<< "${artifact}")"
@@ -437,7 +422,8 @@ jobs:
             test "$(jq -r '.head.sha' <<< "${binding}")" = "${evidence_sha}"
             test "$(jq -r '.base.sha' <<< "${binding}")" = "${base_sha}"
             test "$(jq -r '.merge.sha' <<< "${binding}")" = "${merge_commit_sha}"
-            test "$(jq -r '.merge.tree_sha' <<< "${binding}")" = "${merge_tree_sha}"
+            merge_tree_sha="$(jq -r '.merge.tree_sha' <<< "${binding}")"
+            [[ "${merge_tree_sha}" =~ ^[0-9a-f]{40}$ ]]
             test "$(jq -cS '.merge.parents' <<< "${binding}")" = "[\"${base_sha}\",\"${evidence_sha}\"]"
             test "$(jq -r '.ci.run_id' <<< "${binding}")" = "${EVENT_RUN_ID}"
             test "$(jq -r '.ci.run_attempt' <<< "${binding}")" = "${run_attempt}"
@@ -535,23 +521,34 @@ jobs:
               test "${timestamp_epoch}" -ge "$((artifact_created_epoch - 300))"
               test "${timestamp_epoch}" -le "$((now_epoch + 300))"
             done < <(jq -r '.[].timestamp' <<< "${timestamps}")
-          elif test "${builder_conclusion}" = success; then
-            exit 1
           fi
 
           create_missing=false
-          if live_pr="$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}" 2>/dev/null)" &&
-             test "$(jq -r '.state' <<< "${live_pr}")" = open &&
-             test "$(jq -r '.head.repo.full_name' <<< "${live_pr}")" = "${GITHUB_REPOSITORY}" &&
-             test "$(jq -r '.head.sha' <<< "${live_pr}")" = "${evidence_sha}" &&
-             test "$(jq -r '.base.repo.full_name' <<< "${live_pr}")" = "${GITHUB_REPOSITORY}" &&
-             test "$(jq -r '.base.ref' <<< "${live_pr}")" = main &&
-             test "$(jq -r '.base.sha' <<< "${live_pr}")" = "${base_sha}"; then
-            if live_merge_ref="$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/git/ref/pull/${pr_number}/merge" 2>/dev/null)" &&
-               test "$(jq -r '.ref' <<< "${live_merge_ref}")" = "refs/pull/${pr_number}/merge" &&
-               test "$(jq -r '.object.type' <<< "${live_merge_ref}")" = commit &&
-               test "$(jq -r '.object.sha' <<< "${live_merge_ref}")" = "${merge_commit_sha}"; then
-              create_missing=true
+          if test "${COMMITTED_EVIDENCE_SHA}" = "${evidence_sha}"; then
+            create_missing=true
+            if test -n "${pr_number}" &&
+               live_pr="$(timeout 15s gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}" 2>/dev/null)" &&
+               test "$(jq -r '.merged' <<< "${live_pr}" 2>/dev/null)" = true &&
+               test "$(jq -r '.head.sha' <<< "${live_pr}" 2>/dev/null)" = "${evidence_sha}"; then
+              create_missing=false
+            fi
+          fi
+          if [[ "${pr_number}" =~ ^[1-9][0-9]*$ ]] &&
+             observed_pr="$(timeout 15s gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}" 2>/dev/null)"; then
+            observed_state="$(jq -r '.state // "unavailable"' <<< "${observed_pr}" 2>/dev/null)" || observed_state=unavailable
+            observed_head="$(jq -r '.head.sha // ""' <<< "${observed_pr}" 2>/dev/null)" || observed_head=''
+            [[ "${observed_head}" =~ ^[0-9a-f]{40}$ ]] || observed_head=unavailable
+            case "${observed_state}" in open|closed) ;; *) observed_state=unavailable ;; esac
+            printf 'Observed PR state=%s head=%s; denial remains scoped to %s.\n' "${observed_state}" "${observed_head}" "${evidence_sha}" >> "${GITHUB_STEP_SUMMARY}"
+            if test "${observed_state}" = open &&
+               observed_ref="$(timeout 15s gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/git/ref/pull/${pr_number}/merge" 2>/dev/null)"; then
+              observed_sha="$(jq -r '.object.sha // ""' <<< "${observed_ref}" 2>/dev/null)" || observed_sha=''
+              if [[ "${observed_sha}" =~ ^[0-9a-f]{40}$ ]] &&
+                 observed_object="$(timeout 15s gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/git/commits/${observed_sha}" 2>/dev/null)"; then
+                observed_matches=false
+                if test "${observed_sha}" = "${merge_commit_sha}"; then observed_matches=true; fi
+                printf 'Observed live merge=%s recorded_match=%s (observation only).\n' "${observed_sha}" "${observed_matches}" >> "${GITHUB_STEP_SUMMARY}"
+              fi
             fi
           fi
           if test "${create_missing}" = true; then
@@ -982,11 +979,11 @@ jobs:
           test "${DEFAULT_BRANCH}" = "main"
           test "${REVOKER_REF}" = "refs/heads/main"
           [[ "${AUTHORIZED_SOURCE_SHA}" =~ ^[0-9a-f]{40}$ ]]
-          [[ "${BASE_SHA}" =~ ^[0-9a-f]{40}$ ]]
+          [[ -z "${BASE_SHA}" || "${BASE_SHA}" =~ ^[0-9a-f]{40}$ ]]
           [[ "${EVIDENCE_SHA}" =~ ^[0-9a-f]{40}$ ]]
-          [[ "${MERGE_COMMIT_SHA}" =~ ^[0-9a-f]{40}$ ]]
-          [[ "${MERGE_TREE_SHA}" =~ ^[0-9a-f]{40}$ ]]
-          [[ "${PR_NUMBER}" =~ ^[1-9][0-9]*$ ]]
+          [[ -z "${MERGE_COMMIT_SHA}" || "${MERGE_COMMIT_SHA}" =~ ^[0-9a-f]{40}$ ]]
+          [[ -z "${MERGE_TREE_SHA}" || "${MERGE_TREE_SHA}" =~ ^[0-9a-f]{40}$ ]]
+          [[ -z "${PR_NUMBER}" || "${PR_NUMBER}" =~ ^[1-9][0-9]*$ ]]
           [[ "${SECURITY_DEFINITION_SHA}" =~ ^[0-9a-f]{40}$ ]]
           [[ "${SECURITY_APP_ID}" =~ ^[1-9][0-9]*$ ]]
           [[ "${SECURITY_APP_INSTALLATION_ID}" =~ ^[1-9][0-9]*$ ]]
@@ -1027,40 +1024,12 @@ jobs:
           fi
           external_id="chio:v3:deny:${EVIDENCE_SHA}"
 
-          revalidate_target() {
-            merge_commit="$({
-              gh api \
-                -H "Accept: application/vnd.github+json" \
-                -H "X-GitHub-Api-Version: 2026-03-10" \
-                "repos/${GITHUB_REPOSITORY}/git/commits/${MERGE_COMMIT_SHA}"
-            })"
-            test "$(jq -cS '[.parents[].sha]' <<< "${merge_commit}")" = "[\"${BASE_SHA}\",\"${EVIDENCE_SHA}\"]"
-            test "$(jq -r '.tree.sha' <<< "${merge_commit}")" = "${MERGE_TREE_SHA}"
-            if test "${CREATE_MISSING}" = true; then
-              live_pr="$({
-                gh api \
-                  -H "Accept: application/vnd.github+json" \
-                  -H "X-GitHub-Api-Version: 2026-03-10" \
-                  "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}"
-              })"
-              test "$(jq -r '.state' <<< "${live_pr}")" = open
-              test "$(jq -r '.head.repo.full_name' <<< "${live_pr}")" = "${GITHUB_REPOSITORY}"
-              test "$(jq -r '.head.sha' <<< "${live_pr}")" = "${EVIDENCE_SHA}"
-              test "$(jq -r '.base.repo.full_name' <<< "${live_pr}")" = "${GITHUB_REPOSITORY}"
-              test "$(jq -r '.base.ref' <<< "${live_pr}")" = main
-              test "$(jq -r '.base.sha' <<< "${live_pr}")" = "${BASE_SHA}"
-              merge_ref="$({
-                gh api \
-                  -H "Accept: application/vnd.github+json" \
-                  -H "X-GitHub-Api-Version: 2026-03-10" \
-                  "repos/${GITHUB_REPOSITORY}/git/ref/pull/${PR_NUMBER}/merge"
-              })"
-              test "$(jq -r '.ref' <<< "${merge_ref}")" = "refs/pull/${PR_NUMBER}/merge"
-              test "$(jq -r '.object.type' <<< "${merge_ref}")" = commit
-              test "$(jq -r '.object.sha' <<< "${merge_ref}")" = "${MERGE_COMMIT_SHA}"
-            fi
+          revalidate_denial_scope() {
+            local evidence_commit
+            evidence_commit="$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/git/commits/${EVIDENCE_SHA}")"
+            test "$(jq -r '.sha' <<< "${evidence_commit}")" = "${EVIDENCE_SHA}"
           }
-          revalidate_target
+          revalidate_denial_scope
 
           private_key="${RUNNER_TEMP}/chio-security-authority-revocation.pem"
           trap 'unset SECURITY_APP_PRIVATE_KEY_PEM installation_token token_response jwt jwt_header jwt_claims jwt_unsigned jwt_signature; rm -f -- "${private_key}"' EXIT
@@ -1171,9 +1140,9 @@ jobs:
                   }'
               })"
               payload="$(jq -cS -n --arg completed_at "$(date --utc +%Y-%m-%dT%H:%M:%SZ)" --arg external_id "${required_external_id}" --arg head_sha "${EVIDENCE_SHA}" --arg name "${check_name}" --arg summary "${summary}" --arg text "${tombstone_text}" '{completed_at: $completed_at, conclusion: "failure", external_id: $external_id, head_sha: $head_sha, name: $name, output: {summary: $summary, text: $text, title: "Chio security authority revoked"}, status: "completed"}')"
-              revalidate_target
+              revalidate_denial_scope
               created="$(curl --proto '=https' --tlsv1.2 --fail --silent --show-error --request POST -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" -H "X-GitHub-Api-Version: 2026-03-10" --data-binary "${payload}" "https://api.github.com/repos/${GITHUB_REPOSITORY}/check-runs")"
-              revalidate_target
+              revalidate_denial_scope
               [[ "$(jq -r '.id' <<< "${created}")" =~ ^[1-9][0-9]*$ ]]
               test "$(jq -r '.name' <<< "${created}")" = "${check_name}"
               test "$(jq -r '.head_sha' <<< "${created}")" = "${EVIDENCE_SHA}"
@@ -1202,9 +1171,9 @@ jobs:
                 current_external_id="$(jq -c '.external_id' <<< "${check_run}")"
                 current_text="$(jq -r '.output.text // ""' <<< "${check_run}")"
                 payload="$(jq -cS -n --arg completed_at "$(date --utc +%Y-%m-%dT%H:%M:%SZ)" --arg name "${target_name}" --arg summary "${summary}" --arg text "${current_text}" --argjson external_id "${current_external_id}" '{completed_at: $completed_at, conclusion: "failure", external_id: $external_id, name: $name, output: {summary: $summary, text: $text, title: "Chio security authority revoked"}, status: "completed"}')"
-                revalidate_target
+                revalidate_denial_scope
                 updated="$(curl --proto '=https' --tlsv1.2 --fail --silent --show-error --request PATCH -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" -H "X-GitHub-Api-Version: 2026-03-10" --data-binary "${payload}" "https://api.github.com/repos/${GITHUB_REPOSITORY}/check-runs/${check_run_id}")"
-                revalidate_target
+                revalidate_denial_scope
                 test "$(jq -r '.id' <<< "${updated}")" = "${check_run_id}"
                 test "$(jq -r '.name' <<< "${updated}")" = "${target_name}"
                 test "$(jq -r '.head_sha' <<< "${updated}")" = "${EVIDENCE_SHA}"
@@ -1228,7 +1197,7 @@ jobs:
           }
 
           normalize_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${external_id}"
-          revalidate_target
+          revalidate_denial_scope
           unset installation_token
           trap - EXIT
           echo "Normalized the dedicated Security contract namespace to sticky failure on ${EVIDENCE_SHA}." >> "${GITHUB_STEP_SUMMARY}"

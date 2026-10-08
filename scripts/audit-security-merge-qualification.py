@@ -367,7 +367,7 @@ def audit_qualification(api: GitHub, repository: str, pr_number: int,
     # Repository-wide discovery retains historical runs across workflow rename,
     # deletion and re-registration. The run path/source and recorded App tuple
     # authenticate the qualification, not the current workflow registry.
-    run_query = f"actions/runs?event=pull_request&head_sha={evidence}"
+    run_query = f"actions/runs?event=pull_request&head_sha={evidence}&exclude_pull_requests=true"
     runs = api.pages(run_query, "workflow_runs")
     # Every attempt of every CI run for E, whatever its title, pull request,
     # base or test merge, must have succeeded before any title selects the
@@ -430,6 +430,12 @@ def audit_qualification(api: GitHub, repository: str, pr_number: int,
     merge = observations["ci"]
     ci_run_id, ci_attempt = positive_id(source_ci["run_id"]), positive_id(source_ci["run_attempt"])
     ci_workflow_id = positive_id(source_ci["workflow_id"])
+    workflow_query = f"actions/workflows/{ci_workflow_id}/runs?event=pull_request&head_sha={evidence}"
+    workflow_runs = api.pages(workflow_query, "workflow_runs")
+    repository_ci_ids = {positive_id(run.get("id")) for run in runs if run.get("path") == ci_path}
+    workflow_run_ids = {positive_id(run.get("id")) for run in workflow_runs}
+    require(workflow_run_ids <= repository_ci_ids,
+            "source workflow CI census is not a subset of repository CI census")
     matching_runs = []
     for run in runs:
         candidate = CI_TITLE.fullmatch(str(run.get("display_title", "")))
@@ -563,6 +569,8 @@ def audit_qualification(api: GitHub, repository: str, pr_number: int,
                      "authority_check_run_id": positive_id(authority.get("id")),
                      "finalizer": {"run_id": finalizer_id, "run_attempt": finalizer_attempt, "attempts": finalizer_attempts}}
     require(api.pages(run_query, "workflow_runs") == runs, "CI run inventory changed during audit")
+    require(api.pages(workflow_query, "workflow_runs") == workflow_runs,
+            "source workflow CI census changed during audit")
     for run_id, fingerprint in history.items():
         current = api.get(f"actions/runs/{run_id}")
         require((current.get("run_attempt"), current.get("status"), current.get("conclusion")) == fingerprint,

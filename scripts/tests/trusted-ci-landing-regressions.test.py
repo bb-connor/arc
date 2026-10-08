@@ -258,7 +258,9 @@ def snapshot() -> dict[str, dict]:
     for filename in ("ci.yml", "enterprise-evidence-finalizer.yml"):
         record = data[f"{prefix}/actions/workflows/{filename}"]
         data[f"{prefix}/actions/workflows/{record['id']}"] = copy.deepcopy(record)
-    data[f"{prefix}/actions/runs"] = data[f"{prefix}/actions/workflows/ci.yml/runs"]
+    data[f"{prefix}/actions/workflows/{CI_WORKFLOW}/runs"] = copy.deepcopy(
+        data[f"{prefix}/actions/workflows/ci.yml/runs"])
+    data[f"{prefix}/actions/runs"] = copy.deepcopy(data[f"{prefix}/actions/workflows/ci.yml/runs"])
     data[f"{prefix}/git/commits/{EVIDENCE}"] = {"sha": EVIDENCE}
     return data
 
@@ -761,16 +763,23 @@ class RunIdentityLivenessTests(unittest.TestCase):
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertEqual(output.read_text(), f"workflow_path={expected_path}\n")
 
-    def filter(self, workflow_name: str, job_id: str, marker: str) -> str:
+    def filter(self, workflow_name: str, job_id: str, marker: str, helper_name: str = "") -> str:
         body = "\n".join(step.get("run", "") for step in workflow(workflow_name)["jobs"][job_id]["steps"])
-        predicates = [match.group(1) for match in re.finditer(r"'([^']*)'", body)
+        quoted = r"'([^']*)'"
+        if helper_name:
+            helpers = list(re.finditer(r"^([ \t]*)" + re.escape(helper_name) + r"\(\) \{\n(.*?)^\1\}",
+                                       body, re.MULTILINE | re.DOTALL))
+            self.assertEqual(len(helpers), 1, "the real workflow discovery helper must be unique")
+            body = helpers[0].group(2)
+            quoted += r'\s*<<< "\$\{(?:runs|ci_runs)\}" \|\| return 1'
+        predicates = [match.group(1) for match in re.finditer(quoted, body)
                       if match.group(1).startswith("[.[] | select(") and marker in match.group(1)]
         self.assertEqual(len(predicates), 1, "the real workflow discovery predicate must be unique")
         return predicates[0]
 
     def check_ci_filter(self, job_id: str) -> None:
         predicate = self.filter("enterprise-evidence-finalizer.yml", job_id,
-                                '.path == ".github/workflows/ci.yml"')
+                                '.path == ".github/workflows/ci.yml"', "list_matching_ci_runs")
         run = snapshot()[f"repos/{REPOSITORY}/actions/runs/{CI_RUN}"]
         run["name"] = run["display_title"]
         run["head_branch"] = "integration/process-security-m4"
@@ -955,6 +964,7 @@ class DisabledCriticalCiBinderTests(unittest.TestCase):
                     env = os.environ | {'PATH': str(root) + os.pathsep + os.environ['PATH'], 'API_FIXTURE': str(fixture),
                                         'GITHUB_REPOSITORY': REPOSITORY, 'GITHUB_REPOSITORY_OWNER': 'bb-connor',
                                         'GITHUB_OUTPUT': str(output), 'RUNNER_TEMP': str(root), 'DEFAULT_BRANCH': 'main',
+                                        'GITHUB_STEP_SUMMARY': str(root / 'summary'),
                                         'EVENT_ACTION': 'completed', 'EVENT_CONCLUSION': 'failure', 'EVENT_RUN_ATTEMPT': '2',
                                         'EVENT_RUN_ID': str(CI_RUN), 'EVENT_WORKFLOW_ID': str(CI_WORKFLOW),
                                         'LISTENER_REF': 'refs/heads/main', 'LISTENER_RUN_ATTEMPT': '1', 'LISTENER_RUN_ID': '901',
@@ -1472,7 +1482,9 @@ def pull_request_ci_run(run_id: int, title_merge: str, conclusion: str | None = 
 def add_ci_runs(data: dict, *runs: dict) -> None:
     prefix = f"repos/{REPOSITORY}"
     listing = [copy.deepcopy(run) for run in sorted(runs, key=lambda run: run["id"], reverse=True)]
-    data[f"{prefix}/actions/workflows/ci.yml/runs"] = {"total_count": len(listing), "workflow_runs": listing}
+    inventory = {"total_count": len(listing), "workflow_runs": listing}
+    for endpoint in ("actions/workflows/ci.yml/runs", f"actions/workflows/{CI_WORKFLOW}/runs", "actions/runs"):
+        data[f"{prefix}/{endpoint}"] = copy.deepcopy(inventory)
     for run in runs:
         data[f"{prefix}/actions/runs/{run['id']}"] = copy.deepcopy(run)
         data[f"{prefix}/actions/runs/{run['id']}/attempts/{run['run_attempt']}"] = copy.deepcopy(run)
@@ -1565,6 +1577,7 @@ def publisher_environment() -> dict[str, str]:
         "AUTHORIZED_SOURCE_SHA": SOURCE, "CI_RUN_ATTEMPT": "1", "CI_RUN_ID": str(CI_RUN),
         "CI_WORKFLOW_ID": str(CI_WORKFLOW), "EVIDENCE_SHA": EVIDENCE, "EXTERNAL_ID": EXTERNAL_ID,
         "CI_MERGE_SHA": MERGE, "IDENTITY_JSON": IDENTITY_JSON, "IDENTITY_DIGEST": IDENTITY_DIGEST,
+        "COMMITTED_EVIDENCE_SHA": EVIDENCE,
         "GH_TOKEN": ACTIONS_TOKEN, "MERGE_COMMIT_SHA": MERGE, "PR_NUMBER": str(PR), "REPOSITORY_ID": "1195888645",
         "SECURITY_APP_ID": str(APP_ID), "SECURITY_DEFINITION_SHA": DEFINITION,
         "installation_token": INSTALLATION_TOKEN, "canonical_binding": publication_binding(),
@@ -1933,7 +1946,7 @@ def with_failed_ci_run(run_id: int, display_title: str, title_base: str = BASE, 
 
 class AuditEvidenceHeadOriginalRedTests(unittest.TestCase):
     def test_a_reopened_qualification_cannot_hide_failed_ci_for_the_same_evidence(self) -> None:
-        discovery = f"GET repos/{REPOSITORY}/actions/runs?event=pull_request&head_sha={EVIDENCE}&per_page=100&page=1"
+        discovery = f"GET repos/{REPOSITORY}/actions/runs?event=pull_request&head_sha={EVIDENCE}&exclude_pull_requests=true&per_page=100&page=1"
         healthy, healthy_report = run_logged_audit(snapshot())
         self.assertEqual(healthy_report.get("status"), "verified", healthy.result.stdout + healthy.result.stderr)
         same, same_report = run_logged_audit(with_failed_ci_run(
@@ -2231,7 +2244,7 @@ class AuditFullHistoryOriginalRedTests(unittest.TestCase):
         healthy, healthy_report = run_logged_audit(snapshot())
         self.assertEqual(healthy_report.get("status"), "verified", healthy.result.stdout + healthy.result.stderr)
         run, report = run_logged_audit(data)
-        self.assertIn(f"GET repos/{REPOSITORY}/actions/runs?event=pull_request&head_sha={EVIDENCE}&per_page=100&page=1",
+        self.assertIn(f"GET repos/{REPOSITORY}/actions/runs?event=pull_request&head_sha={EVIDENCE}&exclude_pull_requests=true&per_page=100&page=1",
                       run.calls)
         self.assertEqual(report.get("status"), "unverified", reason)
         self.assertNotIn("GitHub read failed", report.get("error", ""))
@@ -2280,7 +2293,7 @@ class AuditForeignHeadIdentityTests(unittest.TestCase):
                                  ("pull_request", EVIDENCE, "failure", 1195888645))
                 audit, report = run_logged_audit(with_listed_pull_request_run(run))
                 self.assertIn(f"GET repos/{REPOSITORY}/actions/runs?event=pull_request&head_sha={EVIDENCE}"
-                              "&per_page=100&page=1", audit.calls)
+                              "&exclude_pull_requests=true&per_page=100&page=1", audit.calls)
                 self.assertEqual(report.get("status"), "verified", audit.result.stdout + audit.result.stderr)
                 self.assertNotIn(f"GET repos/{REPOSITORY}/actions/runs/{FOREIGN_CI_RUN}/attempts/1", audit.calls)
 

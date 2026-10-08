@@ -2818,11 +2818,15 @@ jobs:
           reconcile_bad_ci() {
             bad_ci_observed=false
 
-            list_matching_ci_runs() {
+            list_ci_inventory() {
               # Conditional callers disable errexit throughout this helper.
               # Propagate every API, parsing, and validation failure explicitly.
+              local endpoint="$1"
               local page=1
               local query="event=pull_request&head_sha=${EVIDENCE_SHA}&"
+              if test "${endpoint}" = actions/runs; then
+                query+="exclude_pull_requests=true&"
+              fi
               local ci_runs='[]'
               local first_response total_count page_response page_total page_runs collected_count
               first_response="$({
@@ -2835,7 +2839,7 @@ jobs:
                   -H "Accept: application/vnd.github+json" \
                   -H "Authorization: Bearer ${GH_TOKEN}" \
                   -H "X-GitHub-Api-Version: 2026-03-10" \
-                  "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?${query}per_page=100&page=1"
+                  "https://api.github.com/repos/${GITHUB_REPOSITORY}/${endpoint}?${query}per_page=100&page=1"
               })" || return 1
               total_count="$(jq -er '.total_count | select(type == "number" and . >= 0 and floor == .)' <<< "${first_response}")" || return 1
               [[ "${total_count}" =~ ^[0-9]+$ ]] || return 1
@@ -2857,7 +2861,7 @@ jobs:
                       -H "Accept: application/vnd.github+json" \
                       -H "Authorization: Bearer ${GH_TOKEN}" \
                       -H "X-GitHub-Api-Version: 2026-03-10" \
-                      "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?${query}per_page=100&page=${page}"
+                      "https://api.github.com/repos/${GITHUB_REPOSITORY}/${endpoint}?${query}per_page=100&page=${page}"
                   })" || return 1
                 fi
                 page_total="$(jq -er '.total_count | select(type == "number" and . >= 0 and floor == .)' <<< "${page_response}")" || return 1
@@ -2874,6 +2878,19 @@ jobs:
                 page="$((page + 1))"
               done
               test "$(jq -r '[.[].id] | unique | length' <<< "${ci_runs}")" = "${total_count}" || return 1
+              printf '%s\n' "${ci_runs}"
+            }
+
+            list_matching_ci_runs() {
+              local workflow_runs repository_runs workflow_ids repository_ids ci_runs
+              workflow_runs="$(list_ci_inventory actions/workflows/ci.yml/runs)" || return 1
+              repository_runs="$(list_ci_inventory actions/runs)" || return 1
+              workflow_ids="$(jq -cS '[.[].id] | sort' <<< "${workflow_runs}")" || return 1
+              repository_ids="$(jq -cS '[.[] | select(.path == ".github/workflows/ci.yml") | .id] | sort' <<< "${repository_runs}")" || return 1
+              test "$(jq -r -n --argjson workflow "${workflow_ids}" --argjson repository "${repository_ids}" '$workflow - $repository | length')" = 0 || return 1
+              # Other known workflow paths are outside CI history. Missing
+              # paths remain visible and make the scan incomplete.
+              ci_runs="$(jq -cS '[.[] | select(.path == ".github/workflows/ci.yml" or (.path | type) != "string")]' <<< "${repository_runs}")" || return 1
               # A run is outside this history only when it is a trusted CI
               # run of this repository for E whose head repository has both
               # a distinct ID and a distinct well-formed name.
@@ -2884,11 +2901,10 @@ jobs:
                 --arg evidence_sha "${EVIDENCE_SHA}" \
                 --arg repository "${GITHUB_REPOSITORY}" \
                 --arg repository_id "${REPOSITORY_ID}" \
-                --arg workflow_id "${CI_WORKFLOW_ID}" \
                 '[.[] | select((
                   .path == ".github/workflows/ci.yml" and
                   .event == "pull_request" and
-                  (.workflow_id | tostring) == $workflow_id and
+                  (.workflow_id | type == "number" and . > 0 and floor == .) and
                   .head_sha == $evidence_sha and
                   (.repository | type) == "object" and
                   .repository.full_name == $repository and
@@ -2909,10 +2925,9 @@ jobs:
                 --arg evidence_sha "${EVIDENCE_SHA}" \
                 --arg repository "${GITHUB_REPOSITORY}" \
                 --arg repository_id "${REPOSITORY_ID}" \
-                --arg workflow_id "${CI_WORKFLOW_ID}" \
                 '.path == ".github/workflows/ci.yml" and
                   .event == "pull_request" and
-                  (.workflow_id | tostring) == $workflow_id and
+                  (.workflow_id | type == "number" and . > 0 and floor == .) and
                   .head_sha == $evidence_sha and
                   .repository.full_name == $repository and
                   (.repository.id | tostring) == $repository_id and
@@ -2952,15 +2967,16 @@ jobs:
             require_matching_ci_identity() {
               local candidate_run="$1"
               local required_run_id="$2"
-              test "$(jq -r '.id' <<< "${candidate_run}")" = "${required_run_id}"
-              test "$(jq -r '.workflow_id' <<< "${candidate_run}")" = "${CI_WORKFLOW_ID}"
-              test "$(jq -r '.path' <<< "${candidate_run}")" = .github/workflows/ci.yml
-              test "$(jq -r '.event' <<< "${candidate_run}")" = pull_request
-              test "$(jq -r '.head_sha' <<< "${candidate_run}")" = "${EVIDENCE_SHA}"
-              test "$(jq -r '.repository.full_name' <<< "${candidate_run}")" = "${GITHUB_REPOSITORY}"
-              test "$(jq -r '.repository.id' <<< "${candidate_run}")" = "${REPOSITORY_ID}"
-              test "$(jq -r '.head_repository.full_name' <<< "${candidate_run}")" = "${GITHUB_REPOSITORY}"
-              test "$(jq -r '.head_repository.id' <<< "${candidate_run}")" = "${REPOSITORY_ID}"
+              local required_workflow_id="$3"
+              test "$(jq -r '.id' <<< "${candidate_run}")" = "${required_run_id}" || return 1
+              test "$(jq -r '.workflow_id' <<< "${candidate_run}")" = "${required_workflow_id}" || return 1
+              test "$(jq -r '.path' <<< "${candidate_run}")" = .github/workflows/ci.yml || return 1
+              test "$(jq -r '.event' <<< "${candidate_run}")" = pull_request || return 1
+              test "$(jq -r '.head_sha' <<< "${candidate_run}")" = "${EVIDENCE_SHA}" || return 1
+              test "$(jq -r '.repository.full_name' <<< "${candidate_run}")" = "${GITHUB_REPOSITORY}" || return 1
+              test "$(jq -r '.repository.id' <<< "${candidate_run}")" = "${REPOSITORY_ID}" || return 1
+              test "$(jq -r '.head_repository.full_name' <<< "${candidate_run}")" = "${GITHUB_REPOSITORY}" || return 1
+              test "$(jq -r '.head_repository.id' <<< "${candidate_run}")" = "${REPOSITORY_ID}" || return 1
             }
 
             scan_stable=false
@@ -2983,16 +2999,33 @@ jobs:
                   scan_incomplete=true
                   continue
                 fi
-                current_ci_run="$(get_current_ci_run "${run_id}")"
-                require_matching_ci_identity "${current_ci_run}" "${run_id}"
+                listed_workflow_id="$(jq -r '.workflow_id' <<< "${listed_ci_run}")"
+                if ! current_ci_run="$(get_current_ci_run "${run_id}")" ||
+                   ! require_matching_ci_identity "${current_ci_run}" "${run_id}" "${listed_workflow_id}"; then
+                  scan_incomplete=true
+                  continue
+                fi
                 max_attempt="$(jq -r '.run_attempt' <<< "${current_ci_run}")"
-                [[ "${max_attempt}" =~ ^[1-9][0-9]*$ ]]
+                if [[ ! "${max_attempt}" =~ ^[1-9][0-9]*$ ]]; then
+                  scan_incomplete=true
+                  continue
+                fi
+                attempt_limit="${max_attempt}"
+                # Preserve authenticated negatives within the finite window,
+                # but an over-limit history can never authorize publication.
+                if test "${#max_attempt}" -gt 3 || test "${max_attempt}" -gt 100; then
+                  scan_incomplete=true
+                  attempt_limit=100
+                fi
                 current_max_fingerprint="$(jq -cS '{conclusion: (.conclusion // ""), run_attempt: .run_attempt, status: .status}' <<< "${current_ci_run}")"
                 exact_max_fingerprint=''
-                for ((run_attempt = 1; run_attempt <= max_attempt; run_attempt++)); do
-                  exact_attempt="$(get_exact_ci_attempt "${run_id}" "${run_attempt}")"
-                  require_matching_ci_identity "${exact_attempt}" "${run_id}"
-                  test "$(jq -r '.run_attempt' <<< "${exact_attempt}")" = "${run_attempt}"
+                for ((run_attempt = 1; run_attempt <= attempt_limit; run_attempt++)); do
+                  if ! exact_attempt="$(get_exact_ci_attempt "${run_id}" "${run_attempt}")" ||
+                     ! require_matching_ci_identity "${exact_attempt}" "${run_id}" "${listed_workflow_id}" ||
+                     ! test "$(jq -r '.run_attempt' <<< "${exact_attempt}")" = "${run_attempt}"; then
+                    scan_incomplete=true
+                    continue
+                  fi
                   attempt_status="$(jq -r '.status' <<< "${exact_attempt}")"
                   if test "${run_attempt}" = "${max_attempt}"; then
                     exact_max_fingerprint="$(jq -cS '{conclusion: (.conclusion // ""), run_attempt: .run_attempt, status: .status}' <<< "${exact_attempt}")"
@@ -3007,22 +3040,27 @@ jobs:
                     scanned_bad_ci_runs="$(jq -cS -n --argjson collected "${scanned_bad_ci_runs}" --argjson candidate "${bad_attempt}" '$collected + [$candidate]')"
                   fi
                 done
-                stable_ci_run="$(get_current_ci_run "${run_id}")"
-                require_matching_ci_identity "${stable_ci_run}" "${run_id}"
+                if ! stable_ci_run="$(get_current_ci_run "${run_id}")" ||
+                   ! require_matching_ci_identity "${stable_ci_run}" "${run_id}" "${listed_workflow_id}"; then
+                  scan_incomplete=true
+                  continue
+                fi
                 stable_max_attempt="$(jq -r '.run_attempt' <<< "${stable_ci_run}")"
-                [[ "${stable_max_attempt}" =~ ^[1-9][0-9]*$ ]]
+                if [[ ! "${stable_max_attempt}" =~ ^[1-9][0-9]*$ ]]; then
+                  scan_incomplete=true
+                  continue
+                fi
                 stable_max_fingerprint="$(jq -cS '{conclusion: (.conclusion // ""), run_attempt: .run_attempt, status: .status}' <<< "${stable_ci_run}")"
                 if test "${stable_max_attempt}" != "${max_attempt}"; then
-                  test "${stable_max_attempt}" -gt "${max_attempt}"
                   round_stable=false
-                  break
+                  continue
                 fi
                 if test "${current_max_fingerprint}" != "${exact_max_fingerprint}" ||
                    test "${stable_max_fingerprint}" != "${exact_max_fingerprint}"; then
                   round_stable=false
-                  break
+                  continue
                 fi
-                snapshot_entry="$(jq -cS -n --argjson fingerprint "${exact_max_fingerprint}" --arg run_id "${run_id}" '{fingerprint: $fingerprint, run_id: ($run_id | tonumber)}')"
+                snapshot_entry="$(jq -cS -n --argjson fingerprint "${exact_max_fingerprint}" --arg run_id "${run_id}" --arg workflow_id "${listed_workflow_id}" '{fingerprint: $fingerprint, run_id: ($run_id | tonumber), workflow_id: $workflow_id}')"
                 scan_snapshot="$(jq -cS -n --argjson collected "${scan_snapshot}" --argjson candidate "${snapshot_entry}" '$collected + [$candidate]')"
               done < <(jq -c '.[]' <<< "${matching_ci_runs}")
               if test "$(jq -r 'length' <<< "${scanned_bad_ci_runs}")" -gt 0; then
@@ -3048,9 +3086,13 @@ jobs:
               fi
               while IFS= read -r snapshot_entry; do
                 run_id="$(jq -r '.run_id' <<< "${snapshot_entry}")"
+                expected_workflow_id="$(jq -r '.workflow_id' <<< "${snapshot_entry}")"
                 expected_fingerprint="$(jq -cS '.fingerprint' <<< "${snapshot_entry}")"
-                revalidated_ci_run="$(get_current_ci_run "${run_id}")"
-                require_matching_ci_identity "${revalidated_ci_run}" "${run_id}"
+                if ! revalidated_ci_run="$(get_current_ci_run "${run_id}")" ||
+                   ! require_matching_ci_identity "${revalidated_ci_run}" "${run_id}" "${expected_workflow_id}"; then
+                  round_stable=false
+                  break
+                fi
                 revalidated_fingerprint="$(jq -cS '{conclusion: (.conclusion // ""), run_attempt: .run_attempt, status: .status}' <<< "${revalidated_ci_run}")"
                 if test "${revalidated_fingerprint}" != "${expected_fingerprint}"; then
                   round_stable=false
@@ -3071,18 +3113,12 @@ jobs:
               return 0
             fi
             bad_ci_create_missing=false
-            if live_bad_ci_pr="$(curl --proto '=https' --tlsv1.2 --fail --silent --show-error -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GH_TOKEN}" -H "X-GitHub-Api-Version: 2026-03-10" "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" 2>/dev/null)" &&
-               test "$(jq -r '.state' <<< "${live_bad_ci_pr}")" = open &&
-               test "$(jq -r '.head.repo.full_name' <<< "${live_bad_ci_pr}")" = "${GITHUB_REPOSITORY}" &&
-               test "$(jq -r '.head.sha' <<< "${live_bad_ci_pr}")" = "${EVIDENCE_SHA}" &&
-               test "$(jq -r '.base.repo.full_name' <<< "${live_bad_ci_pr}")" = "$(jq -r '.base.repository' <<< "${canonical_binding}")" &&
-               test "$(jq -r '.base.ref' <<< "${live_bad_ci_pr}")" = "$(jq -r '.base.ref' <<< "${canonical_binding}")" &&
-               test "$(jq -r '.base.sha' <<< "${live_bad_ci_pr}")" = "$(jq -r '.base.sha' <<< "${canonical_binding}")"; then
-              if live_bad_ci_merge_ref="$(curl --proto '=https' --tlsv1.2 --fail --silent --show-error -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GH_TOKEN}" -H "X-GitHub-Api-Version: 2026-03-10" "https://api.github.com/repos/${GITHUB_REPOSITORY}/git/ref/pull/${PR_NUMBER}/merge" 2>/dev/null)" &&
-                 test "$(jq -r '.ref' <<< "${live_bad_ci_merge_ref}")" = "refs/pull/${PR_NUMBER}/merge" &&
-                 test "$(jq -r '.object.type' <<< "${live_bad_ci_merge_ref}")" = commit &&
-                 test "$(jq -r '.object.sha' <<< "${live_bad_ci_merge_ref}")" = "${MERGE_COMMIT_SHA}"; then
-                bad_ci_create_missing=true
+            if test "${COMMITTED_EVIDENCE_SHA}" = "${EVIDENCE_SHA}"; then
+              bad_ci_create_missing=true
+              if live_bad_ci_pr="$(curl --max-time 15 --proto '=https' --tlsv1.2 --fail --silent --show-error -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GH_TOKEN}" -H "X-GitHub-Api-Version: 2026-03-10" "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" 2>/dev/null)" &&
+                 test "$(jq -r '.merged' <<< "${live_bad_ci_pr}" 2>/dev/null)" = true &&
+                 test "$(jq -r '.head.sha' <<< "${live_bad_ci_pr}" 2>/dev/null)" = "${EVIDENCE_SHA}"; then
+                bad_ci_create_missing=false
               fi
             fi
             normalize_bad_ci_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "chio:v3:deny:${EVIDENCE_SHA}"

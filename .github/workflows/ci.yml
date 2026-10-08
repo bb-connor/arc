@@ -178,6 +178,7 @@ jobs:
           run_gate python3 ./scripts/tests/trusted-ci-landing-regressions.test.py
           run_gate python3 ./scripts/tests/trusted-ci-currency-regressions.test.py
           run_gate python3 ./scripts/tests/trusted-ci-identity-regressions.test.py
+          run_gate python3 ./scripts/tests/trusted-ci-revocation-regressions.test.py
           run_gate python3 ./scripts/tests/check-fips-ci-contract.test.py
           run_gate python3 ./scripts/tests/check-required-evidence-binding.test.py
           run_gate bash ./scripts/tests/check-rust-verification-gates.test.sh

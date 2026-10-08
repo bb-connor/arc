@@ -306,16 +306,16 @@ success, including an absent conclusion, is failure-authoritative. Both paths
 bind the immutable `workflow_run.run_attempt` carried by the event, retrieve the
 exact historical attempt endpoint, and require the returned run and attempt
 identity to match. They never substitute the mutable current-run projection.
-The listener never trusts nested workflow-run pull request metadata. For CI, it
-parses the exact `N/E/base/M` run title, authenticates the run head as `E`,
-proves the authorized `ci.yml` blob at `S`, `E`, and `M`,
-proves the ordered parents and tree of `M` directly, and verifies the signed
-binding artifact and certificate whenever the builder succeeded. If the live
-pull request still has the same base, head, and explicit merge ref, it requires
-`CHIO_COMMITTED_LINUX_EVIDENCE_SHA=E` and may create missing tombstones. If the
-pull request advanced from `(base1, M1)` to `(base2, M2)`, it may normalize only
-preexisting authority on the recorded evidence head `E`; it cannot create a
-missing namespace. Merge observations do not select the authority head.
+The listener never trusts nested workflow-run pull request metadata. It binds
+the immutable event attempt, repository and head repository IDs, trusted workflow
+path and API head `E`, and proves the authorized `ci.yml` blob at `S` and `E`.
+The run title is classification, never authentication. When the title is valid
+and an exact artifact is available, its binding and certificate are verified;
+startup failures without jobs and malformed titles cannot erase an authenticated
+negative. When `CHIO_COMMITTED_LINUX_EVIDENCE_SHA=E`, it creates a denial-only
+tombstone even for a closed pull request, unless that PR merged with head `E`.
+A non-committed `E` is existing-only. No main, live test-merge or pull-request
+state predicate gates a denial. N and M remain recorded observations.
 Under the shared non-cancelling
 `security-check-authority-<E>` lock, it proves every affected namespace is a
 singleton completed failure while preserving existing external IDs and source
@@ -373,8 +373,8 @@ gh workflow run security-contract-revocation.yml \
   -f reason='policy-authority-withdrawn'
 ```
 
-The protected manual revoker requires the all-zero freeze, revalidates the
-requested live `(<PR>, <E>, <M>, <S>)` tuple, and mints the same
+The protected manual revoker requires the all-zero freeze and authenticates the
+commit `E`; N and M are recorded evidence. It mints the same
 Checks-write-only App token.
 It paginates the dedicated-App `Security contract` namespace on `E`. An
 absent eligible namespace receives an exact completed-failure tombstone with
@@ -412,8 +412,8 @@ A listed run without a proven
 same-repository head and repository identity, the trusted workflow ID and path,
 the `pull_request` event, and API head `E` leaves the history incomplete.
 For every matching run it reads the current
-maximum attempt, retrieves every exact historical attempt from one through that
-maximum, and fails closed before GitHub's 1,000-result filtered-search ceiling.
+maximum attempt, retrieves exact historical attempts within the first100, and
+fails closed before GitHub's 1,000-result filtered-search ceiling.
 It never falls back to an unfiltered listing.
 A completed non-success attempt dominates any newer incomplete attempt and
 immediately selects the failure-only branch. An incomplete history blocks
@@ -427,9 +427,9 @@ earlier failure followed by a successful rerun,
 its separate late-CI branch creates missing failure tombstones or
 updates existing members only toward completed failure while preserving
 external IDs and source metadata. It normalizes only the dedicated-App
-`Security contract` namespace. After PR or merge-ref drift, the
-publisher branch may normalize existing authority on `E` but cannot
-create a missing namespace. Every serialized ordering converges to a failed
+`Security contract` namespace. A current unmerged E permits a missing denial
+tombstone; a merged same-head PR or non-current E is existing-only.
+Every serialized ordering converges to a failed
 authority tombstone that publication cannot
 restore. This is deliberately conservative: any completed non-success CI
 completion for the current `E`, under any pull request, base, test merge, or run
@@ -447,11 +447,18 @@ its evidence head, so the publisher refuses every later tuple on the same `E`.
 The listener's writes for an obsolete tuple still reach only its evidence head `E`,
 subject to the existing no-create rule.
 
-P6 changes identity and placement. The inherited listener/manual eligibility
-still has PR and merge-observation checks; removing those dependencies for
-authenticated E-scoped negatives is the separate P5 repair. The shared-E history
-and final-boundary census amendments remain separate H work. These partial
-source changes do not establish hosted qualification or dedicated-App H2 acceptance.
+P5 denies authenticated E without main or live-merge predicates at any write
+boundary. H reads both workflow and repository CI inventories, requires every
+workflow-listed ID to appear in the repository path-`ci.yml` census, and scans
+the repository census across registration changes. A retired workflow's success
+cannot supply positive authority; its authenticated non-success remains sticky.
+API errors or incomplete identities beside an authenticated bad attempt preserve
+the denial; without a bad attempt, incomplete history refuses publication.
+The maximum is100 exact attempts per run. An over-limit history cannot grant,
+while an authenticated negative within that window still denies E. Close and
+reopen cannot erase same-E history. The auditor re-lists both inventories and
+rechecks the retained maximum attempts. These source changes do not establish
+hosted qualification or dedicated-App H2 acceptance.
 
 The post-merge audit first requires every attempt of every `ci.yml`
 `pull_request` run whose API head is `E`, for any pull request, base, test merge,
