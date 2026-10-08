@@ -230,8 +230,8 @@ exclude = [
     "third_party/nono-upstream-chio",
     # Preserve custom and hidden-file filters in the selected ignore release.
     "third_party/ignore-chio",
-    # Patched transitive Sigstore verifier: compiled through nono and tested
-    # independently from the first-party workspace.
+    # Preserved Sigstore verifier fork patched for upstream nono 0.53.0. No
+    # lockfile selects it, so it is not compiled into any Chio artifact.
     "third_party/sigstore-verify-chio",
     # Locally maintained enumflags derive repair; upstream library stays pinned.
     "third_party/enumflags2-derive-chio",
