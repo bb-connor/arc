@@ -41,12 +41,12 @@ From the agentic work kernel design and the W4 beta-convergence plan on
 
 | # | Decision | Choice |
 | --- | --- | --- |
-| D1 | Human role | Agents merge into integration branches. Connor approves every merge to `main`. Codex review bots and Greptile review train PRs. |
+| D1 | Human role | Agents merge into integration branches. Amended 2026-10-08: agents also merge to `main`, but only through `swarm merge`, whose gate is section 8.3. Codex review bots (and Greptile, while it has credits) review PRs into `main`. |
 | D2 | Spend posture | Tiered. Premium models for kernel/security authoring, design calls and final review. Mid-tier subscription models (Claude Sonnet 5.5, Codex 6.1-sol) for routine implementation and review fixes. Hermes on OpenRouter (DeepSeek, Kimi, GLM) for mechanical work. |
 | D3 | Compute | Free first: clean up workstation-2, enable sccache, GitHub Actions as the x86 test farm (the repo is public, so standard hosted runners are free), cloud agent sessions for lanes that need no full Rust build. Add a preemptible Oracle E5 build box only on measured need. No E2B, no Cursor cloud agents. |
 | D4 | Coordination substrate | Approach A: a git-native coordination store on an orphan `swarm` branch of `bb-connor/arc`, driven by a `swarm` CLI. GitHub PRs on the public repo carry code and review bots only. |
 | D5 | Conductor | Claude (premium) on workstation-2. |
-| D6 | GitHub identity | Agents push as a dedicated machine user (`bb-chio-swarm`, write but not admin) so `main` rulesets bind them. |
+| D6 | GitHub identity | Amended 2026-10-08: agents act as Connor's account (`bb-connor`), reading the existing `gh` login at runtime; no machine user. Accepted costs: agents could bypass admin-bypassable rules, GitHub attributes their actions to Connor, and they share his API rate limit. |
 | D7 | Hermes spend cap | OpenRouter key credit limit of $25/day. |
 | D8 | Existing security pair | Runs unchanged on its own `coord/pr1160` mailbox until #1160 lands, then migrates onto the swarm. |
 
@@ -368,18 +368,30 @@ week preemptible or $170 on demand) joined to the tailnet as `tag:builder`.
 - Oracle budget alert if the build box is provisioned.
 - Claude and Codex subscriptions cap themselves; throttling routes around them.
 
-### 8.3 Branch protection
+### 8.3 Branch protection and the merge gate
 
-All agents push as the machine user `bb-chio-swarm` over HTTPS with a token
-that has write but not admin access. Today the `main` ruleset only requires
-status checks and blocks deletion and force pushes, with no bypass actors. A
-new ruleset adds a restrict-updates rule on `main` with the repository admin
-role as the only bypass actor, so only Connor can merge to `main` and the
-machine user cannot. A pre-push hook in every
-swarm worktree enforces roles: only the integrator pushes `beta-next`, only
-the security pair pushes the #1160 branch, and workers force-push only their
-own `lane/*` branches. This also resolves workstation-2's missing GitHub
-authentication.
+Amended 2026-10-08 (D1, D6). Agents act as Connor's account. The
+`main-required-checks` ruleset (required checks, no deletion, no force push,
+no bypass actors) binds every merge to `main`, admin or not; the earlier
+`main-human-merge` update restriction was deleted because it could not bind
+agents acting as an admin.
+
+Agents land PRs on `main` only through `swarm merge <PR>`, run by the
+integrator (train PRs) or the conductor (PRs it owns). On the PR's current
+head commit it requires all of:
+
+- the four required checks completed with success;
+- a completed Codex review (its summary row names the head commit);
+- every P0-P2 finding from the review bots imported as an item and either
+  `integrated`/`done` or `wontfix` with a recorded reason;
+- an accepted whole-PR review (`swarm review-pr`) of that head by a reviewer
+  whose vendor differs from the author's.
+
+It then runs `gh pr merge --merge --match-head-commit <head>`, never
+`--admin`, and notifies Connor. A pre-push hook in every swarm worktree still
+enforces roles: nobody pushes `main` directly, only the integrator pushes
+`beta-next`, only the security pair pushes the #1160 branch, and workers
+force-push only their own `lane/*` branches.
 
 ### 8.4 Agent rules (`PROTOCOL.md`, backed by agent permission deny rules)
 
