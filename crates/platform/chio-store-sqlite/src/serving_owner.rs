@@ -55,6 +55,20 @@ pub(crate) fn verify_authenticated_recovery_history(
     global_commit_chain::verify_global_commit_chain(connection).map(|_| ())
 }
 
+pub(crate) fn compiled_global_commit_schema() -> &'static str {
+    global_commit_chain::compiled_schema()
+}
+
+/// Read the actual current global head through its owning source decoder.
+/// This tuple is DATA and supplies no source origin, finishing purse or permit.
+/// A borrower must authenticate its real owner and transaction independently.
+pub(crate) fn native_finishing_global_head(
+    connection: &Connection,
+) -> Result<(u64, String), SqliteServingOwnerError> {
+    let head = global_commit_chain::load_global_commit_head(connection)?;
+    Ok((head.head_sequence, head.chain_digest))
+}
+
 #[cfg(test)]
 pub(crate) fn verify_finding_market_projection_for_tests(
     connection: &Connection,
@@ -420,6 +434,7 @@ impl SqliteAuthorityStore {
             initialize_offline_authority_schemas(&mut connection)?;
             initialize_serving_lease_schema(&connection)?;
             relocation::initialize_serving_relocation_schema(&connection)?;
+            initialize_provisioned_global_before_admission(&mut connection, &record)?;
             crate::admission_operation_store::initialize_admission_operation_schema(
                 &mut connection,
             )?;
@@ -439,7 +454,6 @@ impl SqliteAuthorityStore {
                 .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
             crate::finding_status_store::initialize_finding_status_schema(&mut connection)
                 .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
-            initialize_global_commit_schema(&connection)?;
             seed_global_baseline(&mut connection)?;
             reset_derived_budget_ack_cache(&connection)?;
             verify_authority_store_invariants(&connection)?;
@@ -552,6 +566,11 @@ impl SqliteAuthorityStore {
                     "serving-owner insert did not affect exactly one row".to_string(),
                 ));
             }
+            // The pristine proof precedes owner creation. Commit the global
+            // catalog with that owner, before admission inventory readers can
+            // require its custody. No retained source is adopted as genesis.
+            verify_pristine_authority_tables(&transaction)?;
+            initialize_global_commit_schema(&transaction)?;
             transaction.commit().map_err(|error| {
                 SqliteServingOwnerError::OutcomeUnknown(format!(
                     "sqlite authority provisioning commit outcome is unknown: {error}"
@@ -591,7 +610,6 @@ impl SqliteAuthorityStore {
             .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
         crate::finding_status_store::initialize_finding_status_schema(&mut connection)
             .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
-        initialize_global_commit_schema(&connection)?;
         seed_global_baseline(&mut connection)?;
         reset_derived_budget_ack_cache(&connection)?;
         verify_authority_store_invariants(&connection)?;
@@ -673,6 +691,8 @@ impl SqliteAuthorityStore {
         )?;
         initialize_serving_lease_schema(&connection)?;
         relocation::initialize_serving_relocation_schema(&connection)?;
+        // An existing serving identity cannot recreate lost global custody.
+        verify_global_commit_schema(&connection)?;
         crate::admission_operation_store::initialize_admission_operation_schema(&mut connection)?;
         crate::channel_lifecycle_store::initialize_channel_lifecycle_schema(&mut connection)?;
         crate::channel_release_publisher_store::initialize_channel_release_publisher_schema(
@@ -690,7 +710,6 @@ impl SqliteAuthorityStore {
             .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
         crate::finding_status_store::initialize_finding_status_schema(&mut connection)
             .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
-        verify_global_commit_schema(&connection)?;
         reset_derived_budget_ack_cache(&connection)?;
         for (key, supported) in [
             ("budget", BUDGET_STORE_SUPPORTED_SCHEMA_VERSION),
@@ -748,6 +767,26 @@ impl SqliteAuthorityStore {
             SqliteServingOwnerError::Invalid("serving owner epoch overflowed u64".to_string())
         })?;
         let lease_id = next_lease_id()?;
+        // The next owner stays private while its lease and migration cohort
+        // are committed. Native source cuts can borrow this actual owner
+        // before the SQL epoch changes, without publishing a serving handle.
+        let mut clock_fence = chio_security_types::clock::ClockFence::default();
+        let opened_at = clock_fence.observe(clock.read()?)?;
+        let opened_at_ms = i64::try_from(opened_at.unix_millis().get())
+            .map_err(|_| chio_security_types::clock::ClockError::Overflow)?;
+        let owner = Arc::new(SqliteServingOwner {
+            clock,
+            clock_fence: Arc::new(Mutex::new(clock_fence)),
+            rollback_anchor,
+            fence: StoreMutationFence {
+                store_uuid: record.store_uuid.clone(),
+                lease_id: lease_id.clone(),
+                owner_epoch,
+            },
+            poisoned: AtomicBool::new(false),
+            expected_data_version: AtomicU64::new(expected_data_version),
+            replay_source_migration_in_flight: AtomicBool::new(false),
+        });
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let current = load_provisioning_record_tx(&transaction)?.ok_or_else(|| {
             SqliteServingOwnerError::NotProvisioned(database_path.display().to_string())
@@ -800,10 +839,6 @@ impl SqliteAuthorityStore {
                 ));
             }
         }
-        let mut clock_fence = chio_security_types::clock::ClockFence::default();
-        let opened_at = clock_fence.observe(clock.read()?)?;
-        let opened_at_ms = i64::try_from(opened_at.unix_millis().get())
-            .map_err(|_| chio_security_types::clock::ClockError::Overflow)?;
         let changed = transaction.execute(
             r#"
             UPDATE chio_serving_owner
@@ -848,25 +883,12 @@ impl SqliteAuthorityStore {
                 "sqlite serving-owner epoch commit outcome is unknown: {error}"
             ))
         })?;
-        rollback_anchor.sync_after_commit(&connection)?;
+        owner.sync_authority_anchor(&connection)?;
         if authority_data_version(&connection)? != expected_data_version {
             return Err(SqliteServingOwnerError::Invalid(
                 "authority database changed concurrently while opening".to_string(),
             ));
         }
-        let owner = Arc::new(SqliteServingOwner {
-            clock,
-            clock_fence: Arc::new(Mutex::new(clock_fence)),
-            rollback_anchor,
-            fence: StoreMutationFence {
-                store_uuid: record.store_uuid,
-                lease_id,
-                owner_epoch,
-            },
-            poisoned: AtomicBool::new(false),
-            expected_data_version: AtomicU64::new(expected_data_version),
-            replay_source_migration_in_flight: AtomicBool::new(false),
-        });
         crate::channel_release_publisher_store::quarantine_incomplete_dispatches_at_startup(
             &mut connection,
             &owner,
@@ -1058,6 +1080,62 @@ impl SqliteAuthorityStore {
             self.owner.clone(),
         )
     }
+}
+
+/// Only an interrupted identity that never acquired a lease and has no
+/// retained safety data may finish creating its absent global catalog.
+fn initialize_provisioned_global_before_admission(
+    connection: &mut Connection,
+    record: &ProvisioningRecord,
+) -> Result<(), SqliteServingOwnerError> {
+    let exists: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type='table' AND name='authority_global_commits')",
+        [],
+        |row| row.get(0),
+    )?;
+    if exists {
+        return initialize_global_commit_schema(connection);
+    }
+    let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+    let current = load_provisioning_record_tx(&transaction)?
+        .ok_or_else(|| SqliteServingOwnerError::PartialProvision(record.database_path.clone()))?;
+    let leases: i64 =
+        transaction.query_row("SELECT COUNT(*) FROM chio_serving_leases", [], |row| {
+            row.get(0)
+        })?;
+    if current.store_uuid != record.store_uuid || current.owner_epoch != 0 || leases != 0 {
+        return Err(SqliteServingOwnerError::Invalid(
+            "absent global custody belongs to a retained serving identity".into(),
+        ));
+    }
+    verify_pristine_authority_tables(&transaction)?;
+    // Native imported rows and source metadata are independently authoritative.
+    // A zero recovery/admission census cannot excuse any retained native row.
+    let mut statement = transaction.prepare(
+        "SELECT name FROM sqlite_schema WHERE type='table' AND
+         (name GLOB 'security_participant_*' OR name GLOB 'native_dispatch_ledger*'
+          OR name='authority_global_commit_meta') ORDER BY name",
+    )?;
+    for table in statement.query_map([], |row| row.get::<_, String>(0))? {
+        let table = table?;
+        let quoted = table.replace('"', "\"\"");
+        let rows: i64 =
+            transaction.query_row(&format!("SELECT COUNT(*) FROM \"{quoted}\""), [], |row| {
+                row.get(0)
+            })?;
+        if rows != 0 {
+            return Err(SqliteServingOwnerError::Invalid(format!(
+                "absent global custody has retained native data in `{table}`"
+            )));
+        }
+    }
+    drop(statement);
+    initialize_global_commit_schema(&transaction)?;
+    transaction.commit().map_err(|error| {
+        SqliteServingOwnerError::OutcomeUnknown(format!(
+            "sqlite pristine global catalog commit outcome is unknown: {error}"
+        ))
+    })
 }
 
 fn initialize_offline_authority_schemas(

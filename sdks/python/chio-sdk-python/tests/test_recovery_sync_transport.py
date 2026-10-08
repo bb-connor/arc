@@ -208,6 +208,32 @@ def selected_native_command():
                 if row["contract"] == "command" and row["valid"])
 
 
+@pytest.mark.asyncio
+async def test_completed_native_tasks_release_admission_before_delayed_completion_callbacks():
+    calls = []
+
+    def respond(request):
+        calls.append(request)
+        return httpx.Response(200, json=native_response())
+
+    session = session_for(httpx.MockTransport(respond), budget=2,
+                          command=selected_native_command())
+    completed = session._retained_completed
+    deferred = []
+    try:
+        # Delay only bookkeeping callbacks; the native request and cleanup run
+        # as real tasks to completion before the next public action.
+        with patch.object(session, "_retained_completed", side_effect=deferred.append):
+            assert (await session.execute("resume")).category == "complete"
+            assert session._retained_tasks
+            assert all(task.done() for task in session._retained_tasks)
+            assert (await session.execute("resume")).category == "complete"
+            assert len(calls) == session.attempts == 2
+    finally:
+        for task in deferred:
+            completed(task)
+
+
 def assert_selected_native_intent(transport, command, count):
     assert transport.calls == len(transport.wires) == count
     assert all(wire["command"].encode() == command for wire in transport.wires)

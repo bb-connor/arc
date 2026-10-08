@@ -133,6 +133,13 @@ async fn modeled_legacy_missing_status_is_unknown_without_blocking_private_final
         influence.unknown,
         "the retained missing status channel must remain unknown after the model is disabled"
     );
+    assert!(
+        first_delivery.is_err()
+            || first_delivery
+                .as_ref()
+                .is_ok_and(|response| response.verdict == Verdict::Deny),
+        "an unauthored historical status channel must refuse the first public completion after private terminal commitment"
+    );
     let replay = runtime
         .execute_step(&fixture.process, "root", key, &request)
         .await;

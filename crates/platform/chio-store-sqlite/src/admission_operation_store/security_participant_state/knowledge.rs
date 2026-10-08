@@ -10,12 +10,18 @@ use chio_security_types::{
     knowledge::ArtifactReleaseIntentV1, recovery::RecoveryScopeV1, InformationLabel,
 };
 
+mod current_authority;
 pub(in crate::admission_operation_store) mod encoding;
+mod influence_sources;
+pub(in crate::admission_operation_store) mod liability;
+pub(in crate::admission_operation_store) use current_authority::CurrentNativeInfluenceAuthority;
 mod release_source;
 pub(in crate::admission_operation_store) use release_source::release_observation_source;
 
 #[cfg(feature = "admission-test-support")]
 mod encoding_test_support;
+#[cfg(feature = "admission-test-support")]
+pub(in crate::admission_operation_store) mod read_work_test_support;
 #[cfg(feature = "admission-test-support")]
 pub(in crate::admission_operation_store) use encoding_test_support::observe_restore_record_encoding_bytes_fixture;
 
@@ -155,6 +161,8 @@ pub(in crate::admission_operation_store) fn load_with_digest(
     authority: &str,
     sequence: u64,
 ) -> Result<(Record, String), AdmissionOperationStoreError> {
+    #[cfg(feature = "admission-test-support")]
+    read_work_test_support::history_body();
     let key = record_key(authority, sequence);
     let row = protected::raw_checked(tx, &key)?.ok_or_else(|| invalid("knowledge join absent"))?;
     // Require the latest event and exact authenticated global reference. An
@@ -210,6 +218,22 @@ pub(in crate::admission_operation_store) fn join<'a>(
     owner: &SqliteServingOwner,
     input: KnowledgeJoin<'_>,
 ) -> Result<(Transaction<'a>, ArtifactReleaseIntentV1), AdmissionOperationStoreError> {
+    let origin = owner
+        .prepare_native_source_transaction(&tx)
+        .map_err(map_owner_error)?;
+    join_with_origin(tx, owner, &origin, input)
+}
+
+/// An enclosing source may have already appended independently authenticated
+/// evidence. It retains its actual initial cut before those mutations.
+pub(in crate::admission_operation_store) fn join_with_origin<'a>(
+    tx: Transaction<'a>,
+    owner: &SqliteServingOwner,
+    origin: &crate::serving_owner::NativeSourceTransactionOrigin<'_>,
+    input: KnowledgeJoin<'_>,
+) -> Result<(Transaction<'a>, ArtifactReleaseIntentV1), AdmissionOperationStoreError> {
+    let liability = liability::prepare_native_knowledge_join_liability(&tx, owner, origin, &input)?;
+    liability.verify_before(&tx, owner)?;
     let KnowledgeJoin {
         binding,
         key,
@@ -228,7 +252,7 @@ pub(in crate::admission_operation_store) fn join<'a>(
     let request =
         crate::security_state::resolve_native_label_join(&tx, authority, key, source, &transition)
             .map_err(invalid)?;
-    let (mut rows, mut bytes) = history::ordered::latest_totals(&tx, &initialized)?;
+    let totals = history::ordered::latest_totals(&tx, &initialized)?;
     let sequence = head(&tx, authority)?
         .checked_add(1)
         .ok_or_else(|| invalid("knowledge sequence overflow"))?;
@@ -245,24 +269,7 @@ pub(in crate::admission_operation_store) fn join<'a>(
         },
     )
     .map_err(invalid)?;
-    for change in &changes {
-        if let Some(before) = &change.before {
-            rows = rows
-                .checked_sub(1)
-                .ok_or_else(|| invalid("knowledge row underflow"))?;
-            bytes = bytes
-                .checked_sub(before.len() as u64)
-                .ok_or_else(|| invalid("knowledge byte underflow"))?;
-        }
-        if let Some(after) = &change.after {
-            rows = rows
-                .checked_add(1)
-                .ok_or_else(|| invalid("knowledge row overflow"))?;
-            bytes = bytes
-                .checked_add(after.len() as u64)
-                .ok_or_else(|| invalid("knowledge byte overflow"))?;
-        }
-    }
+    let (rows, bytes) = liability::apply_totals(totals, &changes)?;
     release.source_label = request.principal_join.clone();
     release.observation_generation =
         chio_security_types::recovery::SafeInteger::new(result.context_generation)
@@ -282,7 +289,11 @@ pub(in crate::admission_operation_store) fn join<'a>(
         current_bytes: bytes,
     };
     record.validate()?;
+    liability.verify_native_result(&tx, owner, &record)?;
     let write = encoding::prepare(&tx, &record)?;
+    liability.verify_encoding(write.root_payload(), write.staged_chunks())?;
+    #[cfg(feature = "admission-test-support")]
+    read_work_test_support::knowledge_join_readback();
     #[cfg(feature = "admission-test-support")]
     encoding_test_support::observe_wire(&record, write.root_payload());
     let (_source, _delta) = protected::persist_knowledge_encoding(&tx, owner, write)?;

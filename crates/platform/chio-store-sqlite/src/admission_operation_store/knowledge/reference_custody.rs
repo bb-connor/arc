@@ -14,6 +14,7 @@ pub(in crate::admission_operation_store) struct VerifiedKnowledgeReferenceRetain
 enum RetainedSourceEvidence {
     Publication,
     ModernPin,
+    ConfinedInputs { envelope: CanonicalPayloadDigest },
     Product { owner: ProductEvidenceOwner },
     Checkpoint { envelope: CanonicalPayloadDigest },
     Restore { envelope: CanonicalPayloadDigest },
@@ -37,6 +38,33 @@ impl<'tx, 'conn> VerifiedKnowledgeReferenceRetain<'tx, 'conn> {
             owner: ReferenceOwner::from(owner.clone()),
             references,
             evidence: RetainedSourceEvidence::Product { owner },
+        };
+        witness.verify(tx)?;
+        Ok(witness)
+    }
+
+    /// Original reservation custody remains held across every child state.
+    /// The source adapter authenticates the first boundary and every pin tuple.
+    pub(super) fn confined_inputs(
+        tx: &'tx Transaction<'conn>,
+        key: &str,
+    ) -> Result<Self, AdmissionOperationStoreError> {
+        let inputs: confinement::ConfinedInputReferenceSource =
+            confinement::input_reference_source(tx, key)?
+                .ok_or_else(|| refused("confined inputs have no original boundary source"))?;
+        let boundary = inputs.boundary();
+        let witness = Self {
+            transaction: tx,
+            source: protected::source_reference(tx, key)?,
+            owner: ReferenceOwner::ConfinedInputs {
+                scope: boundary.scope.clone(),
+                request: boundary.request.clone(),
+                boundary: boundary.boundary.clone(),
+            },
+            references: inputs.references().to_vec(),
+            evidence: RetainedSourceEvidence::ConfinedInputs {
+                envelope: confined_input_envelope_digest(boundary)?,
+            },
         };
         witness.verify(tx)?;
         Ok(witness)
@@ -230,6 +258,25 @@ impl<'tx, 'conn> VerifiedKnowledgeReferenceRetain<'tx, 'conn> {
                     ));
                 }
             }
+            RetainedSourceEvidence::ConfinedInputs { envelope } => {
+                let inputs = confinement::input_reference_source(tx, self.source.record_key())?
+                    .ok_or_else(|| refused("confined original boundary source disappeared"))?;
+                let boundary = inputs.boundary();
+                if *envelope != confined_input_envelope_digest(boundary)?
+                    || SourceAnchor::capture(inputs.source()) != SourceAnchor::capture(&self.source)
+                    || self.references.as_slice() != inputs.references()
+                    || self.owner
+                        != (ReferenceOwner::ConfinedInputs {
+                            scope: boundary.scope.clone(),
+                            request: boundary.request.clone(),
+                            boundary: boundary.boundary.clone(),
+                        })
+                {
+                    return Err(refused(
+                        "confined references changed original input custody",
+                    ));
+                }
+            }
             RetainedSourceEvidence::ModernPin => {
                 let pin = pins::modern_reference_source(tx, self.source.record_key())?
                     .ok_or_else(|| refused("reference pin disappeared"))?;
@@ -333,6 +380,19 @@ impl<'tx, 'conn> VerifiedKnowledgeReferenceRetain<'tx, 'conn> {
     }
 }
 
+fn confined_input_envelope_digest(
+    boundary: &chio_security_types::confinement::IsolationBoundaryV1,
+) -> Result<CanonicalPayloadDigest, AdmissionOperationStoreError> {
+    boundary.validate().map_err(refused)?;
+    // Use the same canonical record bound and domain framing as the owning
+    // source. This digest describes an envelope and grants no custody by itself.
+    let _canonical_envelope = protected::encode(boundary)?;
+    Ok(CanonicalPayloadDigest::from_bytes(
+        knowledge_digest(RecoveryDigestDomain::KnowledgeReferenceOwner, boundary)
+            .map_err(refused)?,
+    ))
+}
+
 fn pin_owner(pin: &pins::ModernPinSource) -> ReferenceOwner {
     let scope = pin.scope().clone();
     match pin.owner() {
@@ -359,4 +419,68 @@ impl std::fmt::Debug for VerifiedKnowledgeReferenceRetain<'_, '_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("VerifiedKnowledgeReferenceRetain([redacted])")
     }
+}
+
+pub(super) fn retain_publication_references(
+    tx: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    record: &NativeArtifactRecordV1,
+) -> Result<(), AdmissionOperationStoreError> {
+    let proof = VerifiedKnowledgeReferenceRetain::publication_dependencies(tx, record)?;
+    protected::persist_knowledge_reference_retain(tx, owner, proof)?;
+    Ok(())
+}
+
+pub(super) fn retain_pin_references(
+    tx: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    key: &str,
+) -> Result<(), AdmissionOperationStoreError> {
+    let proof = VerifiedKnowledgeReferenceRetain::modern_pin(tx, key)?
+        .ok_or_else(|| refused("active pin has no genuine reference source"))?;
+    protected::persist_knowledge_reference_retain(tx, owner, proof)?;
+    Ok(())
+}
+
+pub(super) fn retain_confined_input_references(
+    tx: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    key: &str,
+) -> Result<(), AdmissionOperationStoreError> {
+    let proof = VerifiedKnowledgeReferenceRetain::confined_inputs(tx, key)?;
+    protected::persist_knowledge_reference_retain(tx, owner, proof)?;
+    Ok(())
+}
+
+pub(super) fn retain_checkpoint_references(
+    tx: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    key: &str,
+) -> Result<(), AdmissionOperationStoreError> {
+    let proof = VerifiedKnowledgeReferenceRetain::checkpoint(tx, key)?
+        .ok_or_else(|| refused("active checkpoint has no genuine reference source"))?;
+    protected::persist_knowledge_reference_retain(tx, owner, proof)?;
+    Ok(())
+}
+
+pub(super) fn retain_release_references(
+    tx: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    key: &str,
+) -> Result<(), AdmissionOperationStoreError> {
+    let proof = VerifiedKnowledgeReferenceRetain::artifact_release(tx, key)?
+        .ok_or_else(|| refused("active release has no genuine reference source"))?;
+    protected::persist_knowledge_reference_retain(tx, owner, proof)?;
+    Ok(())
+}
+
+pub(super) fn retain_restore_references(
+    tx: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    key: &str,
+) -> Result<(), AdmissionOperationStoreError> {
+    let proof = VerifiedKnowledgeReferenceRetain::restore(tx, key)?
+        .ok_or_else(|| refused("active restore has no genuine reference source"))?;
+    protected::persist_knowledge_reference_retain(tx, owner, proof)?;
+    Ok(())
 }

@@ -29,7 +29,7 @@ fn sweep_key(
     ))
 }
 
-fn logical_object(seal: &ArtifactBlobSealV1) -> bool {
+pub(super) fn logical_object(seal: &ArtifactBlobSealV1) -> bool {
     seal.generation
         .as_str()
         .strip_prefix("object:")
@@ -67,7 +67,23 @@ pub(super) fn publication_collection_source(
         // An absent envelope field does not prove its physical collection.
         return Ok(None);
     };
-    let key = if logical_object(seal) {
+    let key = publication_sweep_key(record, seal)?;
+    let Some(row) = protected::raw_checked(tx, &key)? else {
+        return Ok(None);
+    };
+    let source = protected::source_reference(tx, &key)?;
+    if row.kind != "command" || row.scope != scope_key(&record.metadata.scope)? {
+        return Err(refused("collection source changed its scope"));
+    }
+    let sweep: SweepRecord = protected::decode(&row.payload)?;
+    Ok((sweep.seal == *seal && sweep.state == SweepState::Collected).then_some(source))
+}
+
+fn publication_sweep_key(
+    record: &NativeArtifactRecordV1,
+    seal: &ArtifactBlobSealV1,
+) -> Result<String, AdmissionOperationStoreError> {
+    Ok(if logical_object(seal) {
         format!(
             "knowledge-object-sweep:{}",
             hex::encode(
@@ -89,16 +105,91 @@ pub(super) fn publication_collection_source(
                 seal.content,
             ))?)
         )
+    })
+}
+
+/// An old shared sweep can advance to another generation. Authenticate the
+/// exact retained acknowledgment and its preceding barrier rather than losing
+/// the original collected owner's custody when its current projection moves.
+pub(super) fn publication_collected_anchor(
+    tx: &Connection,
+    record: &NativeArtifactRecordV1,
+) -> Result<Option<references::SourceAnchor>, AdmissionOperationStoreError> {
+    if record.state != ArtifactPublicationStateV1::Retired {
+        return Ok(None);
+    }
+    let Some(seal) = &record.seal else {
+        return Ok(None);
     };
+    let key = publication_sweep_key(record, seal)?;
     let Some(row) = protected::raw_checked(tx, &key)? else {
         return Ok(None);
     };
-    let source = protected::source_reference(tx, &key)?;
-    if row.kind != "command" || row.scope != scope_key(&record.metadata.scope)? {
-        return Err(refused("collection source changed its scope"));
+    let current = protected::source_reference(tx, &key)?;
+    let _: SweepRecord = protected::decode(&row.payload)?;
+    if row.scope != scope_key(&record.metadata.scope)? || row.kind != "command" {
+        return Err(refused("publication sweep changed its original scope"));
     }
-    let sweep: SweepRecord = protected::decode(&row.payload)?;
-    Ok((sweep.seal == *seal && sweep.state == SweepState::Collected).then_some(source))
+    let expected = protected::encode(&SweepRecord {
+        seal: seal.clone(),
+        state: SweepState::Collected,
+    })?;
+    for version in (2..=current.version()).rev() {
+        if let Some(anchor) =
+            references::SourceAnchor::historical_command(tx, &current, version, &expected)?
+        {
+            verify_publication_collected_anchor(tx, record, &anchor)?;
+            return Ok(Some(anchor));
+        }
+    }
+    Ok(None)
+}
+
+pub(super) fn verify_publication_collected_anchor(
+    tx: &Connection,
+    record: &NativeArtifactRecordV1,
+    collected: &references::SourceAnchor,
+) -> Result<u64, AdmissionOperationStoreError> {
+    let seal = record
+        .seal
+        .as_ref()
+        .ok_or_else(|| refused("collected publication lost its exact seal"))?;
+    let key = publication_sweep_key(record, seal)?;
+    let current = protected::source_reference(tx, &key)?;
+    let expected = protected::encode(&SweepRecord {
+        seal: seal.clone(),
+        state: SweepState::Collected,
+    })?;
+    let before = collected
+        .version()
+        .checked_sub(1)
+        .filter(|version| *version != 0)
+        .ok_or_else(|| refused("collection acknowledgment has no original barrier"))?;
+    if record.state != ArtifactPublicationStateV1::Retired
+        || collected.record_key() != key
+        || collected.scope_key() != scope_key(&record.metadata.scope)?
+        || !collected.matches_historical_command_payload(tx, &expected)?
+        || !protected::matches_historical_source_command_payload(
+            tx,
+            &current,
+            before,
+            &protected::encode(&SweepRecord {
+                seal: seal.clone(),
+                state: SweepState::Sweeping,
+            })?,
+        )?
+    {
+        return Err(refused(
+            "collection acknowledgment changed its original barrier",
+        ));
+    }
+    let barrier = protected::historical_record_commit(tx, &key, before)?;
+    if barrier >= collected.global_commit_sequence() {
+        return Err(refused(
+            "collection acknowledgment precedes its original barrier",
+        ));
+    }
+    Ok(barrier)
 }
 
 pub(super) fn require_stage_not_sweeping(
@@ -141,36 +232,57 @@ fn publications(
         .map(|key| load(tx, &key)?.ok_or_else(|| refused("publication inventory")))
         .collect()
 }
-fn pinned(
-    tx: &Transaction<'_>,
+pub(super) fn pinned(
+    tx: &Connection,
     reference: &ArtifactVersionRefV1,
 ) -> Result<bool, AdmissionOperationStoreError> {
-    // New Product writers retain closed typed owner leaves. Keep the legacy
-    // family barriers below until all their owning writers have joined this
-    // index; zero typed owners alone does not prove safe collection.
     if super::references::active_reference_owner_count(tx, reference)? > 0 {
         return Ok(true);
     }
-    // Dependencies include reserved/staged versions, so publication cannot lose
-    // a required input between independent blob and metadata commits.
-    for record in publications(tx, &reference.scope)? {
-        if record.state != ArtifactPublicationStateV1::Retired
-            && record.input.dependencies.as_slice().contains(reference)
+    let ready = super::references::ready_reference_account(tx, &reference.scope)?;
+    ready.verify_current(tx)?;
+    if ready.has_complete_writer_coverage() {
+        return Ok(false);
+    }
+    // V1 and V2 activation predate confined input writer coverage. Their cold
+    // census owns retained references through the authenticated cutoff. Keep
+    // later retained sources as conservative barriers, including vanished
+    // current projections. Streaming has no authority-wide lifetime ceiling.
+    let mut statement = tx.prepare(
+        "SELECT record_key FROM admission_operation_recovery_records
+         WHERE record_key GLOB 'knowledge-publication:*' OR record_key GLOB 'knowledge-checkpoint:*'
+            OR record_key GLOB 'knowledge-pin:*' OR record_key GLOB 'knowledge-release:*'
+            OR record_key GLOB 'knowledge-restore:*'
+         UNION SELECT record_key FROM admission_operation_recovery_events
+         WHERE record_key GLOB 'knowledge-publication:*' OR record_key GLOB 'knowledge-checkpoint:*'
+            OR record_key GLOB 'knowledge-pin:*' OR record_key GLOB 'knowledge-release:*'
+            OR record_key GLOB 'knowledge-restore:*'
+         UNION SELECT projection_key FROM authority_global_commits WHERE projection_kind='recovery'
+            AND (projection_key GLOB 'knowledge-publication:*' OR projection_key GLOB 'knowledge-checkpoint:*'
+            OR projection_key GLOB 'knowledge-pin:*' OR projection_key GLOB 'knowledge-release:*'
+            OR projection_key GLOB 'knowledge-restore:*') ORDER BY 1",
+    ).map_err(sqlite_error)?;
+    let mut keys = statement.query([]).map_err(sqlite_error)?;
+    while let Some(row) = keys.next().map_err(sqlite_error)? {
+        let key: String = row.get(0).map_err(sqlite_error)?;
+        let source = protected::source_reference(tx, &key)?;
+        if source.scope_key() != scope_key(&reference.scope)?
+            || source.global_commit_sequence() <= ready.cutoff().sequence()
         {
-            return Ok(true);
+            continue;
         }
-    }
-    let mut statement=tx.prepare("SELECT record_key FROM admission_operation_recovery_records WHERE record_key GLOB 'knowledge-checkpoint:*' OR record_key GLOB 'knowledge-pin:*' OR record_key GLOB 'knowledge-release:*' OR record_key GLOB 'knowledge-restore:*' LIMIT 4097").map_err(sqlite_error)?;
-    let keys = statement
-        .query_map([], |row| row.get::<_, String>(0))
-        .map_err(sqlite_error)?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(sqlite_error)?;
-    if keys.len() > 4096 {
-        return Err(refused("pin inventory overflow"));
-    }
-    for key in keys {
-        if key.starts_with("knowledge-checkpoint:") {
+        if key.starts_with("knowledge-publication:") {
+            let record: NativeArtifactRecordV1 =
+                load(tx, &key)?.ok_or_else(|| refused("legacy publication disappeared"))?;
+            if record_publication_key(&record)? != key || record.metadata.scope != reference.scope {
+                return Err(refused("legacy publication changed its dependency owner"));
+            }
+            if record.state != ArtifactPublicationStateV1::Retired
+                && record.input.dependencies.as_slice().contains(reference)
+            {
+                return Ok(true);
+            }
+        } else if key.starts_with("knowledge-checkpoint:") {
             if super::checkpoints::pins(tx, &key, reference)? {
                 return Ok(true);
             }
@@ -282,6 +394,7 @@ impl SqliteAdmissionOperationStore {
         mutate(self, actor, fence, now, |tx, _, _| {
             let mut record = artifact(&tx, reference)?;
             traversal::ensure_audience(&tx, actor, &record.metadata.label)?;
+            super::publication_capacity::validate_existing_allocation(&tx, &record)?;
             record.location = location.clone();
             save(
                 &tx,
@@ -312,6 +425,7 @@ impl SqliteAdmissionOperationStore {
                 .ok_or_else(|| refused("retirement version"))?;
             let mut record: NativeArtifactRecordV1 =
                 load(&tx, &key)?.ok_or_else(|| refused("retirement record"))?;
+            super::publication_capacity::validate_retained_allocation(&tx, &record)?;
             traversal::ensure_audience(&tx, actor, &record.metadata.label)?;
             if artifact_version_reference(&record.metadata).map_err(refused)? != *reference
                 || record.metadata.retention != ArtifactRetentionV1::Ephemeral
@@ -328,6 +442,11 @@ impl SqliteAdmissionOperationStore {
             if record.state != ArtifactPublicationStateV1::Retired {
                 record.state = ArtifactPublicationStateV1::Retired;
                 save(&tx, &self.serving_owner, actor.scope(), &key, &record)?;
+                super::reference_retirement::retire_publication_references(
+                    &tx,
+                    &self.serving_owner,
+                    &record,
+                )?;
             }
             let result = schedule_collection(&tx, &self.serving_owner, profile, &record)?;
             Ok((tx, result))
@@ -354,6 +473,12 @@ impl SqliteAdmissionOperationStore {
                 record.state = SweepState::Collected;
                 save(&tx, &self.serving_owner, actor.scope(), &key, &record)?;
             }
+            super::publication_capacity::collection::acknowledge_collection(
+                &tx,
+                &self.serving_owner,
+                actor.scope(),
+                seal,
+            )?;
             Ok((tx, ()))
         })
     }
@@ -453,6 +578,7 @@ impl SqliteAdmissionOperationStore {
             let key = publication_key(actor.scope(), actor.principal(), &input.publication)?;
             let mut record: NativeArtifactRecordV1 =
                 load(&tx, &key)?.ok_or_else(|| refused("abort absent"))?;
+            super::publication_capacity::validate_retained_allocation(&tx, &record)?;
             traversal::ensure_audience(&tx, actor, &record.metadata.label)?;
             if record.input != *input
                 || record.metadata.scope != *actor.scope()
@@ -461,8 +587,19 @@ impl SqliteAdmissionOperationStore {
             {
                 return Err(refused("abort identity"));
             }
+            if super::publication_capacity::collection::collected_source(&tx, &record)?.is_some() {
+                if orphan.is_some_and(|seal| record.seal.as_ref() != Some(seal)) {
+                    return Err(refused("collected orphan identity changed"));
+                }
+                return Ok((tx, None));
+            }
             record.state = ArtifactPublicationStateV1::Retired;
             save(&tx, &self.serving_owner, actor.scope(), &key, &record)?;
+            super::reference_retirement::retire_publication_references(
+                &tx,
+                &self.serving_owner,
+                &record,
+            )?;
             if let Some(seal) = orphan {
                 if seal.object != record.object
                     || seal.process != actor.scope().process_id

@@ -1,8 +1,8 @@
 use crate::security::adapters::{FlowResolverConfig, NativeFlowResolver};
 use chio_core::{
+    Keypair,
     capability::scope::{ChioScope, Operation, ToolGrant},
     capability::token::CapabilityToken,
-    Keypair,
 };
 use chio_kernel::admission_operation::{
     AdmissionIdentifier, AdmissionOperationState, AdmissionOperationStore,
@@ -20,8 +20,8 @@ use chio_store_sqlite::security_state::SqliteSecurityParticipantSource;
 use chio_store_sqlite::{SqliteAuthorityStore, SqliteSecurityStateStore};
 use std::collections::BTreeMap;
 use std::sync::{
-    atomic::{AtomicUsize, Ordering},
     Arc,
+    atomic::{AtomicUsize, Ordering},
 };
 mod bootstrap;
 use bootstrap::*;
@@ -46,12 +46,16 @@ mod explanations;
 mod linked_generations;
 #[path = "tests/native_lineage_bootstrap.rs"]
 mod native_lineage_bootstrap;
+#[path = "tests/original_action_semantics.rs"]
+mod original_action_semantics;
 #[path = "tests/original_denials.rs"]
 mod original_denials;
 #[path = "tests/original_namespaces.rs"]
 mod original_namespaces;
 #[path = "tests/original_no_effect_replacement.rs"]
 mod original_no_effect_replacement;
+#[path = "tests/output_retention.rs"]
+mod output_retention;
 #[path = "tests/overload.rs"]
 mod overload;
 #[path = "tests/participant_intake.rs"]
@@ -62,15 +66,17 @@ mod preview_authority;
 mod semantic;
 #[path = "tests/stale_owner.rs"]
 mod stale_owner;
+#[path = "tests/wire_boundaries.rs"]
+mod wire_boundaries;
 #[path = "tests/workflow_lifecycle.rs"]
 mod workflow_lifecycle;
 
 use crate::recovery::{RecoveryCommandResultV1, RecoveryRuntime};
 use chio_core::crypto::Ed25519Backend;
 use chio_core_types::recovery::SignedAuthorityCoverageAttestationV1;
+use chio_kernel::ToolInvocationContext;
 use chio_kernel::admission_operation::DurableAdmissionMode;
 use chio_kernel::recovery::*;
-use chio_kernel::ToolInvocationContext;
 use chio_process::{ProcessLimits, ProcessRuntime, ProcessSecurityProfile};
 use chio_security_types::recovery::*;
 use serde_json::Value;
@@ -122,6 +128,25 @@ impl RecoveryFixture {
         observer: Option<chio_kernel::NativeSecurityCaptureObserver>,
         tool_server: Option<Box<dyn ToolServerConnection>>,
     ) -> TestResult<Self> {
+        Self::open_with_participants(path, directory, nonce, observer, tool_server, None)
+    }
+    fn open_with_payment_adapter(
+        path: std::path::PathBuf,
+        directory: Option<tempfile::TempDir>,
+        nonce: bool,
+        payment_adapter: Box<dyn chio_kernel::PaymentAdapter>,
+    ) -> TestResult<Self> {
+        Self::open_with_participants(path, directory, nonce, None, None, Some(payment_adapter))
+    }
+    fn open_with_participants(
+        path: std::path::PathBuf,
+        directory: Option<tempfile::TempDir>,
+        nonce: bool,
+        observer: Option<chio_kernel::NativeSecurityCaptureObserver>,
+        tool_server: Option<Box<dyn ToolServerConnection>>,
+        payment_adapter: Option<Box<dyn chio_kernel::PaymentAdapter>>,
+    ) -> TestResult<Self> {
+        let monetary_semantic = payment_adapter.is_some();
         let fresh = !path.join("fixture.json").exists();
         let locks = path.join("locks");
         std::fs::create_dir_all(&locks)?;
@@ -137,7 +162,15 @@ impl RecoveryFixture {
             SqliteAuthorityStore::provision(&database, &locks)?;
         }
         let authority = SqliteAuthorityStore::open_serving(&database, &locks)?;
-        let ca = Keypair::from_seed(&[140; 32]);
+        let ca = Keypair::from_seed(
+            if path.join("legacy-near-capacity").exists()
+                && path.join("current-recovery-receipt-signer").exists()
+            {
+                &[207; 32]
+            } else {
+                &[140; 32]
+            },
+        );
         let agent = Keypair::from_seed(&[141; 32]);
         let approval_key = authority_history::fixture_approval_key(&path);
         let issuer = authority_history::fixture_aggregate_key(&path);
@@ -154,6 +187,9 @@ impl RecoveryFixture {
         )?;
         kernel.register_tool_server(tool_server.unwrap_or_else(|| Box::new(ordinary_server)));
         install_native_fault(&mut kernel, &authority)?;
+        if let Some(adapter) = payment_adapter {
+            kernel.set_payment_adapter(adapter);
+        }
         let persisted: Option<(ToolCallRequest, CapabilityToken)> = if fresh {
             None
         } else {
@@ -162,6 +198,12 @@ impl RecoveryFixture {
             )?)?)
         };
         kernel.configure_durable_admission(DurableAdmissionMode::All, false)?;
+        let retention_path = path.join("output-retention-profile.json");
+        if retention_path.exists() {
+            let profile: chio_kernel::admission_operation::NativeOutputRetentionProfileV1 =
+                serde_json::from_slice(&std::fs::read(retention_path)?)?;
+            kernel.select_native_output_retention(profile)?;
+        }
         if nonce {
             let config = chio_kernel::execution_nonce::ExecutionNonceConfig {
                 nonce_ttl_secs: 30,
@@ -206,8 +248,18 @@ impl RecoveryFixture {
                     operations: vec![Operation::Invoke],
                     constraints: semantic::fixture_output_constraints(&path)?,
                     max_invocations: Some(8),
-                    max_cost_per_invocation: None,
-                    max_total_cost: None,
+                    max_cost_per_invocation: monetary_semantic.then(|| {
+                        chio_core::capability::scope::MonetaryAmount {
+                            units: 10,
+                            currency: "USD".into(),
+                        }
+                    }),
+                    max_total_cost: monetary_semantic.then(|| {
+                        chio_core::capability::scope::MonetaryAmount {
+                            units: 80,
+                            currency: "USD".into(),
+                        }
+                    }),
                     dpop_required: None,
                 });
             }
@@ -324,13 +376,15 @@ impl RecoveryFixture {
             };
             let [principal_join, lineage_join, session_join] =
                 command_quotas::fixture_source_labels(&path, initial_label)?;
-            source.join(&FlowJoinRequest {
-                key: chio_kernel::recovery::recovery_flow_key(&context),
-                principal_join,
-                lineage_join,
-                session_join,
-                transition_id: RecordId::new("recovery-initial-source")?,
-            })?;
+            if !path.join("empty-native-import").exists() {
+                source.join(&FlowJoinRequest {
+                    key: chio_kernel::recovery::recovery_flow_key(&context),
+                    principal_join,
+                    lineage_join,
+                    session_join,
+                    transition_id: RecordId::new("recovery-initial-source")?,
+                })?;
+            }
             drop(source);
             let source = SqliteSecurityParticipantSource::open(source_path)?;
             let selected = AdmissionIdentifier::try_new("authority", "recovery-native")?;
@@ -810,11 +864,13 @@ async fn recovery_frozen_denial_gets_a_distinct_successful_native_continuation()
         result.status.effect,
         EffectObservationV1::Complete { .. }
     ));
-    assert!(result
-        .original_response
-        .ok_or("useful disclosure result")?
-        .receipt
-        .verify_signature()?);
+    assert!(
+        result
+            .original_response
+            .ok_or("useful disclosure result")?
+            .receipt
+            .verify_signature()?
+    );
     assert_eq!(f.effects.load(Ordering::SeqCst), 1);
     assert_eq!(f.process.process("root")?.tree_calls, 2);
     assert_eq!(chio_core::canonical_json_bytes(&f.seed)?, original_bytes);
@@ -1027,6 +1083,56 @@ async fn recovery_crash_child() -> TestResult {
             },
         )
         .await?;
+    }
+    let returned = f.record(&response.status.workflow_id)?;
+    let effect = match &returned.effect {
+        EffectObservationV1::NeverAdmitted => "never_admitted",
+        EffectObservationV1::AdmissionUnresolved { .. } => "admission_unresolved",
+        EffectObservationV1::ClosedBeforeEffect { .. } => "closed_before_effect",
+        EffectObservationV1::AwaitingApproval { .. } => "awaiting_approval",
+        EffectObservationV1::InFlight { .. } => "in_flight",
+        EffectObservationV1::AwaitingCallerReport { .. } => "awaiting_caller_report",
+        EffectObservationV1::Unknown { .. } => "unknown",
+        EffectObservationV1::Complete { .. } => "complete",
+        EffectObservationV1::Partial { .. } => "partial",
+        EffectObservationV1::FailedAfterEffect { .. } => "failed_after_effect",
+    };
+    eprintln!(
+        "recovery crash child returned: control={:?} effect={effect} captured={} admission_closed={} revision={} response_present={} external_effects={}",
+        returned.control,
+        returned.captured,
+        returned.admission_closed,
+        returned.revision.get(),
+        response.original_response.is_some(),
+        external_count(&f.path)?,
+    );
+    if let Some(intent) = returned.admission.as_ref() {
+        use chio_kernel::ReceiptStore;
+        use chio_kernel::admission_operation::{AdmissionOperationId, AdmissionTerminalReplay};
+        if let Some(operation) = f
+            .authority
+            .admission_operation_store()
+            .load_by_operation_id(&AdmissionOperationId::from_persisted(
+                intent.native_operation_id.as_str(),
+            )?)?
+        {
+            eprintln!("recovery crash child native state={:?}", operation.state());
+            if let Some(AdmissionTerminalReplay::Receipt { receipt_id, .. }) =
+                operation.terminal_replay()
+            {
+                if let Some(receipt) = f
+                    .authority
+                    .admission_operation_store()
+                    .load_chio_receipt(receipt_id.as_str())?
+                {
+                    if let Some(chio_core::receipt::decision::Decision::Deny { guard, .. }) =
+                        receipt.decision
+                    {
+                        eprintln!("recovery crash child native denial guard={guard}");
+                    }
+                }
+            }
+        }
     }
     Err("child did not reach its declared cutpoint".into())
 }
@@ -1406,15 +1512,16 @@ async fn recovery_cancel_negative_lookup_fences_late_original_admission() -> Tes
         .await;
     assert_eq!(external_count(&f.path)?, 0);
     let native = closed.admission.ok_or("intent")?;
-    assert!(f
-        .authority
-        .admission_operation_store()
-        .load_by_operation_id(
-            &chio_kernel::admission_operation::AdmissionOperationId::from_persisted(
-                native.native_operation_id.as_str()
+    assert!(
+        f.authority
+            .admission_operation_store()
+            .load_by_operation_id(
+                &chio_kernel::admission_operation::AdmissionOperationId::from_persisted(
+                    native.native_operation_id.as_str()
+                )?
             )?
-        )?
-        .is_none());
+            .is_none()
+    );
     assert_eq!(f.process.process("root")?.tree_calls, 2);
     assert!(f.record(&id)?.admission_closed);
     Ok(())
@@ -1544,10 +1651,11 @@ async fn recovery_partial_finality_is_positive_scoped_and_spends_the_original() 
         foreign.workflow_id = WorkflowId::new("foreign")?;
         let foreign = SignedRecoveryProviderFinalityV1::sign(foreign, &signer)?;
         assert!(foreign.verify_signature()?);
-        assert!(f
-            .kernel
-            .attach_recovery_provider_finality(&actor, &id, &foreign)
-            .is_err());
+        assert!(
+            f.kernel
+                .attach_recovery_provider_finality(&actor, &id, &foreign)
+                .is_err()
+        );
         let proof = SignedRecoveryProviderFinalityV1::sign(body, &signer)?;
         f.kernel
             .attach_recovery_provider_finality(&actor, &id, &proof)?;
@@ -1781,23 +1889,26 @@ async fn recovery_workflow_flood_retains_settlement_and_tombstones() -> TestResu
         |row| row.get(0),
     )?;
     assert_eq!(workflows, 64);
-    assert!(connection
-        .execute(
-            "DELETE FROM admission_operation_recovery_records WHERE kind='workflow'",
-            []
-        )
-        .is_err());
+    assert!(
+        connection
+            .execute(
+                "DELETE FROM admission_operation_recovery_records WHERE kind='workflow'",
+                []
+            )
+            .is_err()
+    );
     assert!(connection.execute("UPDATE admission_operation_recovery_records SET native_request='foreign' WHERE native_request IS NOT NULL",[]).is_err());
     let native = f.record(&id)?.admission.ok_or("intent")?;
-    assert!(f
-        .authority
-        .admission_operation_store()
-        .load_by_operation_id(
-            &chio_kernel::admission_operation::AdmissionOperationId::from_persisted(
-                native.native_operation_id.as_str()
+    assert!(
+        f.authority
+            .admission_operation_store()
+            .load_by_operation_id(
+                &chio_kernel::admission_operation::AdmissionOperationId::from_persisted(
+                    native.native_operation_id.as_str()
+                )?
             )?
-        )?
-        .is_some());
+            .is_some()
+    );
     Ok(())
 }
 #[tokio::test]
@@ -1911,7 +2022,7 @@ async fn recovery_two_coordinators_select_once_and_review_exact_payload() -> Tes
 #[tokio::test]
 async fn recovery_transport_closed_replay_and_audience_refusals() -> TestResult {
     use axum::{
-        body::{to_bytes, Body},
+        body::{Body, to_bytes},
         http::{Request, StatusCode},
     };
     use tower::ServiceExt;
@@ -2037,11 +2148,12 @@ async fn recovery_rotated_scope_refuses_pending_approval_without_replacing_ident
             expected_revision: before.revision,
         },
     )?;
-    assert!(f
-        .runtime
-        .execute_command(&f.control, &resume)
-        .await
-        .is_err());
+    assert!(
+        f.runtime
+            .execute_command(&f.control, &resume)
+            .await
+            .is_err()
+    );
     let after = f.record(&id)?;
     assert_eq!(
         chio_core::canonical_json_bytes(&before.action)?,

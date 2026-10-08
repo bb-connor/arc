@@ -72,6 +72,42 @@ pub(super) fn retirement_source(
 }
 
 impl SqliteAdmissionOperationStore {
+    /// Carry an authentic retained revision into current logical custody under
+    /// fresh storage administration. This allocates no new checkpoint revision
+    /// and supplies no restore, execution or byte-delivery authority.
+    pub fn migrate_checkpoint_reference_custody(
+        &self,
+        actor: &AuthenticatedRecoveryActor,
+        id: &CheckpointId,
+        revision: u64,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        if actor.permission() != RecoveryPermission::KnowledgeAdmin || revision == 0 {
+            return Err(refused("checkpoint custody migration authority"));
+        }
+        mutate_retained_admin(self, actor, fence, now, |tx, _, _| {
+            let latest = load_checkpoint(&tx, actor.scope(), id, 0)?;
+            let checkpoint =
+                if let Some(latest) = latest.filter(|latest| latest.revision.get() == revision) {
+                    latest
+                } else {
+                    load_checkpoint(&tx, actor.scope(), id, revision)?
+                        .ok_or_else(|| refused("checkpoint custody migration absent"))?
+                };
+            traversal::ensure_audience(&tx, actor, &checkpoint.label)?;
+            retain_checkpoint_revision(&tx, &self.serving_owner, &checkpoint)?;
+            if !revision_is_retired(&tx, &checkpoint)? {
+                super::super::reference_custody::retain_checkpoint_references(
+                    &tx,
+                    &self.serving_owner,
+                    &head::checkpoint_revision_key(actor.scope(), id, revision)?,
+                )?;
+            }
+            Ok((tx, ()))
+        })
+    }
+
     /// One-way retirement of exact checkpoint restore authority. The retained
     /// envelope remains evidence and never becomes a new revision reservation.
     pub fn retire_checkpoint_revision(
@@ -117,6 +153,28 @@ impl SqliteAdmissionOperationStore {
                     authority_scope: protected::deployment_tx(&tx, actor.scope())?.authority_scope,
                     retired_at: SafeInteger::new(now).map_err(refused)?,
                 },
+            )?;
+            let source_key = if protected::raw_checked(
+                &tx,
+                &head::checkpoint_revision_key(actor.scope(), id, revision)?,
+            )?
+            .is_some()
+            {
+                head::checkpoint_revision_key(actor.scope(), id, revision)?
+            } else {
+                // Preserve the exact authentic legacy source when no modern
+                // historical alias was retained before this retirement.
+                let legacy = head::legacy_checkpoint_key(actor.scope(), id, revision)?;
+                if protected::raw_checked(&tx, &legacy)?.is_some() {
+                    legacy
+                } else {
+                    head::legacy_checkpoint_key(actor.scope(), id, 0)?
+                }
+            };
+            super::super::reference_retirement::retire_checkpoint_references(
+                &tx,
+                &self.serving_owner,
+                &source_key,
             )?;
             Ok((tx, ()))
         })

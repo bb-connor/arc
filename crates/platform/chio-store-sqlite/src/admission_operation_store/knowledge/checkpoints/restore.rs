@@ -253,7 +253,7 @@ fn retained_restore(
 }
 
 pub(super) fn pins(
-    tx: &Transaction<'_>,
+    tx: &Connection,
     key: &str,
     reference: &ArtifactVersionRefV1,
 ) -> Result<bool, AdmissionOperationStoreError> {
@@ -537,6 +537,11 @@ impl SqliteAdmissionOperationStore {
             );
             let (_root_source, _encoded_delta) =
                 protected::persist_knowledge_encoding(&tx, &self.serving_owner, prepared)?;
+            super::super::reference_custody::retain_restore_references(
+                &tx,
+                &self.serving_owner,
+                &key,
+            )?;
             Ok((tx, intent))
         })
     }
@@ -605,6 +610,13 @@ impl SqliteAdmissionOperationStore {
                     )?;
                 let (_root_source, _encoded_delta) =
                     protected::persist_knowledge_encoding(&tx, &self.serving_owner, prepared)?;
+                if next == ArtifactDeliveryStateV1::Delivered {
+                    super::super::reference_retirement::retire_restore_references(
+                        &tx,
+                        &self.serving_owner,
+                        &key,
+                    )?;
+                }
             }
             Ok((tx, ()))
         })

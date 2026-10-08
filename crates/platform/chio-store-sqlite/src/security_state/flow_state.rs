@@ -27,6 +27,7 @@ mod generations;
 mod input_join;
 mod labels;
 mod mutations;
+mod native_join_preview;
 #[cfg(test)]
 mod tests;
 mod transitions;
@@ -44,6 +45,7 @@ use labels::{
     load_session_label, session_membership_exists, store_lineage_label, store_principal_label,
     store_session_label,
 };
+pub(crate) use native_join_preview::{preview_native_flow_join, NativeFlowJoinPreview};
 use transitions::{scoped_record_transition, scoped_transition_status};
 
 pub(crate) fn planned_native_egress_fence(request: &EgressFenceRequest) -> PortResult<EgressFence> {

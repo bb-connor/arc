@@ -2,6 +2,10 @@
 use super::*;
 use std::sync::OnceLock;
 mod mutations;
+mod write_catalog;
+pub(in crate::admission_operation_store) use write_catalog::{
+    native_flow_write_catalog, NativeFlowWriteCatalogData,
+};
 
 pub(in crate::admission_operation_store) struct Table {
     pub source: &'static str,
@@ -95,11 +99,11 @@ pub(in crate::admission_operation_store) fn sql() -> Result<String, AdmissionOpe
 }
 
 fn catalog(connection: &Connection) -> Result<Vec<CatalogEntry>, AdmissionOperationStoreError> {
-    let (count, bytes): (i64, i64) = connection.query_row(&format!("SELECT COUNT(*), COALESCE(SUM(length(CAST(name AS BLOB)) + length(CAST(tbl_name AS BLOB)) + COALESCE(length(CAST(sql AS BLOB)), 0)), 0) FROM sqlite_schema WHERE {NAMESPACE}"), [], |row| Ok((row.get(0)?, row.get(1)?))).map_err(sqlite_error)?;
+    let (count, bytes): (i64, i64) = connection.query_row(&format!("SELECT COUNT(*), COALESCE(SUM(length(CAST(name AS BLOB)) + length(CAST(tbl_name AS BLOB)) + COALESCE(length(CAST(sql AS BLOB)), 0)), 0) FROM main.sqlite_schema WHERE {NAMESPACE}"), [], |row| Ok((row.get(0)?, row.get(1)?))).map_err(sqlite_error)?;
     if !(0..=256).contains(&count) || !(0..=1_048_576).contains(&bytes) {
         return Err(invalid("native security catalog exceeds bounds"));
     }
-    let mut statement = connection.prepare(&format!("SELECT type, name, tbl_name, sql FROM sqlite_schema WHERE {NAMESPACE} ORDER BY type, name, tbl_name")).map_err(sqlite_error)?;
+    let mut statement = connection.prepare(&format!("SELECT type, name, tbl_name, sql FROM main.sqlite_schema WHERE {NAMESPACE} ORDER BY type, name, tbl_name")).map_err(sqlite_error)?;
     let entries = statement
         .query_map([], |row| {
             Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
@@ -169,7 +173,7 @@ pub(super) fn recorded_version(
     connection: &Connection,
 ) -> Result<i32, AdmissionOperationStoreError> {
     let version: i32 = connection.query_row(
-        "SELECT version FROM chio_store_schema_versions WHERE store_key = 'admission_operation'",
+        "SELECT version FROM main.chio_store_schema_versions WHERE store_key = 'admission_operation'",
         [], |row| row.get(0),
     ).map_err(sqlite_error)?;
     match version {

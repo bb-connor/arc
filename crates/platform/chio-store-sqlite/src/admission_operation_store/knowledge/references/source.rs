@@ -52,6 +52,52 @@ impl SourceAnchor {
         &self.scope_key
     }
 
+    pub(in crate::admission_operation_store) fn version(&self) -> u64 {
+        self.version
+    }
+
+    /// Authenticate a complete historical command envelope. This returns
+    /// immutable source data and conveys no fresh writer or terminal authority.
+    pub(in crate::admission_operation_store) fn historical_command(
+        connection: &Connection,
+        current: &protected::ProtectedSourceReference,
+        version: u64,
+        canonical_envelope: &[u8],
+    ) -> Result<Option<Self>, AdmissionOperationStoreError> {
+        if !protected::matches_historical_source_command_payload(
+            connection,
+            current,
+            version,
+            canonical_envelope,
+        )? {
+            return Ok(None);
+        }
+        let (sequence, digest): (i64, String) = connection.query_row(
+            "SELECT sequence,record_digest FROM admission_operation_recovery_events WHERE record_key=?1 AND record_version=?2",
+            params![current.record_key(), i64::try_from(version).map_err(refused)?],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        ).map_err(sqlite_error)?;
+        let digest: [u8; 32] = hex::decode(digest)
+            .map_err(refused)?
+            .try_into()
+            .map_err(|_| refused("publication historical digest"))?;
+        let anchor = Self {
+            record_key: current.record_key().to_owned(),
+            scope_key: current.scope_key().to_owned(),
+            kind: current.kind().to_owned(),
+            version,
+            digest: ProjectionDigest::from_bytes(digest),
+            event_sequence: stored_u64(sequence, "publication historical event")?,
+            global_commit_sequence: protected::historical_record_commit(
+                connection,
+                current.record_key(),
+                version,
+            )?,
+        };
+        anchor.verify_historical_identity(connection)?;
+        Ok(Some(anchor))
+    }
+
     pub(in crate::admission_operation_store) fn global_commit_sequence(&self) -> u64 {
         self.global_commit_sequence
     }

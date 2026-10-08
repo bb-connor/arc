@@ -5,6 +5,7 @@ use chio_core::{recovery::RecoveryDigestDomain, PublicKey};
 use chio_kernel::recovery::{AuthenticatedRecoveryActor, RecoveryDeploymentV1, RecoveryPermission};
 use chio_security_types::{flow::PrincipalId, knowledge::*, recovery::*, InformationLabel};
 
+pub(in crate::admission_operation_store) mod evidence_reclamation;
 mod evidence_source;
 use evidence_source::require_product_evidence_owners;
 pub(in crate::admission_operation_store) use evidence_source::{
@@ -159,6 +160,22 @@ fn join_attachment(
         return Err(AdmissionOperationStoreError::RecoveryAuthorityDenied);
     }
     let artifact = super::knowledge::selected_product_artifact(tx, reference)?;
+    label
+        .join_restrictions(&artifact.metadata.label)
+        .map_err(refused)
+}
+fn join_retained_attachment(
+    tx: &Transaction<'_>,
+    scope: &RecoveryScopeV1,
+    label: InformationLabel,
+    reference: &ArtifactVersionRefV1,
+) -> Result<InformationLabel, AdmissionOperationStoreError> {
+    if reference.scope.tenant_id != scope.tenant_id
+        || reference.scope.authority_domain != scope.authority_domain
+    {
+        return Err(AdmissionOperationStoreError::RecoveryAuthorityDenied);
+    }
+    let artifact = super::knowledge::retained_product_artifact(tx, reference)?;
     label
         .join_restrictions(&artifact.metadata.label)
         .map_err(refused)

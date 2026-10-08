@@ -317,6 +317,7 @@ fn validate_publication_transition(
                 && before.metadata.schema == after.metadata.schema
                 && before.metadata.producer == after.metadata.producer
                 && before.metadata.dependencies == after.metadata.dependencies
+                && before.metadata.influence == after.metadata.influence
                 && before.metadata.lineage == after.metadata.lineage
                 && before.metadata.isolation_epoch == after.metadata.isolation_epoch
                 && before.metadata.policy == after.metadata.policy

@@ -62,7 +62,7 @@ pub(in crate::admission_operation_store) fn product_evidence_source(
     let source = protected::source_reference(tx, &key)?;
     let (namespace, request): (Option<String>, Option<String>) = tx
         .query_row(
-            "SELECT native_namespace,native_request FROM admission_operation_recovery_records WHERE record_key=?1",
+            "SELECT native_namespace,native_request FROM main.admission_operation_recovery_records WHERE record_key=?1",
             [&key],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )
@@ -97,16 +97,38 @@ pub(super) fn require_product_evidence_owners(
     owner: &ProductEvidenceOwner,
 ) -> Result<(), AdmissionOperationStoreError> {
     use super::super::knowledge::references::{
-        require_active_reference_owner, ReferenceOwner, SourceAnchor,
+        require_active_reference_owner, require_retired_reference_owner, ReferenceOwner,
+        SourceAnchor,
     };
     let (source, references) = product_evidence_source(tx, owner)?;
     if references.is_empty() {
         return Ok(());
     }
     let anchor = SourceAnchor::capture(&source);
+    let terminal = match owner {
+        ProductEvidenceOwner::Proposal { .. } => {
+            super::evidence_reclamation::product_reclamation_source(tx, owner)?
+        }
+        ProductEvidenceOwner::Report { .. } => None,
+    };
     let owner = ReferenceOwner::from(owner.clone());
     for reference in &references {
-        require_active_reference_owner(tx, reference, &owner, &anchor)?;
+        if let Some(terminal) = &terminal {
+            if terminal.references() != references.as_slice()
+                || SourceAnchor::capture(terminal.original()) != anchor
+            {
+                return Err(refused("reclaimed Proposal changed its complete owner set"));
+            }
+            require_retired_reference_owner(
+                tx,
+                reference,
+                &owner,
+                &anchor,
+                &SourceAnchor::capture(terminal.terminal()),
+            )?;
+        } else {
+            require_active_reference_owner(tx, reference, &owner, &anchor)?;
+        }
     }
     Ok(())
 }

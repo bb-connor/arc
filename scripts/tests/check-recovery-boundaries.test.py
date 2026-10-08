@@ -332,16 +332,17 @@ class RecoveryBoundariesTest(unittest.TestCase):
                                      "dep_kinds": [{"kind": None, "target": None}]})
             with patch.object(GUARD.subprocess, "check_output", return_value=json.dumps(metadata).encode()):
                 GUARD.resolved_contract(False, True, root)
-            for ordering in ["forward", "reverse"]:
-                with self.subTest(ordering=ordering):
-                    altered = copy.deepcopy(metadata)
-                    older = next(node for node in altered["resolve"]["nodes"] if node["id"] == "sha2-0.10.9")
-                    older["features"].append("std")
-                    if ordering == "reverse":
-                        altered["resolve"]["nodes"].reverse()
-                    with patch.object(GUARD.subprocess, "check_output", return_value=json.dumps(altered).encode()):
-                        with self.assertRaisesRegex(ValueError, "alloc dependency enabled std"):
-                            GUARD.resolved_contract(False, True, root)
+            for version in ["0.10.9", "0.11.0"]:
+                for ordering in ["forward", "reverse"]:
+                    with self.subTest(version=version, ordering=ordering):
+                        altered = copy.deepcopy(metadata)
+                        selected = next(node for node in altered["resolve"]["nodes"] if node["id"] == "sha2-" + version)
+                        selected["features"].append("std")
+                        if ordering == "reverse":
+                            altered["resolve"]["nodes"].reverse()
+                        with patch.object(GUARD.subprocess, "check_output", return_value=json.dumps(altered).encode()):
+                            with self.assertRaisesRegex(ValueError, "alloc dependency enabled std"):
+                                GUARD.resolved_contract(False, True, root)
 
 
 if __name__ == "__main__":

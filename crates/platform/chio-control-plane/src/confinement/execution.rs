@@ -399,11 +399,9 @@ impl ConfinedExecution {
         }
         let seal = diagnostic_phase!(
             StageBrokerCandidate,
-            self.runtime.broker.stage(
-                &ArtifactObjectId::new(&uuid::Uuid::new_v4().to_string()).map_err(refused)?,
-                &self.reservation.boundary.child,
-                &bytes,
-            )
+            self.runtime
+                .broker
+                .stage_confined_return(&actor, &self.reservation.boundary, &bytes)
         )?;
         diagnostic_phase!(
             StageNativeCandidate,

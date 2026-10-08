@@ -16,6 +16,8 @@ mod foreign_fixture_admission;
 mod knowledge_encoding;
 #[path = "logical_reference.rs"]
 mod logical_reference;
+#[path = "original_owner.rs"]
+mod original_owner;
 #[path = "planning_budgets.rs"]
 mod planning_budgets;
 #[path = "protected_mutation_delta.rs"]
@@ -33,8 +35,20 @@ pub(in crate::admission_operation_store) use logical_reference::{
     bind_product_reference_source, initialize_knowledge_reference_account,
     persist_knowledge_new_artifact_reference_baseline, persist_knowledge_reference_cold_baseline,
     persist_knowledge_reference_progress, persist_knowledge_reference_ready,
-    reserve_product_reference_intake, ReservedProductReferenceIntake,
-    VerifiedKnowledgeReferenceColdProgress, VerifiedParticipantAllowance,
+    persist_knowledge_reference_retain, persist_knowledge_reference_retirement,
+    persist_product_reference_retirement, reserve_product_reference_intake,
+    ReservedProductReferenceIntake, VerifiedKnowledgeReferenceColdProgress,
+    VerifiedParticipantAllowance,
+};
+pub(in crate::admission_operation_store) use original_owner::{
+    original_owner_is_current, persist_original_owner_cohort, prepare_original_owner_cohort,
+    prepare_original_owner_creation, publish_original_owner_creation,
+    require_current_original_owner, require_predecessor_original_owner_absence,
+    retire_unused_setup_generation_with_origin, seal_original_owner_predecessor,
+    using_original_owner_successor_format, verify_original_owner_inventory,
+    verify_original_owner_membership, verify_unused_setup_generation_inventory,
+    VerifiedOriginalOwnerCohort, VerifiedOriginalOwnerInventory, ORIGINAL_OWNER_SQL,
+    UNUSED_SETUP_GENERATION_SQL,
 };
 pub(in crate::admission_operation_store) use protected_mutation_delta::ProtectedMutationDelta;
 pub(in crate::admission_operation_store) use settled_command_aliases::{
@@ -65,7 +79,8 @@ mod projection_presence_tests;
 #[path = "protected_source_reference.rs"]
 mod protected_source_reference;
 pub(in crate::admission_operation_store) use protected_source_reference::{
-    source_reference, verify_source_reference, ProtectedSourceReference,
+    matches_historical_source_payload_at_cut, source_reference, verify_source_reference,
+    HistoricalProtectedSourceData, ProtectedSourceReference,
 };
 
 /// Missing current data is pristine only without any exact retained ownership.
@@ -126,7 +141,7 @@ pub(in crate::admission_operation_store) fn raw(
     key: &str,
 ) -> Result<Option<RawRecord>, AdmissionOperationStoreError> {
     let row = tx.query_row(
-        "SELECT version,length(payload),CASE WHEN length(payload) BETWEEN 1 AND 262144 THEN payload END,scope_key,kind,native_namespace,native_request FROM admission_operation_recovery_records WHERE record_key=?1", [key],
+        "SELECT version,length(payload),CASE WHEN length(payload) BETWEEN 1 AND 262144 THEN payload END,scope_key,kind,native_namespace,native_request FROM main.admission_operation_recovery_records WHERE record_key=?1", [key],
         |row| Ok((row.get::<_,i64>(0)?, row.get::<_,i64>(1)?, row.get::<_,Option<Vec<u8>>>(2)?,
             row.get::<_,String>(3)?, row.get::<_,String>(4)?, row.get::<_,Option<String>>(5)?, row.get::<_,Option<String>>(6)?)))
         .optional().map_err(sqlite_error)?;
@@ -136,7 +151,7 @@ pub(in crate::admission_operation_store) fn raw(
         let version = stored_u64(version,"recovery version")?;
         let digest = record_digest(key, &scope, &kind, version, &payload, namespace.as_deref(), request.as_deref())?;
         let event: Option<String> = tx.query_row(
-            "SELECT record_digest FROM admission_operation_recovery_events WHERE record_key=?1 AND record_version=?2",
+            "SELECT record_digest FROM main.admission_operation_recovery_events WHERE record_key=?1 AND record_version=?2",
             params![key,i64::try_from(version).map_err(|_| invariant("recovery version exhausted"))?], |row| row.get(0))
             .optional().map_err(sqlite_error)?;
         if event.as_deref() != Some(&digest) {
@@ -147,8 +162,8 @@ pub(in crate::admission_operation_store) fn raw(
 }
 fn retained_history(tx: &Connection, key: &str) -> Result<bool, AdmissionOperationStoreError> {
     tx.query_row(
-        "SELECT EXISTS(SELECT 1 FROM admission_operation_recovery_events WHERE record_key=?1)
-            OR EXISTS(SELECT 1 FROM authority_global_commits WHERE projection_kind='recovery' AND projection_key=?1)",
+        "SELECT EXISTS(SELECT 1 FROM main.admission_operation_recovery_events WHERE record_key=?1)
+            OR EXISTS(SELECT 1 FROM main.authority_global_commits WHERE projection_kind='recovery' AND projection_key=?1)",
         [key], |row| row.get(0),
     ).map_err(sqlite_error)
 }
@@ -296,7 +311,7 @@ fn historical_record_reference(
     let event: Option<(i64, String, String, String, i64)> = tx
         .query_row(
             "SELECT sequence,record_digest,previous_digest,event_digest,observed_at
-             FROM admission_operation_recovery_events WHERE record_key=?1 AND record_version=?2",
+             FROM main.admission_operation_recovery_events WHERE record_key=?1 AND record_version=?2",
             params![key, version_sql],
             |row| {
                 Ok((
@@ -319,7 +334,7 @@ fn historical_record_reference(
     }
     let mut statement = tx
         .prepare(
-            "SELECT commit_sequence,projection_reference_digest FROM authority_global_commits
+            "SELECT commit_sequence,projection_reference_digest FROM main.authority_global_commits
          WHERE projection_kind='recovery' AND projection_key=?1 AND projection_sequence=?2 LIMIT 2",
         )
         .map_err(sqlite_error)?;
@@ -373,10 +388,10 @@ pub(in crate::admission_operation_store) fn save(
     let (retained, events): (i64, i64) = tx
         .query_row(
             "SELECT coalesce(sum(length(payload)),0),
-            (SELECT count(*) FROM admission_operation_recovery_events e
-             JOIN admission_operation_recovery_records r ON r.record_key=e.record_key
+            (SELECT count(*) FROM main.admission_operation_recovery_events e
+             JOIN main.admission_operation_recovery_records r ON r.record_key=e.record_key
              WHERE r.record_key GLOB ?1 OR r.record_key GLOB ?2 OR r.record_key GLOB ?3)
-         FROM admission_operation_recovery_records r
+         FROM main.admission_operation_recovery_records r
          WHERE r.record_key GLOB ?1 OR r.record_key GLOB ?2 OR r.record_key GLOB ?3",
             params![patterns[0], patterns[1], patterns[2]],
             |row| Ok((row.get(0)?, row.get(1)?)),
@@ -478,8 +493,8 @@ fn persist_record(
     let (namespace, request) = native.map_or((None, None), |(namespace, request)| {
         (Some(namespace), Some(request))
     });
-    tx.execute("INSERT INTO admission_operation_recovery_records(record_key,scope_key,kind,version,payload,native_namespace,native_request) VALUES (?1,?2,?3,?4,?5,?6,?7) ON CONFLICT(record_key) DO UPDATE SET version=excluded.version,payload=excluded.payload,native_namespace=excluded.native_namespace,native_request=excluded.native_request",params![key,scope,kind,i64::try_from(version).map_err(|_|invariant("recovery version exhausted"))?,payload,namespace,request]).map_err(sqlite_error)?;
-    let head:Option<(i64,String)>=tx.query_row("SELECT sequence,event_digest FROM admission_operation_recovery_events ORDER BY sequence DESC LIMIT 1",[],|row|Ok((row.get(0)?,row.get(1)?))).optional().map_err(sqlite_error)?;
+    tx.execute("INSERT INTO main.admission_operation_recovery_records(record_key,scope_key,kind,version,payload,native_namespace,native_request) VALUES (?1,?2,?3,?4,?5,?6,?7) ON CONFLICT(record_key) DO UPDATE SET version=excluded.version,payload=excluded.payload,native_namespace=excluded.native_namespace,native_request=excluded.native_request",params![key,scope,kind,i64::try_from(version).map_err(|_|invariant("recovery version exhausted"))?,payload,namespace,request]).map_err(sqlite_error)?;
+    let head:Option<(i64,String)>=tx.query_row("SELECT sequence,event_digest FROM main.admission_operation_recovery_events ORDER BY sequence DESC LIMIT 1",[],|row|Ok((row.get(0)?,row.get(1)?))).optional().map_err(sqlite_error)?;
     let (sequence, previous) = head.map_or((1, "0".repeat(64)), |(sequence, digest)| {
         (sequence + 1, digest)
     });
@@ -491,7 +506,7 @@ fn persist_record(
     let digest = record_digest(key, scope, kind, version, payload, namespace, request)?;
     let observed = super::super::schema::observe_authority_time(tx)?;
     let event = event_digest(sequence, key, version, &digest, &previous, observed)?;
-    tx.execute("INSERT INTO admission_operation_recovery_events(sequence,record_key,record_version,record_digest,previous_digest,event_digest,observed_at) VALUES (?1,?2,?3,?4,?5,?6,?7)",params![i64::try_from(sequence).map_err(|_|invariant("recovery sequence exhausted"))?,key,i64::try_from(version).map_err(|_|invariant("recovery version exhausted"))?,digest,previous,event,i64::try_from(observed).map_err(|_|invariant("recovery time exhausted"))?]).map_err(sqlite_error)?;
+    tx.execute("INSERT INTO main.admission_operation_recovery_events(sequence,record_key,record_version,record_digest,previous_digest,event_digest,observed_at) VALUES (?1,?2,?3,?4,?5,?6,?7)",params![i64::try_from(sequence).map_err(|_|invariant("recovery sequence exhausted"))?,key,i64::try_from(version).map_err(|_|invariant("recovery version exhausted"))?,digest,previous,event,i64::try_from(observed).map_err(|_|invariant("recovery time exhausted"))?]).map_err(sqlite_error)?;
     owner
         .append_global_commit(tx, "recovery_transition", "recovery", key, version)
         .map_err(map_owner_error)
@@ -519,17 +534,17 @@ pub(crate) fn projection_reference(
     key: &str,
     version: u64,
 ) -> Result<String, crate::SqliteServingOwnerError> {
-    tx.query_row("SELECT event_digest FROM admission_operation_recovery_events WHERE record_key=?1 AND record_version=?2",params![key,i64::try_from(version).map_err(|_|crate::SqliteServingOwnerError::Invalid("recovery version exhausted".into()))?],|row|row.get(0)).optional()?.ok_or_else(||crate::SqliteServingOwnerError::Invalid("recovery event is absent".into()))
+    tx.query_row("SELECT event_digest FROM main.admission_operation_recovery_events WHERE record_key=?1 AND record_version=?2",params![key,i64::try_from(version).map_err(|_|crate::SqliteServingOwnerError::Invalid("recovery version exhausted".into()))?],|row|row.get(0)).optional()?.ok_or_else(||crate::SqliteServingOwnerError::Invalid("recovery event is absent".into()))
 }
 pub(crate) fn verify_all(tx: &Connection) -> Result<(), AdmissionOperationStoreError> {
-    let exists:bool=tx.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name='admission_operation_recovery_events')",[],|row|row.get(0)).map_err(sqlite_error)?;
+    let exists:bool=tx.query_row("SELECT EXISTS(SELECT 1 FROM main.sqlite_schema WHERE name='admission_operation_recovery_events')",[],|row|row.get(0)).map_err(sqlite_error)?;
     if !exists {
         return Ok(());
     }
     let mut previous = "0".repeat(64);
     let mut expected = 1;
     let mut high_water = 0;
-    let mut statement=tx.prepare("SELECT sequence,record_key,record_version,record_digest,previous_digest,event_digest,observed_at FROM admission_operation_recovery_events ORDER BY sequence").map_err(sqlite_error)?;
+    let mut statement=tx.prepare("SELECT sequence,record_key,record_version,record_digest,previous_digest,event_digest,observed_at FROM main.admission_operation_recovery_events ORDER BY sequence").map_err(sqlite_error)?;
     let rows = statement
         .query_map([], |row| {
             Ok((
@@ -560,12 +575,14 @@ pub(crate) fn verify_all(tx: &Connection) -> Result<(), AdmissionOperationStoreE
         previous = event;
         expected += 1;
     }
-    let invalid:bool=tx.query_row("SELECT EXISTS(SELECT 1 FROM admission_operation_recovery_records r WHERE (SELECT count(*) FROM admission_operation_recovery_events e WHERE e.record_key=r.record_key)<>r.version OR (SELECT max(record_version) FROM admission_operation_recovery_events e WHERE e.record_key=r.record_key)<>r.version) OR EXISTS(SELECT 1 FROM admission_operation_recovery_events e WHERE NOT EXISTS(SELECT 1 FROM admission_operation_recovery_records r WHERE r.record_key=e.record_key))",[],|row|row.get(0)).map_err(sqlite_error)?;
+    let invalid:bool=tx.query_row("SELECT EXISTS(SELECT 1 FROM main.admission_operation_recovery_records r WHERE (SELECT count(*) FROM main.admission_operation_recovery_events e WHERE e.record_key=r.record_key)<>r.version OR (SELECT max(record_version) FROM main.admission_operation_recovery_events e WHERE e.record_key=r.record_key)<>r.version) OR EXISTS(SELECT 1 FROM main.admission_operation_recovery_events e WHERE NOT EXISTS(SELECT 1 FROM main.admission_operation_recovery_records r WHERE r.record_key=e.record_key))",[],|row|row.get(0)).map_err(sqlite_error)?;
     if invalid {
         return Err(invariant("recovery history coverage is incomplete"));
     }
     let mut statement = tx
-        .prepare("SELECT record_key FROM admission_operation_recovery_records ORDER BY record_key")
+        .prepare(
+            "SELECT record_key FROM main.admission_operation_recovery_records ORDER BY record_key",
+        )
         .map_err(sqlite_error)?;
     for key in statement
         .query_map([], |row| row.get::<_, String>(0))
@@ -578,6 +595,8 @@ pub(crate) fn verify_all(tx: &Connection) -> Result<(), AdmissionOperationStoreE
     planning_budgets::verify_all(tx)?;
     active_workflows::verify_all(tx)?;
     settled_command_aliases::verify_all(tx)?;
+    verify_original_owner_inventory(tx)?;
+    verify_unused_setup_generation_inventory(tx)?;
     super::origins::verify_history(tx)?;
     Ok(())
 }

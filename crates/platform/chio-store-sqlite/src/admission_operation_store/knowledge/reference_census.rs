@@ -5,6 +5,53 @@ use super::*;
 use std::ops::Deref;
 use std::rc::Rc;
 
+impl SqliteAdmissionOperationStore {
+    /// Inspect the actual cold source preflight without writing a baseline,
+    /// marker or reference owner. The proof stays inside its originating writer.
+    #[cfg(feature = "admission-test-support")]
+    pub fn inspect_confined_input_cold_reference_count(
+        &self,
+        scope: &RecoveryScopeV1,
+        request: &RequestId,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<usize, AdmissionOperationStoreError> {
+        let mut connection = self.connection()?;
+        let tx = self.begin_write(&mut connection, Some(fence))?;
+        schema::authority_validation_time(&tx, now)?;
+        let profile = installation(&tx, scope)?;
+        let count = {
+            let baseline = VerifiedKnowledgeReferenceAccountBaseline::for_installation(
+                &tx,
+                &self.serving_owner,
+                &profile,
+            )?;
+            let mut count = 0_usize;
+            baseline.visit_artifacts(|reference| {
+                let cohort = baseline.artifact_cohort(&reference)?;
+                cohort.visit_active_owners(|owner, _| {
+                    if let ReferenceOwner::ConfinedInputs {
+                        scope: source_scope,
+                        request: source_request,
+                        ..
+                    } = owner
+                    {
+                        if source_scope == scope && source_request == request {
+                            count = count
+                                .checked_add(1)
+                                .ok_or_else(|| refused("confined cold owner count overflow"))?;
+                        }
+                    }
+                    Ok(())
+                })
+            })?;
+            count
+        };
+        tx.rollback().map_err(sqlite_error)?;
+        Ok(count)
+    }
+}
+
 /// The spill table is local to the originating SQLite connection and writer.
 /// It bounds resident Rust memory without truncating authenticated history.
 /// It is never consulted by hot reads, never signed, and never grants custody.
@@ -231,6 +278,9 @@ impl<'tx, 'conn> VerifiedKnowledgeReferenceColdCohort<'tx, 'conn> {
 impl<'tx, 'conn> ColdReferenceCensus<'tx, 'conn> {
     fn populate(&mut self) -> Result<(), AdmissionOperationStoreError> {
         let tx = self.transaction;
+        // Every irreversible Product terminal, including an orphan retained
+        // event or global key, must resolve its complete original and archive.
+        super::super::product::evidence_reclamation::verify_product_reclamation_inventory(tx)?;
         // UNION includes vanished current rows. Exact source loading below must
         // refuse them; absence cannot become a zero baseline or reclaimed pin.
         let mut statement = tx.prepare(
@@ -238,14 +288,17 @@ impl<'tx, 'conn> ColdReferenceCensus<'tx, 'conn> {
              WHERE record_key GLOB 'knowledge-publication:*' OR record_key GLOB 'knowledge-checkpoint:*'
                 OR record_key GLOB 'knowledge-pin:*' OR record_key GLOB 'knowledge-release:*' OR record_key GLOB 'knowledge-restore:*'
                 OR record_key GLOB 'product-report:*' OR record_key GLOB 'product-proposal:*'
+                OR record_key GLOB 'confined-boundary:*'
              UNION SELECT record_key FROM admission_operation_recovery_events
              WHERE record_key GLOB 'knowledge-publication:*' OR record_key GLOB 'knowledge-checkpoint:*'
                 OR record_key GLOB 'knowledge-pin:*' OR record_key GLOB 'knowledge-release:*' OR record_key GLOB 'knowledge-restore:*'
                 OR record_key GLOB 'product-report:*' OR record_key GLOB 'product-proposal:*'
+                OR record_key GLOB 'confined-boundary:*'
              UNION SELECT projection_key FROM authority_global_commits WHERE projection_kind='recovery' AND
                 (projection_key GLOB 'knowledge-publication:*' OR projection_key GLOB 'knowledge-checkpoint:*'
                  OR projection_key GLOB 'knowledge-pin:*' OR projection_key GLOB 'knowledge-release:*' OR projection_key GLOB 'knowledge-restore:*'
-                 OR projection_key GLOB 'product-report:*' OR projection_key GLOB 'product-proposal:*') ORDER BY 1"
+                 OR projection_key GLOB 'product-report:*' OR projection_key GLOB 'product-proposal:*'
+                 OR projection_key GLOB 'confined-boundary:*') ORDER BY 1"
         ).map_err(sqlite_error)?;
         let mut rows = statement.query([]).map_err(sqlite_error)?;
         while let Some(row) = rows.next().map_err(sqlite_error)? {
@@ -256,7 +309,32 @@ impl<'tx, 'conn> ColdReferenceCensus<'tx, 'conn> {
             if raw.kind != "command" || source.global_commit_sequence() > self.cutoff.sequence() {
                 return Err(refused("reference cold source changed kind or cutoff"));
             }
-            if key.starts_with("knowledge-publication:") {
+            if key.starts_with("confined-boundary:") {
+                let inputs = confinement::input_reference_source(tx, &key)?
+                    .ok_or_else(|| refused("reference cold confined boundary disappeared"))?;
+                let boundary = inputs.boundary();
+                if !self.in_account(&boundary.scope) {
+                    continue;
+                }
+                self.add_source(inputs.source())?;
+                for pin in inputs.pins() {
+                    self.add_source(pin)?;
+                }
+                let owner = ReferenceOwner::ConfinedInputs {
+                    scope: boundary.scope.clone(),
+                    request: boundary.request.clone(),
+                    boundary: boundary.boundary.clone(),
+                };
+                let original = SourceAnchor::capture(inputs.source());
+                let meaning = digest(&(&owner, boundary))?;
+                for reference in inputs.references() {
+                    // A permanent original reservation never proves that its
+                    // inputs became collectible. Lost physical availability
+                    // cannot be promoted into a clean cold baseline.
+                    artifact(tx, reference)?;
+                    self.add_owner(&owner, reference, &original, meaning)?;
+                }
+            } else if key.starts_with("knowledge-publication:") {
                 let record: NativeArtifactRecordV1 = protected::decode(&raw.payload)?;
                 record.metadata.validate().map_err(refused)?;
                 if record_publication_key(&record)? != key
@@ -331,19 +409,64 @@ impl<'tx, 'conn> ColdReferenceCensus<'tx, 'conn> {
                         "reference cold product changed its complete source",
                     ));
                 }
+                let reclamation = if matches!(&product, ProductEvidenceOwner::Proposal { .. }) {
+                    super::super::product::evidence_reclamation::product_reclamation_source(
+                        tx, &product,
+                    )?
+                } else {
+                    None
+                };
                 let owner = ReferenceOwner::from(product);
                 if !self.in_account(owner.scope()) {
                     continue;
                 }
-                // Queue archival does not release the physical evidence.
+                // Queue archival retains evidence. Only the complete separate
+                // irreversible native terminal can exclude Proposal owners.
                 // Even an empty immutable source guards the census cutoff.
                 self.add_source(&current)?;
-                let original = SourceAnchor::capture(&current);
-                let meaning = digest(&(&owner, &references))?;
-                for reference in references {
-                    self.add_owner(&owner, &reference, &original, meaning)?;
+                if let Some(reclamation) = reclamation {
+                    if reclamation.references() != references.as_slice()
+                        || SourceAnchor::capture(reclamation.original())
+                            != SourceAnchor::capture(&current)
+                        || owner != ReferenceOwner::from(reclamation.owner().clone())
+                    {
+                        return Err(refused("reference cold Product reclamation changed source"));
+                    }
+                    self.add_source(reclamation.archive())?;
+                    self.add_source(reclamation.terminal())?;
+                    for reference in references {
+                        self.add_artifact(&reference)?;
+                        references::require_retired_reference_owner(
+                            tx,
+                            &reference,
+                            &owner,
+                            &SourceAnchor::capture(&current),
+                            &SourceAnchor::capture(reclamation.terminal()),
+                        )?;
+                    }
+                } else {
+                    let original = SourceAnchor::capture(&current);
+                    let meaning = digest(&(&owner, &references))?;
+                    for reference in references {
+                        self.add_owner(&owner, &reference, &original, meaning)?;
+                    }
                 }
             } else if key.starts_with("knowledge-pin:") {
+                if key.starts_with(&format!("knowledge-pin:{}:confined:", raw.scope)) {
+                    let reference: Option<ArtifactVersionRefV1> = protected::decode(&raw.payload)?;
+                    let reference = reference.ok_or_else(|| {
+                        refused("reference cold confined pin lost original input")
+                    })?;
+                    if raw.scope != scope_key(&reference.scope)? {
+                        return Err(refused("reference cold confined pin changed input scope"));
+                    }
+                    if self.in_account(&reference.scope) {
+                        // Boundary keys sort before pin keys. The complete
+                        // original adapter must have enumerated this exact pin.
+                        self.require_enumerated_source(&source)?;
+                    }
+                    continue;
+                }
                 if let Some(pin) = pins::modern_reference_source(tx, &key)? {
                     if !self.in_account(pin.scope()) {
                         continue;
@@ -359,21 +482,11 @@ impl<'tx, 'conn> ColdReferenceCensus<'tx, 'conn> {
                         )?;
                     }
                 } else {
-                    let reference: Option<ArtifactVersionRefV1> = protected::decode(&raw.payload)?;
+                    let reference = pins::reference(tx, &key)?;
                     let Some(reference) = reference else {
-                        if source.version() != 1
-                            || !key.starts_with(&format!("knowledge-pin:{}:", raw.scope))
-                            || !protected::matches_historical_source_command_payload(
-                                tx,
-                                &source,
-                                1,
-                                &protected::encode(&Option::<ArtifactVersionRefV1>::None)?,
-                            )?
-                        {
-                            return Err(refused("reference cold null lost historical custody"));
-                        }
-                        // Authenticated first-ever null contributes no owner to
-                        // any tenant. It cannot conceal an older Some reference.
+                        // The shared source reader authenticated every retained
+                        // null, including the actual first source. It cannot
+                        // conceal an older Some reference or intermediate value.
                         // Its exact head still participates in preflight, so a
                         // later mutation cannot race the finalized zero census.
                         self.add_source(&source)?;
@@ -386,16 +499,6 @@ impl<'tx, 'conn> ColdReferenceCensus<'tx, 'conn> {
                     }
                     if !self.in_account(&reference.scope) {
                         continue;
-                    }
-                    if !protected::matches_historical_source_command_payload(
-                        tx,
-                        &source,
-                        1,
-                        &protected::encode(&Some(reference.clone()))?,
-                    )? {
-                        return Err(refused(
-                            "reference cold legacy pin lacks original value custody",
-                        ));
                     }
                     self.add_source(&source)?;
                     let original = SourceAnchor::capture(&source);
@@ -531,6 +634,28 @@ impl<'tx, 'conn> ColdReferenceCensus<'tx, 'conn> {
                 rusqlite::params![owner, envelope],
             )
             .map_err(sqlite_error)?;
+        Ok(())
+    }
+
+    fn require_enumerated_source(
+        &self,
+        source: &protected::ProtectedSourceReference,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        let expected = protected::encode(&SourceAnchor::capture(source))?;
+        let retained: Option<Vec<u8>> = self
+            .transaction
+            .query_row(
+                &format!("SELECT original FROM {} WHERE record_key=?1", self.sources),
+                [source.record_key()],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(sqlite_error)?;
+        if retained.as_deref() != Some(expected.as_slice()) {
+            return Err(refused(
+                "reference cold confined pin has no original boundary",
+            ));
+        }
         Ok(())
     }
 

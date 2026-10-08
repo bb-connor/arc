@@ -319,6 +319,22 @@ pub(super) mod capacity_test_support {
     use super::*;
     use tokio::sync::{OwnedSemaphorePermit, TryAcquireError};
 
+    pub(in crate::recovery) fn trust_fixture_certificate(
+        connector: &mut PinnedSupportIssueConnector,
+        certificate: reqwest::Certificate,
+    ) -> Result<(), KernelError> {
+        connector.client = client_builder_with_contract(&connector.egress_contract)
+            .https_only(true)
+            .no_retries()
+            .connect_timeout(Duration::from_secs(5))
+            .timeout(connector.request_timeout)
+            .pool_max_idle_per_host(4)
+            .add_root_certificate(certificate)
+            .build()
+            .map_err(|_| refused())?;
+        Ok(())
+    }
+
     pub(in crate::recovery) fn hold_submission_capacity(
         connector: &PinnedSupportIssueConnector,
     ) -> Result<OwnedSemaphorePermit, TryAcquireError> {

@@ -15,6 +15,7 @@ mod pins;
 mod product_artifact_selection;
 mod product_evidence;
 mod publication;
+pub(in crate::admission_operation_store) mod publication_capacity;
 pub(super) mod publication_census;
 pub(super) mod publication_source;
 pub(in crate::admission_operation_store) mod reference_activation;
@@ -26,6 +27,13 @@ pub(in crate::admission_operation_store) mod reference_retirement;
 pub(super) mod reference_source;
 pub(in crate::admission_operation_store) mod references;
 mod release;
+#[cfg(feature = "admission-test-support")]
+mod release_basis_observation;
+#[cfg(feature = "admission-test-support")]
+pub use release_basis_observation::{
+    observe_artifact_release_basis, ArtifactReleaseBasisObservation,
+    ArtifactReleaseBasisObservationScope,
+};
 mod transfer;
 mod traversal;
 pub(in crate::admission_operation_store) use checkpoints::AuthenticatedCheckpointRestoreEncodingSource;
@@ -37,9 +45,11 @@ pub use checkpoints::{
 };
 pub(in crate::admission_operation_store) use confinement::setup_confinement_inventory;
 pub use confinement::*;
-pub(in crate::admission_operation_store) use product_artifact_selection::selected_product_artifact;
+pub(in crate::admission_operation_store) use product_artifact_selection::{
+    retained_product_artifact, selected_product_artifact,
+};
 pub(in crate::admission_operation_store) use product_evidence::{
-    retain_product_evidence, verify_product_reference_available,
+    retain_product_evidence, retire_product_evidence, verify_product_reference_available,
 };
 pub(in crate::admission_operation_store) use reference_activation::{
     verify_reference_baseline, verify_reference_ready,
@@ -479,6 +489,11 @@ impl SqliteAdmissionOperationStore {
                     &self.serving_owner,
                     profile,
                 )?;
+                publication_capacity::activate_installation_publications(
+                    &tx,
+                    &self.serving_owner,
+                    profile,
+                )?;
                 return self.commit_write(tx);
             }
             if profile.generation <= old.generation
@@ -529,6 +544,11 @@ impl SqliteAdmissionOperationStore {
             &self.serving_owner,
             profile,
         )?;
+        publication_capacity::activate_installation_publications(
+            &tx,
+            &self.serving_owner,
+            profile,
+        )?;
         self.commit_write(tx)?;
         self.sync_after_write(&connection)
     }
@@ -565,15 +585,14 @@ impl SqliteAdmissionOperationStore {
         schema::verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
         schema::authority_validation_time(&tx, now)?;
         let deployment = protected::deployment_tx(&tx, scope)?;
-        security_participant_state::verify_recovery_initialization(
-            &tx,
-            &deployment.native_authority,
-        )?;
-        let result = security_participant_state::knowledge::observed_influence(
-            &tx,
-            deployment.native_authority.security_authority_id().as_str(),
-            &recovery_flow_key(&deployment.security_context),
-        )?;
+        let result = {
+            let current = security_participant_state::knowledge::CurrentNativeInfluenceAuthority::authenticate(
+                &tx,
+                &self.serving_owner,
+                &deployment.native_authority,
+            )?;
+            current.observe(&recovery_flow_key(&deployment.security_context))?
+        };
         tx.commit().map_err(sqlite_error)?;
         Ok(result)
     }

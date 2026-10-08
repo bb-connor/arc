@@ -100,6 +100,10 @@ BEGIN
 END;
 "#;
 
+pub(super) fn compiled_schema() -> &'static str {
+    GLOBAL_COMMIT_SCHEMA
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct GlobalCommitHead {
     pub(crate) head_sequence: u64,

@@ -420,7 +420,7 @@ impl RecoveryRuntime {
         let kernel = self.kernel.clone();
         let scope = self.scope.clone();
         let authentication_capability = capability.clone();
-        let actor = native_work::execute(principal.clone(), fixed_time, async move {
+        let actor = native_work::execute_settlement(principal.clone(), fixed_time, async move {
             kernel
                 .authenticate_recovery_actor(
                     &scope,
@@ -441,7 +441,7 @@ impl RecoveryRuntime {
         let kernel = self.kernel.clone();
         let selected_workflow = workflow.clone();
         let request_budget = observation_owner.request_budget();
-        let lookup = native_work::execute(principal.clone(), fixed_time, async move {
+        let lookup = native_work::execute_settlement(principal.clone(), fixed_time, async move {
             kernel
                 .reserve_recovery_provider_lookup_with_budget(
                     &actor,
@@ -458,7 +458,7 @@ impl RecoveryRuntime {
         let runtime = self.clone();
         let settlement_capability = capability.clone();
         let selected_workflow = workflow.clone();
-        native_work::execute(principal, fixed_time, async move {
+        native_work::execute_settlement(principal, fixed_time, async move {
             let current = runtime
                 .kernel
                 .authenticate_recovery_actor(

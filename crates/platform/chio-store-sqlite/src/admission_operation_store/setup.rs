@@ -312,7 +312,7 @@ pub(super) use context::register_native_setup_context;
 pub(super) use gate::{require_capture, require_command, require_ready};
 use inventory::required_coverage;
 pub use retirement::{NativeSetupRetirementAuthorizationV1, NativeSetupRetirementBodyV1};
-pub(super) use unused_generation::VerifiedUnusedSetupGeneration;
+pub(super) use unused_generation::{UnusedSetupReplacementReason, VerifiedUnusedSetupGeneration};
 
 fn preparation(value: &Selection) -> NativeSetupPreparationV1 {
     NativeSetupPreparationV1 {

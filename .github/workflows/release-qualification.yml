@@ -171,7 +171,7 @@ jobs:
             ./INSTALL
           )
           cargo creusot version
-          cargo kani --version
+          bash scripts/check-kani-toolchain.sh
 
       - name: Install portable qualification dependencies
         run: |

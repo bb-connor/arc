@@ -330,6 +330,67 @@ fn workflow_quota(
     workflow_quota_with_count(tx, scope, workflow, None)
 }
 
+/// A pristine native purpose is proven from the actual FIRST allocation, never
+/// inferred from absent workflow fields or a legacy zero baseline.
+pub(super) fn require_unmaterialized_no_native_accounting(
+    tx: &Connection,
+    record: &RecoveryWorkflowRecordV1,
+) -> Result<(), AdmissionOperationStoreError> {
+    let key = quota_key(&record.scope, &record.workflow_id)?;
+    let source = source_reference(tx, &key)?;
+    let quota = workflow_quota(tx, &record.scope, &record.workflow_id)?;
+    if source.kind() != "command"
+        || quota.baseline_revision != SafeInteger::ZERO
+        || quota.baseline_commands != SafeInteger::ZERO
+        || quota.native != SafeInteger::ZERO
+        || quota.native_archive.is_some()
+        || quota.native_hold.is_some()
+        || quota.native_terminal.is_some()
+        || quota.native_release.is_some()
+        || record.action.is_some()
+        || record.process_reservation.is_some()
+    {
+        return Err(invariant(
+            "unused original lacks its authentic zero native-purpose allocation",
+        ));
+    }
+    Ok(())
+}
+
+pub(super) fn verify_unused_setup_control_quota(
+    tx: &Connection,
+    record: &RecoveryWorkflowRecordV1,
+    previous_version: u64,
+    previous_digest: &ProjectionDigest,
+) -> Result<(), AdmissionOperationStoreError> {
+    let key = quota_key(&record.scope, &record.workflow_id)?;
+    let source = source_reference(tx, &key)?;
+    let mut before = workflow_quota(tx, &record.scope, &record.workflow_id)?;
+    if previous_version.checked_add(1) != Some(source.version()) || before.control.get() == 0 {
+        return Err(invariant(
+            "unused setup closure lost its single reserved control purpose",
+        ));
+    }
+    before.control = SafeInteger::new(before.control.get() - 1)
+        .map_err(|_| invariant("unused setup prior control count refused"))?;
+    if before.units()? != previous_version
+        || record_digest(
+            &key,
+            &scope_key(&record.scope)?,
+            "command",
+            previous_version,
+            &encode(&before)?,
+            None,
+            None,
+        )? != hex(previous_digest.as_bytes())
+    {
+        return Err(invariant(
+            "unused setup closure changed its retained purpose preimage",
+        ));
+    }
+    Ok(())
+}
+
 /// The first durable Resume request belongs to this exact physical generation.
 pub(in crate::admission_operation_store) fn workflow_resume_requested(
     tx: &Connection,
@@ -519,6 +580,14 @@ pub(in crate::admission_operation_store) fn save_workflow(
     let existing = raw(tx, &key)?;
     if let Some(row) = &existing {
         let physical: RecoveryWorkflowRecordV1 = decode(&row.payload)?;
+        if !physical.captured
+            && physical.origin.is_some()
+            && !original_owner_is_current(tx, &physical)?
+        {
+            return Err(invariant(
+                "closed original owner cannot acquire another workflow mutation",
+            ));
+        }
         if auxiliary_historical_hold(tx, &physical)?.is_some() {
             return Err(invariant("auxiliary held workflow cannot be rewritten"));
         }

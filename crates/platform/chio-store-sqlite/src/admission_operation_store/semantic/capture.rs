@@ -1,5 +1,11 @@
 use super::*;
 use materialization::{step_key, verify_current_prerequisites, verify_materialized_plan};
+#[path = "capture/input_origin.rs"]
+mod input_origin;
+pub(in crate::admission_operation_store) use input_origin::{
+    validate_historical_semantic_refused_input_origin, HistoricalSemanticRefusedInputObservation,
+    SemanticHistoricalInputOriginData, SemanticRefusedInputOriginData,
+};
 
 /// Private, transaction-borrowed semantic evidence cannot be decoded or reused.
 pub(in crate::admission_operation_store) struct SemanticCaptureWitness {
@@ -74,6 +80,9 @@ fn current_status_audience_required(
 pub(in crate::admission_operation_store) struct SemanticInputObservation<'a> {
     pub operation: &'a AdmissionOperationV1,
     pub original: &'a chio_kernel::admission_operation::RetainedToolAdmissionRequestV1,
+    pub classification: Option<
+        &'a chio_kernel::admission_operation::NativeSecurityInputClassificationAuthority<'a>,
+    >,
     pub binding: &'a NativeSecurityAuthorityBindingV1,
     pub context: &'a SecurityInvocationContext,
     pub input: &'a chio_kernel::admission_operation::NativeSecurityInputJoinRequestV1,
@@ -87,6 +96,7 @@ pub(in crate::admission_operation_store) struct SemanticInputObservation<'a> {
 pub(in crate::admission_operation_store) struct SemanticInputWitness {
     restriction_floor: chio_security_types::InformationLabel,
     withheld_status_audience: Option<chio_security_types::InformationLabel>,
+    refused_origin: Option<SemanticRefusedInputOriginData>,
 }
 impl SemanticInputWitness {
     pub(in crate::admission_operation_store) fn restriction_floor(
@@ -129,6 +139,15 @@ impl SemanticInputAssessment {
     pub(in crate::admission_operation_store) fn is_refused(&self) -> bool {
         matches!(self, Self::Refused(_))
     }
+
+    pub(in crate::admission_operation_store) fn refused_origin(
+        &self,
+    ) -> Option<&SemanticRefusedInputOriginData> {
+        match self {
+            Self::Refused(witness) => witness.refused_origin.as_ref(),
+            Self::Eligible(_) => None,
+        }
+    }
 }
 
 enum SemanticSourceFacts {
@@ -164,6 +183,7 @@ struct SemanticSourceVerification {
     facts: SemanticSourceFacts,
     input_refused: bool,
     input_annotation_floor: Option<chio_security_types::InformationLabel>,
+    prior_influence: Option<chio_security_types::knowledge::ArtifactInfluenceV1>,
 }
 
 enum SourcePhase<'a> {
@@ -178,10 +198,22 @@ pub(in crate::admission_operation_store) fn verify_input_tx(
     tx: &Transaction<'_>,
     observed: SemanticInputObservation<'_>,
 ) -> Result<Option<SemanticInputAssessment>, AdmissionOperationStoreError> {
-    let request = observed.original.request_for_revalidation();
-    if selected_scope(tx, observed.binding, observed.context, request)?.is_none() {
+    let retained_projection = observed.original.request_for_revalidation();
+    if selected_scope(tx, observed.binding, observed.context, retained_projection)?.is_none() {
         return Ok(None);
     }
+    let classification = observed.classification.ok_or_else(|| {
+        refused("selected semantic Input requires the original call-scoped request")
+    })?;
+    if classification.operation() != observed.operation
+        || classification.binding() != observed.binding
+        || classification.context() != observed.context
+        || classification.input() != observed.input
+    {
+        return Err(refused("semantic Input original callback source changed"));
+    }
+    let request = classification.request();
+    observed.original.validate_request_material(request)?;
     let before = observed
         .before
         .ok_or_else(|| refused("configured semantic input has no initialized source"))?;
@@ -258,9 +290,21 @@ pub(in crate::admission_operation_store) fn verify_input_tx(
         } else {
             None
         };
+    let refused_origin = if verified.input_refused {
+        Some(input_origin::authenticate_refused_input_origin(
+            tx,
+            &observed,
+            &verified,
+            &restriction_floor,
+            withheld_status_audience.as_ref(),
+        )?)
+    } else {
+        None
+    };
     let witness = SemanticInputWitness {
         restriction_floor,
         withheld_status_audience,
+        refused_origin,
     };
     Ok(Some(if verified.input_refused {
         SemanticInputAssessment::Refused(witness)
@@ -409,15 +453,16 @@ fn verify_source_tx(
             .and_then(|label| label.join_restrictions(&resolved.session_join))
             .map_err(refused)?;
     }
-    let (influence, externally_influenced) = materialization::materialized_influence(
-        tx,
-        &invocation,
-        binding,
-        context,
-        contract.external_influence,
-        request.model_metadata.as_ref(),
-        &mut budget,
-    )?;
+    let (influence, externally_influenced, prior_influence) =
+        materialization::materialized_influence(
+            tx,
+            &invocation,
+            binding,
+            context,
+            contract.external_influence,
+            request.model_metadata.as_ref(),
+            &mut budget,
+        )?;
     let namespace: [u8; 32] = hex::decode(operation.binding().request_namespace_digest().as_str())
         .map_err(refused)?
         .try_into()
@@ -571,6 +616,7 @@ fn verify_source_tx(
         facts: verified,
         input_refused,
         input_annotation_floor,
+        prior_influence,
     }))
 }
 pub(in crate::admission_operation_store) fn capture_tx(

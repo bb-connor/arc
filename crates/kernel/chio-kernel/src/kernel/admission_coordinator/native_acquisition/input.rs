@@ -55,6 +55,7 @@ impl NativeSecurityFlowJoinAuthority<'_> {
                     &self.binding,
                     self.context,
                     &input,
+                    self.request,
                     now,
                 );
                 let acknowledged = store_call(|| {

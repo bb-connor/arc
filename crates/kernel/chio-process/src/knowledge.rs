@@ -5,6 +5,9 @@ use chio_kernel::recovery::RecoveryPermission;
 use chio_kernel::{knowledge::*, KernelError, SecurityInvocationContext};
 use chio_security_types::{knowledge::MAX_ARTIFACT_BYTES, recovery::*};
 
+mod confined_delivery;
+mod confined_returns;
+
 #[cfg(feature = "admission-test-support")]
 #[path = "knowledge/process_validation_test_support.rs"]
 mod process_validation_test_support;
@@ -298,6 +301,25 @@ impl ArtifactBlobPort for ProcessArtifactBroker {
         Ok(())
     }
 
+    fn stage_confined_return(
+        &self,
+        actor: &chio_kernel::recovery::AuthenticatedRecoveryActor,
+        boundary: &chio_security_types::confinement::IsolationBoundaryV1,
+        bytes: &[u8],
+    ) -> Result<ArtifactBlobSealV1, KernelError> {
+        self.stage_verified_confined_return(actor, boundary, bytes)
+    }
+
+    fn begin_confined_delivery(
+        &self,
+        actor: &chio_kernel::recovery::AuthenticatedRecoveryActor,
+        request: &RequestId,
+        seal: &ArtifactBlobSealV1,
+        admission: &chio_security_types::confinement::ReturnAdmissionV1,
+    ) -> Result<(), KernelError> {
+        self.begin_verified_confined_delivery(actor, request, seal, admission)
+    }
+
     fn stage_retained_archive(
         &self,
         actor: &chio_kernel::recovery::AuthenticatedRecoveryActor,
@@ -420,6 +442,9 @@ impl ArtifactBlobPort for ProcessArtifactBroker {
         Ok(seal)
     }
     fn read_private(&self, seal: &ArtifactBlobSealV1) -> Result<Vec<u8>, KernelError> {
+        if seal.generation.as_str().starts_with("confined:") {
+            return self.read_confined_slot(seal, false);
+        }
         if seal.runtime.as_str() != self.runtime_id()
             || seal.bytes.get() > MAX_ARTIFACT_BYTES as u64
         {
@@ -489,6 +514,9 @@ impl ArtifactBlobPort for ProcessArtifactBroker {
     }
 
     fn read_retained_private(&self, seal: &ArtifactBlobSealV1) -> Result<Vec<u8>, KernelError> {
+        if seal.generation.as_str().starts_with("confined:") {
+            return self.read_confined_slot(seal, true);
+        }
         if seal.runtime.as_str() != self.runtime_id()
             || seal.bytes.get() > MAX_ARTIFACT_BYTES as u64
         {
@@ -525,6 +553,11 @@ impl ArtifactBlobPort for ProcessArtifactBroker {
     fn collect_private(&self, seal: &ArtifactBlobSealV1) -> Result<(), KernelError> {
         if seal.runtime.as_str() != self.runtime_id() {
             return Err(refused("runtime"));
+        }
+        if seal.generation.as_str().starts_with("confined:") {
+            return Err(refused(
+                "confined slot custody cannot use generic collection",
+            ));
         }
         self.runtime
             .with_store(|store| {

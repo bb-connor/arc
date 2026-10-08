@@ -19,16 +19,24 @@ mod constraints;
 mod dispatch_interceptors;
 #[path = "semantic/emergency_stop_finalization.rs"]
 mod emergency_stop_finalization;
+#[path = "semantic/empty_import.rs"]
+pub(super) mod empty_import;
 #[path = "semantic/finalization_history.rs"]
 mod finalization_history;
 #[path = "semantic/grant_sources.rs"]
 mod grant_sources;
+#[path = "semantic/input_generation.rs"]
+mod input_generation;
 #[path = "semantic/legacy_annotation_history.rs"]
 mod legacy_annotation_history;
 #[path = "semantic/legacy_output_history.rs"]
 mod legacy_output_history;
 #[path = "semantic/legacy_status_history.rs"]
 mod legacy_status_history;
+#[path = "semantic/native_input_compatibility.rs"]
+mod native_input_compatibility;
+#[path = "semantic/retained_ordinary_capture.rs"]
+mod retained_ordinary_capture;
 #[path = "semantic/status_observations.rs"]
 mod status_observations;
 #[path = "semantic/status_refusals.rs"]
@@ -55,10 +63,12 @@ fn kind(path: &std::path::Path) -> TestResult<SemanticOperationKindV1> {
     Ok(
         match std::fs::read_to_string(path.join("semantic-kind"))?.as_str() {
             "read"
+            | "read-reviewed-constraints"
             | "read-weak-manifest"
             | "read-missing-status"
             | "annotated-read"
             | "annotated-read-weak-manifest"
+            | "trusted-annotated-read"
             | "annotated-disclosure"
             | "acl-subjects" => SemanticOperationKindV1::SupportRead,
             "write" | "saturated-write" | "alternate" | "error" | "transform" | "historical"
@@ -438,14 +448,26 @@ pub(super) fn prepare(
         p.invocation.audience = SignedSemanticAudienceV1::sign(acl, &p.resolver)?;
     }
     p.plan.steps = NonEmptyBoundedList::new(vec![step])?;
+    if std::env::var("CHIO_RECOVERY_ORDINARY_STAGE_TRACE").as_deref() == Ok("1") {
+        eprintln!("ordinary recorded child: accept_plan enter");
+    }
     let plan = runtime.accept_plan(&f.control, &p.plan)?;
+    if std::env::var("CHIO_RECOVERY_ORDINARY_STAGE_TRACE").as_deref() == Ok("1") {
+        eprintln!("ordinary recorded child: accept_plan complete");
+    }
     let request =
         f.process
             .tool_request("root", key, "semantic-a", "remedy", serde_json::json!({}))?;
     p.invocation.action.plan = plan;
     p.invocation.action.step = StepId::new(key)?;
     p.invocation.action.output = output;
+    if std::env::var("CHIO_RECOVERY_ORDINARY_STAGE_TRACE").as_deref() == Ok("1") {
+        eprintln!("ordinary recorded child: frame_action enter");
+    }
     p.invocation.action = runtime.frame_action(&request, p.invocation.action, &p.payload)?;
+    if std::env::var("CHIO_RECOVERY_ORDINARY_STAGE_TRACE").as_deref() == Ok("1") {
+        eprintln!("ordinary recorded child: frame_action complete");
+    }
     if !p.invocation.endorsements.as_slice().is_empty() {
         let mut body = p.invocation.endorsements.as_slice()[0].body().clone();
         body.evidence = EvidenceRef::new(&format!("endorsement-{key}"))?;

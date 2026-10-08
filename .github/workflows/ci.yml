@@ -290,6 +290,7 @@ jobs:
           run_gate bash ./scripts/tests/formal-workflow-wiring.test.sh
           run_gate cargo metadata --manifest-path fuzz/Cargo.toml --locked --no-deps --format-version 1
           run_gate bash ./scripts/check-corpus-metadata.sh
+          run_gate python3 scripts/tests/legacy-machine-interfaces.test.py
           run_gate bash ./scripts/tests/fuzz-budget-hard-halt.test.sh
           run_gate bash ./scripts/tests/check-proof-report.test.sh
           run_gate bash ./scripts/tests/lane-gate.test.sh

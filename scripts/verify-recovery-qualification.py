@@ -24,6 +24,7 @@ import subprocess
 import sys
 import tarfile
 import tomllib
+import types
 from types import SimpleNamespace
 import unicodedata
 
@@ -32,6 +33,9 @@ INVENTORY_VERSION = "chio.source-inventory.v4"
 MATERIALIZATION_SCHEMA = "chio.confined-source-snapshot.v2"
 SOURCE_ORIGIN_SCHEMA = "chio.rust-profile-source-origin.v2"
 SOURCE_MANIFEST_NAME = "__declared_source_snapshot__.json"
+COMPILED_IMAGE_MAX_BYTES = 512 * 1024**2
+COMPILED_IMAGE_POOL_MAX_BYTES = 16 * 1024**3
+COMPILED_DIMENSION_TOOL_SHA = "e0495799c3b23d00648843615785b9c4a87f5f76876f3de44e0e3358f883a8e8"
 MATERIALIZATION_RUNNER = "scripts/run-confined-return-linux-acceptance.py"
 MATERIALIZATION_CACHE_PARTS = frozenset({".cache", ".git", ".ignored-cache", ".mypy_cache", ".next",
     ".pytest_cache", ".ruff_cache", ".turbo", ".venv", "__pycache__", "node_modules", "venv"})
@@ -185,6 +189,7 @@ def gate_catalog():
     commands = {
         "format":["cargo", "fmt", "--all", "--", "--check"],
         "workspace-build":["cargo", "build", "--offline", "--locked", "--workspace"],
+        "workspace-msrv":["cargo", "+1.95.0", "check", "--offline", "--locked", "--workspace", "--all-targets"],
         "workspace-test":["cargo", "test", "--offline", "--locked", "--workspace"],
         "workspace-clippy":["cargo", "clippy", "--offline", "--locked", "--workspace", "--all-targets", "--", "-D", "warnings"],
         "contracts":["cargo", "test", "--offline", "--locked", "-p", "chio-core-types", "-p", "chio-security-types"],
@@ -1179,6 +1184,104 @@ def same_compilation_json(left, right):
     return compilation_canonical(left) == compilation_canonical(right)
 
 
+COMPILER_CUSTODY_DESCRIPTOR_BUDGET = 32768
+COMPILER_CUSTODY_DESCRIPTOR_RESERVE = 128
+
+
+def original_compiler_descriptor_capacity(namespace):
+    """Require measured capacity before retained-byte reads; never raise a limit."""
+    try:
+        import resource
+    except ImportError:
+        require(False,"compiler_descriptor_capacity")
+    namespace = Path(namespace)
+    require(namespace.is_absolute() and ".." not in namespace.parts, "compiler_descriptor_namespace")
+    leaves = 0
+    with ExitStack() as stack:
+        stack.enter_context(compiler_namespace_directory(namespace))
+        for name in ["artifacts", "records", "completions", "batches"]:
+            descriptor = stack.enter_context(compiler_namespace_directory(namespace/name))
+            names = os.listdir(descriptor)
+            require(len(names) <= 200000, "compiler_descriptor_namespace")
+            for leaf in names:
+                metadata = os.stat(leaf,dir_fd=descriptor,follow_symlinks=False)
+                require(stat.S_ISREG(metadata.st_mode), "compiler_descriptor_namespace")
+            leaves += len(names)
+    # Compiler readers share original ancestor descriptors and retain one
+    # original regular-file descriptor per live image. Reserve covers the
+    # fixed input/configuration/log joins around that closed namespace.
+    ancestry = len(namespace.parts) + 4
+    descriptor_directory = Path("/proc/self/fd") if platform.system() == "Linux" else Path("/dev/fd")
+    open_names = os.listdir(descriptor_directory)
+    require(all(name.isdecimal() for name in open_names), "compiler_descriptor_capacity")
+    existing = len(open_names)
+    needed = existing + leaves + ancestry + COMPILER_CUSTODY_DESCRIPTOR_RESERVE
+    soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    require(type(soft) is int and type(hard) is int and soft > 0 and hard >= soft
+            and needed <= COMPILER_CUSTODY_DESCRIPTOR_BUDGET and needed <= soft,
+            "compiler_descriptor_capacity")
+    return {"schema":"chio.original-compiler-descriptor-capacity.v1",
+            "namespace":str(namespace), "regular_namespace_leaves":leaves,
+            "observed_open_descriptors":existing,
+            "ancestry_descriptors":ancestry, "reserved_descriptors":COMPILER_CUSTODY_DESCRIPTOR_RESERVE,
+            "required_descriptors":needed, "descriptor_budget":COMPILER_CUSTODY_DESCRIPTOR_BUDGET,
+            "observed_soft_limit":soft, "observed_hard_limit":hard, "limit_changed":False}
+
+
+@contextmanager
+def compiler_input_custody():
+    """Share held no-follow ancestors while preserving every held regular leaf."""
+    directories = {}
+    ancestry = []
+    opened = []
+    def directory(path):
+        path = Path(path)
+        if path in directories:
+            return directories[path]
+        if path == Path("/"):
+            descriptor = os.open("/",os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+            opened.append(descriptor)
+            directories[path] = descriptor
+            return descriptor
+        parent = directory(path.parent)
+        located = os.stat(path.name,dir_fd=parent,follow_symlinks=False)
+        descriptor = os.open(path.name,os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,dir_fd=parent)
+        opened.append(descriptor)
+        identity = compiler_metadata_identity(os.fstat(descriptor))[:3]
+        require(identity == compiler_metadata_identity(located)[:3], "compiler_namespace_changed")
+        directories[path] = descriptor
+        ancestry.append((parent,path.name,descriptor,identity))
+        return descriptor
+    @contextmanager
+    def regular(path):
+        path = Path(path)
+        require(path.is_absolute() and ".." not in path.parts, "compiler_namespace")
+        parent = directory(path.parent)
+        located = os.stat(path.name,dir_fd=parent,follow_symlinks=False)
+        descriptor = os.open(path.name,os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,dir_fd=parent)
+        stream = os.fdopen(descriptor,"rb")
+        try:
+            actual = os.fstat(descriptor)
+            identity = compiler_metadata_identity(actual)
+            require(stat.S_ISREG(actual.st_mode) and actual.st_nlink == 1
+                    and identity == compiler_metadata_identity(located), "compiler_namespace_changed")
+            yield stream
+            require(compiler_metadata_identity(os.fstat(descriptor)) == identity
+                    == compiler_metadata_identity(os.stat(path.name,dir_fd=parent,follow_symlinks=False)),
+                    "compiler_namespace_changed")
+        finally:
+            stream.close()
+    try:
+        yield regular
+        for parent,name,descriptor,identity in ancestry:
+            require(compiler_metadata_identity(os.fstat(descriptor))[:3] == identity
+                    == compiler_metadata_identity(os.stat(name,dir_fd=parent,follow_symlinks=False))[:3],
+                    "compiler_namespace_changed")
+    finally:
+        for descriptor in reversed(opened):
+            os.close(descriptor)
+
+
 def current_compiler_publications(base, namespace, source_binding):
     """Read original v4/v3 pairs and batches without claiming past fsync success."""
     require(type(source_binding) is str and re.fullmatch(r"[a-f0-9]{64}", source_binding), "compiler_source_binding")
@@ -1404,6 +1507,38 @@ def current_required_sync_observations(publication, stderr):
             "scope": "Decoded required-sync joins only; actual enclosing argv/source/image/exit and original stream custody required."}
 
 
+def checked_public_compilation_count(publications, name):
+    """Count actual parser units; metadata probes cannot replace compiled units."""
+    records = publications.get("records") if type(publications) is dict else None
+    units = publications.get("unit_publications") if type(publications) is dict else None
+    require(type(records) is list and type(units) is dict
+            and all(type(row) is dict and type(row.get("invocation_id")) is str
+                    and type(row.get("kind")) is str and row["kind"] in {"compilation","probe"}
+                    and type(row.get("status")) is str
+                    and row["status"] in {"success","refused","compiler_failed","instrumentation_failed"}
+                    for row in records), "micro_primary_compilations")
+    identifiers = [row["invocation_id"] for row in records]
+    require(len(set(identifiers)) == len(identifiers) and set(identifiers) == set(units),
+            "micro_primary_compilations")
+    compiled = 0
+    for row in records:
+        unit = units[row["invocation_id"]]
+        require(type(unit) is dict and unit.get("kind") == row["kind"]
+                and unit.get("record_status") == row["status"]
+                and (unit.get("compiler_exit") is None or type(unit["compiler_exit"]) is int),
+                "micro_primary_compilations")
+        if row["status"] == "success":
+            require(type(unit.get("compiler_exit")) is int and unit["compiler_exit"] == 0,
+                    "micro_primary_compilations")
+            compiled += row["kind"] == "compilation"
+        elif row["status"] == "compiler_failed":
+            require(type(unit.get("compiler_exit")) is int and unit["compiler_exit"] != 0,
+                    "micro_primary_compilations")
+    require(name in PRIMARY_COMPILER_PROBES and (name not in {"gnu-native","musl-static-pie"}
+            or compiled >= (2 if name == "gnu-native" else 1)), "micro_primary_compilations")
+    return compiled
+
+
 def audit_compiler_publications(namespace, source_binding):
     """Current physical observations and explicit historical format handling."""
     namespace = Path(namespace)
@@ -1412,9 +1547,11 @@ def audit_compiler_publications(namespace, source_binding):
     except FileNotFoundError:
         return audit_legacy_compiler_publications(namespace,source_binding)
     require(stat.S_ISDIR(metadata.st_mode),"compiler_namespace")
-    primitives = SimpleNamespace(compiler_namespace_directory=compiler_namespace_directory,
-        regular_input=regular_input,compiler_json=compiler_json,compiler_metadata_identity=compiler_metadata_identity)
-    return current_compiler_publications(primitives,namespace,source_binding)
+    original_compiler_descriptor_capacity(namespace)
+    with compiler_input_custody() as inputs:
+        primitives = SimpleNamespace(compiler_namespace_directory=compiler_namespace_directory,
+            regular_input=inputs,compiler_json=compiler_json,compiler_metadata_identity=compiler_metadata_identity)
+        return current_compiler_publications(primitives,namespace,source_binding)
 
 
 def compiler_graph_image(image):
@@ -1423,7 +1560,7 @@ def compiler_graph_image(image):
     require(name.startswith("/") and not name.startswith("//")
             and ".." not in PurePosixPath(name).parts and PurePosixPath(name).as_posix() == name
             and re.fullmatch(r"[a-f0-9]{64}",image.get("sha256",""))
-            and type(image.get("size")) is int and 0 <= image["size"] <= 512*1024**2,
+            and type(image.get("size")) is int and 0 <= image["size"] <= COMPILED_IMAGE_MAX_BYTES,
             "compiler_graph_image")
     return name,image["sha256"],image["size"]
 
@@ -1618,8 +1755,48 @@ def compilation_explicit_linkers(arguments):
     require(len(linkers) <= 1, "micro_compiler_driver")
     return linkers
 
+def audit_native_compiler_output(output, read_raw):
+    """Join complete bounded output bytes to an outside-owned native dispatch."""
+    require(type(output) is dict and set(output) == {"schema","status","refusal","observed_bytes","eof",
+            "elapsed_seconds","cleanup","policy","stdout","stderr"}
+            and output["schema"] == "chio.native-compiler-output.v1"
+            and output["status"] == "complete" and output["refusal"] is None and output["cleanup"] is None
+            and type(output["elapsed_seconds"]) in {int,float} and 0 <= output["elapsed_seconds"] <= 180
+            and type(output["policy"]) is dict
+            and set(output["policy"]) == {"maximum_bytes_per_stream","execution_and_cleanup_seconds",
+                                         "cleanup_reserve_seconds","raw_diagnostics_forwarded"}
+            and type(output["policy"]["maximum_bytes_per_stream"]) is int
+            and output["policy"]["maximum_bytes_per_stream"] == 16*1024**2
+            and type(output["policy"]["execution_and_cleanup_seconds"]) is int
+            and output["policy"]["execution_and_cleanup_seconds"] == 180
+            and type(output["policy"]["cleanup_reserve_seconds"]) is int
+            and output["policy"]["cleanup_reserve_seconds"] == 1
+            and output["policy"]["raw_diagnostics_forwarded"] is False
+            and type(output["observed_bytes"]) is dict and set(output["observed_bytes"]) == {"stdout","stderr"}
+            and type(output["eof"]) is dict and set(output["eof"]) == {"stdout","stderr"}
+            and callable(read_raw), "micro_compiler_output")
+    for name in ["stdout","stderr"]:
+        reference = output[name]
+        require(type(reference) is dict and set(reference) == {"artifact","sha256","size"}
+                and type(reference["sha256"]) is str and re.fullmatch(r"[a-f0-9]{64}",reference["sha256"])
+                and reference["artifact"] == "artifacts/"+reference["sha256"]
+                and type(reference["size"]) is int and 0 <= reference["size"] <= 16*1024**2
+                and type(output["observed_bytes"][name]) is int
+                and output["observed_bytes"][name] == reference["size"] and output["eof"][name] is True,
+                "micro_compiler_output")
+        raw = read_raw(reference)
+        require(type(raw) is bytes and len(raw) == reference["size"]
+                and hashlib.sha256(raw).hexdigest() == reference["sha256"], "micro_compiler_output_bytes")
+
+
 def audit_compilation_dispatches(namespace, configuration, declaration, events, publications, read, retained,
-                                read_raw=None):
+                                read_raw=None, retained_raw=None):
+    require(type(events) is dict and set(events) == {"schema","events"}
+            and type(events["schema"]) is str
+            and events["schema"] in {"chio.compilation-supervisor-events.v1","chio.compilation-supervisor-events.v2"},
+            "micro_supervisor_events")
+    require(type(events["events"]) is list and len(events["events"]) <= 100000, "micro_supervisor_events")
+    captured = events["schema"] == "chio.compilation-supervisor-events.v2"
     available = {row["invocation_id"]:row for row in publications["records"]}
     joined = set()
     verified = 0
@@ -1645,10 +1822,17 @@ def audit_compilation_dispatches(namespace, configuration, declaration, events, 
             require(event["exit"] == 86 and event["refusal"] == "compilation_response_limit",
                     "micro_supervisor_outcome")
         for dispatch in event["dispatches"]:
-            require(type(dispatch) is dict and set(dispatch) == {"kind","invocation_sha256","environment_sha256","cwd","compiler_exit"}
+            fields = {"kind","invocation_sha256","environment_sha256","cwd","compiler_exit"}
+            if captured:
+                fields |= {"schema","output"}
+            require(type(dispatch) is dict and set(dispatch) == fields
+                    and type(dispatch["kind"]) is str
                     and dispatch["kind"] in {"compiler-probe","compiler-unit"}
                     and all(re.fullmatch(r"[a-f0-9]{64}",dispatch.get(key,"")) for key in ["invocation_sha256","environment_sha256"])
                     and type(dispatch["compiler_exit"]) is int, "micro_dispatch")
+            if captured:
+                require(dispatch["schema"] == "chio.native-compiler-dispatch.v2", "micro_dispatch")
+                audit_native_compiler_output(dispatch["output"], retained_raw)
             cwd = compilation_absolute_path(dispatch["cwd"])
             require(cwd.is_relative_to(candidate)
                     and not any(cwd.is_relative_to(compilation_absolute_path(configuration[key]))
@@ -2010,6 +2194,61 @@ def checked_current_retention(declaration, execution, source_binding):
             and declaration["retention_outcome_sha256"] == hashlib.sha256(compilation_canonical(outcome)).hexdigest(),
             "compilation_scope_retention")
 
+def audit_compilation_directory_inventory(configured, inventory):
+    """Recompute READ_DIR metadata from the finite approved regular byte leaves."""
+    fields = {"schema","role","root","selection","directories","members"}
+    version = inventory.get("schema") if type(inventory) is dict else None
+    require(type(version) is str and version in {"chio.compilation-read-scope.v1","chio.compilation-read-scope.v2"}
+            and set(inventory) == fields | ({"directory_metadata"} if version.endswith(".v2") else set())
+            and type(inventory.get("directories")) is list and type(inventory.get("members")) is list,
+            "compilation_scope_directories")
+    directories = inventory["directories"]
+    require(all(type(name) is str and name and (name == "." or not secret_source(name)) for name in directories)
+            and directories == sorted(set(directories))
+            and len({portable_path_key(name) for name in directories}) == len(directories),
+            "compilation_scope_directories")
+    for name in directories:
+        require(name == "." or str(relative_path(name)) == name,"compilation_scope_directories")
+    if configured["selection"] == "explicit-members":
+        members = inventory["members"]
+        require(type(configured["members"]) is list
+                and all(type(member) is dict and type(member.get("path")) is str for member in members)
+                and [member["path"] for member in members] == sorted(configured["members"]),
+                "compilation_scope_directories")
+        expected = sorted({str(PurePosixPath(member["path"]).parent) for member in members
+                           if member.get("kind") == "regular"})
+        require(directories == (expected if version.endswith(".v2") else []),
+                "compilation_scope_directories")
+    else:
+        require(version == "chio.compilation-read-scope.v1", "compilation_scope_directories")
+    if version.endswith(".v2"):
+        metadata = inventory["directory_metadata"]
+        require(type(metadata) is list and bool(metadata) and len(metadata) == len(directories)
+                and all(type(row) is dict and set(row) == {"path","identity"}
+                        and type(row.get("identity")) is list and len(row["identity"]) == 3
+                        and all(type(value) is int and value >= 0 for value in row["identity"])
+                        and stat.S_ISDIR(row["identity"][2]) for row in metadata)
+                and [row["path"] for row in metadata] == directories,
+                "compilation_scope_directories")
+
+
+def hold_compilation_directory_metadata(inventories, descriptors, observed):
+    """Join retained READ_DIR metadata to original no-follow directory objects."""
+    for inventory in inventories:
+        if inventory["schema"] != "chio.compilation-read-scope.v2":
+            continue
+        root = Path(compilation_absolute_path(inventory["root"]))
+        for row in inventory["directory_metadata"]:
+            path = root/row["path"]
+            require(not secret_source(path.as_posix().lstrip("/")), "compilation_scope_directories_physical")
+            if path not in observed:
+                descriptor = descriptors.enter_context(compiler_namespace_directory(path))
+                info = os.fstat(descriptor)
+                observed[path] = [info.st_dev,info.st_ino,info.st_mode]
+            require(same_compilation_json(observed[path],row["identity"]),
+                    "compilation_scope_directories_physical")
+
+
 def audit_current_linux_compilation_scope_records(configuration, declaration, scope, inventories,
                                          source_binding, command, declaration_path):
     """Join already decoded records; this does not prove kernel enforcement.
@@ -2062,11 +2301,12 @@ def audit_current_linux_compilation_scope_records(configuration, declaration, sc
     total_members = 0
     for configured,inventory in zip(configuration["scopes"],inventories):
         require(type(configured) is dict and set(configured) == {"role","root","selection","members"}
-                and type(inventory) is dict and set(inventory) == {"schema","role","root","selection","directories","members"}
-                and inventory["schema"] == "chio.compilation-read-scope.v1"
+                and type(inventory) is dict
+                and inventory.get("schema") in {"chio.compilation-read-scope.v1","chio.compilation-read-scope.v2"}
                 and inventory["role"] in required_roles and inventory["role"] == configured["role"]
                 and inventory["root"] == configured["root"] and inventory["selection"] == configured["selection"]
                 and inventory["selection"] in {"complete-tree","explicit-members"},"compilation_scope_inventory")
+        audit_compilation_directory_inventory(configured,inventory)
         root = compilation_absolute_path(inventory["root"])
         require(str(root) != "/" and not any(root.is_relative_to(path) for path in protected)
                 and (inventory["role"] == "candidate" or not any(root.is_relative_to(write)
@@ -2710,12 +2950,17 @@ def audit_model_output(name, output):
         require(len(baselines) == len(coverage) == 1,"formal_model_baseline_inventory")
 
 
+def audit_kani_tool_version(version):
+    require(re.fullmatch(r"Kani Rust Verifier 0\.68\.0 \(cargo plugin\)\nCBMC 6\.11\.0\n?",version) is not None,
+            "formal_tool_version")
+
+
 def audit_formal(root, evidence, candidate, sources, base_commit):
     require(evidence.get("schema") == "chio.recovery-formal-evidence.v1", "formal_record")
     require(sources is not None and base_commit is not None and evidence.get("full_system_proof") is False,
             "formal_scope")
     architecture = artifact_json(root,evidence["architecture"])
-    require(architecture.get("schema") == "chio.recovery-architecture-model-evidence.v1"
+    require(architecture.get("schema") in {"chio.recovery-architecture-model-evidence.v1","chio.recovery-architecture-model-evidence.v2"}
             and architecture.get("toolchain") == "+1.94.1" and architecture.get("edition") == "2021",
             "formal_architecture_record")
     prefix = "docs/architecture/recoverable-agent-runtime/model/"
@@ -2740,10 +2985,24 @@ def audit_formal(root, evidence, candidate, sources, base_commit):
     for run in runs:
         name = run["name"]
         compile_row, execute = by_name["compile-"+name],by_name["execute-"+name]
-        require(compile_row["command"][:-1] == ["rustc","+1.94.1","--edition","2021","-D","warnings",run["entry"],"-o"]
+        capture = architecture["schema"] == "chio.recovery-architecture-model-evidence.v2"
+        expected_compile = ["rustc","+1.94.1","--edition","2021","-D","warnings",run["entry"],
+                            *(["--emit","dep-info,link"] if capture else []),"-o"]
+        require(compile_row["command"][:-1] == expected_compile
                 and execute["command"] == [compile_row["command"][-1]],"formal_command")
+        if capture:
+            producer = artifact_json(root,compile_row["compiled_capture"])
+            require(producer.get("schema") == "chio.compiled-dimension-command-production.v2"
+                    and producer.get("dimension") == "formal" and producer.get("label") == name
+                    and producer.get("contract") == {"command":compile_row["command"],"cwd":compile_row["cwd"],
+                        "environment":{},"caller_source":"docs/architecture/recoverable-agent-runtime/model/run.py",
+                        "entry_source":prefix+run["entry"]}
+                    and type(producer.get("actual_exit")) is int and producer["actual_exit"] == 0
+                    and producer.get("completed") is True and producer.get("qualified") is False,
+                    "formal_compilation_producer")
         executable = evidence["executables"][name]
         require(executable["sha256"] == run["executable_sha256"],"formal_executable_binding")
+        if capture:require(type(run.get("executable_size")) is int and run["executable_size"] == executable.get("size"),"formal_executable_binding")
         checked_executable(root,executable)
         output = checked_log(root,{"path":str(base/relative_path(run["output"])),"sha256":run["output_sha256"]})
         logged = checked_log(root,{"path":str(base/relative_path(execute["log"])),"sha256":execute["log_sha256"]})
@@ -2781,7 +3040,7 @@ def audit_formal(root, evidence, candidate, sources, base_commit):
         audit_formal_lane_verdict(tool["tool"],text,data)
         version = checked_log(root,primary["version_log"])
         if tool["tool"] == "kani":
-            require(re.fullmatch(r"cargo-kani 0\.67\.0\s*",version) is not None,"formal_tool_version")
+            audit_kani_tool_version(version)
         else:
             required_version = data.decode("utf-8").strip().removeprefix("leanprover/lean4:v")
             require(re.search(r"\bLean \(version "+re.escape(required_version)+r",",version) is not None,
@@ -2939,6 +3198,7 @@ def audit_live_cohort(root, reference, candidate):
     require(manifest.get("schema") == "chio.recovery-live-corpus.v2"
             and manifest.get("source_inventory_version") == INVENTORY_VERSION
             and manifest.get("provider_endpoint") == PROVIDER_ENDPOINT
+            and manifest.get("source_binding") == candidate
             and binding(manifest["sources"],manifest["base_commit"]) == candidate,"cohort_manifest")
     require(manifest.get("model") == COHORT_MODEL and manifest.get("hosts") == COHORT_HOSTS,
             "cohort_profile")
@@ -2978,8 +3238,19 @@ def audit_live_cohort(root, reference, candidate):
                 and row.get("requested_model") == manifest["model"],"cohort_trial_source")
         require(type(row.get("hidden_retries")) is int and row["hidden_retries"] == 0
                 and type(row.get("tool_actions")) is int and 0 <= row["tool_actions"] <= 8,"cohort_budget")
+        require(row.get("outcome") in ["complete", "completed_with_effects", "waiting_for_approval",
+                    "waiting_for_outcome", "reconciliation_required", "closed_without_effect", "withheld",
+                    "quarantined", "cancel_requested", "cancelled", "refused", "unavailable",
+                    "restart_required", "conflict", "unsupported_profile", "uncovered_mediation",
+                    "probe_expired", "origin_refused", "busy", "projection_too_large",
+                    "invalid_choice", "skipped_tool", "parser_error", "provider_error",
+                    "budget_exhausted", "framework_error", "native_error"],"cohort_outcome")
         attempts = row.get("model_attempts")
         require(isinstance(attempts,list) and len(attempts) <= 4,"cohort_budget")
+        elapsed = row.get("elapsed_seconds")
+        require(type(elapsed) in [int,float] and math.isfinite(elapsed) and elapsed >= 0,"cohort_latency")
+        provider_seconds = 0
+        successful_provider_response = False
         for attempt in attempts:
             require(attempt.get("provider_endpoint") == PROVIDER_ENDPOINT
                     and attempt.get("model") in [None,manifest["model"]],"cohort_provider")
@@ -3001,6 +3272,22 @@ def audit_live_cohort(root, reference, candidate):
             unknown_tokens += int(attempt.get("input_tokens") is None or attempt.get("output_tokens") is None)
             seconds = attempt.get("seconds")
             require(type(seconds) in [int,float] and math.isfinite(seconds) and seconds >= 0,"cohort_latency")
+            # Provider calls are serial. Allow only the public six-place timing
+            # rounding error when joining them to the containing trial.
+            require(seconds <= elapsed + 0.00001,"cohort_latency")
+            provider_seconds += seconds
+            require(math.isfinite(provider_seconds) and provider_seconds <= elapsed + 0.00001,
+                    "cohort_latency")
+            if error is None:
+                completion = attempt.get("completion")
+                require(type(completion) is str
+                        and attempt["output_tokens"] <= budgets["output_tokens"],"cohort_provider_completion")
+                try:
+                    completion_bytes = completion.encode("utf-8")
+                except UnicodeEncodeError:
+                    require(False,"cohort_provider_completion")
+                require(len(completion_bytes) <= budgets["output_bytes"],"cohort_provider_completion")
+                successful_provider_response = successful_provider_response or bool(completion.strip())
         references = retained[row["id"]]
         require(artifact_json(root,references["result"]) == row,"cohort_result_join")
         native = row.get("native")
@@ -3008,9 +3295,13 @@ def audit_live_cohort(root, reference, candidate):
             require(row.get("native_observation") == "unknown","cohort_native_unknown")
             native_unknown += 1
             continue
+        require(type(native) is dict and row.get("native_observation") == "observed",
+                "cohort_native_observation")
         require(artifact_json(root,references["native"]) == native,"cohort_native_join")
         log = checked_log(root,references["native_log"])
-        native_passed = top_level_rust_counts(log) == {"passed":1,"failed":0,"ignored":0} \
+        native_exit = row.get("native_exit_code")
+        require(native_exit is None or type(native_exit) is int,"cohort_native_execution")
+        native_passed = native_exit == 0 and top_level_rust_counts(log) == {"passed":1,"failed":0,"ignored":0} \
             and "live_comparative_native_host" in log
         if native_passed:
             checked_executable(root,references["native_executable"])
@@ -3022,8 +3313,9 @@ def audit_live_cohort(root, reference, candidate):
             require(type(native.get(key)) is int and 0 <= native[key] <= 1000000,"cohort_native_counters")
         require(type(native.get("source_label_retained")) is bool and type(native.get("useful_completion")) is bool,
                 "cohort_native_counters")
-        elapsed = row.get("elapsed_seconds")
-        require(type(elapsed) in [int,float] and math.isfinite(elapsed) and elapsed >= 0,"cohort_latency")
+        require(not native["useful_completion"] or row["tool_actions"] > 0,"cohort_completion_without_action")
+        if row.get("outcome") == "complete":
+            require(successful_provider_response and native["useful_completion"],"cohort_trial_completion")
         failures += int(native["unauthorized_effects"] != 0 or native["duplicate_effects"] != 0
                         or native["source_label_retained"] is not True or not attempts or not native_passed
                         or row.get("native_execution_error") or row.get("native_shutdown_error")
@@ -3134,6 +3426,44 @@ def compiled_subjects(root, record):
         if type(images) is dict:
             for label, image in images.items():
                 subjects["dimension/"+name+"/"+label] = [image]
+        if name == "linux" and "acceptance" in evidence:
+            primary = artifact_json(root,evidence["acceptance"])
+            require(type(images) is dict,"compiled_profile_subjects")
+            for image in [*primary.get("measured_images",[]),primary.get("native_test_executable")]:
+                require(type(image) is dict and type(image.get("path")) is str
+                        and image["path"] in images,"compiled_profile_subjects")
+                retained = images[image["path"]]
+                require(retained.get("sha256") == image.get("sha256")
+                        and retained.get("size") == image.get("size"),"compiled_profile_subjects")
+                subjects["dimension/linux/"+image["path"]] = [{**retained,"original_relative_path":image["path"]}]
+        elif name == "formal" and "architecture" in evidence:
+            architecture = artifact_json(root,evidence["architecture"])
+            commands = {row["name"]:row for row in architecture.get("commands",[])}
+            for run in architecture.get("runs",[]):
+                label = run.get("name")
+                require(type(label) is str and label in images and "compile-"+label in commands,"compiled_profile_subjects")
+                command = commands["compile-"+label]["command"]
+                require(type(command) is list and bool(command) and type(command[-1]) is str,"compiled_profile_subjects")
+                subjects["dimension/formal/"+label] = [{**images[label],"original_path":command[-1]}]
+        elif name == "live_provider" and "cohort_attempts" in evidence:
+            attempts = artifact_json(root,evidence["cohort_attempts"])
+            require(type(attempts) is list and bool(attempts),"compiled_profile_subjects")
+            cohort = artifact_json(root,attempts[-1]["primary"])
+            raw = read_bytes(root/relative_path(cohort["rows"]["path"]))
+            require(hashlib.sha256(raw).hexdigest() == cohort["rows"]["sha256"],"evidence_reference_hash")
+            rows = [json.loads(line,object_pairs_hook=closed_pairs) for line in raw.splitlines() if line.strip()]
+            require(len(rows) == 96 and type(cohort.get("trials")) is dict,"compiled_profile_subjects")
+            native = {}
+            for row in rows:
+                require(type(row) is dict and type(row.get("id")) is str and row["id"] in cohort["trials"]
+                        and type(row.get("native_executable")) is dict,"compiled_profile_subjects")
+                image = cohort["trials"][row["id"]]["native_executable"]
+                observed = row["native_executable"]
+                require(type(observed.get("path")) is str and observed.get("sha256") == image.get("sha256")
+                        and observed.get("size") == image.get("size"),"compiled_profile_subjects")
+                key = (observed["path"],image["sha256"],image["size"])
+                native[key] = {**image,"original_relative_path":observed["path"]}
+            subjects["dimension/live_provider/native-host-library"] = list(native.values())
     return subjects
 
 
@@ -3157,16 +3487,27 @@ def checked_compiled_blob(root, image):
 def compiled_image_custody(root):
     """Keep each retained image and its parents bound through aggregate return."""
     with ExitStack() as descriptors:
+        inputs = descriptors.enter_context(compiler_input_custody())
         originals = {}
+        total_bytes = 0
         def hold(image):
+            nonlocal total_bytes
+            require(type(image) is dict and set(image) == {"path","sha256","size"}
+                    and type(image.get("sha256")) is str
+                    and re.fullmatch(r"[a-f0-9]{64}",image["sha256"])
+                    and type(image.get("size")) is int
+                    and 0 <= image["size"] <= COMPILED_IMAGE_MAX_BYTES,
+                    "compiled_profile_image")
             path = root/relative_path(image["path"])
             expected = image["sha256"],image["size"]
             if path in originals:
                 require(originals[path][0] == expected, "compiled_profile_image")
                 return
-            stream = descriptors.enter_context(regular_input(path))
+            stream = descriptors.enter_context(inputs(path))
             identity = compiler_metadata_identity(os.fstat(stream.fileno()))
             require(identity[3] == image["size"] and identity[-1] == 1, "compiled_profile_image")
+            total_bytes += image["size"]
+            require(total_bytes <= COMPILED_IMAGE_POOL_MAX_BYTES, "compiled_profile_image_budget")
             originals[path] = (expected,identity,stream)
         yield hold
         for path,(expected,identity,stream) in originals.items():
@@ -3201,7 +3542,7 @@ def hold_compiled_profile_references(root, profile, image_custody):
             pending.extend(value)
 
 
-def audit_compilation_scope_data(data, source_binding, repository, namespace, publications, retained):
+def audit_compilation_scope_data(data, source_binding, repository, namespace, publications, retained, retained_raw=None):
     """Join decoded scope data to checked CAS bytes and completed publications."""
     fields = {"schema","scope_path","scope_sha256","configuration","declaration","scope","inventories",
               "command","events","runtime_inventory","source_origin","rows"}
@@ -3223,7 +3564,8 @@ def audit_compilation_scope_data(data, source_binding, repository, namespace, pu
         source_binding, data["command"], str(scope_path.with_name("declaration.json")))
     events = data["events"]
     require(type(events) is dict and set(events) == {"schema","events"}
-            and events["schema"] == "chio.compilation-supervisor-events.v1"
+            and type(events["schema"]) is str
+            and events["schema"] in {"chio.compilation-supervisor-events.v1","chio.compilation-supervisor-events.v2"}
             and type(events["events"]) is list and len(events["events"]) <= 100000, "compiled_profile_linux_dispatch")
     rows = data["rows"]
     require(type(rows) is list and len(rows) <= 100000, "compiled_profile_rows")
@@ -3240,7 +3582,7 @@ def audit_compilation_scope_data(data, source_binding, repository, namespace, pu
         return selected[path.stem]
     joins = audit_compilation_dispatches(Path(namespace),config,declaration,events,subset,read_record,
         lambda _namespace, image:retained(image),
-        lambda path:compilation_canonical(read_record(path))+b"\n")
+        lambda path:compilation_canonical(read_record(path))+b"\n", retained_raw)
     readonly = {}
     for inventory in data["inventories"]:
         for member in inventory["members"]:
@@ -3271,6 +3613,8 @@ def inspect_linux_compiled_profile(linux, request, profile, verified_native_inpu
             "root":{"device":info.st_dev,"inode":info.st_ino,"mode":info.st_mode & 0o7777,"uid":info.st_uid}}
         require(location == expected_location, "compiled_profile_linux_location")
         observed, retained_bytes = {}, 0
+        output_originals = {}
+        observed_directories = {}
         def read_original(path):
             path = Path(compilation_absolute_path(str(path)))
             if path in observed and observed[path][1] is not None:
@@ -3296,6 +3640,25 @@ def inspect_linux_compiled_profile(linux, request, profile, verified_native_inpu
             require(len(raw) == image["size"] and hashlib.sha256(raw).hexdigest() == image["sha256"],
                     "compiled_profile_linux_image")
             return value
+        def retained_output_raw(image):
+            nonlocal retained_bytes
+            path = namespace/image["artifact"]
+            if path in output_originals:
+                raw, _identity, _stream = output_originals[path]
+                require(len(raw) == image["size"] and hashlib.sha256(raw).hexdigest() == image["sha256"],
+                        "compiled_profile_linux_image")
+                return raw
+            stream = held.enter_context(regular_input(path))
+            identity = compiler_metadata_identity(os.fstat(stream.fileno()))
+            require(identity[3] == image["size"] <= 16*1024**2 and identity[-1] == 1,
+                    "compiled_profile_linux_image")
+            retained_bytes += image["size"]
+            require(retained_bytes <= 16*1024**3, "compiled_profile_linux_image")
+            raw = stream.read(16*1024**2+1)
+            require(len(raw) == image["size"] and hashlib.sha256(raw).hexdigest() == image["sha256"],
+                    "compiled_profile_linux_image")
+            output_originals[path] = (raw,identity,stream)
+            return raw
         scope_reports, covered, seen_scopes = [], set(), set()
         publications = profile["publication"]
         require(publications["incomplete_records"] == 0, "compiled_profile_linux_publication")
@@ -3327,7 +3690,9 @@ def inspect_linux_compiled_profile(linux, request, profile, verified_native_inpu
                 "scope":scope,"inventories":[retained(row["inventory"]) for row in declaration["scopes"]],
                 "command":command,"events":events,"runtime_inventory":retained(declaration["runtime_inventory"]),
                 "source_origin":retained(declaration["source_origin"]),"rows":rows}
-            joined = audit_compilation_scope_data(data,request["source_binding"],repository,namespace,publications,retained)
+            joined = audit_compilation_scope_data(data,request["source_binding"],repository,namespace,publications,retained,
+                                                 retained_output_raw)
+            hold_compilation_directory_metadata(data["inventories"],held,observed_directories)
             check_compilation_alias_physical(declaration)
             recorder = config["images"]["recorder"]
             current = {str(repository/source["path"]):source.get("sha256") for source in
@@ -3371,6 +3736,12 @@ def inspect_linux_compiled_profile(linux, request, profile, verified_native_inpu
             require(compiler_metadata_identity(os.fstat(stream.fileno())) == identity
                     and compiler_metadata_identity(os.stat(path,follow_symlinks=False)) == identity,
                     "compiled_profile_linux_changed")
+        for path,(raw,identity,stream) in output_originals.items():
+            require(compiler_metadata_identity(os.fstat(stream.fileno())) == identity
+                    and compiler_metadata_identity(os.stat(path,follow_symlinks=False)) == identity,
+                    "compiled_profile_linux_changed")
+            stream.seek(0)
+            require(stream.read(len(raw)+1) == raw, "compiled_profile_linux_changed")
         require(audit_compiler_publications(namespace,request["source_binding"]) == publications,
                 "compiled_profile_linux_changed")
     return {"schema":"chio.original-linux-compiler-custody-observation.v1","source_location":location,
@@ -3380,7 +3751,7 @@ def inspect_linux_compiled_profile(linux, request, profile, verified_native_inpu
 
 
 def audit_linux_compiled_profile(root, linux, request, report, candidate, sources, base_commit, rows,
-                                  images=None, producer=None, runtime=None):
+                                  images=None, producer=None, runtime=None, dimension_context=None):
     require(type(linux) is dict and set(linux) == {"schema","scopes","primary_probes"}
             and linux["schema"] == "chio.linux-compiled-profile-evidence.v1"
             and type(linux["scopes"]) is list and bool(linux["scopes"])
@@ -3393,7 +3764,8 @@ def audit_linux_compiled_profile(root, linux, request, report, candidate, source
             and report["coverage"] == "completed-original-scope-and-dispatch-record-joins"
             and report["compiled_closure_status"] == "not-established", "compiled_profile_linux_required")
     require(type(images) is dict and producer is not None and runtime is not None, "compiled_profile_linux_required")
-    repository = compilation_absolute_path(artifact_json(root,producer["provenance"]["start"])["repository"])
+    repository = compilation_absolute_path(request["source_location"]["repository"] if dimension_context is not None
+        else artifact_json(root,producer["provenance"]["start"])["repository"])
     namespace = compilation_absolute_path(report["original_namespace"])
     require(report["source_binding"] == runtime["source_binding"] and request["source_location"]["repository"] == str(repository)
             and request["source_location"]["host"].get("system") == "Linux"
@@ -3402,13 +3774,33 @@ def audit_linux_compiled_profile(root, linux, request, report, candidate, source
             "compiled_profile_linux_scope")
     publications = {"records":[{"invocation_id":row["invocation_id"],
         "record_sha256":hashlib.sha256(compilation_canonical(row)+b"\n").hexdigest()} for row in rows]}
-    producer_start = artifact_json(root,producer["provenance"]["start"])
-    launch = audit_compiler_launch(root,producer["provenance"]["compiler_launch"],producer_start["command"],repository,
-        gate_catalog()[producer["id"]],sources,runtime["source_binding"])
+    if dimension_context is None:
+        producer_start = artifact_json(root,producer["provenance"]["start"])
+        launch = audit_compiler_launch(root,producer["provenance"]["compiler_launch"],producer_start["command"],repository,
+            gate_catalog()[producer["id"]],sources,runtime["source_binding"])
+        source_origin = artifact_json(root,producer["provenance"]["source_origin"])
+    else:
+        configuration = artifact_json(root,portable_original_compiler_reference(producer["launch_configuration"],repository))
+        require(configuration.get("candidate") == str(repository) and configuration.get("records") == producer["namespace"]
+                and configuration.get("source_binding") == runtime["source_binding"]
+                and configuration.get("environment") == dimension_context["environment"]
+                and all(configuration.get("images",{}).get(name) == {key:producer["tools"][name][key] for key in ["path","sha256"]}
+                        for name in ["cargo","rustc","python","recorder"]),"compiled_dimension_compiler_context")
+        launch = {"configuration":configuration,"launch":{"command":dimension_context["inner_command"]}}
+        source_origin = artifact_json(root,portable_original_compiler_reference(producer["source_origin"],repository))
     def retained(image):
         require(type(image) is dict and image.get("artifact") == "artifacts/"+image.get("sha256","")
                 and (image.get("sha256"),image.get("size")) in images, "compiled_profile_linux_image")
         return artifact_json(root, images[(image["sha256"],image["size"])])
+    def retained_output_raw(image):
+        require((image["sha256"],image["size"]) in images, "compiled_profile_linux_image")
+        reference = images[(image["sha256"],image["size"])]
+        name = relative_path(reference["path"]).as_posix()
+        require(not secret_source(name), "compiled_profile_linux_image")
+        with regular_input(root/name) as stream:
+            require(os.fstat(stream.fileno()).st_size == image["size"] <= 16*1024**2,
+                    "compiled_profile_linux_image")
+            return stream.read(16*1024**2+1)
     covered,verified_native_inputs = set(),{}
     for reference, original, observed in zip(linux["scopes"],request["scopes"],report["scope_reports"]):
         data = artifact_json(root,reference)
@@ -3419,7 +3811,8 @@ def audit_linux_compiled_profile(root, linux, request, report, candidate, source
                 and data["scope_path"] == observed["scope_path"] == original["scope"]["path"]
                 and data["scope_sha256"] == observed["scope_sha256"] == original["scope"]["sha256"],
                 "compiled_profile_linux_scope")
-        joined = audit_compilation_scope_data(data,runtime["source_binding"],repository,namespace,publications,retained)
+        joined = audit_compilation_scope_data(data,runtime["source_binding"],repository,namespace,publications,retained,
+                                             retained_output_raw)
         require(joined["configuration"] == launch["configuration"] and data["command"] == launch["launch"]["command"],
                 "compiled_profile_compiler_context")
         require(joined["scope_id"] == observed["scope_id"] and joined["unit_ids"] == observed["unit_ids"]
@@ -3429,8 +3822,7 @@ def audit_linux_compiled_profile(root, linux, request, report, candidate, source
         verified_native_inputs.setdefault(joined["scope_id"],set()).update(
             compiler_graph_image(image) for image in joined["readonly"].values()
             if image["role"] in {"toolchain","native-runtime"})
-        require(data["runtime_inventory"] == runtime
-                and data["source_origin"] == artifact_json(root,producer["provenance"]["source_origin"]),
+        require(data["runtime_inventory"] == runtime and data["source_origin"] == source_origin,
                 "compiled_profile_linux_source")
         recorder = joined["configuration"]["images"]["recorder"]
         require(recorder["path"] == str(repository/"scripts/record-rust-compilation.py")
@@ -3460,17 +3852,76 @@ CURRENT_PRIMARY_COMPILER_TOOLS = {
     'run-public-compiler-campaign-current.py':'35735f7d03fa1030155b076cad5fe5e0d66ac653a2458708750aaf09a3a4d26a',
 }
 
+DIRECTORY_PRIMARY_COMPILER_TOOLS = {
+    "consumer/verify_public_compilation_probes.py":"17fb2e3e1d18e7d4733b606095dd454c32d9530d7509d9f07954c4d9654cef9a",
+    "consumer/scope-record-functions.py":"39f6e1477b63751a5730305d75035aa97ba3a8cf8c7f8fcb7c2cfa888afeb94b",
+    "consumer/physical_publication_functions.py":"35274dde491ca572e22d5d44d787f52aaa8f1f13a9d9d40a714fa5cfe6799564",
+    "consumer/probe-observation-functions.py":"8ac9b9822c09e629c81d458207cf8f1b0af8a3161bf81dd045dc9b098172403e",
+    "inventory-collector.py":"0e58111416e15594d7009c77b6a0ae26c24c6e1510f6ccb06603a7901be7adde",
+    "run-public-compiler-campaign-current.py":"35735f7d03fa1030155b076cad5fe5e0d66ac653a2458708750aaf09a3a4d26a",
+}
+
+DESCRIPTOR_CUSTODY_PRIMARY_COMPILER_TOOLS = {
+    "consumer/verify_public_compilation_probes.py":"1733d055922b83c4228646b1e7bc4426d89e425f663c3ea5e0fb3279b88696da",
+    "consumer/scope-record-functions.py":"39f6e1477b63751a5730305d75035aa97ba3a8cf8c7f8fcb7c2cfa888afeb94b",
+    "consumer/physical_publication_functions.py":"35274dde491ca572e22d5d44d787f52aaa8f1f13a9d9d40a714fa5cfe6799564",
+    "consumer/probe-observation-functions.py":"8ac9b9822c09e629c81d458207cf8f1b0af8a3161bf81dd045dc9b098172403e",
+    "inventory-collector.py":"e5cfc57485dcc268d45fba83e588e66c40b6f1386020204106b2a0df9bb9610c",
+    "run-public-compiler-campaign-current.py":"35735f7d03fa1030155b076cad5fe5e0d66ac653a2458708750aaf09a3a4d26a",
+}
+
+SCOPE_DEPENDENCY_PRIMARY_COMPILER_TOOLS = {
+    **DESCRIPTOR_CUSTODY_PRIMARY_COMPILER_TOOLS,
+    "consumer/verify_public_compilation_probes.py":"4cfecc814d8077069efac6e052005ba506d43c9ce2f47fce4f930dcbd1bf5122",
+    "consumer/scope-record-functions.py":"cd1da76e46982c7f8846cb5e3f5526e4dbc2a54afb486a7361a485676f25b1e6",
+}
+
+
+PUBLIC_PAYLOAD_PRIMARY_AUTHORIZATION_SHA = "0658e3dfa7e8a5ecd58a11ccc4842e76275fd055bd57052e063bf238f6908f21"
+PUBLIC_PAYLOAD_PRIMARY_COMPILER_TOOLS = {
+    "consumer/verify_public_compilation_probes.py":"47deea10c5be41a12dd2b4528677623c01999f4a81ae8a50c80d1f25099c0f31",
+    "consumer/scope-record-functions.py":"cd1da76e46982c7f8846cb5e3f5526e4dbc2a54afb486a7361a485676f25b1e6",
+    "consumer/physical_publication_functions.py":"35274dde491ca572e22d5d44d787f52aaa8f1f13a9d9d40a714fa5cfe6799564",
+    "consumer/probe-observation-functions.py":"6137af233bdbbedc245eb5105a8fe381a6981576a81b582c5c5ae8ce73aaa027",
+    "inventory-collector.py":"0ec77f139132a449270a96baf188a49efad057d3d8be3214e118efcb7d34f410",
+    "run-public-compiler-campaign-current.py":"e3b2cca44d42b0487ca604061a30486fdf35402d4bf6bf8f47802c90079fb5cf",
+}
+
+
 def audit_primary_compiler_tools(plan):
     candidate = compilation_absolute_path(plan["candidate"])
-    selected = CURRENT_PRIMARY_COMPILER_TOOLS if plan.get("schema") == "chio.public-linux-primary-plan.v2" else PRIMARY_COMPILER_TOOLS
-    expected = {str(candidate/"target/metadata"/name):digest for name,digest in selected.items()}
+    if plan.get("schema") == "chio.public-linux-primary-plan.v2":
+        authorization = plan.get("authorization_sha256",PRIMARY_AUTHORIZATION_SHA)
+        require(type(authorization) is str and authorization in {PRIMARY_AUTHORIZATION_SHA,
+            PUBLIC_PAYLOAD_PRIMARY_AUTHORIZATION_SHA},"compiled_profile_primary_authorization")
+        if authorization == PUBLIC_PAYLOAD_PRIMARY_AUTHORIZATION_SHA:
+            selected = [PUBLIC_PAYLOAD_PRIMARY_COMPILER_TOOLS]
+        else:
+            selected = [CURRENT_PRIMARY_COMPILER_TOOLS,DIRECTORY_PRIMARY_COMPILER_TOOLS,
+                        DESCRIPTOR_CUSTODY_PRIMARY_COMPILER_TOOLS,SCOPE_DEPENDENCY_PRIMARY_COMPILER_TOOLS]
+    else:selected = [PRIMARY_COMPILER_TOOLS]
+    expected = [{str(candidate/"target/metadata"/name):digest for name,digest in roster.items()} for roster in selected]
     tools = plan.get("tools")
-    require(type(tools) is list and len(tools) == len(expected)
-            and all(type(tool) is dict and set(tool) == {"path","sha256"} for tool in tools),
+    require(type(tools) is list and len(tools) == len(expected[0])
+            and all(type(tool) is dict and set(tool) == {"path","sha256"}
+                    and type(tool["path"]) is str and type(tool["sha256"]) is str
+                    and re.fullmatch(r"[a-f0-9]{64}",tool["sha256"]) for tool in tools),
             "compiled_profile_primary_tool")
     declared = {tool["path"]:tool["sha256"] for tool in tools}
-    require(len(declared) == len(tools) and declared == expected, "compiled_profile_primary_tool")
+    require(len(declared) == len(tools) and any(declared == roster for roster in expected), "compiled_profile_primary_tool")
     return declared
+
+
+def checked_primary_compiler_contract(plan, summary, authorization_raw):
+    """Pair exact approved payload bytes with their reviewed producer tools."""
+    authorization = checked_public_authorization(authorization_raw)
+    authorization_sha = hashlib.sha256(authorization_raw).hexdigest()
+    require(type(plan) is dict and type(summary) is dict
+            and plan.get("schema") == "chio.public-linux-primary-plan.v2"
+            and summary.get("schema") == "chio.public-linux-primary-result.v2"
+            and plan.get("authorization_sha256") == summary.get("authorization_sha256") == authorization_sha,
+            "compiled_profile_primary_authorization")
+    return authorization,audit_primary_compiler_tools(plan),authorization_sha
 
 
 def audit_legacy_primary_compiler_probes(root, reference, sources):
@@ -3624,7 +4075,186 @@ def audit_current_compiled_publication(root,publication,runtime,producer):
     return current_required_sync_observations(publication,checked_log(root,producer["log"]).encode("utf-8"))
 
 
-def audit_compiled_profile(root, profile, candidate, sources, base_commit, image_custody=None):
+def load_compiled_dimension_support(root, reference, sources):
+    """Execute only the maintained, literal-pinned standard-library helper."""
+    expected = next((row.get("sha256") for row in sources
+                     if row.get("path") == "scripts/compiled-dimension-profiles.py"),None)
+    require(type(reference) is dict and set(reference) == {"path","sha256","size"}
+            and type(COMPILED_DIMENSION_TOOL_SHA) is str
+            and re.fullmatch(r"[a-f0-9]{64}",COMPILED_DIMENSION_TOOL_SHA)
+            and reference["sha256"] == expected == COMPILED_DIMENSION_TOOL_SHA
+            and type(reference["size"]) is int and 0 < reference["size"] <= 1024*1024,
+            "compiled_dimension_tool")
+    path = root/relative_path(reference["path"])
+    with regular_input(path) as stream:
+        raw = stream.read(1024*1024+1)
+        require(len(raw) == reference["size"] and hashlib.sha256(raw).hexdigest() == expected,
+                "compiled_dimension_tool")
+        module = types.ModuleType("literal_pinned_compiled_dimension_support")
+        module.__file__ = str(path)
+        exec(compile(raw,str(path),"exec"),module.__dict__)
+    return module
+
+
+def portable_original_compiler_reference(reference, repository):
+    """Map an original input image to the same path in the retained package."""
+    require(type(reference) is dict and set(reference) == {"path","sha256","size"},"compiled_dimension_reference")
+    path,digest,size = compiler_graph_image(reference)
+    path,repository = Path(path),Path(repository)
+    require(path.is_relative_to(repository) and path != repository,"compiled_dimension_reference")
+    return {"path":str(path.relative_to(repository)),"sha256":digest,"size":size}
+
+
+def audit_dimension_compiled_profile(root, profile, candidate, sources, base_commit, image_custody, dimension_records):
+    """Version two joins an owned action to observed and actually used images."""
+    fields = {"schema","source_binding","mode","subjects","producer","runtime_inventory","custody_request",
+        "custody_report","custody_execution","custody_tool","rows","inputs","roots","images","linux",
+        "dimension_binding","subject_export","source_projections","producer_tool"}
+    require(type(profile) is dict and set(profile) == fields and profile["schema"] == "chio.compiled-profile-evidence.v2"
+            and profile["source_binding"] == candidate and type(dimension_records) is dict,
+            "compiled_dimension_profile")
+    hold_compiled_profile_references(root,profile,image_custody)
+    support = load_compiled_dimension_support(root,profile["producer_tool"],sources)
+    owner = profile["dimension_binding"]
+    require(type(owner) is dict and type(owner.get("dimension")) is str
+            and owner["dimension"] in dimension_records,"compiled_dimension_binding")
+    reference = dimension_records[owner["dimension"]]
+    dimension,label = support.checked_dimension_binding(owner,reference)
+    artifact_json(root,reference)
+    producer = artifact_json(root,profile["producer"])
+    require(type(producer) is dict and producer.get("dimension") == dimension and producer.get("label") == label,
+            "compiled_dimension_producer")
+    runtime = artifact_json(root,profile["runtime_inventory"])
+    require(type(runtime) is dict and set(runtime) == {"source_inventory_version","base_commit","sources","source_binding"}
+            and runtime["source_inventory_version"] == INVENTORY_VERSION and runtime["sources"] == sources
+            and runtime["source_binding"] == binding(sources,runtime["base_commit"]),"compiled_profile_source")
+    request = artifact_json(root,profile["custody_request"])
+    require(type(request) is dict and set(request) == {"schema","namespace","repository","runtime_inventory",
+        "source_binding","roots","additional_inputs","selected_invocation_ids","mode","linux","producer",
+        "subject_observation","source_projections"}
+        and request["schema"] == "chio.compiler-profile-custody-request.v2","compiled_profile_custody_request")
+    repository = Path(compilation_absolute_path(request["repository"]))
+    options_ref = portable_original_compiler_reference(producer["options"],repository)
+    options = artifact_json(root,options_ref)
+    context = support.checked_producer_record(producer,runtime,repository,options,
+        checked_log(root,producer["toolchain_probe"]["stdout"]))
+    require(profile["mode"] == request["mode"] == context["mode"]
+            and request["namespace"] == producer["namespace"] and request["source_binding"] == runtime["source_binding"]
+            and profile["runtime_inventory"] == producer["runtime_inventory_before"]
+            and artifact_json(root,producer["runtime_inventory_before"]) == runtime
+            and artifact_json(root,producer["runtime_inventory_after"]) == runtime,"compiled_dimension_source")
+    if producer["source_origin"] is not None:
+        origin = artifact_json(root,portable_original_compiler_reference(producer["source_origin"],repository))
+        receipt = audit_source_origin(root,origin,sources,base_commit,candidate)
+        require(receipt["candidate"] == str(repository) and runtime["base_commit"] is None,"compiled_dimension_source")
+    else:require(runtime["base_commit"] == base_commit,"compiled_dimension_source")
+    for name,path in {"helper":"scripts/compiled-dimension-profiles.py","inspector":"scripts/verify-recovery-qualification.py",
+                      "recorder":"scripts/record-rust-compilation.py"}.items():
+        tool = producer["tools"][name]
+        expected = next((row.get("sha256") for row in sources if row["path"] == path),None)
+        require(tool["path"] == str(repository/path) and tool["sha256"] == expected,"compiled_dimension_tool")
+    require(request["producer"] == {**profile["producer"],"path":str(repository/relative_path(profile["producer"]["path"]))},
+            "compiled_dimension_producer")
+    report = artifact_json(root,profile["custody_report"])
+    report_fields = {"schema","request_sha256","request_path","namespace","repository","source_binding",
+        "runtime_inventory_binding","mode","profile","linux","host","qualified","producer_sha256",
+        "subject_observation","source_projections"}
+    require(type(report) is dict and set(report) == report_fields
+            and report["schema"] == "chio.compiler-profile-custody-observation.v2" and report["qualified"] is False
+            and report["request_sha256"] == profile["custody_request"]["sha256"]
+            and report["request_path"] == str(repository/relative_path(profile["custody_request"]["path"]))
+            and report["producer_sha256"] == profile["producer"]["sha256"]
+            and report["namespace"] == request["namespace"] and report["repository"] == str(repository)
+            and report["source_binding"] == report["runtime_inventory_binding"] == runtime["source_binding"]
+            and report["mode"] == profile["mode"] and report["subject_observation"] == request["subject_observation"]
+            and report["source_projections"] == request["source_projections"] == profile["source_projections"],
+            "compiled_dimension_custody")
+    execution = artifact_json(root,profile["custody_execution"])
+    require(type(execution) is dict and set(execution) == {"schema","command","cwd","actual_exit","stdout","stderr",
+        "runtime_inventory_before","runtime_inventory_after","tool","request","qualified"}
+        and execution["schema"] == "chio.compiled-dimension-inspector-execution.v2"
+        and type(execution["actual_exit"]) is int and execution["actual_exit"] == 0 and execution["qualified"] is False
+        and execution["cwd"] == str(repository) and execution["tool"] == producer["tools"]["inspector"]
+        and execution["request"] == profile["custody_request"]
+        and execution["command"] == [producer["tools"]["python"]["path"],"-I","-B",
+            producer["tools"]["inspector"]["path"],"--compiler-profile-request",report["request_path"]]
+        and artifact_json(root,execution["runtime_inventory_before"]) == runtime
+        and artifact_json(root,execution["runtime_inventory_after"]) == runtime,"compiled_dimension_custody_execution")
+    output = checked_log(root,execution["stdout"]);checked_log(root,execution["stderr"])
+    prefix = "COMPILER_PROFILE_CUSTODY "
+    observations = [json.loads(line[len(prefix):],object_pairs_hook=closed_pairs)
+                    for line in output.splitlines() if line.startswith(prefix)]
+    require(observations == [report],"compiled_dimension_custody_execution")
+    tool = profile["custody_tool"]
+    require(tool["sha256"] == producer["tools"]["inspector"]["sha256"] == sha(Path(__file__)),"compiled_profile_inspector")
+    rows = artifact_json(root,profile["rows"])
+    subject = support.checked_subject_observation(request["subject_observation"],rows)
+    require(request["subject_observation"]["dimension"] == dimension and request["subject_observation"]["label"] == label
+            and profile["subjects"] == request["subject_observation"]["produced_subjects"],"compiled_dimension_subjects")
+    exported = support.export_dimension_bindings(owner,reference,rows,profile["subjects"],
+        request["subject_observation"]["executed_subjects"],request["subject_observation"]["copy_custody"])
+    require(profile["subject_export"] == exported,"compiled_dimension_subjects")
+    observed = report["profile"]
+    require(observed.get("schema") == "chio.original-compiler-profile-verification.v1"
+            and observed.get("coverage") == "original-publication-and-current-declared-source-unit-graph"
+            and observed.get("source_binding") == runtime["source_binding"]
+            and observed.get("runtime_inventory_binding") == runtime["source_binding"]
+            and observed.get("repository") == str(repository),"compiled_dimension_custody")
+    publication = observed["publication"]
+    require(type(publication) is dict and type(publication.get("records")) is list,"compiled_profile_rows")
+    published = {row["invocation_id"]:row for row in publication["records"]}
+    identifiers = [row["invocation_id"] for row in rows]
+    require(len(published) == len(publication["records"]) and identifiers == request["selected_invocation_ids"]
+            == observed["selected_invocation_ids"] and len(set(identifiers)) == len(identifiers)
+            and set(identifiers) == set(published),"compiled_profile_rows")
+    by_image = {}
+    require(type(profile["images"]) is list and 0 < len(profile["images"]) <= 200000,"compiled_profile_images")
+    for image in profile["images"]:
+        checked_compiled_blob(root,image);image_custody(image)
+        key = image["sha256"],image["size"]
+        require(key not in by_image,"compiled_profile_images");by_image[key] = image
+    for row in rows:
+        require(row.get("source_binding") == runtime["source_binding"] and hashlib.sha256(compilation_canonical(row)+b"\n").hexdigest()
+                == published[row["invocation_id"]]["record_sha256"],"compiled_profile_rows")
+        for image in [*row["inputs"],*row["outputs"],row["compiler"]]:
+            require((image.get("sha256"),image.get("size")) in by_image,"compiled_profile_images")
+        require(row["compiler"]["sha256"] == producer["tools"]["rustc"]["sha256"],"compiled_dimension_toolchain")
+    inputs,roots = profile["inputs"],profile["roots"]
+    require(type(inputs) is list and len(inputs) <= 200000 and type(roots) is list and bool(roots)
+            and roots == request["roots"] and request["additional_inputs"] == [image for image in inputs if image["role"] != "candidate"],
+            "compiled_profile_inputs")
+    if dimension == "formal":
+        projection_inputs = support.checked_source_projections(profile["source_projections"],sources,repository,producer["contract"]["cwd"])
+        require(all(image in inputs for image in projection_inputs),"compiled_dimension_projection")
+    else:require(profile["source_projections"] == [],"compiled_dimension_projection")
+    current = {str(repository/source["path"]):source["sha256"] for source in sources if "sha256" in source}
+    for image in inputs:
+        name,digest,size = compiler_graph_image(image)
+        require((digest,size) in by_image,"compiled_profile_images")
+        if image["role"] == "candidate":require(current.get(name) == digest,"compiled_profile_source")
+        elif image["role"] == "campaign-produced":
+            require(Path(name).is_relative_to(repository/"target"),"compiled_profile_inputs")
+        else:require(image["role"] in {"vendor","toolchain","native-runtime"},"compiled_profile_inputs")
+    if profile["mode"] == "host-trusted-fresh":
+        require(profile["linux"] is None and request["linux"] is None and report["linux"] is None
+                and report["host"].get("system") != "Linux","compiled_profile_mode")
+        native = None
+    else:
+        # Native version two uses its own finite command producer. The gate
+        # catalogue cannot supply a surrogate dimension action.
+        native = audit_linux_compiled_profile(root,profile["linux"],request["linux"],report["linux"],candidate,
+            sources,base_commit,rows,by_image,producer,runtime,dimension_context=context)
+    graph = audit_compiler_unit_graph(rows,inputs,roots,compiler_immutable_externs(rows,inputs,native))
+    require(graph == observed["unit_graph"],"compiled_profile_graph")
+    require(all(compiler_graph_image(image) in {compiler_graph_image(root) for root in roots}
+                for images in profile["subjects"].values() for image in images),"compiled_profile_roots")
+    audit_current_compiled_publication(root,publication,runtime,producer)
+    return {"subjects":request["subject_observation"]["executed_subjects"],"roots":{compiler_graph_image(image) for image in roots},
+        "graph":graph,"mode":profile["mode"],"dimension":dimension,"repository":str(repository),
+        "coverage":"owning-dimension-action-and-original-produced-to-executed-image-custody"}
+
+
+def audit_compiled_profile(root, profile, candidate, sources, base_commit, image_custody=None, dimension_records=None):
     """Recompute exported graph and joins to actual original custody execution.
 
     Physical namespace checks occur in the pinned inspector's retained actual
@@ -3633,7 +4263,9 @@ def audit_compiled_profile(root, profile, candidate, sources, base_commit, image
     """
     if image_custody is None:
         with compiled_image_custody(root) as hold:
-            return audit_compiled_profile(root,profile,candidate,sources,base_commit,hold)
+            return audit_compiled_profile(root,profile,candidate,sources,base_commit,hold,dimension_records)
+    if type(profile) is dict and profile.get("schema") == "chio.compiled-profile-evidence.v2":
+        return audit_dimension_compiled_profile(root,profile,candidate,sources,base_commit,image_custody,dimension_records)
     fields = {"schema", "source_binding", "mode", "subjects", "producer", "runtime_inventory",
               "custody_request", "custody_report", "custody_execution", "custody_tool", "rows",
               "inputs", "roots", "images", "linux"}
@@ -3656,8 +4288,10 @@ def audit_compiled_profile(root, profile, candidate, sources, base_commit, image
                     and producer["id"] == name.removeprefix("performance/")+"-performance",
                     "compiled_profile_producer_subject")
         else:
-            require(re.fullmatch(r"dimension/(?:linux|formal|live_provider)/[A-Za-z0-9_.-]+",name) is not None,
-                    "compiled_profile_subjects")
+            # This version records one supported Cargo producer. Dimension
+            # runners do not yet supply that producer contract, so a gate's
+            # compilation cannot manufacture their independent image custody.
+            require(False,"compiled_profile_producer_subject")
     audit_gate(root, producer, candidate)
     audit_execution_provenance(root, producer, sources, base_commit)
     producer_start = artifact_json(root, producer["provenance"]["start"])
@@ -3810,7 +4444,8 @@ def audit_compiled_profiles(root, record, candidate, sources, base_commit, image
     reports = []
     for reference in references:
         hold_compiled_profile_references(root,reference,image_custody)
-        report = audit_compiled_profile(root, artifact_json(root,reference), candidate, sources, base_commit,image_custody)
+        report = audit_compiled_profile(root, artifact_json(root,reference), candidate, sources, base_commit,image_custody,
+                                        record.get("dimension_records",{}))
         for name, images in report["subjects"].items():
             require(name in expected and name not in claimed, "compiled_profile_subjects")
             required = expected[name]
@@ -3820,6 +4455,13 @@ def audit_compiled_profiles(root, record, candidate, sources, base_commit, image
                 require(type(image) is dict and type(image.get("size")) is int
                         and any(root[1:] == (image.get("sha256"),image["size"])
                                 for root in subject_images), "compiled_profile_roots")
+                if "dimension" in report:
+                    original = image.get("original_path")
+                    if original is None and "original_relative_path" in image:
+                        original = str(Path(report["repository"])/relative_path(image["original_relative_path"]))
+                    require(type(original) is str and any(observed[0] == original
+                            and observed[1:] == (image["sha256"],image["size"]) for observed in subject_images),
+                            "compiled_dimension_executed_subject")
             claimed[name] = images
         reports.append(report)
     require(bool(expected) and set(claimed) == set(expected), "compiled_profile_subjects")
@@ -3841,8 +4483,10 @@ def inspect_compiler_profile_request(request_path):
         request = json.loads(raw, object_pairs_hook=closed_pairs)
         fields = {"schema", "namespace", "repository", "runtime_inventory", "source_binding", "roots",
                   "additional_inputs", "selected_invocation_ids", "mode", "linux"}
+        dimension_request = type(request) is dict and request.get("schema") == "chio.compiler-profile-custody-request.v2"
+        if dimension_request:fields |= {"producer","subject_observation","source_projections"}
         require(type(request) is dict and set(request) == fields
-                and request["schema"] == "chio.compiler-profile-custody-request.v1"
+                and request["schema"] in {"chio.compiler-profile-custody-request.v1","chio.compiler-profile-custody-request.v2"}
                 and request["mode"] in {"host-trusted-fresh", "linux-enforced"}, "compiled_profile_custody_request")
         repository = compilation_absolute_path(request["repository"])
         namespace = compilation_absolute_path(request["namespace"])
@@ -3865,6 +4509,69 @@ def inspect_compiler_profile_request(request_path):
         extra = request["additional_inputs"]
         require(type(extra) is list and len(extra) <= 200000, "compiled_profile_inputs")
         retained_originals = []
+        producer_sha = None
+        if dimension_request:
+            own_sources = inventory["sources"]
+            helper_path = repository/"scripts/compiled-dimension-profiles.py"
+            helper_sha = next((row.get("sha256") for row in own_sources
+                               if row["path"] == "scripts/compiled-dimension-profiles.py"),None)
+            require(helper_sha == COMPILED_DIMENSION_TOOL_SHA and re.fullmatch(r"[a-f0-9]{64}",helper_sha or ""),
+                    "compiled_dimension_tool")
+            helper_stream = originals.enter_context(regular_input(helper_path))
+            helper_identity = compiler_metadata_identity(os.fstat(helper_stream.fileno()))
+            helper_raw = helper_stream.read(1024*1024+1)
+            require(0 < len(helper_raw) <= 1024*1024 and hashlib.sha256(helper_raw).hexdigest() == helper_sha,
+                    "compiled_dimension_tool")
+            support = types.ModuleType("original_literal_pinned_dimension_support")
+            support.__file__ = str(helper_path)
+            exec(compile(helper_raw,str(helper_path),"exec"),support.__dict__)
+            retained_originals.append((helper_path,helper_identity,helper_stream))
+            def original_image(reference):
+                path,digest,size = compiler_graph_image(reference)
+                require(not secret_source(path.lstrip("/")),"compiled_profile_input_policy")
+                stream = originals.enter_context(regular_input(Path(path)))
+                identity = compiler_metadata_identity(os.fstat(stream.fileno()))
+                require(identity[3] == size <= 16*1024**2 and identity[-1] == 1,"compiled_dimension_input")
+                body = stream.read(16*1024**2+1)
+                require(len(body) == size and hashlib.sha256(body).hexdigest() == digest,"compiled_dimension_input")
+                retained_originals.append((Path(path),identity,stream))
+                return body
+            producer_raw = original_image(request["producer"])
+            producer_sha = hashlib.sha256(producer_raw).hexdigest()
+            producer = json.loads(producer_raw,object_pairs_hook=closed_pairs,
+                parse_constant=lambda _:require(False,"nonfinite_json_number"))
+            options = json.loads(original_image(producer["options"]),object_pairs_hook=closed_pairs,
+                parse_constant=lambda _:require(False,"nonfinite_json_number"))
+            version_reference = producer["toolchain_probe"]["stdout"]
+            version = original_image({**version_reference,"path":str(repository/relative_path(version_reference["path"]))})
+            context = support.checked_producer_record(producer,inventory,repository,options,version.decode("ascii"))
+            require(context["mode"] == request["mode"] and producer["namespace"] == str(namespace),"compiled_dimension_producer")
+            for key in ["runtime_inventory_before","runtime_inventory_after"]:
+                reference = producer[key]
+                actual_inventory = json.loads(original_image({**reference,"path":str(repository/relative_path(reference["path"]))}),
+                    object_pairs_hook=closed_pairs,parse_constant=lambda _:require(False,"nonfinite_json_number"))
+                require(actual_inventory == inventory,"compiled_dimension_source")
+            for key in ["helper","inspector","recorder","cargo","rustc","python"]:
+                image = producer["tools"][key]
+                name,digest,size = compiler_graph_image(image)
+                require(not secret_source(name.lstrip("/")),"compiled_profile_input_policy")
+                held = originals.enter_context(regular_input(Path(name)))
+                before = compiler_metadata_identity(os.fstat(held.fileno()))
+                require(before[3] == size and before[-1] == 1,"compiled_dimension_tool")
+                tool_digest = hashlib.sha256()
+                for block in iter(lambda:held.read(1024*1024),b""):tool_digest.update(block)
+                require(tool_digest.hexdigest() == digest,"compiled_dimension_tool")
+                retained_originals.append((Path(name),before,held))
+            if producer["dimension"] == "formal":
+                projection_inputs = support.checked_source_projections(request["source_projections"],inventory["sources"],
+                    repository,producer["contract"]["cwd"])
+                require(all(image in request["additional_inputs"] for image in projection_inputs),"compiled_dimension_projection")
+                for receipt in request["source_projections"]:
+                    for key in ["source","captured"]:
+                        original_image(receipt[key])
+                        require(compiler_metadata_identity(os.stat(receipt[key]["path"],follow_symlinks=False))
+                                == tuple(receipt[key+"_identity"]),"compiled_dimension_projection")
+            else:require(request["source_projections"] == [],"compiled_dimension_projection")
         for image in extra:
             name, digest, size = compiler_graph_image(image)
             require(not secret_source(name.lstrip("/")), "compiled_profile_input_policy")
@@ -3886,6 +4593,30 @@ def inspect_compiler_profile_request(request_path):
             verified_native_inputs,linux = None,None
         profile = audit_compiler_profile_namespace(namespace, repository, inventory, request["source_binding"],
             request["roots"], extra, request["selected_invocation_ids"],verified_native_inputs)
+        if dimension_request:
+            require(set(request["selected_invocation_ids"]) == {row["invocation_id"] for row in profile["publication"]["records"]},
+                    "compiled_dimension_rows")
+            rows = [read_json(Path(namespace)/"records"/(identifier+".json")) for identifier in profile["selected_invocation_ids"]]
+            support.checked_subject_observation(request["subject_observation"],rows)
+            require(request["subject_observation"]["dimension"] == producer["dimension"]
+                    and request["subject_observation"]["label"] == producer["label"],"compiled_dimension_subjects")
+            for images in request["subject_observation"]["executed_subjects"].values():
+                for image in images:
+                    path,digest,size = compiler_graph_image(image)
+                    require(Path(path).is_relative_to(repository/"target") and not Path(path).is_relative_to(namespace),
+                            "compiled_dimension_subjects")
+                    held = originals.enter_context(regular_input(Path(path)))
+                    identity = compiler_metadata_identity(os.fstat(held.fileno()))
+                    require(identity[3] == size and identity[-1] == 1 and identity[2] & 0o111,"compiled_dimension_subjects")
+                    actual_digest = hashlib.sha256()
+                    for block in iter(lambda:held.read(1024*1024),b""):actual_digest.update(block)
+                    require(actual_digest.hexdigest() == digest,"compiled_dimension_subjects")
+                    retained_originals.append((Path(path),identity,held))
+            for receipt in request["subject_observation"]["copy_custody"]:
+                for key in ["source","destination"]:
+                    path = receipt[key]["path"]
+                    require(compiler_metadata_identity(os.stat(path,follow_symlinks=False)) == tuple(receipt[key+"_identity"]),
+                            "compiled_dimension_copy")
         for image in request["roots"]:
             name, digest, size = compiler_graph_image(image)
             require(not secret_source(name.lstrip("/")), "compiled_profile_input_policy")
@@ -3908,10 +4639,14 @@ def inspect_compiler_profile_request(request_path):
         require(compiler_metadata_identity(os.fstat(stream.fileno())) == metadata
                 and compiler_metadata_identity(os.stat(request_path,follow_symlinks=False)) == metadata,
                 "compiled_profile_custody_request")
-    return {"schema":"chio.compiler-profile-custody-observation.v1", "request_path":str(request_path),
+    observation = {"schema":"chio.compiler-profile-custody-observation.v2" if dimension_request else "chio.compiler-profile-custody-observation.v1", "request_path":str(request_path),
         "request_sha256":hashlib.sha256(raw).hexdigest(), "namespace":str(namespace), "repository":str(repository),
         "source_binding":request["source_binding"], "runtime_inventory_binding":inventory["source_binding"],
         "mode":request["mode"], "profile":profile, "linux":linux, "host":host, "qualified":False}
+    if dimension_request:
+        observation.update(producer_sha256=producer_sha,subject_observation=request["subject_observation"],
+                           source_projections=request["source_projections"])
+    return observation
 
 
 def audit_record(root, record, expected_seal=None, source_root=None):
@@ -4072,7 +4807,8 @@ AUTHORIZATION_SHA = "90659258cf73681a01780b0e83018bd418b1cbf3207fa29c2e0454af0a5
 
 def checked_public_authorization(raw):
     require(type(raw) is bytes and len(raw) <= 16*1024
-            and hashlib.sha256(raw).hexdigest() == AUTHORIZATION_SHA, "micro_primary_authorization")
+            and hashlib.sha256(raw).hexdigest() in {AUTHORIZATION_SHA,PUBLIC_PAYLOAD_PRIMARY_AUTHORIZATION_SHA},
+            "micro_primary_authorization")
     value = json.loads(raw, object_pairs_hook=closed_pairs,
                        parse_constant=lambda _:require(False,"micro_primary_authorization"))
     require(value["schema"] == "chio.public-linux-primary-authorization.v1", "micro_primary_authorization")
@@ -4255,14 +4991,7 @@ def audit_current_primary_compiler_probes(root, reference, sources):
     plan,summary,dispatch = (artifact_json(root,evidence[key]) for key in ["plan","summary","dispatch_start"])
     require(all(type(value) is dict for value in [plan,summary,dispatch]),"compiled_profile_primary_record")
     authorization_raw = current_primary_bytes(root,evidence["authorization"])
-    require(hashlib.sha256(authorization_raw).hexdigest() == PRIMARY_AUTHORIZATION_SHA,
-            "compiled_profile_primary_authorization")
-    authorization = checked_public_authorization(authorization_raw)
-    require(plan.get("schema") == "chio.public-linux-primary-plan.v2"
-            and summary.get("schema") == "chio.public-linux-primary-result.v2"
-            and plan.get("authorization_sha256") == summary.get("authorization_sha256") == PRIMARY_AUTHORIZATION_SHA,
-            "compiled_profile_primary_authorization")
-    tools = audit_primary_compiler_tools(plan)
+    authorization,tools,authorization_sha = checked_primary_compiler_contract(plan,summary,authorization_raw)
     caps = {"total_seconds":900,"ordinary_seconds":120,"compiler_seconds":180,"retry":False}
     elapsed = summary.get("elapsed_from_first_dispatch_seconds")
     require(same_compilation_json(plan.get("caps"),caps) and same_compilation_json(summary.get("caps"),caps)
@@ -4336,7 +5065,7 @@ def audit_current_primary_compiler_probes(root, reference, sources):
     require(start["repository"] == str(candidate), "compiled_profile_primary_controller")
     expected_pins = [("compiler-primary-controller",str(original_controller),controller["sha256"]),
         ("compiler-primary-plan",str(original_plan),evidence["plan"]["sha256"]),
-        ("compiler-primary-authorization",str(original_authorization),PRIMARY_AUTHORIZATION_SHA),
+        ("compiler-primary-authorization",str(original_authorization),authorization_sha),
         *(("compiler-primary-tool",path,digest) for path,digest in tools.items())]
     for name in ["before","after"]:
         pins = artifact_json(root,execution["provenance"][name]).get("explicit_file_pins",[])
@@ -4417,7 +5146,7 @@ def audit_current_primary_compiler_probes(root, reference, sources):
                 and original.get("source_binding") == micro_binding and original.get("scope_path") == str(scope_path)
                 and original.get("original_namespace") == str(candidate/"target/records"/case["name"])
                 and type(original["scope_id"]) is str and re.fullmatch(r"[a-f0-9]{64}",original["scope_id"])
-                and original.get("authorization_sha256") == PRIMARY_AUTHORIZATION_SHA
+                and original.get("authorization_sha256") == authorization_sha
                 and original.get("coverage") == "original-namespace-public-microprobe-record-joins-only"
                 and original["primary_probe_result_coverage"] == "separate actual whole controller execution required"
                 and same_compilation_json(original.get("launcher_observation"),ref)
@@ -4443,8 +5172,12 @@ def audit_current_primary_compiler_probes(root, reference, sources):
         successful = [value for value in sync["unit_outcomes"].values()
                       if value["record_status"] == "success" and type(value["compiler_exit"]) is int
                          and value["compiler_exit"] == 0]
+        compiled_from_units = checked_public_compilation_count({
+            "records":[{"invocation_id":identifier,"kind":value["kind"],"status":value["record_status"]}
+                       for identifier,value in sync["unit_outcomes"].items()],
+            "unit_publications":sync["unit_outcomes"]},case["name"])
         require(original["verified_dispatches"] == len(successful)
-                and original["verified_compilations"] == sum(value["kind"] == "compilation" for value in successful),
+                and original["verified_compilations"] == compiled_from_units,
                 "compiled_profile_primary_observation")
         checked_log(root,case["original_audit_stderr"])
     return {"case_count":len(cases),"coverage":"actual-primary-public-native-probe-executions"}

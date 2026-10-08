@@ -68,6 +68,9 @@ impl ChioKernel {
                 .retained_request
                 .as_ref()
                 .map(|original| original.authority_profile()),
+            admission
+                .original_retained_request()
+                .and_then(|original| original.native_output_retention()),
         )?;
         if &recovered_request_hash != admission.operation.binding().immutable_request_hash() {
             return Err(super::super::recovery::failure::item_failure(

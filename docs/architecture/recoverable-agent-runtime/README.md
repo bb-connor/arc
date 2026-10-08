@@ -28,7 +28,11 @@ The first deliverable is a private support ticket converted into one owner-appro
 
 From the development checkout root, run `python3 docs/architecture/recoverable-agent-runtime/check.py --source-revision de84fc306` to verify document traceability, local links and the architecture's historical source inputs after implementation begins. Omitting `--source-revision` checks the working tree and rejects source/build-input drift from the architecture baseline. Historical validation reports its explicit revision and does not qualify the changed implementation. The [model instructions](model/README.md) reproduce the separate Rust protocol exploration. The validator checks retained model and foundation-test evidence; it does not compile or rerun either itself.
 
+The [current source notes](implementation/current-source-anchors.md) correct renamed phase references and advisory claim meanings; these source-only corrections do not establish qualification.
 The current implementation state is [remediation and pending requalification](implementation/STATUS.md).
+The [current reproduction overlay](implementation/current-reproduction.md) separates
+current source names and command declarations from archived package audits, including
+the two documented P6 metadata redactions.
 The P0-P6 implementation is present. Phase completion and review closure in the
 retained records apply to their exact source inventories and declared profiles,
 which precede the naming cleanup and current runtime repairs. They do not

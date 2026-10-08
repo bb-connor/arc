@@ -53,8 +53,12 @@ mod native_egress;
 mod native_output;
 #[path = "admission_coordinator/payment_compensation.rs"]
 mod payment_compensation;
+#[path = "admission_coordinator/output_retention.rs"]
+mod output_retention;
 #[path = "admission_coordinator/payment_journal.rs"]
 mod payment_journal;
+#[path = "admission_coordinator/process_return_participant.rs"]
+mod process_return_participant;
 pub use native_output::NativeSecurityOutputJoinAuthority;
 #[path = "admission_coordinator/recovery.rs"]
 mod recovery;
@@ -492,13 +496,15 @@ fn immutable_tool_admission_request_hash(
     post_return_plan: &DurablePostReturnPlan,
     security_binding: Option<&crate::admission_operation::AdmissionSecurityBindingV1>,
     authority_profile: Option<&crate::admission_operation::AdmissionAuthorityProfileV1>,
+    native_output_retention: Option<&crate::admission_operation::NativeOutputRetentionProfileV1>,
 ) -> Result<AdmissionDigest, KernelError> {
-    crate::admission_operation::immutable_tool_request_hash_with_profile(
+    crate::admission_operation::immutable_tool_request_hash_with_output_retention(
         request,
         matching_grants,
         &post_return_plan.frozen_steps,
         security_binding,
         authority_profile,
+        native_output_retention,
     )
     .map_err(durable_store_error)
 }
@@ -733,7 +739,15 @@ impl ChioKernel {
                 "admission store lacks atomic terminal tool-outcome projection support".to_owned(),
             ));
         }
-        let post_return_plan = self.durable_post_return_plan()?;
+        // A safe Input-only denial may precede capture. Missing selection stays
+        // explicit here and is refused at the actual native capture boundary.
+        let native_output_retention = if native_security_selected {
+            self.native_output_retention.as_deref()
+        } else {
+            None
+        };
+        let post_return_plan =
+            self.durable_post_return_plan_for_fresh_native_profile(native_output_retention)?;
 
         let supplemental_authorization_artifact_digest = request
             .supplemental_authorization
@@ -753,6 +767,7 @@ impl ChioKernel {
             &post_return_plan,
             security_binding.as_ref(),
             authority_profile.as_ref(),
+            native_output_retention,
         )?;
         let action =
             ToolCallAction::from_parameters(request.arguments.clone()).map_err(|error| {
@@ -834,12 +849,13 @@ impl ChioKernel {
         let retained_request = authority_profile
             .as_ref()
             .map(|profile| {
-                crate::admission_operation::RetainedToolAdmissionRequestV1::from_admission(
+                crate::admission_operation::RetainedToolAdmissionRequestV1::from_admission_with_output_retention(
                     request,
                     matching_grants,
                     &post_return_plan.frozen_steps,
                     security_binding.as_ref(),
                     profile,
+                    native_output_retention,
                 )
             })
             .transpose()

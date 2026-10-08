@@ -260,7 +260,12 @@ impl SqliteAdmissionOperationStore {
                 return Err(refused("recipient revoked"));
             }
             let artifact = artifact(&tx, &retained.artifact)?;
-            require_current_artifact(&artifact, profile)?;
+            let basis = require_current_artifact(&artifact, profile);
+            #[cfg(feature = "admission-test-support")]
+            super::release_basis_observation::record_artifact_release_basis(
+                actor, request, &artifact, profile, &basis,
+            );
+            basis?;
             if artifact.seal.as_ref() != Some(seal) {
                 return Err(refused("exact bytes changed"));
             }
@@ -347,6 +352,7 @@ impl SqliteAdmissionOperationStore {
             };
             let key = release_key(actor, request)?;
             save(&tx, &self.serving_owner, actor.scope(), &key, &retained)?;
+            super::reference_custody::retain_release_references(&tx, &self.serving_owner, &key)?;
             Ok((tx, intent))
         })
     }
@@ -388,6 +394,13 @@ impl SqliteAdmissionOperationStore {
             {
                 record.intent.state = next;
                 save(&tx, &self.serving_owner, actor.scope(), &key, &record)?;
+                if next == ArtifactDeliveryStateV1::Delivered {
+                    super::reference_retirement::retire_release_references(
+                        &tx,
+                        &self.serving_owner,
+                        &key,
+                    )?;
+                }
             }
             Ok((tx, ()))
         })
@@ -405,7 +418,7 @@ fn require_current_artifact(
     Ok(())
 }
 pub(super) fn pins(
-    tx: &Transaction<'_>,
+    tx: &Connection,
     key: &str,
     reference: &ArtifactVersionRefV1,
 ) -> Result<bool, AdmissionOperationStoreError> {

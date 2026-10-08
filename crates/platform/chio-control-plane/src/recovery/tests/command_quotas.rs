@@ -617,6 +617,27 @@ async fn recovery_inspection_keeps_command_and_event_capacity() -> TestResult {
         assert_eq!(recovery_commands(&fixture)?, commands_before);
         assert_eq!(fixture.record(&workflow)?.revision, revision);
         assert_eq!(external_count(&fixture.path)?, 0);
+        diagnostics.phase("actual native capture after authority-sized status polling");
+        require_live_quota_capability("control capability", &fixture.control)?;
+        require_live_workflow_seed(&fixture, &workflow)?;
+        fixture
+            .execute(
+                "native-effect-after-status-polling",
+                RecoveryCommandBodyV1::ResumeWorkflow {
+                    workflow_id: workflow.clone(),
+                    expected_revision: revision,
+                },
+            )
+            .await?;
+        let current = fixture.record(&workflow)?;
+        assert!(current.captured);
+        assert!(current.effect.is_settled());
+        assert_eq!(current.effect.applied_effects(), Some(SafeInteger::new(1)?));
+        assert!(matches!(
+            current.release,
+            ReleaseDispositionV1::Released { .. }
+        ));
+        assert_eq!(external_count(&fixture.path)?, 1);
         Ok(())
     })
     .await;

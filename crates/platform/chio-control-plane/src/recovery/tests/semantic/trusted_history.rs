@@ -5,7 +5,7 @@ use chio_kernel::tool_outcome::{InvocationOutputV1, ToolOutcomeStore};
 #[tokio::test]
 async fn native_trusted_read_history_does_not_turn_presence_into_external_influence() -> TestResult
 {
-    let f = native_fixture("trusted-history")?;
+    let f = empty_import::native_fixture_from_empty_import("trusted-history").await?;
     let (runtime, read, source) = chains::prepare_origin_read(&f, "trusted-read-history")?;
     assert!(!source.package.body().operations.as_slice()[0].external_influence);
     assert!(!source.invocation.action.externally_influenced);
@@ -116,7 +116,7 @@ async fn native_trusted_read_history_does_not_turn_presence_into_external_influe
 #[tokio::test]
 async fn native_unresolved_trusted_provider_status_keeps_unknown_influence_on_later_exact_inputs(
 ) -> TestResult {
-    let f = native_fixture("trusted-history")?;
+    let f = empty_import::native_fixture_from_empty_import("trusted-history").await?;
     std::fs::write(f.path.join("provider-error"), "enabled")?;
     let (runtime, read, source) = chains::prepare_origin_read(&f, "trusted-read-failure")?;
     assert!(!source.package.body().operations.as_slice()[0].external_influence);

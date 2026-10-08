@@ -154,6 +154,42 @@ fn set_preview_clearance(f: &ConfinedFixture, clearance: InformationLabel) -> Te
     Ok(())
 }
 
+fn independent_return_capability(f: &ConfinedFixture) -> TestResult<CapabilityToken> {
+    let key = Keypair::from_seed(&[239; 32]);
+    let mut deployment = f.knowledge.f.kernel.recovery_deployment(&f.profile.scope)?;
+    let mut actors = deployment.actors.as_slice().to_vec();
+    actors.push(RecoveryActorAssignment {
+        subject: key.public_key(),
+        principal: chio_security_types::PrincipalId::new("confined-return-operator")?,
+        permissions: BoundedList::new(vec![RecoveryPermission::ConfinedReturn])?,
+        preview_clearance: restricted_label(),
+    });
+    deployment.actors = NonEmptyBoundedList::new(actors)?;
+    deployment.authority_scope = recovery_authority_scope_digest(&deployment)?;
+    f.knowledge
+        .f
+        .authority
+        .admission_operation_store()
+        .configure_recovery_deployment(&deployment)?;
+    Ok(f.knowledge.f.kernel.issue_capability(
+        &key.public_key(),
+        ChioScope {
+            grants: vec![ToolGrant {
+                server_id: "chio.recovery".into(),
+                tool_name: RecoveryPermission::ConfinedReturn.wire_name().into(),
+                operations: vec![Operation::Invoke],
+                constraints: vec![],
+                max_invocations: None,
+                max_cost_per_invocation: None,
+                max_total_cost: None,
+                dpop_required: None,
+            }],
+            ..Default::default()
+        },
+        1200,
+    )?)
+}
+
 #[test]
 fn linux_staging_receipt_and_return_preparation_enforce_source_audience() -> TestResult {
     let canaries = PathBuf::from(
@@ -494,6 +530,8 @@ fn linux_acknowledgement_retains_delivery_after_cancel_and_authority_change() ->
         "installation",
         "launch-capability",
         "return-capability",
+        "return-assignment",
+        "return-clearance",
     ] {
         let (f, cage) = measured_fixture(&reader()?)?;
         let request = RequestId::new("delivery-outcome-retention")?;
@@ -527,6 +565,33 @@ fn linux_acknowledgement_retains_delivery_after_cancel_and_authority_change() ->
                     .map_err(|_| KernelError::Internal("rotate confinement".into()))?,
                 "launch-capability" => kernel.revoke_capability(&root_capability.id)?,
                 "return-capability" => kernel.revoke_capability(&control.id)?,
+                "return-assignment" | "return-clearance" => {
+                    let mut deployment = kernel.recovery_deployment(&rotated.scope)?;
+                    let mut actors = deployment.actors.as_slice().to_vec();
+                    if change == "return-assignment" {
+                        actors[0].permissions = BoundedList::new(
+                            actors[0]
+                                .permissions
+                                .as_slice()
+                                .iter()
+                                .copied()
+                                .filter(|permission| {
+                                    *permission != RecoveryPermission::ConfinedReturn
+                                })
+                                .collect(),
+                        )
+                        .map_err(|_| KernelError::Internal("change return assignment".into()))?;
+                    } else {
+                        actors[0].preview_clearance = InformationLabel::bottom();
+                    }
+                    deployment.actors = NonEmptyBoundedList::new(actors)
+                        .map_err(|_| KernelError::Internal("change return assignment".into()))?;
+                    deployment.authority_scope = recovery_authority_scope_digest(&deployment)
+                        .map_err(|_| KernelError::Internal("change return assignment".into()))?;
+                    store
+                        .configure_recovery_deployment(&deployment)
+                        .map_err(|_| KernelError::Internal("change return assignment".into()))?;
+                }
                 _ => return Err(KernelError::Internal("unknown outcome test change".into())),
             }
             Ok(())
@@ -565,6 +630,178 @@ fn linux_acknowledgement_retains_delivery_after_cancel_and_authority_change() ->
             "{change}"
         );
     }
+    Ok(())
+}
+
+#[test]
+fn linux_original_return_acknowledgement_survives_expiry_without_launch_authority() -> TestResult {
+    let (f, cage) = measured_fixture(&reader()?)?;
+    let request = RequestId::new("expired-original-return-outcome")?;
+    f.reserve(
+        request.as_str(),
+        &child(&f.knowledge, "expired-return-child", 201)?,
+    )?;
+    f.runtime
+        .launch(&f.knowledge.f.control, &request, cage)?
+        .stage(&f.knowledge.f.control)?;
+    let capability = independent_return_capability(&f)?;
+    let (disclosure, endorsement) = approve(f.runtime.review_return(&capability, &request)?)?;
+    let actor = f.knowledge.f.kernel.authenticate_recovery_actor(
+        &f.profile.scope,
+        &capability,
+        RecoveryPermission::ConfinedReturn,
+    )?;
+    assert!(f
+        .knowledge
+        .f
+        .kernel
+        .authenticate_recovery_actor(
+            &f.profile.scope,
+            &capability,
+            RecoveryPermission::ConfinedLaunch
+        )
+        .is_err());
+    let store = f.knowledge.f.authority.admission_operation_store();
+    let fence = f.knowledge.f.authority.mutation_fence();
+    let (seal, _) = store.prepare_confined_return(&actor, &request, &fence, now_ms()?)?;
+    let admission = store.admit_confined_return(
+        &actor,
+        ConfinedReturnAdmissionInput {
+            request: &request,
+            seal: &seal,
+            parent: &f.profile.contract.parent,
+            disclosure: Some(&disclosure),
+            endorsement: Some(&endorsement),
+        },
+        &fence,
+        now_ms()?,
+    )?;
+    let sink = f.knowledge.sink();
+    sink.deliver(&admission.admitted, b"true")?;
+    let after_expiry =
+        (f.profile.contract.expires_at_unix_ms.get() / 1000).max(capability.expires_at) + 1;
+    let _clock = chio_kernel::scope_fixed_runtime_clock_for_current_thread(after_expiry);
+    store.acknowledge_confined_return(
+        &actor,
+        &request,
+        &admission,
+        true,
+        &fence,
+        after_expiry * 1000,
+    )?;
+    let connection = rusqlite::Connection::open(f.knowledge.f.path.join("admission.db"))?;
+    let state: String = connection.query_row(
+        "SELECT json_extract(payload,'$.return_admission.admitted.state')
+         FROM admission_operation_recovery_records WHERE record_key GLOB 'confined-boundary:*'",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        state, "delivered",
+        "the original RETURN outcome was lost after expiry"
+    );
+    assert_eq!(sink.delivered.lock().map_err(|_| "sink")?.len(), 1);
+    Ok(())
+}
+
+#[test]
+fn linux_post_delivery_fault_preserves_possible_delivery_before_acknowledgement() -> TestResult {
+    use crate::confinement::ConfinedCutpoint;
+    let (f, cage) = measured_fixture(&reader()?)?;
+    let request = RequestId::new("post-delivery-acknowledgement-fault")?;
+    f.reserve(
+        request.as_str(),
+        &child(&f.knowledge, "post-delivery-child", 201)?,
+    )?;
+    f.runtime
+        .launch(&f.knowledge.f.control, &request, cage)?
+        .stage(&f.knowledge.f.control)?;
+    let (disclosure, endorsement) =
+        approve(f.runtime.review_return(&f.knowledge.f.control, &request)?)?;
+    let runtime = f.runtime.clone().with_test_cutpoint(Arc::new(|stage| {
+        if stage == ConfinedCutpoint::DeliveryCompleted {
+            return Err(KernelError::Internal(
+                "lost delivery acknowledgement".into(),
+            ));
+        }
+        Ok(())
+    }));
+    let sink = f.knowledge.sink();
+    let error = runtime
+        .deliver(
+            &f.knowledge.f.control,
+            f.runtime.prepare_return(&f.knowledge.f.control, &request)?,
+            &sink,
+            Some(&disclosure),
+            Some(&endorsement),
+        )
+        .err()
+        .ok_or("delivery fault did not retain pending custody")?;
+    assert_eq!(sink.delivered.lock().map_err(|_| "sink")?.len(), 1);
+    let connection = rusqlite::Connection::open(f.knowledge.f.path.join("admission.db"))?;
+    let state: String = connection.query_row(
+        "SELECT json_extract(payload,'$.return_admission.admitted.state')
+         FROM admission_operation_recovery_records WHERE record_key GLOB 'confined-boundary:*'",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        state, "uncertain",
+        "a post-delivery crash forgot possible bytes"
+    );
+    assert!(
+        error
+            .to_string()
+            .contains("delivered; acknowledgement pending"),
+        "known delivery was reported as an ordinary refusal"
+    );
+    let store = f.knowledge.f.authority.admission_operation_store();
+    let fence = f.knowledge.f.authority.mutation_fence();
+    let mut foreign = fence.clone();
+    foreign.store_uuid = uuid::Uuid::new_v4().to_string();
+    let error = error
+        .reconcile(&store, &foreign)
+        .err()
+        .ok_or("foreign serving fence accepted pending outcome")?;
+    assert!(error
+        .to_string()
+        .contains("delivered; acknowledgement pending"));
+    let mut deployment = f.knowledge.f.kernel.recovery_deployment(&f.profile.scope)?;
+    let mut actors = deployment.actors.as_slice().to_vec();
+    actors[0].permissions = BoundedList::new(
+        actors[0]
+            .permissions
+            .as_slice()
+            .iter()
+            .copied()
+            .filter(|permission| *permission != RecoveryPermission::ConfinedReturn)
+            .collect(),
+    )?;
+    actors[0].preview_clearance = InformationLabel::bottom();
+    deployment.actors = NonEmptyBoundedList::new(actors)?;
+    deployment.authority_scope = recovery_authority_scope_digest(&deployment)?;
+    store.configure_recovery_deployment(&deployment)?;
+    f.knowledge
+        .f
+        .kernel
+        .revoke_capability(&f.knowledge.f.control.id)?;
+    let acknowledged = error.reconcile(&store, &fence)?;
+    assert_eq!(
+        acknowledged.admitted.state,
+        ArtifactDeliveryStateV1::Delivered
+    );
+    let state: String = connection.query_row(
+        "SELECT json_extract(payload,'$.return_admission.admitted.state')
+         FROM admission_operation_recovery_records WHERE record_key GLOB 'confined-boundary:*'",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(state, "delivered");
+    assert_eq!(
+        sink.delivered.lock().map_err(|_| "sink")?.len(),
+        1,
+        "outcome reconciliation called the sink again"
+    );
     Ok(())
 }
 
@@ -743,7 +980,13 @@ fn linux_cancellation_reports_an_already_ordered_parent_return() -> TestResult {
             .stage(&f.knowledge.f.control)?;
         let (disclosure, endorsement) =
             approve(f.runtime.review_return(&f.knowledge.f.control, &request)?)?;
-        let process = f.knowledge.f.process.clone();
+        // This independent connection is genuinely opened before marker7.
+        let process = ProcessRuntime::open(
+            f.knowledge.f.path.join("process.db"),
+            f.knowledge.f.kernel.clone(),
+        )?;
+        let journal = f.knowledge.f.path.join("process.db");
+        let kernel = f.knowledge.f.kernel.clone();
         let target = if cancel_parent {
             "root".to_owned()
         } else {
@@ -753,10 +996,24 @@ fn linux_cancellation_reports_an_already_ordered_parent_return() -> TestResult {
         let recorded = observed.clone();
         let runtime = f.runtime.clone().with_test_cutpoint(Arc::new(move |stage| {
             if stage == ConfinedCutpoint::DeliveryOrdered {
+                let connection = rusqlite::Connection::open(&journal)
+                    .map_err(|_| KernelError::Internal("inspect delivery marker".into()))?;
+                let (version, markers): (u32, u32) = connection
+                    .query_row(
+                        "SELECT version,(SELECT count(*) FROM process_confined_delivery_markers)
+                     FROM process_runtime WHERE singleton=1",
+                        [],
+                        |row| Ok((row.get(0)?, row.get(1)?)),
+                    )
+                    .map_err(|_| KernelError::Internal("inspect ordered custody".into()))?;
+                assert_eq!((version, markers), (7, 1));
                 let cancellation = process.cancel(&target);
                 let was_successful = cancellation.is_ok();
                 assert!(
-                    !was_successful,
+                    matches!(
+                        cancellation,
+                        Err(chio_process::ProcessError::ConfinedReturnAlreadyOrdered)
+                    ),
                     "cancellation reported success despite an already ordered return"
                 );
                 assert_eq!(
@@ -766,6 +1023,28 @@ fn linux_cancellation_reports_an_already_ordered_parent_return() -> TestResult {
                         .state,
                     chio_process::ProcessState::Cancelled
                 );
+                assert!(
+                    matches!(
+                        process.cancel(&target),
+                        Err(chio_process::ProcessError::ConfinedReturnAlreadyOrdered)
+                    ),
+                    "a repeated stop forgot the retained delivery marker"
+                );
+                let reopened = ProcessRuntime::open(&journal, kernel.clone())
+                    .map_err(|_| KernelError::Internal("reopen ordered process journal".into()))?;
+                assert!(
+                    matches!(
+                        reopened.cancel(&target),
+                        Err(chio_process::ProcessError::ConfinedReturnAlreadyOrdered)
+                    ),
+                    "a reopened journal forgot the retained delivery marker"
+                );
+                assert!(connection
+                    .execute("DELETE FROM process_confined_delivery_markers", [])
+                    .is_err());
+                assert!(connection
+                    .execute("UPDATE process_runtime SET version=6 WHERE singleton=1", [])
+                    .is_err());
                 *recorded
                     .lock()
                     .map_err(|_| KernelError::Internal("cancellation evidence".into()))? =

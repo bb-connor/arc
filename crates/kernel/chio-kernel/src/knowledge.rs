@@ -3,6 +3,15 @@
 use chio_security_types::{knowledge::*, recovery::*};
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "admission-test-support")]
+#[path = "knowledge/confined_candidate_test_support.rs"]
+mod confined_candidate_test_support;
+#[cfg(feature = "admission-test-support")]
+pub use confined_candidate_test_support::observe_confined_candidate_verification_fixture;
+
+mod confined_delivery;
+pub use confined_delivery::VerifiedConfinedReturnDelivery;
+
 /// Read-only anchored profile probe. Native process services retain the serving
 /// port and fence, rather than an Arc back to the kernel that owns them.
 #[derive(Clone)]
@@ -11,6 +20,41 @@ pub struct DurableKnowledgeEnforcement {
     pub(crate) fence: crate::admission_operation::StoreMutationFence,
 }
 impl DurableKnowledgeEnforcement {
+    /// A fresh native verifier call grants no public candidate, evidence or
+    /// process write permit. Implementations without it refuse by default.
+    pub fn verify_confined_return_candidate(
+        &self,
+        input: crate::admission_operation::ConfinedReturnCandidateInput<'_>,
+    ) -> Result<(), crate::KernelError> {
+        #[cfg(feature = "admission-test-support")]
+        confined_candidate_test_support::observe(&input);
+        self.store
+            .verify_confined_return_candidate(
+                input,
+                &self.fence,
+                crate::kernel::current_unix_timestamp_ms(),
+            )
+            .map_err(|_| {
+                crate::KernelError::DurableAdmission("confined candidate unavailable".into())
+            })
+    }
+    /// Only a successful fresh native verifier can mint this single-use,
+    /// exact-boundary and exact-byte proof for the trusted process broker.
+    pub fn verified_confined_return_candidate(
+        &self,
+        input: crate::admission_operation::ConfinedReturnCandidateInput<'_>,
+    ) -> Result<VerifiedConfinedReturnCandidate, crate::KernelError> {
+        let boundary = input.boundary;
+        let bytes = input.bytes;
+        self.verify_confined_return_candidate(input)?;
+        Ok(VerifiedConfinedReturnCandidate {
+            boundary: chio_core_types::recovery::isolation_boundary_digest(boundary).map_err(
+                |_| crate::KernelError::DurableAdmission("confined candidate unavailable".into()),
+            )?,
+            content: chio_core_types::recovery::knowledge_content_digest(bytes),
+            bytes: bytes.len(),
+        })
+    }
     pub fn verify_confined_attachment(
         &self,
         input: crate::admission_operation::ConfinedProcessAttachment<'_>,
@@ -58,6 +102,52 @@ impl DurableKnowledgeEnforcement {
             .map_err(|_| {
                 crate::KernelError::DurableAdmission("durable knowledge unavailable".into())
             })
+    }
+}
+
+/// Affine native proof. Callers cannot construct, deserialize, clone or inspect
+/// it to turn arbitrary bytes or a described boundary into slot authority.
+///
+/// ```compile_fail
+/// use chio_kernel::knowledge::VerifiedConfinedReturnCandidate;
+/// fn duplicate(candidate: VerifiedConfinedReturnCandidate) { let _ = candidate.clone(); }
+/// ```
+///
+/// ```compile_fail
+/// use chio_kernel::knowledge::VerifiedConfinedReturnCandidate;
+/// let _: Result<VerifiedConfinedReturnCandidate, _> = serde_json::from_str("{}");
+/// ```
+pub struct VerifiedConfinedReturnCandidate {
+    boundary: CanonicalPayloadDigest,
+    content: CanonicalPayloadDigest,
+    bytes: usize,
+}
+impl VerifiedConfinedReturnCandidate {
+    /// Consuming the proof permits only its exact input. The process broker
+    /// still verifies the retained signed endpoints inside its slot transaction.
+    pub fn consume_for(
+        self,
+        boundary: &chio_security_types::confinement::IsolationBoundaryV1,
+        bytes: &[u8],
+    ) -> Result<(), crate::KernelError> {
+        let actual =
+            chio_core_types::recovery::isolation_boundary_digest(boundary).map_err(|_| {
+                crate::KernelError::DurableAdmission("confined candidate unavailable".into())
+            })?;
+        if self.boundary != actual
+            || self.content != chio_core_types::recovery::knowledge_content_digest(bytes)
+            || self.bytes != bytes.len()
+        {
+            return Err(crate::KernelError::DurableAdmission(
+                "confined candidate unavailable".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+impl core::fmt::Debug for VerifiedConfinedReturnCandidate {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("VerifiedConfinedReturnCandidate([redacted])")
     }
 }
 
@@ -151,7 +241,7 @@ pub trait ArtifactBlobPort: Send + Sync {
     /// Fill an already reserved slot after native canonical/projection checks.
     fn stage_confined_return(
         &self,
-        _object: &ArtifactObjectId,
+        _actor: &crate::recovery::AuthenticatedRecoveryActor,
         _boundary: &chio_security_types::confinement::IsolationBoundaryV1,
         _bytes: &[u8],
     ) -> Result<ArtifactBlobSealV1, crate::KernelError> {
@@ -162,9 +252,10 @@ pub trait ArtifactBlobPort: Send + Sync {
     /// The process journal serializes this durable marker with cancellation.
     fn begin_confined_delivery(
         &self,
-        _process: &ProcessId,
-        _context: &crate::SecurityInvocationContext,
-        _intent: &ArtifactReleaseIntentV1,
+        _actor: &crate::recovery::AuthenticatedRecoveryActor,
+        _request: &RequestId,
+        _seal: &ArtifactBlobSealV1,
+        _admission: &chio_security_types::confinement::ReturnAdmissionV1,
     ) -> Result<(), crate::KernelError> {
         Err(crate::KernelError::DurableAdmission(
             "confined delivery custody unavailable".into(),

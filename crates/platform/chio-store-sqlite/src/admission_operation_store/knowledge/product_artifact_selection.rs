@@ -6,6 +6,36 @@ pub(in crate::admission_operation_store) fn selected_product_artifact(
     tx: &Connection,
     requested: &ArtifactVersionRefV1,
 ) -> Result<NativeArtifactRecordV1, AdmissionOperationStoreError> {
+    let record = authenticated_product_artifact(tx, requested)?;
+    if record.state != ArtifactPublicationStateV1::Available {
+        return Err(AdmissionOperationStoreError::RecoveryAuthorityDenied);
+    }
+    Ok(record)
+}
+
+/// Exact retained Product replay observes metadata only. The Product caller
+/// must separately authenticate its immutable source and current audience.
+/// This selector cannot admit fresh references or recover private bytes.
+pub(in crate::admission_operation_store) fn retained_product_artifact(
+    tx: &Connection,
+    requested: &ArtifactVersionRefV1,
+) -> Result<NativeArtifactRecordV1, AdmissionOperationStoreError> {
+    let record = authenticated_product_artifact(tx, requested)?;
+    if !matches!(
+        record.state,
+        ArtifactPublicationStateV1::Available
+            | ArtifactPublicationStateV1::Quarantined
+            | ArtifactPublicationStateV1::Retired
+    ) {
+        return Err(AdmissionOperationStoreError::RecoveryAuthorityDenied);
+    }
+    Ok(record)
+}
+
+fn authenticated_product_artifact(
+    tx: &Connection,
+    requested: &ArtifactVersionRefV1,
+) -> Result<NativeArtifactRecordV1, AdmissionOperationStoreError> {
     let pointer_key = version_key(requested)?;
     let Some(pointer_row) = protected::raw_checked(tx, &pointer_key)? else {
         // raw_checked has already refused missing current with any retained
@@ -66,9 +96,7 @@ pub(in crate::admission_operation_store) fn selected_product_artifact(
     protected::verify_source_reference(tx, &publication)?;
     // Exact canonical source custody and its own scope/id/version were proved
     // before comparing caller-supplied governed provenance or availability.
-    if artifact_version_reference(&record.metadata).map_err(refused)? != *requested
-        || record.state != ArtifactPublicationStateV1::Available
-    {
+    if artifact_version_reference(&record.metadata).map_err(refused)? != *requested {
         return Err(AdmissionOperationStoreError::RecoveryAuthorityDenied);
     }
     Ok(record)
@@ -78,7 +106,7 @@ fn require_local_frame(tx: &Connection, key: &str) -> Result<(), AdmissionOperat
     let local: bool = tx
         .query_row(
             "SELECT native_namespace IS NULL AND native_request IS NULL
-         FROM admission_operation_recovery_records WHERE record_key=?1",
+         FROM main.admission_operation_recovery_records WHERE record_key=?1",
             [key],
             |row| row.get(0),
         )

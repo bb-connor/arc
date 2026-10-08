@@ -187,3 +187,6 @@ fn overload_disconnected_intake_cannot_starve_existing_native_settlement() -> Te
 
 #[path = "overload/transport_admission.rs"]
 mod transport_admission;
+
+#[path = "overload/provider_settlement.rs"]
+mod provider_settlement;

@@ -7,8 +7,12 @@ mod cancellation;
 mod context;
 mod identity;
 mod launch;
+mod reference_source;
 mod returns;
 pub use cancellation::NativeConfinedCancellation;
+pub(in crate::admission_operation_store::knowledge) use reference_source::{
+    input_reference_source, ConfinedInputReferenceSource,
+};
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -66,6 +70,8 @@ struct BoundaryRecord {
     return_metadata: Option<ArtifactVersionV1>,
     return_admission: Option<ReturnAdmissionV1>,
     return_authority: Option<ConfinedCapabilityDigest>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    return_origin: Option<returns::OriginalReturnOrigin>,
 }
 impl core::fmt::Debug for NativeConfinedInstallationV1 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -367,6 +373,11 @@ impl SqliteAdmissionOperationStore {
                 let dependencies = traversal::dependencies(&tx, actor.scope(), &roots)?;
                 let input_label = traversal::join_metadata(source_label, &dependencies)?;
                 traversal::ensure_audience(&tx, actor, &input_label)?;
+                super::reference_custody::retain_confined_input_references(
+                    &tx,
+                    &self.serving_owner,
+                    &key(actor.scope(), request)?,
+                )?;
                 return Ok((tx, old.reservation));
             }
             if parent.subject.to_hex() != profile.producer_context.as_v1().principal_id().as_str()
@@ -481,6 +492,7 @@ impl SqliteAdmissionOperationStore {
                 return_metadata: None,
                 return_admission: None,
                 return_authority: None,
+                return_origin: None,
             };
             validate_current(&tx, &record, profile, now)?;
             identity::require_unused(&tx, actor.scope(), child)?;
@@ -542,6 +554,11 @@ impl SqliteAdmissionOperationStore {
                 )?;
             }
             retain(&tx, &self.serving_owner, &record)?;
+            super::reference_custody::retain_confined_input_references(
+                &tx,
+                &self.serving_owner,
+                &key(actor.scope(), request)?,
+            )?;
             Ok((tx, record.reservation))
         })
     }

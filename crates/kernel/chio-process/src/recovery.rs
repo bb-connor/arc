@@ -1,5 +1,9 @@
 //! Host-only reservation bridge. No store lock spans native/provider execution.
 mod origin;
+mod unused_reservation;
+pub use unused_reservation::{
+    ClosedUnusedRecoveryReservation, UnusedRecoveryReservationClosureData,
+};
 
 use crate::{digest, validate_id, ProcessError, ProcessRuntime};
 use chio_kernel::{RecoveryRequestCustody, ToolCallRequest};

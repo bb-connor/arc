@@ -238,7 +238,7 @@ pub(in crate::admission_operation_store) fn persist_knowledge_reference_progress
     })
 }
 
-fn ordinary_slot(
+pub(super) fn ordinary_slot(
     write: &StagedReferenceUpdate,
     references: &[ArtifactVersionRefV1],
     owner: &ReferenceOwner,

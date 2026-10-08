@@ -184,8 +184,11 @@ pub(crate) fn require_terminal_release(
         else {
             return Ok(());
         };
-        let Some(StoredInvocationBlob::Present(blob)) =
-            load_blob_state_connection(connection, outcome.raw_output_digest())?
+        let Some(StoredInvocationBlob::Present(blob)) = load_blob_state_connection(
+            connection,
+            outcome.raw_output_digest(),
+            operation.binding().operation_id().as_str(),
+        )?
         else {
             // Existing terminal replay may outlive payload retention. Exact
             // checkpoint and admission-chain coverage remain mandatory.
@@ -237,8 +240,12 @@ impl SqliteToolOutcomeStore {
         require_finalizing_operation(&operation, &outcome)?;
         let evaluation = load_evaluation_tx(&transaction, record.operation_id())?
             .ok_or(ToolOutcomeStoreError::NotFound)?;
-        let blob = load_blob_tx(&transaction, outcome.raw_output_digest())?
-            .ok_or(ToolOutcomeStoreError::NotFound)?;
+        let blob = load_blob_tx(
+            &transaction,
+            outcome.raw_output_digest(),
+            record.operation_id().as_str(),
+        )?
+        .ok_or(ToolOutcomeStoreError::NotFound)?;
         let raw = RawInvocationOutcomeV1::from_canonical_bytes(blob.bytes())
             .map_err(|error| invariant(error.to_string()))?;
         crate::SqliteAdmissionOperationStore::verify_original_native_return_tx(

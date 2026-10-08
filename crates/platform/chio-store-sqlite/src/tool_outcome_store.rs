@@ -34,6 +34,8 @@ const TOOL_OUTCOME_SCHEMA_ANCHORS: &[&str] = &[
 const TOOL_OUTCOME_SCHEMA: &str = include_str!("tool_outcome_store.sql");
 const SECURITY_RELEASE_SCHEMA: &str = include_str!("tool_outcome_security_release.sql");
 const PAYLOAD_COMPACTION_SCHEMA: &str = include_str!("tool_outcome_payload_compaction.sql");
+#[cfg(feature = "admission-test-support")]
+pub(crate) mod cold_read_test_support;
 #[path = "tool_outcome_native_output.rs"]
 mod native_output;
 #[path = "tool_outcome_projection.rs"]
@@ -195,8 +197,12 @@ impl SqliteToolOutcomeStore {
                 .map_err(admission_error)?
                 .ok_or(ToolOutcomeStoreError::NotFound)?;
         if let Some(existing) = load_outcome_tx(&transaction, operation.binding().operation_id())? {
-            let stored_blob = load_blob_state_tx(&transaction, existing.raw_output_digest())?
-                .ok_or_else(|| invariant("tool outcome lost its canonical blob"))?;
+            let stored_blob = load_blob_state_tx(
+                &transaction,
+                existing.raw_output_digest(),
+                operation.binding().operation_id().as_str(),
+            )?
+            .ok_or_else(|| invariant("tool outcome lost its canonical blob"))?;
             let blob_matches = match &stored_blob {
                 StoredInvocationBlob::Present(existing_blob) => {
                     existing_blob.bytes() == blob.bytes()
@@ -463,10 +469,14 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
         let mut connection = self.connection()?;
         let transaction = self.begin_read(&mut connection)?;
         let raw = match load_outcome_tx(&transaction, operation_id)? {
-            Some(outcome) => load_blob_tx(&transaction, outcome.raw_output_digest())?
-                .map(|blob| RawInvocationOutcomeV1::from_canonical_bytes(blob.bytes()))
-                .transpose()
-                .map_err(|error| invariant(error.to_string()))?,
+            Some(outcome) => load_blob_tx(
+                &transaction,
+                outcome.raw_output_digest(),
+                operation_id.as_str(),
+            )?
+            .map(|blob| RawInvocationOutcomeV1::from_canonical_bytes(blob.bytes()))
+            .transpose()
+            .map_err(|error| invariant(error.to_string()))?,
             None => None,
         };
         transaction.commit().map_err(sqlite_error)?;
@@ -770,6 +780,24 @@ impl SqliteToolOutcomeStore {
 }
 
 impl QualifiedToolOutcomeStore for SqliteToolOutcomeStore {}
+
+/// The producer's exact compiled schema, including its immutable and lease
+/// guards. Returned SQL is catalog DATA and grants no mutation or loan.
+pub(crate) fn compiled_tool_outcome_schema() -> &'static str {
+    TOOL_OUTCOME_SCHEMA
+}
+
+/// The actual producer's enforced complete canonical outcome record bound.
+/// This describes cost and grants no claim, mutation or financing authority.
+pub(crate) fn outcome_record_maximum_bytes() -> usize {
+    MAX_OUTCOME_RECORD_BYTES
+}
+
+/// The actual producer's enforced complete canonical evaluation record bound.
+/// Original producing profiles can select a smaller bound without changing it.
+pub(crate) fn evaluation_record_maximum_bytes() -> usize {
+    MAX_EVALUATION_RECORD_BYTES
+}
 
 pub(crate) fn initialize_tool_outcome_schema(
     connection: &mut Connection,
@@ -1261,21 +1289,28 @@ fn load_evaluation_connection(
     connection: &Connection,
     operation_id: &str,
 ) -> Result<Option<PostReturnEvaluationRecordV1>, ToolOutcomeStoreError> {
+    let maximum =
+        crate::admission_operation_store::original_output_read_bounds(connection, operation_id)
+            .map_err(admission_error)?
+            .map(|(_, evaluation)| sqlite_u64(evaluation, "original evaluation bound"))
+            .transpose()?;
     let row = connection
         .query_row(
             r#"
             SELECT evaluation_id, outcome_id, evaluation_version,
-                   lifecycle_digest, evaluation_json
+                   lifecycle_digest,
+                   CASE WHEN ?2 IS NULL OR length(evaluation_json) BETWEEN 1 AND ?2
+                        THEN evaluation_json END
             FROM post_return_evaluations WHERE operation_id = ?1
             "#,
-            [operation_id],
+            params![operation_id, maximum],
             |row| {
                 Ok((
                     row.get::<_, String>(0)?,
                     row.get::<_, String>(1)?,
                     row.get::<_, i64>(2)?,
                     row.get::<_, String>(3)?,
-                    row.get::<_, Vec<u8>>(4)?,
+                    row.get::<_, Option<Vec<u8>>>(4)?,
                 ))
             },
         )
@@ -1284,6 +1319,10 @@ fn load_evaluation_connection(
     let Some((evaluation_id, outcome_id, version, lifecycle, encoded)) = row else {
         return Ok(None);
     };
+    let encoded =
+        encoded.ok_or_else(|| invariant("evaluation exceeds its original storage bound"))?;
+    #[cfg(feature = "admission-test-support")]
+    cold_read_test_support::observe_evaluation_allocation(encoded.len());
     let persisted: PersistedPostReturnEvaluationRecordV1 =
         chio_core::canonical::UntrustedJsonText::from_wire(&encoded, MAX_EVALUATION_RECORD_BYTES)
             .and_then(|input| input.decode_canonical())
@@ -1308,15 +1347,17 @@ fn load_evaluation_connection(
 fn load_blob_tx(
     transaction: &Transaction<'_>,
     digest: &chio_kernel::admission_operation::AdmissionDigest,
+    operation_id: &str,
 ) -> Result<Option<CanonicalInvocationBlobV1>, ToolOutcomeStoreError> {
-    load_blob_connection(transaction, digest)
+    load_blob_connection(transaction, digest, operation_id)
 }
 
 fn load_blob_connection(
     connection: &Connection,
     digest: &chio_kernel::admission_operation::AdmissionDigest,
+    operation_id: &str,
 ) -> Result<Option<CanonicalInvocationBlobV1>, ToolOutcomeStoreError> {
-    match load_blob_state_connection(connection, digest)? {
+    match load_blob_state_connection(connection, digest, operation_id)? {
         None => Ok(None),
         Some(StoredInvocationBlob::Present(blob)) => Ok(Some(blob)),
         Some(StoredInvocationBlob::Compacted { size_bytes }) => {
@@ -1328,15 +1369,17 @@ fn load_blob_connection(
 fn load_blob_state_tx(
     transaction: &Transaction<'_>,
     digest: &chio_kernel::admission_operation::AdmissionDigest,
+    operation_id: &str,
 ) -> Result<Option<StoredInvocationBlob>, ToolOutcomeStoreError> {
-    load_blob_state_connection(transaction, digest)
+    load_blob_state_connection(transaction, digest, operation_id)
 }
 
 fn load_blob_state_connection(
     connection: &Connection,
     digest: &chio_kernel::admission_operation::AdmissionDigest,
+    operation_id: &str,
 ) -> Result<Option<StoredInvocationBlob>, ToolOutcomeStoreError> {
-    match load_blob_bytes_connection(connection, digest)? {
+    match load_blob_bytes_connection(connection, digest, operation_id)? {
         None => Ok(None),
         Some(None) => {
             let size: i64 = connection
@@ -1362,18 +1405,39 @@ fn load_blob_state_connection(
     }
 }
 
+/// Raw bytes are read only within the operation's original storage bound, so a
+/// hostile row cannot force an allocation larger than its admitted payload.
 fn load_blob_bytes_connection(
     connection: &Connection,
     digest: &chio_kernel::admission_operation::AdmissionDigest,
+    operation_id: &str,
 ) -> Result<Option<Option<Vec<u8>>>, ToolOutcomeStoreError> {
-    connection
+    let maximum =
+        crate::admission_operation_store::original_output_read_bounds(connection, operation_id)
+            .map_err(admission_error)?
+            .map(|(raw, _)| sqlite_u64(raw, "original Raw bound"))
+            .transpose()?;
+    let stored: Option<(Option<i64>, Option<Vec<u8>>)> = connection
         .query_row(
-            "SELECT canonical_bytes FROM tool_outcome_blobs WHERE digest = ?1",
-            [digest.as_str()],
-            |row| row.get::<_, Option<Vec<u8>>>(0),
+            "SELECT length(canonical_bytes),
+                    CASE WHEN ?2 IS NULL OR length(canonical_bytes) BETWEEN 1 AND ?2
+                         THEN canonical_bytes END
+             FROM tool_outcome_blobs WHERE digest = ?1",
+            params![digest.as_str(), maximum],
+            |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .optional()
-        .map_err(sqlite_error)
+        .map_err(sqlite_error)?;
+    match stored {
+        None => Ok(None),
+        Some((None, None)) => Ok(Some(None)),
+        Some((_, None)) => Err(invariant("Raw outcome exceeds its original storage bound")),
+        Some((_, Some(bytes))) => {
+            #[cfg(feature = "admission-test-support")]
+            cold_read_test_support::observe_raw_allocation(bytes.len());
+            Ok(Some(Some(bytes)))
+        }
+    }
 }
 
 fn compacted_blob_error(digest: &AdmissionDigest, size_bytes: u64) -> ToolOutcomeStoreError {
@@ -1383,7 +1447,9 @@ fn compacted_blob_error(digest: &AdmissionDigest, size_bytes: u64) -> ToolOutcom
     }
 }
 
-fn encode_outcome(record: &ToolOutcomeRecordV1) -> Result<Vec<u8>, ToolOutcomeStoreError> {
+pub(crate) fn encode_outcome(
+    record: &ToolOutcomeRecordV1,
+) -> Result<Vec<u8>, ToolOutcomeStoreError> {
     encode_bounded(
         "tool outcome",
         &record.to_persisted(),

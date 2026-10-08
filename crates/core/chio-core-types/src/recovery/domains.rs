@@ -76,6 +76,7 @@ const KNOWLEDGE_OBJECT_CUSTODY_DOMAIN: &str = "chio.knowledge.object-custody.v1"
 const ARTIFACT_ARCHIVE_DOMAIN: &str = "chio.artifact.archive.v1";
 const PARTICIPANT_OWNER_DOMAIN: &str = "chio.participant.owner.v1";
 const SEMANTIC_NATIVE_STATUS_ORIGIN_DOMAIN: &str = "chio.semantic.native-status-origin.v1";
+const SEMANTIC_NATIVE_INPUT_ORIGIN_DOMAIN: &str = "chio.semantic.native-input-origin.v1";
 
 // Framing and identity are declared together; tests check their byte equality.
 macro_rules! registered_domains {
@@ -171,6 +172,7 @@ registered_domains! {
     ArtifactArchive = ARTIFACT_ARCHIVE_DOMAIN => "chio.artifact.archive.v1",
     ParticipantOwner = PARTICIPANT_OWNER_DOMAIN => "chio.participant.owner.v1",
     SemanticNativeStatusOrigin = SEMANTIC_NATIVE_STATUS_ORIGIN_DOMAIN => "chio.semantic.native-status-origin.v1",
+    SemanticNativeInputOrigin = SEMANTIC_NATIVE_INPUT_ORIGIN_DOMAIN => "chio.semantic.native-input-origin.v1",
 }
 
 impl RecoveryDigestDomain {

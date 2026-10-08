@@ -48,6 +48,10 @@ pub(in crate::admission_operation_store) struct ReferenceReadyRecord {
 pub(in crate::admission_operation_store) enum ReferenceReadySchema {
     #[serde(rename = "chio.knowledge.reference-ready.v1")]
     V1,
+    #[serde(rename = "chio.knowledge.reference-ready.v2")]
+    V2,
+    #[serde(rename = "chio.knowledge.reference-ready.v3")]
+    V3,
 }
 
 pub(in crate::admission_operation_store) struct ReadyReferenceAccount {
@@ -56,6 +60,13 @@ pub(in crate::admission_operation_store) struct ReadyReferenceAccount {
 }
 
 impl ReadyReferenceAccount {
+    /// The original input producer is integrated only by this schema. Both
+    /// predecessor markers retain their authenticated historical cutoff and
+    /// conservative source barriers; they cannot assert complete coverage.
+    pub(in crate::admission_operation_store) fn has_complete_writer_coverage(&self) -> bool {
+        self.record.schema == ReferenceReadySchema::V3
+    }
+
     pub(in crate::admission_operation_store) fn cutoff(&self) -> &ReferenceCutoff {
         &self.record.cutoff
     }

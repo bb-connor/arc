@@ -20,6 +20,7 @@ pub struct NativeSecurityInputClassificationAuthority<'call> {
     binding: &'call NativeSecurityAuthorityBindingV1,
     context: &'call crate::SecurityInvocationContext,
     input: &'call NativeSecurityInputJoinRequestV1,
+    request: &'call crate::ToolCallRequest,
     trusted_now_unix_ms: u64,
     finished: Cell<bool>,
 }
@@ -49,6 +50,7 @@ impl<'call> NativeSecurityInputClassificationAuthority<'call> {
         binding: &'call NativeSecurityAuthorityBindingV1,
         context: &'call crate::SecurityInvocationContext,
         input: &'call NativeSecurityInputJoinRequestV1,
+        request: &'call crate::ToolCallRequest,
         trusted_now_unix_ms: u64,
     ) -> Self {
         Self {
@@ -57,6 +59,7 @@ impl<'call> NativeSecurityInputClassificationAuthority<'call> {
             binding,
             context,
             input,
+            request,
             trusted_now_unix_ms,
             finished: Cell::new(false),
         }
@@ -80,6 +83,13 @@ impl<'call> NativeSecurityInputClassificationAuthority<'call> {
 
     pub fn input(&self) -> &NativeSecurityInputJoinRequestV1 {
         self.input
+    }
+
+    /// Borrow the actual request from this original Kernel callback. Retained
+    /// history deliberately strips transient credentials and cannot supply it.
+    /// This read-only value cannot authorize a join, capture or external effect.
+    pub fn request(&self) -> &crate::ToolCallRequest {
+        self.request
     }
 
     pub const fn trusted_now_unix_ms(&self) -> u64 {

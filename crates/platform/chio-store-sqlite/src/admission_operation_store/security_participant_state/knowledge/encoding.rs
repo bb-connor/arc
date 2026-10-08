@@ -112,6 +112,46 @@ fn require_atom_format(tx: &Connection) -> Result<(), AdmissionOperationStoreErr
     }
     Ok(())
 }
+
+/// Exact pure framing for a proposed native journal. This creates no encoding
+/// write source and does not authorize inserting its root or immutable chunks.
+pub(super) fn preview_rows(
+    record: &Record,
+) -> Result<Vec<(String, String, Vec<u8>)>, AdmissionOperationStoreError> {
+    let body = atoms::logical_body(record)?;
+    let owner = EncodingOwner::Journal {
+        scope: record.scope.clone(),
+        authority: record.authority.clone(),
+        sequence: record.sequence,
+        release: record.release.release.clone(),
+    };
+    let key = owner.root_key()?;
+    let scope = protected::scope_key(&record.scope)?;
+    if body.len() <= 262_144 {
+        return Ok(vec![(key, scope, body)]);
+    }
+    let (root, chunks) = ChunkedBody::capture(owner, &body)?;
+    let payload = protected::encode(&JournalRoot {
+        knowledge_join_encoding: JournalChunkMarker::ChunkedLabelAtomsV1,
+        authority: record.authority.clone(),
+        sequence: record.sequence,
+        scope: record.scope.clone(),
+        release: ReleaseIdentity {
+            release: record.release.release.clone(),
+        },
+        body: root,
+    })?;
+    let mut rows = Vec::with_capacity(chunks.len() + 1);
+    rows.push((key, scope, payload));
+    rows.extend(chunks.into_iter().map(|chunk| {
+        (
+            chunk.key().into(),
+            chunk.scope().into(),
+            chunk.payload().to_vec(),
+        )
+    }));
+    Ok(rows)
+}
 fn invalid() -> AdmissionOperationStoreError {
     invariant("knowledge journal atom source is invalid")
 }

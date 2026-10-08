@@ -243,10 +243,68 @@ async fn setup_current_inspector_qualifies_the_retained_completion_without_a_new
 
 #[tokio::test]
 async fn setup_foreign_resume_cannot_acquire_the_pinned_benign_identity() -> TestResult {
+    type RetainedProcessRows = Vec<(String, Vec<Vec<rusqlite::types::Value>>)>;
     let f = KnowledgeFixture::from(super::super::super::semantic::native_fixture("read")?)?;
     let inspector = second_inspector(&f)?;
     let workflow = Box::pin(f.f.ready()).await?;
     let _service = setup(&f, &workflow)?;
+    let actor = f.f.kernel.authenticate_recovery_actor(
+        f.f.runtime.scope(),
+        &inspector,
+        RecoveryPermission::Resume,
+    )?;
+    assert_eq!(actor.permission(), RecoveryPermission::Resume);
+    assert_ne!(actor.principal(), &f.f.record(&workflow)?.created_by);
+    let inspection = f.f.command(
+        "foreign-setup-inspect",
+        RecoveryCommandBodyV1::InspectWorkflow {
+            workflow_id: workflow.clone(),
+        },
+    )?;
+    let inspected = f.f.runtime.execute_command(&inspector, &inspection).await?;
+    assert_eq!(inspected.status.workflow_id, workflow);
+    // The legitimate inspection may append its bounded command audit. Take
+    // the refusal baseline after that completed, freshly authorized read.
+    let before_workflow = chio_core_types::canonical_json_bytes(&f.f.record(&workflow)?)?;
+    let before_flow =
+        f.f.kernel
+            .observe_recovery_source(f.f.runtime.scope())?
+            .snapshot()
+            .cloned()
+            .ok_or("authenticated current setup source")?;
+    let retained_process_rows = || -> TestResult<RetainedProcessRows> {
+        let connection = rusqlite::Connection::open_with_flags(
+            f.f.path.join("process.db"),
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )?;
+        let mut tables = connection
+            .prepare("SELECT name FROM main.sqlite_schema WHERE type='table' ORDER BY name")?;
+        let table_rows = tables.query_map([], |row| row.get::<_, String>(0))?;
+        let names = table_rows.collect::<Result<Vec<_>, _>>()?;
+        let mut snapshot = Vec::new();
+        for name in names {
+            let quoted = name.replace('"', "\"\"");
+            let mut statement = connection.prepare(&format!("SELECT * FROM main.\"{quoted}\""))?;
+            let columns = statement.column_count();
+            if columns == 0 {
+                return Err("retained Process table has no columns".into());
+            }
+            let order = (1..=columns)
+                .map(|column| column.to_string())
+                .collect::<Vec<_>>()
+                .join(",");
+            statement =
+                connection.prepare(&format!("SELECT * FROM main.\"{quoted}\" ORDER BY {order}"))?;
+            let rows = statement.query_map([], |row| {
+                (0..columns)
+                    .map(|column| row.get::<_, rusqlite::types::Value>(column))
+                    .collect::<Result<Vec<_>, _>>()
+            })?;
+            snapshot.push((name, rows.collect::<Result<Vec<_>, _>>()?));
+        }
+        Ok(snapshot)
+    };
+    let before_process = retained_process_rows()?;
     let calls = f.f.process.process("root")?.tree_calls;
     let command = f.f.command(
         "foreign-setup-resume",
@@ -255,15 +313,28 @@ async fn setup_foreign_resume_cannot_acquire_the_pinned_benign_identity() -> Tes
             expected_revision: f.f.record(&workflow)?.revision,
         },
     )?;
-    assert!(f
-        .f
-        .runtime
-        .execute_command(&inspector, &command)
-        .await
-        .is_err());
+    assert_eq!(
+        f.f.runtime
+            .execute_command(&inspector, &command)
+            .await
+            .err(),
+        Some(crate::recovery::RecoveryRuntimeError::AuthorityDenied),
+        "a valid foreign Resume actor must reach the pinned setup owner refusal"
+    );
     assert_eq!(external_count(&f.f.path)?, 0);
     assert_eq!(f.f.process.process("root")?.tree_calls, calls);
     assert!(!f.f.record(&workflow)?.captured);
+    assert_eq!(
+        chio_core_types::canonical_json_bytes(&f.f.record(&workflow)?)?,
+        before_workflow
+    );
+    assert_eq!(
+        f.f.kernel
+            .observe_recovery_source(f.f.runtime.scope())?
+            .snapshot(),
+        Some(&before_flow)
+    );
+    assert_eq!(retained_process_rows()?, before_process);
     Ok(())
 }
 

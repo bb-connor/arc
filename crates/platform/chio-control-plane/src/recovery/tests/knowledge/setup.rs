@@ -16,6 +16,7 @@ mod preparation;
 mod process_scopes;
 mod signed_proof_refusals;
 mod transport_admission;
+mod unmaterialized_replacement;
 mod validity;
 
 fn setup(f: &KnowledgeFixture, workflow: &WorkflowId) -> TestResult<RecoverySetupService> {

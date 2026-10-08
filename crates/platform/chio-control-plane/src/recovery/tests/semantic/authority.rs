@@ -427,7 +427,7 @@ async fn native_semantic_read_origin_restricts_output_when_native_manifest_floor
 #[tokio::test]
 async fn native_trusted_transport_keeps_external_ticket_influence_on_later_exact_inputs(
 ) -> TestResult {
-    let f = native_fixture("external-history")?;
+    let f = empty_import::native_fixture_from_empty_import("external-history").await?;
     let (runtime, read, _) = chains::prepare_origin_read(&f, "customer-ticket-read")?;
     let response = runtime
         .execute_step(&f.process, "root", "customer-ticket-read", &read)

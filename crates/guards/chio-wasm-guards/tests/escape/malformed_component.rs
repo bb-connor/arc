@@ -106,3 +106,53 @@ fn empty_input_yields_compilation_error() {
         other => panic!("expected Compilation, got {other:?}"),
     }
 }
+
+fn async_callback_component(result_count: usize) -> Vec<u8> {
+    let result_types = vec!["i32"; result_count].join(" ");
+    let result_values = vec!["i32.const 0"; result_count].join(" ");
+    let component = format!(
+        r#"(component
+            (core module $module
+                (func (export "run") (result i32) i32.const 0)
+                (func (export "callback") (param i32 i32 i32)
+                    (result {result_types}) {result_values}))
+            (core instance $instance (instantiate $module))
+            (alias core export $instance "run" (core func $run))
+            (alias core export $instance "callback" (core func $callback))
+            (type $signature (func async))
+            (func (export "run") (type $signature)
+                (canon lift (core func $run) async (callback $callback))))"#
+    );
+    wat::parse_str(component).expect("callback fixture must be well-formed component bytes")
+}
+
+#[test]
+fn correctly_typed_async_callback_remains_supported() {
+    let engine = create_shared_engine().expect("create_shared_engine");
+    wasmtime::component::Component::new(&engine, async_callback_component(1))
+        .expect("valid asynchronous callback component must compile");
+}
+
+/// RUSTSEC-2026-0327 permitted callbacks with three i32 parameters and an
+/// arbitrary result count, which could overrun the native callback buffer.
+/// Validate the real backend before any malformed callback can execute.
+#[test]
+fn async_callback_wrong_result_count_is_rejected_before_execution() {
+    let cfg = load_frozen_config();
+    for result_count in [0, 2, 32] {
+        let engine = create_shared_engine().expect("create_shared_engine");
+        let bytes = async_callback_component(result_count);
+        let validation = wasmtime::component::Component::new(&engine, &bytes)
+            .expect_err("invalid callback signature must fail validation");
+        assert!(format!("{validation:#}").contains("callback"));
+        assert!(format!("{validation:#}").contains("incorrect signature"));
+        let mut backend = ComponentBackend::with_engine(engine);
+        let error = backend
+            .load_module(&bytes, cfg.escape_fuel_limit)
+            .expect_err("callback result count must be validated");
+        match error {
+            WasmGuardError::Compilation(_) => {}
+            other => panic!("expected callback Compilation error, got {other:?}"),
+        }
+    }
+}

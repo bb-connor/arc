@@ -1,5 +1,6 @@
 //! Maintenance reads recompute protected contract data without reserving writes.
 use super::*;
+use chio_security_types::InformationLabel;
 
 impl SqliteAdmissionOperationStore {
     /// Return historical constraints, never authority to rerun the captured step.
@@ -77,7 +78,9 @@ impl SqliteAdmissionOperationStore {
                         .contains(&RecoveryPermission::Maintain)
             })
             .ok_or_else(|| refused("semantic constraint reader revoked"))?;
-        if !label.flows_to(&assignment.preview_clearance) {
+        if matches!(assignment.preview_clearance, InformationLabel::Top)
+            || !label.flows_to(&assignment.preview_clearance)
+        {
             return Err(refused("semantic constraint audience"));
         }
         if canonical_json_bytes(&constraints).map_err(refused)?.len() > MAX_RECOVERY_WIRE_BYTES {

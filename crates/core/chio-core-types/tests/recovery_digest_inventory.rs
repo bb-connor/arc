@@ -1,5 +1,9 @@
 //! Every production recovery digest domain has a single registered meaning.
-use chio_core_types::recovery::RECOVERY_DIGEST_DOMAINS;
+use chio_core_types::{
+    canonical::CanonicalBytes,
+    recovery::{RecoveryDigestDomain, RECOVERY_DIGEST_DOMAINS},
+};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -65,5 +69,29 @@ fn production_digest_domains_are_complete_and_pinned_in_the_wire_inventory() -> 
             "registered digest domain is not acknowledged by the wire inventory: {name}",
         );
     }
+    Ok(())
+}
+
+#[test]
+fn native_input_provenance_cannot_alias_output_or_status_provenance() -> TestResult {
+    let input = RECOVERY_DIGEST_DOMAINS
+        .iter()
+        .find(|domain| domain.name() == "chio.semantic.native-input-origin.v1")
+        .ok_or("native input provenance domain is missing")?;
+    let body = CanonicalBytes::new(&serde_json::json!({"operation":"native-input"}))?;
+    let actual = input.digest(&body);
+    let mut expected = Sha256::new();
+    expected.update(b"chio.semantic.native-input-origin.v1\0");
+    expected.update(b"{\"operation\":\"native-input\"}");
+    let expected: [u8; 32] = expected.finalize().into();
+    assert_eq!(actual.as_bytes(), &expected);
+    assert_ne!(
+        actual,
+        RecoveryDigestDomain::SemanticNativeOutputOrigin.digest(&body)
+    );
+    assert_ne!(
+        actual,
+        RecoveryDigestDomain::SemanticNativeStatusOrigin.digest(&body)
+    );
     Ok(())
 }

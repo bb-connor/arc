@@ -1,4 +1,4 @@
-//! Fixed owned command capacity independent of the caller's async executor.
+//! Finite native work domains independent of the caller's async executor.
 use super::RecoveryRuntimeError;
 use std::{
     collections::BTreeMap,
@@ -14,13 +14,40 @@ use tokio::{
 
 const WORKERS: usize = 4;
 const PER_PRINCIPAL: usize = 2;
-type Work = Box<dyn FnOnce(&Runtime) + Send + 'static>;
+#[derive(Clone, Copy)]
+enum ExecutionDomain {
+    Command,
+    ProviderFinality,
+}
+impl ExecutionDomain {
+    const fn workers(self) -> usize {
+        match self {
+            Self::Command => WORKERS,
+            Self::ProviderFinality => 2,
+        }
+    }
+    const fn per_principal(self) -> usize {
+        match self {
+            Self::Command => PER_PRINCIPAL,
+            Self::ProviderFinality => 1,
+        }
+    }
+    const fn thread_prefix(self) -> &'static str {
+        match self {
+            Self::Command => "chio-recovery-command",
+            Self::ProviderFinality => "chio-recovery-finality",
+        }
+    }
+}
+type Work = Box<dyn FnOnce(&Runtime, PrincipalPermit) + Send + 'static>;
 #[cfg(test)]
 type PrincipalRefusalObserver = dyn Fn(&str) + Send + Sync + 'static;
+#[cfg(test)]
+type ReplyPublicationObserver = dyn Fn(&str) + Send + Sync + 'static;
 
 struct Job {
     work: Work,
-    _permit: PrincipalPermit,
+    permit: PrincipalPermit,
 }
 
 struct PrincipalPermit {
@@ -75,6 +102,7 @@ impl Drop for WorkerExit {
 }
 
 pub(super) struct CommandExecutor {
+    domain: ExecutionDomain,
     sender: Arc<Mutex<Option<mpsc::SyncSender<Job>>>>,
     lifecycle: Arc<WorkerLifecycle>,
     state: watch::Receiver<WorkerState>,
@@ -83,6 +111,8 @@ pub(super) struct CommandExecutor {
     _workers: Vec<thread::JoinHandle<()>>,
     #[cfg(test)]
     principal_refusal_observer: Mutex<Option<Arc<PrincipalRefusalObserver>>>,
+    #[cfg(test)]
+    reply_publication_observer: Mutex<Option<Arc<ReplyPublicationObserver>>>,
 }
 
 impl CommandExecutor {
@@ -95,8 +125,23 @@ impl CommandExecutor {
         Ok(executor)
     }
 
+    /// Two retained finality workers are independent of all command capacity.
+    /// One outstanding native phase per checked authority/subject leaves the
+    /// other slot available to another settlement principal.
+    pub(super) async fn shared_provider_finality() -> Result<&'static Self, RecoveryRuntimeError> {
+        static EXECUTOR: OnceLock<CommandExecutor> = OnceLock::new();
+        let executor =
+            EXECUTOR.get_or_init(|| Self::new_in_domain(ExecutionDomain::ProviderFinality));
+        executor.ready().await?;
+        Ok(executor)
+    }
+
     fn new() -> Self {
-        let (sender, receiver) = mpsc::sync_channel::<Job>(WORKERS);
+        Self::new_in_domain(ExecutionDomain::Command)
+    }
+
+    fn new_in_domain(domain: ExecutionDomain) -> Self {
+        let (sender, receiver) = mpsc::sync_channel::<Job>(domain.workers());
         let sender = Arc::new(Mutex::new(Some(sender)));
         let receiver = Arc::new(Mutex::new(receiver));
         let (state, observed) = watch::channel(WorkerState::default());
@@ -104,13 +149,13 @@ impl CommandExecutor {
             state,
             sender: sender.clone(),
         });
-        let mut workers = Vec::with_capacity(WORKERS);
-        for index in 0..WORKERS {
+        let mut workers = Vec::with_capacity(domain.workers());
+        for index in 0..domain.workers() {
             let receiver = receiver.clone();
             let lifecycle = lifecycle.clone();
             let worker_lifecycle = lifecycle.clone();
             match thread::Builder::new()
-                .name(format!("chio-recovery-command-{index}"))
+                .name(format!("{}-{index}", domain.thread_prefix()))
                 .spawn(move || {
                     let _exit = WorkerExit(worker_lifecycle.clone());
                     // Construct and drop the Tokio driver on its owned OS
@@ -133,14 +178,17 @@ impl CommandExecutor {
             }
         }
         Self {
+            domain,
             sender,
             lifecycle,
             state: observed,
-            capacity: Arc::new(Semaphore::new(WORKERS)),
+            capacity: Arc::new(Semaphore::new(domain.workers())),
             principals: Arc::new(Mutex::new(BTreeMap::new())),
             _workers: workers,
             #[cfg(test)]
             principal_refusal_observer: Mutex::new(None),
+            #[cfg(test)]
+            reply_publication_observer: Mutex::new(None),
         }
     }
 
@@ -154,7 +202,7 @@ impl CommandExecutor {
                 if state.exited == self._workers.len() {
                     return Err(RecoveryRuntimeError::Unavailable);
                 }
-            } else if state.ready == WORKERS {
+            } else if state.ready == self.domain.workers() {
                 return Ok(());
             }
             observed
@@ -176,7 +224,8 @@ impl CommandExecutor {
         }
     }
 
-    /// At most four accepted jobs and two per checked authority/subject.
+    /// Commands admit four jobs and two per checked authority/subject. Provider
+    /// finality admits two jobs and one per checked authority/subject.
     /// Capacity includes queued, running and disconnected work through completion.
     pub(super) fn try_submit<T: Send + 'static>(
         &self,
@@ -193,7 +242,7 @@ impl CommandExecutor {
                 .lock()
                 .map_err(|_| RecoveryRuntimeError::Unavailable)?;
             let count = principals.get(&principal).copied().unwrap_or_default();
-            if count >= PER_PRINCIPAL {
+            if count >= self.domain.per_principal() {
                 // Pause only a real principal refusal in the default-off test
                 // bridge. No principal lock spans the observer.
                 drop(principals);
@@ -217,24 +266,38 @@ impl CommandExecutor {
             _capacity: capacity,
         };
         let (reply, response) = oneshot::channel();
+        #[cfg(test)]
+        let reply_observer = self
+            .reply_publication_observer
+            .lock()
+            .ok()
+            .and_then(|observer| observer.clone());
+        #[cfg(test)]
+        let observed_principal = permit.principal.clone();
         // The owning job moves only its pinned pointer through unwind and
         // runtime frames. Large native command futures stay on the heap.
         let future = Box::pin(future);
-        let work = Box::new(move |runtime: &Runtime| {
+        let work = Box::new(move |runtime: &Runtime, permit: PrincipalPermit| {
             let _clock = fixed_time.map(chio_kernel::scope_fixed_runtime_clock_for_current_thread);
             let result = catch_unwind(AssertUnwindSafe(|| runtime.block_on(future)))
                 .unwrap_or(Err(RecoveryRuntimeError::Unavailable));
+            // Completion and unwind retain this exact permit. Release it before
+            // waking a caller that may immediately submit its next native phase.
+            drop(permit);
             let _ = reply.send(result);
+            #[cfg(test)]
+            if let Some(observer) = reply_observer {
+                // Observe a real published reply outside queue/principal locks.
+                // The default-off bridge grants no native execution authority.
+                observer(&observed_principal);
+            }
         });
         self.sender
             .lock()
             .map_err(|_| RecoveryRuntimeError::Unavailable)?
             .as_ref()
             .ok_or(RecoveryRuntimeError::Unavailable)?
-            .try_send(Job {
-                work,
-                _permit: permit,
-            })
+            .try_send(Job { work, permit })
             .map_err(|_| RecoveryRuntimeError::Unavailable)?;
         Ok(response)
     }
@@ -254,14 +317,17 @@ fn worker(receiver: Arc<Mutex<mpsc::Receiver<Job>>>, runtime: Runtime) {
             Ok(receiver) => receiver.recv(),
             Err(_) => return,
         };
-        let Ok(Job { work, _permit }) = job else {
+        let Ok(Job { work, permit }) = job else {
             return;
         };
         // No queue or principal mutex spans native work. Contained failures
         // finish this exact job; they never create another admission attempt.
-        let _ = catch_unwind(AssertUnwindSafe(|| work(&runtime)));
+        let _ = catch_unwind(AssertUnwindSafe(|| work(&runtime, permit)));
     }
 }
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod finality_tests;

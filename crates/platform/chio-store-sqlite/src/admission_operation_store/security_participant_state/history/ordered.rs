@@ -162,6 +162,24 @@ pub(in crate::admission_operation_store::security_participant_state) fn validate
     Ok(())
 }
 
+/// Actual retained native bytes and journal slots above the retained
+/// checkpoint. These totals are data and cannot discharge a pending source
+/// purpose or create an allocation.
+pub(in crate::admission_operation_store::security_participant_state) fn journal_totals(
+    connection: &Connection,
+    authority: &str,
+) -> Result<(u64, u64), AdmissionOperationStoreError> {
+    let (count, bytes) = segment_totals(connection, authority)?;
+    let (max_events, max_bytes) = journal_bounds();
+    if !(0..=max_events).contains(&count) || !(0..=max_bytes).contains(&bytes) {
+        return Err(invalid("combined native journal exceeds bounds"));
+    }
+    Ok((
+        u64::try_from(count).map_err(invalid)?,
+        u64::try_from(bytes).map_err(invalid)?,
+    ))
+}
+
 pub(in crate::admission_operation_store::security_participant_state) fn segment_totals(
     connection: &Connection,
     authority: &str,

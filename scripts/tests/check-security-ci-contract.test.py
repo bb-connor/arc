@@ -1359,6 +1359,44 @@ assert_boundary_file_rejected(
     replace_once('"--network",\n        "none"', '"--network",\n        "bridge"'),
     "trusted security container runner contract changed",
 )
+for label, original, replacement in (
+    (
+        "security runner accepts changed mount cardinality",
+        "or len(mounts) != len(expected_mounts)",
+        "or False",
+    ),
+    (
+        "security runner accepts unknown mount fields",
+        "or set(mount) != set(mount_field_types)",
+        "or False",
+    ),
+    (
+        "security runner accepts changed mount field types",
+        "type(mount[field]) is not field_type",
+        "False",
+    ),
+    (
+        "security runner accepts duplicate mount destinations",
+        "len(set(destinations)) != len(destinations)",
+        "False",
+    ),
+    (
+        "security runner accepts altered mount records",
+        'or sorted(mounts, key=lambda mount: mount["Destination"])',
+        'or sorted(expected_mounts, key=lambda mount: mount["Destination"])',
+    ),
+    (
+        "security runner accepts a writable source bind",
+        '"Destination": "/source",\n            "Mode": "",\n            "RW": False',
+        '"Destination": "/source",\n            "Mode": "",\n            "RW": True',
+    ),
+):
+    assert_boundary_file_rejected(
+        label,
+        Path("scripts/run-security-execution-container.py"),
+        replace_once(original, replacement),
+        "trusted security container mount inventory contract changed",
+    )
 assert_boundary_file_rejected(
     "security runner appends a later host-network override",
     Path("scripts/run-security-execution-container.py"),

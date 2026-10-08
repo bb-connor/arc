@@ -1,6 +1,90 @@
 use super::*;
 use chio_kernel::admission_operation::RetainedToolAdmissionRequestV1;
 
+/// Load limits from the committed original inside the reader's transaction.
+/// Bounds are storage data, never a source of mutation or release authority.
+pub(crate) fn original_output_read_bounds(
+    connection: &Connection,
+    operation_id: &str,
+) -> Result<Option<(u64, u64)>, AdmissionOperationStoreError> {
+    let operation_id = AdmissionOperationId::from_persisted(operation_id.to_owned())?;
+    // Older dispatches have no retained request and a NULL begin participant.
+    // Authenticate that literal absence before adding profile-specific reads;
+    // it supplies no output bound and never supplies a financing purpose.
+    let legacy_without_original: bool = connection
+        .query_row(
+            "SELECT EXISTS(
+                 SELECT 1 FROM admission_operations AS operation
+                 JOIN admission_operation_commits AS begin_commit
+                   ON begin_commit.operation_id=operation.operation_id
+                  AND begin_commit.mutation_kind='begin'
+                  AND begin_commit.participant_digest IS NULL
+                 WHERE operation.operation_id=?1
+                   AND NOT EXISTS(SELECT 1 FROM admission_operation_tool_requests AS original
+                                  WHERE original.operation_id=operation.operation_id))",
+            [operation_id.as_str()],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)?;
+    if legacy_without_original {
+        return Ok(None);
+    }
+    let Some(stored) = load_output_bound_owner(connection, &operation_id)? else {
+        let has_outcome: bool = connection
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM tool_outcomes WHERE operation_id=?1
+                 UNION ALL SELECT 1 FROM post_return_evaluations WHERE operation_id=?1)",
+                [operation_id.as_str()],
+                |row| row.get(0),
+            )
+            .map_err(sqlite_error)?;
+        return if has_outcome {
+            Err(invariant("stored outcome has no owning original operation"))
+        } else {
+            Ok(None)
+        };
+    };
+    let original = load_retained_request_tx(connection, &stored.operation)?;
+    Ok(original.and_then(|original| {
+        original
+            .native_output_retention()
+            .map(|profile| (profile.envelopes().raw(), profile.envelopes().evaluation()))
+    }))
+}
+
+/// Authenticate only the immutable binding/current canonical row and its commit
+/// before reading the original envelope. Full native/terminal verification is
+/// the caller's responsibility and itself reads Raw/evaluation bytes; invoking
+/// it here would reenter the output loader being verified. This private leaf
+/// returns no recovery, capture, release or writer authority.
+fn load_output_bound_owner(
+    connection: &Connection,
+    operation_id: &AdmissionOperationId,
+) -> Result<Option<StoredOperation>, AdmissionOperationStoreError> {
+    let raw = connection
+        .query_row(
+            "SELECT operation_id, request_namespace_digest, request_id,
+                CASE WHEN length(operation_json) BETWEEN 1 AND 262144
+                     THEN operation_json ELSE zeroblob(0) END,
+                state, terminal, coordinator_lease_epoch, version,
+                created_at_unix_ms, updated_at_unix_ms,
+                recovery_claimant_id, recovery_coordinator_lease_id,
+                recovery_coordinator_lease_epoch, recovery_claimed_version,
+                recovery_expires_at_unix_ms, recovery_store_uuid,
+                recovery_store_lease_id, recovery_store_owner_epoch
+         FROM main.admission_operations WHERE operation_id=?1",
+            [operation_id.as_str()],
+            read_raw_row,
+        )
+        .optional()
+        .map_err(sqlite_error)?;
+    let stored = raw.map(decode_row).transpose()?;
+    if let Some(stored) = &stored {
+        verify_latest_commit(connection, stored)?;
+    }
+    Ok(stored)
+}
+
 pub(super) fn verify_retained_request_ownership(
     connection: &Connection,
 ) -> Result<(), AdmissionOperationStoreError> {

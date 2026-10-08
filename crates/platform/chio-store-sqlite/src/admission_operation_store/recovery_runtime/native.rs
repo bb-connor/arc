@@ -7,6 +7,9 @@ use chio_security_types::ports::FlowStateSnapshot;
 #[cfg(feature = "admission-test-support")]
 #[path = "native_begin_test_support.rs"]
 mod native_begin_test_support;
+#[path = "native/private_settlement.rs"]
+mod private_settlement;
+pub(super) use private_settlement::verified_private_settlement;
 
 pub(in crate::admission_operation_store) fn located(
     tx: &Connection,
@@ -89,6 +92,7 @@ pub(in crate::admission_operation_store) fn prepare_begin_tx(
     let original = load_by_operation_id_tx(tx, operation.binding().operation_id())?;
     if original.is_none() {
         require_active(&record)?;
+        require_current_original_owner(tx, &record)?;
         let profile = deployment_tx(tx, &record.scope)?;
         fresh_basis(tx, &profile, &record, now)?;
         let grant = record
@@ -135,6 +139,7 @@ pub(in crate::admission_operation_store) fn publish_begin_tx(
         Some(existing) if *existing == linked => Ok(false),
         Some(_) => Err(invariant("recovery original operation changed")),
         None => {
+            require_current_original_owner(tx, &record)?;
             record.native_link = Some(linked);
             save_workflow(tx, owner, &mut record, WorkflowWriteClass::Native)?;
             Ok(true)
@@ -184,14 +189,14 @@ pub(super) fn historical_release(
     let Some(native) = load_by_operation_id_tx(tx, id)? else {
         return Ok(None);
     };
-    let Some(record) = located(tx, native.operation.binding())? else {
+    let Some(mut record) = located(tx, native.operation.binding())? else {
         return Ok(None);
     };
     let Some((_, custody)) = captured_custody(tx, id, fence)? else {
         return Err(invariant("recovery historical capture custody absent"));
     };
     if !matches!(custody, RecoveryCapturedDeploymentV1::Verified(_))
-        || historical_holds::effective(tx, &record)?.is_some()
+        || historical_holds::blocks_original_private_settlement(tx, &record)?
     {
         return Err(invariant(
             "legacy recovery deployment verifier is unavailable",
@@ -212,6 +217,9 @@ pub(super) fn historical_release(
     {
         return Err(invariant("recovery historical release custody refused"));
     }
+    // Only data is returned. This exact authenticated hold cannot authorize
+    // dispatch or result delivery, but the private signer must attest it.
+    record.historical_hold = historical_holds::effective(tx, &record)?;
     Ok(Some(record))
 }
 
@@ -469,6 +477,7 @@ pub(crate) fn capture_tx(
     historical_holds::require_unheld(tx, &record)?;
     super::terminal_custody::require_unfinished(tx, &record)?;
     require_active(&record)?;
+    require_current_original_owner(tx, &record)?;
     if record.captured {
         return Err(invariant("recovery continuation is already captured"));
     }
@@ -586,8 +595,16 @@ pub(super) fn settle(
                         operation: reference,
                     }
                 }
+                AdmissionOperationState::DeniedAfterDelivery => {
+                    if verified_private_settlement(tx, &record, operation, &owner.fence)? {
+                        super::terminal_custody::publish_completed(tx, owner, operation)?;
+                        return historical_holds::view(tx, record);
+                    }
+                    EffectObservationV1::Unknown {
+                        operation: reference,
+                    }
+                }
                 AdmissionOperationState::OutcomeUnknownAfterDispatch
-                | AdmissionOperationState::DeniedAfterDelivery
                 | AdmissionOperationState::NotAcceptedAfterDispatchCommit => {
                     EffectObservationV1::Unknown {
                         operation: reference,
@@ -774,6 +791,11 @@ pub(super) fn release_result(
         return Err(invariant("recovery current result release basis changed"));
     }
     super::super::projection::verify_stored_terminal_projection(tx, &stored)?;
+    if verified_private_settlement(tx, &record, operation, &owner.fence)? {
+        return Err(invariant(
+            "private recovery settlement permanently withholds its result",
+        ));
+    }
     let historical = match captured_custody(tx, binding.operation_id(), &owner.fence)?
         .ok_or_else(|| invariant("recovery captured result custody absent"))?
         .1

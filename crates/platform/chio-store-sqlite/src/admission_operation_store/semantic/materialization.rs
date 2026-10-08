@@ -1,4 +1,5 @@
 use super::*;
+use chio_security_types::knowledge::ArtifactInfluenceV1;
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -82,7 +83,8 @@ pub(super) fn materialized_influence(
     contract_external: bool,
     model: Option<&chio_core::capability::scope::ModelMetadata>,
     budget: &mut VerificationBudget,
-) -> Result<(CanonicalPayloadDigest, bool), AdmissionOperationStoreError> {
+) -> Result<(CanonicalPayloadDigest, bool, Option<ArtifactInfluenceV1>), AdmissionOperationStoreError>
+{
     let observed = super::super::security_participant_state::knowledge::observed_influence(
         tx,
         binding.security_authority_id().as_str(),
@@ -139,6 +141,7 @@ pub(super) fn materialized_influence(
                 || parent.invocation.action.externally_influenced
                 || model.is_some()
                 || observed.is_some(),
+            observed,
         ));
     }
     let digest = if inherited.is_empty() {
@@ -161,6 +164,7 @@ pub(super) fn materialized_influence(
         )
         .map_err(refused)?,
         external || model.is_some() || observed.is_some(),
+        observed,
     ))
 }
 pub(super) fn verify_materialized_plan(

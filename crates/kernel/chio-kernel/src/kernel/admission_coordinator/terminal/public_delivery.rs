@@ -8,6 +8,7 @@ impl ChioKernel {
         request: &ToolCallRequest,
         response: &ToolCallResponse,
     ) -> Result<(), KernelError> {
+        self.require_no_historical_settlement_delivery(&response.receipt)?;
         if self.is_emergency_stopped() {
             return Err(KernelError::GuardDenied(EMERGENCY_STOP_DENY_REASON.into()));
         }

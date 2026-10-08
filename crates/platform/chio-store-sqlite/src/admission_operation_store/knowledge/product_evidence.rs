@@ -1,5 +1,7 @@
 //! One admitted Product source consumes one complete logical reference plan.
+use super::super::product::evidence_reclamation::VerifiedProductEvidenceReclamation;
 use super::reference_custody::VerifiedKnowledgeReferenceRetain;
+use super::reference_retirement::VerifiedKnowledgeReferenceRetirement;
 use super::references::{prepare_reference_retain, ProductEvidenceOwner};
 use super::*;
 
@@ -85,4 +87,77 @@ pub(in crate::admission_operation_store) fn retain_product_evidence<'tx, 'conn>(
     let plan = prepare_reference_retain(tx, source)?;
     let allowance = protected::bind_product_reference_source(tx, reserved, plan.owner_source())?;
     protected::persist_knowledge_reference_progress(tx, owner, plan, allowance)
+}
+
+/// Only the Product writer's current affine terminal proof can retire its
+/// complete Proposal evidence owner set. Archive alone has no such role.
+/// Logical retirement changes no publication or physical byte allocation.
+pub(in crate::admission_operation_store) fn retire_product_evidence<'tx, 'conn>(
+    tx: &'tx Transaction<'conn>,
+    owner: &SqliteServingOwner,
+    proof: VerifiedProductEvidenceReclamation<'tx, 'conn>,
+) -> Result<protected::ProtectedMutationDelta, AdmissionOperationStoreError> {
+    if !std::ptr::eq(owner, proof.serving_owner()) {
+        return Err(refused(
+            "Product retirement changed its actual serving owner",
+        ));
+    }
+    let source = VerifiedKnowledgeReferenceRetirement::product_proposal(tx, proof)?;
+    protected::persist_product_reference_retirement(tx, owner, source)
+}
+
+#[cfg(feature = "admission-test-support")]
+impl SqliteAdmissionOperationStore {
+    /// Observe exact retired custody using two genuine retained Proposal
+    /// terminals. The scoped selectors are data only and cannot mutate a leaf.
+    pub fn inspect_retired_proposal_terminal_custody(
+        &self,
+        scope: &RecoveryScopeV1,
+        proposal_id: &ReviewId,
+        terminal_proposal_id: &ReviewId,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        use super::super::product::{evidence_reclamation, stored_proposal};
+        use super::references::{ReferenceOwner, SourceAnchor};
+
+        let mut connection = self.connection()?;
+        let tx = self.begin_read(&mut connection)?;
+        schema::verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
+        schema::authority_validation_time(&tx, now)?;
+        if scope.authority_domain.as_str() != fence.store_uuid {
+            return Err(refused("retired Proposal observer changed authority"));
+        }
+        let proposal = stored_proposal(&tx, scope, proposal_id)?;
+        let terminal_proposal = stored_proposal(&tx, scope, terminal_proposal_id)?;
+        let owner = ProductEvidenceOwner::Proposal {
+            scope: scope.clone(),
+            id: proposal_id.clone(),
+            digest: proposal.digest,
+        };
+        let terminal_owner = ProductEvidenceOwner::Proposal {
+            scope: scope.clone(),
+            id: terminal_proposal_id.clone(),
+            digest: terminal_proposal.digest,
+        };
+        let original = evidence_reclamation::product_reclamation_source(&tx, &owner)?
+            .ok_or_else(|| refused("retired Proposal observer lost its source tuple"))?;
+        let terminal = evidence_reclamation::product_reclamation_source(&tx, &terminal_owner)?
+            .ok_or_else(|| refused("retired Proposal observer lost its terminal tuple"))?;
+        original.verify(&tx)?;
+        terminal.verify(&tx)?;
+        let owner = ReferenceOwner::from(owner);
+        let original_anchor = SourceAnchor::capture(original.original());
+        let terminal_anchor = SourceAnchor::capture(terminal.terminal());
+        for reference in original.references() {
+            references::require_retired_reference_owner(
+                &tx,
+                reference,
+                &owner,
+                &original_anchor,
+                &terminal_anchor,
+            )?;
+        }
+        tx.commit().map_err(sqlite_error)
+    }
 }
