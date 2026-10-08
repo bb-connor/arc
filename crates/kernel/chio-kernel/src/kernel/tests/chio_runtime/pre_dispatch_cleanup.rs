@@ -490,6 +490,7 @@ fn drop_guard_reverse_failure_records_cleanup_fault() {
         None,
         PostAdmissionReceiptContext {
             extra_metadata: None,
+            runtime_reservation: RuntimeReservation::NONE,
             pre_invocation_guard_evidence: Vec::new(),
             verified_payee_binding: None,
         },
@@ -577,7 +578,10 @@ fn drop_pre_dispatch_releases_reservations_no_receipt() -> Result<(), Box<dyn st
         &mutation,
         None,
         PostAdmissionReceiptContext {
-            extra_metadata: Some(metadata),
+            extra_metadata: Some(metadata.clone()),
+            runtime_reservation: RuntimeReservation::from_decision(
+                &RuntimeAdmissionDecision::allow(Some(metadata)),
+            ),
             pre_invocation_guard_evidence: Vec::new(),
             verified_payee_binding: None,
         },
@@ -656,7 +660,10 @@ fn drop_pre_dispatch_monetary_unwinds_without_receipt() -> Result<(), Box<dyn st
         &mutation,
         Some(&authorization),
         PostAdmissionReceiptContext {
-            extra_metadata: Some(metadata),
+            extra_metadata: Some(metadata.clone()),
+            runtime_reservation: RuntimeReservation::from_decision(
+                &RuntimeAdmissionDecision::allow(Some(metadata)),
+            ),
             pre_invocation_guard_evidence: Vec::new(),
             verified_payee_binding: None,
         },
@@ -720,6 +727,7 @@ fn drop_pre_dispatch_reverses_invocation_budget() -> Result<(), Box<dyn std::err
         None,
         PostAdmissionReceiptContext {
             extra_metadata: None,
+            runtime_reservation: RuntimeReservation::NONE,
             pre_invocation_guard_evidence: Vec::new(),
             verified_payee_binding: None,
         },
@@ -777,6 +785,7 @@ fn drop_pre_dispatch_releases_admitted_child_budget() -> Result<(), Box<dyn std:
         None,
         PostAdmissionReceiptContext {
             extra_metadata: None,
+            runtime_reservation: RuntimeReservation::NONE,
             pre_invocation_guard_evidence: Vec::new(),
             verified_payee_binding: None,
         },
@@ -854,6 +863,7 @@ fn drop_pre_dispatch_overlapping_readmit_keeps_sibling_denied(
         None,
         PostAdmissionReceiptContext {
             extra_metadata: None,
+            runtime_reservation: RuntimeReservation::NONE,
             pre_invocation_guard_evidence: Vec::new(),
             verified_payee_binding: None,
         },
@@ -924,7 +934,10 @@ fn drop_pre_dispatch_records_receipt_on_cleanup_fault() -> Result<(), Box<dyn st
         &mutation,
         None,
         PostAdmissionReceiptContext {
-            extra_metadata: Some(metadata),
+            extra_metadata: Some(metadata.clone()),
+            runtime_reservation: RuntimeReservation::from_decision(
+                &RuntimeAdmissionDecision::allow(Some(metadata)),
+            ),
             pre_invocation_guard_evidence: Vec::new(),
             verified_payee_binding: None,
         },
@@ -1010,6 +1023,7 @@ fn drop_pre_dispatch_cleanup_fault_receipt_includes_monetary_hold_id(
         None,
         PostAdmissionReceiptContext {
             extra_metadata: None,
+            runtime_reservation: RuntimeReservation::NONE,
             pre_invocation_guard_evidence: Vec::new(),
             verified_payee_binding: None,
         },

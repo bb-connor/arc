@@ -74,6 +74,9 @@ pub(super) struct PreDispatchCleanupDeny<'a> {
     pub(super) payment_authorization: Option<&'a PaymentAuthorization>,
     pub(super) durable_operation: Option<&'a AdmissionOperationV1>,
     pub(super) runtime_admission_metadata: Option<serde_json::Value>,
+    /// The runtime hook's own reservation record. Cleanup releases only what
+    /// it names, never what the receipt metadata claims.
+    pub(super) runtime_reservation: &'a RuntimeReservation,
     pub(super) verified_payee_binding: Option<&'a VerifiedGovernedPayeeBinding>,
     /// Whether THIS evaluation acquired a sibling-sum child-budget holder lease
     /// (the `admit_capability_budget` return). Only then may cleanup release
@@ -90,6 +93,7 @@ pub(super) struct ExecutionNonceReservingResponse<'a> {
     pub(super) matched_grant_index: usize,
     pub(super) budget_mutation: &'a PreExecutionBudgetMutation,
     pub(super) runtime_admission_metadata: Option<serde_json::Value>,
+    pub(super) runtime_reservation: &'a RuntimeReservation,
     pub(super) reserved_payment_reference: Option<String>,
     pub(super) budget_lease_acquired: bool,
     pub(super) nonce: PreflightNonceSource,
@@ -373,12 +377,14 @@ impl ChioKernel {
         cap: &CapabilityToken,
         budget_mutation: &PreExecutionBudgetMutation,
         runtime_admission_metadata: Option<serde_json::Value>,
+        runtime_reservation: &RuntimeReservation,
         budget_lease_acquired: bool,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
     ) -> Result<ToolCallResponse, KernelError> {
         let (runtime_metadata, _) = self
             .release_runtime_admission_reservations_for_pre_dispatch_denial(
                 None,
+                runtime_reservation,
                 runtime_admission_metadata,
             );
         let runtime_metadata = self
@@ -414,12 +420,14 @@ impl ChioKernel {
         budget_mutation: &PreExecutionBudgetMutation,
         durable_operation: Option<&AdmissionOperationV1>,
         runtime_admission_metadata: Option<serde_json::Value>,
+        runtime_reservation: &RuntimeReservation,
         budget_lease_acquired: bool,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
     ) -> Result<ToolCallResponse, KernelError> {
         let (runtime_metadata, runtime_release_confirmed) = self
             .release_runtime_admission_reservations_for_pre_dispatch_denial(
                 durable_operation,
+                runtime_reservation,
                 runtime_admission_metadata,
             );
         let lease_release =
@@ -540,6 +548,7 @@ impl ChioKernel {
         let (runtime_admission_metadata, runtime_release_confirmed) = self
             .release_runtime_admission_reservations_for_pre_dispatch_denial(
                 denial.durable_operation,
+                denial.runtime_reservation,
                 runtime_admission_metadata,
             );
         let lease_release = self.release_budget_lease_with_evidence(
@@ -725,6 +734,7 @@ impl ChioKernel {
         let (runtime_metadata, _) = self
             .release_runtime_admission_reservations_for_pre_dispatch_denial(
                 denial.durable_operation,
+                denial.runtime_reservation,
                 denial.runtime_admission_metadata,
             );
         let runtime_metadata = self
@@ -911,11 +921,13 @@ impl ChioKernel {
         budget_mutation: &PreExecutionBudgetMutation,
         durable_admission: Option<&mut DurableToolAdmission>,
         runtime_admission_metadata: Option<serde_json::Value>,
+        runtime_reservation: &RuntimeReservation,
         budget_lease_acquired: bool,
     ) -> Result<ToolCallResponse, KernelError> {
         let (runtime_admission_metadata, runtime_release_confirmed) = self
             .release_runtime_admission_reservations_for_pre_dispatch_denial(
                 durable_operation(durable_admission.as_deref()),
+                runtime_reservation,
                 runtime_admission_metadata,
             );
         // Release this evaluation's sibling-sum child-budget lease only when it
@@ -1062,6 +1074,7 @@ impl ChioKernel {
             matched_grant_index,
             budget_mutation,
             runtime_admission_metadata,
+            runtime_reservation,
             reserved_payment_reference,
             budget_lease_acquired,
             nonce,
@@ -1089,6 +1102,7 @@ impl ChioKernel {
         } else {
             self.release_runtime_admission_reservations_for_pre_dispatch_denial(
                 None,
+                runtime_reservation,
                 runtime_admission_metadata,
             )
         };

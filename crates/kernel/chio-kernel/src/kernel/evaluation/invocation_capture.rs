@@ -11,6 +11,7 @@ pub(super) struct NonDurableInvocationCapture<'a> {
     pub(super) now: u64,
     pub(super) matched_grant_index: usize,
     pub(super) extra_metadata: &'a Option<serde_json::Value>,
+    pub(super) runtime_reservation: &'a RuntimeReservation,
     pub(super) budget_lease_acquired: bool,
     pub(super) verified_payee_binding: Option<&'a VerifiedGovernedPayeeBinding>,
     pub(super) pre_invocation_guard_evidence: &'a [chio_core::receipt::metadata::GuardEvidence],
@@ -31,6 +32,7 @@ impl ChioKernel {
             now,
             matched_grant_index,
             extra_metadata,
+            runtime_reservation,
             budget_lease_acquired,
             verified_payee_binding,
             pre_invocation_guard_evidence,
@@ -48,6 +50,7 @@ impl ChioKernel {
                         cap,
                         budget_mutation,
                         extra_metadata.clone(),
+                        runtime_reservation,
                         budget_lease_acquired,
                         verified_payee_binding,
                     )

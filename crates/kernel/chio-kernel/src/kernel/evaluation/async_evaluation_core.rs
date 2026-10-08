@@ -465,6 +465,7 @@ impl ChioKernel {
                 None,
                 PostAdmissionReceiptContext {
                     extra_metadata: extra_metadata.clone(),
+                    runtime_reservation: RuntimeReservation::NONE,
                     pre_invocation_guard_evidence: Vec::new(),
                     verified_payee_binding: validated_governed_admission
                         .as_ref()
@@ -503,6 +504,7 @@ impl ChioKernel {
                 dpop_required,
                 durable_admission.as_mut(),
             );
+            let runtime_reservation = RuntimeReservation::from_decision(&runtime_admission);
             let runtime_metadata =
                 merge_metadata_objects(extra_metadata.clone(), runtime_admission.metadata.clone());
             if !runtime_admission.allowed {
@@ -513,6 +515,7 @@ impl ChioKernel {
                 let (runtime_metadata, runtime_release_confirmed) = self
                     .release_runtime_admission_reservations_for_pre_dispatch_denial(
                         durable_operation(durable_admission.as_ref()),
+                        &runtime_reservation,
                         runtime_metadata,
                     );
                 if runtime_release_confirmed {
@@ -560,6 +563,7 @@ impl ChioKernel {
                         let (runtime_metadata, runtime_release_confirmed) = self
                             .release_runtime_admission_reservations_for_pre_dispatch_denial(
                                 durable_operation(durable_admission.as_ref()),
+                                &runtime_reservation,
                                 runtime_metadata,
                             );
                         if runtime_release_confirmed {
@@ -584,6 +588,7 @@ impl ChioKernel {
                         governed_call_chain_receipt_evidence,
                         pre_invocation_guard_evidence,
                         runtime_metadata,
+                        runtime_reservation,
                     ));
                     break;
                 }
@@ -594,6 +599,7 @@ impl ChioKernel {
                     let (runtime_metadata, runtime_release_confirmed) = self
                         .release_runtime_admission_reservations_for_pre_dispatch_denial(
                             durable_operation(durable_admission.as_ref()),
+                            &runtime_reservation,
                             runtime_metadata,
                         );
                     if !runtime_release_confirmed {
@@ -626,6 +632,7 @@ impl ChioKernel {
                     let (runtime_metadata, runtime_release_confirmed) = self
                         .release_runtime_admission_reservations_for_pre_dispatch_denial(
                             durable_operation(durable_admission.as_ref()),
+                            &runtime_reservation,
                             runtime_metadata,
                         );
                     budget_error = Some(
@@ -650,6 +657,7 @@ impl ChioKernel {
                     let (runtime_metadata, runtime_release_confirmed) = self
                         .release_runtime_admission_reservations_for_pre_dispatch_denial(
                             durable_operation(durable_admission.as_ref()),
+                            &runtime_reservation,
                             runtime_metadata,
                         );
                     if runtime_release_confirmed {
@@ -687,6 +695,7 @@ impl ChioKernel {
             governed_call_chain_receipt_evidence,
             pre_invocation_guard_evidence,
             extra_metadata,
+            runtime_reservation,
         )) = selected
         else {
             // Guards are evaluated per grant, so a denial on one candidate only
@@ -804,6 +813,7 @@ impl ChioKernel {
                             payment_authorization: None,
                             durable_operation: durable_operation(durable_admission.as_ref()),
                             runtime_admission_metadata: extra_metadata,
+                            runtime_reservation: &runtime_reservation,
                             verified_payee_binding: verified_governed_payee_binding.as_ref(),
                             // Admission failed: this evaluation acquired no
                             // lease, so there is nothing for cleanup to release.
@@ -832,6 +842,7 @@ impl ChioKernel {
                     budget_mutation: &budget_mutation,
                     durable_admission: &mut durable_admission,
                     extra_metadata,
+                    runtime_reservation: &runtime_reservation,
                     pre_invocation_guard_evidence: &pre_invocation_guard_evidence,
                     verified_governed_payee_binding: &verified_governed_payee_binding,
                     budget_lease_acquired,
@@ -857,6 +868,7 @@ impl ChioKernel {
                     payment_authorization: None,
                     durable_operation: durable_operation(durable_admission.as_ref()),
                     runtime_admission_metadata: error.rejection_metadata(extra_metadata),
+                    runtime_reservation: &runtime_reservation,
                     verified_payee_binding: verified_governed_payee_binding.as_ref(),
                     budget_lease_acquired,
                 })
@@ -908,6 +920,7 @@ impl ChioKernel {
                                 payment_authorization: None,
                                 durable_operation: durable_operation(durable_admission.as_ref()),
                                 runtime_admission_metadata: extra_metadata.clone(),
+                                runtime_reservation: &runtime_reservation,
                                 verified_payee_binding: verified_governed_payee_binding.as_ref(),
                                 budget_lease_acquired,
                             })
@@ -936,6 +949,7 @@ impl ChioKernel {
                             payment_authorization: None,
                             durable_operation: durable_operation(durable_admission.as_ref()),
                             runtime_admission_metadata: denied_metadata(&extra_metadata, &denial),
+                            runtime_reservation: &runtime_reservation,
                             verified_payee_binding: verified_governed_payee_binding.as_ref(),
                             budget_lease_acquired,
                         })
@@ -960,6 +974,7 @@ impl ChioKernel {
                             payment_authorization: None,
                             durable_operation: durable_operation(durable_admission.as_ref()),
                             runtime_admission_metadata: denied_metadata(&extra_metadata, &denial),
+                            runtime_reservation: &runtime_reservation,
                             verified_payee_binding: verified_governed_payee_binding.as_ref(),
                             budget_lease_acquired,
                         })
@@ -995,6 +1010,7 @@ impl ChioKernel {
                     payment_authorization: None,
                     durable_operation: durable_operation(durable_admission.as_ref()),
                     runtime_admission_metadata: extra_metadata,
+                    runtime_reservation: &runtime_reservation,
                     verified_payee_binding: verified_governed_payee_binding.as_ref(),
                     budget_lease_acquired,
                 })
@@ -1025,6 +1041,7 @@ impl ChioKernel {
                     payment_authorization: None,
                     durable_operation: durable_operation(durable_admission.as_ref()),
                     runtime_admission_metadata: extra_metadata,
+                    runtime_reservation: &runtime_reservation,
                     verified_payee_binding: verified_governed_payee_binding.as_ref(),
                     budget_lease_acquired,
                 })
@@ -1066,6 +1083,7 @@ impl ChioKernel {
                             durable_operation: durable_operation(durable_admission.as_ref()),
                             runtime_admission_metadata: error
                                 .rejection_metadata(extra_metadata.clone()),
+                            runtime_reservation: &runtime_reservation,
                             verified_payee_binding: verified_governed_payee_binding.as_ref(),
                             budget_lease_acquired,
                         })
@@ -1088,6 +1106,7 @@ impl ChioKernel {
                 None,
                 PostAdmissionReceiptContext {
                     extra_metadata: extra_metadata.clone(),
+                    runtime_reservation: runtime_reservation.clone(),
                     pre_invocation_guard_evidence: pre_invocation_guard_evidence.clone(),
                     verified_payee_binding: verified_governed_payee_binding.clone(),
                 },
@@ -1161,6 +1180,7 @@ impl ChioKernel {
                     payment_authorization: None,
                     durable_operation: durable_operation(durable_admission.as_ref()),
                     runtime_admission_metadata: error.denied_metadata(&extra_metadata),
+                    runtime_reservation: &runtime_reservation,
                     verified_payee_binding: verified_governed_payee_binding.as_ref(),
                     budget_lease_acquired,
                 })
@@ -1173,6 +1193,7 @@ impl ChioKernel {
                 budget_mutation: &budget_mutation,
                 credential_reservation: &mut credential_reservation,
                 extra_metadata: extra_metadata.clone(),
+                runtime_reservation: &runtime_reservation,
                 now,
                 now_unix_ms,
                 matched_grant_index,
@@ -1204,6 +1225,7 @@ impl ChioKernel {
                 now,
                 matched_grant_index,
                 extra_metadata: &extra_metadata,
+                runtime_reservation: &runtime_reservation,
                 budget_lease_acquired,
                 verified_payee_binding: verified_governed_payee_binding.as_ref(),
                 pre_invocation_guard_evidence: &pre_invocation_guard_evidence,
@@ -1247,6 +1269,7 @@ impl ChioKernel {
                                             durable_admission.as_ref(),
                                         ),
                                         runtime_admission_metadata: extra_metadata.clone(),
+                                        runtime_reservation: &runtime_reservation,
                                         verified_payee_binding: verified_governed_payee_binding
                                             .as_ref(),
                                         budget_lease_acquired,
@@ -1302,6 +1325,7 @@ impl ChioKernel {
                                     &budget_mutation,
                                     durable_operation(durable_admission.as_ref()),
                                     cleanup_metadata,
+                                    &runtime_reservation,
                                     budget_lease_acquired,
                                     verified_governed_payee_binding.as_ref(),
                                 )
@@ -1324,6 +1348,7 @@ impl ChioKernel {
                                         durable_admission.as_ref(),
                                     ),
                                     runtime_admission_metadata: cleanup_metadata,
+                                    runtime_reservation: &runtime_reservation,
                                     verified_payee_binding: verified_governed_payee_binding
                                         .as_ref(),
                                     budget_lease_acquired,
@@ -1425,6 +1450,7 @@ impl ChioKernel {
                                 payment_authorization: payment_authorization.as_ref(),
                                 durable_operation: durable_operation(durable_admission.as_ref()),
                                 runtime_admission_metadata: error.denied_metadata(&extra_metadata),
+                                runtime_reservation: &runtime_reservation,
                                 verified_payee_binding: verified_governed_payee_binding.as_ref(),
                                 budget_lease_acquired,
                             },
@@ -1452,6 +1478,7 @@ impl ChioKernel {
                     payment_authorization: payment_authorization.as_ref(),
                     durable_operation: durable_operation(durable_admission.as_ref()),
                     runtime_admission_metadata: extra_metadata.clone(),
+                    runtime_reservation: &runtime_reservation,
                     verified_payee_binding: verified_governed_payee_binding.as_ref(),
                     budget_lease_acquired,
                 };
@@ -1501,6 +1528,7 @@ impl ChioKernel {
                         payment_authorization: payment_authorization.as_ref(),
                         durable_operation: durable_operation(durable_admission.as_ref()),
                         runtime_admission_metadata: error.denied_metadata(&extra_metadata),
+                        runtime_reservation: &runtime_reservation,
                         verified_payee_binding: verified_governed_payee_binding.as_ref(),
                         budget_lease_acquired,
                     },
@@ -1525,6 +1553,7 @@ impl ChioKernel {
                 matched_grant_index,
                 payment_authorization: payment_authorization.as_ref(),
                 metadata: extra_metadata.as_ref(),
+                runtime_reservation: &runtime_reservation,
                 verified_payee_binding: verified_governed_payee_binding.as_ref(),
                 budget_lease_acquired,
                 evidence: &pre_invocation_guard_evidence,
@@ -1555,6 +1584,7 @@ impl ChioKernel {
                         payment_authorization: payment_authorization.as_ref(),
                         durable_operation: durable_operation(durable_admission.as_ref()),
                         runtime_admission_metadata: extra_metadata.clone(),
+                        runtime_reservation: &runtime_reservation,
                         verified_payee_binding: verified_governed_payee_binding.as_ref(),
                         budget_lease_acquired,
                     },
@@ -1583,6 +1613,7 @@ impl ChioKernel {
                             payment_authorization: payment_authorization.as_ref(),
                             durable_operation: durable_operation(durable_admission.as_ref()),
                             runtime_admission_metadata: extra_metadata.clone(),
+                            runtime_reservation: &runtime_reservation,
                             verified_payee_binding: verified_governed_payee_binding.as_ref(),
                             budget_lease_acquired,
                         },
@@ -1631,6 +1662,7 @@ impl ChioKernel {
                             payment_authorization: payment_authorization.as_ref(),
                             durable_operation: Some(admission.operation()),
                             runtime_admission_metadata: extra_metadata,
+                            runtime_reservation: &runtime_reservation,
                             verified_payee_binding: verified_governed_payee_binding.as_ref(),
                             budget_lease_acquired,
                         },
@@ -1674,6 +1706,7 @@ impl ChioKernel {
             payment_authorization.as_ref(),
             PostAdmissionReceiptContext {
                 extra_metadata: extra_metadata.clone(),
+                runtime_reservation: runtime_reservation.clone(),
                 pre_invocation_guard_evidence: pre_invocation_guard_evidence.clone(),
                 verified_payee_binding: verified_governed_payee_binding.clone(),
             },

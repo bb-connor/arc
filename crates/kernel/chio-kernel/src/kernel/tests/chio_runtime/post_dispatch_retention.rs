@@ -274,7 +274,10 @@ fn chio_post_admission_drop_guard_retains_non_monetary_runtime_reservations(
         &mutation,
         None,
         PostAdmissionReceiptContext {
-            extra_metadata: Some(metadata),
+            extra_metadata: Some(metadata.clone()),
+            runtime_reservation: RuntimeReservation::from_decision(
+                &RuntimeAdmissionDecision::allow(Some(metadata)),
+            ),
             pre_invocation_guard_evidence: Vec::new(),
             verified_payee_binding: None,
         },

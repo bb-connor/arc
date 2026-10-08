@@ -7,7 +7,7 @@ use crate::{CapabilityToken, ChildRequestReceipt, PaymentAuthorization, ToolCall
 
 use super::{
     merge_metadata_objects, scope_pre_invocation_guard_evidence, ChioKernel, KernelError,
-    PreExecutionBudgetMutation, VerifiedGovernedPayeeBinding,
+    PreExecutionBudgetMutation, RuntimeReservation, VerifiedGovernedPayeeBinding,
 };
 
 const POST_ADMISSION_DROP_REASON: &str = "tool evaluation future dropped after admission";
@@ -20,6 +20,9 @@ const PRE_DISPATCH_CLEANUP_FAULT_REASON: &str =
 
 pub(crate) struct PostAdmissionReceiptContext {
     pub(crate) extra_metadata: Option<serde_json::Value>,
+    /// The runtime hook's own reservation record. A pre-dispatch drop
+    /// releases only what it names.
+    pub(crate) runtime_reservation: RuntimeReservation,
     pub(crate) pre_invocation_guard_evidence: Vec<GuardEvidence>,
     pub(crate) verified_payee_binding: Option<VerifiedGovernedPayeeBinding>,
 }
@@ -306,7 +309,7 @@ impl<'a> PostAdmissionDropGuard<'a> {
         // 3. Runtime-admission reservation release.
         if let Err(error) = self.kernel.release_runtime_admission_reservations(
             self.durable_operation,
-            self.receipt_context.extra_metadata.as_ref(),
+            &self.receipt_context.runtime_reservation,
         ) {
             let reason = redacted!(&error).to_string();
             warn!(
@@ -320,7 +323,7 @@ impl<'a> PostAdmissionDropGuard<'a> {
                 // Name the reserved lease / continuation ids so an operator can
                 // locate the possibly-stuck reservation from the fault entry.
                 hold_ids: reserved_runtime_admission_ids(
-                    self.receipt_context.extra_metadata.as_ref(),
+                    self.receipt_context.runtime_reservation.hook_metadata(),
                 ),
             });
         }

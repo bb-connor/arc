@@ -504,6 +504,7 @@ pub(crate) struct SecurityPreDispatchDenial {
 pub const EMERGENCY_STOP_DENY_REASON: &str = "kernel emergency stop active";
 
 mod runtime_admission;
+pub(crate) use runtime_admission::RuntimeReservation;
 pub use runtime_admission::{
     RuntimeAdmissionContext, RuntimeAdmissionDecision, RuntimeAdmissionHook,
     RuntimeAdmissionReadinessToken, RuntimeAdmissionRevalidationContext,

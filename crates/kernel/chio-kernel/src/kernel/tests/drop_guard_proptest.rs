@@ -103,7 +103,10 @@ fn drop_guard_disposition_table() -> Result<(), TestCaseError> {
             &budget_mutation,
             None,
             PostAdmissionReceiptContext {
-                extra_metadata,
+                extra_metadata: extra_metadata.clone(),
+                runtime_reservation: RuntimeReservation::from_decision(
+                    &RuntimeAdmissionDecision::allow(extra_metadata),
+                ),
                 pre_invocation_guard_evidence: Vec::new(),
                 verified_payee_binding: None,
             },

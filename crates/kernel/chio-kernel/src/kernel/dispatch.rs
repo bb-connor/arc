@@ -1449,7 +1449,7 @@ impl ChioKernel {
     pub(crate) fn release_runtime_admission_reservations(
         &self,
         operation: Option<&crate::admission_operation::AdmissionOperationV1>,
-        metadata: Option<&serde_json::Value>,
+        reservation: &RuntimeReservation,
     ) -> Result<(), KernelError> {
         // DPoP, approval and runtime custody share the selected-grant episode. All
         // must be released before a denied candidate can yield to a sibling.
@@ -1468,7 +1468,7 @@ impl ChioKernel {
         if self.configured_runtime_participant_binding()?.is_some() {
             return self.release_operation_owned_runtime_before_dispatch(operation);
         }
-        let Some(metadata) = metadata else {
+        let Some(metadata) = reservation.hook_metadata() else {
             return Ok(());
         };
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -1550,9 +1550,10 @@ impl ChioKernel {
     pub(crate) fn release_runtime_admission_reservations_for_pre_dispatch_denial(
         &self,
         operation: Option<&crate::admission_operation::AdmissionOperationV1>,
+        reservation: &RuntimeReservation,
         metadata: Option<serde_json::Value>,
     ) -> (Option<serde_json::Value>, bool) {
-        match self.release_runtime_admission_reservations(operation, metadata.as_ref()) {
+        match self.release_runtime_admission_reservations(operation, reservation) {
             Ok(()) => (metadata, true),
             Err(error) => {
                 warn!(

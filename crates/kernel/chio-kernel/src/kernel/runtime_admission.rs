@@ -89,6 +89,25 @@ impl RuntimeAdmissionDecision {
     }
 }
 
+/// What a legacy runtime admission hook reserved for one evaluation, kept
+/// exactly as that hook's own decision returned it. Receipt metadata merges
+/// caller-supplied keys, so it never selects what the hook releases.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub(crate) struct RuntimeReservation(Option<serde_json::Value>);
+
+impl RuntimeReservation {
+    /// No hook decision exists yet, so nothing was reserved.
+    pub(crate) const NONE: Self = Self(None);
+
+    pub(crate) fn from_decision(decision: &RuntimeAdmissionDecision) -> Self {
+        Self(decision.metadata.clone())
+    }
+
+    pub(crate) fn hook_metadata(&self) -> Option<&serde_json::Value> {
+        self.0.as_ref()
+    }
+}
+
 /// Optional pre-dispatch admission hook for product-specific runtime gates.
 pub trait RuntimeAdmissionHook: Send + Sync {
     fn name(&self) -> &str;

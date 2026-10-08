@@ -113,7 +113,8 @@ fn retained_runtime_release_does_not_depend_on_current_hook_selection() {
             }));
         }
         let result = catch_unwind(AssertUnwindSafe(|| {
-            kernel.release_runtime_admission_reservations(Some(&original), None)
+            kernel
+                .release_runtime_admission_reservations(Some(&original), &RuntimeReservation::NONE)
         }));
         assert!(result.is_ok(), "hook {hook:?} escaped retained release");
         result
@@ -133,7 +134,7 @@ fn retained_runtime_release_does_not_depend_on_current_hook_selection() {
         assert_eq!(invocations.load(Ordering::SeqCst), 0);
         drop(state);
         kernel
-            .release_runtime_admission_reservations(Some(&original), None)
+            .release_runtime_admission_reservations(Some(&original), &RuntimeReservation::NONE)
             .expect("exact cleanup retry");
         assert_eq!(
             store
@@ -160,7 +161,7 @@ fn absent_runtime_ledger_does_not_turn_selection_failure_into_successful_release
         panic: true,
     }));
     let result = catch_unwind(AssertUnwindSafe(|| {
-        kernel.release_runtime_admission_reservations(None, None)
+        kernel.release_runtime_admission_reservations(None, &RuntimeReservation::NONE)
     }));
     assert!(
         result.is_ok(),

@@ -29,6 +29,8 @@ pub(super) struct SelectedNestedFlowGrant {
     pub(super) governed_call_chain_receipt_evidence: Option<GovernedCallChainReceiptEvidence>,
     pub(super) pre_invocation_guard_evidence: Vec<GuardEvidence>,
     pub(super) runtime_admission_metadata: Option<serde_json::Value>,
+    /// The runtime hook's own reservation record for this grant.
+    pub(super) runtime_reservation: RuntimeReservation,
 }
 
 impl ChioKernel {
@@ -105,6 +107,7 @@ impl ChioKernel {
                 None,
                 PostAdmissionReceiptContext {
                     extra_metadata: extra_metadata.clone(),
+                    runtime_reservation: RuntimeReservation::NONE,
                     pre_invocation_guard_evidence: Vec::new(),
                     verified_payee_binding: validated_governed_admission
                         .as_ref()
@@ -145,6 +148,7 @@ impl ChioKernel {
                     .any(|grant| grant.grant.dpop_required == Some(true)),
                 durable_admission.as_mut(),
             );
+            let runtime_reservation = RuntimeReservation::from_decision(&runtime_admission);
             let runtime_admission_metadata =
                 merge_metadata_objects(extra_metadata.clone(), runtime_admission.metadata.clone());
             if !runtime_admission.allowed {
@@ -155,6 +159,7 @@ impl ChioKernel {
                 let (runtime_admission_metadata, runtime_release_confirmed) = self
                     .release_runtime_admission_reservations_for_pre_dispatch_denial(
                         durable_operation(durable_admission.as_ref()),
+                        &runtime_reservation,
                         runtime_admission_metadata,
                     );
                 if runtime_release_confirmed {
@@ -201,6 +206,7 @@ impl ChioKernel {
                         let (runtime_admission_metadata, runtime_release_confirmed) = self
                             .release_runtime_admission_reservations_for_pre_dispatch_denial(
                                 durable_operation(durable_admission.as_ref()),
+                                &runtime_reservation,
                                 runtime_admission_metadata,
                             );
                         if runtime_release_confirmed {
@@ -227,6 +233,7 @@ impl ChioKernel {
                         governed_call_chain_receipt_evidence,
                         pre_invocation_guard_evidence,
                         runtime_admission_metadata,
+                        runtime_reservation,
                     ));
                     break;
                 }
@@ -237,6 +244,7 @@ impl ChioKernel {
                     let (runtime_admission_metadata, runtime_release_confirmed) = self
                         .release_runtime_admission_reservations_for_pre_dispatch_denial(
                             durable_operation(durable_admission.as_ref()),
+                            &runtime_reservation,
                             runtime_admission_metadata,
                         );
                     if !runtime_release_confirmed {
@@ -263,6 +271,7 @@ impl ChioKernel {
                     let (runtime_admission_metadata, runtime_release_confirmed) = self
                         .release_runtime_admission_reservations_for_pre_dispatch_denial(
                             durable_operation(durable_admission.as_ref()),
+                            &runtime_reservation,
                             runtime_admission_metadata,
                         );
                     budget_error = Some(
@@ -287,6 +296,7 @@ impl ChioKernel {
                     let (runtime_admission_metadata, runtime_release_confirmed) = self
                         .release_runtime_admission_reservations_for_pre_dispatch_denial(
                             durable_operation(durable_admission.as_ref()),
+                            &runtime_reservation,
                             runtime_admission_metadata,
                         );
                     if runtime_release_confirmed {
@@ -322,6 +332,7 @@ impl ChioKernel {
             governed_call_chain_receipt_evidence,
             pre_invocation_guard_evidence,
             runtime_admission_metadata,
+            runtime_reservation,
         )) = selected
         else {
             // Guards are evaluated per grant, so a denial on one candidate only
@@ -392,6 +403,7 @@ impl ChioKernel {
             governed_call_chain_receipt_evidence,
             pre_invocation_guard_evidence,
             runtime_admission_metadata,
+            runtime_reservation,
         }))
     }
 }
