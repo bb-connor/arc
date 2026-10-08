@@ -990,8 +990,6 @@
 1	crates/security/chio-secret-broker/src/migration.rs	production_binding_rejects_missing_provider_digest_and_stage	ProductionBrokerMigrationEnforcer::load( &wrong_digest_store, &wrong_digest_fixture.deployment_id, &wrong_digest_fixture.credential_provider, EnterpriseMigrationStage::Enforced, EnterpriseMigrationStage::Enforced, ) .is_err()
 1	crates/security/chio-secret-broker/src/prepared_mcp/tests.rs	malformed_or_oversized_stdio_never_reaches_the_broker	serve_prepared_broker_mcp(config(), client, Cursor::new(bytes), Vec::new()).is_err()
 1	crates/security/chio-secret-broker/src/prepared_mcp/tests.rs	missing_handshake_or_wrong_tool_closes_without_any_broker_request	serve_prepared_broker_mcp( config(), client, Cursor::new(lines(&messages)), Vec::new() ) .is_err()
-1	crates/security/chio-secret-broker/src/privileged_audit.rs	audit_peer_authentication_pins_uid_and_gid	validate_audit_peer(&client, uid, gid.wrapping_add(1)).is_err()
-1	crates/security/chio-secret-broker/src/privileged_audit.rs	audit_peer_authentication_pins_uid_and_gid	validate_audit_peer(&client, uid.wrapping_add(1), gid).is_err()
 1	crates/security/chio-secret-broker/src/privileged_audit.rs	signed_challenge_rejects_nonce_and_commitment_rebinding	verify_broker_privileged_audit_challenge(&forged_commitment, &signer.public_key()) .is_err()
 1	crates/security/chio-secret-broker/src/privileged_audit.rs	signed_challenge_rejects_nonce_and_commitment_rebinding	verify_broker_privileged_audit_challenge(&rebound, &signer.public_key()).is_err()
 1	crates/security/chio-secret-broker/src/process_boundary_tests/native_response_tests.rs	reject_signed_capture_substitutions	host.reader .verify_completed_response( host.participant.as_ref(), operation_id, &changed, now()?, ) .is_err()
