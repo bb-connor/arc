@@ -954,6 +954,34 @@ mod tests {
     }
 
     #[test]
+    fn authority_request_from_weak_broker_key_is_rejected() {
+        let mut universal = [0_u8; 64];
+        universal[0] = 1;
+        let request = SignedAuthorityRequest {
+            body: AuthorityRequestBody {
+                schema: AUTHORITY_RPC_SCHEMA.to_string(),
+                request_id: "request-weak-broker".to_string(),
+                issued_at_unix_seconds: 1_000,
+                broker: PublicKey::from_hex(
+                    "0100000000000000000000000000000000000000000000000000000000000000",
+                )
+                .test_expect("identity point key"),
+                operation: AuthorityOperation::Capabilities,
+            },
+            algorithm: SigningAlgorithm::Ed25519,
+            signature: Signature::from_bytes(&universal),
+        };
+
+        let error = verify_authority_request(&request, &request.body.broker, 1_000, 30)
+            .test_expect_err("weak broker key");
+        assert!(matches!(
+            error,
+            BrokerError::AuthorizationDenied(ref message)
+                if message == "authority request signature is invalid"
+        ));
+    }
+
+    #[test]
     fn authority_rpc_requires_signed_exact_responses_and_full_capabilities() {
         let directory = crate::private_tempdir().test_expect("tempdir");
         let socket = directory.path().join("authority.sock");
