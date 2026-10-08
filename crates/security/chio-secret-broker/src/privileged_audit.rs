@@ -28,6 +28,8 @@ use chio_core_types::{
     canonical_json_bytes, PublicKey, Signature, SigningAlgorithm, SigningBackend,
 };
 #[cfg(unix)]
+use chio_secure_ipc::frame::FrameError;
+#[cfg(unix)]
 use rand_core::{OsRng, RngCore};
 #[cfg(unix)]
 use serde::de::DeserializeOwned;
@@ -1085,51 +1087,24 @@ fn encode_audit_frame<T: Serialize>(value: &T) -> chio_core_types::Result<Zeroiz
     chio_core_types::canonical::canonical_json_bytes_zeroizing(value)
 }
 
+/// A frame fault on the audit socket. A refused length or a failed read is the
+/// runner's fault; a runner that stops receiving ends only its own session.
 #[cfg(unix)]
-fn read_audit_frame_body(reader: &mut impl Read, bytes: &mut Zeroizing<Vec<u8>>) -> Result<()> {
-    if let Err(error) = reader.read_exact(bytes.as_mut_slice()) {
-        bytes.zeroize();
-        return Err(BrokerError::InvalidRequest(format!(
-            "privileged audit frame body failed: {error}"
-        )));
-    }
-    Ok(())
-}
-
-#[cfg(unix)]
-fn read_frame(reader: &mut impl Read, maximum: usize) -> Result<Zeroizing<Vec<u8>>> {
-    let mut prefix = [0_u8; 4];
-    reader.read_exact(&mut prefix).map_err(|error| {
-        BrokerError::InvalidRequest(format!("privileged audit frame prefix failed: {error}"))
-    })?;
-    let length = usize::try_from(u32::from_be_bytes(prefix)).map_err(|_| {
-        BrokerError::InvalidRequest("privileged audit frame length overflow".to_string())
-    })?;
-    if length == 0 || length > maximum {
-        return Err(BrokerError::InvalidRequest(
-            "privileged audit frame is empty or oversized".to_string(),
-        ));
-    }
-    let mut bytes = Zeroizing::new(vec![0_u8; length]);
-    read_audit_frame_body(reader, &mut bytes)?;
-    Ok(bytes)
-}
-
-#[cfg(unix)]
-fn write_frame(writer: &mut impl Write, bytes: &[u8], maximum: usize) -> Result<()> {
-    if bytes.is_empty() || bytes.len() > maximum {
-        return Err(BrokerError::Invariant(
-            "privileged audit response frame is empty or oversized".to_string(),
-        ));
-    }
-    let length = u32::try_from(bytes.len()).map_err(|_| {
-        BrokerError::Invariant("privileged audit response length overflow".to_string())
-    })?;
-    writer
-        .write_all(&length.to_be_bytes())
-        .and_then(|()| writer.write_all(bytes))
-        .and_then(|()| writer.flush())
-        .map_err(|error| {
+fn audit_frame_error(error: FrameError, length_refusal: &'static str) -> BrokerError {
+    match error {
+        FrameError::Prefix(error) => {
+            BrokerError::InvalidRequest(format!("privileged audit frame prefix failed: {error}"))
+        }
+        FrameError::Body(error) => {
+            BrokerError::InvalidRequest(format!("privileged audit frame body failed: {error}"))
+        }
+        FrameError::Empty | FrameError::Oversized { .. } => {
+            BrokerError::InvalidRequest(length_refusal.to_string())
+        }
+        FrameError::InvalidLimit { .. } => {
+            BrokerError::Invariant("privileged audit frame limit is invalid".to_string())
+        }
+        FrameError::Write(error)
             if matches!(
                 error.kind(),
                 std::io::ErrorKind::BrokenPipe
@@ -1138,14 +1113,44 @@ fn write_frame(writer: &mut impl Write, bytes: &[u8], maximum: usize) -> Result<
                     | std::io::ErrorKind::NotConnected
                     | std::io::ErrorKind::TimedOut
                     | std::io::ErrorKind::WouldBlock
-            ) {
-                BrokerError::InvalidRequest(format!(
-                    "privileged audit runner stopped receiving: {error}"
-                ))
-            } else {
-                BrokerError::Storage(format!("privileged audit response write failed: {error}"))
-            }
-        })
+            ) =>
+        {
+            BrokerError::InvalidRequest(format!(
+                "privileged audit runner stopped receiving: {error}"
+            ))
+        }
+        FrameError::Write(error) => {
+            BrokerError::Storage(format!("privileged audit response write failed: {error}"))
+        }
+    }
+}
+
+#[cfg(all(unix, test))]
+fn read_audit_frame_body(reader: &mut impl Read, bytes: &mut Zeroizing<Vec<u8>>) -> Result<()> {
+    chio_secure_ipc::frame::read_sensitive_frame_body(reader, bytes)
+        .map_err(|error| audit_frame_error(error, "privileged audit frame is empty or oversized"))
+}
+
+#[cfg(unix)]
+fn read_frame(reader: &mut impl Read, maximum: usize) -> Result<Zeroizing<Vec<u8>>> {
+    chio_secure_ipc::frame::read_sensitive_frame(reader, maximum)
+        .map_err(|error| audit_frame_error(error, "privileged audit frame is empty or oversized"))
+}
+
+#[cfg(unix)]
+fn write_frame(writer: &mut impl Write, bytes: &[u8], maximum: usize) -> Result<()> {
+    chio_secure_ipc::frame::write_frame(writer, bytes, maximum).map_err(|error| {
+        if error.is_length_refusal() {
+            BrokerError::Invariant(
+                "privileged audit response frame is empty or oversized".to_string(),
+            )
+        } else {
+            audit_frame_error(
+                error,
+                "privileged audit response frame is empty or oversized",
+            )
+        }
+    })
 }
 
 #[cfg(unix)]
