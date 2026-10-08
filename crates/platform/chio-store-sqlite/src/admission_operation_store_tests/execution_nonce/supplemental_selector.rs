@@ -488,3 +488,112 @@ fn nonce_only_tampered_artifact_member_refuses_instead_of_appearing_unselected()
     assert_eq!(fixture.counts()?, before);
     Ok(())
 }
+
+#[test]
+fn nonce_only_rebound_capability_artifact_refuses_without_changing_selector() -> TestResult {
+    let fixture = SelectionFixture::new()?;
+    let operation =
+        fixture.own_preflight(&fixture.prepare("nonce-capability-member-corruption")?)?;
+    let identity = AdmissionNoncePreflightIdentityV1::for_operation(&operation, 0)?;
+    let before = fixture.counts()?;
+    assert_eq!((before.0, before.1, before.2), (1, 1, 1));
+    assert!(fixture.select()?.is_none());
+    assert_eq!(fixture.counts()?, before);
+
+    let snapshot = |sql: &str| -> TestResult<Vec<Vec<rusqlite::types::Value>>> {
+        let connection = fixture.fixture.store.connection()?;
+        let mut statement = connection.prepare(sql)?;
+        let rows = statement.query_map([], |row| {
+            (0..row.as_ref().column_count())
+                .map(|index| row.get::<_, rusqlite::types::Value>(index))
+                .collect::<Result<Vec<_>, _>>()
+        })?;
+        Ok(rows.collect::<Result<Vec<_>, _>>()?)
+    };
+    let metadata_queries = [
+        "SELECT * FROM admission_operations ORDER BY operation_id",
+        "SELECT * FROM admission_nonce_preflight_holds ORDER BY operation_id",
+        "SELECT * FROM budget_authorization_holds ORDER BY hold_id",
+        "SELECT * FROM budget_mutation_events ORDER BY event_seq",
+        "SELECT * FROM budget_event_authorization_artifacts ORDER BY event_id, artifact_index",
+        "SELECT * FROM authority_global_commits ORDER BY commit_sequence",
+    ];
+    let metadata_before = metadata_queries
+        .iter()
+        .map(|sql| snapshot(sql))
+        .collect::<TestResult<Vec<_>>>()?;
+    let capability_digest = operation
+        .binding()
+        .authorization_capability_hash()
+        .as_str()
+        .to_owned();
+    let changed = ['f', 'e', 'd']
+        .into_iter()
+        .map(|digit| digit.to_string().repeat(64))
+        .find(|candidate| candidate != &capability_digest && candidate != &fixture.digest)
+        .ok_or("distinct physical artifact replacement")?;
+    let mut artifacts = vec![fixture.digest.clone(), changed];
+    artifacts.sort();
+    let mut binding = fixture
+        .budget(&operation)?
+        .admission_binding
+        .ok_or("binding")?;
+    assert_eq!(binding.authorization_artifact_digests.len(), 2);
+    assert!(binding
+        .authorization_artifact_digests
+        .contains(&capability_digest));
+    binding.authorization_artifact_digests = artifacts.clone();
+    binding.validate()?;
+    {
+        // Only the non-selector physical artifact member changes. The queried
+        // supplemental column, original event, ownership and commits stay intact.
+        let connection = fixture.fixture.store.connection()?;
+        let physical = connection
+            .prepare(
+                "SELECT artifact_digest FROM budget_hold_authorization_artifacts \
+                 WHERE hold_id = ?1 ORDER BY artifact_index",
+            )?
+            .query_map([identity.hold_id().as_str()], |row| row.get::<_, String>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut original = vec![capability_digest.clone(), fixture.digest.clone()];
+        original.sort();
+        assert_eq!(physical, original);
+        assert_eq!(
+            connection.execute(
+                "DELETE FROM budget_hold_authorization_artifacts WHERE hold_id = ?1",
+                [identity.hold_id().as_str()],
+            )?,
+            2
+        );
+        for (index, artifact) in artifacts.iter().enumerate() {
+            assert_eq!(connection.execute(
+                "INSERT INTO budget_hold_authorization_artifacts (hold_id, artifact_index, artifact_digest) VALUES (?1, ?2, ?3)",
+                params![identity.hold_id().as_str(), i64::try_from(index)?, artifact],
+            )?, 1);
+        }
+        let physical = connection
+            .prepare(
+                "SELECT artifact_digest FROM budget_hold_authorization_artifacts \
+                 WHERE hold_id = ?1 ORDER BY artifact_index",
+            )?
+            .query_map([identity.hold_id().as_str()], |row| row.get::<_, String>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        assert_eq!(physical, artifacts);
+        assert_eq!(physical.len(), 2);
+    }
+    assert_eq!(fixture.counts()?, before);
+    let selected = fixture.select();
+    let after = fixture.counts()?;
+    let metadata_after = metadata_queries
+        .iter()
+        .map(|sql| snapshot(sql))
+        .collect::<TestResult<Vec<_>>>()?;
+    assert_eq!(after, before);
+    assert_eq!(metadata_after, metadata_before);
+    assert!(
+        matches!(selected, Err(AdmissionOperationStoreError::Invariant(ref reason))
+            if reason == "budget state invariant violated: nonce preflight authorization identity changed"),
+        "a rebound physical capability artifact was not refused as authenticated budget custody: {selected:?}"
+    );
+    Ok(())
+}
