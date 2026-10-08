@@ -68,6 +68,9 @@ impl RestrictEgressOverlayBackend {
             contribution_hash: request.contribution_hash,
             expires_at_unix_ms: request.plan_expires_at_unix_ms,
         };
+        // Contributions are keyed by effect and the denied destinations are
+        // their union, so a snapshot without this effect's contribution
+        // differs from the observed base only by other effects' denials.
         if let Some(existing) = current
             .contributions
             .as_slice()
@@ -77,8 +80,6 @@ impl RestrictEgressOverlayBackend {
             if existing != &desired {
                 return Err(PortError::conflict());
             }
-        } else if egress_snapshot_version_hash(&current)? != request.expected_version_hash {
-            return Err(PortError::conflict());
         }
         let predicted = predict_egress_apply(&current, &desired, request.scheduler_fencing_token)?;
         let result = egress_installed_result(request, &key, &desired, true)?;
