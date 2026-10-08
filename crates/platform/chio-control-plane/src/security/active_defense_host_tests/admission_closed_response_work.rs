@@ -173,7 +173,40 @@ impl AttestedFindingResponseCoordinator for ExecutingResponseCoordinator {
             &chio_kernel::ActiveResponseExecutionApproval::Automatic,
         )
         .map_err(|_| PortError::integrity_failure())?;
-        Ok(PreparedAttestedFindingResponse::synthetic(dispatch_id))
+        let artifact_fingerprint = Digest32::new([0x73; 32]);
+        let dispatch_id = chio_kernel::bind_active_response_dispatch_id_to_artifact(
+            &dispatch_id,
+            &artifact_fingerprint,
+        )
+        .map_err(|_| PortError::integrity_failure())?;
+        // Match execute_automatic_for_test's canonical descriptor before the
+        // response outbox records preparation. This uses the real SQLite claim.
+        let binding = PreparedActiveResponseDispatchBinding {
+            schema_version:
+                chio_security_types::ports::PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION,
+            tenant_id: response_plan.tenant_id.clone(),
+            action_id: response_plan.action_id.clone(),
+            plan_hash: response_plan.plan_hash,
+            dispatch_id,
+            executor_authority_id: RecordId::new(self.identity.authority_id())?,
+            executor_authority_generation: self.identity.generation(),
+            authorized_at_unix_ms: response_plan.created_at_unix_ms,
+            authorization_capability_hash: response_plan.operator_capability.capability_digest,
+            governed_intent_hash: Digest32::new(GOVERNED_INTENT_HASH),
+            policy_decision_hash: Digest32::new(POLICY_DECISION_HASH),
+            admission_artifact_fingerprint: Some(artifact_fingerprint),
+            approval: chio_security_types::ports::ResponseDispatchApproval::Automatic,
+        };
+        let claimed = chio_kernel::ActiveResponseExecutorAuthority::claim_automatic_preparation(
+            &self.executor,
+            response_plan,
+            &binding,
+        )
+        .map_err(|_| PortError::integrity_failure())?;
+        if claimed != binding {
+            return Err(PortError::integrity_failure());
+        }
+        Ok(PreparedAttestedFindingResponse::synthetic_bound(claimed))
     }
 
     fn cancel_prepared(

@@ -19,6 +19,10 @@ pub(crate) enum PreparedAttestedFindingResponse {
     Synthetic {
         dispatch_id: RecordId,
     },
+    #[cfg(test)]
+    SyntheticBound {
+        binding: Box<PreparedActiveResponseDispatchBinding>,
+    },
 }
 
 pub(crate) struct KernelPreparedAttestedFindingResponse {
@@ -32,7 +36,9 @@ impl PreparedAttestedFindingResponse {
         match self {
             Self::Kernel(response) => Ok(response.as_ref()),
             #[cfg(test)]
-            Self::Synthetic { .. } => Err(PortError::integrity_failure()),
+            Self::Synthetic { .. } | Self::SyntheticBound { .. } => {
+                Err(PortError::integrity_failure())
+            }
         }
     }
 
@@ -42,6 +48,8 @@ impl PreparedAttestedFindingResponse {
             Self::Kernel(response) => response.prepared.dispatch_id(),
             #[cfg(test)]
             Self::Synthetic { dispatch_id } => dispatch_id,
+            #[cfg(test)]
+            Self::SyntheticBound { binding } => &binding.dispatch_id,
         }
     }
 
@@ -58,6 +66,8 @@ impl PreparedAttestedFindingResponse {
             Self::Synthetic { dispatch_id } => {
                 synthetic_prepared_dispatch_binding(response_plan, dispatch_id.clone())?
             }
+            #[cfg(test)]
+            Self::SyntheticBound { binding } => binding.as_ref().clone(),
         };
         binding
             .validate_for_plan(response_plan)
@@ -76,7 +86,7 @@ impl PreparedAttestedFindingResponse {
                 _ => return Err(PortError::integrity_failure()),
             },
             #[cfg(test)]
-            Self::Synthetic { .. } => {}
+            Self::Synthetic { .. } | Self::SyntheticBound { .. } => {}
         }
         Ok(binding)
     }
@@ -84,6 +94,14 @@ impl PreparedAttestedFindingResponse {
     #[cfg(test)]
     pub(crate) fn synthetic(dispatch_id: RecordId) -> Self {
         Self::Synthetic { dispatch_id }
+    }
+
+    /// Retain an exact fixture preparation already claimed by its real executor.
+    #[cfg(test)]
+    pub(crate) fn synthetic_bound(binding: PreparedActiveResponseDispatchBinding) -> Self {
+        Self::SyntheticBound {
+            binding: Box::new(binding),
+        }
     }
 }
 
@@ -869,7 +887,8 @@ impl AttestedFindingResponseCoordinator for KernelAttestedFindingResponseCoordin
                 (request, prepared, governed_approval)
             }
             #[cfg(test)]
-            PreparedAttestedFindingResponse::Synthetic { .. } => {
+            PreparedAttestedFindingResponse::Synthetic { .. }
+            | PreparedAttestedFindingResponse::SyntheticBound { .. } => {
                 return Err(PortError::integrity_failure());
             }
         };
