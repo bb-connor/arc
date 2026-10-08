@@ -4,7 +4,11 @@ pub(crate) async fn list_pending_approvals_handler(
     State(state): State<Arc<ProxyState>>,
     Query(query): Query<PendingQuery>,
 ) -> Response {
-    match handle_list_pending(&state.approval_admin, query) {
+    match approval_blocking(&state, move |state| {
+        handle_list_pending(&state.approval_admin, query)
+    })
+    .await
+    {
         Ok(response) => approval_json(StatusCode::OK, response),
         Err(error) => approval_error_response(error),
     }
@@ -14,7 +18,11 @@ pub(crate) async fn get_approval_handler(
     State(state): State<Arc<ProxyState>>,
     Path(approval_id): Path<String>,
 ) -> Response {
-    match handle_get_approval(&state.approval_admin, &approval_id) {
+    match approval_blocking(&state, move |state| {
+        handle_get_approval(&state.approval_admin, &approval_id)
+    })
+    .await
+    {
         Ok(response) => approval_json(StatusCode::OK, response),
         Err(error) => approval_error_response(error),
     }
@@ -41,7 +49,11 @@ pub(crate) async fn respond_approval_handler(
     if let Err(error) = require_current_approver(&state, &approval_id, &body.approver).await {
         return approval_error_response(error);
     }
-    match handle_respond(&state.approval_admin, &approval_id, body, now) {
+    match approval_blocking(&state, move |state| {
+        handle_respond(&state.approval_admin, &approval_id, body, now)
+    })
+    .await
+    {
         Ok(response) => approval_json(StatusCode::OK, response),
         Err(error) => approval_error_response(error),
     }
@@ -71,7 +83,11 @@ pub(crate) async fn batch_respond_approvals_handler(
             return approval_error_response(error);
         }
     }
-    match handle_batch_respond(&state.approval_admin, body, now) {
+    match approval_blocking(&state, move |state| {
+        handle_batch_respond(&state.approval_admin, body, now)
+    })
+    .await
+    {
         Ok(response) => approval_json(StatusCode::OK, response),
         Err(error) => approval_error_response(error),
     }
@@ -93,7 +109,11 @@ pub(crate) async fn create_threshold_proposal_handler(
         Ok(now) => now,
         Err(error) => return approval_error_response(error),
     };
-    match handle_create_threshold_proposal(&state.approval_admin, body, now) {
+    match approval_blocking(&state, move |state| {
+        handle_create_threshold_proposal(&state.approval_admin, body, now)
+    })
+    .await
+    {
         Ok(response) => approval_json(StatusCode::CREATED, response),
         Err(error) => approval_error_response(error),
     }
@@ -111,7 +131,11 @@ pub(crate) async fn get_threshold_proposal_handler(
         Ok(now) => now,
         Err(error) => return approval_error_response(error),
     };
-    match handle_get_threshold_proposal(&state.approval_admin, &proposal_id, now) {
+    match approval_blocking(&state, move |state| {
+        handle_get_threshold_proposal(&state.approval_admin, &proposal_id, now)
+    })
+    .await
+    {
         Ok(response) => approval_json(StatusCode::OK, response),
         Err(error) => approval_error_response(error),
     }
@@ -134,7 +158,11 @@ pub(crate) async fn submit_threshold_approval_handler(
         Ok(now) => now,
         Err(error) => return approval_error_response(error),
     };
-    match handle_submit_threshold_approval(&state.approval_admin, &proposal_id, body, now) {
+    match approval_blocking(&state, move |state| {
+        handle_submit_threshold_approval(&state.approval_admin, &proposal_id, body, now)
+    })
+    .await
+    {
         Ok(response) => approval_json(StatusCode::OK, response),
         Err(error) => approval_error_response(error),
     }
@@ -152,7 +180,11 @@ pub(crate) async fn deliver_threshold_approval_handler(
         Ok(now) => now,
         Err(error) => return approval_error_response(error),
     };
-    match handle_deliver_threshold_approval(&state.approval_admin, &proposal_id, now) {
+    match approval_blocking(&state, move |state| {
+        handle_deliver_threshold_approval(&state.approval_admin, &proposal_id, now)
+    })
+    .await
+    {
         Ok(response) => approval_json(StatusCode::OK, response),
         Err(error) => approval_error_response(error),
     }
@@ -317,7 +349,7 @@ pub(crate) async fn operator_respond_approval_handler(
 }
 
 async fn require_current_approver(
-    state: &ProxyState,
+    state: &Arc<ProxyState>,
     approval_id: &str,
     approver: &PublicKey,
 ) -> Result<(), ApprovalHandlerError> {
@@ -329,11 +361,14 @@ async fn require_current_approver(
             "approval signer is not in configured roster".into(),
         ));
     }
-    let pending = state
-        .approval_admin
-        .store()
-        .get_pending(approval_id)?
-        .ok_or_else(|| ApprovalHandlerError::NotFound(approval_id.into()))?;
+    let pending = {
+        let approval_id = approval_id.to_owned();
+        approval_blocking(state, move |state| {
+            Ok(state.approval_admin.store().get_pending(&approval_id)?)
+        })
+        .await?
+    }
+    .ok_or_else(|| ApprovalHandlerError::NotFound(approval_id.into()))?;
     let kernel = state
         .mediation_kernel
         .as_ref()
@@ -360,6 +395,22 @@ async fn require_current_approver(
         ));
     }
     Ok(())
+}
+
+/// Run approval-store work on the blocking pool with an owned state handle. A
+/// worker that does not complete is an internal approval failure.
+async fn approval_blocking<T, F>(
+    state: &Arc<ProxyState>,
+    operation: F,
+) -> Result<T, ApprovalHandlerError>
+where
+    T: Send + 'static,
+    F: FnOnce(&ProxyState) -> Result<T, ApprovalHandlerError> + Send + 'static,
+{
+    let state = Arc::clone(state);
+    blocking(move || operation(&state))
+        .await
+        .map_err(|error| ApprovalHandlerError::Internal(error.to_string()))?
 }
 
 pub(super) fn redeem_approval(
