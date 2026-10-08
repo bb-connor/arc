@@ -1015,6 +1015,10 @@ fn is_initialize_request(message: &Value) -> bool {
 /// keep the accounted decode. Members other than `method` and `id` are skipped
 /// without building a document.
 fn initialize_request_shape(body: &[u8]) -> Option<bool> {
+    chio_core::canonical::UntrustedJsonText::from_wire(body, MCP_MAX_POST_BODY_BYTES).ok()?;
+    if body.iter().copied().find(|byte| !byte.is_ascii_whitespace()) != Some(b'{') {
+        return None;
+    }
     #[derive(Default)]
     struct Present(bool);
     impl<'de> serde::Deserialize<'de> for Present {
@@ -1026,12 +1030,19 @@ fn initialize_request_shape(body: &[u8]) -> Option<bool> {
     #[derive(serde::Deserialize)]
     struct Shape<'a> {
         #[serde(default, borrow)]
-        method: std::borrow::Cow<'a, str>,
+        method: Option<&'a serde_json::value::RawValue>,
         #[serde(default)]
         id: Present,
     }
     let shape: Shape<'_> = serde_json::from_slice(body).ok()?;
-    (shape.method == "initialize").then_some(shape.id.0)
+    let method = shape.method?;
+    // Ten ASCII characters, each representable as one six-byte unicode escape,
+    // plus the two string quotes. Check the borrowed wire before allocating.
+    if method.get().len() > 62 {
+        return None;
+    }
+    let method: std::borrow::Cow<'_, str> = serde_json::from_str(method.get()).ok()?;
+    (method == "initialize").then_some(shape.id.0)
 }
 
 fn initialize_without_id_refusal() -> Response {
@@ -1336,5 +1347,49 @@ fn remote_session_send_error(error: CliError) -> Response {
             jsonrpc_http_error(StatusCode::FORBIDDEN, -32003, &message)
         }
         other => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &other.to_string()),
+    }
+}
+
+// Test-only originals proposed for the HTTP module. Use exact original bytes.
+#[cfg(test)]
+mod initialize_shape_controls {
+    use super::*;
+
+    #[test]
+    fn only_top_level_object_initialize_is_classified() {
+        for wire in [
+            br#"{"method":"initialize","id":null}"#.as_slice(),
+            br#"{"method":"initialize","id":18446744073709551615}"#,
+            br#"{"method":"initialize","id":{"anything":true}}"#,
+            br#"{"method":"\u0069\u006e\u0069\u0074\u0069\u0061\u006c\u0069\u007a\u0065","id":1}"#,
+        ] {
+            assert_eq!(initialize_request_shape(wire), Some(true));
+        }
+        assert_eq!(initialize_request_shape(br#"{"method":"initialize"}"#), Some(false));
+        for wire in [
+            br#"["initialize",null]"#.as_slice(),
+            br#"{"method":"ping","params":{"method":"initialize"}}"#,
+            br#"{"method":null,"id":1}"#,
+            br#"{"id":1}"#,
+            br#"{"method":"initialize","method":"initialize","id":1}"#,
+            br#"{"method":"initialize","id":1,"id":2}"#,
+            br#"{"method":"initialize","id":1}{}"#,
+            br#"{"method":"initialize","id":1,"params": }"#,
+            b"{\"method\":\"initialize\",\"id\":\"\xff\"}",
+        ] {
+            assert_eq!(initialize_request_shape(wire), None, "wire: {wire:?}");
+        }
+    }
+
+    #[test]
+    fn skipped_rejected_members_never_become_a_document_or_authority() {
+        let duplicate_and_numbers = br#"{"method":"initialize","id":18446744073709551615,"params":{"x":1,"x":2,"decimal":0.50,"huge":1e9999}}"#;
+        assert_eq!(initialize_request_shape(duplicate_and_numbers), Some(true));
+        let deep = format!("{{\"method\":\"initialize\",\"id\":1,\"params\":{}0{}}}", "[".repeat(256), "]".repeat(256));
+        assert_eq!(initialize_request_shape(deep.as_bytes()), Some(true));
+        let non_initialize = format!("{{\"method\":\"{}\",\"id\":1}}", "x".repeat(63));
+        assert_eq!(initialize_request_shape(non_initialize.as_bytes()), None);
+        let too_large = format!("{{\"method\":\"initialize\",\"id\":1,\"params\":\"{}\"}}", "x".repeat(MCP_MAX_POST_BODY_BYTES));
+        assert_eq!(initialize_request_shape(too_large.as_bytes()), None);
     }
 }

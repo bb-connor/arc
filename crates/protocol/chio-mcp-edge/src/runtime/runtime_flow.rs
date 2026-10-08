@@ -159,13 +159,29 @@ impl ChioMcpEdge {
         request: &Value,
         client_rx: &mut mpsc::Receiver<ClientInbound>,
         writer: &mut W,
-    ) -> Option<Value> {
+    ) -> Result<Option<Value>, AdapterError> {
         if self.pending_action_route != PendingActionRoute::NextClientRequest
             || request.get("method").is_none()
+            || self.pending_actions.is_empty()
         {
-            return None;
+            return Ok(None);
         }
-        let request_id = request.get("id")?.clone();
+        let Some(request_id) = request.get("id").cloned() else {
+            return Ok(None);
+        };
+        // Register the carrier before consuming queued work. An oversized peer
+        // identity is a local shape refusal; internal owner faults stay global.
+        let _carrier_control = match self.inbox_admission.begin_operation(&request_id, None) {
+            Ok(control) => control,
+            Err(AdapterError::IngressCapacity) => {
+                return Ok(Some(jsonrpc_error(
+                    request_id,
+                    -32600,
+                    "MCP request identity exceeds the control limit",
+                )));
+            }
+            Err(error) => return Err(error),
+        };
         while let Some(action) = self.pending_actions.pop() {
             match action {
                 EdgeAction::RefreshRoots { session_id, reason } => {
@@ -179,7 +195,7 @@ impl ChioMcpEdge {
                         Ok(Carried::CarrierCancelled(cancellation)) => {
                             self.pending_actions
                                 .push(EdgeAction::RefreshRoots { session_id, reason });
-                            return Some(jsonrpc_error(request_id, -32800, &cancellation));
+                            return Ok(Some(jsonrpc_error(request_id, -32800, &cancellation)));
                         }
                         Err(error) => self.emit_log(
                             LogLevel::Warning,
@@ -194,7 +210,7 @@ impl ChioMcpEdge {
                 }
             }
         }
-        None
+        Ok(None)
     }
 
     pub(super) fn queue_roots_refresh(&mut self, session_id: SessionId, reason: &'static str) {

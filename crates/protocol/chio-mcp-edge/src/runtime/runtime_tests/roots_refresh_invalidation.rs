@@ -228,3 +228,259 @@ fn healthy_refresh_after_list_changed_restores_reads_inside_the_new_roots() {
     assert_eq!(roots[0].uri, "file:///workspace");
     assert_ne!(read_denial(&mut edge, 3).as_deref(), Some(NO_ROOTS));
 }
+
+// Test-only proposal. Append inside runtime_tests/roots_refresh_invalidation.rs.
+// Not installed, compiled, or executed by the independent reviewer.
+// The existing edge_with_existing_roots and LineSink fixtures are reused.
+
+fn hold_all_ordinary_slots(sender: &crate::ingress::McpInboxSender) -> Vec<AccountedMessage> {
+    let mut held = Vec::new();
+    // 128 ordinary slots is the current fixed inbox ceiling. No open-ended fill.
+    for _ in 0..128 {
+        match sender.decode(
+            br#"{"jsonrpc":"2.0","method":"notifications/message","params":{}}"#,
+            4096,
+        ) {
+            Ok(message) => held.push(message),
+            Err(AdapterError::IngressCapacity) => break,
+            Err(error) => panic!("ordinary admission failed: {error}"),
+        }
+    }
+    assert_eq!(sender.usage().unwrap().messages, 128);
+    held
+}
+
+#[test]
+fn carried_roots_cancel_uses_reserved_capacity_under_ordinary_saturation() {
+    let (mut edge, session_id) = edge_with_existing_roots(None);
+    let (sender, mut inbox) = mcp_inbox();
+    edge.inbox_admission = inbox.admission.clone();
+    edge.pending_action_route = PendingActionRoute::NextClientRequest;
+    list_changed(&mut edge);
+    let carrier = sender
+        .decode(
+            br#"{"jsonrpc":"2.0","id":7,"method":"resources/read","params":{"uri":"file:///workspace/project/docs/roadmap.md"}}"#,
+            4096,
+        )
+        .unwrap();
+    let (line_tx, line_rx) = mpsc::channel();
+    let worker = std::thread::spawn(move || {
+        let (message, reservation) = carrier.into_parts();
+        let mut sink = LineSink {
+            buffer: Vec::new(),
+            lines: line_tx,
+        };
+        let (_cancel_tx, mut cancel_rx) = mpsc::channel();
+        let response = edge.handle_inbound_with_channel(
+            message,
+            reservation.request_digest().cloned(),
+            &mut inbox.receiver,
+            &mut cancel_rx,
+            &mut sink,
+        );
+        // Keep the original carrier reservation until handling is complete.
+        drop(reservation);
+        (edge, response, inbox)
+    });
+    let roots = line_rx.recv_timeout(Duration::from_secs(10)).unwrap();
+    assert_eq!(roots["method"], "roots/list");
+    assert_eq!(roots["id"], "edge-client-2");
+    let held = hold_all_ordinary_slots(&sender);
+    for wire in [
+        br#"{"jsonrpc":"2.0","id":"wrong","result":{"roots":[]}}"#.as_slice(),
+        br#"{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":8}}"#,
+    ] {
+        assert!(matches!(
+            sender.decode(wire, 4096),
+            Err(AdapterError::IngressCapacity)
+        ));
+    }
+    // A matching roots reply must still obtain the reserved share. Retaining
+    // then dropping it demonstrates original reservation accounting.
+    let full = sender.usage().unwrap();
+    let reply = sender
+        .decode(
+            br#"{"jsonrpc":"2.0","id":"edge-client-2","result":{"roots":[]}}"#,
+            4096,
+        )
+        .unwrap();
+    assert_eq!(sender.usage().unwrap().messages, full.messages + 1);
+    drop(reply);
+    assert_eq!(sender.usage().unwrap(), full);
+
+    let cancellation = sender.decode(
+        br#"{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":7,"reason":"saturated carrier cancel"}}"#,
+        4096,
+    );
+    let cancellation = match cancellation {
+        Ok(message) => message,
+        Err(error) => {
+            // Wake and join the worker before the intended red assertion. Do
+            // not leak a worker waiting for its production 30 second deadline.
+            drop(held);
+            drop(sender);
+            let _ = worker.join().unwrap();
+            panic!("matching carrier cancellation lost reserved admission: {error}");
+        }
+    };
+    sender.send(cancellation).unwrap();
+    let started = std::time::Instant::now();
+    while !worker.is_finished() && started.elapsed() < Duration::from_secs(10) {
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    if !worker.is_finished() {
+        drop(held);
+        drop(sender);
+        let _ = worker.join().unwrap();
+        panic!("admitted carrier cancellation did not end the roots wait");
+    }
+    let (edge, response, inbox) = worker.join().unwrap();
+    let response = response.unwrap().unwrap();
+    assert_eq!(response["id"], 7);
+    assert_eq!(response["error"]["code"], -32800);
+    assert_eq!(edge.pending_actions.len(), 1);
+    assert!(edge.kernel.session(&session_id).unwrap().roots().is_empty());
+    assert!(edge
+        .kernel
+        .session(&session_id)
+        .unwrap()
+        .inflight()
+        .is_empty());
+
+    // The carrier reservation was released. Refill that slot before checking
+    // that both active identities stopped claiming the reserved share.
+    let extra = hold_all_ordinary_slots(&sender);
+    for wire in [
+        br#"{"jsonrpc":"2.0","id":"edge-client-2","result":{"roots":[]}}"#.as_slice(),
+        br#"{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":7}}"#,
+    ] {
+        assert!(matches!(
+            sender.decode(wire, 4096),
+            Err(AdapterError::IngressCapacity)
+        ));
+    }
+    drop(extra);
+    drop(held);
+    drop(inbox);
+    assert_eq!(
+        sender.usage().unwrap(),
+        crate::ingress::IngressUsage::default()
+    );
+}
+
+#[test]
+fn carried_roots_control_scope_ends_after_success_and_error_reply() {
+    for reply in [
+        br#"{"jsonrpc":"2.0","id":"edge-client-2","result":{"roots":[{"uri":"file:///workspace/project"}]}}"#.as_slice(),
+        br#"{"jsonrpc":"2.0","id":"edge-client-2","error":{"code":-32603,"message":"roots unavailable"}}"#,
+    ] {
+        let (mut edge, _) = edge_with_existing_roots(None);
+        let (sender, mut inbox) = mcp_inbox();
+        edge.inbox_admission = inbox.admission.clone();
+        edge.pending_action_route = PendingActionRoute::NextClientRequest;
+        list_changed(&mut edge);
+        let (line_tx, line_rx) = mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            let mut sink = LineSink { buffer: Vec::new(), lines: line_tx };
+            let terminal = edge.service_pending_actions_before_request(
+                &json!({"jsonrpc":"2.0","id":7,"method":"ping","params":{}}),
+                &mut inbox.receiver,
+                &mut sink,
+            ).unwrap();
+            assert!(terminal.is_none());
+            (edge, inbox)
+        });
+        assert_eq!(line_rx.recv_timeout(Duration::from_secs(10)).unwrap()["method"], "roots/list");
+        let held = hold_all_ordinary_slots(&sender);
+        sender.send(sender.decode(reply, 4096).unwrap()).unwrap();
+        let (edge, inbox) = worker.join().unwrap();
+        assert!(edge.pending_actions.is_empty());
+        for wire in [
+            br#"{"jsonrpc":"2.0","id":"edge-client-2","result":{"roots":[]}}"#.as_slice(),
+            br#"{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":7}}"#,
+        ] {
+            assert!(matches!(sender.decode(wire, 4096), Err(AdapterError::IngressCapacity)));
+        }
+        drop(held);
+        drop(inbox);
+        assert_eq!(sender.usage().unwrap(), crate::ingress::IngressUsage::default());
+    }
+}
+
+// Test-only proposal. Append inside roots_refresh_invalidation.rs.
+// Root owns installation and actual results. This test is uncompiled/unrun here.
+#[test]
+fn failed_carrier_control_registration_refuses_without_consuming_refresh() {
+    let (mut edge, session_id) = edge_with_existing_roots(None);
+    let (_sender, mut inbox) = mcp_inbox();
+    edge.inbox_admission = inbox.admission.clone();
+    edge.pending_action_route = PendingActionRoute::NextClientRequest;
+    list_changed(&mut edge);
+    let id = "x".repeat(513);
+    let carrier = json!({"jsonrpc":"2.0","id":id,"method":"ping","params":{}});
+    let digest = chio_kernel::ProtocolRequestDigest::from_decoded_json(&carrier).unwrap();
+    let (_cancel_tx, mut cancel_rx) = mpsc::channel();
+    let mut output = Vec::new();
+    let response = edge
+        .handle_inbound_with_channel(
+            carrier,
+            Some(digest),
+            &mut inbox.receiver,
+            &mut cancel_rx,
+            &mut output,
+        )
+        .unwrap()
+        .unwrap();
+    assert!(
+        response.get("error").is_some(),
+        "carrier reached ping: {response}"
+    );
+    assert_eq!(response["error"]["code"], -32600);
+    assert_eq!(
+        edge.pending_actions.len(),
+        1,
+        "failed carrier consumed refresh"
+    );
+    assert!(
+        output.is_empty(),
+        "a rejected carrier emitted a roots request"
+    );
+    assert!(edge.kernel.session(&session_id).unwrap().roots().is_empty());
+    let operation = inbox.admission.begin_operation(&json!(7), None).unwrap();
+    drop(operation);
+    let wait = inbox.admission.begin_wait(json!("next-reply")).unwrap();
+    drop(wait);
+}
+
+#[test]
+fn unavailable_carrier_control_remains_global_without_consuming_refresh() {
+    let (mut edge, _) = edge_with_existing_roots(None);
+    let (_sender, mut inbox) = mcp_inbox();
+    edge.inbox_admission = inbox.admission.clone();
+    edge.pending_action_route = PendingActionRoute::NextClientRequest;
+    list_changed(&mut edge);
+    let original = inbox.admission.begin_operation(&json!(900), None).unwrap();
+    let (_cancel_tx, mut cancel_rx) = mpsc::channel();
+    let mut output = Vec::new();
+    let error = edge
+        .handle_inbound_with_channel(
+            json!({"jsonrpc":"2.0","id":7,"method":"ping","params":{}}),
+            None,
+            &mut inbox.receiver,
+            &mut cancel_rx,
+            &mut output,
+        )
+        .unwrap_err();
+    assert!(
+        matches!(error, AdapterError::ConnectionFailed(ref cause) if cause == "MCP operation control is unavailable")
+    );
+    assert_eq!(edge.pending_actions.len(), 1);
+    assert!(output.is_empty());
+    // The failed attempt must not release an unrelated active parent.
+    assert!(matches!(
+        inbox.admission.begin_operation(&json!(7), None),
+        Err(AdapterError::ConnectionFailed(_))
+    ));
+    drop(original);
+    drop(inbox.admission.begin_operation(&json!(7), None).unwrap());
+}

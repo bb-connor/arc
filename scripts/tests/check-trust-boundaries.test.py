@@ -448,5 +448,14 @@ class PrivateAuditCustodyCalibration(unittest.TestCase):
                 self.assertTrue(all(not row["checked"] for row in rows))
 
 
+# Keep the finite rejection-reader controls in the existing CI gate command.
+_mcp_spec = importlib.util.spec_from_file_location(
+    "mcp_rejection_calibration", ROOT / "scripts/tests/check-trust-boundaries-mcp-rejection.test.py"
+)
+_mcp_tests = importlib.util.module_from_spec(_mcp_spec)
+_mcp_spec.loader.exec_module(_mcp_tests)
+InitializeRejectWitnessMutations = _mcp_tests.InitializeRejectWitnessMutations
+
+
 if __name__ == "__main__":
     unittest.main()

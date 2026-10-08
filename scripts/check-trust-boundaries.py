@@ -239,6 +239,16 @@ def scan(root, catalog):
     production_code = {path: _lexer.blank_rust_noise(text) for path, text in files.items()}
     found["ingress_census"] = _ingress.scan(production_code, _contracts, json_decoders)
     supports = {path: _lexer.blank_rust_noise(files.get(path, "")) for path in _contracts.SUPPORT_PATHS}
+    # Preserve literals only for the finite reject-only MCP source witness.
+    # Test-scoped tokens are blanked through the same calibrated Rust lexer.
+    mcp_http = "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs"
+    raw = files.get(mcp_http, "")
+    syntax = _lexer.blank_rust_noise(raw)
+    production = _lexer.blank_test_scoped_items(syntax)
+    supports[mcp_http + "::initialize-reject-source"] = "".join(
+        original if before == after else ("\n" if original == "\n" else " ")
+        for original, before, after in zip(raw, syntax, production)
+    )
     decoder_owners = set(catalog["signed_input_files"])
     for path, text in files.items():
         code = _lexer.blank_rust_noise(text)

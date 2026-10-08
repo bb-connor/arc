@@ -3,8 +3,23 @@
 These rules retain existing numeric/typed contracts. They are checked lexical
 witnesses, not path-only exemptions, and cannot be supplied by inventory prose.
 """
+import importlib.util
 import re
+import sys
 from functools import lru_cache
+from pathlib import Path
+
+_classifier_spec = importlib.util.spec_from_file_location(
+    "trust_boundary_mcp_rejection", Path(__file__).with_name("trust_boundary_mcp_rejection.py")
+)
+_classifier = importlib.util.module_from_spec(_classifier_spec)
+_classifier_spec.loader.exec_module(_classifier)
+_lexer_spec = importlib.util.spec_from_file_location(
+    "mcp_rejection_lexer", Path(__file__).with_name("check-accounting-arithmetic.py")
+)
+_lexer = importlib.util.module_from_spec(_lexer_spec)
+sys.modules[_lexer_spec.name] = _lexer
+_lexer_spec.loader.exec_module(_lexer)
 
 CORE = "crates/core/chio-core-types/src/"
 CHECKPOINT = "crates/kernel/chio-kernel/src/checkpoint.rs"
@@ -78,7 +93,9 @@ def closed_checkpoint(code):
 
 
 def special_apis(path, reader, body, supports):
-    apis = []
+    apis = _classifier.apis(
+        path, reader, supports.get(_classifier.RAW_SUPPORT, ""), _lexer
+    )
     rule = RULES.get((path, reader.split("#")[0]))
     if rule and all(re.search(pattern, body) for pattern in rule[1]):
         apis.append(rule[0])

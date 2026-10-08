@@ -513,7 +513,7 @@ impl ChioMcpEdge {
         writer: &mut W,
     ) -> Result<Option<Value>, AdapterError> {
         if let Some(cancelled) =
-            self.service_pending_actions_before_request(&message, client_rx, writer)
+            self.service_pending_actions_before_request(&message, client_rx, writer)?
         {
             return Ok(Some(cancelled));
         }

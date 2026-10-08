@@ -1528,6 +1528,7 @@
     "crates/protocol/chio-mcp-remote/src/input.rs::decode::from_wire",
     "crates/protocol/chio-mcp-remote/src/input.rs::document::from_wire",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/approval_policy.rs::load::from_wire",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs::initialize_request_shape::from_wire",
     "crates/protocol/chio-openai-adapter/src/input.rs::arguments::from_wire",
     "crates/protocol/chio-openai-adapter/src/input.rs::read_json::from_wire",
     "crates/protocol/chio-openapi/src/input.rs::decode::from_wire",
@@ -2384,7 +2385,10 @@
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_model_metadata::from_value",
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_supplemental_authorization::from_value",
     "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs::create_message_with_client_inbox::from_value",
-    "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs::refresh_roots_from_client_with_channel::from_value",
+    "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs::refresh_roots_carried_by::from_value",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs::deserialize::from_slice",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs::deserialize::from_str",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs::initialize_request_shape::custom_deserialize",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs::parse_request_time_authorization_details_from_value::from_value",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs::parse_request_time_transaction_context_from_value::from_value",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs::validate_chio_oauth_authorization_profile_metadata::from_value",
@@ -4790,7 +4794,7 @@
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_model_metadata::from_value": "Wire metadata becomes typed unverified artifacts. Kernel validation binds signed nonce, approvals, governance, model and supplemental authorization to the actual invocation. No serde result is a verification witness.",
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_supplemental_authorization::from_value": "Wire metadata becomes typed unverified artifacts. Kernel validation binds signed nonce, approvals, governance, model and supplemental authorization to the actual invocation. No serde result is a verification witness.",
     "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs::create_message_with_client_inbox::from_value": "Nested response Values are correlated with the outstanding request and converted into untrusted session data. Conversion does not create a capability or a verified proof.",
-    "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs::refresh_roots_from_client_with_channel::from_value": "Nested response Values are correlated with the outstanding request and converted into untrusted session data. Conversion does not create a capability or a verified proof.",
+    "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs::refresh_roots_carried_by::from_value": "Nested response Values are correlated with the outstanding request and converted into untrusted session data. Conversion does not create a capability or a verified proof.",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs::parse_request_time_authorization_details_from_value::from_value": "Authorization-details and transaction-context form JSON are bounded and duplicate-checked before typed conversion; sender-constraint JSON/base64 failures retain their local sources.",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs::parse_request_time_transaction_context_from_value::from_value": "Authorization-details and transaction-context form JSON are bounded and duplicate-checked before typed conversion; sender-constraint JSON/base64 failures retain their local sources.",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs::validate_chio_oauth_authorization_profile_metadata::from_value": "Authorization-details and transaction-context form JSON are bounded and duplicate-checked before typed conversion; sender-constraint JSON/base64 failures retain their local sources.",
@@ -4857,7 +4861,10 @@
     "crates/trust/chio-pheromone-runtime/src/lib.rs::peer_weights_from_json::from_value": "Policy/weight imports reject duplicate original native JSON under a 16 MiB bound before Value projection, embedded schema validation or signed envelope verification. Signature, trusted policy issuer, admission issuer and scarcity gates remain. Embedded schema JSON is repository-owned; typed Value projections preserve native integers.",
     "crates/trust/chio-pheromone-runtime/src/lib.rs::runtime_policy_from_json::from_value": "Policy/weight imports reject duplicate original native JSON under a 16 MiB bound before Value projection, embedded schema validation or signed envelope verification. Signature, trusted policy issuer, admission issuer and scarcity gates remain. Embedded schema JSON is repository-owned; typed Value projections preserve native integers.",
     "crates/trust/chio-pheromone-runtime/src/lib.rs::validate_json_schema::from_str": "Policy/weight imports reject duplicate original native JSON under a 16 MiB bound before Value projection, embedded schema validation or signed envelope verification. Signature, trusted policy issuer, admission issuer and scarcity gates remain. Embedded schema JSON is repository-owned; typed Value projections preserve native integers.",
-    "crates/trust/chio-weights/src/card.rs::schema::custom_deserialize": "Model-card import requires 1 MiB bounded native canonical typed byte equality and existing card validation. StringSet custom Deserialize still rejects duplicates, blanks and padding; signature/cosign verification remains outside structural decoding."
+    "crates/trust/chio-weights/src/card.rs::schema::custom_deserialize": "Model-card import requires 1 MiB bounded native canonical typed byte equality and existing card validation. StringSet custom Deserialize still rejects duplicates, blanks and padding; signature/cosign verification remains outside structural decoding.",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs::deserialize::from_slice": "Lexical census alias for the Shape read inside initialize_request_shape. The fixed Source witness requires the original 8 MiB wire bound, object gate, borrowed RawValue method and ignored-value id presence; no full DOM is built. A classified initialize body can only return an immediate refusal before session resolution. Every nonclassification falls through to the same original body through accounted inbox decode; parsing grants no authority.",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs::deserialize::from_str": "Lexical census alias for the bounded method conversion inside initialize_request_shape: borrow the original RawValue and require its wire length <=62 before decoding a small Cow string. The only successful classification is initialize id presence for immediate refusal; nonmatches/malformed values keep the original accounted decode. No positive request admission or authority is created.",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs::initialize_request_shape::custom_deserialize": "Lexical enclosing-function alias for nested Present::deserialize. IgnoredAny discards one id value and records presence only, including null; it does not build a Value document or interpret id authority. The containing reject-only helper and immediate-refusal caller are pinned by the finite Source witness."
   },
   "proofs": [
     {
@@ -6224,7 +6231,7 @@
     ],
     "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs": [
       "create_message_with_client_inbox::from_value",
-      "refresh_roots_from_client_with_channel::from_value"
+      "refresh_roots_carried_by::from_value"
     ],
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs": [
       "parse_request_time_authorization_details_from_value::from_value",
@@ -6529,6 +6536,11 @@
     ],
     "crates/trust/chio-weights/src/card.rs": [
       "schema::custom_deserialize"
+    ],
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs": [
+      "deserialize::from_slice",
+      "deserialize::from_str",
+      "initialize_request_shape::custom_deserialize"
     ]
   },
   "decoder_file_contracts": {
@@ -9973,7 +9985,7 @@
           "checked": true
         },
         {
-          "reader": "refresh_roots_from_client_with_channel",
+          "reader": "refresh_roots_carried_by",
           "decoders": [
             "from_value"
           ],
@@ -11416,6 +11428,34 @@
           ],
           "checked": true,
           "instances": 6
+        }
+      ]
+    },
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Private HTTP initialize id-presence classifier is reject-only, before any session resolution/full DOM. Fixed reviewer-owned Source token witnesses require Origin/auth/header ordering, original 8 MiB body/wire bounds, object-only Shape with borrowed method RawValue, <=62-byte method string conversion, and IgnoredAny presence. Some can only produce an immediate initialize refusal; None retains exact original-wire aggregate inbox admission and decode. Parser/witness/catalog classification is not capability or signature verification.",
+      "readers": [
+        {
+          "reader": "deserialize",
+          "decoders": [
+            "custom_deserialize"
+          ],
+          "apis": [
+            "serde::Deserializer"
+          ],
+          "checked": true
+        },
+        {
+          "reader": "initialize_request_shape",
+          "decoders": [
+            "from_slice",
+            "from_str"
+          ],
+          "apis": [
+            "UntrustedJsonText::from_wire#1::bounds_only",
+            "bounded-reject-only::object+borrowed-method62+immediate-refusal+same-wire-admission"
+          ],
+          "checked": true
         }
       ]
     }
@@ -16695,6 +16735,7 @@
     "crates/protocol/chio-mcp-remote/src/input.rs::decode::from_wire#1::decode_signed",
     "crates/protocol/chio-mcp-remote/src/input.rs::document::from_wire#1::decode_document",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/approval_policy.rs::load::from_wire#1::decode_signed",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs::initialize_request_shape::from_wire#1::bounds_only",
     "crates/protocol/chio-openai-adapter/src/input.rs::arguments::from_wire#1::decode_document",
     "crates/protocol/chio-openai-adapter/src/input.rs::read_json::from_wire#1::decode_document",
     "crates/protocol/chio-openapi/src/input.rs::decode::from_wire#1::decode_document",
@@ -21023,7 +21064,9 @@
     ],
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs": [
       "handle_authorization_approval::request-form::AuthorizationApprovalForm",
-      "handle_token_endpoint::request-form::TokenRequestForm"
+      "handle_post::shared-reader::crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs::initialize_request_shape",
+      "handle_token_endpoint::request-form::TokenRequestForm",
+      "initialize_request_shape::original-json-reader::UntrustedJsonText"
     ],
     "crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/bearer_auth.rs": [
       "authenticate_token#2::http-response-json::json"
