@@ -1,5 +1,13 @@
 # Security and process landing ledger
 
+## Latest integration checkpoint (2026-10-08)
+
+The authoritative [JSON ledger](landing-ledger.json) has 1,783 requirements. The additive [MCP and diagnostic checkpoint](audits/mcp-and-diagnostic-integration-checkpoint-20261008.json) records MCP source `2488df7f78`, fuzz repair `3f3dc21b45`, and diagnostics `f41e8928d9`. Current MCP libraries pass 478 cases; the diagnostics pass 12 Rust and five Python cases. Strict lint for MCP, CLI, and the fuzz feature, the source inventory, and 42 existing plus 21 new mutation controls pass within their recorded scope. The native CLI attempt remains failed at preflight on ARM (43 HTTP failures and conformance three passed, one failed). Earlier native evidence from `8060ded996` binds a separate source.
+
+Published PR #1160 is still `89d79ac6ab`, with 118 successful, 21 failed, and 12 skipped hosted checks. Local source is unpublished, unqualified, and unmerged. Remaining production repairs, exact-source native, cold and trusted evidence, the full test matrix, and protected landing are open. The real mini-SWE attachment defect remains open despite the diagnostic repair. The active landing queue contains #1160; #1167, #1168, and #1176 are merged.
+
+Checkpoints below retain their capture dates, historical counts, and outcomes. Use the JSON's current requirement states and this latest checkpoint for present acceptance.
+
 ## Artifact, terminal and SIEM source checkpoint (2026-10-07)
 
 The [artifact and SIEM checkpoint](audits/artifact-and-siem-integration-checkpoint-20261007.json) pins source repair `aaa62b32e1`. Its bounded evidence includes 66 focused artifact/terminal controls, 167 distinct affected integration/module cases, the 24-case SIEM evidence target, six conformance/proof/signer controls, and strict all-targets lint for five owners. Original runtime failures and fixture/setup failures remain separate. The current source inventory needs the new automatic-preparation and moved-reader classifications, and the other owner/native handoffs and full default/PQ, trusted/hosted and protected-merge acceptance remain open. This local checkpoint is unpublished and does not qualify the full foundation.

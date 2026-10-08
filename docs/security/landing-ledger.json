@@ -7744,6 +7744,211 @@
       "work_status": "source-integrated",
       "owner": "codex",
       "review_thread_urls": []
+    },
+    {
+      "id": "incoming-pr1160-review-20261008:resume:MCP-INIT400",
+      "label": "MCP-INIT400",
+      "priority": "P2",
+      "requirement": "Session-bearing initialize refuses400 before unknown-session resolution; original authenticated/read-limited ordering preserved.",
+      "source": {
+        "path": "docs/security/audits/mcp-and-diagnostic-integration-checkpoint-20261008.json",
+        "line": 9,
+        "line_sha256": "08f81531d9bcc5149e980db670aa59918584a60edabf6df0307b6feab139597e",
+        "checkpoint": "759bb100ccfb16d1e37fe8b48db96cb40f5197fe",
+        "reviewed_source": "2488df7f780d59e92ff5312d42159f15ccdb02b5"
+      },
+      "disposition": "source-repaired-scoped-local-acceptance-final-candidate-pending",
+      "source_repair": {
+        "checkpoint": "2488df7f780d59e92ff5312d42159f15ccdb02b5",
+        "files": [
+          "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs",
+          "crates/protocol/chio-mcp-remote/src/remote_mcp/tests/worker_lifecycle/initialize_session_header.rs",
+          "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/error_contract.rs"
+        ],
+        "application": "Exact Original/control and source-witness repairs; allfailed/setup/nativeavailability outcomes retained."
+      },
+      "verification_evidence": [
+        {
+          "checkpoint": "759bb100ccfb16d1e37fe8b48db96cb40f5197fe",
+          "path": "docs/security/audits/mcp-and-diagnostic-integration-checkpoint-20261008.json",
+          "scope": "478MCP libraries, strict3/CLI/fuzz0,42+21mutations, exactsourceinventory; nativepreflight failed, not final qualification"
+        }
+      ],
+      "remaining_acceptance": [
+        "Finish exactcurrent nativeCLI HTTP/C++/Python onqualifiedLinuxx86_64; localARM43preflightfail+3/1conformance remains retained.",
+        "Complete allother now production repairs, full default/PQ/source/independent/cold/trusted/hosted acceptance and protected landing."
+      ],
+      "landing_unit": "foundation",
+      "landing_pr": 1160,
+      "main_ancestry_verified": false,
+      "review_scope": "now",
+      "work_status": "source-integrated",
+      "owner": "codex",
+      "review_thread_urls": []
+    },
+    {
+      "id": "incoming-pr1160-review-20261008:resume:MCP-PEERS",
+      "label": "MCP-PEERS",
+      "priority": "P2",
+      "requirement": "Existing Python/C++ nested routers answer carried callbacks; explicit C++ callback scopes prevent duplicate answers and retain safe lifetime.",
+      "source": {
+        "path": "docs/security/audits/mcp-and-diagnostic-integration-checkpoint-20261008.json",
+        "line": 10,
+        "line_sha256": "558a19e286f4b6913351a9c53cfdd77aa8031f13243d02756edd5b6925c14134",
+        "checkpoint": "759bb100ccfb16d1e37fe8b48db96cb40f5197fe",
+        "reviewed_source": "2488df7f780d59e92ff5312d42159f15ccdb02b5"
+      },
+      "disposition": "source-repaired-scoped-local-acceptance-final-candidate-pending",
+      "source_repair": {
+        "checkpoint": "2488df7f780d59e92ff5312d42159f15ccdb02b5",
+        "files": [
+          "tests/conformance/peers/cpp/client.cpp",
+          "tests/conformance/peers/python/client.py"
+        ],
+        "application": "Exact Original/control and source-witness repairs; allfailed/setup/nativeavailability outcomes retained."
+      },
+      "verification_evidence": [
+        {
+          "checkpoint": "759bb100ccfb16d1e37fe8b48db96cb40f5197fe",
+          "path": "docs/security/audits/mcp-and-diagnostic-integration-checkpoint-20261008.json",
+          "scope": "478MCP libraries, strict3/CLI/fuzz0,42+21mutations, exactsourceinventory; nativepreflight failed, not final qualification"
+        }
+      ],
+      "remaining_acceptance": [
+        "Finish exactcurrent nativeCLI HTTP/C++/Python onqualifiedLinuxx86_64; localARM43preflightfail+3/1conformance remains retained.",
+        "Complete allother now production repairs, full default/PQ/source/independent/cold/trusted/hosted acceptance and protected landing."
+      ],
+      "landing_unit": "foundation",
+      "landing_pr": 1160,
+      "main_ancestry_verified": false,
+      "review_scope": "now",
+      "work_status": "source-integrated",
+      "owner": "codex",
+      "review_thread_urls": []
+    },
+    {
+      "id": "incoming-pr1160-review-20261008:resume:MCP-GET",
+      "label": "MCP-GET",
+      "priority": "P2",
+      "requirement": "Exact original priming event and notification-before-response test corrections, no server behavior or replay/ownership oracle relaxation.",
+      "source": {
+        "path": "docs/security/audits/mcp-and-diagnostic-integration-checkpoint-20261008.json",
+        "line": 11,
+        "line_sha256": "9ba940b1f039ce103afad26046e55eb01c4000010994bb1d3cfbcd58ff3e03f4",
+        "checkpoint": "759bb100ccfb16d1e37fe8b48db96cb40f5197fe",
+        "reviewed_source": "2488df7f780d59e92ff5312d42159f15ccdb02b5"
+      },
+      "disposition": "source-repaired-scoped-local-acceptance-final-candidate-pending",
+      "source_repair": {
+        "checkpoint": "2488df7f780d59e92ff5312d42159f15ccdb02b5",
+        "files": [
+          "crates/products/chio-cli/tests/mcp_serve_http.rs"
+        ],
+        "application": "Exact Original/control and source-witness repairs; allfailed/setup/nativeavailability outcomes retained."
+      },
+      "verification_evidence": [
+        {
+          "checkpoint": "759bb100ccfb16d1e37fe8b48db96cb40f5197fe",
+          "path": "docs/security/audits/mcp-and-diagnostic-integration-checkpoint-20261008.json",
+          "scope": "478MCP libraries, strict3/CLI/fuzz0,42+21mutations, exactsourceinventory; nativepreflight failed, not final qualification"
+        }
+      ],
+      "remaining_acceptance": [
+        "Finish exactcurrent nativeCLI HTTP/C++/Python onqualifiedLinuxx86_64; localARM43preflightfail+3/1conformance remains retained.",
+        "Complete allother now production repairs, full default/PQ/source/independent/cold/trusted/hosted acceptance and protected landing."
+      ],
+      "landing_unit": "foundation",
+      "landing_pr": 1160,
+      "main_ancestry_verified": false,
+      "review_scope": "now",
+      "work_status": "source-integrated",
+      "owner": "codex",
+      "review_thread_urls": []
+    },
+    {
+      "id": "incoming-pr1160-review-20261008:resume:MCP-CANCEL",
+      "label": "MCP-CANCEL",
+      "priority": "P2",
+      "requirement": "Exact carrier identity uses reserved capacity; registration precedes consuming queued refresh, local oversized-ID refusal and internal global fault separate.",
+      "source": {
+        "path": "docs/security/audits/mcp-and-diagnostic-integration-checkpoint-20261008.json",
+        "line": 12,
+        "line_sha256": "ae9c49605b66e65db4d693f19762b14306ee8d7a74aadd7fb810d0031358ddcf",
+        "checkpoint": "759bb100ccfb16d1e37fe8b48db96cb40f5197fe",
+        "reviewed_source": "2488df7f780d59e92ff5312d42159f15ccdb02b5"
+      },
+      "disposition": "source-repaired-scoped-local-acceptance-final-candidate-pending",
+      "source_repair": {
+        "checkpoint": "2488df7f780d59e92ff5312d42159f15ccdb02b5",
+        "files": [
+          "crates/protocol/chio-mcp-edge/src/runtime.rs",
+          "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs",
+          "crates/protocol/chio-mcp-edge/src/runtime/runtime_tests/roots_refresh_invalidation.rs"
+        ],
+        "application": "Exact Original/control and source-witness repairs; allfailed/setup/nativeavailability outcomes retained."
+      },
+      "verification_evidence": [
+        {
+          "checkpoint": "759bb100ccfb16d1e37fe8b48db96cb40f5197fe",
+          "path": "docs/security/audits/mcp-and-diagnostic-integration-checkpoint-20261008.json",
+          "scope": "478MCP libraries, strict3/CLI/fuzz0,42+21mutations, exactsourceinventory; nativepreflight failed, not final qualification"
+        }
+      ],
+      "remaining_acceptance": [
+        "Finish exactcurrent nativeCLI HTTP/C++/Python onqualifiedLinuxx86_64; localARM43preflightfail+3/1conformance remains retained.",
+        "Complete allother now production repairs, full default/PQ/source/independent/cold/trusted/hosted acceptance and protected landing."
+      ],
+      "landing_unit": "foundation",
+      "landing_pr": 1160,
+      "main_ancestry_verified": false,
+      "review_scope": "now",
+      "work_status": "source-integrated",
+      "owner": "codex",
+      "review_thread_urls": []
+    },
+    {
+      "id": "incoming-pr1160-review-20261008:resume:MCP-REJECT-READER",
+      "label": "MCP-REJECT-READER",
+      "priority": "P2",
+      "requirement": "Explicit8MiB/object-bound streaming DTO, borrowed method cap62 and ignored id presence; only immediate refusal, unchanged accounted fallback, no pre-admission DOM.",
+      "source": {
+        "path": "docs/security/audits/mcp-and-diagnostic-integration-checkpoint-20261008.json",
+        "line": 13,
+        "line_sha256": "09b32ce5ae4430a49ee29f07d86fdbef86a2d4915870094444df08059b0bcbf5",
+        "checkpoint": "759bb100ccfb16d1e37fe8b48db96cb40f5197fe",
+        "reviewed_source": "2488df7f780d59e92ff5312d42159f15ccdb02b5"
+      },
+      "disposition": "source-repaired-scoped-local-acceptance-final-candidate-pending",
+      "source_repair": {
+        "checkpoint": "2488df7f780d59e92ff5312d42159f15ccdb02b5",
+        "files": [
+          "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs",
+          "scripts/trust_boundary_mcp_rejection.py",
+          "scripts/trust_boundary_reader_rules.py",
+          "scripts/check-trust-boundaries.py",
+          "scripts/tests/check-trust-boundaries-mcp-rejection.test.py",
+          "docs/security/trust-boundary-inventory.json"
+        ],
+        "application": "Exact Original/control and source-witness repairs; allfailed/setup/nativeavailability outcomes retained."
+      },
+      "verification_evidence": [
+        {
+          "checkpoint": "759bb100ccfb16d1e37fe8b48db96cb40f5197fe",
+          "path": "docs/security/audits/mcp-and-diagnostic-integration-checkpoint-20261008.json",
+          "scope": "478MCP libraries, strict3/CLI/fuzz0,42+21mutations, exactsourceinventory; nativepreflight failed, not final qualification"
+        }
+      ],
+      "remaining_acceptance": [
+        "Finish exactcurrent nativeCLI HTTP/C++/Python onqualifiedLinuxx86_64; localARM43preflightfail+3/1conformance remains retained.",
+        "Complete allother now production repairs, full default/PQ/source/independent/cold/trusted/hosted acceptance and protected landing."
+      ],
+      "landing_unit": "foundation",
+      "landing_pr": 1160,
+      "main_ancestry_verified": false,
+      "review_scope": "now",
+      "work_status": "source-integrated",
+      "owner": "codex",
+      "review_thread_urls": []
     }
   ],
   "incoming_review_execution": {
@@ -129809,7 +130014,8 @@
       "evidence_checkpoint": "9423113ed7a49bd59418d659a5f8ceceb0707d52",
       "evidence_path": "docs/security/audits/artifact-and-siem-integration-checkpoint-20261007.json",
       "qualified": false,
-      "merged": false
+      "merged": false,
+      "automatic_preparation_reader_inventory": "cd5531924a+fe8ebbc59e, currentMCP sourcegate497/86/171 Green, allraw45preserved"
     },
     "incoming-pr1160-review-20261007:resume:AR-CAS": {
       "state": "source-integrated-scoped-green-final-acceptance-pending",
@@ -129817,7 +130023,8 @@
       "evidence_checkpoint": "9423113ed7a49bd59418d659a5f8ceceb0707d52",
       "evidence_path": "docs/security/audits/artifact-and-siem-integration-checkpoint-20261007.json",
       "qualified": false,
-      "merged": false
+      "merged": false,
+      "automatic_preparation_reader_inventory": "cd5531924a+fe8ebbc59e, currentMCP sourcegate497/86/171 Green, allraw45preserved"
     },
     "incoming-pr1160-review-20261007:resume:AR-TERM": {
       "state": "source-integrated-scoped-green-final-acceptance-pending",
@@ -129825,7 +130032,8 @@
       "evidence_checkpoint": "9423113ed7a49bd59418d659a5f8ceceb0707d52",
       "evidence_path": "docs/security/audits/artifact-and-siem-integration-checkpoint-20261007.json",
       "qualified": false,
-      "merged": false
+      "merged": false,
+      "automatic_preparation_reader_inventory": "cd5531924a+fe8ebbc59e, currentMCP sourcegate497/86/171 Green, allraw45preserved"
     },
     "incoming-pr1160-review-20261007:resume:AR-PROOF": {
       "state": "source-integrated-scoped-green-final-acceptance-pending",
@@ -129833,7 +130041,8 @@
       "evidence_checkpoint": "9423113ed7a49bd59418d659a5f8ceceb0707d52",
       "evidence_path": "docs/security/audits/artifact-and-siem-integration-checkpoint-20261007.json",
       "qualified": false,
-      "merged": false
+      "merged": false,
+      "automatic_preparation_reader_inventory": "cd5531924a+fe8ebbc59e, currentMCP sourcegate497/86/171 Green, allraw45preserved"
     },
     "incoming-pr1160-review-20261007:resume:AR-LATE": {
       "state": "source-integrated-scoped-green-final-acceptance-pending",
@@ -129841,7 +130050,8 @@
       "evidence_checkpoint": "9423113ed7a49bd59418d659a5f8ceceb0707d52",
       "evidence_path": "docs/security/audits/artifact-and-siem-integration-checkpoint-20261007.json",
       "qualified": false,
-      "merged": false
+      "merged": false,
+      "automatic_preparation_reader_inventory": "cd5531924a+fe8ebbc59e, currentMCP sourcegate497/86/171 Green, allraw45preserved"
     },
     "incoming-pr1160-review-20261007:resume:AR-EXPIRY": {
       "state": "source-integrated-scoped-green-final-acceptance-pending",
@@ -129849,7 +130059,8 @@
       "evidence_checkpoint": "9423113ed7a49bd59418d659a5f8ceceb0707d52",
       "evidence_path": "docs/security/audits/artifact-and-siem-integration-checkpoint-20261007.json",
       "qualified": false,
-      "merged": false
+      "merged": false,
+      "automatic_preparation_reader_inventory": "cd5531924a+fe8ebbc59e, currentMCP sourcegate497/86/171 Green, allraw45preserved"
     },
     "incoming-pr1160-review-20261007:resume:AR-VIEW": {
       "state": "source-integrated-scoped-green-final-acceptance-pending",
@@ -129857,7 +130068,8 @@
       "evidence_checkpoint": "9423113ed7a49bd59418d659a5f8ceceb0707d52",
       "evidence_path": "docs/security/audits/artifact-and-siem-integration-checkpoint-20261007.json",
       "qualified": false,
-      "merged": false
+      "merged": false,
+      "automatic_preparation_reader_inventory": "cd5531924a+fe8ebbc59e, currentMCP sourcegate497/86/171 Green, allraw45preserved"
     },
     "incoming-pr1160-review-20261007:resume:NF-CAP": {
       "state": "claude-complete-partial-gates-public-direct-path-amendment-pending",
@@ -129900,10 +130112,12 @@
       "merged": false
     },
     "incoming-pr1160-review-20261007:resume:MINISW-ATTACH": {
-      "state": "published-failure-fixed-diagnostics-and-authorized-reproduction-pending",
-      "source_checkpoint": "61b4272bf929f205db2bc3a38130e89c8f8a8ea1",
+      "state": "diagnostic-source-integrated12Rust5Python-green-realnativeattachmentrepairOPEN",
+      "source_checkpoint": "f41e8928d9baf5e722801146fef7e20b2921ed10",
       "qualified": false,
-      "merged": false
+      "merged": false,
+      "evidence_checkpoint": "759bb100ccfb16d1e37fe8b48db96cb40f5197fe",
+      "audit_path": "docs/security/audits/mcp-and-diagnostic-integration-checkpoint-20261008.json"
     },
     "incoming-pr1160-review-20261007:resume:F016-TC": {
       "state": "claude-composed-original-first-and-internal-consumer-proposal-pending",
@@ -129917,7 +130131,8 @@
       "evidence_checkpoint": "9423113ed7a49bd59418d659a5f8ceceb0707d52",
       "evidence_path": "docs/security/audits/artifact-and-siem-integration-checkpoint-20261007.json",
       "qualified": false,
-      "merged": false
+      "merged": false,
+      "automatic_preparation_reader_inventory": "cd5531924a+fe8ebbc59e, currentMCP sourcegate497/86/171 Green, allraw45preserved"
     },
     "incoming-pr1160-review-20261007:resume:AR-SCHEMA": {
       "state": "source-integrated-scoped-green-final-acceptance-pending",
@@ -129925,19 +130140,24 @@
       "evidence_checkpoint": "9423113ed7a49bd59418d659a5f8ceceb0707d52",
       "evidence_path": "docs/security/audits/artifact-and-siem-integration-checkpoint-20261007.json",
       "qualified": false,
-      "merged": false
+      "merged": false,
+      "automatic_preparation_reader_inventory": "cd5531924a+fe8ebbc59e, currentMCP sourcegate497/86/171 Green, allraw45preserved"
     },
     "incoming-pr1160-review-20261007:resume:MCP-ROOTS": {
-      "state": "claude-real-native-red-repair-and-controls-running",
-      "source_checkpoint": "61b4272bf929f205db2bc3a38130e89c8f8a8ea1",
+      "state": "source-integrated-current478-owning-strict-green-currentnativepreflightfailed-finalpending",
+      "source_checkpoint": "2488df7f780d59e92ff5312d42159f15ccdb02b5",
       "qualified": false,
-      "merged": false
+      "merged": false,
+      "evidence_checkpoint": "759bb100ccfb16d1e37fe8b48db96cb40f5197fe",
+      "audit_path": "docs/security/audits/mcp-and-diagnostic-integration-checkpoint-20261008.json"
     },
     "incoming-pr1160-review-20261007:resume:FUZZ-FRAMING": {
-      "state": "published-E0425-claude-narrow-fuzz-feature-repair-running",
-      "source_checkpoint": "61b4272bf929f205db2bc3a38130e89c8f8a8ea1",
+      "state": "source-integrated-currentcompilerRED-toGREEN-andstrict0-lockedcorpuspending",
+      "source_checkpoint": "3f3dc21b45",
       "qualified": false,
-      "merged": false
+      "merged": false,
+      "evidence_checkpoint": "759bb100ccfb16d1e37fe8b48db96cb40f5197fe",
+      "audit_path": "docs/security/audits/mcp-and-diagnostic-integration-checkpoint-20261008.json"
     },
     "incoming-pr1160-review-20261007:resume:F042-CURRENT": {
       "state": "promoted-current-genuine-original-red-claude-repair-pending",
@@ -129998,6 +130218,47 @@
       "source_repair": "aaa62b32e1884b9f942f57a0713222f7fb87a4bf",
       "evidence_checkpoint": "9423113ed7a49bd59418d659a5f8ceceb0707d52",
       "evidence_path": "docs/security/audits/artifact-and-siem-integration-checkpoint-20261007.json",
+      "qualified": false,
+      "merged": false,
+      "automatic_preparation_reader_inventory": "cd5531924a+fe8ebbc59e, currentMCP sourcegate497/86/171 Green, allraw45preserved"
+    },
+    "incoming-pr1160-review-20261008:resume:MCP-INIT400": {
+      "state": "source-integrated-scoped-local-green-native-final-pending",
+      "source_checkpoint": "2488df7f780d59e92ff5312d42159f15ccdb02b5",
+      "evidence_checkpoint": "759bb100ccfb16d1e37fe8b48db96cb40f5197fe",
+      "audit_path": "docs/security/audits/mcp-and-diagnostic-integration-checkpoint-20261008.json",
+      "qualified": false,
+      "merged": false
+    },
+    "incoming-pr1160-review-20261008:resume:MCP-PEERS": {
+      "state": "source-integrated-scoped-local-green-native-final-pending",
+      "source_checkpoint": "2488df7f780d59e92ff5312d42159f15ccdb02b5",
+      "evidence_checkpoint": "759bb100ccfb16d1e37fe8b48db96cb40f5197fe",
+      "audit_path": "docs/security/audits/mcp-and-diagnostic-integration-checkpoint-20261008.json",
+      "qualified": false,
+      "merged": false
+    },
+    "incoming-pr1160-review-20261008:resume:MCP-GET": {
+      "state": "source-integrated-scoped-local-green-native-final-pending",
+      "source_checkpoint": "2488df7f780d59e92ff5312d42159f15ccdb02b5",
+      "evidence_checkpoint": "759bb100ccfb16d1e37fe8b48db96cb40f5197fe",
+      "audit_path": "docs/security/audits/mcp-and-diagnostic-integration-checkpoint-20261008.json",
+      "qualified": false,
+      "merged": false
+    },
+    "incoming-pr1160-review-20261008:resume:MCP-CANCEL": {
+      "state": "source-integrated-scoped-local-green-native-final-pending",
+      "source_checkpoint": "2488df7f780d59e92ff5312d42159f15ccdb02b5",
+      "evidence_checkpoint": "759bb100ccfb16d1e37fe8b48db96cb40f5197fe",
+      "audit_path": "docs/security/audits/mcp-and-diagnostic-integration-checkpoint-20261008.json",
+      "qualified": false,
+      "merged": false
+    },
+    "incoming-pr1160-review-20261008:resume:MCP-REJECT-READER": {
+      "state": "source-integrated-scoped-local-green-native-final-pending",
+      "source_checkpoint": "2488df7f780d59e92ff5312d42159f15ccdb02b5",
+      "evidence_checkpoint": "759bb100ccfb16d1e37fe8b48db96cb40f5197fe",
+      "audit_path": "docs/security/audits/mcp-and-diagnostic-integration-checkpoint-20261008.json",
       "qualified": false,
       "merged": false
     }
@@ -131310,5 +131571,16 @@
     ],
     "candidate_qualified": false,
     "foundation_merged": false
+  },
+  "mcp_diagnostic_integration_checkpoint_20261008": {
+    "audit_path": "docs/security/audits/mcp-and-diagnostic-integration-checkpoint-20261008.json",
+    "evidence_checkpoint": "759bb100ccfb16d1e37fe8b48db96cb40f5197fe",
+    "source": "2488df7f780d59e92ff5312d42159f15ccdb02b5",
+    "diagnostic_source": "f41e8928d9",
+    "current_requirements": 1783,
+    "published_source": "89d79ac6ab79de5d55b99a7c8ec611bc8b021cb2",
+    "qualified": false,
+    "merged": false,
+    "boundary": "scoped localMCP/diagnostic/source gates; nativepreflightfailure retained and realattachmentrepair open"
   }
 }
