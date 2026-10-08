@@ -15,6 +15,8 @@ mod amount_and_rails;
 mod authorization_window;
 #[path = "payment_recovery/continuation_controls.rs"]
 mod continuation_controls;
+#[path = "payment_recovery/fx_clock.rs"]
+mod fx_clock;
 #[cfg(feature = "finding-market")]
 #[path = "payment_recovery/publication.rs"]
 mod publication;
