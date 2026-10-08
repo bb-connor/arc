@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::admission_operation::{AdmissionRecoveryError, AdmissionRecoveryFailureKind};
+use crate::disposition::Disposition;
 
 pub(crate) fn item_failure(
     kind: AdmissionRecoveryFailureKind,
@@ -15,11 +16,7 @@ pub(crate) fn item_failure(
 
 pub(super) fn classify(error: &KernelError) -> Option<AdmissionRecoveryFailureKind> {
     match error {
-        KernelError::AdmissionRecovery(failure) => match failure.as_ref() {
-            AdmissionRecoveryError::Item { kind, .. } => Some(*kind),
-            AdmissionRecoveryError::Payment { kind, .. } => Some(*kind),
-            _ => None,
-        },
+        KernelError::AdmissionRecovery(failure) => failure.failure_kind(),
         KernelError::FindingDenied(denial) => Some(match denial.code() {
             crate::finding_denial::FindingDenialCode::Unavailable => {
                 AdmissionRecoveryFailureKind::ParticipantUnavailable
@@ -32,6 +29,15 @@ pub(super) fn classify(error: &KernelError) -> Option<AdmissionRecoveryFailureKi
         }
         _ => None,
     }
+}
+
+/// How the recovery sweep handles one operation's failure. Only a failure
+/// that belongs to that operation is item scoped; everything else is fatal.
+pub(super) fn disposition(error: &KernelError) -> Disposition {
+    classify(error).map_or(
+        Disposition::Fatal,
+        AdmissionRecoveryFailureKind::disposition,
+    )
 }
 
 pub(crate) fn payment_store_error(
@@ -63,3 +69,7 @@ pub(crate) fn port_error(
 ) -> KernelError {
     KernelError::AdmissionRecovery(Box::new(AdmissionRecoveryError::Port(error)))
 }
+
+#[cfg(test)]
+#[path = "failure/tests.rs"]
+mod tests;

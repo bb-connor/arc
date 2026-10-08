@@ -3,6 +3,7 @@ use super::*;
 use crate::admission_operation::{
     AdmissionOperationId, AdmissionOperationStoreError, AdmissionRecoveryPageQuery,
 };
+use crate::disposition::Disposition;
 
 impl ChioKernel {
     pub(super) fn reconcile_admission_recovery_page(
@@ -88,10 +89,17 @@ impl ChioKernel {
                         })?;
                     }
                 }
-                Err(error) if failure::classify(&error).is_some() => {
-                    self.defer_admission_recovery(&operation, previous.as_ref(), &error, item_now)?;
-                }
-                Err(error) => return Err(error),
+                Err(error) => match failure::disposition(&error) {
+                    Disposition::Deny | Disposition::Retry | Disposition::Quarantine => {
+                        self.defer_admission_recovery(
+                            &operation,
+                            previous.as_ref(),
+                            &error,
+                            item_now,
+                        )?;
+                    }
+                    Disposition::Fatal => return Err(error),
+                },
             }
         }
         Ok((reconciled, page.next_cursor))

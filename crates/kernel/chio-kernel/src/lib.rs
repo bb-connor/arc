@@ -78,6 +78,8 @@ pub mod custody;
 #[cfg(not(loom))]
 pub mod dispatch_status;
 #[cfg(not(loom))]
+pub mod disposition;
+#[cfg(not(loom))]
 pub mod dpop;
 #[cfg(not(loom))]
 pub mod evidence_export;
@@ -215,6 +217,8 @@ pub(crate) use receipt_support::*;
 // envelope issuance) sign through the resulting backend so the receipt body
 // remains byte-identical across classical and hybrid paths under
 // `crypto_floor=allow_classical`.
+#[cfg(not(loom))]
+pub use disposition::Disposition;
 #[cfg(not(loom))]
 pub use receipt_support::{
     kernel_signing_backend, receipt_body_fields_coupled, scope_receipt_ids_for_current_thread,

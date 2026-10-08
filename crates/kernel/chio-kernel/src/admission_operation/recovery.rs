@@ -1,6 +1,7 @@
 //! Recovery bookkeeping never grants dispatch, nonce, or monetary authority.
 
 use super::*;
+use crate::disposition::Disposition;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -108,6 +109,21 @@ pub enum AdmissionRecoveryFailureKind {
     LegacyPaymentAmountAbsent,
 }
 
+impl AdmissionRecoveryFailureKind {
+    /// How a recovery loop handles an operation that failed this way.
+    #[must_use]
+    pub fn disposition(self) -> Disposition {
+        match self {
+            Self::ParticipantUnavailable | Self::PaymentPending => Disposition::Retry,
+            Self::OutputDenied => Disposition::Deny,
+            Self::ContractChanged
+            | Self::RecoveryRequestAbsent
+            | Self::UnsupportedState
+            | Self::LegacyPaymentAmountAbsent => Disposition::Quarantine,
+        }
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum AdmissionRecoveryError {
     #[error(transparent)]
@@ -133,6 +149,32 @@ pub enum AdmissionRecoveryError {
         kind: AdmissionRecoveryFailureKind,
         detail: String,
     },
+}
+
+impl AdmissionRecoveryError {
+    /// The item failure family, when this failure belongs to one operation.
+    /// Store, port, journal and record faults have none: they are shared.
+    #[must_use]
+    pub fn failure_kind(&self) -> Option<AdmissionRecoveryFailureKind> {
+        match self {
+            Self::Item { kind, .. } | Self::Payment { kind, .. } => Some(*kind),
+            Self::Port(_)
+            | Self::Store(_)
+            | Self::Outcome(_)
+            | Self::PaymentJournal(_)
+            | Self::PaymentRecord(_)
+            | Self::Operation(_) => None,
+        }
+    }
+
+    /// How a recovery loop handles this failure. Shared faults are fatal.
+    #[must_use]
+    pub fn disposition(&self) -> Disposition {
+        self.failure_kind().map_or(
+            Disposition::Fatal,
+            AdmissionRecoveryFailureKind::disposition,
+        )
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
