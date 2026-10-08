@@ -1,30 +1,15 @@
-use chio_core::capability::governance::{
-    GovernedApprovalToken, GovernedResponsePlanIntentBody, CHIO_ACTIVE_RESPONSE_SERVER_ID,
-};
-use chio_core::receipt::body::ChioReceipt;
-use chio_core::receipt::decision::ToolCallAction;
-use chio_core::receipt::kinds::{
-    BoundaryClass, ObservationOutcome, ReceiptKind, RedactionMode, ToolOrigin, TrustLevel,
-};
-use chio_core::receipt::security::{
-    validate_response_snapshot_lifecycle, ActiveDefenseReceiptBody,
-};
-use chio_core::{canonical_json_bytes, sha256, Hash};
+use chio_core::capability::governance::{GovernedApprovalToken, CHIO_ACTIVE_RESPONSE_SERVER_ID};
 use chio_security_types::ports::{
-    AdmissionArtifactRef, Digest32, EffectId, PreparedActiveResponseDispatchBinding, RecordId,
-    ResponseDispatchApproval, RESPONSE_AFFECTED_SET_DOMAIN, RESPONSE_EFFECT_ID_DOMAIN,
+    AdmissionArtifactRef, Digest32, PreparedActiveResponseDispatchBinding, RecordId,
+    ResponseDispatchApproval,
 };
-use chio_security_types::{
-    PlannedResponseEffect, ResponseApprovalRequirement, ResponseEffectSpec, ResponseMutationRecord,
-    ResponsePlan, ResponseSnapshot, ResponseState,
-};
-use serde::Serialize;
+use chio_security_types::{ResponseApprovalRequirement, ResponsePlan};
 
 use crate::approval::{ApprovalReservation, ApprovalSetReservationInput};
 use crate::security_admission_operation::{
     AdmissionDispatchState, AdmissionOperation, AdmissionOperationCasOutcome,
-    AdmissionOperationCompareAndSwap, AdmissionOperationCreateOutcome, AdmissionOperationKind,
-    AdmissionOperationState, PreparedAdmissionOperation, ReplayReservationState,
+    AdmissionOperationCompareAndSwap, AdmissionOperationCreateOutcome, AdmissionOperationState,
+    ReplayReservationState,
 };
 use crate::threshold_approval::{
     verify_threshold_approval_set, ThresholdApprovalProposal, ThresholdApprovalVerificationInput,
@@ -37,27 +22,30 @@ use super::active_response_admission::{
 use super::active_response_artifact::{self, ActiveResponseArtifactAuthorityAttestation};
 use super::active_response_operation_binding::{
     active_response_dispatch_operation_version, build_active_response_operation_anchor,
-    derive_active_response_operation_request_binding_hash, ActiveResponseOperationAnchor,
 };
 use super::active_response_policy::VerifiedActiveResponseRequirement;
-use super::active_response_proof::{
-    active_response_effect_commitment, active_response_execution_dispatch_binding,
-    active_response_expected_effect_outcome, active_response_response_binding,
-    verify_active_response_dispatch_authorization,
-};
 use super::admission_cleanup::ActiveResponseOperationAnchorJournalError;
 use super::{
-    derive_active_response_dispatch_id, ActiveResponseExecutionApproval,
-    ActiveResponseExecutionEvidence, ActiveResponseExecutionOutcome,
-    ActiveResponseExecutionRequest, ActiveResponseExecutionRequestParts,
-    ActiveResponseExecutorAuthorityIdentity,
+    ActiveResponseExecutionApproval, ActiveResponseExecutionEvidence,
+    ActiveResponseExecutionRequest,
 };
 use super::{ChioKernel, KernelError};
 
 mod admission_request;
 mod cancellation;
+mod execution_validation;
 mod executor_error;
 mod prepared_binding;
+
+pub(super) use execution_validation::{
+    active_response_denied, active_response_internal, bounded_admission_error,
+    build_active_response_execution_request, digest_hex,
+    validate_active_response_terminal_executor_receipt, validate_executable_response_plan_value,
+};
+use execution_validation::{
+    build_governed_active_response_operation, validate_active_response_execution_evidence,
+    validate_executable_response_plan,
+};
 
 pub use admission_request::{
     ActiveResponseAdmissionRequest, AutomaticActiveResponsePermit,
@@ -1147,5 +1135,3 @@ impl ChioKernel {
         }
     }
 }
-
-include!("active_response_coordinator/execution_validation.inc");

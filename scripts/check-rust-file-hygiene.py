@@ -566,12 +566,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         max_lines=2_159,
         max_fragments=2,
     ),
-    "crates/kernel/chio-kernel/src/kernel/active_response_coordinator.rs": allow(
-        "2026-10-31",
-        "kernel active response coordinator assembled from include! fragments; capped until the fragments become modules",
-        max_lines=2_046,
-        max_fragments=1,
-    ),
     "crates/security/chio-quarantine/src/executor.rs": allow(
         "2026-11-30",
         "quarantine executor assembled from include! fragments; capped until the fragments become modules",

@@ -1,4 +1,52 @@
-fn build_governed_active_response_operation(
+//! Active-response execution validation: operation construction, executor
+//! evidence and terminal receipt checks, and executable plan validation.
+
+use chio_core::capability::governance::GovernedResponsePlanIntentBody;
+use chio_core::receipt::body::ChioReceipt;
+use chio_core::receipt::decision::ToolCallAction;
+use chio_core::receipt::kinds::{
+    BoundaryClass, ObservationOutcome, ReceiptKind, RedactionMode, ToolOrigin, TrustLevel,
+};
+use chio_core::receipt::security::{
+    validate_response_snapshot_lifecycle, ActiveDefenseReceiptBody,
+};
+use chio_core::{canonical_json_bytes, sha256, Hash};
+use chio_security_types::ports::{
+    Digest32, EffectId, ResponseDispatchApproval, RESPONSE_AFFECTED_SET_DOMAIN,
+    RESPONSE_EFFECT_ID_DOMAIN,
+};
+use chio_security_types::{
+    PlannedResponseEffect, ResponseEffectSpec, ResponseMutationRecord, ResponsePlan,
+    ResponseSnapshot, ResponseState,
+};
+use serde::Serialize;
+
+use crate::approval::ApprovalSetReservationInput;
+use crate::security_admission_operation::{
+    AdmissionDispatchState, AdmissionOperation, AdmissionOperationKind, AdmissionOperationState,
+    PreparedAdmissionOperation,
+};
+use crate::threshold_approval::VerifiedThresholdApprovalSet;
+
+use super::super::active_response_admission::VerifiedActiveResponseBindings;
+use super::super::active_response_operation_binding::{
+    derive_active_response_operation_request_binding_hash, ActiveResponseOperationAnchor,
+};
+use super::super::active_response_policy::VerifiedActiveResponseRequirement;
+use super::super::active_response_proof::{
+    active_response_effect_commitment, active_response_execution_dispatch_binding,
+    active_response_expected_effect_outcome, active_response_response_binding,
+    verify_active_response_dispatch_authorization,
+};
+use super::super::{
+    derive_active_response_dispatch_id, ActiveResponseExecutionApproval,
+    ActiveResponseExecutionEvidence, ActiveResponseExecutionOutcome,
+    ActiveResponseExecutionRequest, ActiveResponseExecutionRequestParts,
+    ActiveResponseExecutorAuthorityIdentity, KernelError,
+};
+use super::{ActiveResponseAdmissionRequest, ACTIVE_RESPONSE_COORDINATOR_LEASE_EPOCH};
+
+pub(super) fn build_governed_active_response_operation(
     bindings: &VerifiedActiveResponseBindings,
     requirement: &VerifiedActiveResponseRequirement,
     verified_approvals: &VerifiedThresholdApprovalSet,
@@ -17,7 +65,7 @@ fn build_governed_active_response_operation(
         requirement.policy_hash(),
     )
     .map_err(|error| active_response_denied(error.to_string()))?;
-    let request_binding_hash = super::active_response_operation_binding::bind_active_response_operation_request_hash_to_artifact(
+    let request_binding_hash = super::super::active_response_operation_binding::bind_active_response_operation_request_hash_to_artifact(
         &request_binding_hash, Some(admission_artifact_fingerprint),
     )?;
     let operation = AdmissionOperation::prepared(PreparedAdmissionOperation {
@@ -41,7 +89,7 @@ fn build_governed_active_response_operation(
     Ok((operation, approval_set))
 }
 
-pub(super) fn build_active_response_execution_request(
+pub(in crate::kernel) fn build_active_response_execution_request(
     request: &ActiveResponseAdmissionRequest,
     executor_authority: ActiveResponseExecutorAuthorityIdentity,
     policy_decision_hash: &str,
@@ -74,7 +122,9 @@ pub(super) fn build_active_response_execution_request(
             ))
         })?;
     let admission_artifact_fingerprint =
-        super::active_response_artifact::active_response_admission_artifact_fingerprint(request)?;
+        super::super::active_response_artifact::active_response_admission_artifact_fingerprint(
+            request,
+        )?;
     let plan_body_hash = digest_hex(&response_plan.plan_hash);
     let legacy_dispatch_id = derive_active_response_dispatch_id(
         response_plan,
@@ -87,7 +137,7 @@ pub(super) fn build_active_response_execution_request(
     )
     .map_err(|error| active_response_denied(error.to_string()))?;
     let dispatch_id =
-        super::active_response_executor::bind_active_response_dispatch_id_to_artifact(
+        super::super::active_response_executor::bind_active_response_dispatch_id_to_artifact(
             &legacy_dispatch_id,
             &admission_artifact_fingerprint,
         )
@@ -111,7 +161,7 @@ pub(super) fn build_active_response_execution_request(
     )
 }
 
-fn validate_active_response_execution_evidence(
+pub(super) fn validate_active_response_execution_evidence(
     request: &ActiveResponseExecutionRequest,
     evidence: &ActiveResponseExecutionEvidence,
 ) -> Result<(), KernelError> {
@@ -514,7 +564,7 @@ fn verify_active_response_completion_receipt(
     Ok(active_body)
 }
 
-pub(super) fn validate_active_response_terminal_executor_receipt(
+pub(in crate::kernel) fn validate_active_response_terminal_executor_receipt(
     operation: &AdmissionOperation,
     anchor: &ActiveResponseOperationAnchor,
     receipt: &ChioReceipt,
@@ -621,7 +671,7 @@ pub(super) fn validate_active_response_terminal_executor_receipt(
         1
     };
     let expected_dispatch_id =
-        super::active_response_executor::derive_active_response_terminal_dispatch_id(
+        super::super::active_response_executor::derive_active_response_terminal_dispatch_id(
             execution_dispatch,
             anchor,
             operation,
@@ -691,7 +741,7 @@ pub(super) fn validate_active_response_terminal_executor_receipt(
     Ok(())
 }
 
-fn validate_executable_response_plan(
+pub(super) fn validate_executable_response_plan(
     request: &ActiveResponseAdmissionRequest,
 ) -> Result<(), KernelError> {
     let plan = request.response_plan();
@@ -703,7 +753,7 @@ fn validate_executable_response_plan(
     validate_executable_response_plan_value(plan)
 }
 
-pub(super) fn validate_executable_response_plan_value(
+pub(in crate::kernel) fn validate_executable_response_plan_value(
     plan: &ResponsePlan,
 ) -> Result<(), KernelError> {
     plan.validate_shape().map_err(|error| {
@@ -819,11 +869,11 @@ fn domain_digest<T: Serialize>(domain: &[u8], value: &T) -> Result<Digest32, Ker
     Ok(Digest32::new(*sha256(&preimage).as_bytes()))
 }
 
-pub(super) fn digest_hex(digest: &Digest32) -> String {
+pub(in crate::kernel) fn digest_hex(digest: &Digest32) -> String {
     Hash::from_bytes(*digest.as_bytes()).to_hex()
 }
 
-pub(super) fn bounded_admission_error(reason: &str) -> String {
+pub(in crate::kernel) fn bounded_admission_error(reason: &str) -> String {
     let trimmed = reason.trim();
     let source = if trimmed.is_empty() {
         "active-response admission cancelled"
@@ -844,14 +894,14 @@ pub(super) fn bounded_admission_error(reason: &str) -> String {
     }
 }
 
-pub(super) fn active_response_denied(reason: impl Into<String>) -> KernelError {
+pub(in crate::kernel) fn active_response_denied(reason: impl Into<String>) -> KernelError {
     KernelError::GovernedTransactionDenied(format!(
         "active-response admission denied: {}",
         reason.into()
     ))
 }
 
-pub(super) fn active_response_internal(reason: impl Into<String>) -> KernelError {
+pub(in crate::kernel) fn active_response_internal(reason: impl Into<String>) -> KernelError {
     KernelError::Internal(format!(
         "active-response admission failed: {}",
         reason.into()
