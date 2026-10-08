@@ -718,9 +718,10 @@ impl SqliteFindingChallengeStore {
 mod challenge_lifecycle;
 mod dispute_locks;
 mod effect_intents;
+mod effect_root_recovery;
 mod governance_claims;
 mod liability_lifecycle;
-include!("finding_challenge_store/effect_root_recovery.rs");
+use effect_root_recovery::*;
 mod write_transactions;
 use write_transactions::*;
 mod row_mappers;
