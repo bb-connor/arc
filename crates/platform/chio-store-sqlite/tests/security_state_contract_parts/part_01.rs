@@ -1,12 +1,17 @@
-use std::collections::BTreeSet;
-use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+//! Fault-injecting and in-memory model stores shared by the security state
+//! contract cases, with the fixtures both backends run against.
 
-use chio_core::hashing::sha256;
-use chio_quarantine::{
+use super::*;
+
+pub(super) use std::collections::BTreeSet;
+pub(super) use std::sync::{Arc, Mutex, MutexGuard};
+pub(super) use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+pub(super) use chio_core::hashing::sha256;
+pub(super) use chio_quarantine::{
     build_response_plan, decode_response_record, ResponseStateMachine, ResponseTransitionRequest,
 };
-use chio_security_types::ports::{
+pub(super) use chio_security_types::ports::{
     containment_installed_version_hash, containment_overlay_version_hash,
     containment_session_target, predict_containment_overlay_apply,
     predict_containment_overlay_remove, ActionId, AdvisorySecurityEvent, CanonicalBody,
@@ -28,40 +33,40 @@ use chio_security_types::ports::{
     ScheduledWork, SchedulerClaimRequest, SecurityEventStore, SecurityEventVerificationRecord,
     SessionId, TenantId, TenantScopedId, VerifiedEventBatch,
 };
-use chio_security_types::{
+pub(super) use chio_security_types::{
     Compartment, InformationLabel, OperatorCapabilityBinding, PrincipalId,
     ResponseApprovalRequirement, ResponseEffectKind, ResponseEffectSpec, ResponsePlanInput,
     ResponseState, ResponseTarget,
 };
-use chio_store_sqlite::SqliteSecurityStateStore;
+pub(super) use chio_store_sqlite::SqliteSecurityStateStore;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum FaultMoment {
+pub(super) enum FaultMoment {
     BeforeWrite,
     AfterCommit,
 }
 
-struct Faulting<S> {
-    inner: S,
-    fault: Mutex<Option<FaultMoment>>,
+pub(super) struct Faulting<S> {
+    pub(super) inner: S,
+    pub(super) fault: Mutex<Option<FaultMoment>>,
 }
 
 impl<S> Faulting<S> {
-    fn new(inner: S) -> Self {
+    pub(super) fn new(inner: S) -> Self {
         Self {
             inner,
             fault: Mutex::new(None),
         }
     }
 
-    fn arm(&self, moment: FaultMoment) {
+    pub(super) fn arm(&self, moment: FaultMoment) {
         *self
             .fault
             .lock()
             .unwrap_or_else(|_| panic!("fault mutex poisoned")) = Some(moment);
     }
 
-    fn trip(&self, moment: FaultMoment) -> PortResult<()> {
+    pub(super) fn trip(&self, moment: FaultMoment) -> PortResult<()> {
         let mut fault = self.fault.lock().map_err(|_| PortError::unavailable())?;
         if *fault == Some(moment) {
             *fault = None;
@@ -70,7 +75,7 @@ impl<S> Faulting<S> {
         Ok(())
     }
 
-    fn write<T>(&self, write: impl FnOnce(&S) -> PortResult<T>) -> PortResult<T> {
+    pub(super) fn write<T>(&self, write: impl FnOnce(&S) -> PortResult<T>) -> PortResult<T> {
         self.trip(FaultMoment::BeforeWrite)?;
         let value = write(&self.inner)?;
         self.trip(FaultMoment::AfterCommit)?;
@@ -315,99 +320,102 @@ impl<S: LineageFenceStore> LineageFenceStore for Faulting<S> {
 }
 
 #[derive(Clone)]
-struct ModelPrincipalFlow {
-    tenant_id: TenantId,
-    principal_id: PrincipalId,
-    isolation_epoch_id: IsolationEpochId,
-    label: InformationLabel,
-    generation: u64,
+pub(super) struct ModelPrincipalFlow {
+    pub(super) tenant_id: TenantId,
+    pub(super) principal_id: PrincipalId,
+    pub(super) isolation_epoch_id: IsolationEpochId,
+    pub(super) label: InformationLabel,
+    pub(super) generation: u64,
 }
 
 #[derive(Clone)]
-struct ModelLineageFlow {
-    tenant_id: TenantId,
-    lineage_id: LineageId,
-    label: InformationLabel,
-    generation: u64,
+pub(super) struct ModelLineageFlow {
+    pub(super) tenant_id: TenantId,
+    pub(super) lineage_id: LineageId,
+    pub(super) label: InformationLabel,
+    pub(super) generation: u64,
 }
 
 #[derive(Clone)]
-struct ModelSessionFlow {
-    tenant_id: TenantId,
-    principal_id: PrincipalId,
-    session_id: SessionId,
-    isolation_epoch_id: IsolationEpochId,
-    label: InformationLabel,
-    generation: u64,
+pub(super) struct ModelSessionFlow {
+    pub(super) tenant_id: TenantId,
+    pub(super) principal_id: PrincipalId,
+    pub(super) session_id: SessionId,
+    pub(super) isolation_epoch_id: IsolationEpochId,
+    pub(super) label: InformationLabel,
+    pub(super) generation: u64,
 }
 
 #[derive(Clone)]
-struct ModelEpochAssociation {
-    tenant_id: TenantId,
-    principal_id: PrincipalId,
-    lineage_id: LineageId,
-    isolation_epoch_id: IsolationEpochId,
+pub(super) struct ModelEpochAssociation {
+    pub(super) tenant_id: TenantId,
+    pub(super) principal_id: PrincipalId,
+    pub(super) lineage_id: LineageId,
+    pub(super) isolation_epoch_id: IsolationEpochId,
 }
 
 #[derive(Clone)]
-struct ModelContextGeneration {
-    key: FlowStateKey,
-    generation: u64,
+pub(super) struct ModelContextGeneration {
+    pub(super) key: FlowStateKey,
+    pub(super) generation: u64,
 }
 
 #[derive(Clone)]
-struct ModelOverlayBinding {
-    tenant_id: TenantId,
-    target_id: RecordId,
-    effect_id: EffectId,
-    action_id: ActionId,
+pub(super) struct ModelOverlayBinding {
+    pub(super) tenant_id: TenantId,
+    pub(super) target_id: RecordId,
+    pub(super) effect_id: EffectId,
+    pub(super) action_id: ActionId,
 }
 
 #[derive(Clone, Default)]
-struct ModelState {
-    flows: Vec<model_flow::FlowTransition>,
-    principal_flows: Vec<ModelPrincipalFlow>,
-    lineage_flows: Vec<ModelLineageFlow>,
-    session_flows: Vec<ModelSessionFlow>,
-    epoch_associations: Vec<ModelEpochAssociation>,
-    flow_contexts: Vec<ModelContextGeneration>,
-    flow_generation: u64,
-    egress: Vec<(EgressFence, Option<CommittedEgressFence>)>,
-    verified: Vec<SecurityEventVerificationRecord>,
-    advisory: Vec<AdvisorySecurityEvent>,
-    correlation_index: Vec<(CorrelationEventIndexRequest, u64)>,
-    correlations: Vec<(RecordId, CorrelationPartial)>,
-    correlation_outcomes: Vec<CorrelationOutcomePublication>,
-    correlation_deletes: Vec<RecordId>,
-    response_plans: Vec<(Option<ResponseCasRequest>, ResponsePlanRecord)>,
-    response_effects: Vec<ResponseEffectRecord>,
-    response_effect_transitions: Vec<ResponseEffectCasRequest>,
-    scheduler_claims: Vec<(SchedulerClaimRequest, Vec<ScheduledWork>)>,
-    scheduler_leases: Vec<ScheduledWork>,
-    scheduler_tokens: Vec<(TenantId, u64)>,
-    overlays: Vec<(TenantScopedId, OverlaySnapshot)>,
-    overlay_bindings: Vec<ModelOverlayBinding>,
-    overlay_commands: Vec<ContainmentOverlayCommand>,
-    lineage_fences: Vec<(LineageFence, bool)>,
+pub(super) struct ModelState {
+    pub(super) flows: Vec<model_flow::FlowTransition>,
+    pub(super) principal_flows: Vec<ModelPrincipalFlow>,
+    pub(super) lineage_flows: Vec<ModelLineageFlow>,
+    pub(super) session_flows: Vec<ModelSessionFlow>,
+    pub(super) epoch_associations: Vec<ModelEpochAssociation>,
+    pub(super) flow_contexts: Vec<ModelContextGeneration>,
+    pub(super) flow_generation: u64,
+    pub(super) egress: Vec<(EgressFence, Option<CommittedEgressFence>)>,
+    pub(super) verified: Vec<SecurityEventVerificationRecord>,
+    pub(super) advisory: Vec<AdvisorySecurityEvent>,
+    pub(super) correlation_index: Vec<(CorrelationEventIndexRequest, u64)>,
+    pub(super) correlations: Vec<(RecordId, CorrelationPartial)>,
+    pub(super) correlation_outcomes: Vec<CorrelationOutcomePublication>,
+    pub(super) correlation_deletes: Vec<RecordId>,
+    pub(super) response_plans: Vec<(Option<ResponseCasRequest>, ResponsePlanRecord)>,
+    pub(super) response_effects: Vec<ResponseEffectRecord>,
+    pub(super) response_effect_transitions: Vec<ResponseEffectCasRequest>,
+    pub(super) scheduler_claims: Vec<(SchedulerClaimRequest, Vec<ScheduledWork>)>,
+    pub(super) scheduler_leases: Vec<ScheduledWork>,
+    pub(super) scheduler_tokens: Vec<(TenantId, u64)>,
+    pub(super) overlays: Vec<(TenantScopedId, OverlaySnapshot)>,
+    pub(super) overlay_bindings: Vec<ModelOverlayBinding>,
+    pub(super) overlay_commands: Vec<ContainmentOverlayCommand>,
+    pub(super) lineage_fences: Vec<(LineageFence, bool)>,
 }
 
 #[derive(Default)]
-struct ModelStore {
-    state: Mutex<ModelState>,
+pub(super) struct ModelStore {
+    pub(super) state: Mutex<ModelState>,
 }
 
 impl ModelStore {
-    fn state(&self) -> PortResult<MutexGuard<'_, ModelState>> {
+    pub(super) fn state(&self) -> PortResult<MutexGuard<'_, ModelState>> {
         self.state.lock().map_err(|_| PortError::unavailable())
     }
 }
 
-fn joined(left: &InformationLabel, right: &InformationLabel) -> PortResult<InformationLabel> {
+pub(super) fn joined(
+    left: &InformationLabel,
+    right: &InformationLabel,
+) -> PortResult<InformationLabel> {
     left.join_restrictions(right)
         .map_err(|_| PortError::invalid_data())
 }
 
-fn model_next_flow_generation(state: &mut ModelState) -> PortResult<u64> {
+pub(super) fn model_next_flow_generation(state: &mut ModelState) -> PortResult<u64> {
     state.flow_generation = state
         .flow_generation
         .checked_add(1)
@@ -415,7 +423,7 @@ fn model_next_flow_generation(state: &mut ModelState) -> PortResult<u64> {
     Ok(state.flow_generation)
 }
 
-fn model_flow_snapshot(
+pub(super) fn model_flow_snapshot(
     state: &ModelState,
     key: &FlowStateKey,
 ) -> PortResult<Option<FlowStateSnapshot>> {
@@ -883,7 +891,7 @@ impl SecurityEventStore for ModelStore {
     }
 }
 
-fn model_validate_scheduler_fence(
+pub(super) fn model_validate_scheduler_fence(
     state: &ModelState,
     tenant_id: &TenantId,
     action_id: &ActionId,
@@ -1370,7 +1378,7 @@ impl ContainmentOverlayStore for ModelStore {
     }
 }
 
-fn empty_model_overlay(target: &TenantScopedId) -> OverlaySnapshot {
+pub(super) fn empty_model_overlay(target: &TenantScopedId) -> OverlaySnapshot {
     OverlaySnapshot {
         target: target.clone(),
         generation: 0,
@@ -1381,7 +1389,10 @@ fn empty_model_overlay(target: &TenantScopedId) -> OverlaySnapshot {
     }
 }
 
-fn model_effect_request_matches_query(request: &EffectRequest, query: &EffectResultQuery) -> bool {
+pub(super) fn model_effect_request_matches_query(
+    request: &EffectRequest,
+    query: &EffectResultQuery,
+) -> bool {
     request.tenant_id == query.tenant_id
         && request.action_id == query.action_id
         && request.plan_hash == query.plan_hash
@@ -1481,23 +1492,23 @@ impl LineageFenceStore for ModelStore {
     }
 }
 
-fn tenant() -> TenantId {
+pub(super) fn tenant() -> TenantId {
     TenantId::new("tenant-contract").unwrap_or_else(|error| panic!("tenant id: {error}"))
 }
 
-fn record(value: &str) -> RecordId {
+pub(super) fn record(value: &str) -> RecordId {
     RecordId::new(value).unwrap_or_else(|error| panic!("record id: {error}"))
 }
 
-fn action(value: &str) -> ActionId {
+pub(super) fn action(value: &str) -> ActionId {
     ActionId::new(value).unwrap_or_else(|error| panic!("action id: {error}"))
 }
 
-fn effect(value: &str) -> EffectId {
+pub(super) fn effect(value: &str) -> EffectId {
     EffectId::new(value).unwrap_or_else(|error| panic!("effect id: {error}"))
 }
 
-fn now_unix_ms() -> u64 {
+pub(super) fn now_unix_ms() -> u64 {
     let duration = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_else(|error| panic!("clock before epoch: {error}"));
@@ -1505,7 +1516,7 @@ fn now_unix_ms() -> u64 {
         .unwrap_or_else(|error| panic!("clock value exceeds u64: {error}"))
 }
 
-fn digest(bytes: &[u8]) -> Digest32 {
+pub(super) fn digest(bytes: &[u8]) -> Digest32 {
     let hash = sha256(bytes);
     let mut value = [0_u8; 32];
     value.copy_from_slice(hash.as_ref());
