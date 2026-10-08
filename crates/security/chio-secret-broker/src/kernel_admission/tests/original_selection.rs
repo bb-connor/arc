@@ -163,8 +163,8 @@ fn broker_prepares_a_unique_original_and_refuses_unknown_or_reused_requests() ->
         "{reason}"
     );
     assert_eq!(
-        request_operations(&store.database, REQUEST_ID)?,
-        [dispatch.operation_id.clone()]
+        request_operations(&store.database, REQUEST_ID)?.as_slice(),
+        std::slice::from_ref(&dispatch.operation_id)
     );
     assert_eq!(broker.pending_dispatches()?, 0);
     Ok(())

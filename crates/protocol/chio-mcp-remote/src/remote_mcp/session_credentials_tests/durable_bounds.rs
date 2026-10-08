@@ -349,7 +349,7 @@ fn delivery_writer_refuses_event_sized_outcome_before_replacing_pending_rows() {
     response["result"]["_meta"]["chioEvidence"]["fixtureAlignment"] = json!(false);
     let empty = signed_extension(&keypair, &response, "padding", json!(""));
     let mut remaining = MAX_SESSION_JSON_BYTES - serde_json::to_vec(&empty).unwrap().len() - 1;
-    if remaining % 2 != 0 {
+    if !remaining.is_multiple_of(2) {
         // Only a diagnostic boolean changes by one byte. Signed padding has two
         // copies, and the exact original input ceiling remains unchanged.
         response["result"]["_meta"]["chioEvidence"]["fixtureAlignment"] = json!(true);
