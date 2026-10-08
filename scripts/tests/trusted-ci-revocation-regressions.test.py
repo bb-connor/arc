@@ -490,9 +490,9 @@ def revoke_with(steps: tuple, event_name: str, committed_evidence: str) -> Revoc
     return Revocation((*steps, revoke), bound)
 
 
-def revoke_failed_ci(data: dict, event_run: dict, committed_evidence: str = EVIDENCE) -> Revocation:
-    """The `workflow_run` path: resolve the completed run, bind it, then revoke."""
-    context = {
+def listener_context(event_run: dict, committed_evidence: str) -> dict[str, str]:
+    """The `workflow_run` context of the listener job for the completed `event_run`."""
+    return {
         "github.event.workflow_run.conclusion": event_run["conclusion"] or "",
         "github.event.workflow_run.run_attempt": str(event_run["run_attempt"]),
         "github.event.workflow_run.id": str(event_run["id"]),
@@ -504,6 +504,18 @@ def revoke_failed_ci(data: dict, event_run: dict, committed_evidence: str = EVID
         "vars.CHIO_COMMITTED_LINUX_EVIDENCE_SHA": committed_evidence, "vars.CHIO_SECURITY_APP_ID": str(APP_ID),
         "vars.CHIO_ENTERPRISE_SECURITY_DEFINITION_SHA": DEFINITION,
     }
+
+
+def bind_failed_ci_alone(data: dict, event_run: dict, committed_evidence: str = EVIDENCE):
+    """Run `Bind later failed CI rerun to existing authority` by itself, without the route step before it."""
+    script, environment = render_step(REVOCATION, "bind-revocation", "Bind later failed CI rerun to existing authority",
+                                      listener_context(event_run, committed_evidence))
+    return run_step(script, data, environment)
+
+
+def revoke_failed_ci(data: dict, event_run: dict, committed_evidence: str = EVIDENCE) -> Revocation:
+    """The `workflow_run` path: resolve the completed run, bind it, then revoke."""
+    context = listener_context(event_run, committed_evidence)
     script, environment = render_step(REVOCATION, "bind-revocation", "Resolve exact completed workflow identity", context)
     route = run_step(script, data, environment)
     if route.result.returncode != 0 or outputs(route).get("workflow_path") != ".github/workflows/ci.yml":
@@ -1013,6 +1025,42 @@ class ListenerRunIdentityPreservationTests(unittest.TestCase):
                 self.assertEqual(run.outputs, {})
                 self.assertEqual(mutations(run), [])
                 self.assertEqual(app_checks(run.data), [])
+
+
+LISTENER_REPOSITORY_ID_REFUSAL = 'test "$(jq -r \'.repository.id\' <<< "${upstream}")" = "${REPOSITORY_ID}"'
+
+
+class ListenerRepositoryIdProspectiveTests(unittest.TestCase):
+    """A completed run without `repository.id`, presented to the listener binder itself (C-P5-10).
+
+    The listener binds the event attempt by API identity, including this
+    repository's ID, independently of the route step before it: a run missing
+    `repository.id` is refused there, with no outputs and nothing written.
+    Prospective design control, activated at the P5/P6 boundary; never a genuine Original.
+    """
+
+    def test_listener_binder_refuses_a_run_without_this_repository_id(self) -> None:
+        valid = failed_event()
+        control = bind_failed_ci_alone(listener_fixture(valid), valid)
+        self.assertEqual(control.result.returncode, 0, control.result.stderr)
+        self.assertEqual((outputs(control)["eligible"], outputs(control)["create_missing"]), ("true", "true"))
+
+        event = failed_event()
+        event.update(repository={"full_name": REPOSITORY})
+        data = listener_fixture(event)
+        self.assertEqual((data[f"{PREFIX}/actions/runs/{EVENT_RUN}/attempts/1"]["repository"],
+                          data[f"{PREFIX}/actions/runs/{EVENT_RUN}/attempts/1"]["head_repository"]["id"]),
+                         ({"full_name": REPOSITORY}, 1195888645))
+        run = bind_failed_ci_alone(data, event)
+        self.assertNotIn("unprovided API", run.result.stderr)
+        self.assertEqual(refusals(run)[-1:], [LISTENER_REPOSITORY_ID_REFUSAL],
+                         f"the listener binder accepted run {EVENT_RUN} without repository.id: exit "
+                         f"{run.result.returncode}, outputs {run.output!r}, mutations {mutations(run)}")
+        self.assertEqual(run.calls, LISTENER_SETUP[1:])
+        self.assertEqual(run.output, "")
+        self.assertEqual(mutations(run), [])
+        self.assertEqual(app_checks(run.data), [])
+        self.assertNotEqual(run.result.returncode, 0)
 
 
 def e_placed_authority() -> dict:
