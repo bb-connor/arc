@@ -121,11 +121,10 @@ pub(super) fn verified_receipt(
     message: &Value,
 ) -> Option<ChioReceipt> {
     let evidence = &message["result"]["_meta"]["chioEvidence"];
-    let Ok(receipt) = serde_json::from_value::<chio_core::receipt::body::ChioReceipt>(
+    let receipt = serde_json::from_value::<chio_core::receipt::body::ChioReceipt>(
         evidence["receipt"].clone(),
-    ) else {
-        return None;
-    };
+    )
+    .ok()?;
     if receipt.kernel_key != keypair.public_key()
         || !matches!(receipt.verify_signature(), Ok(true))
         || receipt.decision != Some(chio_core::receipt::decision::Decision::Allow)
@@ -136,9 +135,7 @@ pub(super) fn verified_receipt(
     {
         return None;
     }
-    let Some(metadata) = receipt.metadata.as_ref() else {
-        return None;
-    };
+    let metadata = receipt.metadata.as_ref()?;
     let admission = &metadata["admission_operation"];
     if metadata["receipt_context"]["request_id"] != call.request_id
         || metadata["attribution"]["subject_key"] != call.subject_key
