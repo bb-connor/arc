@@ -4,6 +4,7 @@
 
 use rusqlite::{params, Connection};
 
+use crate::admission_operation_store::errors::RecordIntegrityError;
 use crate::serving_owner::SqliteServingOwnerError;
 
 use super::{records, PROJECTION_KIND};
@@ -14,6 +15,15 @@ fn invalid(detail: impl std::fmt::Display) -> SqliteServingOwnerError {
     ))
 }
 
+/// A record read that failed in storage keeps its SQLite cause; only an
+/// invalid record is an invalid store.
+fn record_invalid(error: RecordIntegrityError) -> SqliteServingOwnerError {
+    match error {
+        RecordIntegrityError::Storage(error) => SqliteServingOwnerError::Sqlite(error),
+        RecordIntegrityError::Invalid(detail) => invalid(detail),
+    }
+}
+
 /// Resolve exactly one retained local event, without recursing through the
 /// authority anchor or global coverage verifier.
 pub(crate) fn governed_approval_replay_projection_reference(
@@ -22,7 +32,7 @@ pub(crate) fn governed_approval_replay_projection_reference(
     sequence: u64,
 ) -> Result<String, SqliteServingOwnerError> {
     let record = records::load_record(connection, key)
-        .map_err(invalid)?
+        .map_err(record_invalid)?
         .ok_or_else(|| invalid("global projection names an absent migration"))?;
     let event = record
         .events
@@ -37,7 +47,7 @@ pub(crate) fn governed_approval_replay_projection_reference(
 pub(crate) fn verify_governed_approval_replay_projection_coverage(
     connection: &Connection,
 ) -> Result<(), SqliteServingOwnerError> {
-    let records = records::verify_all_records(connection).map_err(invalid)?;
+    let records = records::verify_all_records(connection).map_err(record_invalid)?;
     let local_event_count = records.iter().try_fold(0_usize, |count, record| {
         count
             .checked_add(record.events.len())
@@ -97,7 +107,7 @@ pub(crate) fn verify_governed_approval_replay_pristine(
     connection: &Connection,
 ) -> Result<(), SqliteServingOwnerError> {
     if !records::verify_all_records(connection)
-        .map_err(invalid)?
+        .map_err(record_invalid)?
         .is_empty()
     {
         return Err(invalid(

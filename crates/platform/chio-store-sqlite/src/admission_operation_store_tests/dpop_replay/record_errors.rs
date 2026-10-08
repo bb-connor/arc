@@ -58,3 +58,23 @@ fn a_partial_dpop_migration_schema_is_an_integrity_failure() -> AnchoredTestResu
     );
     Ok(())
 }
+
+#[test]
+fn a_locked_store_keeps_its_sqlite_cause_at_the_dpop_authority_boundary() -> AnchoredTestResult {
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("dpop-pristine.db");
+    let holder = Connection::open(&path)?;
+    holder.execute_batch("CREATE TABLE unrelated (id INTEGER); BEGIN EXCLUSIVE;")?;
+    let reader = Connection::open(&path)?;
+    reader.busy_timeout(std::time::Duration::ZERO)?;
+
+    let error = crate::admission_operation_store::verify_dpop_replay_pristine(&reader)
+        .err()
+        .ok_or("a locked store cannot prove a pristine migration state")?;
+    assert!(
+        matches!(error, SqliteServingOwnerError::Sqlite(_)),
+        "{error:?}"
+    );
+    holder.execute_batch("ROLLBACK;")?;
+    Ok(())
+}
