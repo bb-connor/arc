@@ -2770,6 +2770,17 @@ codes:
       - chio-kernel
       - chio-store-sqlite
 
+  - urn: "urn:chio:error:kernel:execution-nonce-missing"
+    domain: kernel
+    severity: error
+    summary: "Execution nonce refused: missing."
+    help: "Present a fresh execution nonce bound to the exact authorized request. Strict mode refuses a tool call without one."
+    string_code: "CHIO-KERNEL-EXECUTION-NONCE-MISSING"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
   - urn: "urn:chio:error:kernel:execution-nonce-schema"
     domain: kernel
     severity: error

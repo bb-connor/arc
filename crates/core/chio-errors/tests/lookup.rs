@@ -197,6 +197,18 @@ fn transaction_artifact_hash_mismatch_is_registered() {
 }
 
 #[test]
+fn missing_execution_nonce_code_is_registered() {
+    let Some(spec) = lookup_error_code("urn:chio:error:kernel:execution-nonce-missing") else {
+        panic!("missing execution nonce code is registered");
+    };
+
+    assert_eq!(spec.domain.as_str(), "kernel");
+    assert_eq!(spec.severity, Severity::Error);
+    assert_eq!(spec.string_code, "CHIO-KERNEL-EXECUTION-NONCE-MISSING");
+    assert!(spec.consumed_by.contains(&"chio-kernel"));
+}
+
+#[test]
 fn launch_transaction_failure_codes_are_registered() {
     let expected = [
         "urn:chio:error:transaction:passport-schema-unsupported",
