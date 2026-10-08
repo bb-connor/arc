@@ -1299,6 +1299,7 @@ async fn cancelling_shutdown_transfers_retained_teardown_to_host_drop() {
 }
 
 mod admission_closed_response_work;
+mod receipt_producer_policy_coverage;
 mod recovery_worker_readiness;
 mod teardown_overlay_wait;
 mod terminal_response_refusal;
