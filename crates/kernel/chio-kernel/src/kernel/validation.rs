@@ -1204,8 +1204,8 @@ impl ChioKernel {
                                 key: BudgetQuotaKey::grant(
                                     cap.id.clone(),
                                     u32::try_from(matching.index).map_err(|_| {
-                                        KernelError::DurableAdmission(
-                                            "matching grant index exceeds u32".to_string(),
+                                        KernelError::admission_invariant(
+                                            "matching grant index exceeds u32",
                                         )
                                     })?,
                                 ),
@@ -1268,15 +1268,13 @@ impl ChioKernel {
                     } else {
                         let payment_journal = if admission.requires_payment() {
                             let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
-                                KernelError::DurableAdmission(
-                                    "durable monetary authorization lost its payment adapter"
-                                        .to_owned(),
+                                KernelError::admission_unsupported(
+                                    "durable monetary authorization lost its payment adapter",
                                 )
                             })?;
                             let rail_mode = adapter.rail_mode().ok_or_else(|| {
-                                KernelError::DurableAdmission(
-                                    "durable monetary authorization lost its payment rail mode"
-                                        .to_owned(),
+                                KernelError::admission_unsupported(
+                                    "durable monetary authorization lost its payment rail mode",
                                 )
                             })?;
                             let authorized_amount_units = Self::durable_payment_authorized_amount(
@@ -1299,9 +1297,8 @@ impl ChioKernel {
                                     .to_owned(),
                                 capability_id: cap.id.clone(),
                                 grant_index: u32::try_from(matching.index).map_err(|_| {
-                                    KernelError::DurableAdmission(
-                                        "payment grant index exceeds the durable journal range"
-                                            .to_owned(),
+                                    KernelError::admission_invariant(
+                                        "payment grant index exceeds the durable journal range",
                                     )
                                 })?,
                                 hold_id: Some(budget_hold_id.clone()),
@@ -1321,9 +1318,7 @@ impl ChioKernel {
                                 state: crate::payment::PaymentJournalState::HoldPlaced,
                                 created_at_unix_ms: trusted_now_unix_ms.max(1),
                             };
-                            journal.validate().map_err(|error| {
-                                KernelError::DurableAdmission(error.to_string())
-                            })?;
+                            journal.validate().map_err(KernelError::admission)?;
                             Some(journal)
                         } else {
                             None
@@ -1369,8 +1364,8 @@ impl ChioKernel {
                     }
                     BudgetAuthorizeHoldDecision::ApprovalRequired(required) => {
                         let admission = durable_admission.as_deref_mut().ok_or_else(|| {
-                            KernelError::DurableAdmission(
-                                "cumulative approval lost its durable operation".to_owned(),
+                            KernelError::admission_invariant(
+                                "cumulative approval lost its durable operation",
                             )
                         })?;
                         let proposal = self.ensure_cumulative_approval_proposal(
@@ -1468,8 +1463,8 @@ impl ChioKernel {
         }
 
         if durable_admission.is_some() && !eligible_grant_seen {
-            Err(KernelError::DurableAdmission(
-                "retained budget hold does not identify a matching grant".to_string(),
+            Err(KernelError::admission_record(
+                "retained budget hold does not identify a matching grant",
             ))
         } else if saw_exhausted_budget {
             Err(KernelError::BudgetExhausted(cap.id.clone()))

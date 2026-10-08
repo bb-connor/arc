@@ -34,8 +34,8 @@ impl ChioKernel {
         // proposal before reserving an allowance that could require approval.
         self.ensure_threshold_proposal_signer_ready()?;
         let admission = admission.ok_or_else(|| {
-            KernelError::DurableAdmission(
-                "cumulative approval requires a durable admission operation".to_owned(),
+            KernelError::admission_unsupported(
+                "cumulative approval requires a durable admission operation",
             )
         })?;
         let peer = self
@@ -123,8 +123,8 @@ impl ChioKernel {
                 .budget_hold_id()
                 .is_none_or(|hold_id| hold_id.as_str() != required.hold_id)
             {
-                return Err(KernelError::DurableAdmission(
-                    "retained approval proposal changed its budget hold".to_owned(),
+                return Err(KernelError::admission_record(
+                    "retained approval proposal changed its budget hold",
                 ));
             }
             let proposal = admission
@@ -132,13 +132,13 @@ impl ChioKernel {
                 .threshold_proposal()
                 .cloned()
                 .ok_or_else(|| {
-                    KernelError::DurableAdmission(
-                        "approval-required operation omitted its stored proposal".to_owned(),
+                    KernelError::admission_record(
+                        "approval-required operation omitted its stored proposal",
                     )
                 })?;
             if proposal.body.proposal_id != admission.operation_id() {
-                return Err(KernelError::DurableAdmission(
-                    "retained threshold proposal changed its admission operation".into(),
+                return Err(KernelError::admission_record(
+                    "retained threshold proposal changed its admission operation",
                 ));
             }
             self.validate_cumulative_threshold_proposal(request, &proposal, &requirement, now)?;
@@ -157,8 +157,8 @@ impl ChioKernel {
                 .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?,
         );
         let proposal_created_at = required.metadata.recorded_at_unix_seconds.ok_or_else(|| {
-            KernelError::DurableAdmission(
-                "cumulative approval authorization omitted its durable timestamp".to_owned(),
+            KernelError::admission_record(
+                "cumulative approval authorization omitted its durable timestamp",
             )
         })?;
         // A bound nonce is verified at the proposal's creation time from here
@@ -167,9 +167,7 @@ impl ChioKernel {
         // a nonce that has expired by the proposal's own clock.
         if let Some(nonce) = admission.issued_nonce() {
             let created_at_unix_ms = proposal_created_at.checked_mul(1_000).ok_or_else(|| {
-                KernelError::DurableAdmission(
-                    "approval proposal creation time overflows".to_owned(),
-                )
+                KernelError::admission_invariant("approval proposal creation time overflows")
             })?;
             crate::kernel::admission_coordinator::require_live_nonce(nonce, created_at_unix_ms)?;
         }
