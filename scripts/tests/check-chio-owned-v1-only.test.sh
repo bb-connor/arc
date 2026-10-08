@@ -220,6 +220,82 @@ expect_scanner_failure "scanner error on the quoted v2 recheck in ${identity_sui
 expect_scanner_failure "scanner error on the backtick v3 recheck in ${evidence_doc}" \
   "$evidence_doc" "SCHEMA = \`$(authority 3)\`"
 
+# Carry the five compatible controls from the thin-main59 suite without
+# changing Source's core/authority scanner policy or its existing112 cases.
+expect_scanner_failure "scanner error on the quoted v3 recheck in ${definitions_suite}" \
+  "$definitions_suite" "SCHEMA = \"$(authority 3)\""
+
+compatibility_tree=""
+new_compatibility_tree() {
+  compatibility_tree="$(mktemp -d "${fixture}/compatibility.XXXXXX")"
+  mkdir -p "${compatibility_tree}"/{crates,spec,sdks,scripts,docs,formal,xtask}
+  cp "${root}/scripts/check-chio-owned-v1-only.sh" "${compatibility_tree}/scripts/"
+}
+
+new_compatibility_tree
+compatibility_status=0
+compatibility_output="$(bash "${compatibility_tree}/scripts/check-chio-owned-v1-only.sh" 2>&1)" || compatibility_status=$?
+if ((compatibility_status == 0)) &&
+   [[ "$compatibility_output" == 'Core capability and receipt surfaces remain v1-only.' ]]; then
+  printf 'ok %s\n' 'empty-tree baseline admission'
+else
+  contract_failures+=("empty-tree baseline: status ${compatibility_status}: ${compatibility_output}")
+fi
+
+mkdir -p "${compatibility_tree}/docs/reference"
+printf '%s\n' "$normative_claim" > "${compatibility_tree}/docs/reference/version.md"
+compatibility_status=0
+compatibility_output="$(bash "${compatibility_tree}/scripts/check-chio-owned-v1-only.sh" 2>&1)" || compatibility_status=$?
+compatibility_expected='Core capability or receipt v1 contract remnants found:'$'\n'"  docs/reference/version.md:1:${normative_claim}"
+if ((compatibility_status == 1)) && [[ "$compatibility_output" == "$compatibility_expected" ]]; then
+  printf 'ok %s\n' 'standalone normative-root claim refusal'
+else
+  contract_failures+=("standalone normative-root claim: status ${compatibility_status}: ${compatibility_output}")
+fi
+
+mkdir "${fixture}/compatibility-tools"
+cat > "${fixture}/compatibility-tools/rg" <<'MOCK_COMPATIBILITY_RG'
+#!/usr/bin/env bash
+phase=generic
+for arg in "$@"; do
+  if [[ "$arg" == '*.md' ]]; then
+    phase=normative
+  fi
+done
+if [[ "${1:-}" == -q ]]; then
+  phase=recheck
+fi
+if [[ "$phase" == "$CHIO_V1_COMPATIBILITY_FAIL" ]]; then
+  printf '%s\n' "$phase" >> "$CHIO_V1_COMPATIBILITY_REACHED"
+  exit 2
+fi
+exec "$CHIO_V1_COMPATIBILITY_REAL_RG" "$@"
+MOCK_COMPATIBILITY_RG
+chmod +x "${fixture}/compatibility-tools/rg"
+
+expect_compatibility_scan_failure() {
+  local phase="$1" expected_error="$2" reached observed='' status=0 output
+  new_compatibility_tree
+  if [[ "$phase" == normative ]]; then
+    mkdir -p "${compatibility_tree}/docs/reference"
+    printf '%s\n' 'Chio protocol reference.' > "${compatibility_tree}/docs/reference/version.md"
+  fi
+  reached="${compatibility_tree}/scanner-phase-reached"
+  output="$(CHIO_V1_COMPATIBILITY_FAIL="$phase" CHIO_V1_COMPATIBILITY_REACHED="$reached" \
+    CHIO_V1_COMPATIBILITY_REAL_RG="$real_rg" PATH="${fixture}/compatibility-tools:$PATH" \
+    bash "${compatibility_tree}/scripts/check-chio-owned-v1-only.sh" 2>&1)" || status=$?
+  if [[ -f "$reached" ]]; then
+    observed="$(cat "$reached")"
+  fi
+  if ((status == 2)) && [[ "$output" == "$expected_error" ]] && [[ "$observed" == "$phase" ]]; then
+    printf 'ok %s\n' "${phase} scanner error propagated after exact phase reach"
+  else
+    contract_failures+=("${phase} scanner fault: status ${status}: reached [${observed}]: ${output}")
+  fi
+}
+expect_compatibility_scan_failure generic 'ripgrep failed while scanning Chio-owned version remnants'
+expect_compatibility_scan_failure normative 'ripgrep failed while scanning normative version claims'
+
 if ((${#contract_failures[@]})); then
   printf '%s\n' "Authority namespace contract failures:" >&2
   printf '  %s\n' "${contract_failures[@]}" >&2
