@@ -10,6 +10,9 @@ type TestResult<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 #[cfg(unix)]
 mod kernel;
 
+#[cfg(unix)]
+mod original_selection;
+
 #[cfg(target_os = "linux")]
 mod registration_peer;
 
