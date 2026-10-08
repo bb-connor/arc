@@ -25,7 +25,10 @@ Every agent reads this at startup. It is short on purpose. The design is
    `swarm verdict`. More than two rounds of changes blocks the item.
 6. Only the integrator merges into `integration/beta-next`, in batches, and
    never pushes while a full CI run is in progress unless the push fixes it.
-7. Only Connor merges to `main`.
+7. Only the integrator or the conductor merges to `main`, and only with `swarm merge`. Its gate
+   requires, on the PR's head commit: the four required checks green, a completed Codex review,
+   no open P0-P2 review-bot finding (fixed, or `wontfix` with a recorded reason), and an accepted
+   cross-vendor whole-PR review (`swarm review-pr`). Never `gh pr merge` by hand, never `--admin`.
 
 ## Never
 

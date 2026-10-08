@@ -125,6 +125,48 @@ def verdict(store: Store, item_id: str, decision: str, findings: str) -> None:
     store.transact(f"verdict {item_id} {decision}", mutate)
 
 
+PR_REVIEW_BRIEF = """## Brief
+
+Review the whole diff of PR #{pr} ({base}...{branch}) at the commit under review, as one change.
+Item reviews already covered each lane; look for what they cannot see: interactions between
+items, inconsistent invariants, missing tests across crate boundaries, and anything that would
+make main worse than before. Decision 0001 applies.
+
+## Acceptance
+
+- `swarm verdict PR{pr} accept` only if you find no P0, P1 or P2 problem in the whole diff.
+- Otherwise `swarm verdict PR{pr} changes --findings-file <file>` listing each finding with file:line.
+"""
+
+
+def request_pr_review(store: Store, pr: int, *, head: str, branch: str, author_vendor: str, base: str = "main") -> bool:
+    """Open (or re-open for a new head) the whole-PR review item PR<n>. False if already requested."""
+    if store.role not in ("conductor", "integrator"):
+        raise SwarmError("only the integrator or the conductor requests a whole-PR review")
+    item_id = f"PR{pr}"
+
+    def mutate() -> bool:
+        if items.exists(store, item_id):
+            item = items.load(store, item_id)
+            if item.meta["commits"] == [head[:12]] and item.status in ("review", "ready"):
+                return False
+        else:
+            item = items.create(
+                store, item_id=item_id, title=f"Whole-diff review of PR #{pr}", severity="P1",
+                wave=max(store.config()["active_waves"]), tier="premium", paths=[], depends_on=[],
+                estimate_hours=2, assignee="", brief=PR_REVIEW_BRIEF.format(pr=pr, base=base, branch=branch),
+            )
+        item.meta.update(status="review", owner=store.agent, branch=branch, commits=[head[:12]],
+                         author_vendor=author_vendor, review_base=base)
+        item.meta["review"].update(verdict="", reviewer="", round=0)
+        item.log(store.agent, f"review requested for {base}...{branch} at {head[:12]}")
+        items.save(store, item)
+        msgs.write(store, "reviewer", "request", item_id, f"review PR #{pr}", f"Whole diff {base}...{branch} at {head[:12]}.")
+        return True
+
+    return store.transact(f"review-pr {pr}", mutate)
+
+
 def _priority(item: items.Item, me: str) -> tuple:
     return (item.meta["assignee"] != me, SEVERITY_ORDER.get(item.meta["severity"], 9), item.meta["wave"], item.id)
 

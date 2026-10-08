@@ -148,14 +148,14 @@ class Context:
     def logs(self) -> Path:
         return logs_root() / self.meta["id"]
 
-    def worktree_for(self, item_id: str, review: bool = False) -> Path:
+    def worktree_for(self, item_id: str, review: bool = False, base: str | None = None) -> Path:
         if self.make_worktree is not None:
             return self.make_worktree(item_id, review)
         return worktree.create(
             self.store, item_id,
             repo=Path(os.environ.get("SWARM_REPO", "~/backbay/arc")).expanduser(),
             lanes=Path(os.environ.get("SWARM_LANES", "~/lanes/swarm")).expanduser(),
-            base_branch=self.store.config()["base_branch"], review=review,
+            base_branch=base or self.store.config()["base_branch"], review=review,
         )
 
 
@@ -191,12 +191,13 @@ def reviewer_iteration(ctx: Context) -> str:
     picked = lifecycle.next_review(store)
     if not picked:
         return "idle"
-    view = ctx.worktree_for(picked, True)
-    store.sync()
     item = items.load(store, picked)
+    base = item.meta.get("review_base") or store.config()["base_branch"]  # whole-PR items review against main
+    view = ctx.worktree_for(picked, True, base)
+    store.sync()
     prompt = render(
         ctx.prompts / "reviewer.md", agent=meta["id"], item_id=picked, worktree=str(view),
-        branch=item.meta["branch"], base=store.config()["base_branch"], brief=lifecycle.brief(store, picked),
+        branch=item.meta["branch"], base=base, brief=lifecycle.brief(store, picked),
     )
     log = ctx.logs / f"review-{picked}-{clock.stamp()}.log"
     result = ctx.executor(vendor_command(meta, prompt, view, settings=ctx.settings), view, log)

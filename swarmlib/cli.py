@@ -7,7 +7,7 @@ import os
 import sys
 from pathlib import Path
 
-from . import agents, board, build, ci, claims, clock, gitio, items, lifecycle, metrics, msgs, reviews, secrets, worktree
+from . import agents, board, build, ci, claims, clock, gitio, items, lifecycle, merge, metrics, msgs, reviews, secrets, worktree
 from .store import Store, SwarmError, halt, record, resume, set_config
 
 
@@ -211,6 +211,30 @@ def cmd_record(store: Store, a: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_review_pr(store: Store, a: argparse.Namespace) -> int:
+    if store.role not in ("conductor", "integrator"):
+        raise SwarmError("only the integrator or the conductor requests a whole-PR review")
+    info = merge.pull(ci.default_runner, a.pr)
+    created = lifecycle.request_pr_review(store, a.pr, head=info["head"]["sha"], branch=info["head"]["ref"],
+                                          author_vendor=a.author_vendor or store.vendor, base=info["base"]["ref"])
+    print(f"PR{a.pr}: review {'requested' if created else 'already requested'} for {info['head']['sha'][:12]}")
+    return 0
+
+
+def cmd_merge_gate(store: Store, a: argparse.Namespace) -> int:
+    sha, reasons = merge.gate(store, ci.default_runner, a.pr)
+    for reason in reasons:
+        print(reason)
+    print(f"PR #{a.pr} at {sha[:12]}: {'blocked' if reasons else 'mergeable'}")
+    return 1 if reasons else 0
+
+
+def cmd_merge(store: Store, a: argparse.Namespace) -> int:
+    sha = merge.merge(store, ci.default_runner, a.pr)
+    print(f"merged PR #{a.pr} at {sha}")
+    return 0
+
+
 def cmd_scan(store: Store, a: argparse.Namespace) -> int:
     dirty = False
     for name in a.files:
@@ -374,6 +398,19 @@ def parser() -> argparse.ArgumentParser:
     s.add_argument("name", help="decision slug, or digest name such as 2026-10-07-am")
     s.add_argument("--file", required=True)
     s.set_defaults(fn=cmd_record)
+
+    s = sub.add_parser("review-pr", help="integrator/conductor: request a whole-PR cross-vendor review of the head")
+    s.add_argument("pr", type=int)
+    s.add_argument("--author-vendor", choices=agents.VENDORS)
+    s.set_defaults(fn=cmd_review_pr)
+
+    s = sub.add_parser("merge-gate", help="report why a PR may not merge (exit 0 when mergeable)")
+    s.add_argument("pr", type=int)
+    s.set_defaults(fn=cmd_merge_gate)
+
+    s = sub.add_parser("merge", help="integrator/conductor: merge a PR that passes the merge gate")
+    s.add_argument("pr", type=int)
+    s.set_defaults(fn=cmd_merge)
 
     s = sub.add_parser("scan", help="check files for credential-shaped strings")
     s.add_argument("files", nargs="+")

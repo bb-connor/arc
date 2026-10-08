@@ -39,6 +39,12 @@ class CLITest(SwarmCase):
         leak.write_text("sk-" + "a" * 30)
         self.assertEqual(self.run_cli(worker, "scan", str(leak)).returncode, 1)
         self.assertEqual(self.run_cli(worker, "halt", "--reason", "x").returncode, 2)
+        refused = self.run_cli(worker, "merge", "1200")
+        self.assertEqual(refused.returncode, 2)
+        self.assertIn("only the integrator or the conductor merges", refused.stderr)
+        refused = self.run_cli(worker, "review-pr", "1200")
+        self.assertEqual(refused.returncode, 2)
+        self.assertIn("only the integrator or the conductor requests a whole-PR review", refused.stderr)
         recorded = self.run_cli(conductor, "record", "decision", "pilot-roster", "--file", str(brief))
         self.assertEqual((recorded.returncode, recorded.stdout.strip()), (0, "decisions/0001-pilot-roster.md"))
 

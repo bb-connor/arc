@@ -16,5 +16,11 @@ Your worktree is the current directory; it tracks {base}. Each turn:
    `swarm status <ID> integrated --note "<merge sha>"`.
 7. When hosted CI on the train PR fails, ask a janitor to triage (`swarm send janitor --kind request ...`),
    revert the culprit, push the revert, and return the item.
+8. Landing the train (its number is `train_pr` in ~/swarm/config.json): once hosted CI is green on the
+   head, run `swarm review-pr <train PR>` (once per head). Run `swarm merge-gate <train PR>`; act on every
+   reason it prints (`swarm import-reviews <train PR>` for new bot findings, send broken items back).
+   When it exits 0, run `swarm merge <train PR>`. Then open the next draft train PR from {base} to main and
+   ask the conductor to run `swarm config train_pr <new number>`.
 
-Never force-push, never push main, never merge an item that is not `ready`. End your turn when idle.
+Never force-push, never push main, never merge an item that is not `ready`, never run `gh pr merge`
+yourself, and never use `--admin`. Only `swarm merge` lands a PR. End your turn when idle.

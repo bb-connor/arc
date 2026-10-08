@@ -128,6 +128,23 @@ class LoopTest(SwarmCase):
         reviewer.sync()
         self.assertEqual(items.load(reviewer, "F1").meta["review"]["reviewer"], "")
 
+    def test_reviewer_diffs_whole_pr_items_against_their_review_base(self):
+        integrator = self.clone("codex-ws2-integrator", role="integrator", vendor="codex")
+        lifecycle.request_pr_review(integrator, 1200, head="a" * 40, branch="integration/beta-next", author_vendor="codex")
+        reviewer = self.clone("claude-ws2-reviewer1", role="reviewer", vendor="claude")
+        agents.register(reviewer, agent_id=reviewer.agent, machine="ws2", vendor="claude", role="reviewer",
+                        model="opus", effort="", tiers=["premium"])
+        seen = {}
+
+        def fake(command, cwd, log):
+            seen["prompt"] = command[2]
+            lifecycle.verdict(reviewer, "PR1200", "accept", "")
+            return Execution(0, "")
+
+        meta = agents.load(reviewer, reviewer.agent)
+        self.assertEqual(agent.reviewer_iteration(self.ctx(reviewer, meta, fake)), "done")
+        self.assertIn("refs/remotes/swarm/main...HEAD", seen["prompt"])
+
     def test_session_iteration_saves_and_resumes_session(self):
         conductor = self.clone("claude-ws2-conductor-2", role="conductor", vendor="claude")
         agents.register(conductor, agent_id=conductor.agent, machine="ws2", vendor="claude", role="conductor",
