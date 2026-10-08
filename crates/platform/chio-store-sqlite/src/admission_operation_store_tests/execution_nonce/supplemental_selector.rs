@@ -6,7 +6,9 @@ use super::*;
 use chio_kernel::admission_operation::{
     AdmissionNoncePreflightIdentityV1, NativeSecurityAuthorityBindingV1,
 };
-use chio_kernel::budget_store::BudgetReverseHoldRequest;
+use chio_kernel::budget_store::{
+    BudgetInvocationQuota, BudgetQuotaKey, BudgetQuotaProfile, BudgetReverseHoldRequest,
+};
 use chio_kernel::supplemental_admission::SupplementalAdmissionAuthorityBindingV1;
 use chio_kernel::RevocationStore;
 
@@ -166,6 +168,23 @@ impl SelectionFixture {
 
     fn budget(&self, operation: &AdmissionOperationV1) -> TestResult<BudgetAuthorizeHoldRequest> {
         let mut request = lifecycle::budget_request(&self.fixture, operation);
+        request.invocation_quotas = vec![
+            BudgetInvocationQuota {
+                key: BudgetQuotaKey::grant(&request.capability_id, 0),
+                max_invocations: 1,
+            },
+            BudgetInvocationQuota {
+                key: BudgetQuotaKey {
+                    profile: BudgetQuotaProfile::SupplementalBrokerCapabilityExecution,
+                    owner_id: "supplemental-selector-broker-quota".into(),
+                    grant_index: None,
+                },
+                max_invocations: 1,
+            },
+        ];
+        request
+            .invocation_quotas
+            .sort_by(|left, right| left.key.cmp(&right.key));
         request.hold_id = Some(format!(
             "selector-hold:{}",
             operation.binding().operation_id().as_str()
@@ -192,6 +211,9 @@ impl SelectionFixture {
         assert!(!observation.revoked);
         binding.last_observed_revocation =
             Some(observation.commit.ok_or("own revocation authority")?);
+        request
+            .validate()
+            .map_err(|error| format!("selector fixture budget: {error}"))?;
         Ok(request)
     }
 
