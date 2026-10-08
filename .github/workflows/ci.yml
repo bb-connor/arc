@@ -73,6 +73,13 @@ jobs:
         with:
           python-version: "3.12"
 
+      # These checks need only Python, Git and the checkout. Fail before
+      # dependency installation and the compiling structural/temporal gates.
+      - name: Stub surface hygiene
+        run: |
+          python3 scripts/check-stub-surfaces.py
+          bash scripts/tests/check-stub-surfaces.test.sh
+
       - name: Install Python workflow validators
         run: python -m pip install --disable-pip-version-check PyYAML==6.0.2 jsonschema==4.26.0 referencing==0.37.0
 
@@ -271,13 +278,11 @@ jobs:
           python3 scripts/check-rust-file-hygiene.py
           bash scripts/tests/check-rust-file-hygiene.test.sh
 
-      - name: Stub surface hygiene
+      - name: SDK and release contract regressions
         env:
           CARGO_BUILD_JOBS: "1"
           RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
         run: |
-          python3 scripts/check-stub-surfaces.py
-          bash scripts/tests/check-stub-surfaces.test.sh
           bash scripts/tests/check-sdk-release-python-generated.test.sh
           bash scripts/tests/check-sdk-release-ts-bun.test.sh
           bash scripts/tests/conformance-matrix-peer-target.test.sh
