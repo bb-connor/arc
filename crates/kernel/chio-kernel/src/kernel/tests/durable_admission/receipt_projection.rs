@@ -134,8 +134,8 @@ fn existing_admission_projections_use_verified_batch_without_point_reads_or_appe
         matches!(
             error.durable_admission(),
             Some(crate::DurableAdmissionError::Record(reason))
-                if reason.as_ref()
-                    == format!(
+                if **reason
+                    == *format!(
                         "receipt projection {} conflicts with the canonical admission receipt",
                         completed.receipt.id
                     )

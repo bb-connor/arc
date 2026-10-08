@@ -59,7 +59,7 @@ impl ChioKernel {
         )?;
         let unresolved = store.count_unresolved(AdmissionOperationKind::GovernedActiveResponse)?;
         if unresolved != 0 {
-            return Err(KernelError::Internal(format!(
+            return Err(KernelError::active_response_refused(format!(
                 "admission authority replacement would strand {unresolved} unresolved governed active-response operations"
             )));
         }
@@ -78,7 +78,7 @@ impl ChioKernel {
             || candidate.approval_set_hash != approval_set.approval_set_hash()
         {
             return Err(ActiveResponseOperationAnchorJournalError::Kernel(
-                KernelError::Internal("active-response operation anchor is invalid".to_string()),
+                KernelError::active_response_record("active-response operation anchor is invalid"),
             ));
         }
         let payload = ActiveResponseApprovalCleanupPayload {
@@ -88,9 +88,11 @@ impl ChioKernel {
             approval_set: approval_set.clone(),
         };
         let store = self.admission_operation_store.as_ref().ok_or_else(|| {
-            ActiveResponseOperationAnchorJournalError::Kernel(KernelError::Internal(
-                "durable admission operation store is unavailable".to_string(),
-            ))
+            ActiveResponseOperationAnchorJournalError::Kernel(
+                KernelError::active_response_unsupported(
+                    "durable admission operation store is unavailable",
+                ),
+            )
         })?;
         let anchor_exists = store
             .load_cleanup_actions(operation.operation_id())
@@ -125,8 +127,8 @@ impl ChioKernel {
                 if retained == action => {}
             Ok(_) => {
                 return Err(ActiveResponseOperationAnchorJournalError::Kernel(
-                    KernelError::Internal(
-                        "active-response anchor store returned a different action".to_string(),
+                    KernelError::active_response_invariant(
+                        "active-response anchor store returned a different action",
                     ),
                 ))
             }
@@ -185,7 +187,9 @@ impl ChioKernel {
         operation: &AdmissionOperation,
     ) -> Result<ActiveResponseApprovalCleanupPayload, KernelError> {
         let store = self.admission_operation_store.as_ref().ok_or_else(|| {
-            KernelError::Internal("durable admission operation store is unavailable".to_string())
+            KernelError::active_response_unsupported(
+                "durable admission operation store is unavailable",
+            )
         })?;
         self.load_active_response_operation_anchor_payload_with_store(store.as_ref(), operation)
     }
@@ -198,24 +202,25 @@ impl ChioKernel {
         let actions = store
             .load_cleanup_actions(operation.operation_id())
             .map_err(|error| {
-                KernelError::Internal(format!(
-                    "active-response operation anchor lookup failed: {error}"
-                ))
+                KernelError::active_response_in(
+                    "active-response operation anchor lookup failed",
+                    error,
+                )
             })?;
         let approval_actions = actions
             .iter()
             .filter(|action| action.kind() == AdmissionCleanupActionKind::Approval)
             .collect::<Vec<_>>();
         let [action] = approval_actions.as_slice() else {
-            return Err(KernelError::Internal(
-                "active-response operation must retain exactly one dispatch anchor".to_string(),
+            return Err(KernelError::active_response_record(
+                "active-response operation must retain exactly one dispatch anchor",
             ));
         };
         if action.operation_id() != operation.operation_id()
             || action.request_binding_hash() != operation.request_binding_hash()
         {
-            return Err(KernelError::Internal(
-                "active-response operation anchor changed operation identity".to_string(),
+            return Err(KernelError::active_response_record(
+                "active-response operation anchor changed operation identity",
             ));
         }
         let payload: ActiveResponseApprovalCleanupPayload = parse_cleanup_payload(action)?;
@@ -227,8 +232,8 @@ impl ChioKernel {
             || !approval_set_input_is_valid(&payload.approval_set)
             || !payload.dispatch_anchor.is_valid()
         {
-            return Err(KernelError::Internal(
-                "active-response operation anchor payload is invalid".to_string(),
+            return Err(KernelError::active_response_record(
+                "active-response operation anchor payload is invalid",
             ));
         }
         Ok(payload)
@@ -240,10 +245,14 @@ impl ChioKernel {
         reason: &str,
     ) -> Result<Option<AdmissionOperation>, KernelError> {
         let store = self.admission_operation_store.as_ref().ok_or_else(|| {
-            KernelError::Internal("durable admission operation store is unavailable".to_string())
+            KernelError::active_response_unsupported(
+                "durable admission operation store is unavailable",
+            )
         })?;
         let operation = store.load(operation_id)?.ok_or_else(|| {
-            KernelError::Internal(format!("admission operation {operation_id} disappeared"))
+            KernelError::active_response_record(format!(
+                "admission operation {operation_id} disappeared"
+            ))
         })?;
         if operation.kind() != AdmissionOperationKind::GovernedActiveResponse {
             return Ok(None);
@@ -285,7 +294,9 @@ impl ChioKernel {
         operation_id: &str,
     ) -> Result<bool, KernelError> {
         let store = self.admission_operation_store.as_ref().ok_or_else(|| {
-            KernelError::Internal("durable admission operation store is unavailable".to_string())
+            KernelError::active_response_unsupported(
+                "durable admission operation store is unavailable",
+            )
         })?;
         self.recover_compensated_active_response_operation_with_store(
             store.as_ref(),
@@ -329,7 +340,7 @@ impl ChioKernel {
                     progress.record_completed()?;
                 } else {
                     progress.record_pending(|| {
-                        KernelError::Internal(format!(
+                        KernelError::active_response_pending(format!(
                             "active-response cleanup remains pending for {id}"
                         ))
                     })?;
@@ -349,7 +360,7 @@ impl ChioKernel {
         operation_id: &str,
     ) -> Result<bool, KernelError> {
         let operation = operation_store.load(operation_id)?.ok_or_else(|| {
-            KernelError::Internal(format!(
+            KernelError::active_response_record(format!(
                 "active-response cleanup operation {operation_id} disappeared"
             ))
         })?;
@@ -360,7 +371,7 @@ impl ChioKernel {
                     | AdmissionOperationState::CompensatedBeforeDispatch
             )
         {
-            return Err(KernelError::Internal(format!(
+            return Err(KernelError::active_response_record(format!(
                 "active-response cleanup refused operation {} in {}",
                 operation.operation_id(),
                 operation.state().as_str()
@@ -385,7 +396,7 @@ impl ChioKernel {
             let own_receipt = match (own_receipts.next(), own_receipts.next()) {
                 (Some(action), None) => action,
                 _ => {
-                    return Err(KernelError::Internal(format!(
+                    return Err(KernelError::active_response_record(format!(
                         "compensated operation {operation_id} does not have exactly one terminal receipt outbox"
                     )))
                 }
@@ -393,7 +404,7 @@ impl ChioKernel {
             if own_receipt.operation_id() != operation.operation_id()
                 || own_receipt.request_binding_hash() != operation.request_binding_hash()
             {
-                return Err(KernelError::Internal(format!(
+                return Err(KernelError::active_response_record(format!(
                     "terminal receipt outbox for operation {operation_id} changed its immutable binding"
                 )));
             }
@@ -406,7 +417,7 @@ impl ChioKernel {
                 && action.state() != AdmissionCleanupActionState::Completed
         }) {
             if action.kind() != AdmissionCleanupActionKind::Approval {
-                return Err(KernelError::Internal(format!(
+                return Err(KernelError::active_response_record(format!(
                     "governed active-response operation contains unsupported {} cleanup",
                     action.kind().as_str()
                 )));
@@ -434,8 +445,8 @@ impl ChioKernel {
             return Ok(false);
         }
         let current = operation_store.load(operation_id)?.ok_or_else(|| {
-            KernelError::Internal(
-                "active-response operation disappeared before terminal receipt commit".to_string(),
+            KernelError::active_response_record(
+                "active-response operation disappeared before terminal receipt commit",
             )
         })?;
         match current.state() {
@@ -446,7 +457,7 @@ impl ChioKernel {
                 self.validate_terminal_receipt_binding_with_store(operation_store, &current)?;
             }
             state => {
-                return Err(KernelError::Internal(format!(
+                return Err(KernelError::active_response_record(format!(
                     "active-response compensation changed to {} before terminal receipt commit",
                     state.as_str()
                 )))
@@ -472,7 +483,7 @@ impl ChioKernel {
             now_unix_ms
                 .checked_add(CLEANUP_CLAIM_LEASE_MS)
                 .ok_or_else(|| {
-                    KernelError::Internal("cleanup claim deadline overflowed u64".to_string())
+                    KernelError::active_response_invariant("cleanup claim deadline overflowed u64")
                 })?;
         let claim_token = uuid::Uuid::now_v7().to_string();
         let claimed = match store.claim_cleanup_action(
@@ -485,8 +496,8 @@ impl ChioKernel {
             AdmissionCleanupActionClaimOutcome::Completed(_) => return Ok(true),
             AdmissionCleanupActionClaimOutcome::Busy(_) => return Ok(false),
             AdmissionCleanupActionClaimOutcome::Missing => {
-                return Err(KernelError::Internal(
-                    "cleanup action disappeared during claim".to_string(),
+                return Err(KernelError::active_response_record(
+                    "cleanup action disappeared during claim",
                 ))
             }
         };
@@ -516,13 +527,13 @@ impl ChioKernel {
                 if completed {
                     Ok(true)
                 } else {
-                    Err(KernelError::Internal(
-                        "cleanup acknowledgement conflicted".to_string(),
+                    Err(KernelError::active_response_pending(
+                        "cleanup acknowledgement conflicted",
                     ))
                 }
             }
-            AdmissionCleanupActionCasOutcome::Missing => Err(KernelError::Internal(
-                "cleanup action disappeared before acknowledgement".to_string(),
+            AdmissionCleanupActionCasOutcome::Missing => Err(KernelError::active_response_record(
+                "cleanup action disappeared before acknowledgement",
             )),
         }
     }
@@ -541,7 +552,7 @@ impl ChioKernel {
             .filter(|action| action.kind() == kind)
             .collect::<Vec<_>>();
         let [action] = actions.as_slice() else {
-            return Err(KernelError::Internal(format!(
+            return Err(KernelError::active_response_record(format!(
                 "operation {} does not have exactly one {} cleanup action",
                 operation.operation_id(),
                 kind.as_str()
@@ -568,43 +579,45 @@ impl ChioKernel {
         let payload = self
             .load_active_response_operation_anchor_payload_with_store(operation_store, operation)?;
         let store = approval_store.ok_or_else(|| {
-            KernelError::Internal(
-                "governed active-response approval authority is unavailable during recovery"
-                    .to_string(),
+            KernelError::active_response_unsupported(
+                "governed active-response approval authority is unavailable during recovery",
             )
         })?;
         let reservation = store
             .get_approval_reservation(operation.operation_id())
             .map_err(|error| {
-                KernelError::Internal(format!(
-                    "governed active-response approval lookup failed: {error}"
-                ))
+                KernelError::active_response_in(
+                    "governed active-response approval lookup failed",
+                    error,
+                )
             })?
             .ok_or_else(|| {
-                KernelError::Internal(
-                    "governed active-response approval reservation is missing".to_string(),
+                KernelError::active_response_record(
+                    "governed active-response approval reservation is missing",
                 )
             })?;
         if reservation.operation_id() != operation.operation_id()
             || reservation.approval_set() != &payload.approval_set
         {
-            return Err(KernelError::Internal(
-                "governed active-response approval reservation changed its exact binding"
-                    .to_string(),
+            return Err(KernelError::active_response_record(
+                "governed active-response approval reservation changed its exact binding",
             ));
         }
 
         match operation.state() {
-            AdmissionOperationState::ApprovalReserved => match reservation.state() {
-                ReplayReservationState::Reserved | ReplayReservationState::Cancelled => Ok(None),
-                ReplayReservationState::Committed => {
-                    let expected = operation.transition_checked(
-                        AdmissionOperationState::DispatchCommitted,
-                        AdmissionDispatchState::Committed,
-                        operation.coordinator_lease_epoch(),
-                        None,
-                    )?;
-                    match operation_store.compare_and_swap(AdmissionOperationCompareAndSwap {
+            AdmissionOperationState::ApprovalReserved => {
+                match reservation.state() {
+                    ReplayReservationState::Reserved | ReplayReservationState::Cancelled => {
+                        Ok(None)
+                    }
+                    ReplayReservationState::Committed => {
+                        let expected = operation.transition_checked(
+                            AdmissionOperationState::DispatchCommitted,
+                            AdmissionDispatchState::Committed,
+                            operation.coordinator_lease_epoch(),
+                            None,
+                        )?;
+                        match operation_store.compare_and_swap(AdmissionOperationCompareAndSwap {
                         operation_id: operation.operation_id(),
                         expected_version: operation.version(),
                         coordinator_lease_epoch: operation.coordinator_lease_epoch(),
@@ -635,40 +648,34 @@ impl ChioKernel {
                             Ok(Some(current))
                         }
                         AdmissionOperationCasOutcome::Applied(_)
-                        | AdmissionOperationCasOutcome::Conflict(_) => Err(KernelError::Internal(
-                            "governed active-response dispatch commitment conflicted".to_string(),
-                        )),
-                        AdmissionOperationCasOutcome::Missing => Err(KernelError::Internal(
-                            "governed active-response operation disappeared during recovery"
-                                .to_string(),
-                        )),
+                        | AdmissionOperationCasOutcome::Conflict(_) => Err(KernelError::active_response_record("governed active-response dispatch commitment conflicted")),
+                        AdmissionOperationCasOutcome::Missing => Err(KernelError::active_response_record("governed active-response operation disappeared during recovery")),
+                    }
                     }
                 }
-            },
+            }
             AdmissionOperationState::DispatchCommitted => {
-                let committed =
-                    match reservation.state() {
-                        ReplayReservationState::Committed => reservation,
-                        ReplayReservationState::Cancelled => return Err(KernelError::Internal(
-                            "governed active-response dispatch commitment has a cancelled approval"
-                                .to_string(),
-                        )),
-                        ReplayReservationState::Reserved => store
-                            .commit_approval_reservation(operation.operation_id())
-                            .map_err(|error| {
-                                KernelError::Internal(format!(
-                                    "governed active-response approval commit failed: {error}"
-                                ))
-                            })?,
-                    };
+                let committed = match reservation.state() {
+                    ReplayReservationState::Committed => reservation,
+                    ReplayReservationState::Cancelled => {
+                        return Err(KernelError::active_response_record(
+                            "governed active-response dispatch commitment has a cancelled approval",
+                        ))
+                    }
+                    ReplayReservationState::Reserved => store
+                        .commit_approval_reservation(operation.operation_id())
+                        .map_err(|error| {
+                            KernelError::active_response_in(
+                                "governed active-response approval commit failed",
+                                error,
+                            )
+                        })?,
+                };
                 if committed.operation_id() != operation.operation_id()
                     || committed.approval_set() != &payload.approval_set
                     || committed.state() != ReplayReservationState::Committed
                 {
-                    return Err(KernelError::Internal(
-                        "governed active-response approval did not converge to its exact commitment"
-                            .to_string(),
-                    ));
+                    return Err(KernelError::active_response_record("governed active-response approval did not converge to its exact commitment"));
                 }
                 Ok(Some(operation.clone()))
             }
@@ -752,8 +759,7 @@ impl ChioKernel {
     ) -> Result<bool, ActiveResponseRecoveryFailure> {
         if operation.coordinator_authority_id() != expected_coordinator_authority_id {
             return Err(ActiveResponseRecoveryFailure::item(
-                Disposition::Deny,
-                KernelError::Internal(format!(
+                KernelError::active_response_refused(format!(
                     "governed active-response operation {} belongs to a different executor authority",
                     operation.operation_id()
                 )),
@@ -792,8 +798,7 @@ impl ChioKernel {
                 )?;
                 if !completed {
                     return Err(ActiveResponseRecoveryFailure::item(
-                        Disposition::Retry,
-                        KernelError::Internal(format!(
+                        KernelError::active_response_pending(format!(
                             "active-response cleanup remains pending for {}",
                             operation.operation_id()
                         )),
@@ -815,9 +820,8 @@ impl ChioKernel {
             }
             AdmissionOperationState::OutcomeUnknownAfterDispatch => Ok(false),
             _ => Err(ActiveResponseRecoveryFailure::item(
-                Disposition::Quarantine,
-                KernelError::Internal(
-                    "governed active response entered a tool-dispatch-only state".into(),
+                KernelError::active_response_record(
+                    "governed active response entered a tool-dispatch-only state",
                 ),
             )),
         }
@@ -832,9 +836,13 @@ struct ActiveResponseRecoveryFailure {
 }
 
 impl ActiveResponseRecoveryFailure {
-    /// A failure confined to one operation. A fatal one comes from `?`.
-    fn item(disposition: Disposition, error: KernelError) -> Self {
-        Self { disposition, error }
+    /// A failure confined to one operation, handled as its typed error
+    /// classifies. Every failure propagated with `?` is fatal instead.
+    fn item(error: KernelError) -> Self {
+        Self {
+            disposition: error.disposition(),
+            error,
+        }
     }
 }
 
@@ -905,7 +913,7 @@ fn increment_recovery_count(count: usize) -> Result<usize, KernelError> {
 
 fn add_recovery_counts(left: usize, right: usize) -> Result<usize, KernelError> {
     left.checked_add(right).ok_or_else(|| {
-        KernelError::Internal("active-response recovery count overflowed usize".into())
+        KernelError::active_response_invariant("active-response recovery count overflowed usize")
     })
 }
 
@@ -915,15 +923,15 @@ fn validate_recovery_page<'a>(
     len: usize,
 ) -> Result<(), KernelError> {
     if len > MAX_ACTIVE_RESPONSE_RECOVERY_OPERATIONS_PER_ACTIVATION + 1 {
-        return Err(KernelError::Internal(
-            "active-response recovery store exceeded its page bound".into(),
+        return Err(KernelError::active_response_invariant(
+            "active-response recovery store exceeded its page bound",
         ));
     }
     let mut previous = cursor;
     for id in ids {
         if previous.is_some_and(|last| id <= last) {
-            return Err(KernelError::Internal(
-                "active-response recovery page did not advance its exact cursor".into(),
+            return Err(KernelError::active_response_invariant(
+                "active-response recovery page did not advance its exact cursor",
             ));
         }
         previous = Some(id);
@@ -946,7 +954,7 @@ fn validate_schema(actual: &str, expected: &str) -> Result<(), KernelError> {
     if actual == expected {
         Ok(())
     } else {
-        Err(KernelError::Internal(format!(
+        Err(KernelError::active_response_record(format!(
             "cleanup payload schema `{actual}` is not `{expected}`"
         )))
     }

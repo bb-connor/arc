@@ -47,7 +47,7 @@ impl ChioKernel {
         if current.dispatch_state() != AdmissionDispatchState::NotStarted
             || current.state().is_terminal()
         {
-            return Err(KernelError::Internal(format!(
+            return Err(KernelError::active_response_record(format!(
                 "admission operation {} cannot stage pre-dispatch compensation from {}",
                 current.operation_id(),
                 current.state().as_str()
@@ -93,14 +93,13 @@ impl ChioKernel {
                     observed,
                     None,
                 ),
-            Ok(AdmissionOperationCasOutcome::Missing) => Err(KernelError::Internal(
-                "compensation operation disappeared during signed outbox staging".to_string(),
+            Ok(AdmissionOperationCasOutcome::Missing) => Err(KernelError::active_response_record(
+                "compensation operation disappeared during signed outbox staging",
             )),
             Err(error) => {
                 let observed = store.load(current.operation_id())?.ok_or_else(|| {
-                    KernelError::Internal(
-                        "compensation operation disappeared after uncertain signed outbox staging"
-                            .to_string(),
+                    KernelError::active_response_record(
+                        "compensation operation disappeared after uncertain signed outbox staging",
                     )
                 })?;
                 self.validate_recovered_compensation_stage(
@@ -130,7 +129,7 @@ impl ChioKernel {
         if same_operation_projection(&observed, expected_pending) && exact_action {
             return Ok(observed);
         }
-        Err(KernelError::Internal(match uncertain_error {
+        Err(KernelError::active_response_record(match uncertain_error {
             Some(error) => format!(
                 "signed compensation staging is uncertain after `{error}` and exact recovery failed"
             ),
@@ -210,8 +209,8 @@ impl ChioKernel {
         compensation_pending: &AdmissionOperation,
     ) -> Result<TerminalReceiptOutboxPayload, KernelError> {
         if compensation_pending.state() != AdmissionOperationState::CompensationPending {
-            return Err(KernelError::Internal(
-                "staged compensation receipt requires compensation_pending state".to_string(),
+            return Err(KernelError::active_response_record(
+                "staged compensation receipt requires compensation_pending state",
             ));
         }
         let terminal = compensation_pending.transition_checked(
@@ -225,13 +224,13 @@ impl ChioKernel {
             .into_iter()
             .filter(|action| action.kind() == AdmissionCleanupActionKind::TerminalReceipt);
         let action = actions.next().ok_or_else(|| {
-            KernelError::Internal(format!(
+            KernelError::active_response_record(format!(
                 "compensation operation {} has no staged signed terminal receipt",
                 compensation_pending.operation_id()
             ))
         })?;
         if actions.next().is_some() {
-            return Err(KernelError::Internal(format!(
+            return Err(KernelError::active_response_record(format!(
                 "compensation operation {} has multiple staged terminal receipts",
                 compensation_pending.operation_id()
             )));
@@ -240,8 +239,8 @@ impl ChioKernel {
             || action.request_binding_hash() != compensation_pending.request_binding_hash()
             || action.state() != AdmissionCleanupActionState::Pending
         {
-            return Err(KernelError::Internal(
-                "staged compensation receipt changed its action binding".to_string(),
+            return Err(KernelError::active_response_record(
+                "staged compensation receipt changed its action binding",
             ));
         }
         let payload: TerminalReceiptOutboxPayload =
@@ -261,9 +260,8 @@ impl ChioKernel {
         terminal: &AdmissionOperation,
     ) -> Result<TerminalReceiptOutboxPayload, KernelError> {
         if terminal.state() != AdmissionOperationState::CompensatedBeforeDispatch {
-            return Err(KernelError::Internal(
-                "terminal compensation receipt validation requires a compensated operation"
-                    .to_string(),
+            return Err(KernelError::active_response_record(
+                "terminal compensation receipt validation requires a compensated operation",
             ));
         }
         let mut actions = store
@@ -271,7 +269,7 @@ impl ChioKernel {
             .into_iter()
             .filter(|action| action.kind() == AdmissionCleanupActionKind::TerminalReceipt);
         let action = actions.next().ok_or_else(|| {
-            KernelError::Internal(format!(
+            KernelError::active_response_record(format!(
                 "compensated operation {} has no exact signed terminal receipt",
                 terminal.operation_id()
             ))
@@ -286,8 +284,8 @@ impl ChioKernel {
                     | AdmissionCleanupActionState::Completed
             )
         {
-            return Err(KernelError::Internal(
-                "compensated operation changed its terminal receipt action binding".to_string(),
+            return Err(KernelError::active_response_record(
+                "compensated operation changed its terminal receipt action binding",
             ));
         }
         let payload: TerminalReceiptOutboxPayload =
@@ -311,7 +309,7 @@ impl ChioKernel {
             .into_iter()
             .filter(|action| action.kind() == AdmissionCleanupActionKind::TerminalReceipt);
         let action = actions.next().ok_or_else(|| {
-            KernelError::Internal(format!(
+            KernelError::active_response_record(format!(
                 "terminal operation {} has no exact signed receipt action",
                 terminal.operation_id()
             ))
@@ -326,8 +324,8 @@ impl ChioKernel {
                     | AdmissionCleanupActionState::Completed
             )
         {
-            return Err(KernelError::Internal(
-                "terminal operation changed its signed receipt action binding".to_string(),
+            return Err(KernelError::active_response_record(
+                "terminal operation changed its signed receipt action binding",
             ));
         }
         let payload: TerminalReceiptOutboxPayload =
@@ -370,9 +368,8 @@ impl ChioKernel {
             || dispatch_committed.state() != AdmissionOperationState::DispatchCommitted
             || dispatch_committed.dispatch_state() != AdmissionDispatchState::Committed
         {
-            return Err(KernelError::Internal(
-                "active-response terminal receipt requires a committed governed response"
-                    .to_string(),
+            return Err(KernelError::active_response_record(
+                "active-response terminal receipt requires a committed governed response",
             ));
         }
         if dispatch_committed.policy_hash() != self.config.policy_hash {
@@ -498,16 +495,14 @@ impl ChioKernel {
                     None,
                 )?,
             Ok(AdmissionOperationCasOutcome::Missing) => {
-                return Err(KernelError::Internal(
-                    "terminal receipt operation disappeared during atomic outbox commit"
-                        .to_string(),
+                return Err(KernelError::active_response_record(
+                    "terminal receipt operation disappeared during atomic outbox commit",
                 ))
             }
             Err(error) => {
                 let current = store.load(current.operation_id())?.ok_or_else(|| {
-                    KernelError::Internal(
-                        "terminal receipt operation disappeared after uncertain atomic commit"
-                            .to_string(),
+                    KernelError::active_response_record(
+                        "terminal receipt operation disappeared after uncertain atomic commit",
                     )
                 })?;
                 self.validate_recovered_terminal_outbox_commit(
@@ -520,9 +515,8 @@ impl ChioKernel {
             }
         };
         if !same_terminal_projection(&terminal, expected_terminal) {
-            return Err(KernelError::Internal(
-                "atomic terminal receipt commit returned a different operation projection"
-                    .to_string(),
+            return Err(KernelError::active_response_invariant(
+                "atomic terminal receipt commit returned a different operation projection",
             ));
         }
         Ok(terminal)
@@ -557,7 +551,7 @@ impl ChioKernel {
         if same_terminal_projection(&current, expected) && exact_action {
             return Ok(current);
         }
-        Err(KernelError::Internal(match uncertain_error {
+        Err(KernelError::active_response_record(match uncertain_error {
             Some(error) => format!(
                 "terminal receipt atomic commit is uncertain after `{error}` and exact recovery failed"
             ),
@@ -631,9 +625,8 @@ impl ChioKernel {
                     .as_deref()
                     .is_some_and(|last| operation_id.as_str() <= last)
                 {
-                    return Err(KernelError::Internal(
-                        "terminal receipt recovery page did not advance its exact cursor"
-                            .to_string(),
+                    return Err(KernelError::active_response_invariant(
+                        "terminal receipt recovery page did not advance its exact cursor",
                     ));
                 }
                 cursor = Some(operation_id.clone());
@@ -644,14 +637,14 @@ impl ChioKernel {
                 }
                 let result = (|| {
                     let operation = store.load(&operation_id)?.ok_or_else(|| {
-                        KernelError::Internal(format!(
+                        KernelError::active_response_record(format!(
                             "terminal receipt operation {operation_id} disappeared during recovery"
                         ))
                     })?;
                     if expected_coordinator_authority_id
                         .is_some_and(|expected| operation.coordinator_authority_id() != expected)
                     {
-                        return Err(KernelError::Internal(format!(
+                        return Err(KernelError::active_response_refused(format!(
                             "terminal receipt operation {operation_id} belongs to a different coordinator authority"
                         )));
                     }
@@ -663,19 +656,19 @@ impl ChioKernel {
                                 && action.state() != AdmissionCleanupActionState::Completed
                         });
                     let action = actions.next().ok_or_else(|| {
-                        KernelError::Internal(format!(
+                        KernelError::active_response_record(format!(
                             "terminal receipt operation {operation_id} has no pending signed outbox"
                         ))
                     })?;
                     if actions.next().is_some() {
-                        return Err(KernelError::Internal(format!(
+                        return Err(KernelError::active_response_record(format!(
                             "terminal receipt operation {operation_id} has multiple pending signed outboxes"
                         )));
                     }
                     if action.operation_id() != operation.operation_id()
                         || action.request_binding_hash() != operation.request_binding_hash()
                     {
-                        return Err(KernelError::Internal(format!(
+                        return Err(KernelError::active_response_record(format!(
                             "terminal receipt outbox for operation {operation_id} changed its immutable binding"
                         )));
                     }
@@ -691,17 +684,11 @@ impl ChioKernel {
                 match result {
                     Ok(true) => progress.record_completed()?,
                     Ok(false) => progress.record_pending(|| {
-                        KernelError::Internal(
-                            "one or more terminal receipt outboxes remain after the paged recovery pass"
-                                .to_string(),
-                        )
+                        KernelError::active_response_pending("one or more terminal receipt outboxes remain after the paged recovery pass")
                     })?,
                     Err(error) => {
                         failed = failed.checked_add(1).ok_or_else(|| {
-                            KernelError::Internal(
-                                "terminal receipt recovery failure count overflowed usize"
-                                    .to_string(),
-                            )
+                            KernelError::active_response_invariant("terminal receipt recovery failure count overflowed usize")
                         })?;
                         if first_failure.is_none() {
                             first_failure = Some((operation_id, error));
@@ -714,9 +701,10 @@ impl ChioKernel {
             }
         }
         if let Some((operation_id, error)) = first_failure {
-            return Err(KernelError::Internal(format!(
+            let reason = format!(
                 "one or more terminal receipt outboxes remain unfinished: {failed} failed, first operation {operation_id}: {error}"
-            )));
+            );
+            return Err(KernelError::active_response_unfinished(reason, error));
         }
         // A count bound, not set equality: no more outboxes may remain than
         // this pass left under another lease. Those stay pending for this
@@ -738,21 +726,17 @@ impl ChioKernel {
                     .as_deref()
                     .is_some_and(|last| operation_id.as_str() <= last)
                 {
-                    return Err(KernelError::Internal(
-                        "terminal receipt recovery page did not advance its exact cursor"
-                            .to_string(),
+                    return Err(KernelError::active_response_invariant(
+                        "terminal receipt recovery page did not advance its exact cursor",
                     ));
                 }
                 remaining = remaining.checked_add(1).ok_or_else(|| {
-                    KernelError::Internal(
-                        "terminal receipt remaining count overflowed usize".to_string(),
+                    KernelError::active_response_invariant(
+                        "terminal receipt remaining count overflowed usize",
                     )
                 })?;
                 if remaining > progress.pending {
-                    return Err(KernelError::Internal(
-                        "one or more terminal receipt outboxes remain after the paged recovery pass"
-                            .to_string(),
-                    ));
+                    return Err(KernelError::active_response_pending("one or more terminal receipt outboxes remain after the paged recovery pass"));
                 }
                 remaining_cursor = Some(operation_id);
             }
@@ -776,14 +760,15 @@ impl ChioKernel {
             return Ok(());
         }
         let executor_receipt = payload.executor_receipt.as_ref().ok_or_else(|| {
-            KernelError::Internal(
-                "completed active-response terminal outbox lacks executor evidence".to_string(),
+            KernelError::active_response_record(
+                "completed active-response terminal outbox lacks executor evidence",
             )
         })?;
         let executor_receipt_bytes = canonical_json_bytes(executor_receipt).map_err(|error| {
-            KernelError::Internal(format!(
-                "active-response executor receipt canonicalization failed: {error}"
-            ))
+            KernelError::active_response_in(
+                "active-response executor receipt canonicalization failed",
+                error,
+            )
         })?;
         let executor_receipt_hash = sha256_hex(&executor_receipt_bytes);
         let expected_action = ToolCallAction::from_parameters(serde_json::json!({
@@ -792,9 +777,10 @@ impl ChioKernel {
             "executor_receipt_id": executor_receipt.id,
         }))
         .map_err(|error| {
-            KernelError::Internal(format!(
-                "active-response terminal action derivation failed: {error}"
-            ))
+            KernelError::active_response_in(
+                "active-response terminal action derivation failed",
+                error,
+            )
         })?;
         let expected_evidence = serde_json::json!({
             "executor_receipt_id": executor_receipt.id,
@@ -811,9 +797,8 @@ impl ChioKernel {
                 .and_then(|metadata| metadata.pointer("/active_response_terminal_evidence"))
                 != Some(&expected_evidence)
         {
-            return Err(KernelError::Internal(
-                "active-response terminal wrapper changed its canonical executor evidence"
-                    .to_string(),
+            return Err(KernelError::active_response_record(
+                "active-response terminal wrapper changed its canonical executor evidence",
             ));
         }
         let anchor = self.load_active_response_operation_anchor_with_store(store, operation)?;
@@ -866,8 +851,8 @@ fn validate_terminal_receipt_payload(
             )
         )
     {
-        return Err(KernelError::Internal(
-            "terminal receipt outbox changed its operation projection".to_string(),
+        return Err(KernelError::active_response_record(
+            "terminal receipt outbox changed its operation projection",
         ));
     }
     let receipt_authority_id = format!("kernel:{}", payload.receipt.kernel_key.to_hex());
@@ -921,8 +906,8 @@ fn validate_terminal_receipt_payload(
         ) != Some(operation.version())
         || !receipt_metadata_last_error_matches(&payload.receipt, operation.last_error())
     {
-        return Err(KernelError::Internal(
-            "signed terminal receipt does not carry the exact operation projection".to_string(),
+        return Err(KernelError::active_response_record(
+            "signed terminal receipt does not carry the exact operation projection",
         ));
     }
     if !payload.receipt.verify_signature().map_err(|error| {

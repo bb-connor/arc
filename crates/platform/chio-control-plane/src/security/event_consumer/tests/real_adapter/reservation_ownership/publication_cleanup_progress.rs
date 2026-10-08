@@ -213,11 +213,14 @@ fn assert_foreign_lease_retained(
 
 fn assert_cleanup_pending(result: Result<(), KernelError>, operation: &AdmissionOperation) {
     assert!(
-        matches!(&result, Err(KernelError::Internal(detail))
-        if *detail == format!(
-            "active-response cleanup remains pending for {}",
-            operation.operation_id()
-        )),
+        matches!(
+            result.as_ref().map_err(KernelError::active_response_failure),
+            Err(Some(chio_kernel::ActiveResponseError::Pending(detail)))
+                if *detail == format!(
+                    "active-response cleanup remains pending for {}",
+                    operation.operation_id()
+                )
+        ),
         "{result:?}"
     );
 }

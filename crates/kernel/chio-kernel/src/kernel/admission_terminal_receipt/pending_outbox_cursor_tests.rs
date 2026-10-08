@@ -125,16 +125,28 @@ fn stage_tail_after_heads(
 fn bounded_refusal(failed: usize, first_head: &str) -> String {
     format!(
         "one or more terminal receipt outboxes remain unfinished: {failed} failed, first operation {first_head}: {}",
-        KernelError::Internal(format!(
+        KernelError::active_response_refused(format!(
             "terminal receipt operation {first_head} belongs to a different coordinator authority"
         ))
     )
 }
 
+/// The reason of an unfinished pass whose first failure is a foreign
+/// coordinator refusal.
 fn refusal_detail(recovery: &Result<usize, KernelError>) -> TestResult<String> {
-    match recovery {
-        Err(KernelError::Internal(detail)) => Ok(detail.clone()),
-        other => Err(format!("{:.1024}", format!("{other:?}")).into()),
+    match recovery
+        .as_ref()
+        .map_err(KernelError::active_response_failure)
+    {
+        Err(Some(crate::ActiveResponseError::Unfinished { reason, first }))
+            if matches!(
+                first.active_response_failure(),
+                Some(crate::ActiveResponseError::Refused(_))
+            ) =>
+        {
+            Ok(reason.to_string())
+        }
+        _ => Err(format!("{:.1024}", format!("{recovery:?}")).into()),
     }
 }
 
@@ -186,7 +198,7 @@ fn recovery_drains_a_healthy_outbox_behind_more_than_one_page_of_failing_heads()
     let first_head = heads.first().ok_or("failing heads")?;
     let expected = bounded_refusal(FAILING_HEADS, first_head);
     assert!(
-        matches!(&recovery, Err(KernelError::Internal(detail)) if detail == &expected),
+        matches!(refusal_detail(&recovery), Ok(detail) if detail == expected),
         "{:.1024}",
         format!("{recovery:?}")
     );

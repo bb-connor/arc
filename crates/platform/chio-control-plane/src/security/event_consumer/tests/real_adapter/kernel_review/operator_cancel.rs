@@ -728,8 +728,11 @@ fn operator_cancel_refuses_a_substituted_approval_binding_without_compensating()
             .cancel_active_response_admission(reservation, OPERATOR_CANCEL_REASON),
     ] {
         assert!(
-            matches!(&refused, Err(chio_kernel::KernelError::Internal(reason))
-                if reason.contains("changed its exact binding")),
+            matches!(
+                refused.as_ref().map_err(chio_kernel::KernelError::active_response_failure),
+                Err(Some(chio_kernel::ActiveResponseError::Record(reason)))
+                    if reason == "governed active-response approval reservation changed its exact binding"
+            ),
             "{refused:?}"
         );
         assert_committed_window_retained(&fixture, &id, &operation, &approval);
@@ -903,8 +906,11 @@ fn committed_threshold_approval_retry_refuses_a_substituted_approval_binding() {
         .kernel
         .commit_prepared_active_response_admission(fixture.native_request(), &prepared);
     assert!(
-        matches!(&refused, Err(chio_kernel::KernelError::Internal(reason))
-            if reason.contains("changed its exact binding")),
+        matches!(
+            refused.as_ref().map_err(chio_kernel::KernelError::active_response_failure),
+            Err(Some(chio_kernel::ActiveResponseError::Record(reason)))
+                if reason == "governed active-response approval reservation changed its exact binding"
+        ),
         "{refused:?}"
     );
     assert_committed_window_retained(&fixture, &id, &operation, &approval);

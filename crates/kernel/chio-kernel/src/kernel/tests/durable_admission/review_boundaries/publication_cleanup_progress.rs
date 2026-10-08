@@ -685,11 +685,14 @@ impl Harness {
 
 fn assert_cleanup_pending(result: Result<(), KernelError>, operation: &AdmissionOperation) {
     assert!(
-        matches!(&result, Err(KernelError::Internal(detail))
-        if *detail == format!(
-            "active-response cleanup remains pending for {}",
-            operation.operation_id()
-        )),
+        matches!(
+            result.as_ref().map_err(KernelError::active_response_failure),
+            Err(Some(crate::ActiveResponseError::Pending(detail)))
+                if *detail == format!(
+                    "active-response cleanup remains pending for {}",
+                    operation.operation_id()
+                )
+        ),
         "{result:?}"
     );
 }
@@ -819,11 +822,14 @@ fn publication_still_refuses_a_foreign_executor_row() -> TestResult {
 
     let result = harness.publish();
     assert!(
-        matches!(&result, Err(KernelError::Internal(detail))
-        if *detail == format!(
-            "governed active-response operation {} belongs to a different executor authority",
-            foreign.operation_id()
-        )),
+        matches!(
+            result.as_ref().map_err(KernelError::active_response_failure),
+            Err(Some(crate::ActiveResponseError::Refused(detail)))
+                if *detail == format!(
+                    "governed active-response operation {} belongs to a different executor authority",
+                    foreign.operation_id()
+                )
+        ),
         "{result:?}"
     );
     assert_eq!(
@@ -932,8 +938,11 @@ fn publication_services_later_candidates_while_a_terminal_receipt_lease_is_busy(
         Some(&authority),
     );
     assert!(
-        matches!(&outbox_recovery, Err(KernelError::Internal(detail))
-            if detail == RECEIPT_OUTBOXES_REMAIN),
+        matches!(
+            outbox_recovery.as_ref().map_err(KernelError::active_response_failure),
+            Err(Some(crate::ActiveResponseError::Pending(detail)))
+                if detail == RECEIPT_OUTBOXES_REMAIN
+        ),
         "{outbox_recovery:?}"
     );
     harness.assert_receipt_lease_busy(&busy, lease_deadline)?;
@@ -1020,8 +1029,11 @@ fn activation_services_later_candidates_while_a_terminal_receipt_lease_is_busy()
         ReplayReservationState::Cancelled
     );
     assert!(
-        matches!(&refused, Err(KernelError::Internal(detail))
-            if detail == RECEIPT_OUTBOXES_REMAIN),
+        matches!(
+            refused.as_ref().map_err(KernelError::active_response_failure),
+            Err(Some(crate::ActiveResponseError::Pending(detail)))
+                if detail == RECEIPT_OUTBOXES_REMAIN
+        ),
         "{refused:?}"
     );
 
@@ -1107,8 +1119,22 @@ fn publication_keeps_a_receipt_inventory_fault_fatal_beside_a_busy_lease() -> Te
     Ok(())
 }
 
+/// The pass reports unfinished outboxes whose first failure is the exact
+/// foreign-coordinator refusal.
+fn is_receipt_item_refusal<T>(result: &Result<T, KernelError>, expected: &str) -> bool {
+    matches!(
+        result.as_ref().map_err(KernelError::active_response_failure),
+        Err(Some(crate::ActiveResponseError::Unfinished { reason, first }))
+            if &**reason == expected
+                && matches!(
+                    first.active_response_failure(),
+                    Some(crate::ActiveResponseError::Refused(_))
+                )
+    )
+}
+
 fn receipt_item_refusal(failing_operation_id: &str) -> String {
-    let item = KernelError::Internal(format!(
+    let item = KernelError::active_response_refused(format!(
         "terminal receipt operation {failing_operation_id} belongs to a different coordinator authority"
     ));
     format!(
@@ -1193,7 +1219,10 @@ fn compensated_recovery_fails_closed_on_a_corrupt_own_receipt_readback() -> Test
             .kernel
             .recover_compensated_admission_operation(own.operation_id());
         assert!(
-            matches!(&result, Err(KernelError::Internal(detail)) if *detail == expected),
+            matches!(
+                result.as_ref().map_err(KernelError::active_response_failure),
+                Err(Some(crate::ActiveResponseError::Record(detail))) if *detail == expected
+            ),
             "{case}: {result:?}"
         );
         harness.assert_receipt_lease_busy(&busy, lease_deadline)?;
@@ -1252,10 +1281,7 @@ fn publication_stops_before_candidates_after_a_terminal_receipt_item_failure() -
     let result = harness.publish();
     let expected =
         receipt_item_refusal(std::cmp::max(local.operation_id(), foreign.operation_id()));
-    assert!(
-        matches!(&result, Err(KernelError::Internal(detail)) if *detail == expected),
-        "{result:?}"
-    );
+    assert!(is_receipt_item_refusal(&result, &expected), "{result:?}");
     assert_eq!(harness.operations.candidate_pages.load(Ordering::SeqCst), 0);
     assert_eq!(harness.state(&healthy)?, AdmissionOperationState::Prepared);
     assert_eq!(
@@ -1287,10 +1313,7 @@ fn activation_stops_before_candidates_after_a_receipt_item_failure_beside_a_busy
 
     let result = harness.kernel.enable_governed_active_response_plans();
     let expected = receipt_item_refusal(foreign.operation_id());
-    assert!(
-        matches!(&result, Err(KernelError::Internal(detail)) if *detail == expected),
-        "{result:?}"
-    );
+    assert!(is_receipt_item_refusal(&result, &expected), "{result:?}");
     assert!(!harness.kernel.governed_active_response_plans_enabled);
     assert_eq!(harness.operations.candidate_pages.load(Ordering::SeqCst), 0);
     harness.assert_receipt_lease_busy(&busy, lease_deadline)?;

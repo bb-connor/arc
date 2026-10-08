@@ -337,8 +337,11 @@ fn active_response_recovery_defers_wrong_authority_after_processing_other_operat
         .recover_nonterminal_active_response_operations_with_authorities(&store, None, &authority)
         .err()
         .ok_or("wrong executor authority was recovered")?;
-    assert!(matches!(error, KernelError::Internal(detail)
-        if detail == format!("governed active-response operation {} belongs to a different executor authority", poison.operation_id())));
+    assert!(matches!(
+        error.active_response_failure(),
+        Some(crate::ActiveResponseError::Refused(detail))
+            if *detail == format!("governed active-response operation {} belongs to a different executor authority", poison.operation_id())
+    ));
     assert_eq!(
         store
             .load(poison.operation_id())?
