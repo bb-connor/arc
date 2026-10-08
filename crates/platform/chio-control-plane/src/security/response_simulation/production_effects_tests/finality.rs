@@ -419,3 +419,50 @@ fn corrupt_lift_journal_fails_closed_without_reinstalling_the_effect() {
         assert!(case.installed_ids().is_empty());
     }
 }
+
+#[test]
+fn missing_active_capability_set_without_a_completed_remove_stays_an_integrity_failure() {
+    let case = FinalityCase::new(
+        ResponseEffectKind::SuspendCapabilitySet,
+        "missing-without-lift",
+    );
+    let apply = case.request("missing-without-lift-apply");
+    let applied = case
+        .effects
+        .execute(&apply)
+        .unwrap_or_else(|error| panic!("real capability-set Apply: {error}"));
+    assert!(applied.applied);
+    assert_eq!(
+        case.installed_ids(),
+        vec![apply.effect_id.as_str().to_owned()]
+    );
+    let connection =
+        rusqlite::Connection::open(case.fixture._directory.path().join("production-effects.db"))
+            .unwrap_or_else(|error| panic!("open missing-contribution fixture: {error}"));
+    connection
+        .execute_batch("PRAGMA foreign_keys = ON")
+        .unwrap_or_else(|error| panic!("preserve member FK cascade: {error}"));
+    let journal_rows: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM security_capability_set_suspension_commands WHERE tenant_id = ?1",
+            [apply.tenant_id.as_str()],
+            |row| row.get(0),
+        )
+        .unwrap_or_else(|error| panic!("capability-set journal count: {error}"));
+    assert_eq!(
+        journal_rows, 1,
+        "only the genuine Apply exists; no Remove was executed"
+    );
+    assert_eq!(connection.execute(
+        "DELETE FROM security_capability_set_suspension_effects WHERE tenant_id = ?1 AND action_id = ?2 AND effect_id = ?3",
+        rusqlite::params![apply.tenant_id.as_str(), apply.action_id.as_str(), apply.effect_id.as_str()],
+    ).unwrap_or_else(|error| panic!("remove active row without command: {error}")), 1);
+    drop(connection);
+    assert!(case.installed_ids().is_empty());
+    let before = case.snapshot();
+    let error = case.effects.load_result(&query(&apply)).err()
+        .unwrap_or_else(|| panic!("an absent active contribution without authentic Remove was accepted as historical completion"));
+    assert_eq!(error.kind(), PortErrorKind::IntegrityFailure);
+    assert_eq!(error.code().as_str(), "store.integrity_failure");
+    assert_eq!(case.snapshot(), before);
+}
