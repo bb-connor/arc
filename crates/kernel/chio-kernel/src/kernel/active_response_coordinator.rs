@@ -1019,7 +1019,7 @@ impl ChioKernel {
                 Err(readback_error) => Err(active_response_internal(format!(
                     "active-response approval reservation failed ({error}); readback failed: {readback_error}"
                 ))),
-                _ if matches!(error, crate::approval::ApprovalStoreError::Backend(_)) => {
+                _ if error.disposition() == crate::Disposition::Retry => {
                     Err(active_response_internal(format!(
                         "active-response approval reservation is uncertain: {error}"
                     )))

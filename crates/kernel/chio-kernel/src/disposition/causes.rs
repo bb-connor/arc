@@ -13,6 +13,7 @@ use crate::admission_operation::{
     AdmissionCaptureError, AdmissionOperationError, AdmissionOperationStoreError,
     AdmissionRecoveryPortError, RemoteRecoveryFailureKind,
 };
+use crate::approval::ApprovalStoreError;
 use crate::finding_denial::{FindingDenial, FindingDenialCode};
 use crate::finding_pool::FindingPoolLedgerError;
 use crate::payment::PaymentJournalError;
@@ -149,6 +150,25 @@ impl AdmissionPaymentJournalError {
                 Disposition::Retry
             }
             Self::Fenced | Self::Invariant(_) => Disposition::Fatal,
+        }
+    }
+}
+
+impl ApprovalStoreError {
+    /// How a loop, worker or endpoint handles this failure. Only a storage
+    /// backend fault is retried: every other failure is a decision the
+    /// approval store made about this reservation or token.
+    #[must_use]
+    pub fn disposition(&self) -> Disposition {
+        match self {
+            Self::Backend(_) => Disposition::Retry,
+            Self::Clock(_) => Disposition::Fatal,
+            Self::NotFound(_) | Self::Serialization(_) => Disposition::Quarantine,
+            Self::UntrustedInput(_)
+            | Self::Invalid(_)
+            | Self::AlreadyResolved(_)
+            | Self::Conflict(_)
+            | Self::Replay(_) => Disposition::Deny,
         }
     }
 }
@@ -470,6 +490,30 @@ mod tests {
             }
             .disposition(),
             Disposition::Deny
+        );
+    }
+
+    #[test]
+    fn only_an_approval_backend_fault_retries() {
+        assert_eq!(
+            ApprovalStoreError::Backend("down".into()).disposition(),
+            Disposition::Retry
+        );
+        for decided in [
+            ApprovalStoreError::Invalid("set".into()),
+            ApprovalStoreError::AlreadyResolved("id".into()),
+            ApprovalStoreError::Conflict("state".into()),
+            ApprovalStoreError::Replay("token".into()),
+        ] {
+            assert_eq!(decided.disposition(), Disposition::Deny, "{decided:?}");
+        }
+        assert_eq!(
+            ApprovalStoreError::NotFound("id".into()).disposition(),
+            Disposition::Quarantine
+        );
+        assert_eq!(
+            ApprovalStoreError::Clock(ClockError::Unavailable).disposition(),
+            Disposition::Fatal
         );
     }
 
