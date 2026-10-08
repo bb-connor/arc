@@ -55,8 +55,8 @@ pub(super) struct FindingStatusFloorObservation<'a> {
     pub(super) is_retracted: bool,
 }
 
-/// Status state and its lock are regular files. Their mode, owner and link
-/// count are not checked after creation.
+/// Status state and its lock are regular files created owner-only. Their
+/// mode, owner and link count are not checked after creation.
 #[cfg(unix)]
 const STATUS_STATE_POLICY: chio_secure_fs::OwnerPolicy = chio_secure_fs::OwnerPolicy {
     owner: chio_secure_fs::Owner::Unchecked,
@@ -67,7 +67,7 @@ const STATUS_STATE_POLICY: chio_secure_fs::OwnerPolicy = chio_secure_fs::OwnerPo
 
 /// The creation mode of status state files, before the process umask.
 #[cfg(unix)]
-const STATUS_STATE_MODE: u32 = 0o666;
+const STATUS_STATE_MODE: u32 = 0o600;
 
 pub(super) struct FindingStatusFloorLock {
     file: std::fs::File,

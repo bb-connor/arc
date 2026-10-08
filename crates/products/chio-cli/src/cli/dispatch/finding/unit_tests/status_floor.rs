@@ -236,6 +236,34 @@ fn status_floor_partitions_retractions_without_growing_the_epoch_document() {
     );
 }
 
+#[cfg(unix)]
+#[test]
+fn status_state_files_are_created_owner_only() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = tempfile::tempdir().unwrap();
+    let floor_path = dir.path().join("status-floor.json");
+    advance(&floor_path, &response("inclusion")).unwrap();
+    {
+        let _lock = FindingStatusFloorLock::acquire(&floor_path).unwrap();
+        super::super::status_floor::advance_trusted_time_locked(&floor_path, 1_800_000_100)
+            .unwrap();
+    }
+
+    let mut state_files = vec![
+        floor_path.clone(),
+        dir.path().join("status-floor.json.trusted-time"),
+    ];
+    for entry in std::fs::read_dir(dir.path().join("status-floor.json.retractions")).unwrap() {
+        state_files.push(entry.unwrap().path());
+    }
+    assert_eq!(state_files.len(), 3);
+    for path in state_files {
+        let mode = std::fs::metadata(&path).unwrap().permissions().mode();
+        assert_eq!(mode & 0o077, 0, "{} has mode {mode:o}", path.display());
+    }
+}
+
 #[test]
 fn status_floor_lock_recovers_from_stale_sidecar_and_excludes_live_writer() {
     let dir = tempfile::tempdir().unwrap();
