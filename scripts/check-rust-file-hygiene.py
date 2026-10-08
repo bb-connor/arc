@@ -203,7 +203,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/core/chio-core-types/src/capability/tests.rs": allow(
         "2026-12-31",
         "existing oversized capability type test suite; capped to current size until split; covers time-checked verification, attenuation narrowing, and wildcard/concrete reflection regressions",
-        max_lines=3_147,
+        max_lines=3_091,
     ),
     "crates/kernel/chio-runtime-core/tests/runtime_buyer_review.rs": allow(
         "2026-11-30",
