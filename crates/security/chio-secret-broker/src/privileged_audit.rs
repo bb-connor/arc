@@ -10,13 +10,11 @@
 
 use std::fmt;
 #[cfg(unix)]
-use std::fs::{File, OpenOptions};
-#[cfg(unix)]
 use std::io::{Read, Write};
 #[cfg(unix)]
-use std::os::unix::fs::{DirBuilderExt, FileTypeExt, MetadataExt, OpenOptionsExt, PermissionsExt};
+use std::os::unix::fs::{DirBuilderExt, MetadataExt, PermissionsExt};
 #[cfg(unix)]
-use std::os::unix::net::{UnixListener, UnixStream};
+use std::os::unix::net::UnixStream;
 #[cfg(unix)]
 use std::path::{Component, Path, PathBuf};
 #[cfg(unix)]
@@ -29,6 +27,10 @@ use chio_core_types::{
 };
 #[cfg(unix)]
 use chio_secure_ipc::frame::FrameError;
+#[cfg(unix)]
+use chio_secure_ipc::listener::{
+    CustodialUnixListener, ListenerError, PeerPolicy, SocketAccess, SocketCustody,
+};
 #[cfg(unix)]
 use rand_core::{OsRng, RngCore};
 #[cfg(unix)]
@@ -70,8 +72,6 @@ const SESSION_COMMITMENT_DOMAIN: &[u8] = b"chio.broker-privileged-audit-session-
 const MAX_AUDIT_OPEN_FRAME_BYTES: usize = 16 * 1_048_576;
 const MAX_AUDIT_CONTROL_FRAME_BYTES: usize = 256 * 1_024;
 const MAX_AUDIT_EVIDENCE_FRAME_BYTES: usize = 2 * 1_048_576;
-#[cfg(unix)]
-const AUDIT_SOCKET_MODE: u32 = 0o660;
 #[cfg(unix)]
 const AUDIT_SOCKET_DIRECTORY_MODE: u32 = 0o710;
 const MAX_SESSION_LIFETIME_SECONDS: u64 = 300;
@@ -688,20 +688,11 @@ pub enum BrokerPrivilegedAuditServeOutcome {
 }
 
 #[cfg(unix)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct AuditSocketIdentity {
-    device: u64,
-    inode: u64,
-}
-
-#[cfg(unix)]
 pub(crate) struct BrokerPrivilegedAuditEndpoint {
-    listener: UnixListener,
+    listener: CustodialUnixListener,
     config: BrokerPrivilegedAuditEndpointConfig,
     challenge_signer: Arc<dyn SigningBackend>,
     handler: Arc<dyn BrokerPrivilegedAuditHandler>,
-    socket_identity: AuditSocketIdentity,
-    _lifecycle_lock: File,
 }
 
 #[cfg(unix)]
@@ -722,63 +713,38 @@ impl BrokerPrivilegedAuditEndpoint {
             config.trusted_service_uid,
             config.authorized_runner_gid,
         )?;
-        let lifecycle_lock =
-            acquire_audit_lifecycle_lock(&config.socket_path, config.trusted_service_uid)?;
-        if config.socket_path.exists() {
-            return Err(BrokerError::Storage(
-                "privileged audit socket path already exists".to_string(),
-            ));
-        }
-        let listener = UnixListener::bind(&config.socket_path).map_err(|error| {
-            BrokerError::Storage(format!("privileged audit socket bind failed: {error}"))
-        })?;
-        let cleanup = AuditSocketCleanup::new(&config.socket_path)?;
-        set_audit_socket_custody(
-            &config.socket_path,
-            config.trusted_service_uid,
-            config.authorized_runner_gid,
-        )?;
-        let socket_identity = validate_audit_socket_identity(
-            &config.socket_path,
-            config.trusted_service_uid,
-            config.authorized_runner_gid,
-        )?;
-        if socket_identity != cleanup.identity {
-            return Err(BrokerError::Custody(
-                "privileged audit socket identity changed during bind".to_string(),
-            ));
-        }
-        let endpoint = Self {
+        let listener = CustodialUnixListener::bind(audit_socket_custody(&config))
+            .map_err(audit_listener_error)?;
+        Ok(Self {
             listener,
             config,
             challenge_signer,
             handler,
-            socket_identity,
-            _lifecycle_lock: lifecycle_lock,
-        };
-        cleanup.disarm();
-        Ok(endpoint)
-    }
-
-    pub(crate) fn set_nonblocking(&self, nonblocking: bool) -> Result<()> {
-        self.listener.set_nonblocking(nonblocking).map_err(|error| {
-            BrokerError::Storage(format!("privileged audit listener mode failed: {error}"))
         })
     }
 
+    pub(crate) fn set_nonblocking(&self, nonblocking: bool) -> Result<()> {
+        self.listener
+            .set_nonblocking(nonblocking)
+            .map_err(audit_listener_error)
+    }
+
     pub(crate) fn try_serve_one(&self) -> Result<Option<BrokerPrivilegedAuditServeOutcome>> {
-        let stream = match self.listener.accept() {
-            Ok((stream, _)) => stream,
-            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => return Ok(None),
-            Err(error) => {
-                return Err(BrokerError::Storage(format!(
-                    "privileged audit accept failed: {error}"
-                )))
-            }
+        self.serve_accepted(self.listener.try_accept_authenticated())
+    }
+
+    fn serve_accepted(
+        &self,
+        accepted: std::result::Result<Option<UnixStream>, ListenerError>,
+    ) -> Result<Option<BrokerPrivilegedAuditServeOutcome>> {
+        let accepted = match accepted {
+            Ok(None) => return Ok(None),
+            Ok(Some(stream)) => Ok(stream),
+            Err(error) => Err(audit_listener_error(error)),
         };
         // Only the faults that end the ordinary endpoint end this one; an audit
         // must never take down normal tool traffic.
-        let outcome = match self.serve_stream(stream) {
+        let outcome = match accepted.and_then(|stream| self.serve_stream(stream)) {
             Ok(()) => BrokerPrivilegedAuditServeOutcome::EvidenceWritten,
             Err(error) if error.is_service_fault() => return Err(error),
             Err(error)
@@ -807,11 +773,6 @@ impl BrokerPrivilegedAuditEndpoint {
             stream,
             self.config.read_timeout_ms,
             self.config.write_timeout_ms,
-        )?;
-        validate_audit_peer(
-            stream.stream(),
-            self.config.authorized_runner_uid,
-            self.config.authorized_runner_gid,
         )?;
         let mut open = read_privileged_audit_open_frame(&mut stream)?;
         let reference = open.take_reference()?;
@@ -901,21 +862,6 @@ impl BrokerPrivilegedAuditEndpoint {
 }
 
 #[cfg(unix)]
-impl Drop for BrokerPrivilegedAuditEndpoint {
-    fn drop(&mut self) {
-        if validate_audit_socket_identity(
-            &self.config.socket_path,
-            self.config.trusted_service_uid,
-            self.config.authorized_runner_gid,
-        )
-        .is_ok_and(|identity| identity == self.socket_identity)
-        {
-            let _remove_result = std::fs::remove_file(&self.config.socket_path);
-        }
-    }
-}
-
-#[cfg(unix)]
 struct AuditDeadlineIo {
     stream: UnixStream,
     read_deadline: Instant,
@@ -956,10 +902,6 @@ impl AuditDeadlineIo {
             read_deadline_setup_failed: false,
             write_deadline_setup_failed: false,
         })
-    }
-
-    fn stream(&self) -> &UnixStream {
-        &self.stream
     }
 
     fn remaining(deadline: Instant, label: &'static str) -> std::io::Result<Duration> {
@@ -1278,26 +1220,52 @@ fn validate_audit_socket_path(path: &Path) -> Result<()> {
     Ok(())
 }
 
-#[cfg(target_os = "linux")]
-fn validate_audit_peer(stream: &UnixStream, expected_uid: u32, expected_gid: u32) -> Result<()> {
-    let credentials = rustix::net::sockopt::socket_peercred(stream).map_err(|error| {
-        BrokerError::Storage(format!(
-            "privileged audit peer credential lookup failed: {error}"
-        ))
-    })?;
-    if credentials.uid.as_raw() != expected_uid || credentials.gid.as_raw() != expected_gid {
-        return Err(BrokerError::AuthorizationDenied(
-            "privileged audit peer UID or GID is not authorized".to_string(),
-        ));
+/// The socket admits the runner group; each session must also come from the
+/// runner user in that group before any frame is read.
+#[cfg(unix)]
+fn audit_socket_custody(config: &BrokerPrivilegedAuditEndpointConfig) -> SocketCustody {
+    SocketCustody {
+        socket_path: config.socket_path.clone(),
+        trusted_service_uid: config.trusted_service_uid,
+        access: SocketAccess::Group {
+            gid: config.authorized_runner_gid,
+        },
+        peer: PeerPolicy::UserAndGroup {
+            uid: config.authorized_runner_uid,
+            gid: config.authorized_runner_gid,
+        },
     }
-    Ok(())
 }
 
-#[cfg(all(unix, not(target_os = "linux")))]
-fn validate_audit_peer(_stream: &UnixStream, _expected_uid: u32, _expected_gid: u32) -> Result<()> {
-    Err(BrokerError::AuthorityUnavailable(
-        "privileged audit peer credentials require Linux".to_string(),
-    ))
+/// A listener fault on the audit socket. A runner the peer policy refuses is
+/// denied and contained to its session; custody and I/O faults are service
+/// faults, as on the ordinary endpoint.
+#[cfg(unix)]
+fn audit_listener_error(error: ListenerError) -> BrokerError {
+    match error {
+        ListenerError::UnauthorizedPeer { .. } => BrokerError::AuthorizationDenied(
+            "privileged audit peer UID or GID is not authorized".to_string(),
+        ),
+        ListenerError::InvalidPath | ListenerError::InvalidPeerPolicy(_) => {
+            BrokerError::InvalidRequest(format!("privileged audit socket configuration: {error}"))
+        }
+        ListenerError::Unsupported => BrokerError::AuthorityUnavailable(
+            "privileged audit peer authentication requires Linux".to_string(),
+        ),
+        ListenerError::LockHeld(source) => BrokerError::AuthorityUnavailable(format!(
+            "privileged audit socket is owned by another daemon: {source}"
+        )),
+        ListenerError::PathOccupied => {
+            BrokerError::Storage("privileged audit socket path already exists".to_string())
+        }
+        ListenerError::Io { .. } => BrokerError::Storage(format!("privileged audit {error}")),
+        ListenerError::DirectoryCustody
+        | ListenerError::LockCustody
+        | ListenerError::SocketCustody
+        | ListenerError::SocketReplaced => {
+            BrokerError::Custody(format!("privileged audit {error}"))
+        }
+    }
 }
 
 #[cfg(unix)]
@@ -1393,156 +1361,6 @@ fn prepare_audit_socket_parent(path: &Path, service_uid: u32, runner_gid: u32) -
     Ok(())
 }
 
-#[cfg(unix)]
-fn set_audit_socket_custody(path: &Path, service_uid: u32, runner_gid: u32) -> Result<()> {
-    let metadata = std::fs::symlink_metadata(path).map_err(|error| {
-        BrokerError::Storage(format!("privileged audit socket metadata failed: {error}"))
-    })?;
-    if metadata.gid() != runner_gid {
-        rustix::fs::chown(
-            path,
-            Some(rustix::process::Uid::from_raw(service_uid)),
-            Some(rustix::process::Gid::from_raw(runner_gid)),
-        )
-        .map_err(|error| {
-            BrokerError::Custody(format!(
-                "privileged audit socket group setup failed: {error}"
-            ))
-        })?;
-    }
-    std::fs::set_permissions(path, std::fs::Permissions::from_mode(AUDIT_SOCKET_MODE)).map_err(
-        |error| {
-            BrokerError::Storage(format!(
-                "privileged audit socket permissions failed: {error}"
-            ))
-        },
-    )
-}
-
-#[cfg(unix)]
-fn validate_audit_socket_identity(
-    path: &Path,
-    service_uid: u32,
-    runner_gid: u32,
-) -> Result<AuditSocketIdentity> {
-    let metadata = std::fs::symlink_metadata(path).map_err(|error| {
-        BrokerError::Storage(format!("privileged audit socket metadata failed: {error}"))
-    })?;
-    if !metadata.file_type().is_socket()
-        || metadata.uid() != service_uid
-        || metadata.gid() != runner_gid
-        || metadata.nlink() != 1
-        || metadata.permissions().mode() & 0o777 != AUDIT_SOCKET_MODE
-    {
-        return Err(BrokerError::Custody(
-            "privileged audit socket ownership or permissions are invalid".to_string(),
-        ));
-    }
-    Ok(AuditSocketIdentity {
-        device: metadata.dev(),
-        inode: metadata.ino(),
-    })
-}
-
-#[cfg(unix)]
-fn acquire_audit_lifecycle_lock(path: &Path, service_uid: u32) -> Result<File> {
-    let mut lock_path = path.as_os_str().to_os_string();
-    lock_path.push(".lifecycle.lock");
-    let lock_path = PathBuf::from(lock_path);
-    let mut options = OpenOptions::new();
-    options.read(true).write(true).create(true).mode(0o600);
-    let flags = rustix::fs::OFlags::CLOEXEC | rustix::fs::OFlags::NOFOLLOW;
-    options.custom_flags(i32::try_from(flags.bits()).map_err(|_| {
-        BrokerError::Storage("privileged audit lifecycle lock flags are invalid".to_string())
-    })?);
-    let lock = options.open(&lock_path).map_err(|error| {
-        BrokerError::Storage(format!(
-            "privileged audit lifecycle lock open failed: {error}"
-        ))
-    })?;
-    let path_metadata = std::fs::symlink_metadata(&lock_path).map_err(|error| {
-        BrokerError::Storage(format!(
-            "privileged audit lifecycle lock metadata failed: {error}"
-        ))
-    })?;
-    let descriptor_metadata = lock.metadata().map_err(|error| {
-        BrokerError::Storage(format!(
-            "privileged audit lifecycle lock descriptor failed: {error}"
-        ))
-    })?;
-    if !path_metadata.file_type().is_file()
-        || path_metadata.dev() != descriptor_metadata.dev()
-        || path_metadata.ino() != descriptor_metadata.ino()
-        || descriptor_metadata.uid() != service_uid
-        || descriptor_metadata.nlink() != 1
-        || descriptor_metadata.permissions().mode() & 0o077 != 0
-    {
-        return Err(BrokerError::Custody(
-            "privileged audit lifecycle lock identity is invalid".to_string(),
-        ));
-    }
-    rustix::fs::flock(&lock, rustix::fs::FlockOperation::NonBlockingLockExclusive).map_err(
-        |error| {
-            BrokerError::AuthorityUnavailable(format!(
-                "privileged audit socket is owned by another daemon: {error}"
-            ))
-        },
-    )?;
-    Ok(lock)
-}
-
-#[cfg(unix)]
-struct AuditSocketCleanup {
-    path: PathBuf,
-    identity: AuditSocketIdentity,
-    armed: std::cell::Cell<bool>,
-}
-
-#[cfg(unix)]
-impl AuditSocketCleanup {
-    fn new(path: &Path) -> Result<Self> {
-        let metadata = std::fs::symlink_metadata(path).map_err(|error| {
-            BrokerError::Storage(format!(
-                "provisional privileged audit socket metadata failed: {error}"
-            ))
-        })?;
-        if !metadata.file_type().is_socket() {
-            return Err(BrokerError::Custody(
-                "provisional privileged audit path is not a socket".to_string(),
-            ));
-        }
-        Ok(Self {
-            path: path.to_path_buf(),
-            identity: AuditSocketIdentity {
-                device: metadata.dev(),
-                inode: metadata.ino(),
-            },
-            armed: std::cell::Cell::new(true),
-        })
-    }
-
-    fn disarm(&self) {
-        self.armed.set(false);
-    }
-}
-
-#[cfg(unix)]
-impl Drop for AuditSocketCleanup {
-    fn drop(&mut self) {
-        if !self.armed.get() {
-            return;
-        }
-        let is_exact_socket = std::fs::symlink_metadata(&self.path).is_ok_and(|metadata| {
-            metadata.file_type().is_socket()
-                && metadata.dev() == self.identity.device
-                && metadata.ino() == self.identity.inode
-        });
-        if is_exact_socket {
-            let _remove_result = std::fs::remove_file(&self.path);
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1630,12 +1448,65 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn audit_peer_authentication_pins_uid_and_gid() {
-        let (client, server) = UnixStream::pair().test_expect("Unix pair");
+        use chio_secure_ipc::PeerIdentity;
+
         let uid = rustix::process::geteuid().as_raw();
         let gid = rustix::process::getegid().as_raw();
-        validate_audit_peer(&server, uid, gid).test_expect("matching peer");
-        assert!(validate_audit_peer(&client, uid.wrapping_add(1), gid).is_err());
-        assert!(validate_audit_peer(&client, uid, gid.wrapping_add(1)).is_err());
+        let directory = crate::private_tempdir().test_expect("audit socket directory");
+        let root = std::fs::canonicalize(directory.path()).test_expect("canonical directory");
+        std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o710))
+            .test_expect("runner-searchable directory");
+        let socket_path = root.join("audit.sock");
+        let config = |runner_uid: u32, runner_gid: u32| BrokerPrivilegedAuditEndpointConfig {
+            socket_path: socket_path.clone(),
+            trusted_service_uid: uid,
+            authorized_runner_uid: runner_uid,
+            authorized_runner_gid: runner_gid,
+            read_timeout_ms: 1_000,
+            write_timeout_ms: 1_000,
+            authorization_lifetime_seconds: 60,
+            deployment_id: "deployment-production".to_string(),
+            broker_instance_id: "broker-production-1".to_string(),
+            tenant_scope: "tenant-production".to_string(),
+            runner_id: "runner-production".to_string(),
+        };
+        assert_eq!(
+            audit_socket_custody(&config(uid.wrapping_add(1), gid)).peer,
+            PeerPolicy::UserAndGroup {
+                uid: uid.wrapping_add(1),
+                gid,
+            }
+        );
+        assert_eq!(
+            audit_socket_custody(&config(uid, gid)).access,
+            SocketAccess::Group { gid }
+        );
+
+        let listener = CustodialUnixListener::bind(audit_socket_custody(&config(uid, gid)))
+            .test_expect("matching runner socket");
+        let _matching = UnixStream::connect(&socket_path).test_expect("matching runner");
+        listener
+            .accept_authenticated()
+            .test_expect("matching runner is admitted");
+        drop(listener);
+
+        let listener =
+            CustodialUnixListener::bind(audit_socket_custody(&config(uid.wrapping_add(1), gid)))
+                .test_expect("other runner socket");
+        let _other = UnixStream::connect(&socket_path).test_expect("other user connects");
+        let error = listener
+            .accept_authenticated()
+            .map(drop)
+            .test_expect_err("another user is refused");
+        assert!(matches!(
+            error,
+            ListenerError::UnauthorizedPeer {
+                observed: PeerIdentity { user_id, group_id, .. }
+            } if user_id == uid && group_id == gid
+        ));
+        let error = audit_listener_error(error);
+        assert!(matches!(&error, BrokerError::AuthorizationDenied(message)
+            if message == "privileged audit peer UID or GID is not authorized"));
     }
 
     #[cfg(unix)]
