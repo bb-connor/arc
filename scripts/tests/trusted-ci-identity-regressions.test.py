@@ -8,11 +8,11 @@ mapping resolves to; only the App key, JWT and installation-token exchange is
 cut, and the offline installation token stands in for its output.
 
 Each class carries exactly one label:
-- Original: RED on the current producers at the claimed boundary, GREEN once
+- Original: RED on the pre-P6 producers at the claimed boundary, GREEN once
   the candidate identity rules land;
-- Preservation: GREEN on the current producers and required to stay GREEN;
-- Prospective: the post-change expectation for a boundary the current
-  producers cannot reach, skipped with the exact reason.
+- Preservation: GREEN on the pre-P6 producers and required to stay GREEN;
+- Activated: a prospective design control activated at the P6 boundary, never
+  a genuine Original, required to pass on the P6 producers.
 """
 
 from __future__ import annotations
@@ -815,29 +815,24 @@ def audit_v3(data: dict, pr: int = PR):
     return run_auditor(data, pr=pr, workflow_sha=C9_LANDING)
 
 
-V3_AUDITOR = ("prospective: the current auditor reads authority only on the CI title's test merge "
-              "(commits/<M>/check-runs), accepts only `arc:` external IDs and v2 text, and never reads an "
-              "evidence-head namespace, a candidate identity or a CI binding artifact, so a v3 authority on E "
-              "is never reached and any refusal today is placement and schema, not this rule")
+class CandidateIdentityAuditDesignControlTests(unittest.TestCase):
+    """Activated at the P6 boundary (was prospective; never a genuine Original).
 
-
-class CandidateIdentityAuditProspectiveTests(unittest.TestCase):
-    """Prospective (cannot run before the v3 auditor lands): c9 positive, v3 negatives, C-B1 and QA4 on E.
-
-    Each case is the expectation for the v3 auditor. The exact refusal texts
-    other than the legacy one are fixed when that auditor lands.
+    The c9 positive, the v3 negatives, and C-B1 and QA4 on E. The auditor
+    qualifies a landing only through one v3 authority on E whose candidate
+    identity, digest, recorded CI test merge, sealed check IDs and CI
+    merge-binding artifact all bind the retained protected landing. Each case
+    pins the exact verdict.
     """
 
-    def assert_unverified(self, data: dict, pr: int = PR, error: str | None = None) -> None:
+    def assert_unverified(self, data: dict, error: str, pr: int = PR) -> None:
         run, report = audit_v3(data, pr=pr)
         self.assertEqual(run.result.returncode, 1)
         self.assertEqual((report["status"], report["bypass_attribution"], set(report)),
                          ("unverified", "unestablished", {"status", "repository", "pr_number", "error",
                                                           "bypass_attribution"}))
-        if error is not None:
-            self.assertEqual(report["error"], error)
+        self.assertEqual(report["error"], error)
 
-    @unittest.skip(V3_AUDITOR)
     def test_c9_regenerated_test_merges_verify_one_candidate_identity(self) -> None:
         identity = candidate_identity()
         self.assertEqual(len({C9_CI_MERGE, C9_CAPTURE_MERGE, C9_PUBLICATION_MERGE, C9_LANDING}), 4)
@@ -854,19 +849,16 @@ class CandidateIdentityAuditProspectiveTests(unittest.TestCase):
                          (C9_LANDING, [C9_BASE, C9_HEAD], C9_TREE))
         self.assertNotIn("merge_commit_sha", qualification)
 
-    @unittest.skip(V3_AUDITOR)
     def test_identity_digest_mismatch_is_not_verified(self) -> None:
-        self.assert_unverified(v3_c9_landing(digest="9" * 64))
+        self.assert_unverified(v3_c9_landing(digest="9" * 64), "candidate identity digest mismatch")
 
-    @unittest.skip(V3_AUDITOR)
     def test_identity_that_does_not_match_the_landing_is_not_verified(self) -> None:
         for label, identity in (("base", candidate_identity(base=LANDING.OTHER_BASE)),
                                 ("tree", candidate_identity(tree="1" * 40)),
                                 ("pull request", candidate_identity(pr=OTHER_PR))):
             with self.subTest(identity=label):
-                self.assert_unverified(v3_c9_landing(identity))
+                self.assert_unverified(v3_c9_landing(identity), IDENTITY_MISMATCH)
 
-    @unittest.skip(V3_AUDITOR)
     def test_legacy_external_id_on_the_evidence_head_is_not_a_v3_qualification(self) -> None:
         data = v3_c9_landing()
         (legacy,) = copy.deepcopy(data[f"{PREFIX}/commits/{C9_HEAD}/check-runs"]["check_runs"])
@@ -880,17 +872,15 @@ class CandidateIdentityAuditProspectiveTests(unittest.TestCase):
                                 "source_ci": {"run_id": str(CI_RUN), "run_attempt": "1", "workflow_id": str(CI_WORKFLOW)},
                                 "publication_binding_digest": "2" * 64})}
         data[f"{PREFIX}/commits/{C9_HEAD}/check-runs"] = {"total_count": 1, "check_runs": [legacy]}
-        self.assert_unverified(data, error=LEGACY_REFUSAL)
+        self.assert_unverified(data, LEGACY_REFUSAL)
 
-    @unittest.skip(V3_AUDITOR)
     def test_authority_only_on_a_test_merge_is_not_verified(self) -> None:
         data = v3_c9_landing()
         authority = data[f"{PREFIX}/commits/{C9_HEAD}/check-runs"]["check_runs"][0] | {"head_sha": C9_CI_MERGE}
         data[f"{PREFIX}/commits/{C9_HEAD}/check-runs"] = {"total_count": 0, "check_runs": []}
         data[f"{PREFIX}/commits/{C9_CI_MERGE}/check-runs"] = {"total_count": 1, "check_runs": [authority]}
-        self.assert_unverified(data)
+        self.assert_unverified(data, NAMESPACE_NOT_SINGLETON)
 
-    @unittest.skip(V3_AUDITOR)
     def test_required_check_run_ids_that_differ_from_the_source_inventory_are_not_verified(self) -> None:
         data = v3_c9_landing()
         authority = data[f"{PREFIX}/commits/{C9_HEAD}/check-runs"]["check_runs"][0]
@@ -898,26 +888,25 @@ class CandidateIdentityAuditProspectiveTests(unittest.TestCase):
         text["required_check_run_ids"]["build"] = "601"
         authority["output"]["text"] = json.dumps(text, sort_keys=True, separators=(",", ":"))
         data[f"{PREFIX}/check-runs/601"] = copy.deepcopy(data[f"{PREFIX}/check-runs/501"]) | {"id": 601}
-        self.assert_unverified(data)
+        self.assert_unverified(data, "source CI inventory does not match the sealed original check ID")
 
-    @unittest.skip(V3_AUDITOR)
     def test_ci_binding_artifact_that_does_not_bind_the_ci_merge_is_not_verified(self) -> None:
         tampered = v3_c9_landing()
         tampered[f"{PREFIX}/actions/artifacts/{BINDING_ARTIFACT_ID}/zip"] = {
             "__binary_base64": base64.b64encode(binding_archive(ci_merge_binding() + b" ")).decode()}
-        for label, data in (("archive digest", tampered),
-                            ("merge.sha", v3_c9_landing(binding=ci_merge_binding(merge=C9_PUBLICATION_MERGE))),
-                            ("expired artifact", v3_c9_landing(expired=True))):
+        for label, data, error in (
+                ("archive digest", tampered, "CI merge-binding archive size or digest mismatch"),
+                ("merge.sha", v3_c9_landing(binding=ci_merge_binding(merge=C9_PUBLICATION_MERGE)),
+                 "CI merge-binding does not match the retained landing identity"),
+                ("expired artifact", v3_c9_landing(expired=True), "CI merge-binding artifact provenance mismatch")):
             with self.subTest(binding=label):
-                self.assert_unverified(data)
+                self.assert_unverified(data, error)
 
-    @unittest.skip(V3_AUDITOR)
     def test_authority_bound_to_another_pull_request_on_the_shared_head_is_not_verified(self) -> None:
         data = v3_c9_landing()
         data[f"{PREFIX}/pulls/{OTHER_PR}"] = copy.deepcopy(data[f"{PREFIX}/pulls/{PR}"]) | {"number": OTHER_PR}
-        self.assert_unverified(data, pr=OTHER_PR)
+        self.assert_unverified(data, IDENTITY_MISMATCH, pr=OTHER_PR)
 
-    @unittest.skip(V3_AUDITOR)
     def test_duplicate_or_forged_authority_on_the_evidence_head_is_not_verified(self) -> None:
         duplicate = v3_c9_landing()
         namespace = duplicate[f"{PREFIX}/commits/{C9_HEAD}/check-runs"]
@@ -928,17 +917,20 @@ class CandidateIdentityAuditProspectiveTests(unittest.TestCase):
         text = json.loads(authority["output"]["text"])
         text["source_ci"]["run_id"] = "202"
         authority["output"]["text"] = json.dumps(text, sort_keys=True, separators=(",", ":"))
-        for label, data in (("duplicate", duplicate), ("forged source CI", forged)):
+        for label, data, error in (("duplicate", duplicate, NAMESPACE_NOT_SINGLETON),
+                                   ("forged source CI", forged, SOURCE_CI_ABSENT)):
             with self.subTest(namespace=label):
-                self.assert_unverified(data)
+                self.assert_unverified(data, error)
 
 
-class SharedHeadDenialProspectiveTests(unittest.TestCase):
-    """Prospective (cannot run before the denial namespace moves to E): C-P6-1 for a sibling pull request."""
+class SharedHeadDenialDesignControlTests(unittest.TestCase):
+    """Activated at the P6 boundary (was prospective; never a genuine Original).
 
-    @unittest.skip("prospective: the current revoker lists only commits/<M>/check-runs of the bound pull request "
-                   "(`list_checks`), so a sibling's authority on E is outside every namespace it reads and a missing "
-                   "PATCH today would be placement, not the canonical-member rule")
+    C-P6-1 for a sibling pull request on E. A revocation for E normalizes the
+    one dedicated namespace on E, so the authority another pull request holds
+    on E is failed in place with its external ID and text kept.
+    """
+
     def test_revocation_for_e_fails_a_sibling_pull_request_authority_on_e(self) -> None:
         sibling = own_authority() | {"id": 611}
         data = with_namespace(LANDING.revoker_fixture(), sibling)
@@ -955,13 +947,19 @@ class SharedHeadDenialProspectiveTests(unittest.TestCase):
         self.assertEqual(run.result.returncode, 0, run.result.stderr)
 
 
-class PublicationSourceCiRevalidationProspectiveTests(unittest.TestCase):
-    """Prospective (cannot run before `revalidate_source_ci_checks` exists): QA3 at publication."""
+SEALED_CHECK_REFUSAL = ('test "$(jq -r --arg id "${expected_check_id}" --arg name "${required_name}" '
+                        '--arg head "${EVIDENCE_SHA}" --arg suite "${suite_id}" \'')
 
-    @unittest.skip("prospective: the current publish step never re-reads the source CI attempt, its job inventory "
-                   "or its check runs; the IDs it holds were sealed by the authorize job of the same run, and no "
-                   "observed record shows a sealed check run changing after authorization, so a RED today would rest "
-                   "on an unobserved fixture")
+
+class PublicationSourceCiRevalidationDesignControlTests(unittest.TestCase):
+    """Prospective design control, activated at the P6 boundary; never a genuine Original.
+
+    QA3 at publication. Before a positive write the publish step re-reads the
+    sealed source CI attempt, its job inventory and each sealed check run, and
+    refuses with no write when a sealed check run is no longer that attempt's
+    success.
+    """
+
     def test_publisher_refuses_when_a_sealed_check_run_is_no_longer_the_source_attempt_s_success(self) -> None:
         data = LANDING.publication_fixture()
         for check in (LANDING.ci_authentication_fixture()[f"{PREFIX}/check-runs/{identifier}"] for identifier in range(501, 506)):
@@ -976,6 +974,7 @@ class PublicationSourceCiRevalidationProspectiveTests(unittest.TestCase):
         self.assertIn(f"GET {PREFIX}/check-runs/501", run.calls)
         self.assertEqual(LANDING.check_mutations(run), [])
         self.assertEqual(run.result.returncode, 1)
+        self.assertEqual(refusal(run), SEALED_CHECK_REFUSAL)
 
 
 if __name__ == "__main__":
