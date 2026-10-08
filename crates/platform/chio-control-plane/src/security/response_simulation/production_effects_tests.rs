@@ -288,6 +288,26 @@ impl ProductionEffectsFixture {
         }
     }
 
+    /// A lineage freeze planned against the live issuance-freeze snapshot.
+    fn live_freeze_spec(&self, action_id: &str) -> ResponseEffectSpec {
+        let key = IssuanceFreezeKey {
+            tenant_id: tenant(),
+            lineage_id: lineage(),
+        };
+        let live = chio_security_types::ports::IssuanceFreezeStore::load_issuance_freezes(
+            self.store.as_ref(),
+            &key,
+        )
+        .unwrap_or_else(|error| panic!("load issuance freezes: {error}"))
+        .map_or_else(|| empty_issuance_freeze_snapshot(key.clone()), Ok)
+        .unwrap_or_else(|error| panic!("issuance freeze snapshot: {error}"));
+        ResponseEffectSpec {
+            observed_base_version_hash: issuance_freeze_version_hash(&live)
+                .unwrap_or_else(|error| panic!("live freeze version: {error}")),
+            ..self.freeze_spec(action_id)
+        }
+    }
+
     fn alert_spec(&self) -> ResponseEffectSpec {
         let (canonical_contribution, contribution_hash) =
             canonical(&serde_json::json!({ "channel": "security" }));
@@ -1172,5 +1192,169 @@ fn session_throttles_planned_on_one_base_both_hold() {
         ),
         SharedBaseOutcome::composed(&first, &second),
         "a session throttle planned on the same base must compose with the first and outlive its lift"
+    );
+}
+
+/// Installed effect ids in effect-id order. The store lists contributions by
+/// action first.
+fn capability_set_effect_ids(
+    store: &SqliteSecurityStateStore,
+    key: &CapabilitySetSuspensionKey,
+) -> Vec<String> {
+    let mut ids: Vec<String> =
+        chio_security_types::ports::CapabilitySetSuspensionStore::load_capability_set_suspensions(
+            store, key,
+        )
+        .unwrap_or_else(|error| panic!("load capability-set suspensions: {error}"))
+        .map(|snapshot| {
+            snapshot
+                .contributions
+                .as_slice()
+                .iter()
+                .map(|entry| entry.effect_id.as_str().to_owned())
+                .collect()
+        })
+        .unwrap_or_default();
+    ids.sort();
+    ids
+}
+
+fn capability_set_version(
+    store: &SqliteSecurityStateStore,
+    key: &CapabilitySetSuspensionKey,
+) -> Digest32 {
+    let snapshot =
+        chio_security_types::ports::CapabilitySetSuspensionStore::load_capability_set_suspensions(
+            store, key,
+        )
+        .unwrap_or_else(|error| panic!("load capability-set suspensions: {error}"))
+        .map_or_else(|| empty_capability_set_suspension_snapshot(key.clone()), Ok)
+        .unwrap_or_else(|error| panic!("capability-set snapshot: {error}"));
+    capability_set_suspension_version_hash(&snapshot)
+        .unwrap_or_else(|error| panic!("capability-set version: {error}"))
+}
+
+/// Two plans that suspend one capability set. The executor applies a plan's
+/// lineage freeze and its suspension in separate steps, so the second plan is
+/// built after the first plan's freeze and before its suspension: it observes
+/// the live freeze and the still empty suspension base, and its own freeze
+/// applies before the first suspension does.
+struct SharedCapabilitySet {
+    first_plan: ResponsePlan,
+    first_work: ScheduledWork,
+    second_plan: ResponsePlan,
+    second_work: ScheduledWork,
+    key: CapabilitySetSuspensionKey,
+}
+
+impl SharedCapabilitySet {
+    fn frozen(fixture: &ProductionEffectsFixture, effects: &dyn EffectPort, label: &str) -> Self {
+        let affected = ["capability-child", "capability-root"];
+        let affected_ids = || affected.iter().map(|id| record(*id)).collect::<Vec<_>>();
+        let first_action = format!("production-effects-{label}-first");
+        let second_action = format!("production-effects-{label}-second");
+        let (first_plan, first_work) = fixture.dispatch_with_ttl(
+            &first_action,
+            affected_ids(),
+            vec![
+                fixture.freeze_spec(&first_action),
+                fixture.capability_set_spec(&affected),
+            ],
+            600_000,
+        );
+        let first_freeze = effects
+            .execute(
+                &LeasedEffect {
+                    plan: &first_plan,
+                    work: &first_work,
+                    ordinal: 0,
+                }
+                .request(&format!("{label}-first-freeze")),
+            )
+            .unwrap_or_else(|error| panic!("first lineage freeze: {error}"));
+        assert!(first_freeze.applied);
+        let (second_plan, second_work) = fixture.dispatch_with_ttl(
+            &second_action,
+            affected_ids(),
+            vec![
+                fixture.live_freeze_spec(&second_action),
+                fixture.capability_set_spec(&affected),
+            ],
+            3_600_000,
+        );
+        let second_freeze = effects
+            .execute(
+                &LeasedEffect {
+                    plan: &second_plan,
+                    work: &second_work,
+                    ordinal: 0,
+                }
+                .request(&format!("{label}-second-freeze")),
+            )
+            .map(|result| result.applied)
+            .map_err(|error| error.kind());
+        assert_eq!(
+            second_freeze,
+            Ok(true),
+            "the second plan's freeze observed the live freeze and applies"
+        );
+        let ResponseTarget::CapabilitySet { affected_set_hash } = first_plan
+            .effects
+            .as_slice()
+            .get(1)
+            .unwrap_or_else(|| panic!("first suspension missing"))
+            .target
+        else {
+            panic!("capability-set suspension targets a capability set");
+        };
+        Self {
+            first_plan,
+            first_work,
+            second_plan,
+            second_work,
+            key: CapabilitySetSuspensionKey {
+                tenant_id: tenant(),
+                affected_set_hash,
+            },
+        }
+    }
+
+    fn first(&self) -> LeasedEffect<'_> {
+        LeasedEffect {
+            plan: &self.first_plan,
+            work: &self.first_work,
+            ordinal: 1,
+        }
+    }
+
+    fn second(&self) -> LeasedEffect<'_> {
+        LeasedEffect {
+            plan: &self.second_plan,
+            work: &self.second_work,
+            ordinal: 1,
+        }
+    }
+}
+
+#[test]
+fn capability_set_suspensions_planned_on_one_base_both_hold() {
+    let fixture = ProductionEffectsFixture::new();
+    let effects = fixture.effects();
+    let shared = SharedCapabilitySet::frozen(&fixture, effects.as_ref(), "shared-capability");
+    let (first, second) = (shared.first(), shared.second());
+    let version = || capability_set_version(&fixture.store, &shared.key);
+    let installed = || capability_set_effect_ids(&fixture.store, &shared.key);
+    assert_eq!(
+        shared_base_outcome(
+            effects.as_ref(),
+            &SharedKey {
+                version: &version,
+                installed: &installed,
+            },
+            &first,
+            &second,
+        ),
+        SharedBaseOutcome::composed(&first, &second),
+        "a capability-set suspension planned on the same base must compose with the first and outlive its lift"
     );
 }
