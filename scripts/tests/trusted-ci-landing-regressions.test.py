@@ -1840,5 +1840,126 @@ class AuditEvidenceHeadOriginalRedTests(unittest.TestCase):
         self.assertNotEqual(run.result.returncode, 0)
 
 
+OTHER_PR, OTHER_BASE, OTHER_MERGE = PR + 1, "8" * 40, "6" * 40
+# Observed CI display title when the run-name was absent: GitHub falls back to
+# the pull request title, which the pull request author chooses.
+FALLBACK_TITLE = "fix(ci): bind authenticated qualification and preserve retry failure history"
+
+
+def other_title_failures() -> dict[str, dict]:
+    other_pull = prior_failed_ci_run(OTHER_MERGE, f"CI N={OTHER_PR} E={EVIDENCE} B={BASE} M={OTHER_MERGE}")
+    other_pull["head_branch"] = "evidence-copy"
+    return {"pull-request": other_pull,
+            "base": prior_failed_ci_run(PRIOR_MERGE, f"CI N={PR} E={EVIDENCE} B={OTHER_BASE} M={PRIOR_MERGE}")}
+
+
+def assert_authoritative_history(test: unittest.TestCase, run: dict) -> None:
+    test.assertEqual((run["workflow_id"], run["path"], run["event"], run["head_sha"]),
+                     (CI_WORKFLOW, ".github/workflows/ci.yml", "pull_request", EVIDENCE))
+    test.assertEqual([(side["id"], side["full_name"]) for side in (run["repository"], run["head_repository"])],
+                     [(1195888645, REPOSITORY)] * 2)
+
+
+def publication_fixture(*other_pulls: dict) -> dict:
+    prefix = f"repos/{REPOSITORY}"
+    repository = {"id": 1195888645, "full_name": REPOSITORY}
+    data = bad_ci_fixture()
+    for pull in other_pulls:
+        data[f"{prefix}/pulls/{pull['number']}"] = copy.deepcopy(pull)
+        data[f"{prefix}/pulls"].append(copy.deepcopy(pull))
+        data[f"{prefix}/commits/{EVIDENCE}/pulls"].append(copy.deepcopy(pull))
+    finalizer = {
+        "id": FINALIZER_RUN, "workflow_id": FINALIZER_WORKFLOW, "path": ".github/workflows/enterprise-evidence-finalizer.yml",
+        "display_title": f"Enterprise evidence finalizer N={PR} E={EVIDENCE} M={MERGE} S={SOURCE} K={'1' * 64}",
+        "event": "workflow_dispatch", "head_sha": DEFINITION, "head_branch": "main", "run_attempt": 1,
+        "status": "in_progress", "conclusion": None, "repository": repository, "head_repository": repository,
+        "actor": {"login": "github-actions[bot]"}, "triggering_actor": {"login": "github-actions[bot]"},
+    }
+    data[f"{prefix}/actions/runs/{FINALIZER_RUN}"] = finalizer
+    data[f"{prefix}/actions/runs/{FINALIZER_RUN}/attempts/1"] = copy.deepcopy(finalizer)
+    jobs = [{"id": 800 + offset, "name": name, "run_id": FINALIZER_RUN, "head_sha": DEFINITION,
+             "status": "in_progress" if offset == 4 else "completed", "conclusion": None if offset == 4 else "success"}
+            for offset, name in enumerate((
+                "validate unsigned enterprise Linux capture", "sign committed enterprise Linux migration evidence",
+                "authorize dedicated Security contract publication", "reconcile exact merge authority contexts"), 1)]
+    data[f"{prefix}/actions/runs/{FINALIZER_RUN}/attempts/1/jobs"] = {"total_count": 4, "jobs": jobs}
+    data[f"{prefix}/contents/.github/workflows/enterprise-evidence-finalizer.yml?ref={DEFINITION}"] = {"sha": "5" * 40}
+    return data
+
+
+def publish_five_contexts(data: dict) -> OfflineRun:
+    body = publisher_body()
+    binding = publication_binding()
+    tail = body.index('\nreconcile_bad_ci\nif test "${bad_ci_observed}" = false; then')
+    script = ("set -euo pipefail\nshopt -s inherit_errexit\n" + body[body.index("revalidate_live_publication_head() {"):tail]
+              + "\nreconcile_bad_ci() { bad_ci_observed=false; }\n" + body[tail:])
+    return run_offline_step(script, data, publisher_environment() | {
+        "FINALIZER_RUN_ATTEMPT": "1", "FINALIZER_RUN_ID": str(FINALIZER_RUN),
+        "PUBLICATION_BINDING_DIGEST": hashlib.sha256(binding.encode()).hexdigest(),
+        "publication_details_url": f"https://github.com/{REPOSITORY}/actions/runs/{FINALIZER_RUN}/attempts/1",
+    })
+
+
+def second_pull_request_on_evidence() -> dict:
+    return live_pull_request(number=OTHER_PR, merge=OTHER_MERGE, head_ref="evidence-copy")
+
+
+class PublisherFullHistoryOriginalRedTests(unittest.TestCase):
+    def assert_refused_with_tombstone(self, extra: dict, reason: str) -> None:
+        assert_authoritative_history(self, extra)
+        healthy = reconcile_bad_ci_then_publish(bad_ci_fixture())
+        self.assertIn(PUBLICATION_PROBE, healthy.result.stdout, healthy.result.stderr)
+        run = reconcile_bad_ci_then_publish(bad_ci_fixture(extra))
+        self.assertIn(f"GET repos/{REPOSITORY}/{CI_HISTORY_QUERY}", run.calls)
+        self.assertNotIn(PUBLICATION_PROBE, run.result.stdout, reason)
+        self.assertNotEqual(run.result.returncode, 0)
+        self.assertEqual(len(security_contract_failures(run.data)), 1, run.result.stderr)
+
+    def test_failed_ci_with_a_fallback_title_blocks_publication_for_the_same_evidence(self) -> None:
+        self.assert_refused_with_tombstone(
+            prior_failed_ci_run(PRIOR_MERGE, FALLBACK_TITLE),
+            f"failed CI run {PRIOR_CI_RUN} on the evidence head was dropped from history by its fallback title")
+
+    def test_failed_ci_titled_for_another_pull_request_or_base_blocks_publication(self) -> None:
+        for label, extra in other_title_failures().items():
+            with self.subTest(title=label):
+                self.assert_refused_with_tombstone(
+                    extra, f"failed CI run {PRIOR_CI_RUN} on the evidence head titled for another {label} was ignored")
+
+
+class PublisherSharedHeadOriginalRedTests(unittest.TestCase):
+    def test_publication_refuses_a_second_open_pull_request_on_the_evidence_head(self) -> None:
+        control = publish_five_contexts(publication_fixture())
+        self.assertEqual(control.result.returncode, 0, control.result.stderr)
+        self.assertEqual(len(checks_on(control.data, "Security contract", APP_ID, "success")), 1)
+        self.assertEqual(sum(len(checks_on(control.data, f"Security mirror / {name}", 15368, "success"))
+                             for name, _ in ORDINARY), 4)
+        duplicate = second_pull_request_on_evidence()
+        self.assertEqual((duplicate["state"], duplicate["head"]["sha"], duplicate["head"]["repo"]["id"]),
+                         ("open", EVIDENCE, 1195888645))
+        run = publish_five_contexts(publication_fixture(duplicate))
+        self.assertIn(f"GET repos/{REPOSITORY}/pulls/{PR}", run.calls)
+        self.assertEqual(len(checks_on(run.data, "Security contract", APP_ID, "success")), 0,
+                         f"Security contract was published on {EVIDENCE} while pull request {OTHER_PR} "
+                         "was also open on that head")
+        self.assertNotEqual(run.result.returncode, 0)
+
+    def test_ci_authentication_refuses_a_second_open_pull_request_on_the_evidence_head(self) -> None:
+        control = authenticate_ci(ci_authentication_fixture(), MERGE)
+        self.assertEqual(control.result.returncode, 0, control.result.stderr)
+        self.assertIn(f"ci_run_id={CI_RUN}\n", control.output)
+        prefix = f"repos/{REPOSITORY}"
+        data = ci_authentication_fixture()
+        duplicate = second_pull_request_on_evidence()
+        data[f"{prefix}/pulls/{OTHER_PR}"] = duplicate
+        data[f"{prefix}/pulls"].append(copy.deepcopy(duplicate))
+        data[f"{prefix}/commits/{EVIDENCE}/pulls"].append(copy.deepcopy(duplicate))
+        run = authenticate_ci(data, MERGE)
+        self.assertIn(f"GET {prefix}/pulls/{PR}", run.calls)
+        self.assertNotEqual(run.result.returncode, 0,
+                            f"CI authentication accepted {EVIDENCE} while pull request {OTHER_PR} was also open on that head")
+        self.assertNotIn(f"ci_run_id={CI_RUN}\n", run.output)
+
+
 if __name__ == "__main__":
     unittest.main()
