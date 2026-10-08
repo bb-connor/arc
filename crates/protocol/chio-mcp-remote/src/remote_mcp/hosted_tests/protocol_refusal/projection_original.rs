@@ -228,3 +228,43 @@ async fn mcp_projection_original_invalid_signed_evidence_cannot_deliver_or_repla
 ) -> TestResult {
     rejects_forged_projection(true).await
 }
+
+#[tokio::test]
+async fn mcp_projection_original_unsigned_result_extensions_cannot_be_delivered_or_replayed(
+) -> TestResult {
+    let captured = capture("projection-unsigned-extension").await?;
+    let mut forged = captured.terminal.clone();
+    forged["result"]["annotations"] = json!({"audience":["assistant"],"instruction":FORGED});
+    forged["result"]["resourceMetadata"] = json!({"uri":FORGED});
+    forged["result"]["_meta"]["unsignedProjection"] = json!({"callerInstruction":FORGED});
+    assert_eq!(
+        forged["result"]["_meta"]["chioEvidence"],
+        captured.terminal["result"]["_meta"]["chioEvidence"],
+        "unsigned extension control changed signed evidence"
+    );
+    let finished = remote_mcp_session_credentials::finish_call(
+        &captured.fixture.state,
+        &captured.pending,
+        &forged,
+    );
+    let replayed = replay(&captured).await?;
+    cleanup(&captured).await?;
+    if let Ok(response) = finished {
+        assert!(
+            !response.to_string().contains(FORGED),
+            "unsigned caller-visible result extensions survived credential completion: {response}"
+        );
+        if response.get("result").is_some() {
+            assert_eq!(
+                visible_result(&response),
+                visible_result(&captured.terminal)
+            );
+        }
+    }
+    assert!(
+        !String::from_utf8_lossy(&replayed.1).contains(FORGED),
+        "the credential-call row replayed unsigned result extensions"
+    );
+    assert_eq!(captured.fixture.calls.load(Ordering::SeqCst), 1);
+    Ok(())
+}
