@@ -288,3 +288,48 @@ pub(super) fn completed_capability_remove(
     }
     Ok(Some(command))
 }
+
+pub(super) fn completed_freeze_remove(
+    connection: &Connection,
+    key: &chio_security_types::ports::IssuanceFreezeKey,
+    action: &ActionId,
+    effect: &EffectId,
+    plan_hash: Digest32,
+) -> PortResult<Option<chio_security_types::ports::IssuanceFreezeCommand>> {
+    let Some(marker) = load_marker(
+        connection,
+        &key.tenant_id,
+        ResponseEffectKind::FreezeIssuance,
+        effect,
+    )?
+    else {
+        return Ok(None);
+    };
+    let command = super::issuance_freeze::load_finality_command(
+        connection,
+        key.tenant_id.as_str(),
+        marker.remove_idempotency_key.as_str(),
+    )?
+    .ok_or_else(PortError::integrity_failure)?;
+    let projection = commands::project(
+        command.request.clone(),
+        command.result.clone(),
+        Some(
+            canonical_json_bytes(&command.resulting_snapshot)
+                .map_err(|_| PortError::integrity_failure())?,
+        ),
+    )?;
+    if Marker::from_command(&projection)? != marker {
+        return Err(PortError::integrity_failure());
+    }
+    if marker.action_id != *action
+        || marker.plan_hash != plan_hash
+        || marker.target
+            != (ResponseTarget::Lineage {
+                lineage_id: key.lineage_id.clone(),
+            })
+    {
+        return Ok(None);
+    }
+    Ok(Some(command))
+}

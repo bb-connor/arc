@@ -590,51 +590,6 @@ fn load_pending_release(
     }))
 }
 
-fn load_completed_release(
-    connection: &Connection,
-    key: &IssuanceFreezeKey,
-    action_id: &ActionId,
-    effect_id: &EffectId,
-    plan_hash: Digest32,
-) -> PortResult<Option<IssuanceFreezeCommand>> {
-    let mut statement = connection
-        .prepare(
-            r#"
-            SELECT idempotency_key
-            FROM security_issuance_freeze_commands
-            WHERE tenant_id = ?1 AND lineage_id = ?2
-              AND command_state = ?3 AND action_id = ?4 AND effect_id = ?5
-            ORDER BY idempotency_key
-            "#,
-        )
-        .map_err(sqlite_error)?;
-    let rows = statement
-        .query_map(
-            params![
-                key.tenant_id.as_str(),
-                key.lineage_id.as_str(),
-                COMMAND_COMPLETED,
-                action_id.as_str(),
-                effect_id.as_str()
-            ],
-            |row| row.get::<_, String>(0),
-        )
-        .map_err(sqlite_error)?;
-    let mut completed = None;
-    for row in rows {
-        let idempotency_key = row.map_err(sqlite_error)?;
-        let stored = load_command(connection, key.tenant_id.as_str(), &idempotency_key)?
-            .ok_or_else(PortError::integrity_failure)?;
-        if stored.command.request.operation == EffectOperation::Remove
-            && stored.command.request.plan_hash == plan_hash
-            && completed.replace(stored.command).is_some()
-        {
-            return Err(PortError::integrity_failure());
-        }
-    }
-    Ok(completed)
-}
-
 pub(super) fn load_snapshot(
     connection: &Connection,
     key: &IssuanceFreezeKey,
@@ -1373,8 +1328,19 @@ impl IssuanceFreezeStore for SqliteSecurityStateStore {
         effect_id: &EffectId,
         plan_hash: Digest32,
     ) -> PortResult<Option<IssuanceFreezeCommand>> {
-        let connection = self.connection()?;
-        load_completed_release(&connection, key, action_id, effect_id, plan_hash)
+        let mut connection = self.connection()?;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Deferred)
+            .map_err(sqlite_error)?;
+        let command = super::effect_finality::completed_freeze_remove(
+            &transaction,
+            key,
+            action_id,
+            effect_id,
+            plan_hash,
+        )?;
+        transaction.commit().map_err(sqlite_error)?;
+        Ok(command)
     }
 
     fn maintain_issuance_freeze_fence(

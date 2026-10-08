@@ -457,6 +457,17 @@ impl IssuanceFreezeBackend {
                 entry.action_id == request.action_id && entry.effect_id == request.effect_id
             })
             .cloned();
+        if existing.is_none() {
+            if let Some(command) = self.freezes.load_completed_issuance_freeze_release(
+                &key,
+                &request.action_id,
+                &request.effect_id,
+                request.plan_hash,
+            )? {
+                Self::validate_release_command_binding(request, &key, &command)?;
+                return Err(PortError::conflict());
+            }
+        }
         let fence = self.acquire_or_recover_fence(request, &spec)?;
         let derived_contribution = match Self::contribution(request, &spec, fence.clone()) {
             Ok(contribution) => contribution,
