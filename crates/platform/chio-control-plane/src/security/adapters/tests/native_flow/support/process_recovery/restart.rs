@@ -305,8 +305,17 @@ pub(super) fn verify(
                         realized_cost: None,
                     },
                 );
+                // Recovery races the late report, so the caller-nonce lookup
+                // refuses it as differing from the original reservation, or
+                // as having no reservation or owner once recovery settles.
                 assert!(
-                    matches!(result, Err(KernelError::DurableAdmission(ref reason)) if reason.contains("caller")),
+                    matches!(
+                        result.as_ref().map_err(KernelError::durable_admission),
+                        Err(Some(chio_kernel::DurableAdmissionError::Refused(reason)))
+                            if reason == "caller nonce differs from its original operation-owned reservation"
+                                || reason == "original caller nonce reservation is absent"
+                                || reason == "no original caller operation owns this nonce"
+                    ),
                     "late caller transport must be rejected: {result:?}"
                 );
                 worker
@@ -529,7 +538,11 @@ fn caller_lookup_waits_for_original_coordinator(
             "caller lookup bypassed the original mutation sequencer"
         );
         assert!(
-            matches!(result, Err(KernelError::DurableAdmission(ref reason)) if reason.contains("caller")),
+            matches!(
+                result.as_ref().map_err(KernelError::durable_admission),
+                Err(Some(chio_kernel::DurableAdmissionError::Refused(reason)))
+                    if reason == "caller nonce differs from its original operation-owned reservation"
+            ),
             "queued native caller report must still be refused: {result:?}"
         );
         Ok(())

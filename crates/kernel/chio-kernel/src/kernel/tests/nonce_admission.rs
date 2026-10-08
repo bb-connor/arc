@@ -182,3 +182,33 @@ fn nonce_admission_reservation_rejects_unsupported_schema_before_consumption() -
     assert!(!consumed(&kernel, &request)?);
     Ok(())
 }
+
+#[test]
+fn nonce_at_its_expiry_is_a_typed_admission_refusal() -> TestResult {
+    use crate::kernel::admission_coordinator::require_live_nonce;
+
+    let (_, request) = prepared_request();
+    let nonce = request
+        .execution_nonce
+        .as_ref()
+        .ok_or("test minted an execution nonce")?;
+    let expires_at_ms = u64::try_from(nonce.expires_at())?
+        .checked_mul(1_000)
+        .ok_or("expiry overflow")?;
+    let live_until_ms = expires_at_ms.checked_sub(1_000).ok_or("expiry underflow")?;
+    assert!(matches!(require_live_nonce(nonce, live_until_ms), Ok(())));
+    let refused = require_live_nonce(nonce, expires_at_ms);
+    assert!(
+        matches!(
+            refused.as_ref().map_err(KernelError::durable_admission),
+            Err(Some(crate::DurableAdmissionError::Refused(reason)))
+                if reason == "execution nonce expired"
+        ),
+        "{refused:?}"
+    );
+    assert!(matches!(
+        refused.as_ref().map_err(KernelError::disposition),
+        Err(crate::Disposition::Deny)
+    ));
+    Ok(())
+}

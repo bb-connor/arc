@@ -158,8 +158,12 @@ fn a_nonce_of_an_unreserved_operation_cannot_reconcile() -> TestResult {
     assert!(
         matches!(
             &refused,
-            Err(chio_kernel::KernelError::DurableAdmission(reason))
-                if reason == "original caller nonce reservation is absent"
+            Err(chio_kernel::KernelError::Admission(error))
+                if matches!(
+                    &**error,
+                    chio_kernel::DurableAdmissionError::Refused(reason)
+                        if reason == "original caller nonce reservation is absent"
+                )
         ),
         "{refused:?}"
     );

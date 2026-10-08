@@ -29,7 +29,7 @@ impl DurableToolAdmission {
         grant_index: usize,
     ) -> Result<AdmissionNoncePreflightIdentityV1, KernelError> {
         let grant_index = u32::try_from(grant_index).map_err(|_| {
-            KernelError::DurableAdmission("nonce preflight grant index exceeds u32".to_owned())
+            KernelError::admission_record("nonce preflight grant index exceeds u32")
         })?;
         AdmissionNoncePreflightIdentityV1::for_operation(&self.operation, grant_index)
             .map_err(KernelError::from)
@@ -45,9 +45,7 @@ impl DurableToolAdmission {
 
     fn retained_request(&self) -> Result<&RetainedToolAdmissionRequestV1, KernelError> {
         self.retained_request.as_ref().ok_or_else(|| {
-            KernelError::DurableAdmission(
-                "nonce operation lost its retained original request".to_owned(),
-            )
+            KernelError::admission_record("nonce operation lost its retained original request")
         })
     }
 }
@@ -64,10 +62,10 @@ impl ChioKernel {
     ) -> Result<(), KernelError> {
         let operation = admission.operation();
         let original = admission.original_retained_request().ok_or_else(|| {
-            KernelError::DurableAdmission("bound nonce lost its original request".into())
+            KernelError::admission_record("bound nonce lost its original request")
         })?;
         let issued = admission.issued_execution_nonce().ok_or_else(|| {
-            KernelError::DurableAdmission("bound nonce lost its original issuance".into())
+            KernelError::admission_record("bound nonce lost its original issuance")
         })?;
         if operation.state() != AdmissionOperationState::CapturePending
             || !operation.binding().participant_requirements().approval
@@ -78,8 +76,8 @@ impl ChioKernel {
             || request.execution_nonce.as_ref() != Some(issued.signed_nonce())
             || operation.execution_nonce_id() != Some(issued.nonce_id())
         {
-            return Err(KernelError::DurableAdmission(
-                "bound nonce time differs from its original operation".into(),
+            return Err(KernelError::admission_record(
+                "bound nonce time differs from its original operation",
             ));
         }
         let runtime = self.durable_runtime()?;
@@ -92,11 +90,11 @@ impl ChioKernel {
             )
             .map_err(durable_store_error)?
             .ok_or_else(|| {
-                KernelError::DurableAdmission("bound nonce physical reservation is absent".into())
+                KernelError::admission_record("bound nonce physical reservation is absent")
             })?;
         if physical.canonical_bytes() != issued.canonical_bytes() {
-            return Err(KernelError::DurableAdmission(
-                "bound nonce changed its exact physical reservation".into(),
+            return Err(KernelError::admission_record(
+                "bound nonce changed its exact physical reservation",
             ));
         }
         issued
@@ -125,13 +123,13 @@ impl ChioKernel {
             return Ok(false);
         };
         if !config.require_nonce {
-            return Err(KernelError::DurableAdmission(
-                "durable execution nonces require strict issuance".to_owned(),
+            return Err(KernelError::admission_unsupported(
+                "durable execution nonces require strict issuance",
             ));
         }
         if !capabilities.execution_nonce_participant {
-            return Err(KernelError::DurableAdmission(
-                "admission store lacks the operation-owned execution nonce participant".to_owned(),
+            return Err(KernelError::admission_unsupported(
+                "admission store lacks the operation-owned execution nonce participant",
             ));
         }
         Ok(true)
@@ -148,24 +146,27 @@ impl ChioKernel {
         trusted_now_unix_ms: u64,
     ) -> Result<Option<AdmissionExecutionNonceReservationV1>, KernelError> {
         let Some(presented) = presented else {
-            if operation.state() != AdmissionOperationState::Prepared {
-                return Err(KernelError::DurableAdmission(format!(
-                    "execution nonce preflight cannot replay an operation in state {:?}",
-                    operation.state()
-                )));
+            let state = operation.state();
+            if state != AdmissionOperationState::Prepared {
+                return Err(KernelError::admission_state(
+                    state,
+                    format!(
+                        "execution nonce preflight cannot replay an operation in state {state:?}"
+                    ),
+                ));
             }
             return Ok(None);
         };
         let issued = self
             .load_durable_nonce_issuance(operation, trusted_now_unix_ms)?
             .ok_or_else(|| {
-                KernelError::DurableAdmission(
-                    "presented execution nonce was never issued for this request".to_owned(),
+                KernelError::admission_refused(
+                    "presented execution nonce was never issued for this request",
                 )
             })?;
         if issued.signed_nonce() != presented {
-            return Err(KernelError::DurableAdmission(
-                "presented execution nonce does not match its retained issuance".to_owned(),
+            return Err(KernelError::admission_refused(
+                "presented execution nonce does not match its retained issuance",
             ));
         }
         // The issuance lifetime bounds the window between preflight and the
@@ -216,8 +217,8 @@ impl ChioKernel {
             )
             .map_err(durable_store_error)?
             .ok_or_else(|| {
-                KernelError::DurableAdmission(
-                    "nonce preflight ownership disappeared from the admission store".to_owned(),
+                KernelError::admission_record(
+                    "nonce preflight ownership disappeared from the admission store",
                 )
             })
             .map(Some)
@@ -258,8 +259,8 @@ impl ChioKernel {
         let _mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
         if request.authority.as_ref() != Some(&runtime.authority()) {
-            return Err(KernelError::DurableAdmission(
-                "nonce preflight authority does not match the admission fence".to_owned(),
+            return Err(KernelError::admission_invariant(
+                "nonce preflight authority does not match the admission fence",
             ));
         }
         let expected = admission.operation.clone();
@@ -272,33 +273,33 @@ impl ChioKernel {
                 request,
                 trusted_now_unix_ms,
             )
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+            .map_err(KernelError::admission)?;
         if operation.binding() != expected.binding()
             || operation.state() != AdmissionOperationState::Prepared
         {
-            return Err(KernelError::DurableAdmission(
-                "nonce preflight authorization changed the immutable operation".to_owned(),
+            return Err(KernelError::admission_invariant(
+                "nonce preflight authorization changed the immutable operation",
             ));
         }
         match &decision {
             BudgetAuthorizeHoldDecision::Authorized(_)
             | BudgetAuthorizeHoldDecision::ApprovalRequired(_) => {
                 if operation.execution_nonce_preflight_digest().is_none() {
-                    return Err(KernelError::DurableAdmission(
-                        "nonce preflight authorization returned no ownership".to_owned(),
+                    return Err(KernelError::admission_invariant(
+                        "nonce preflight authorization returned no ownership",
                     ));
                 }
             }
             BudgetAuthorizeHoldDecision::Denied(_) => {
                 if operation != expected {
-                    return Err(KernelError::DurableAdmission(
-                        "denied nonce preflight mutated its operation".to_owned(),
+                    return Err(KernelError::admission_invariant(
+                        "denied nonce preflight mutated its operation",
                     ));
                 }
             }
             BudgetAuthorizeHoldDecision::AlreadyCaptured(_) => {
-                return Err(KernelError::DurableAdmission(
-                    "nonce preflight cannot adopt captured budget".to_owned(),
+                return Err(KernelError::admission_record(
+                    "nonce preflight cannot adopt captured budget",
                 ));
             }
         }
@@ -322,23 +323,23 @@ impl ChioKernel {
         }
         let identity = recovery.identity();
         if identity.parent_operation_id() != operation.binding().operation_id() {
-            return Err(KernelError::DurableAdmission(
-                "nonce preflight recovery names another operation".to_owned(),
+            return Err(KernelError::admission_record(
+                "nonce preflight recovery names another operation",
             ));
         }
         let hold_id = identity.hold_id().as_str().to_owned();
         let snapshot = self
             .with_budget_store(|store| Ok(store.get_budget_hold(&hold_id)?))?
             .ok_or_else(|| {
-                KernelError::DurableAdmission(
-                    "nonce preflight hold is absent from the budget authority".to_owned(),
+                KernelError::admission_record(
+                    "nonce preflight hold is absent from the budget authority",
                 )
             })?;
         if snapshot.capability_id != operation.binding().capability_id().as_str()
             || usize::try_from(identity.grant_index()) != Ok(snapshot.grant_index)
         {
-            return Err(KernelError::DurableAdmission(
-                "nonce preflight hold belongs to another grant".to_owned(),
+            return Err(KernelError::admission_record(
+                "nonce preflight hold belongs to another grant",
             ));
         }
         if !snapshot.disposition.is_open() {
@@ -372,8 +373,8 @@ impl ChioKernel {
         trusted_now_unix_ms: u64,
     ) -> Result<Box<SignedExecutionNonce>, KernelError> {
         let config = self.execution_nonce_config.as_ref().ok_or_else(|| {
-            KernelError::DurableAdmission(
-                "execution nonce configuration disappeared before issuance".to_owned(),
+            KernelError::admission_unsupported(
+                "execution nonce configuration disappeared before issuance",
             )
         })?;
         let runtime = self.durable_runtime()?;
@@ -406,18 +407,19 @@ impl ChioKernel {
             self.load_durable_nonce_issuance(&admission.operation, trusted_now_unix_ms)?
         {
             require_live_nonce(issued.signed_nonce(), trusted_now_unix_ms).map_err(|_| {
-                KernelError::DurableAdmission(
-                    "retained execution nonce expired; retry with a fresh request".to_owned(),
+                KernelError::admission_refused(
+                    "retained execution nonce expired; retry with a fresh request",
                 )
             })?;
             admission.issued_nonce = Some(issued.clone());
             return Ok(Box::new(issued.signed_nonce().clone()));
         }
-        if admission.operation.state() != AdmissionOperationState::Prepared {
-            return Err(KernelError::DurableAdmission(format!(
-                "execution nonce issuance requires a Prepared operation, found {:?}",
-                admission.operation.state()
-            )));
+        let state = admission.operation.state();
+        if state != AdmissionOperationState::Prepared {
+            return Err(KernelError::admission_state(
+                state,
+                format!("execution nonce issuance requires a Prepared operation, found {state:?}"),
+            ));
         }
         let expected = admission.operation.clone();
         let reservation = AdmissionExecutionNonceReservationV1::mint_for_operation(
@@ -453,8 +455,8 @@ impl ChioKernel {
             || operation.state() != AdmissionOperationState::Prepared
             || operation.execution_nonce_issuance_digest() != Some(&digest)
         {
-            return Err(KernelError::DurableAdmission(
-                "execution nonce issuance changed the immutable operation".to_owned(),
+            return Err(KernelError::admission_invariant(
+                "execution nonce issuance changed the immutable operation",
             ));
         }
         admission.operation = operation;
@@ -474,9 +476,8 @@ impl ChioKernel {
         trusted_now_unix_ms: u64,
     ) -> Result<(), KernelError> {
         let issued = admission.issued_nonce.clone().ok_or_else(|| {
-            KernelError::DurableAdmission(
-                "execution nonce operation reached reservation without a verified issuance"
-                    .to_owned(),
+            KernelError::admission_invariant(
+                "execution nonce operation reached reservation without a verified issuance",
             )
         })?;
         let runtime = self.durable_runtime()?;
@@ -512,8 +513,8 @@ impl ChioKernel {
                 || operation.state() != AdmissionOperationState::ReadyToDispatch
                 || operation.execution_nonce_id() != Some(issued.nonce_id())
             {
-                return Err(KernelError::DurableAdmission(
-                    "execution nonce reservation changed the immutable operation".to_owned(),
+                return Err(KernelError::admission_invariant(
+                    "execution nonce reservation changed the immutable operation",
                 ));
             }
             admission.operation = operation;
@@ -522,10 +523,11 @@ impl ChioKernel {
             admission.operation.state(),
             AdmissionOperationState::ReadyToDispatch | AdmissionOperationState::CapturePending
         ) {
-            return Err(KernelError::DurableAdmission(format!(
-                "execution nonce reservation cannot start from state {:?}",
-                admission.operation.state()
-            )));
+            let state = admission.operation.state();
+            return Err(KernelError::admission_state(
+                state,
+                format!("execution nonce reservation cannot start from state {state:?}"),
+            ));
         }
         Ok(())
     }
@@ -581,7 +583,7 @@ impl ChioKernel {
             .load_retained_tool_request_by_execution_nonce(&selector, &runtime.fence, now)
             .map_err(durable_store_error)?
             .ok_or_else(|| {
-                KernelError::DurableAdmission("no original caller operation owns this nonce".into())
+                KernelError::admission_refused("no original caller operation owns this nonce")
             })?;
         let original_nonce = runtime
             .store
@@ -592,7 +594,7 @@ impl ChioKernel {
             )
             .map_err(durable_store_error)?
             .ok_or_else(|| {
-                KernelError::DurableAdmission("original caller nonce reservation is absent".into())
+                KernelError::admission_refused("original caller nonce reservation is absent")
             })?;
         original_nonce
             .require_operation_bound_profile()
@@ -604,8 +606,8 @@ impl ChioKernel {
                 .provider_attempt()
                 .is_some_and(super::is_caller_report_attempt)
         {
-            return Err(KernelError::DurableAdmission(
-                "caller nonce differs from its original operation-owned reservation".into(),
+            return Err(KernelError::admission_refused(
+                "caller nonce differs from its original operation-owned reservation",
             ));
         }
         self.validate_original_authority_profile(&retained)?;
@@ -667,18 +669,18 @@ impl ChioKernel {
             if operation.binding() != expected.binding()
                 || operation.state() != AdmissionOperationState::CapturePending
             {
-                return Err(KernelError::DurableAdmission(
-                    "execution nonce capture preparation changed the immutable operation"
-                        .to_owned(),
+                return Err(KernelError::admission_invariant(
+                    "execution nonce capture preparation changed the immutable operation",
                 ));
             }
             admission.operation = operation;
         }
-        if admission.operation.state() != AdmissionOperationState::CapturePending {
-            return Err(KernelError::DurableAdmission(format!(
-                "execution nonce capture cannot start from state {:?}",
-                admission.operation.state()
-            )));
+        let state = admission.operation.state();
+        if state != AdmissionOperationState::CapturePending {
+            return Err(KernelError::admission_state(
+                state,
+                format!("execution nonce capture cannot start from state {state:?}"),
+            ));
         }
         Ok(())
     }
@@ -690,9 +692,7 @@ pub(crate) fn require_live_nonce(
 ) -> Result<(), KernelError> {
     let now = i64::try_from(trusted_now_unix_ms / 1_000).unwrap_or(i64::MAX);
     if now >= nonce.expires_at() {
-        return Err(KernelError::DurableAdmission(
-            "execution nonce expired".to_owned(),
-        ));
+        return Err(KernelError::admission_refused("execution nonce expired"));
     }
     Ok(())
 }
