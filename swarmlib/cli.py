@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import argparse
 import os
+import subprocess
 import sys
 from pathlib import Path
 
-from . import agents, board, build, ci, claims, clock, gitio, items, lifecycle, merge, metrics, msgs, reviews, secrets, worktree
+from . import agents, board, build, ci, claims, clock, gitio, items, lifecycle, merge, metrics, msgs, reviews, secrets, train, worktree
 from .store import Store, SwarmError, halt, record, resume, set_config
 
 
@@ -244,6 +245,28 @@ def cmd_merge(store: Store, a: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_check_train(store: Store, a: argparse.Namespace) -> int:
+    store.sync()
+    host = store.config()["train_host"]
+    args = (["--land"] if a.land else []) + (["--max-lanes", str(a.max_lanes)] if a.max_lanes else [])
+    if host and host != os.environ.get("SWARM_MACHINE", "") and not a.local:
+        return subprocess.call(train.remote_command(host, agent=store.agent, role=store.role, vendor=store.vendor, args=args))
+    result = train.run_train(
+        store, repo=_env_path("SWARM_REPO", "~/backbay/arc"), lanes_dir=_env_path("SWARM_LANES", "~/lanes/swarm"),
+        repo_url=worktree.repo_url(), land=a.land, ci_runner=ci.default_runner if a.land else None,
+        max_lanes=a.max_lanes,
+    )
+    print(f"train {result.train_id} on {result.base[:12] or '-'}: green {result.green or '-'}, red {result.red or '-'}, "
+          f"conflicted {result.conflicted or '-'}")
+    if result.landed:
+        print(f"landed {result.landed[:12]}")
+    for line in result.loose:
+        print(f"unattributed: {line}")
+    if result.note:
+        print(result.note)
+    return 1 if result.loose else 0
+
+
 def cmd_scan(store: Store, a: argparse.Namespace) -> int:
     dirty = False
     for name in a.files:
@@ -428,6 +451,12 @@ def parser() -> argparse.ArgumentParser:
     s = sub.add_parser("merge", help="integrator/conductor: merge a PR that passes the merge gate")
     s.add_argument("pr", type=int)
     s.set_defaults(fn=cmd_merge)
+
+    s = sub.add_parser("check-train", help="integrator/conductor: verify submitted lanes in one build; --land pushes")
+    s.add_argument("--land", action="store_true", help="push the train when every lane is green (integrator only)")
+    s.add_argument("--max-lanes", type=int)
+    s.add_argument("--local", action="store_true", help="run here even if config train_host names another host")
+    s.set_defaults(fn=cmd_check_train)
 
     s = sub.add_parser("scan", help="check files for credential-shaped strings")
     s.add_argument("files", nargs="+")

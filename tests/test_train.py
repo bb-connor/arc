@@ -96,6 +96,22 @@ class AttributionTest(unittest.TestCase):
         self.assertEqual(loose, ["E3"])  # C never merged, so it is never blamed
 
 
+class RemoteCommandTest(unittest.TestCase):
+    def test_reruns_itself_on_the_train_host_with_the_callers_identity(self):
+        command = train.remote_command("builder", agent="codex-ws2-integrator", role="integrator", vendor="codex",
+                                       args=["--land", "--max-lanes", "6"])
+        self.assertEqual(command[:4], ["ssh", "-o", "BatchMode=yes", "builder"])
+        script = command[4]
+        self.assertIn(". ~/.swarm/env", script)
+        self.assertIn("SWARM_AGENT=codex-ws2-integrator", script)
+        self.assertIn("SWARM_ROLE=integrator", script)
+        self.assertTrue(script.endswith("~/.local/bin/swarm check-train --local --land --max-lanes 6"))
+
+    def test_hostile_arguments_stay_quoted(self):
+        script = train.remote_command("builder", agent="a", role="integrator", vendor="codex", args=["$(rm -rf ~)"])[4]
+        self.assertIn("'$(rm -rf ~)'", script)
+
+
 class ComposeTest(WorkspaceCase):
     def test_merges_clean_lanes_and_reports_conflicts(self):
         self.push_lane("lane/A-a", {"crates/a/src/lib.rs": "pub fn a() -> u32 {\n    10\n}\n"})
@@ -295,6 +311,13 @@ class RunTrainTest(WorkspaceCase):
             self.run_train(refuse)
         self.assertEqual([self.status(i) for i in "ABC"], ["submitted", "submitted", "submitted"])
         self.assertEqual(list((self.tmp / "lanes").glob("train-*")), [])
+    def test_integrator_can_resubmit_a_lane_it_fixed_in_place(self):
+        self.push_lane("lane/A-a", {"crates/a/src/lib.rs": "pub fn a() -> u32 {\n    10\n}\n"})
+        self.submitted("A", "lane/A-a", "codex-ws2-worker1")
+        self.run_train(FakeCargo(errors={"check": [("crates/a/src/lib.rs", "E0308")]}))
+        from swarmlib import lifecycle
+        lifecycle.status(self.integrator, "A", "submitted", "integrator fixed the type error in place")
+        self.assertEqual(self.status("A"), "submitted")
 
     def test_max_lanes_caps_the_train_by_severity(self):
         self.lanes_abc()

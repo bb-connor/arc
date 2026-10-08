@@ -33,7 +33,7 @@ DEFAULTS: dict = {
 # The conductor may make any move.
 TRANSITIONS: dict[tuple[str, str], frozenset[str]] = {
     ("claimed", "in-progress"): frozenset({"owner"}),
-    ("in-progress", "submitted"): frozenset({"owner"}),
+    ("in-progress", "submitted"): frozenset({"owner", "integrator"}),  # integrator: fixed in place
     ("submitted", "ready"): frozenset({"integrator"}),
     ("submitted", "integrated"): frozenset({"integrator"}),
     ("submitted", "in-progress"): frozenset({"integrator"}),

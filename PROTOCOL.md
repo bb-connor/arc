@@ -19,12 +19,17 @@ Every agent reads this at startup. It is short on purpose. The design is
 3. Test first: a regression test that fails, then the fix, then focused tests
    and strict Clippy for the owning crate, through `swarm build -- ...`.
    Linux x86_64-only tests run through `swarm ci <ID> --packages <crate>`.
-4. One commit series per item on its `lane/<ID>-<slug>` branch, conventional
-   messages naming the item ID. `swarm submit <ID>` pushes and requests review.
-5. Reviews are cross-vendor. A reviewer records exactly one verdict with
-   `swarm verdict`. More than two rounds of changes blocks the item.
-6. Only the integrator merges into `integration/beta-next`, in batches, and
-   never pushes while a full CI run is in progress unless the push fixes it.
+4. One commit per fix, containing the code and its regression test, on the
+   item's `lane/<ID>-<slug>` branch, with a conventional message naming the
+   item ID. `swarm submit <ID>` pushes the lane and marks it `submitted`.
+5. Check trains, not per-item reviews: the integrator's `swarm check-train`
+   builds every submitted lane in one pass. A failing or conflicting lane comes
+   back `in-progress` with the exact error; a green one becomes `ready`, and is
+   `integrated` when the train lands. Reviews are batched: one cross-vendor
+   whole-PR review per pushed head (`swarm review-pr`).
+6. Only the integrator lands on `integration/beta-next`, through
+   `swarm check-train --land`, which will not push while CI is running. The
+   integrator fixes small integration breaks in place rather than bouncing them.
 7. Only the integrator or the conductor merges to `main`, and only with `swarm merge`. Its gate
    requires, on the PR's head commit: the four required checks green, a completed Codex review,
    no open P0-P2 review-bot finding (fixed, or `wontfix` with a recorded reason), and an accepted

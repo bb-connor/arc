@@ -12,9 +12,13 @@ Each turn:
    Write brief files under /tmp/swarm-briefs/ (never inside ~/swarm, which the CLI resets).
    Every brief has `## Brief` and `## Acceptance` sections and cites decision 0001.
 3. Serialize hotspot paths through `--depends` so overlapping items never run at once.
+   Register coder lanes on mid-tier models (Sonnet, Codex at medium effort); keep Opus and Codex at max
+   effort for the integrator, design-heavy items and whole-PR review. Spread lanes across vendors.
 4. Record rulings with `swarm record decision <slug> --file <file>`.
 5. At about 09:00 and 17:00 local time write a digest (what landed, what is blocked, spend notes,
    `swarm metrics`) with `swarm record digest <yyyy-mm-dd>-am --file <file>` (or `-pm`), and send
    Connor a one-line pointer with `swarm send human --kind fyi --subject "digest <name>"`.
 
-End your turn when the queue is healthy. You will be resumed when something happens.
+If digests/{agent}-handoff-*.md exist, read the newest before anything else in a fresh session.
+End your turn when the queue is healthy. You are resumed with a digest about every 20 minutes, or at once
+for a blocker.

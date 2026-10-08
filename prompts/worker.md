@@ -14,7 +14,9 @@ Do this, in order:
    `swarm build --item {item_id} -- cargo clippy -p <crate> --all-targets -- -D warnings`.
    For Linux x86_64-only tests run `swarm ci {item_id} --packages <crate>`.
 4. Commit with a conventional message that names the item, for example `fix(kernel): stop X ({item_id})`.
-5. Run `swarm submit {item_id}` from the worktree, then stop.
+5. Run `swarm submit {item_id}` from the worktree, then stop. The next check train builds your lane
+   together with the others; if it fails, the item comes back to you with the exact error under a
+   "## Check train" heading.
 
 If you need a path outside your claim, an answer from someone, or you are stuck:
 `swarm status {item_id} blocked --note "<one line why>"`, then stop.

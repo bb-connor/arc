@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
@@ -148,6 +149,15 @@ class TrainResult:
     conflicted: list[str] = field(default_factory=list)
     loose: list[str] = field(default_factory=list)
     note: str = ""
+
+
+def remote_command(host: str, *, agent: str, role: str, vendor: str, args: list[str]) -> list[str]:
+    """ssh argv that reruns `swarm check-train` on the train host as the same agent."""
+    exports = " ".join(f"{k}={shlex.quote(v)}" for k, v in
+                       (("SWARM_AGENT", agent), ("SWARM_ROLE", role), ("SWARM_VENDOR", vendor)))
+    rest = " ".join(shlex.quote(arg) for arg in args)
+    script = f"set -a; . ~/.swarm/env; set +a; export {exports}; exec ~/.local/bin/swarm check-train --local {rest}"
+    return ["ssh", "-o", "BatchMode=yes", host, script.rstrip()]
 
 
 def slot_runner(command: list[str], cwd: Path, log: Path) -> tuple[int, str]:

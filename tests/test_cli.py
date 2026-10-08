@@ -45,6 +45,9 @@ class CLITest(SwarmCase):
         refused = self.run_cli(worker, "review-pr", "1200")
         self.assertEqual(refused.returncode, 2)
         self.assertIn("only the integrator or the conductor requests a whole-PR review", refused.stderr)
+        refused = self.run_cli(worker, "check-train")
+        self.assertEqual(refused.returncode, 2)
+        self.assertIn("only the integrator or the conductor runs check trains", refused.stderr)
         recorded = self.run_cli(conductor, "record", "decision", "pilot-roster", "--file", str(brief))
         self.assertEqual((recorded.returncode, recorded.stdout.strip()), (0, "decisions/0001-pilot-roster.md"))
 
