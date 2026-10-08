@@ -21037,6 +21037,9 @@
     "crates/protocol/chio-mcp-adapter/src/fuzz.rs": [
       "fuzz_mcp_envelope_parse::shared-reader::crates/protocol/chio-mcp-adapter/src/framing.rs::read_jsonrpc_frame"
     ],
+    "crates/protocol/chio-mcp-edge/src/fuzz.rs": [
+      "fuzz_mcp_envelope_decode::shared-reader::crates/protocol/chio-mcp-edge/src/ingress.rs::decode_mcp_request"
+    ],
     "crates/protocol/chio-mcp-edge/src/ingress.rs": [
       "decode_mcp_request::original-json-reader::UntrustedJsonText"
     ],
