@@ -1931,7 +1931,19 @@
     {"path":"docs/security/audits/native-attachment-diagnostic-20261008.json","commit":"24e97760481275a824a3572bab1b8eed24da5b63","sha256":"90bffa7e29b954c759691c53652128dfa5a254ee6d99fc94bc8afc89b1a2078f","requirement_ids":["incoming-pr1160-review-20261008:native:MINISW-PDEATH","incoming-pr1160-review-20261008:native:MINISW-NATIVE-DENY","incoming-pr1160-review-20261008:native:BROKER-SELECT"]},
     {"path":"docs/security/audits/review-reconciliation-obligations-20261008.json","commit":"b6d38fceca3951c2f6900c0c3e83372b426a5e3a","sha256":"6a445336bfa8184168a334ba9ac549e054b8a2c01f40bc42bfbc702971e08fcf","requirement_ids":["incoming-pr1160-review-20261008:reconciliation:MCP-RESERVE","incoming-pr1160-review-20261008:reconciliation:MCP-PROJECTION","incoming-pr1160-review-20261008:reconciliation:MCP-GENERATION","incoming-pr1160-review-20261008:reconciliation:FX-CLOCK","incoming-pr1160-review-20261008:reconciliation:EF-FINALITY","incoming-pr1160-review-20261008:reconciliation:EF-FREEZE"]},
     {"path":"docs/security/audits/repair-batch-local-checkpoint-20261008.json","commit":"ebdf52364cbafed33bd04e17c25be57ab055755b","sha256":"6e3781eb1b9e8eeb56f7d31ad10ef2cb9bd609bf7013c1477e998326a16a21b9","requirement_ids":["incoming-pr1160-review-20261006:F016","incoming-pr1160-review-20261007:resume:F016-TC","incoming-pr1160-review-20261006:F042","incoming-pr1160-review-20261007:resume:F042-CURRENT","incoming-pr1160-review-20261006:F044","incoming-pr1160-review-20261007:resume:F044-CURRENT","incoming-pr1160-review-20261007:resume:TEARDOWN-TTL","incoming-pr1160-review-20261007:resume:PG-HISTORY","incoming-pr1160-review-20261008:native:BROKER-SELECT","incoming-pr1160-review-20261008:reconciliation:MCP-RESERVE","incoming-pr1160-review-20261008:reconciliation:MCP-GENERATION","incoming-pr1160-review-20261008:reconciliation:MCP-PROJECTION","incoming-pr1160-review-20261008:reconciliation:FX-CLOCK","incoming-pr1160-review-20261007:resume:MINISW-ATTACH","incoming-pr1160-review-20261008:native:MINISW-PDEATH","incoming-pr1160-review-20261008:native:MINISW-NATIVE-DENY","incoming-pr1160-review-20261007:effects:durable-plan-binding","incoming-pr1160-review-20261008:reconciliation:EF-FINALITY","incoming-pr1160-review-20261008:reconciliation:EF-FREEZE","incoming-pr1160-review-20261008:reconciliation:EF-REPLAY"]}
-  ],
+  ,
+{
+  "path": "docs/security/audits/fixture-correction-checkpoint-20261008.json",
+  "commit": "a43226e8e4af96f96fb3a768047796891e0a06cb",
+  "sha256": "72540d5201a1c396a60b4a6051247ca0908ab32276ef2fb6b11dc83bd214cd11",
+  "requirement_ids": [
+    "incoming-pr1160-review-20261008:reconciliation:MCP-PROJECTION",
+    "incoming-pr1160-review-20261008:native:BROKER-SELECT",
+    "incoming-pr1160-review-20261007:effects:durable-plan-binding",
+    "incoming-pr1160-review-20261008:reconciliation:EF-REPLAY"
+  ]
+}
+],
   "pull_requests": [
     {
       "number": 1173,
@@ -130063,62 +130075,74 @@
       ]
     },
     "incoming-pr1160-review-20261007:effects:durable-plan-binding": {
-      "requirement_id": "incoming-pr1160-review-20261007:effects:durable-plan-binding",
-      "label": "effects:durable-plan-binding",
-      "requirement": "Verify exact durable plan binding for every effect execute/readback",
-      "historical_source_identity": {
-        "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007.json",
-        "line": 385,
-        "line_sha256": "23a348238502eb1bbf9206730d11f99ced3993757e60e62561ab3bb33995cda4",
-        "checkpoint": "89d79ac6ab79de5d55b99a7c8ec611bc8b021cb2",
-        "reviewed_source": "7cf5ce39ee4f46d411257e1ab40e18b94eea3758"
-      },
-      "scope": "now",
-      "landing_pr": 1160,
-      "landing_unit": "foundation",
-      "current_state": "source-integrated-missing-authority-original-red-composed-green-pending",
-      "source_repair": {
-        "commits": [
-          "ba6e6fd8224b148d0c91ac6cb98e6d9eda59f513"
-        ],
-        "observed_source": "34443073624f6ee016d1c2599faeb2aefbb3a1cb",
-        "scope": "Source integration; exact runtime campaigns below retain their own source SHAs and limited acceptance."
-      },
-      "source_integrated": true,
-      "focused_green": false,
-      "owning_pending": true,
-      "native_pending": true,
-      "trusted_pending": true,
-      "hosted_pending": true,
-      "merged": false,
-      "full_qualified": false,
-      "verification_evidence": [
-        {
-          "path": "docs/security/audits/repair-batch-local-checkpoint-20261008.json",
-          "sha256": "6e3781eb1b9e8eeb56f7d31ad10ef2cb9bd609bf7013c1477e998326a16a21b9",
-          "scope": "Per-campaign source/binary/log receipts, preserving failing Original/setup/fixture records separately. Current whole-candidate acceptance remains open."
-        }
-      ],
-      "remaining_acceptance": [
-        "Complete effect finality, same-lineage freeze and authenticated historical result-query repairs with Original and preservation controls.",
-        "Complete MCP genuine-v2 positive fixture and extra broker integrity controls; fresh owning and strict checks for the composed source.",
-        "Measure and qualify actual production native trajectory with eight receipts, the unchanged10000ms fence and current enforcing artifacts; bounded journal tests do not establish this.",
-        "Finish F077 protected merge/App/ruleset evidence, current independent review, default/PQ/platform/cold/trusted/hosted checks and protected landing."
-      ],
-      "previous_checkpoint_state": "confirmed-review-obligation-pending-integration-and-final-acceptance",
-      "state": "source-integrated-missing-authority-original-red-composed-green-pending",
-      "source_checkpoint": "34443073624f6ee016d1c2599faeb2aefbb3a1cb",
-      "audit_checkpoint": "ebdf52364cbafed33bd04e17c25be57ab055755b",
-      "audit_path": "docs/security/audits/repair-batch-local-checkpoint-20261008.json",
-      "qualified": false,
-      "prior_source_repair": {
-        "checkpoint": "89d79ac6ab79de5d55b99a7c8ec611bc8b021cb2",
-        "files": [
-          "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007.json"
-        ],
-        "application": "This pins the original review record only. It does not establish an implemented repair; current owner handoffs must be integrated and verified separately."
-      }
+  "requirement_id": "incoming-pr1160-review-20261007:effects:durable-plan-binding",
+  "label": "effects:durable-plan-binding",
+  "requirement": "Verify exact durable plan binding for every effect execute/readback",
+  "historical_source_identity": {
+    "path": "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007.json",
+    "line": 385,
+    "line_sha256": "23a348238502eb1bbf9206730d11f99ced3993757e60e62561ab3bb33995cda4",
+    "checkpoint": "89d79ac6ab79de5d55b99a7c8ec611bc8b021cb2",
+    "reviewed_source": "7cf5ce39ee4f46d411257e1ab40e18b94eea3758"
+  },
+  "scope": "now",
+  "landing_pr": 1160,
+  "landing_unit": "foundation",
+  "current_state": "source-integrated-unbound-router3-green-full-owning-pending",
+  "source_repair": {
+    "commits": [
+      "ba6e6fd822",
+      "8fb315b9dd"
+    ],
+    "observed_source": "ef23fba41cd3d0d8743621ee989d9bc9f5b74903"
+  },
+  "source_integrated": true,
+  "focused_green": true,
+  "owning_pending": true,
+  "native_pending": true,
+  "trusted_pending": true,
+  "hosted_pending": true,
+  "merged": false,
+  "full_qualified": false,
+  "verification_evidence": [
+    {
+      "path": "docs/security/audits/repair-batch-local-checkpoint-20261008.json",
+      "sha256": "6e3781eb1b9e8eeb56f7d31ad10ef2cb9bd609bf7013c1477e998326a16a21b9",
+      "scope": "Per-campaign source/binary/log receipts, preserving failing Original/setup/fixture records separately. Current whole-candidate acceptance remains open."
     },
+    {
+      "path": "docs/security/audits/fixture-correction-checkpoint-20261008.json",
+      "sha256": "72540d5201a1c396a60b4a6051247ca0908ab32276ef2fb6b11dc83bd214cd11",
+      "scope": "Per-campaign source, binary and log identity. Earlier failed records and corrected diagnostic history retained."
+    }
+  ],
+  "remaining_acceptance": [
+    "Complete and review effect finality, same-lineage freeze and authenticated historical-query repairs with preserved legacy source evidence.",
+    "Recheck test-future ownership and strict owning lint.",
+    "Complete current owning/default/PQ/platform/cold/native/trusted and exact-source hosted qualification.",
+    "Qualify protected finalizer and independent review, then protected landing."
+  ],
+  "previous_checkpoint_state": "confirmed-review-obligation-pending-integration-and-final-acceptance",
+  "state": "source-integrated-unbound-router3-green-full-owning-pending",
+  "source_checkpoint": "ef23fba41cd3d0d8743621ee989d9bc9f5b74903",
+  "audit_checkpoint": "a43226e8e4af96f96fb3a768047796891e0a06cb",
+  "audit_path": "docs/security/audits/fixture-correction-checkpoint-20261008.json",
+  "qualified": false,
+  "prior_source_repair": {
+    "checkpoint": "89d79ac6ab79de5d55b99a7c8ec611bc8b021cb2",
+    "files": [
+      "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007.json"
+    ],
+    "application": "This pins the original review record only. It does not establish an implemented repair; current owner handoffs must be integrated and verified separately."
+  },
+  "checkpoint_history": [
+    {
+      "state": "source-integrated-missing-authority-original-red-composed-green-pending",
+      "audit_path": "docs/security/audits/repair-batch-local-checkpoint-20261008.json",
+      "source_checkpoint": "34443073624f6ee016d1c2599faeb2aefbb3a1cb"
+    }
+  ]
+},
     "incoming-pr1160-review-20261007:effects:shared-freeze-fence": {
       "requirement_id": "incoming-pr1160-review-20261007:effects:shared-freeze-fence",
       "label": "effects:shared-freeze-fence",
@@ -130852,41 +130876,53 @@
       ]
     },
     "incoming-pr1160-review-20261008:native:BROKER-SELECT": {
-      "state": "source-integrated-collision-and-replay-green-extra-integrity-controls-pending",
-      "source_checkpoint": "34443073624f6ee016d1c2599faeb2aefbb3a1cb",
-      "audit_checkpoint": "ebdf52364cbafed33bd04e17c25be57ab055755b",
-      "audit_path": "docs/security/audits/repair-batch-local-checkpoint-20261008.json",
-      "source_repair": {
-        "commits": [
-          "5fbd2ca6ab8bea7957182aa36c824ac26225f9d9"
-        ],
-        "observed_source": "34443073624f6ee016d1c2599faeb2aefbb3a1cb",
-        "scope": "Source integration; exact runtime campaigns below retain their own source SHAs and limited acceptance."
-      },
-      "focused_green": true,
-      "qualified": false,
-      "merged": false,
-      "previous_checkpoint_state": "source-suspected-liveness-defect-original-and-selector-proposal-pending",
-      "full_qualified": false,
-      "owning_pending": true,
-      "native_pending": true,
-      "trusted_pending": true,
-      "hosted_pending": true,
-      "source_integrated": true,
-      "verification_evidence": [
-        {
-          "path": "docs/security/audits/repair-batch-local-checkpoint-20261008.json",
-          "sha256": "6e3781eb1b9e8eeb56f7d31ad10ef2cb9bd609bf7013c1477e998326a16a21b9",
-          "scope": "Per-campaign source/binary/log receipts, preserving failing Original/setup/fixture records separately. Current whole-candidate acceptance remains open."
-        }
-      ],
-      "remaining_acceptance": [
-        "Complete effect finality, same-lineage freeze and authenticated historical result-query repairs with Original and preservation controls.",
-        "Complete MCP genuine-v2 positive fixture and extra broker integrity controls; fresh owning and strict checks for the composed source.",
-        "Measure and qualify actual production native trajectory with eight receipts, the unchanged10000ms fence and current enforcing artifacts; bounded journal tests do not establish this.",
-        "Finish F077 protected merge/App/ruleset evidence, current independent review, default/PQ/platform/cold/trusted/hosted checks and protected landing."
-      ]
+  "state": "source-integrated-selector-controls4-and-private3-green-full-owning-pending",
+  "source_checkpoint": "ef23fba41cd3d0d8743621ee989d9bc9f5b74903",
+  "audit_checkpoint": "a43226e8e4af96f96fb3a768047796891e0a06cb",
+  "audit_path": "docs/security/audits/fixture-correction-checkpoint-20261008.json",
+  "source_repair": {
+    "commits": [
+      "5fbd2ca6ab",
+      "e5853308c9"
+    ],
+    "observed_source": "ef23fba41cd3d0d8743621ee989d9bc9f5b74903"
+  },
+  "focused_green": true,
+  "qualified": false,
+  "merged": false,
+  "previous_checkpoint_state": "source-suspected-liveness-defect-original-and-selector-proposal-pending",
+  "full_qualified": false,
+  "owning_pending": true,
+  "native_pending": true,
+  "trusted_pending": true,
+  "hosted_pending": true,
+  "source_integrated": true,
+  "verification_evidence": [
+    {
+      "path": "docs/security/audits/repair-batch-local-checkpoint-20261008.json",
+      "sha256": "6e3781eb1b9e8eeb56f7d31ad10ef2cb9bd609bf7013c1477e998326a16a21b9",
+      "scope": "Per-campaign source/binary/log receipts, preserving failing Original/setup/fixture records separately. Current whole-candidate acceptance remains open."
     },
+    {
+      "path": "docs/security/audits/fixture-correction-checkpoint-20261008.json",
+      "sha256": "72540d5201a1c396a60b4a6051247ca0908ab32276ef2fb6b11dc83bd214cd11",
+      "scope": "Per-campaign source, binary and log identity. Earlier failed records and corrected diagnostic history retained."
+    }
+  ],
+  "remaining_acceptance": [
+    "Complete and review effect finality, same-lineage freeze and authenticated historical-query repairs with preserved legacy source evidence.",
+    "Recheck test-future ownership and strict owning lint.",
+    "Complete current owning/default/PQ/platform/cold/native/trusted and exact-source hosted qualification.",
+    "Qualify protected finalizer and independent review, then protected landing."
+  ],
+  "checkpoint_history": [
+    {
+      "state": "source-integrated-collision-and-replay-green-extra-integrity-controls-pending",
+      "audit_path": "docs/security/audits/repair-batch-local-checkpoint-20261008.json",
+      "source_checkpoint": "34443073624f6ee016d1c2599faeb2aefbb3a1cb"
+    }
+  ]
+},
     "incoming-pr1160-review-20261008:reconciliation:MCP-RESERVE": {
       "state": "source-integrated-reservation-and-generation-controls-green-owning-acceptance-pending",
       "source_checkpoint": "34443073624f6ee016d1c2599faeb2aefbb3a1cb",
@@ -130925,45 +130961,53 @@
       ]
     },
     "incoming-pr1160-review-20261008:reconciliation:MCP-PROJECTION": {
-      "state": "source-integrated-projection-regressions-green-v2-positive-fixture-recheck-pending",
-      "source_checkpoint": "34443073624f6ee016d1c2599faeb2aefbb3a1cb",
-      "audit_checkpoint": "ebdf52364cbafed33bd04e17c25be57ab055755b",
-      "audit_path": "docs/security/audits/repair-batch-local-checkpoint-20261008.json",
-      "source_repair": {
-        "commits": [
-          "73fc114f53ac845d7a2931c02d54770158c7bfbc",
-          "2a544d51275fd3068d6917f0727c49123807155b",
-          "c7e94c207a0f8e1e23ea2c6d5702af4c57ffeca9",
-          "ecae2736b2e664543d629f07c3279f0fbdd32888",
-          "43f53d340f823f168b2200c8c9966a3c866ec04c"
-        ],
-        "observed_source": "34443073624f6ee016d1c2599faeb2aefbb3a1cb",
-        "scope": "Source integration; exact runtime campaigns below retain their own source SHAs and limited acceptance."
-      },
-      "focused_green": false,
-      "qualified": false,
-      "merged": false,
-      "previous_checkpoint_state": "source-confirmed-original-and-repair-pending",
-      "full_qualified": false,
-      "owning_pending": true,
-      "native_pending": true,
-      "trusted_pending": true,
-      "hosted_pending": true,
-      "source_integrated": true,
-      "verification_evidence": [
-        {
-          "path": "docs/security/audits/repair-batch-local-checkpoint-20261008.json",
-          "sha256": "6e3781eb1b9e8eeb56f7d31ad10ef2cb9bd609bf7013c1477e998326a16a21b9",
-          "scope": "Per-campaign source/binary/log receipts, preserving failing Original/setup/fixture records separately. Current whole-candidate acceptance remains open."
-        }
-      ],
-      "remaining_acceptance": [
-        "Complete effect finality, same-lineage freeze and authenticated historical result-query repairs with Original and preservation controls.",
-        "Complete MCP genuine-v2 positive fixture and extra broker integrity controls; fresh owning and strict checks for the composed source.",
-        "Measure and qualify actual production native trajectory with eight receipts, the unchanged10000ms fence and current enforcing artifacts; bounded journal tests do not establish this.",
-        "Finish F077 protected merge/App/ruleset evidence, current independent review, default/PQ/platform/cold/trusted/hosted checks and protected landing."
-      ]
+  "state": "source-integrated-whole-remote-library192-green-native-hosted-pending",
+  "source_checkpoint": "ef23fba41cd3d0d8743621ee989d9bc9f5b74903",
+  "audit_checkpoint": "a43226e8e4af96f96fb3a768047796891e0a06cb",
+  "audit_path": "docs/security/audits/fixture-correction-checkpoint-20261008.json",
+  "source_repair": {
+    "commits": [
+      "2a544d5127",
+      "227c770110"
+    ],
+    "observed_source": "ef23fba41cd3d0d8743621ee989d9bc9f5b74903"
+  },
+  "focused_green": true,
+  "qualified": false,
+  "merged": false,
+  "previous_checkpoint_state": "source-confirmed-original-and-repair-pending",
+  "full_qualified": false,
+  "owning_pending": true,
+  "native_pending": true,
+  "trusted_pending": true,
+  "hosted_pending": true,
+  "source_integrated": true,
+  "verification_evidence": [
+    {
+      "path": "docs/security/audits/repair-batch-local-checkpoint-20261008.json",
+      "sha256": "6e3781eb1b9e8eeb56f7d31ad10ef2cb9bd609bf7013c1477e998326a16a21b9",
+      "scope": "Per-campaign source/binary/log receipts, preserving failing Original/setup/fixture records separately. Current whole-candidate acceptance remains open."
     },
+    {
+      "path": "docs/security/audits/fixture-correction-checkpoint-20261008.json",
+      "sha256": "72540d5201a1c396a60b4a6051247ca0908ab32276ef2fb6b11dc83bd214cd11",
+      "scope": "Per-campaign source, binary and log identity. Earlier failed records and corrected diagnostic history retained."
+    }
+  ],
+  "remaining_acceptance": [
+    "Complete and review effect finality, same-lineage freeze and authenticated historical-query repairs with preserved legacy source evidence.",
+    "Recheck test-future ownership and strict owning lint.",
+    "Complete current owning/default/PQ/platform/cold/native/trusted and exact-source hosted qualification.",
+    "Qualify protected finalizer and independent review, then protected landing."
+  ],
+  "checkpoint_history": [
+    {
+      "state": "source-integrated-projection-regressions-green-v2-positive-fixture-recheck-pending",
+      "audit_path": "docs/security/audits/repair-batch-local-checkpoint-20261008.json",
+      "source_checkpoint": "34443073624f6ee016d1c2599faeb2aefbb3a1cb"
+    }
+  ]
+},
     "incoming-pr1160-review-20261008:reconciliation:MCP-GENERATION": {
       "state": "source-integrated-reservation-and-generation-controls-green-owning-acceptance-pending",
       "source_checkpoint": "34443073624f6ee016d1c2599faeb2aefbb3a1cb",
@@ -131095,24 +131139,35 @@
       ]
     },
     "incoming-pr1160-review-20261008:reconciliation:EF-REPLAY": {
+  "state": "genuine-historical-query-red-no-remove-preservation-green-producer-pending",
+  "source_checkpoint": "ef23fba41cd3d0d8743621ee989d9bc9f5b74903",
+  "audit_checkpoint": "a43226e8e4af96f96fb3a768047796891e0a06cb",
+  "audit_path": "docs/security/audits/fixture-correction-checkpoint-20261008.json",
+  "source_repair": null,
+  "focused_green": false,
+  "qualified": false,
+  "merged": false,
+  "remaining_acceptance": [
+    "Complete and review effect finality, same-lineage freeze and authenticated historical-query repairs with preserved legacy source evidence.",
+    "Recheck test-future ownership and strict owning lint.",
+    "Complete current owning/default/PQ/platform/cold/native/trusted and exact-source hosted qualification.",
+    "Qualify protected finalizer and independent review, then protected landing."
+  ],
+  "checkpoint_history": [
+    {
       "state": "genuine-original-red-repair-and-tamper-preservation-control-pending",
-      "source_checkpoint": "29e9a39d19ec944a60ebf2f0c813eccbf54b8d9e",
-      "audit_checkpoint": "ebdf52364cbafed33bd04e17c25be57ab055755b",
       "audit_path": "docs/security/audits/repair-batch-local-checkpoint-20261008.json",
-      "source_repair": null,
-      "focused_green": false,
-      "qualified": false,
-      "merged": false,
-      "remaining_acceptance": [
-        "Real Apply/Remove then exact Apply query returns its original authenticated result without reinstalling a contribution.",
-        "Direct removal of an active contribution without a matching authenticated completed Remove remains IntegrityFailure.",
-        "Malformed, foreign or unavailable removal evidence cannot authorize historical completion.",
-        "Complete effect finality, same-lineage freeze and authenticated historical result-query repairs with Original and preservation controls.",
-        "Complete MCP genuine-v2 positive fixture and extra broker integrity controls; fresh owning and strict checks for the composed source.",
-        "Measure and qualify actual production native trajectory with eight receipts, the unchanged10000ms fence and current enforcing artifacts; bounded journal tests do not establish this.",
-        "Finish F077 protected merge/App/ruleset evidence, current independent review, default/PQ/platform/cold/trusted/hosted checks and protected landing."
-      ]
+      "source_checkpoint": "29e9a39d19ec944a60ebf2f0c813eccbf54b8d9e"
     }
+  ],
+  "verification_evidence": [
+    {
+      "path": "docs/security/audits/fixture-correction-checkpoint-20261008.json",
+      "sha256": "72540d5201a1c396a60b4a6051247ca0908ab32276ef2fb6b11dc83bd214cd11",
+      "scope": "Per-campaign source, binary and log identity. Earlier failed records and corrected diagnostic history retained."
+    }
+  ]
+}
   },
   "current_view_refresh_488_observations_20261007": {
     "at": "2026-10-07T02:40:40.721349+00:00",
@@ -132466,4 +132521,12 @@
     "qualified": false,
     "merged": false
   }
+,
+"fixture_correction_checkpoint_20261008": {
+  "audit_checkpoint": "a43226e8e4af96f96fb3a768047796891e0a06cb",
+  "audit_path": "docs/security/audits/fixture-correction-checkpoint-20261008.json",
+  "requirement_count": 1793,
+  "qualified": false,
+  "merged": false
+}
 }
