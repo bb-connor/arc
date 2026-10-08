@@ -331,8 +331,12 @@ fn enabled_legacy_federated_active_response_admission_still_reserves_and_cleans_
     assert!(
         matches!(
             &substituted_result,
-            Err(KernelError::DurableAdmission(reason))
-                if reason == "retained approval reservation does not match the verified approval set"
+            Err(KernelError::Admission(error))
+                if matches!(
+                    &**error,
+                    chio_kernel::DurableAdmissionError::Conflict(reason)
+                        if reason == "retained approval reservation does not match the verified approval set"
+                )
         ),
         "{substituted_result:?}"
     );

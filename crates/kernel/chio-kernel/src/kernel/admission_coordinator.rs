@@ -189,7 +189,7 @@ impl DurableAdmissionRuntime {
     fn lock_mutations(&self) -> Result<AdmissionMutationGuard<'_>, KernelError> {
         self.mutation_sequencer
             .lock()
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))
+            .map_err(KernelError::admission)
     }
 
     pub(super) fn set_channel_terminal_authority(
@@ -304,7 +304,7 @@ impl<'r> ExternalCallLock<'r> {
             )
         }))
         .map_err(|_| {
-            KernelError::DurableAdmission("external call lease readback callback panicked".into())
+            KernelError::admission_panicked("external call lease readback callback panicked")
         })?
         .map_err(durable_store_error)?;
         Ok(output)
@@ -496,7 +496,7 @@ impl ChioKernel {
         runtime
             .store
             .load_chio_receipt(receipt_id)
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))
+            .map_err(KernelError::admission)
     }
 
     pub fn reconcile_durable_admission_receipt_projections(&self) -> Result<usize, KernelError> {
@@ -514,27 +514,27 @@ impl ChioKernel {
             let page = runtime
                 .store
                 .list_admission_receipts_after(after_receipt_id.as_deref(), PAGE_LIMIT)
-                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+                .map_err(KernelError::admission)?;
             if page.is_empty() {
                 return Ok(reconciled);
             }
             if page.len() > PAGE_LIMIT {
-                return Err(KernelError::DurableAdmission(
-                    "admission receipt store exceeded the requested page limit".to_owned(),
+                return Err(KernelError::admission_invariant(
+                    "admission receipt store exceeded the requested page limit",
                 ));
             }
             let mut previous = after_receipt_id.as_deref();
             for receipt in &page {
                 if previous.is_some_and(|cursor| receipt.id.as_str() <= cursor) {
-                    return Err(KernelError::DurableAdmission(
-                        "admission receipt store returned a non-advancing page".to_owned(),
+                    return Err(KernelError::admission_invariant(
+                        "admission receipt store returned a non-advancing page",
                     ));
                 }
                 previous = Some(receipt.id.as_str());
             }
             self.materialize_durable_admission_receipts(&page)?;
             reconciled = reconciled.checked_add(page.len()).ok_or_else(|| {
-                KernelError::DurableAdmission("admission receipt count overflow".to_owned())
+                KernelError::admission_invariant("admission receipt count overflow")
             })?;
             after_receipt_id = page.last().map(|receipt| receipt.id.clone());
         }
@@ -1086,9 +1086,8 @@ impl ChioKernel {
             .admission_projection_capabilities()
             .operation_terminal
         {
-            return Err(KernelError::DurableAdmission(
-                "active-response admission store lacks atomic terminal projection support"
-                    .to_owned(),
+            return Err(KernelError::admission_unsupported(
+                "active-response admission store lacks atomic terminal projection support",
             ));
         }
         let immutable_request_hash = admission_digest(
@@ -1106,8 +1105,8 @@ impl ChioKernel {
         )?;
         let policy_hash = AdmissionDigest::try_new("policy_hash", self.config.policy_hash.clone())
             .map_err(|_| {
-                KernelError::DurableAdmission(
-                    "durable admission requires a canonical SHA-256 policy hash".to_owned(),
+                KernelError::admission_unsupported(
+                    "durable admission requires a canonical SHA-256 policy hash",
                 )
             })?;
         let requirements = AdmissionParticipantRequirements {
@@ -1159,7 +1158,7 @@ impl ChioKernel {
                 (operation, false)
             }
             AdmissionBeginResult::ExactReplay { operation, .. } => {
-                return Err(KernelError::DurableAdmission(format!(
+                return Err(KernelError::admission_conflict(format!(
                     "active-response request replay is retained in state {:?}",
                     operation.state()
                 )));
@@ -1167,7 +1166,7 @@ impl ChioKernel {
             AdmissionBeginResult::Conflict {
                 existing_operation_id,
             } => {
-                return Err(KernelError::DurableAdmission(format!(
+                return Err(KernelError::admission_conflict(format!(
                     "active-response request id conflicts with retained operation {}",
                     existing_operation_id.as_str()
                 )));
@@ -1191,7 +1190,7 @@ impl ChioKernel {
         let hook_identities = self
             .post_invocation_pipeline
             .durable_identities()
-            .map_err(KernelError::DurableAdmission)?;
+            .map_err(KernelError::admission_invariant)?;
         let mut frozen_steps = Vec::with_capacity(hook_identities.len() + 1);
         frozen_steps.push(FrozenEvaluationStepV1 {
             phase: EvaluationPhaseV1::OutputGuard,
@@ -1209,8 +1208,8 @@ impl ChioKernel {
         });
         for (index, identity) in hook_identities.iter().enumerate() {
             let position = u32::try_from(index + 1).map_err(|_| {
-                KernelError::DurableAdmission(
-                    "post-invocation pipeline has too many durable steps".to_owned(),
+                KernelError::admission_unsupported(
+                    "post-invocation pipeline has too many durable steps",
                 )
             })?;
             frozen_steps.push(FrozenEvaluationStepV1 {
@@ -1246,9 +1245,10 @@ impl ChioKernel {
         let Some(authorization) = request.supplemental_authorization.as_ref() else {
             return Ok(None);
         };
-        let runtime = self.supplemental_quota_verifier.as_ref().ok_or_else(|| {
-            KernelError::DurableAdmission(SupplementalQuotaError::MissingVerifier.to_string())
-        })?;
+        let runtime = self
+            .supplemental_quota_verifier
+            .as_ref()
+            .ok_or_else(|| KernelError::admission(SupplementalQuotaError::MissingVerifier))?;
 
         #[derive(Serialize)]
         struct ToolDestination<'a> {
@@ -1261,20 +1261,16 @@ impl ChioKernel {
                 server_id: &request.server_id,
                 tool_name: &request.tool_name,
             })
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?,
+            .map_err(KernelError::admission)?,
         )
-        .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-        let capability_digest = sha256_hex(
-            &canonical_json_bytes(&request.capability)
-                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?,
-        );
-        let arguments_hash = sha256_hex(
-            &canonical_json_bytes(&request.arguments)
-                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?,
-        );
+        .map_err(|error| KernelError::admission(DurableAdmissionError::dependency(error)))?;
+        let capability_digest =
+            sha256_hex(&canonical_json_bytes(&request.capability).map_err(KernelError::admission)?);
+        let arguments_hash =
+            sha256_hex(&canonical_json_bytes(&request.arguments).map_err(KernelError::admission)?);
         let mut negotiated_features = self
             .capability_negotiation_for_remote(request.federated_origin_kernel_id.as_deref(), now)
-            .map_err(KernelError::DurableAdmission)?;
+            .map_err(KernelError::admission_refused)?;
         if request.federated_origin_kernel_id.is_none() {
             negotiated_features
                 .features
@@ -1300,7 +1296,7 @@ impl ChioKernel {
             now,
         )
         .map(Some)
-        .map_err(|error| KernelError::DurableAdmission(error.to_string()))
+        .map_err(KernelError::admission)
     }
 
     fn verify_aggregate_quota_for_admission(
@@ -1317,19 +1313,19 @@ impl ChioKernel {
         }
         let peer = self
             .capability_negotiation_for_remote(request.federated_origin_kernel_id.as_deref(), now)
-            .map_err(KernelError::DurableAdmission)?;
+            .map_err(KernelError::admission_refused)?;
         let direct_root = self
             .negotiated_capability_root(&request.capability, &peer)
-            .map_err(KernelError::DurableAdmission)?;
+            .map_err(KernelError::admission_refused)?;
         let verified = verify_aggregate_invocation_budget(
             &request.capability,
             &self.trusted_issuer_keys(),
             direct_root.as_ref(),
         )
-        .map_err(|error| KernelError::DurableAdmission(error.to_string()))?
+        .map_err(KernelError::admission)?
         .ok_or_else(|| {
-            KernelError::DurableAdmission(
-                "aggregate invocation budget did not produce a verified quota".to_string(),
+            KernelError::admission_invariant(
+                "aggregate invocation budget did not produce a verified quota",
             )
         })?;
         let profile = match verified.scope {
@@ -1375,30 +1371,30 @@ impl ChioKernel {
             }
         }
         .map_err(|error| {
-            KernelError::DurableAdmission(format!("capability revocation set is invalid: {error}"))
+            KernelError::admission_in("capability revocation set is invalid", error)
         })?;
         let supplemental = admission.supplemental_quota();
         let last_observed_revocation = if supplemental.is_some() {
             let observation = self
                 .revocation_store
                 .observe_revocation(&capability.id)
-                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+                .map_err(KernelError::admission)?;
             if observation.revoked {
-                return Err(KernelError::DurableAdmission(
-                    "supplemental authorization leaf capability is revoked".to_string(),
+                return Err(KernelError::admission_refused(
+                    "supplemental authorization leaf capability is revoked",
                 ));
             }
             let commit = observation.commit.ok_or_else(|| {
-                KernelError::DurableAdmission(
-                    "supplemental authorization requires atomic revocation observation".to_string(),
+                KernelError::admission_unsupported(
+                    "supplemental authorization requires atomic revocation observation",
                 )
             })?;
             if !matches!(
                 commit.guarantee_level,
                 BudgetGuaranteeLevel::SingleNodeAtomic | BudgetGuaranteeLevel::HaLinearizable
             ) {
-                return Err(KernelError::DurableAdmission(
-                    "supplemental authorization revocation observation is not atomic".to_string(),
+                return Err(KernelError::admission_unsupported(
+                    "supplemental authorization revocation observation is not atomic",
                 ));
             }
             Some(commit)
@@ -1440,14 +1436,13 @@ impl ChioKernel {
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
         let expected = admission.operation.clone();
         let hold_id = request.hold_id.clone().ok_or_else(|| {
-            KernelError::DurableAdmission(
-                "combined durable authorization omitted its budget hold identity".to_owned(),
+            KernelError::admission_invariant(
+                "combined durable authorization omitted its budget hold identity",
             )
         })?;
         if request.authority.as_ref() != Some(&runtime.authority()) {
-            return Err(KernelError::DurableAdmission(
-                "combined durable authorization authority does not match the admission fence"
-                    .to_owned(),
+            return Err(KernelError::admission_invariant(
+                "combined durable authorization authority does not match the admission fence",
             ));
         }
         let claim =
@@ -1464,10 +1459,10 @@ impl ChioKernel {
                 &runtime.fence,
                 trusted_now_unix_ms,
             )
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+            .map_err(KernelError::admission)?;
         if authorization.operation.binding() != expected.binding() {
-            return Err(KernelError::DurableAdmission(
-                "combined durable authorization changed the immutable operation binding".to_owned(),
+            return Err(KernelError::admission_invariant(
+                "combined durable authorization changed the immutable operation binding",
             ));
         }
         match &authorization.decision {
@@ -1486,8 +1481,8 @@ impl ChioKernel {
                     .budget_hold_id()
                     .is_none_or(|bound| bound.as_str() != hold_id)
                 {
-                    return Err(KernelError::DurableAdmission(
-                        "combined durable authorization returned an unbound operation".to_owned(),
+                    return Err(KernelError::admission_invariant(
+                        "combined durable authorization returned an unbound operation",
                     ));
                 }
             }
@@ -1501,7 +1496,7 @@ impl ChioKernel {
                         .budget_hold_id()
                         .is_some_and(|bound| bound.as_str() == hold_id) => {}
             _ => {
-                return Err(KernelError::DurableAdmission(format!(
+                return Err(KernelError::admission_invariant(format!(
                     "combined durable authorization returned incompatible operation state {:?}",
                     authorization.operation.state()
                 )));
@@ -1538,25 +1533,25 @@ impl ChioKernel {
             if proposal_matches && set_matches {
                 return Ok(());
             }
-            return Err(KernelError::DurableAdmission(
-                "retained approval reservation does not match the verified approval set".to_owned(),
+            return Err(KernelError::admission_conflict(
+                "retained approval reservation does not match the verified approval set",
             ));
         }
         let required_source = match admission.operation.binding().kind() {
             AdmissionOperationKind::ToolDispatch => AdmissionOperationState::BudgetAuthorized,
             AdmissionOperationKind::GovernedActiveResponse => AdmissionOperationState::Prepared,
             AdmissionOperationKind::GovernedEconomicMutation => {
-                return Err(KernelError::DurableAdmission(
-                    "economic mutation admission does not accept threshold approval sets"
-                        .to_owned(),
+                return Err(KernelError::admission_refused(
+                    "economic mutation admission does not accept threshold approval sets",
                 ));
             }
         };
-        if admission.operation.state() != required_source {
-            return Err(KernelError::DurableAdmission(format!(
-                "approval reservation requires {required_source:?}, found {:?}",
-                admission.operation.state()
-            )));
+        let state = admission.operation.state();
+        if state != required_source {
+            return Err(KernelError::admission_state(
+                state,
+                format!("approval reservation requires {required_source:?}, found {state:?}"),
+            ));
         }
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
@@ -1569,7 +1564,7 @@ impl ChioKernel {
             let expires_at_unix_ms = trusted_now_unix_ms
                 .checked_add(RECOVERY_LEASE_DURATION_MS)
                 .ok_or_else(|| {
-                    KernelError::DurableAdmission("recovery lease expiration overflowed".to_owned())
+                    KernelError::admission_invariant("recovery lease expiration overflowed")
                 })?;
             let lease = runtime
                 .store
@@ -1641,11 +1636,12 @@ impl ChioKernel {
                 trusted_now_unix_ms,
             )?;
         }
-        if admission.operation.state() != AdmissionOperationState::CapturePending {
-            return Err(KernelError::DurableAdmission(format!(
-                "capture cannot start from state {:?}",
-                admission.operation.state()
-            )));
+        let state = admission.operation.state();
+        if state != AdmissionOperationState::CapturePending {
+            return Err(KernelError::admission_state(
+                state,
+                format!("capture cannot start from state {state:?}"),
+            ));
         }
         Ok(())
     }
@@ -1677,16 +1673,19 @@ impl ChioKernel {
                 AdmissionOperationState::ReadyToDispatch
             }
             AdmissionOperationKind::GovernedEconomicMutation => {
-                return Err(KernelError::DurableAdmission(
-                    "economic mutation admission does not use dispatch commitment".to_owned(),
+                return Err(KernelError::admission_refused(
+                    "economic mutation admission does not use dispatch commitment",
                 ));
             }
         };
-        if admission.operation.state() != required_source {
-            return Err(KernelError::DurableAdmission(format!(
-                "dispatch cannot commit from state {:?}; expected {required_source:?}",
-                admission.operation.state()
-            )));
+        let state = admission.operation.state();
+        if state != required_source {
+            return Err(KernelError::admission_state(
+                state,
+                format!(
+                    "dispatch cannot commit from state {state:?}; expected {required_source:?}"
+                ),
+            ));
         }
         admission.operation = self.apply_admission_command(
             admission.operation.clone(),
@@ -1712,16 +1711,17 @@ impl ChioKernel {
             .load_by_operation_id(operation.binding().operation_id())
             .map_err(durable_store_error)?
             .ok_or_else(|| {
-                KernelError::DurableAdmission(
-                    "pre-dispatch admission disappeared during compensation".to_owned(),
+                KernelError::admission_record(
+                    "pre-dispatch admission disappeared during compensation",
                 )
             })?;
         if &current != operation
             || current.state().is_terminal()
             || current.dispatch_commit().is_some()
         {
-            return Err(KernelError::DurableAdmission(
-                "pre-dispatch compensation operation changed".to_owned(),
+            return Err(KernelError::admission_state(
+                current.state(),
+                "pre-dispatch compensation operation changed",
             ));
         }
         let mut mutation_lock =
@@ -1757,9 +1757,10 @@ impl ChioKernel {
             trusted_now_unix_ms,
         )
         .map_err(|error| {
-            KernelError::DurableAdmission(format!(
-                "pre-dispatch finding pool claim release failed: {error}"
-            ))
+            KernelError::admission_in(
+                "pre-dispatch finding pool claim release failed",
+                DurableAdmissionError::dependency(error),
+            )
         })?;
         // Every budget the operation still holds is internal until dispatch
         // commits. Both the executable hold and an owned preflight hold must be
@@ -1776,12 +1777,12 @@ impl ChioKernel {
         let terminal = runtime
             .store
             .commit_admission_projection(&projection)
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+            .map_err(KernelError::admission)?;
         if terminal.operation_id != *current.binding().operation_id()
             || terminal.state != AdmissionOperationState::CompensatedBeforeDispatch
         {
-            return Err(KernelError::DurableAdmission(
-                "pre-dispatch compensation committed a different terminal operation".to_owned(),
+            return Err(KernelError::admission_invariant(
+                "pre-dispatch compensation committed a different terminal operation",
             ));
         }
         Ok(())
@@ -1910,9 +1911,7 @@ impl ChioKernel {
 
     fn durable_runtime(&self) -> Result<&DurableAdmissionRuntime, KernelError> {
         self.durable_admission_runtime.as_ref().ok_or_else(|| {
-            KernelError::DurableAdmission(
-                "qualified admission operation store is unavailable".to_string(),
-            )
+            KernelError::admission_unsupported("qualified admission operation store is unavailable")
         })
     }
 
@@ -1922,7 +1921,7 @@ impl ChioKernel {
             self.config.memory_budget.max_stream_chunks,
             self.config.max_stream_duration_secs,
         )
-        .map_err(|error| KernelError::DurableAdmission(error.to_string()))
+        .map_err(KernelError::admission)
     }
 }
 
@@ -1930,8 +1929,8 @@ fn admission_digest(
     field: &'static str,
     value: &impl Serialize,
 ) -> Result<AdmissionDigest, KernelError> {
-    let canonical = canonical_json_bytes(value)
-        .map_err(|error| KernelError::DurableAdmission(format!("{field}: {error}")))?;
+    let canonical =
+        canonical_json_bytes(value).map_err(|error| KernelError::admission_in(field, error))?;
     AdmissionDigest::try_new(field, sha256_hex(&canonical)).map_err(KernelError::from)
 }
 
@@ -1972,5 +1971,5 @@ fn durable_outcome_store_error(error: ToolOutcomeStoreError) -> KernelError {
 }
 
 fn tool_outcome_error(error: crate::tool_outcome::ToolOutcomeError) -> KernelError {
-    KernelError::DurableAdmission(error.to_string())
+    KernelError::admission(error)
 }
