@@ -744,6 +744,9 @@ run_exact_target --label "native post-join policy" --allow-filtered --expected \
   security::adapters::tests::native_flow::support::process_recovery::races::evaluation_failure_before_capture_preserves_the_actual_typed_cause \
   security::adapters::tests::native_flow::support::process_recovery::races::observer_unwind_disconnects_a_full_event_channel_before_joining \
   security::adapters::tests::native_flow::support::process_recovery::races::worker_panic_before_capture_reports_completion_instead_of_waiting_for_entry \
+  security::adapters::tests::native_flow::support::capture::store_diagnostic::native_capture_store_diagnostic_commit_runtime_expiry_keeps_physical_rollback \
+  security::adapters::tests::native_flow::support::capture::store_diagnostic::native_capture_store_diagnostic_sqlite_aborts_keep_distinct_physical_stages \
+  security::adapters::tests::native_flow::support::capture::store_diagnostic::native_capture_store_diagnostic_success_preserves_output_and_replay \
   -- cargo test -p chio-control-plane --lib security::adapters::tests::native_flow::
 
 run_exact_target --label "native declassification row semantics" --allow-filtered --expected \
