@@ -122,6 +122,23 @@ is supported by pinned primary source; the specific first compiler traversal
 still needs an actual trace. The source investigation is retained under
 `target/recovery-pr/current-review-followup/api-kani-public-intrinsic-repair/`.
 
+### Current payment validation and strict FIPS check
+
+The disputed-payment match now uses a guarded refusal arm and retains a separate
+successful disputed arm. This preserves accepted recovery states and avoids the
+Clippy nested-match diagnostic. Its exact payment-source composition, manifest
+`40985a9df6918a777c587451a741eff2c6374a2daf4c6d73b55e8cfb37dd4cd4`,
+ran all 53 owning commerce tests on GNU/Linux with zero failures or ignored
+cases. The owning package then passed strict Clippy for all targets.
+
+The full strict FIPS dependency check progressed past that diagnostic and failed
+with 257 SQLite store errors. The original compiler log, exact diagnostic
+inventory and separate owning Clippy acceptance are retained under
+`target/recovery-pr/current-review-followup/linux-current/commerce-payment-lint-20261008T2350/`.
+Unused finishing implementations and the remaining structural lint findings are
+open. The lint gate and the original failure remain intact. This narrow payment
+repair does not qualify the FIPS dependency graph or recovery runtime.
+
 ### Current Linux compilation and targeted controls
 
 The October 8 native GNU/Linux build compiled the five library test targets for
