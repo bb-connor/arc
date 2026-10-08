@@ -1,0 +1,394 @@
+{
+  "schema": "chio.security.local-controls-checkpoint.v1",
+  "observed_source": "ef23fba41cd3d0d8743621ee989d9bc9f5b74903",
+  "qualified": false,
+  "merged": false,
+  "published_source": "89d79ac6ab79de5d55b99a7c8ec611bc8b021cb2",
+  "hosted_status": {
+    "success": 118,
+    "failure": 21,
+    "skipped": 12,
+    "evidence": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/hosted-refresh-08.json",
+    "scope": "Refreshed published head only; local batch remains unpublished."
+  },
+  "campaigns": [
+    {
+      "source": "45c7ddc952ce7c619ff6b174db54c6ecaa77ba1e",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/chio_control_plane-9db6014f2cdf0e08",
+        "effect_router",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.678983211517334,
+      "selected_count": 3,
+      "counts": [
+        [
+          "3",
+          "0",
+          "0"
+        ]
+      ],
+      "binary_sha256": "f1fe8d07e7b7b55c5e13def5dd426bba5dff5c4e170a42c7dd34b94de8972d6c",
+      "log_sha256": "10d2e6ca349f89319c7c639a182427ec8984efe182cc80af8884bb9d4bbb1a10",
+      "build": "mixed-07-build",
+      "receipt": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/cp-unbound-router-green-07-receipt.json",
+      "receipt_sha256": "2d798e27599c151eac5c366fe19e268c72505448acd475bba36989efe460db0d"
+    },
+    {
+      "source": "45c7ddc952ce7c619ff6b174db54c6ecaa77ba1e",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/chio_store_sqlite-15d37b71f470e4c8",
+        "admission_operation_store::tests::budget_selector_corruption::",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 5.328322172164917,
+      "selected_count": 3,
+      "counts": [
+        [
+          "3",
+          "0",
+          "0"
+        ]
+      ],
+      "binary_sha256": "8ca49bc944f6ba6c6c64c4b1d4502402fb28a9a216c20660ceba4fdfe3ec1607",
+      "log_sha256": "f797b309df9e63a15b694f44b0ab9cd169f81d7c7099ae53ed9fa5fb34cd1048",
+      "build": "mixed-07-build",
+      "receipt": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/store-selector-corruption-green-07-receipt.json",
+      "receipt_sha256": "dfe292d5f136e779c1cda6206aa53e9c44d3f129892a22c20f2bab1be68b2340"
+    },
+    {
+      "source": "45c7ddc952ce7c619ff6b174db54c6ecaa77ba1e",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/chio_mcp_remote-986c5d05fbe3d2c1",
+        "mcp_projection_control_valid_v2_nonce",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 2.493358850479126,
+      "selected_count": 1,
+      "counts": [
+        [
+          "0",
+          "1",
+          "0"
+        ]
+      ],
+      "binary_sha256": "0e0ae015a30d8c7d83208ce936412ba2d02a623d6b5c1fe99c956c45ec819f0d",
+      "log_sha256": "83b631539698924bd0b7ea0d3653fbdb961e5a3da7bae6a55e75586e44a33125",
+      "build": "mixed-07-build",
+      "receipt": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/mcp-v2-positive-green-07-receipt.json",
+      "receipt_sha256": "940c0be2edecec57736e28ae9ca07aaa305b6ad27c84ab4564205bd5bb4f520a"
+    },
+    {
+      "source": "45c7ddc952ce7c619ff6b174db54c6ecaa77ba1e",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/chio_secret_broker-59ec3034deaa31a6",
+        "kernel_admission::tests::original_selection::selector_controls::",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 83.70878767967224,
+      "selected_count": 4,
+      "counts": [
+        [
+          "3",
+          "1",
+          "0"
+        ]
+      ],
+      "binary_sha256": "90e37dbcfc970a30e80b000daf76221f9c95f7e7ba4601ba71f4c13da365f703",
+      "log_sha256": "229146d3e9da07eae62d3c51fb54bccd28dfc56b1142ea13529ffe9860824de6",
+      "build": "mixed-07-build",
+      "receipt": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/broker-selector-controls-green-07-receipt.json",
+      "receipt_sha256": "2932d1c2a310f0afc8e67bdbe201ba77c7307393c936613359ac3b0586e759a2"
+    },
+    {
+      "source": "e5853308c9c9c4a7be4c8b531d07c5672db98987",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/chio_mcp_remote-986c5d05fbe3d2c1",
+        "mcp_projection_control_valid_v2_nonce",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 2.7423079013824463,
+      "selected_count": 1,
+      "counts": [
+        [
+          "1",
+          "0",
+          "0"
+        ]
+      ],
+      "binary_sha256": "5f2493ac7dee5270f7325b2631027dc1be159b576f72ee0c70d9198e2584af81",
+      "log_sha256": "68bcf0845c65a686f2d2116cef9db91a7434dd50f35883015afb5a236a4cab2d",
+      "build": "mixed-08-build",
+      "receipt": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/mcp-v2-positive-green-08-receipt.json",
+      "receipt_sha256": "d982c4b807b0aa921e4dd4cb75e02c1c007a23b3f675afafa5504204fc429541"
+    },
+    {
+      "source": "e5853308c9c9c4a7be4c8b531d07c5672db98987",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/chio_control_plane-9db6014f2cdf0e08",
+        "missing_active_capability_set_without_a_completed_remove_stays_an_integrity_failure",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.523449182510376,
+      "selected_count": 1,
+      "counts": [
+        [
+          "1",
+          "0",
+          "0"
+        ]
+      ],
+      "binary_sha256": "c5bd0c7d9bc0cc84acb38e1be7aac91b5da14269df81bbbf853b1d8f817b690b",
+      "log_sha256": "caa1dc4755feed23eece5cfbbf0a7d10d700f3e2f1ce910729ebeb6952b89db7",
+      "build": "mixed-08-build",
+      "receipt": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/cp-no-remove-preservation-08-receipt.json",
+      "receipt_sha256": "e5a9341f20e208b6b552707e44d35defecf2593483467b00000e8872badca5b4"
+    },
+    {
+      "source": "e5853308c9c9c4a7be4c8b531d07c5672db98987",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/egress_restrictions-bc03beaf374808bb",
+        "a_fresh_apply_with_a_stale_generation_is_refused_without_mutation",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.17033791542053223,
+      "selected_count": 1,
+      "counts": [
+        [
+          "1",
+          "0",
+          "0"
+        ]
+      ],
+      "binary_sha256": "6deb30752f78b7bd2670a23d064efa815861634c0378cbb7999688a17aa8f664",
+      "log_sha256": "222031ae274681403928ca9ddd66f37adccd5b2a7d48d41ce39e3f28a3d0082f",
+      "build": "mixed-08-build",
+      "receipt": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/egress-cas-preservation-08-receipt.json",
+      "receipt_sha256": "ade7ec7e3886d0c601eb21bab58a51ef33589e2271e7a58ca1b5f5ec741d5fcc"
+    },
+    {
+      "source": "e5853308c9c9c4a7be4c8b531d07c5672db98987",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/chio_secret_broker-59ec3034deaa31a6",
+        "kernel_admission::tests::original_selection::selector_controls::",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 86.07307934761047,
+      "selected_count": 4,
+      "counts": [
+        [
+          "4",
+          "0",
+          "0"
+        ]
+      ],
+      "binary_sha256": "a652513e379e3d6d87f4f6c6b4e70cb6e73c085375921e45b4b49e29e5ab1b90",
+      "log_sha256": "9ccb848bcb8f155fad0c855e65b43c85acc0ad225bfc9e062bf7b0f2e0577a35",
+      "build": "mixed-08-build",
+      "receipt": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/broker-selector-controls-green-08-receipt.json",
+      "receipt_sha256": "f676a3bb63dfd2c6b216d703d201166281d9d128d62f283e6299d4519325aba7"
+    },
+    {
+      "source": "e5853308c9c9c4a7be4c8b531d07c5672db98987",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/chio_mcp_remote-986c5d05fbe3d2c1",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 145.7644226551056,
+      "selected_count": 192,
+      "counts": [
+        [
+          "192",
+          "0",
+          "0"
+        ]
+      ],
+      "binary_sha256": "5f2493ac7dee5270f7325b2631027dc1be159b576f72ee0c70d9198e2584af81",
+      "log_sha256": "4b1eb7a0ba9c5e6b8cd9cd0f2f810e7f1dfd5098536dcc15f9c87a051c3fb454",
+      "build": "mixed-08-build",
+      "receipt": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/mcp-owning-green-08-receipt.json",
+      "receipt_sha256": "96861dc606b6f1a519c114e6cab248ac4264cd2b5a2b6e140a4fddf887402d8a"
+    },
+    {
+      "source": "e5853308c9c9c4a7be4c8b531d07c5672db98987",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/egress_restrictions-bc03beaf374808bb",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.8768136501312256,
+      "selected_count": 5,
+      "counts": [
+        [
+          "5",
+          "0",
+          "0"
+        ]
+      ],
+      "binary_sha256": "6deb30752f78b7bd2670a23d064efa815861634c0378cbb7999688a17aa8f664",
+      "log_sha256": "df203be8f6b49a914a3023db0b19a5612e7df6332e291181e083ab42b8ddf75b",
+      "build": "mixed-08-build",
+      "receipt": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/egress-owning-green-08-receipt.json",
+      "receipt_sha256": "1a72410ede0bcdbd41111522db27049ac5eb8a0592603d03a219872362ac53dc"
+    }
+  ],
+  "source_gates": [
+    {
+      "source": "e5853308c9c9c4a7be4c8b531d07c5672db98987",
+      "argv": [
+        "python3",
+        "scripts/check-trust-boundaries.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 93.18464255332947,
+      "log_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/mixed08-trust.log",
+      "log_sha256": "c9ee67eaa3d16b912c8df3b0ec1f28ee8d2ec75850a37faf050841c3e327b1e6"
+    },
+    {
+      "source": "e5853308c9c9c4a7be4c8b531d07c5672db98987",
+      "argv": [
+        "python3",
+        "scripts/check-rust-file-hygiene.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 4.617164850234985,
+      "log_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/mixed08-hygiene.log",
+      "log_sha256": "a42e416fc725fdaf80132a312ad674ff940fd61c12c1b2602933f12911c6e2c1"
+    },
+    {
+      "source": "e5853308c9c9c4a7be4c8b531d07c5672db98987",
+      "argv": [
+        "python3",
+        "scripts/check-negative-assertions.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.3814709186553955,
+      "log_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/mixed08-negative.log",
+      "log_sha256": "49516e4ccc9c034cbb5fd748bdcae89b35f56d06d12a4c5e01ea61c0e17c45a6"
+    },
+    {
+      "source": "e5853308c9c9c4a7be4c8b531d07c5672db98987",
+      "argv": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 27.04550051689148,
+      "log_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/mixed08-fmt.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "strict_clippy": {
+    "source": "e5853308c9c9c4a7be4c8b531d07c5672db98987",
+    "argv": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "-p",
+      "chio-control-plane",
+      "-p",
+      "chio-kernel",
+      "-p",
+      "chio-store-sqlite",
+      "-p",
+      "chio-security-types",
+      "-p",
+      "chio-quarantine",
+      "-p",
+      "chio-cli",
+      "-p",
+      "chio-secret-broker",
+      "-p",
+      "chio-mcp-remote",
+      "--features",
+      "chio-kernel/admission-test-support,chio-security-types/std,chio-store-sqlite/admission-test-support",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 248.61506533622742,
+    "log_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/mixed08-owning-clippy.log",
+    "log_sha256": "f5a1456cdf737b20a1d452e9b93aba08c29ab8c43effbccfbe4e9bb7297cb393"
+  },
+  "diagnosis_corrections": [
+    {
+      "prior": "repair-batch-local-checkpoint-20261008.json interpretation and MCP-v2-fixture proposed action",
+      "correction": "Ordinary MCP calls never retain a native original request. The failed terminal read and live-dispatch read were invalid setup assumptions, not proof of premature cleanup. Source227c770110 derives a coherent metadata-only fixture from actual issued capability, request arguments and signed receipt through public canonical validation and nonce mint APIs. It neither adds production retention nor claims native execution custody. Both failed setup campaigns remain retained."
+    },
+    {
+      "prior": "broker-selector-controls-green-07 oversized external mutation",
+      "correction": "The existing composite-hold immutability trigger rejects the external operation-id update before selector lookup. Sourcee5853308c9 asserts typed1811 refusal and unchanged authenticated operation, request and custody. Separate private owning-connection controls reach the selector index,513-byte and ambiguity guards and pass3/0."
+    }
+  ],
+  "source_repairs": {
+    "C2": [
+      "ba6e6fd822",
+      "8fb315b9dd"
+    ],
+    "MCP-v2-fixture": [
+      "227c770110"
+    ],
+    "BROKER-selector-control": [
+      "e5853308c9"
+    ],
+    "EG-CAS-preservation": [
+      "6d0bcda468"
+    ],
+    "EF-REPLAY-preservation": [
+      "c88b97d7e6"
+    ],
+    "TEARDOWN-test-ownership": [
+      "ef23fba41c"
+    ]
+  },
+  "acceptance": {
+    "MCP": "Whole remote library192/0 at e585, including corrected metadata fixture; broader protocol/native/hosted acceptance remains open.",
+    "BROKER": "New controls4/0 at e585 plus private selectors3/0 at45c; full broker/native qualification remains open.",
+    "EG-CAS": "Full egress target5/0 at e585; genuine stale-generation refusal preserved.",
+    "EF-REPLAY": "No-Remove tamper preservation1/0 at e585. Genuine historical query regression at29e9 still awaits authenticated-removal producer.",
+    "strict": "Eight-owner all-targets Clippy failed on test-only drop(Pin<&mut Future>). Owned pinned-future correctionef23 is committed; recheck pending."
+  },
+  "scratch_F077": {
+    "manifest": "/tmp/pr1160-f077-followup/SHA256SUMS",
+    "verified_entries": 418,
+    "all_hashes_match": true,
+    "scope": "Actions scratch transport observations only; exclusive external App and production finalizer qualification remain open.",
+    "design": "Pending minimal candidate identity B/E/tree plus S/D with exclusive App-owned security result; no production issuer/rule changes."
+  },
+  "native_preparation": {
+    "worker": "chio-security-qualification-20260929",
+    "state": "Existing stopped worker started by Root for resource preparation; no candidate build or native attempt.",
+    "holder": "/home/connor/lanes/claude-pr1160-evidence/oci-worker-holders/codex-final-candidate-20261008.json"
+  },
+  "remaining_acceptance": [
+    "Complete and review effect finality, same-lineage freeze and authenticated historical-query repairs with preserved legacy source evidence.",
+    "Recheck test-future ownership and strict owning lint.",
+    "Complete current owning/default/PQ/platform/cold/native/trusted and exact-source hosted qualification.",
+    "Qualify protected finalizer and independent review, then protected landing."
+  ]
+}
