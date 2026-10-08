@@ -950,12 +950,14 @@ impl ChioKernel {
         }))
     }
 
+    /// Returns `false` when another token holds an unexpired lease on the
+    /// outbox, which then stays pending for that holder.
     fn persist_and_acknowledge_terminal_receipt(
         &self,
         store: &dyn AdmissionOperationStore,
         operation: &AdmissionOperation,
         payload: &TerminalReceiptOutboxPayload,
-    ) -> Result<(), KernelError> {
+    ) -> Result<bool, KernelError> {
         self.validate_terminal_receipt_payload_with_store(store, operation, payload)?;
         self.record_chio_receipt(&payload.receipt)?;
         self.discharge_admission_cleanup_action_with_store(
@@ -971,8 +973,28 @@ impl ChioKernel {
         kind: AdmissionOperationKind,
         expected_coordinator_authority_id: Option<&str>,
     ) -> Result<usize, KernelError> {
+        self.recover_terminal_receipt_outboxes_progress(
+            store,
+            kind,
+            expected_coordinator_authority_id,
+        )?
+        .into_ready_count()
+    }
+
+    /// One complete paged pass. An outbox whose lease another token still
+    /// holds stays pending for that holder and counts as item-local pending
+    /// progress, which refuses readiness for this whole invocation. Every
+    /// other item failure accumulates into one bounded refusal of the pass,
+    /// and inventory and operation load faults outside an item return at
+    /// once; neither is ever counted as pending.
+    pub(super) fn recover_terminal_receipt_outboxes_progress(
+        &self,
+        store: &dyn AdmissionOperationStore,
+        kind: AdmissionOperationKind,
+        expected_coordinator_authority_id: Option<&str>,
+    ) -> Result<super::admission_cleanup::ActiveResponseRecoveryProgress, KernelError> {
         self.ensure_receipt_persistence_ready()?;
-        let mut recovered = 0usize;
+        let mut progress = super::admission_cleanup::ActiveResponseRecoveryProgress::default();
         let mut failed = 0usize;
         let mut first_failure: Option<(String, KernelError)> = None;
         let mut cursor: Option<String> = None;
@@ -1049,13 +1071,13 @@ impl ChioKernel {
                     self.persist_and_acknowledge_terminal_receipt(store, &operation, &payload)
                 })();
                 match result {
-                    Ok(()) => {
-                        recovered = recovered.checked_add(1).ok_or_else(|| {
-                            KernelError::Internal(
-                                "terminal receipt recovery count overflowed usize".to_string(),
-                            )
-                        })?;
-                    }
+                    Ok(true) => progress.record_completed()?,
+                    Ok(false) => progress.record_pending(|| {
+                        KernelError::Internal(
+                            "one or more terminal receipt outboxes remain after the paged recovery pass"
+                                .to_string(),
+                        )
+                    })?,
                     Err(error) => {
                         failed = failed.checked_add(1).ok_or_else(|| {
                             KernelError::Internal(
@@ -1078,21 +1100,49 @@ impl ChioKernel {
                 "one or more terminal receipt outboxes remain unfinished: {failed} failed, first operation {operation_id}: {error}"
             )));
         }
-        if !store
-            .list_operations_with_pending_cleanup_action_page(
+        // A count bound, not set equality: no more outboxes may remain than
+        // this pass left under another lease. Those stay pending for this
+        // whole invocation even if their holders finish meanwhile.
+        let mut remaining = 0usize;
+        let mut remaining_cursor: Option<String> = None;
+        loop {
+            let mut operation_ids = store.list_operations_with_pending_cleanup_action_page(
                 kind,
                 AdmissionCleanupActionKind::TerminalReceipt,
-                None,
-                1,
-            )?
-            .is_empty()
-        {
-            return Err(KernelError::Internal(
-                "one or more terminal receipt outboxes remain after the paged recovery pass"
-                    .to_string(),
-            ));
+                remaining_cursor.as_deref(),
+                MAX_TERMINAL_RECEIPT_RECOVERY_OPERATIONS_PER_ACTIVATION + 1,
+            )?;
+            let more_remaining =
+                operation_ids.len() > MAX_TERMINAL_RECEIPT_RECOVERY_OPERATIONS_PER_ACTIVATION;
+            operation_ids.truncate(MAX_TERMINAL_RECEIPT_RECOVERY_OPERATIONS_PER_ACTIVATION);
+            for operation_id in operation_ids {
+                if remaining_cursor
+                    .as_deref()
+                    .is_some_and(|last| operation_id.as_str() <= last)
+                {
+                    return Err(KernelError::Internal(
+                        "terminal receipt recovery page did not advance its exact cursor"
+                            .to_string(),
+                    ));
+                }
+                remaining = remaining.checked_add(1).ok_or_else(|| {
+                    KernelError::Internal(
+                        "terminal receipt remaining count overflowed usize".to_string(),
+                    )
+                })?;
+                if remaining > progress.pending {
+                    return Err(KernelError::Internal(
+                        "one or more terminal receipt outboxes remain after the paged recovery pass"
+                            .to_string(),
+                    ));
+                }
+                remaining_cursor = Some(operation_id);
+            }
+            if !more_remaining {
+                break;
+            }
         }
-        Ok(recovered)
+        Ok(progress)
     }
 
     fn validate_terminal_receipt_payload_with_store(

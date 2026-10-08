@@ -367,12 +367,36 @@ impl ChioKernel {
         }
         if operation.state() == AdmissionOperationState::CompensatedBeforeDispatch {
             self.validate_terminal_receipt_binding_with_store(operation_store, &operation)?;
-            self.recover_terminal_receipt_outboxes_with_store(
+            let receipts = self.recover_terminal_receipt_outboxes_progress(
                 operation_store,
                 AdmissionOperationKind::GovernedActiveResponse,
                 Some(operation.coordinator_authority_id()),
             )?;
-            return Ok(true);
+            if receipts.pending == 0 {
+                return Ok(true);
+            }
+            // Another lease holds an outbox. This operation is resolved only
+            // by its own exactly bound outbox reading back as Completed.
+            let mut own_receipts = operation_store
+                .load_cleanup_actions(operation_id)?
+                .into_iter()
+                .filter(|action| action.kind() == AdmissionCleanupActionKind::TerminalReceipt);
+            let own_receipt = match (own_receipts.next(), own_receipts.next()) {
+                (Some(action), None) => action,
+                _ => {
+                    return Err(KernelError::Internal(format!(
+                        "compensated operation {operation_id} does not have exactly one terminal receipt outbox"
+                    )))
+                }
+            };
+            if own_receipt.operation_id() != operation.operation_id()
+                || own_receipt.request_binding_hash() != operation.request_binding_hash()
+            {
+                return Err(KernelError::Internal(format!(
+                    "terminal receipt outbox for operation {operation_id} changed its immutable binding"
+                )));
+            }
+            return Ok(own_receipt.state() == AdmissionCleanupActionState::Completed);
         }
 
         let actions = operation_store.load_cleanup_actions(operation_id)?;
@@ -430,13 +454,15 @@ impl ChioKernel {
         Ok(true)
     }
 
+    /// Returns `false` only for the typed `Busy` claim outcome: another token
+    /// holds an unexpired lease, and the action stays pending for it.
     fn execute_claimed_cleanup_action<F>(
         &self,
         store: &dyn AdmissionOperationStore,
         operation: &AdmissionOperation,
         action: &AdmissionCleanupAction,
         execute: F,
-    ) -> Result<(), KernelError>
+    ) -> Result<bool, KernelError>
     where
         F: FnOnce() -> Result<(), KernelError>,
     {
@@ -455,8 +481,8 @@ impl ChioKernel {
             claim_deadline_unix_ms,
         )? {
             AdmissionCleanupActionClaimOutcome::Claimed(claimed) => claimed,
-            AdmissionCleanupActionClaimOutcome::Completed(_) => return Ok(()),
-            AdmissionCleanupActionClaimOutcome::Busy(_) => return Ok(()),
+            AdmissionCleanupActionClaimOutcome::Completed(_) => return Ok(true),
+            AdmissionCleanupActionClaimOutcome::Busy(_) => return Ok(false),
             AdmissionCleanupActionClaimOutcome::Missing => {
                 return Err(KernelError::Internal(
                     "cleanup action disappeared during claim".to_string(),
@@ -477,7 +503,7 @@ impl ChioKernel {
             claimed.version(),
             &claim_token,
         )? {
-            AdmissionCleanupActionCasOutcome::Applied(_) => Ok(()),
+            AdmissionCleanupActionCasOutcome::Applied(_) => Ok(true),
             AdmissionCleanupActionCasOutcome::Conflict(_) => {
                 let completed = store
                     .load_cleanup_actions(operation.operation_id())?
@@ -487,7 +513,7 @@ impl ChioKernel {
                             && current.state() == AdmissionCleanupActionState::Completed
                     });
                 if completed {
-                    Ok(())
+                    Ok(true)
                 } else {
                     Err(KernelError::Internal(
                         "cleanup acknowledgement conflicted".to_string(),
@@ -500,12 +526,14 @@ impl ChioKernel {
         }
     }
 
+    /// Returns `false` when another token holds an unexpired lease on the
+    /// action.
     pub(super) fn discharge_admission_cleanup_action_with_store(
         &self,
         store: &dyn AdmissionOperationStore,
         operation: &AdmissionOperation,
         kind: AdmissionCleanupActionKind,
-    ) -> Result<(), KernelError> {
+    ) -> Result<bool, KernelError> {
         let actions = store
             .load_cleanup_actions(operation.operation_id())?
             .into_iter()
@@ -667,14 +695,11 @@ impl ChioKernel {
         approval_store: Option<&dyn ApprovalStore>,
         expected_coordinator_authority_id: &str,
     ) -> Result<ActiveResponseRecoveryProgress, KernelError> {
-        let mut progress = ActiveResponseRecoveryProgress {
-            completed: self.recover_terminal_receipt_outboxes_with_store(
-                operation_store,
-                AdmissionOperationKind::GovernedActiveResponse,
-                Some(expected_coordinator_authority_id),
-            )?,
-            ..ActiveResponseRecoveryProgress::default()
-        };
+        let mut progress = self.recover_terminal_receipt_outboxes_progress(
+            operation_store,
+            AdmissionOperationKind::GovernedActiveResponse,
+            Some(expected_coordinator_authority_id),
+        )?;
         let mut cursor: Option<String> = None;
         loop {
             let mut page = operation_store.list_admission_recovery_candidates_page(
@@ -811,12 +836,15 @@ pub(super) struct ActiveResponseRecoveryProgress {
 }
 
 impl ActiveResponseRecoveryProgress {
-    fn record_completed(&mut self) -> Result<(), KernelError> {
+    pub(super) fn record_completed(&mut self) -> Result<(), KernelError> {
         self.completed = increment_recovery_count(self.completed)?;
         Ok(())
     }
 
-    fn record_pending(&mut self, refusal: impl FnOnce() -> KernelError) -> Result<(), KernelError> {
+    pub(super) fn record_pending(
+        &mut self,
+        refusal: impl FnOnce() -> KernelError,
+    ) -> Result<(), KernelError> {
         self.pending = increment_recovery_count(self.pending)?;
         if self.first_refusal.is_none() {
             self.first_refusal = Some(refusal());
