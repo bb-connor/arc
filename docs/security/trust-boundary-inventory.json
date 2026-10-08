@@ -296,6 +296,7 @@
     "crates/platform/chio-store-sqlite/src/security_state/correlation.rs",
     "crates/platform/chio-store-sqlite/src/security_state/declassification_codec.rs",
     "crates/platform/chio-store-sqlite/src/security_state/dispatch.rs",
+    "crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs",
     "crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs",
     "crates/platform/chio-store-sqlite/src/security_state/finding_batches.rs",
     "crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs",
@@ -1130,6 +1131,12 @@
       "principal": "decoy-registry",
       "contract": "Typed lookup includes authenticated tenant and the keyed artifact/marker reference.",
       "runtime_family": "watermark-sequence"
+    },
+    "security_response_effect_finality": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Immutable first completed-removal markers use exact tenant/kind/effect keys. Canonical marker bytes and hashes must match the authenticated original per-kind Remove journal before blocking a fresh Apply or supplying a readonly removal witness. Privileged schema/migration coverage walks all tenants under named contracts; absence alone is not completion evidence.",
+      "runtime_family": "response-effect-finality"
     }
   },
   "principals": {
@@ -1466,6 +1473,7 @@
     "crates/platform/chio-store-sqlite/src/security_state/dispatch.rs::load_automatic_response_dispatch_fence::from_wire",
     "crates/platform/chio-store-sqlite/src/security_state/dispatch.rs::load_response_dispatch::from_wire",
     "crates/platform/chio-store-sqlite/src/security_state/dispatch.rs::validate_response_dispatch_request::from_wire",
+    "crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::load_marker::from_wire",
     "crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs::decode_egress_command_contribution::from_wire",
     "crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs::load_egress_restriction_command::from_wire",
     "crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs::load_egress_restriction_command::from_wire",
@@ -2750,6 +2758,9 @@
     ],
     "security_transitions": [
       "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
+    ],
+    "security_response_effect_finality": [
+      "crates/platform/chio-store-sqlite/src/security_state/effect_finality/schema.rs"
     ]
   },
   "unscoped_sql": [
@@ -4263,6 +4274,28 @@
       "sql": "SELECT tenant_id, action_id, dispatch_id FROM security_response_dispatch_fences ORDER BY tenant_id ASC, action_id ASC, dispatch_id ASC",
       "principal": "security-runtime",
       "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "owner": "verify_coverage",
+      "path": "crates/platform/chio-store-sqlite/src/security_state/effect_finality/migration.rs",
+      "sha256": "9b56d8622141d76b4371fd8be5436bcd5912ae0ed7d547e51d3cda74fed2b545",
+      "sql": "SELECT EXISTS(SELECT 1 FROM security_response_effect_finality WHERE effect_kind NOT IN ('suspend_session', 'restrict_egress', 'throttle_session', 'suspend_capability_set', 'freeze_issuance'))",
+      "tables": [
+        "security_response_effect_finality"
+      ],
+      "principal": "security-runtime",
+      "contract": "Privileged finality coverage validation rejects every marker outside the five closed effect kinds; this global EXISTS check returns no tenant payload or execution authority."
+    },
+    {
+      "owner": "verify_kind_coverage",
+      "path": "crates/platform/chio-store-sqlite/src/security_state/effect_finality/migration.rs",
+      "sha256": "24462267acffa8b77105db3a4585f7e608de3f1502d0eccc30e5f98930679e76",
+      "sql": "SELECT tenant_id, effect_id FROM security_response_effect_finality WHERE effect_kind = ?1 AND (tenant_id, effect_id) > (?2, ?3) ORDER BY tenant_id, effect_id LIMIT ?4",
+      "tables": [
+        "security_response_effect_finality"
+      ],
+      "principal": "security-runtime",
+      "contract": "Privileged finality coverage walks closed-kind markers in ordered tenant/effect pages of 128 keys. Every selected marker must reconstruct from its exact per-kind original Remove journal and have no active contribution. Tenant-facing reads retain exact tenant predicates; this global walk is validation, not release authority. Keys are typed after SQLite materialization."
     },
     {
       "path": "crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs",
@@ -11947,6 +11980,17 @@
           "test": "watermark_sequence_operation_ids_are_tenant_wide"
         }
       ]
+    },
+    "response-effect-finality": {
+      "entry_points": [
+        "effect_finality::check_apply",
+        "effect_finality::record_remove",
+        "effect_finality::verified_marker",
+        "CapabilitySetSuspensionStore::load_completed_capability_set_suspension_remove",
+        "effect_finality::migration::verify_kind_coverage"
+      ],
+      "evidence_kind": "runtime-gap",
+      "remaining": "Qualify exact tenant/kind/effect collision, first-removal immutability, altered marker/journal refusal and readonly witness across remove/replay/reopen/migration for all five supported kinds. Existing generic tenant/reopen tests do not directly establish the new marker table or removal-witness boundary. Root owns required runtime qualification."
     }
   },
   "reviewed_kernel_sqlite_owners": {
@@ -13099,6 +13143,9 @@
         "table::new#1::decode_signed"
       ],
       "retained_typed_conversions": []
+    },
+    "crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs": {
+      "contract": "The new 16 KiB marker from_wire/decode_signed chain rejects noncanonical bytes, wrong hashes/identities and markers that cannot be reconstructed from the original tenant-scoped per-kind Remove journal. Owning command/request/result/snapshot readers preserve their existing 64 MiB contract. SQLite values are materialized before constructor bounds are checked; this review makes no pre-allocation or input-closure claim. The marker and readonly witness confer no fresh authority."
     }
   },
   "reviewed_authority_owners": {
@@ -16707,6 +16754,7 @@
     "crates/platform/chio-store-sqlite/src/security_state/dispatch.rs::load_automatic_response_dispatch_fence::from_wire#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/security_state/dispatch.rs::load_response_dispatch::from_wire#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/security_state/dispatch.rs::validate_response_dispatch_request::from_wire#1::decode_signed",
+    "crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::load_marker::from_wire#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs::decode_egress_command_contribution::from_wire#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs::load_egress_restriction_command::from_wire#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs::load_egress_restriction_command::from_wire#2::decode_signed",
@@ -17925,7 +17973,8 @@
     ],
     "crates/platform/chio-control-plane/src/security/adapters/effect_port/suspension.rs": [
       "decode_capability_set_suspension_spec::original-json-reader::UntrustedJsonText",
-      "execute::shared-reader::crates/platform/chio-control-plane/src/security/adapters/effect_port/suspension.rs::decode_capability_set_suspension_spec"
+      "execute::shared-reader::crates/platform/chio-control-plane/src/security/adapters/effect_port/suspension.rs::decode_capability_set_suspension_spec",
+      "verify_completed_removal::shared-reader::crates/platform/chio-control-plane/src/security/adapters/effect_port/suspension.rs::decode_capability_set_suspension_spec"
     ],
     "crates/platform/chio-control-plane/src/security/adapters/effect_port/throttle.rs": [
       "decode_session_throttle_limits::original-json-reader::UntrustedJsonText",
@@ -19675,17 +19724,22 @@
       "apply_capability_set_suspension::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::persist_command",
       "apply_capability_set_suspension::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::persist_command",
       "apply_capability_set_suspension::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::validate_apply_request",
+      "apply_capability_set_suspension::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::check_apply",
       "command_contribution::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::decode_suspension_spec",
       "decode_suspension_spec::original-json-reader::UntrustedJsonText",
       "decode_suspension_spec::shared-reader::crates/platform/chio-store-sqlite/src/security_state/codec.rs::validate_canonical_json_body",
       "ensure_capability_set_suspensions_ready::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::load_command",
       "ensure_capability_set_suspensions_ready::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::load_snapshot",
       "ensure_capability_set_suspensions_ready::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::validate_stored_command",
+      "ensure_capability_set_suspensions_ready::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::validate_ready",
       "evaluate_capability_suspension::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension/admission_lookup.rs::evaluate",
       "load_capability_set_suspension_result::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::load_command",
       "load_capability_set_suspension_result::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::validate_stored_command",
       "load_capability_set_suspensions::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::load_snapshot",
       "load_command::original-json-reader::UntrustedJsonText",
+      "load_completed_capability_set_suspension_remove::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::load_command",
+      "load_completed_capability_set_suspension_remove::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::validate_stored_command",
+      "load_completed_capability_set_suspension_remove::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::completed_capability_remove",
       "load_snapshot::original-json-reader::UntrustedJsonText",
       "persist_command::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::load_command",
       "remove_capability_set_suspension::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::command_contribution",
@@ -19695,6 +19749,8 @@
       "remove_capability_set_suspension::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::persist_command",
       "remove_capability_set_suspension::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::persist_command",
       "remove_capability_set_suspension::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::validate_remove_request",
+      "remove_capability_set_suspension::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::record_remove",
+      "remove_capability_set_suspension::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::record_remove",
       "validate_apply_request::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::command_contribution",
       "validate_apply_request::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::validate_command_common",
       "validate_command_common::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::command_contribution",
@@ -19714,10 +19770,12 @@
       "apply_contribution::shared-reader::crates/platform/chio-store-sqlite/src/security_state/containment.rs::persist_containment_overlay_command",
       "apply_contribution::shared-reader::crates/platform/chio-store-sqlite/src/security_state/containment.rs::persist_containment_overlay_command",
       "apply_contribution::shared-reader::crates/platform/chio-store-sqlite/src/security_state/containment.rs::validate_containment_apply_command",
+      "apply_contribution::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::check_apply",
       "decode_containment_command_contribution::original-json-reader::UntrustedJsonText",
       "decode_containment_command_contribution::shared-reader::crates/platform/chio-store-sqlite/src/security_state/codec.rs::validate_canonical_json_body",
       "ensure_containment_overlays_ready::shared-reader::crates/platform/chio-store-sqlite/src/security_state/containment.rs::load_containment_overlay_command",
       "ensure_containment_overlays_ready::shared-reader::crates/platform/chio-store-sqlite/src/security_state/containment.rs::validate_stored_containment_overlay_command",
+      "ensure_containment_overlays_ready::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::validate_ready",
       "load_containment_overlay_command::original-json-reader::UntrustedJsonText",
       "load_containment_overlay_result::shared-reader::crates/platform/chio-store-sqlite/src/security_state/containment.rs::load_containment_overlay_command",
       "load_containment_overlay_result::shared-reader::crates/platform/chio-store-sqlite/src/security_state/containment.rs::validate_stored_containment_overlay_command",
@@ -19727,6 +19785,8 @@
       "remove_contribution::shared-reader::crates/platform/chio-store-sqlite/src/security_state/containment.rs::persist_containment_overlay_command",
       "remove_contribution::shared-reader::crates/platform/chio-store-sqlite/src/security_state/containment.rs::persist_containment_overlay_command",
       "remove_contribution::shared-reader::crates/platform/chio-store-sqlite/src/security_state/containment.rs::validate_containment_remove_command",
+      "remove_contribution::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::record_remove",
+      "remove_contribution::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::record_remove",
       "validate_containment_apply_command::shared-reader::crates/platform/chio-store-sqlite/src/security_state/containment.rs::decode_containment_command_contribution",
       "validate_containment_apply_command::shared-reader::crates/platform/chio-store-sqlite/src/security_state/containment.rs::validate_containment_command_common",
       "validate_containment_command_common::shared-reader::crates/platform/chio-store-sqlite/src/security_state/containment.rs::decode_containment_command_contribution",
@@ -19832,18 +19892,22 @@
       "validate_response_dispatch_request::shared-reader::crates/platform/chio-store-sqlite/src/security_state/response_journal.rs::decode_response_snapshot"
     ],
     "crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs": [
+      "apply_egress_restriction::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::check_apply",
       "apply_egress_restriction::shared-reader::crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs::load_egress_restriction_command",
       "apply_egress_restriction::shared-reader::crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs::persist_egress_restriction_command",
       "apply_egress_restriction::shared-reader::crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs::persist_egress_restriction_command",
       "apply_egress_restriction::shared-reader::crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs::validate_egress_apply_command",
       "decode_egress_command_contribution::original-json-reader::UntrustedJsonText",
       "decode_egress_command_contribution::shared-reader::crates/platform/chio-store-sqlite/src/security_state/codec.rs::validate_canonical_json_body",
+      "ensure_egress_restrictions_ready::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::validate_ready",
       "ensure_egress_restrictions_ready::shared-reader::crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs::load_egress_restriction_command",
       "ensure_egress_restrictions_ready::shared-reader::crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs::validate_stored_egress_restriction_command",
       "load_egress_restriction_command::original-json-reader::UntrustedJsonText",
       "load_egress_restriction_result::shared-reader::crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs::load_egress_restriction_command",
       "load_egress_restriction_result::shared-reader::crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs::validate_stored_egress_restriction_command",
       "persist_egress_restriction_command::shared-reader::crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs::load_egress_restriction_command",
+      "remove_egress_restriction::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::record_remove",
+      "remove_egress_restriction::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::record_remove",
       "remove_egress_restriction::shared-reader::crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs::decode_egress_command_contribution",
       "remove_egress_restriction::shared-reader::crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs::load_egress_restriction_command",
       "remove_egress_restriction::shared-reader::crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs::persist_egress_restriction_command",
@@ -19893,6 +19957,7 @@
       "load_session_label::shared-reader::crates/platform/chio-store-sqlite/src/security_state/codec.rs::decode_label"
     ],
     "crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs": [
+      "apply_issuance_freeze::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::check_apply",
       "apply_issuance_freeze::shared-reader::crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs::load_command",
       "apply_issuance_freeze::shared-reader::crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs::load_snapshot",
       "apply_issuance_freeze::shared-reader::crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs::load_snapshot",
@@ -19900,6 +19965,7 @@
       "apply_issuance_freeze::shared-reader::crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs::persist_command",
       "apply_issuance_freeze::shared-reader::crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs::persist_command",
       "apply_issuance_freeze::shared-reader::crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs::validate_apply_request",
+      "complete_issuance_freeze_remove::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::record_remove",
       "complete_issuance_freeze_remove::shared-reader::crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs::load_command",
       "complete_issuance_freeze_remove::shared-reader::crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs::load_snapshot",
       "complete_issuance_freeze_remove::shared-reader::crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs::load_snapshot",
@@ -19909,6 +19975,7 @@
       "decode_canonical::original-json-reader::UntrustedJsonText",
       "decode_freeze_spec::original-json-reader::UntrustedJsonText",
       "decode_freeze_spec::shared-reader::crates/platform/chio-store-sqlite/src/security_state/codec.rs::validate_canonical_json_body",
+      "ensure_issuance_freezes_ready::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::validate_ready",
       "ensure_issuance_freezes_ready::shared-reader::crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs::load_command",
       "ensure_issuance_freezes_ready::shared-reader::crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs::load_snapshot",
       "evaluate_issuance_freeze::shared-reader::crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs::load_snapshot",
@@ -19919,6 +19986,7 @@
       "load_command::shared-reader::crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs::validate_stored_command",
       "load_completed_issuance_freeze_release::shared-reader::crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs::load_completed_release",
       "load_completed_release::shared-reader::crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs::load_command",
+      "load_finality_command::shared-reader::crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs::load_command",
       "load_issuance_freeze_operation::shared-reader::crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs::load_command",
       "load_issuance_freezes::shared-reader::crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs::load_snapshot",
       "load_pending_issuance_freeze_release::shared-reader::crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs::load_pending_release",
@@ -20069,21 +20137,27 @@
     ],
     "crates/platform/chio-store-sqlite/src/security_state/schema.rs": [
       "migrate::shared-reader::crates/platform/chio-store-sqlite/src/security_state/correlation_schema.rs::ensure_attested_finding_batch_tenant_keys",
-      "migrate::shared-reader::crates/platform/chio-store-sqlite/src/security_state/declassification_schema.rs::prepare_declassification_schema_migration"
+      "migrate::shared-reader::crates/platform/chio-store-sqlite/src/security_state/declassification_schema.rs::prepare_declassification_schema_migration",
+      "migrate::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::migrate_legacy",
+      "migrate::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality/schema.rs::preflight"
     ],
     "crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs": [
+      "apply_session_throttle::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::check_apply",
       "apply_session_throttle::shared-reader::crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs::load_session_throttle_command",
       "apply_session_throttle::shared-reader::crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs::persist_session_throttle_command",
       "apply_session_throttle::shared-reader::crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs::persist_session_throttle_command",
       "apply_session_throttle::shared-reader::crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs::validate_session_throttle_apply_command",
       "decode_session_throttle_limits::original-json-reader::UntrustedJsonText",
       "decode_session_throttle_limits::shared-reader::crates/platform/chio-store-sqlite/src/security_state/codec.rs::validate_canonical_json_body",
+      "ensure_session_throttles_ready::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::validate_ready",
       "ensure_session_throttles_ready::shared-reader::crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs::load_session_throttle_command",
       "ensure_session_throttles_ready::shared-reader::crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs::validate_stored_session_throttle_command",
       "load_session_throttle_command::original-json-reader::UntrustedJsonText",
       "load_session_throttle_result::shared-reader::crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs::load_session_throttle_command",
       "load_session_throttle_result::shared-reader::crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs::validate_stored_session_throttle_command",
       "persist_session_throttle_command::shared-reader::crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs::load_session_throttle_command",
+      "remove_session_throttle::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::record_remove",
+      "remove_session_throttle::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::record_remove",
       "remove_session_throttle::shared-reader::crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs::decode_session_throttle_limits",
       "remove_session_throttle::shared-reader::crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs::load_session_throttle_command",
       "remove_session_throttle::shared-reader::crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs::persist_session_throttle_command",
@@ -22112,6 +22186,41 @@
       "execute::shared-reader::crates/platform/chio-control-plane/src/security/adapters/effect_port/dispatch.rs::validate_durable_plan_binding",
       "load_result::shared-reader::crates/platform/chio-control-plane/src/security/adapters/effect_port/dispatch.rs::validate_durable_plan_binding",
       "validate_durable_plan_binding::shared-reader::crates/core/chio-response-model/src/state.rs::decode_response_record"
+    ],
+    "crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs": [
+      "check_apply::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::verified_marker",
+      "completed_capability_remove::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::load_command",
+      "completed_capability_remove::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::validate_stored_command",
+      "completed_capability_remove::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::load_marker",
+      "load_marker::original-json-reader::UntrustedJsonText",
+      "migrate_legacy::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality/migration.rs::backfill",
+      "persist_first::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::verified_marker",
+      "record_remove::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::persist_first",
+      "record_remove::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality/commands.rs::load",
+      "validate_ready::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality/migration.rs::verify_kind_coverage",
+      "verified_marker::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::load_marker",
+      "verified_marker::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality/commands.rs::load"
+    ],
+    "crates/platform/chio-store-sqlite/src/security_state/effect_finality/schema.rs": [
+      "preflight::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality/migration.rs::verify_coverage"
+    ],
+    "crates/platform/chio-store-sqlite/src/security_state/effect_finality/migration.rs": [
+      "backfill::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::persist_first",
+      "backfill::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality/migration.rs::verify_coverage",
+      "verify_coverage::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality/migration.rs::verify_kind_coverage",
+      "verify_kind_coverage::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::verified_marker",
+      "verify_kind_coverage::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::verified_marker"
+    ],
+    "crates/platform/chio-store-sqlite/src/security_state/effect_finality/commands.rs": [
+      "load::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::load_command",
+      "load::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::validate_stored_command",
+      "load::shared-reader::crates/platform/chio-store-sqlite/src/security_state/containment.rs::load_containment_overlay_command",
+      "load::shared-reader::crates/platform/chio-store-sqlite/src/security_state/containment.rs::validate_stored_containment_overlay_command",
+      "load::shared-reader::crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs::load_egress_restriction_command",
+      "load::shared-reader::crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs::validate_stored_egress_restriction_command",
+      "load::shared-reader::crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs::load_finality_command",
+      "load::shared-reader::crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs::load_session_throttle_command",
+      "load::shared-reader::crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs::validate_stored_session_throttle_command"
     ]
   },
   "retired_direct_readers": {
