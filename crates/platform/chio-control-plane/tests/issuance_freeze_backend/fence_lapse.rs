@@ -43,7 +43,7 @@ impl Clock for ManualClock {
     }
 }
 
-struct StaticLineage(CausalLineageSnapshot);
+pub(super) struct StaticLineage(pub(super) CausalLineageSnapshot);
 
 impl CausalLineageStore for StaticLineage {
     fn ensure_causal_lineage_ready(&self) -> PortResult<()> {
@@ -61,7 +61,7 @@ impl CausalLineageStore for StaticLineage {
     }
 }
 
-struct SqliteFences(Arc<SqliteSecurityStateStore>);
+pub(super) struct SqliteFences(pub(super) Arc<SqliteSecurityStateStore>);
 
 impl LineageFenceStore for SqliteFences {
     fn acquire(&self, request: &LineageFenceRequest) -> PortResult<LineageFence> {
@@ -100,14 +100,27 @@ impl CausalLineageFenceStore for SqliteFences {
 
 /// SQLite issuance-freeze authority whose next fence-maintenance write fails
 /// before it reaches the database, as a busy or lease-lost transaction does.
-struct PersistFaultFreezes {
+pub(super) struct PersistFaultFreezes {
     inner: Arc<SqliteSecurityStateStore>,
     fail_next_maintenance: AtomicBool,
+    fail_next_apply: AtomicBool,
 }
 
 impl PersistFaultFreezes {
+    pub(super) fn new(inner: Arc<SqliteSecurityStateStore>) -> Self {
+        Self {
+            inner,
+            fail_next_maintenance: AtomicBool::new(false),
+            fail_next_apply: AtomicBool::new(false),
+        }
+    }
+
     fn fail_next_maintenance(&self) {
         self.fail_next_maintenance.store(true, Ordering::SeqCst);
+    }
+
+    pub(super) fn fail_next_apply(&self) {
+        self.fail_next_apply.store(true, Ordering::SeqCst);
     }
 }
 
@@ -120,6 +133,9 @@ impl IssuanceFreezeStore for PersistFaultFreezes {
         &self,
         request: &IssuanceFreezeApplyRequest,
     ) -> PortResult<IssuanceFreezeSnapshot> {
+        if self.fail_next_apply.swap(false, Ordering::SeqCst) {
+            return Err(PortError::unavailable());
+        }
         self.inner.apply_issuance_freeze(request)
     }
 
@@ -248,11 +264,11 @@ type LapseExecutor = ResponseExecutor<
 >;
 type LapseScheduler = ResponseScheduler<SqliteSecurityStateStore, LapseExecutor, DeliveredHealth>;
 
-fn worker(value: &str) -> LeaseOwnerId {
+pub(super) fn worker(value: &str) -> LeaseOwnerId {
     LeaseOwnerId::new(value).unwrap_or_else(|error| panic!("lease owner: {error}"))
 }
 
-fn lineage_snapshot() -> CausalLineageSnapshot {
+pub(super) fn lineage_snapshot() -> CausalLineageSnapshot {
     let node = |id: &str| CausalLineageNode {
         tenant_id: tenant(),
         node_id: record(id),
@@ -408,10 +424,7 @@ impl FenceLapseHarness {
         else {
             panic!("fresh dispatch unexpectedly existed");
         };
-        let freezes = Arc::new(PersistFaultFreezes {
-            inner: Arc::clone(&store),
-            fail_next_maintenance: AtomicBool::new(false),
-        });
+        let freezes = Arc::new(PersistFaultFreezes::new(Arc::clone(&store)));
         Self {
             _directory: directory,
             clock,

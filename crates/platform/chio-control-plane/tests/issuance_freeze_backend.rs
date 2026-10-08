@@ -1744,3 +1744,6 @@ fn maintenance_completes_release_pending_without_recreating_the_external_fence()
 
 #[path = "issuance_freeze_backend/fence_lapse.rs"]
 mod fence_lapse;
+
+#[path = "issuance_freeze_backend/duplicate_freeze.rs"]
+mod duplicate_freeze;
