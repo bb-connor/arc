@@ -444,7 +444,14 @@ fn a_client_refuses_an_endpoint_served_by_another_user_before_sending_its_reques
         "the client must connect, check the peer and send nothing"
     );
     assert!(
-        matches!(result, Err(KeyringError::StateInvariant(_))),
+        matches!(
+            result,
+            Err(KeyringError::UnauthorizedPeer {
+                expected_uid,
+                observed_uid,
+            }) if expected_uid == other_user
+                && observed_uid == rustix::process::geteuid().as_raw()
+        ),
         "{result:?}"
     );
 }

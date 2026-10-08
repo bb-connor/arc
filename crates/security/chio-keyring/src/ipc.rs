@@ -925,21 +925,16 @@ fn current_effective_uid() -> u32 {
     0
 }
 
-/// Refuse a connection unless its peer runs as this service's effective user.
-/// The private socket directory already keeps other users from reaching the
-/// socket; this check authenticates each accepted connection from the
-/// kernel's record of the connecting process before any request is read.
+/// Refuse a connection unless the kernel's record of the process at its other
+/// end names `authorized_uid`. Nothing is read from the connection first.
 #[cfg(unix)]
-pub fn require_service_peer(stream: &std::os::unix::net::UnixStream) -> Result<()> {
-    require_peer_uid(stream, current_effective_uid())
-}
-
-#[cfg(unix)]
-fn require_peer_uid(stream: &std::os::unix::net::UnixStream, service_uid: u32) -> Result<()> {
-    if unix_peer_uid(stream)? != service_uid {
-        return Err(KeyringError::StateInvariant(
-            "key-log service peer runs as a different user",
-        ));
+fn require_peer_uid(stream: &std::os::unix::net::UnixStream, authorized_uid: u32) -> Result<()> {
+    let observed_uid = unix_peer_uid(stream)?;
+    if observed_uid != authorized_uid {
+        return Err(KeyringError::UnauthorizedPeer {
+            expected_uid: authorized_uid,
+            observed_uid,
+        });
     }
     Ok(())
 }
@@ -1691,7 +1686,7 @@ fn bound_operation(
 #[cfg(unix)]
 mod listener;
 #[cfg(unix)]
-pub use listener::{bind_private_unix_listener, PrivateUnixListener};
+pub use listener::{bind_private_unix_listener, AcceptedServiceConnection, PrivateUnixListener};
 
 #[cfg(all(test, unix))]
 mod listener_tests;

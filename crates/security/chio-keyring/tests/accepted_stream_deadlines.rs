@@ -10,10 +10,9 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use chio_keyring::{
-    bind_private_unix_listener, read_single_canonical_frame, require_service_peer,
-    write_canonical_frame, AuditServiceOperation, AuditServiceRequest, DeadlineUnixStream,
-    KeyringError, PrivateUnixListener, KEY_LOG_AUDIT_IPC_REQUEST_SCHEMA,
-    KEY_LOG_IPC_REQUEST_DEADLINE,
+    bind_private_unix_listener, read_single_canonical_frame, write_canonical_frame,
+    AuditServiceOperation, AuditServiceRequest, KeyringError, PrivateUnixListener,
+    KEY_LOG_AUDIT_IPC_REQUEST_SCHEMA, KEY_LOG_IPC_REQUEST_DEADLINE,
 };
 use chio_test_support::prelude::*;
 
@@ -57,9 +56,9 @@ fn serve_one(
     listener: &PrivateUnixListener,
 ) -> (chio_keyring::Result<AuditServiceRequest>, Duration) {
     let started = Instant::now();
-    let stream = loop {
+    let connection = loop {
         match listener.accept() {
-            Ok((stream, _)) => break stream,
+            Ok(connection) => break connection,
             Err(error) if error.kind() == ErrorKind::WouldBlock => {
                 assert!(started.elapsed() < ACCEPT_LIMIT, "no client connected");
                 thread::sleep(Duration::from_millis(5));
@@ -67,12 +66,9 @@ fn serve_one(
             Err(error) => return (Err(KeyringError::Io(error)), started.elapsed()),
         }
     };
-    if let Err(error) = require_service_peer(&stream) {
-        return (Err(error), started.elapsed());
-    }
     let accepted = Instant::now();
-    let result = DeadlineUnixStream::new(stream, KEY_LOG_IPC_REQUEST_DEADLINE)
-        .map_err(KeyringError::Io)
+    let result = connection
+        .authenticate(KEY_LOG_IPC_REQUEST_DEADLINE)
         .and_then(|mut stream| read_single_canonical_frame(&mut stream));
     (result, accepted.elapsed())
 }
