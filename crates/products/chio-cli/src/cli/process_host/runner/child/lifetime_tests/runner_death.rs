@@ -86,7 +86,8 @@ fn death_fixture() -> TestResult {
         .join()
         .map_err(|_| "launching thread panicked")??;
     let mut stdout = std::io::stdout();
-    writeln!(stdout, "{DEATH_FIXTURE_WORKER}{}", spawned.child.id())?;
+    // Serial libtest can leave its test-name prefix on this same line.
+    writeln!(stdout, "\n{DEATH_FIXTURE_WORKER}{}", spawned.child.id())?;
     stdout.flush()?;
     // Hold the worker until this process is killed or its parent disappears.
     std::io::stdin().read_to_end(&mut Vec::new())?;
