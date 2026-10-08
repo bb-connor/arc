@@ -1,6 +1,6 @@
 use super::CliError;
 
-use std::io::Write as _;
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
 const FINDING_STATUS_FLOOR_MAX_BYTES: usize = 16 * 1024;
@@ -55,6 +55,20 @@ pub(super) struct FindingStatusFloorObservation<'a> {
     pub(super) is_retracted: bool,
 }
 
+/// Status state and its lock are regular files. Their mode, owner and link
+/// count are not checked after creation.
+#[cfg(unix)]
+const STATUS_STATE_POLICY: chio_secure_fs::OwnerPolicy = chio_secure_fs::OwnerPolicy {
+    owner: chio_secure_fs::Owner::Unchecked,
+    forbidden_mode: 0,
+    require_single_link: false,
+    reject_acl: false,
+};
+
+/// The creation mode of status state files, before the process umask.
+#[cfg(unix)]
+const STATUS_STATE_MODE: u32 = 0o666;
+
 pub(super) struct FindingStatusFloorLock {
     file: std::fs::File,
 }
@@ -69,26 +83,7 @@ impl FindingStatusFloorLock {
         let mut lock_name = file_name.to_os_string();
         lock_name.push(".lock");
         let path = floor_path.with_file_name(lock_name);
-        let mut options = std::fs::OpenOptions::new();
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::OpenOptionsExt;
-            options
-                .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
-                .mode(0o600);
-        }
-        let file = options
-            .read(true)
-            .write(true)
-            .create(true)
-            .truncate(false)
-            .open(&path)
-            .map_err(|error| {
-                CliError::cli_io_error(format!(
-                    "failed to open finding status rollback-floor lock {}: {error}",
-                    path.display()
-                ))
-            })?;
+        let file = open_status_lock(&path).map_err(|error| status_lock_error(&path, error))?;
         if !file.metadata()?.is_file() {
             return Err(CliError::cli_other_error(
                 "finding status lock is not a regular file",
@@ -102,6 +97,42 @@ impl FindingStatusFloorLock {
         })?;
         Ok(Self { file })
     }
+}
+
+/// Opens the lock read-write, creating it at 0600, never truncating it and
+/// never following a symlink.
+#[cfg(unix)]
+fn open_status_lock(path: &Path) -> std::io::Result<std::fs::File> {
+    let name = path
+        .file_name()
+        .ok_or_else(|| std::io::Error::from(std::io::ErrorKind::InvalidInput))?;
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let directory = std::fs::File::open(parent)?;
+    chio_secure_fs::open_lock_at(&directory, name, 0o600, &STATUS_STATE_POLICY)
+}
+
+#[cfg(not(unix))]
+fn open_status_lock(path: &Path) -> std::io::Result<std::fs::File> {
+    std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(path)
+}
+
+fn status_lock_error(path: &Path, error: std::io::Error) -> CliError {
+    #[cfg(unix)]
+    if chio_secure_fs::refusal(&error) == Some(chio_secure_fs::Refusal::NotRegularFile) {
+        return CliError::cli_other_error("finding status lock is not a regular file");
+    }
+    CliError::cli_io_error(format!(
+        "failed to open finding status rollback-floor lock {}: {error}",
+        path.display()
+    ))
 }
 
 impl Drop for FindingStatusFloorLock {
@@ -167,6 +198,30 @@ fn write_canonical_state<T: serde::Serialize>(
             "finding status {kind} serialization exceeds its {max_bytes} byte bound"
         )));
     }
+    replace_state_file(parent, file_name, &bytes)
+}
+
+/// Atomically replaces `file_name` in `parent` through an exclusive
+/// no-follow temporary file staged relative to one descriptor for `parent`,
+/// then flushes `parent`.
+#[cfg(unix)]
+fn replace_state_file(parent: &Path, file_name: &OsStr, bytes: &[u8]) -> Result<(), CliError> {
+    let directory = std::fs::File::open(parent)?;
+    chio_secure_fs::publish_at(
+        &directory,
+        file_name,
+        bytes,
+        STATUS_STATE_MODE,
+        chio_secure_fs::Expect::Replace,
+        &STATUS_STATE_POLICY,
+    )?;
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn replace_state_file(parent: &Path, file_name: &OsStr, bytes: &[u8]) -> Result<(), CliError> {
+    use std::io::Write as _;
+
     let nonce = uuid::Uuid::new_v4();
     let mut temp_name = std::ffi::OsString::from(".");
     temp_name.push(file_name);
@@ -177,11 +232,9 @@ fn write_canonical_state<T: serde::Serialize>(
             .write(true)
             .create_new(true)
             .open(&temp_path)?;
-        file.write_all(&bytes)?;
+        file.write_all(bytes)?;
         file.sync_all()?;
-        std::fs::rename(&temp_path, path)?;
-        #[cfg(unix)]
-        std::fs::File::open(parent)?.sync_all()?;
+        std::fs::rename(&temp_path, parent.join(file_name))?;
         Ok(())
     })();
     if write_result.is_err() {
