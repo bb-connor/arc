@@ -1741,3 +1741,6 @@ fn maintenance_completes_release_pending_without_recreating_the_external_fence()
     assert!(blast.fence.is_none());
     assert_eq!(blast.release_count, 1);
 }
+
+#[path = "issuance_freeze_backend/fence_lapse.rs"]
+mod fence_lapse;
