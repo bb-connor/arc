@@ -11,10 +11,9 @@ use crate::protocol::BrokerExecuteRequest;
 use crate::service::TrustedExecutionContext;
 use crate::store::AttemptRegistration;
 use crate::{BrokerError, Result};
-use chio_kernel::admission_operation::{
-    AdmissionIdentifier, AdmissionOperationId, AdmissionOperationState, AdmissionOperationStore,
-};
+use chio_kernel::admission_operation::{AdmissionOperationId, AdmissionOperationState};
 use chio_kernel::budget_store::BudgetInvocationState;
+use chio_kernel::supplemental_quota::supplemental_authorization_artifact_digest;
 use chio_store_sqlite::admission_operation_store::AdmissionBudgetCustodySnapshot;
 use std::sync::Arc;
 
@@ -133,19 +132,20 @@ impl BrokerAdmissionAuthority for BrokerKernelAdmissionAuthority {
     fn prepare_execution(&self, request: &BrokerExecuteRequest) -> Result<TrustedExecutionContext> {
         request.validate_bounds()?;
         let now = self.reader.trusted_now_ms()?;
-        let (operation, _) = self
+        let selected = self
             .reader
             .store
-            .load_unambiguous_retained_tool_request(
-                &AdmissionIdentifier::try_new("request", &request.invocation_id)
-                    .map_err(|_| rejected())?,
+            .load_retained_tool_admission_custody_by_supplemental_artifact(
+                &supplemental_authorization_artifact_digest(&canonical(request)?),
+                &self.reader.native,
+                &self.reader.participant,
                 &self.reader.fence,
                 now,
             )
             .map_err(unavailable)?
             .ok_or_else(rejected)?;
-        let operation_id = operation.binding().operation_id();
-        if operation.state() != AdmissionOperationState::DispatchCommitted {
+        let operation_id = selected.operation.binding().operation_id();
+        if selected.operation.state() != AdmissionOperationState::DispatchCommitted {
             return Err(rejected());
         }
         let original = self

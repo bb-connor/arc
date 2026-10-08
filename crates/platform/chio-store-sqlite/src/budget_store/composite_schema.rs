@@ -134,6 +134,7 @@ pub(super) fn ensure_composite_budget_schema(
             WHERE operation_id IS NOT NULL;
         CREATE UNIQUE INDEX IF NOT EXISTS idx_budget_holds_operation_hold
             ON budget_authorization_holds(operation_id, hold_id);
+        CREATE INDEX IF NOT EXISTS idx_budget_holds_supplemental_artifact ON budget_authorization_holds(supplemental_artifact_digest, operation_id) WHERE supplemental_artifact_digest IS NOT NULL;
 
         CREATE TABLE IF NOT EXISTS payment_release_evidence (
             operation_id TEXT PRIMARY KEY,
@@ -700,7 +701,7 @@ pub(super) fn ensure_composite_budget_schema(
         backfill_legacy_event_lifecycle(transaction)?;
         backfill_projection_contracts(transaction)?;
     }
-    Ok(())
+    SqliteBudgetStore::verify_supplemental_artifact_selector_index(transaction)
 }
 
 fn migrate_zero_limit_denied_event_quotas(
@@ -1227,6 +1228,34 @@ pub(super) fn verify_budget_foreign_keys(connection: &Connection) -> Result<(), 
         )));
     }
     Ok(())
+}
+
+impl SqliteBudgetStore {
+    pub(crate) fn verify_supplemental_artifact_selector_index(
+        connection: &Connection,
+    ) -> Result<(), BudgetStoreError> {
+        let definition: Option<Option<String>> = connection.query_row(
+            "SELECT CASE WHEN typeof(sql) = 'text' AND length(CAST(sql AS BLOB)) BETWEEN 1 AND 1024 THEN sql END
+             FROM sqlite_schema WHERE type = 'index' AND name = 'idx_budget_holds_supplemental_artifact'
+             AND tbl_name = 'budget_authorization_holds'",
+            [], |row| row.get(0),
+        ).optional()?;
+        let definition = definition.flatten().ok_or_else(|| {
+            BudgetStoreError::Invariant(
+                "supplemental artifact selector index is missing or exceeds bounds".into(),
+            )
+        })?;
+        let normalized = definition
+            .split_ascii_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+        if normalized != "CREATE INDEX idx_budget_holds_supplemental_artifact ON budget_authorization_holds(supplemental_artifact_digest, operation_id) WHERE supplemental_artifact_digest IS NOT NULL" {
+            return Err(BudgetStoreError::Invariant(
+                "supplemental artifact selector index definition differs".into(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 pub(crate) fn verify_budget_projection_invariants(
