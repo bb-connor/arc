@@ -410,7 +410,13 @@ its evidence head, so the publisher refuses every later tuple on the same `E`.
 The listener's writes for an obsolete tuple still reach only its historical `M`,
 subject to the existing no-create rule.
 
-The post-merge audit reads the recorded qualification on test merge `M`, authenticates
+The post-merge audit first requires every attempt of every `ci.yml`
+`pull_request` run whose API head is `E`, for any pull request, base, test merge,
+or run title, to have completed successfully. A run whose head is another
+repository is outside this history only when that identity is complete and
+distinct; any other run without a proven same-repository identity leaves the
+landing unverified. Only then does a run title select the positive source. The
+audit reads the recorded qualification on test merge `M`, authenticates
 all five App-and-name namespaces and their `arc:<PR>:<E>:<M>:<S>` source identity,
 and binds the exact CI and finalizer attempts. It then proves the actual main
 merge has ordered parents `<base>, E` and the same tree as `M`. It does not expect

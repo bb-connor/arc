@@ -109,12 +109,12 @@ def workflow_blob(api: GitHub, path: str, ref: str) -> str:
 
 
 def require_attempt(run: dict, identifier: int, attempt: int, workflow_id: int,
-                    path: str, title: str, head: str, repository: str, repository_id: int,
+                    path: str, title: str | None, head: str, repository: str, repository_id: int,
                     *, successful: bool = True) -> None:
     require(positive_id(run.get("id")) == identifier and positive_id(run.get("run_attempt")) == attempt,
             "historical run/attempt identity mismatch")
     require(positive_id(run.get("workflow_id")) == workflow_id and run.get("path") == path
-            and run.get("display_title") == title and run.get("head_sha") == head,
+            and (title is None or run.get("display_title") == title) and run.get("head_sha") == head,
             "historical workflow, title or source mismatch")
     require(run.get("repository", {}).get("full_name") == repository
             and run.get("head_repository", {}).get("full_name") == repository
@@ -124,6 +124,19 @@ def require_attempt(run: dict, identifier: int, attempt: int, workflow_id: int,
     if successful:
         require(run.get("status") == "completed" and run.get("conclusion") == "success",
                 "critical attempt did not complete successfully")
+
+
+def foreign_head_run(run: dict, path: str, head: str, repository: str, repository_id: int) -> bool:
+    head_repository = run.get("head_repository")
+    if not isinstance(head_repository, dict) or not isinstance(run.get("repository"), dict):
+        return False
+    name, identifier = head_repository.get("full_name"), head_repository.get("id")
+    return (run.get("path") == path and run.get("event") == "pull_request" and run.get("head_sha") == head
+            and type(run.get("workflow_id")) is int and run["workflow_id"] > 0
+            and run["repository"].get("full_name") == repository and run["repository"].get("id") == repository_id
+            and type(identifier) is int and identifier > 0 and identifier != repository_id
+            and isinstance(name, str) and re.fullmatch(r"[A-Za-z0-9-]+/[A-Za-z0-9._-]+", name) is not None
+            and name.lower() != repository.lower())
 
 
 def metadata(check: dict, identity: dict, source_ci: dict, authority: bool) -> dict:
@@ -183,6 +196,35 @@ def audit_qualification(api: GitHub, repository: str, pr_number: int,
     # authenticate the qualification, not the current workflow registry.
     run_query = f"actions/runs?event=pull_request&head_sha={evidence}"
     runs = api.pages(run_query, "workflow_runs")
+    # Every attempt of every CI run for E, whatever its title, pull request,
+    # base or test merge, must have succeeded before any title selects the
+    # positive source. A run whose head is another repository is outside
+    # this history only when that identity is complete and distinct.
+    history: dict[int, tuple] = {}
+    for run in runs:
+        require(isinstance(run.get("path"), str), "CI history identity for the evidence head is incomplete")
+        if run.get("path") != ci_path or foreign_head_run(run, ci_path, evidence, repository, repository_id):
+            continue
+        require(run.get("event") == "pull_request" and run.get("head_sha") == evidence
+                and run.get("repository", {}).get("full_name") == repository
+                and run.get("head_repository", {}).get("full_name") == repository
+                and positive_id(run.get("repository", {}).get("id")) == repository_id
+                and positive_id(run.get("head_repository", {}).get("id")) == repository_id,
+                "CI history identity for the evidence head is incomplete")
+        run_id, workflow_id = positive_id(run.get("id")), positive_id(run.get("workflow_id"))
+        current = api.get(f"actions/runs/{run_id}")
+        maximum = positive_id(current.get("run_attempt"))
+        require(maximum <= 100, "unbounded CI attempt history")
+        require_attempt(current, run_id, maximum, workflow_id, ci_path, None, evidence, repository, repository_id,
+                        successful=False)
+        history[run_id] = (maximum, current.get("status"), current.get("conclusion"))
+        for attempt in range(1, maximum + 1):
+            exact = api.get(f"actions/runs/{run_id}/attempts/{attempt}")
+            require_attempt(exact, run_id, attempt, workflow_id, ci_path, None, evidence, repository, repository_id,
+                            successful=False)
+            require(exact.get("event") == "pull_request", "CI historical event mismatch")
+            require(exact.get("status") == "completed" and exact.get("conclusion") == "success",
+                    "CI history for the evidence head contains an incomplete or unsuccessful attempt")
     candidates: dict[str, list[dict]] = {}
     for run in runs:
         title = CI_TITLE.fullmatch(str(run.get("display_title", "")))
@@ -355,6 +397,10 @@ def audit_qualification(api: GitHub, repository: str, pr_number: int,
                           "authority_check_run_ids": authority_ids})
     require(len(qualified) == 1, "no unique authenticated qualification for this protected landing")
     require(api.pages(run_query, "workflow_runs") == runs, "CI run inventory changed during audit")
+    for run_id, fingerprint in history.items():
+        current = api.get(f"actions/runs/{run_id}")
+        require((current.get("run_attempt"), current.get("status"), current.get("conclusion")) == fingerprint,
+                "CI attempt advanced during audit")
     final_pr = api.get(f"pulls/{pr_number}")
     require(final_pr.get("merged") is True and final_pr.get("merge_commit_sha") == protected
             and final_pr.get("head", {}).get("sha") == evidence and final_pr.get("merged_at") == pr.get("merged_at"),
