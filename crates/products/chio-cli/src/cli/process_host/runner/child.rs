@@ -633,6 +633,9 @@ pub(super) fn write_log(
 }
 
 #[cfg(test)]
+mod lifetime_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
