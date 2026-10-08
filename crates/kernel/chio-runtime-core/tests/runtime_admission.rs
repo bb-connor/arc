@@ -1240,7 +1240,10 @@ fn chio_runtime_hook_denies_stale_swarm_continuation_before_dispatch(
     store.insert_bundle(admission_bundle)?;
 
     let swarm_bundle = runtime_swarm_bundle(true)?;
-    store.insert_swarm_authority_bundle(swarm_bundle.clone())?;
+    store.insert_swarm_authority_bundle(
+        swarm_bundle_before_expiry(&swarm_bundle),
+        &trusted_swarm_witness_keys(),
+    )?;
 
     let cap = capability("cap-live-1")?;
     let request = ToolCallRequest {
@@ -1321,7 +1324,7 @@ fn chio_runtime_hook_denies_swarm_continuation_expired_since_storage(
         &swarm_bundle.continuation_tokens[0],
         &swarm_witness_keypair(),
     )?;
-    store.insert_swarm_authority_bundle(swarm_bundle.clone())?;
+    store.insert_swarm_authority_bundle(swarm_bundle.clone(), &trusted_swarm_witness_keys())?;
 
     let request =
         chio_swarm_runtime_request(args, bundle_hash, swarm_runtime_context(&swarm_bundle)?)?;
@@ -1364,7 +1367,7 @@ fn chio_runtime_hook_denies_swarm_route_metadata_mismatch_before_dispatch(
     store.insert_bundle(admission_bundle)?;
 
     let swarm_bundle = runtime_swarm_bundle(false)?;
-    store.insert_swarm_authority_bundle(swarm_bundle.clone())?;
+    store.insert_swarm_authority_bundle(swarm_bundle.clone(), &trusted_swarm_witness_keys())?;
 
     let request =
         chio_swarm_runtime_request(args, bundle_hash, swarm_runtime_context(&swarm_bundle)?)?;
@@ -1412,7 +1415,7 @@ fn chio_runtime_hook_denies_swarm_route_selection_id_mismatch_before_dispatch(
     store.insert_bundle(admission_bundle)?;
 
     let swarm_bundle = runtime_swarm_bundle(false)?;
-    store.insert_swarm_authority_bundle(swarm_bundle.clone())?;
+    store.insert_swarm_authority_bundle(swarm_bundle.clone(), &trusted_swarm_witness_keys())?;
 
     let request =
         chio_swarm_runtime_request(args, bundle_hash, swarm_runtime_context(&swarm_bundle)?)?;
@@ -1460,7 +1463,7 @@ fn chio_runtime_hook_denies_incomplete_swarm_route_metadata_before_dispatch(
     store.insert_bundle(admission_bundle)?;
 
     let swarm_bundle = runtime_swarm_bundle(false)?;
-    store.insert_swarm_authority_bundle(swarm_bundle.clone())?;
+    store.insert_swarm_authority_bundle(swarm_bundle.clone(), &trusted_swarm_witness_keys())?;
 
     let request =
         chio_swarm_runtime_request(args, bundle_hash, swarm_runtime_context(&swarm_bundle)?)?;
@@ -1507,7 +1510,7 @@ fn chio_runtime_hook_denies_swarm_route_plan_not_bound_to_continuation(
     store.insert_bundle(admission_bundle)?;
 
     let swarm_bundle = runtime_swarm_bundle(false)?;
-    store.insert_swarm_authority_bundle(swarm_bundle.clone())?;
+    store.insert_swarm_authority_bundle(swarm_bundle.clone(), &trusted_swarm_witness_keys())?;
     let mut swarm_context = swarm_runtime_context(&swarm_bundle)?;
     swarm_context["routePlanReceipt"] = serde_json::json!({
         "id": &swarm_bundle.route_plan_receipts[1].route_plan_id,
@@ -1560,7 +1563,7 @@ fn chio_runtime_hook_denies_swarm_missing_route_metadata_before_dispatch(
     store.insert_bundle(admission_bundle)?;
 
     let swarm_bundle = runtime_swarm_bundle(false)?;
-    store.insert_swarm_authority_bundle(swarm_bundle.clone())?;
+    store.insert_swarm_authority_bundle(swarm_bundle.clone(), &trusted_swarm_witness_keys())?;
 
     let request =
         chio_swarm_runtime_request(args, bundle_hash, swarm_runtime_context(&swarm_bundle)?)?;
@@ -1600,7 +1603,10 @@ fn sqlite_runtime_hook_denies_stale_swarm_continuation_before_dispatch(
     store.insert_bundle(admission_bundle)?;
 
     let swarm_bundle = runtime_swarm_bundle(true)?;
-    store.insert_swarm_authority_bundle(swarm_bundle.clone())?;
+    store.insert_swarm_authority_bundle(
+        swarm_bundle_before_expiry(&swarm_bundle),
+        &trusted_swarm_witness_keys(),
+    )?;
 
     let request =
         chio_swarm_runtime_request(args, bundle_hash, swarm_runtime_context(&swarm_bundle)?)?;
@@ -1644,7 +1650,7 @@ fn chio_runtime_hook_revalidates_reserved_swarm_continuation_then_denies_replay(
 
     let swarm_bundle = runtime_swarm_bundle(false)?;
     let continuation_id = swarm_bundle.continuation_tokens[0].token_id.clone();
-    store.insert_swarm_authority_bundle(swarm_bundle.clone())?;
+    store.insert_swarm_authority_bundle(swarm_bundle.clone(), &trusted_swarm_witness_keys())?;
 
     let request =
         chio_swarm_runtime_request(args, bundle_hash, swarm_runtime_context(&swarm_bundle)?)?;
@@ -1710,7 +1716,7 @@ fn chio_runtime_hook_revalidates_resumable_swarm_continuation_without_replay_den
         &swarm_bundle.continuation_tokens[0],
         &swarm_witness_keypair(),
     )?;
-    store.insert_swarm_authority_bundle(swarm_bundle.clone())?;
+    store.insert_swarm_authority_bundle(swarm_bundle.clone(), &trusted_swarm_witness_keys())?;
 
     let request =
         chio_swarm_runtime_request(args, bundle_hash, swarm_runtime_context(&swarm_bundle)?)?;
@@ -1756,7 +1762,7 @@ fn sqlite_runtime_hook_denies_replayed_swarm_continuation_before_dispatch(
     store.insert_bundle(admission_bundle)?;
 
     let swarm_bundle = runtime_swarm_bundle(false)?;
-    store.insert_swarm_authority_bundle(swarm_bundle.clone())?;
+    store.insert_swarm_authority_bundle(swarm_bundle.clone(), &trusted_swarm_witness_keys())?;
 
     let request =
         chio_swarm_runtime_request(args, bundle_hash, swarm_runtime_context(&swarm_bundle)?)?;
@@ -2441,6 +2447,14 @@ fn swarm_route_metadata() -> serde_json::Value {
             "selectedRoute": "mcp:task-child-a"
         }
     })
+}
+
+/// The bundle as stored while its continuations were still live, so only
+/// admission observes the expiry.
+fn swarm_bundle_before_expiry(bundle: &SwarmAuthorityBundle) -> SwarmAuthorityBundle {
+    let mut stored = bundle.clone();
+    stored.now_unix_ms = 1_800_000_000_500;
+    stored
 }
 
 fn runtime_swarm_bundle(

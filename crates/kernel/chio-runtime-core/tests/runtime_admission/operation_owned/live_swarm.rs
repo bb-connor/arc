@@ -27,7 +27,7 @@ fn live_swarm_without_future_results_uses_durable_continuation_custody() -> Test
             .ok_or("missing governed context")?["chioAdmission"]["bundleSha256"] =
             serde_json::json!(runtime_admission_bundle_sha256(&admission)?);
         source.insert_bundle(admission)?;
-        source.insert_swarm_authority_bundle(swarm)?;
+        source.insert_swarm_authority_bundle(swarm, &trusted_swarm_witness_keys())?;
         Ok(request)
     })?;
     let hook = fixture

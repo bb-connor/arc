@@ -316,6 +316,9 @@ fn runtime_admission_store_boundary_exposes_swarm_authority(
             serde_json::from_str(include_str!(
                 "../../../../fixtures/proof-room/swarm-authority/valid-recursive-delegation/continuation-child-b.json"
             ))?,
+            serde_json::from_str(include_str!(
+                "../../../../fixtures/proof-room/swarm-authority/valid-recursive-delegation/continuation-child-c.json"
+            ))?,
         ],
         witness_chains: vec![
             serde_json::from_str(include_str!(
@@ -323,6 +326,9 @@ fn runtime_admission_store_boundary_exposes_swarm_authority(
             ))?,
             serde_json::from_str(include_str!(
                 "../../../../fixtures/proof-room/swarm-authority/valid-recursive-delegation/witness-child-b.json"
+            ))?,
+            serde_json::from_str(include_str!(
+                "../../../../fixtures/proof-room/swarm-authority/valid-recursive-delegation/witness-child-c.json"
             ))?,
         ],
         join_receipts: vec![serde_json::from_str(include_str!(
@@ -335,6 +341,9 @@ fn runtime_admission_store_boundary_exposes_swarm_authority(
             serde_json::from_str(include_str!(
                 "../../../../fixtures/proof-room/swarm-authority/valid-recursive-delegation/route-child-b.json"
             ))?,
+            serde_json::from_str(include_str!(
+                "../../../../fixtures/proof-room/swarm-authority/valid-recursive-delegation/route-child-c.json"
+            ))?,
         ],
         budget_pool: serde_json::from_str(include_str!(
             "../../../../fixtures/proof-room/swarm-authority/valid-recursive-delegation/budget-pool.json"
@@ -345,10 +354,16 @@ fn runtime_admission_store_boundary_exposes_swarm_authority(
         terminal_receipts: vec![serde_json::from_str(include_str!(
             "../../../../fixtures/proof-room/swarm-authority/valid-recursive-delegation/terminal-graph-receipt.json"
         ))?],
-        now_unix_ms: 1_800_000_000_000,
+        now_unix_ms: 1_800_000_001_000,
     };
+    let issuer_key = bundle
+        .task_graph
+        .issuer
+        .strip_prefix("did:chio:")
+        .ok_or_else(|| std::io::Error::other("fixture issuer is not did:chio"))?;
+    let trusted_witness_keys = [chio_core_types::PublicKey::from_hex(issuer_key)?];
     let store = InMemoryRuntimeAdmissionStore::new();
-    store.insert_swarm_authority_bundle(bundle.clone())?;
+    store.insert_swarm_authority_bundle(bundle.clone(), &trusted_witness_keys)?;
     accepts_swarm_store(&store);
     let loaded = store
         .swarm_authority_bundle(&bundle.task_graph.graph_id)?

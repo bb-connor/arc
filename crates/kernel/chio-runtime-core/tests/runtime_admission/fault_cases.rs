@@ -407,7 +407,7 @@ fn runtime_hook_cleanup_request(
     }
 
     let swarm_bundle = runtime_swarm_bundle(false)?;
-    store.insert_swarm_authority_bundle(swarm_bundle.clone())?;
+    store.insert_swarm_authority_bundle(swarm_bundle.clone(), &trusted_swarm_witness_keys())?;
     let mut request =
         chio_swarm_runtime_request(args, bundle_hash, swarm_runtime_context(&swarm_bundle)?)?;
     request.federated_origin_kernel_id = Some("kernel.buyer".to_string());

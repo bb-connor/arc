@@ -508,6 +508,7 @@ pub const CHIO_RUNTIME_FAILURE_CODES: &[&str] = &[
     "runtime_scheduler_profile_stale",
     "runtime_sqlite_integer_negative",
     "runtime_sqlite_integer_out_of_range",
+    "runtime_swarm_authority_bundle_unverified",
     "runtime_swarm_authority_empty_graph_id",
     "runtime_step_evidence_invalid_admission_hash",
     "runtime_step_evidence_invalid_dsse_hash",

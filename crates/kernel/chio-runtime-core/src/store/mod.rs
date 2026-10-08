@@ -1,6 +1,7 @@
 mod json;
 mod memory;
 mod sqlite;
+mod swarm_custody;
 mod traits;
 mod trust_floor;
 

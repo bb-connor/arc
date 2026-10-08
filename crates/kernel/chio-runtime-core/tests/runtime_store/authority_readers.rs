@@ -108,7 +108,8 @@ fn sqlite_swarm_and_treaty_readback_rejects_substitution() -> Result<(), Box<dyn
     let store =
         SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     let original = swarm_authority_bundle_fixture()?;
-    store.insert_swarm_authority_bundle(original.clone())?;
+    store
+        .insert_swarm_authority_bundle(original.clone(), &swarm_fixture_trusted_keys(&original)?)?;
     assert_eq!(
         store
             .swarm_authority_bundle(&original.task_graph.graph_id)?
@@ -176,7 +177,7 @@ fn runtime_clock_fault_refuses_swarm_write_without_a_partial_row() -> Result<(),
         SqliteRuntimeOrchestrationStore::open_with_clock(&path, std::sync::Arc::new(BrokenClock))?;
     let bundle = swarm_authority_bundle_fixture()?;
     let error = store
-        .insert_swarm_authority_bundle(bundle.clone())
+        .insert_swarm_authority_bundle(bundle.clone(), &swarm_fixture_trusted_keys(&bundle)?)
         .err()
         .ok_or("accepted broken clock")?;
     assert_eq!(error.code(), ClockError::BeforeEpoch.code());
@@ -195,7 +196,7 @@ fn runtime_clock_fault_refuses_swarm_write_without_a_partial_row() -> Result<(),
             1_800_000_000_000,
         )),
     )?;
-    store.insert_swarm_authority_bundle(bundle.clone())?;
+    store.insert_swarm_authority_bundle(bundle.clone(), &swarm_fixture_trusted_keys(&bundle)?)?;
     assert_eq!(
         store
             .swarm_authority_bundle(&bundle.task_graph.graph_id)?

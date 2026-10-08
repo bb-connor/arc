@@ -48,7 +48,7 @@ impl BindingFixture {
         admission.binding.capability_id = capability.id.clone();
         let bundle_hash = runtime_admission_bundle_sha256(&admission)?;
         store.insert_bundle(admission)?;
-        store.insert_swarm_authority_bundle(swarm.clone())?;
+        store.insert_swarm_authority_bundle(swarm.clone(), &trusted_swarm_witness_keys())?;
         let mut request =
             chio_swarm_runtime_request(args, bundle_hash, swarm_runtime_context(&swarm)?)?;
         request.agent_id = capability.subject.to_hex();

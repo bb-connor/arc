@@ -57,7 +57,7 @@ impl CombinedFixture {
             let hash = runtime_admission_bundle_sha256(&admission)?;
             source.insert_bundle(admission)?;
             insert_treaty_runtime_fixture(source, &treaty)?;
-            source.insert_swarm_authority_bundle(swarm.clone())?;
+            source.insert_swarm_authority_bundle(swarm.clone(), &trusted_swarm_witness_keys())?;
             // Imported markers model an earlier legacy consumer. They must
             // exclude the entire new live claim, not only the colliding member.
             match retired {

@@ -97,7 +97,8 @@ impl RuntimeAdmissionStore for SqliteRuntimeOrchestrationStore {
         &self,
         task_graph_id: &str,
     ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
-        self.load_swarm_authority_bundle(task_graph_id)
+        let connection = self.lock_connection()?;
+        Self::load_swarm_authority_bundle(&connection, task_graph_id)
     }
 
     fn consume_destructive_lease(

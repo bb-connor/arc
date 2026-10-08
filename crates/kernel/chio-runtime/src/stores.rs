@@ -4,6 +4,8 @@ use std::{fmt, path::Path, sync::Arc};
 
 use chio_security_types::clock::Clock;
 
+use chio_core_types::PublicKey;
+
 use crate::{
     unwrap_runtime, wrap_runtime, ChioRuntimeError, RuntimeAdmissionBundle, RuntimeCoreError,
     RuntimeEvidenceManifestEntry, RuntimeOpsStatusReport, RuntimeOrchestrationProfile,
@@ -126,8 +128,12 @@ impl InMemoryRuntimeAdmissionStore {
     pub fn insert_swarm_authority_bundle(
         &self,
         bundle: SwarmAuthorityBundle,
+        trusted_witness_keys: &[PublicKey],
     ) -> Result<(), ChioRuntimeError> {
-        wrap_runtime(self.inner.insert_swarm_authority_bundle(bundle))
+        wrap_runtime(
+            self.inner
+                .insert_swarm_authority_bundle(bundle, trusted_witness_keys),
+        )
     }
 }
 
@@ -362,8 +368,12 @@ impl JsonRuntimeAdmissionStore {
     pub fn insert_swarm_authority_bundle(
         &self,
         bundle: SwarmAuthorityBundle,
+        trusted_witness_keys: &[PublicKey],
     ) -> Result<(), ChioRuntimeError> {
-        wrap_runtime(self.inner.insert_swarm_authority_bundle(bundle))
+        wrap_runtime(
+            self.inner
+                .insert_swarm_authority_bundle(bundle, trusted_witness_keys),
+        )
     }
 }
 
@@ -459,8 +469,12 @@ impl SqliteRuntimeOrchestrationStore {
     pub fn insert_swarm_authority_bundle(
         &self,
         bundle: SwarmAuthorityBundle,
+        trusted_witness_keys: &[PublicKey],
     ) -> Result<(), ChioRuntimeError> {
-        wrap_runtime(self.inner.insert_swarm_authority_bundle(bundle))
+        wrap_runtime(
+            self.inner
+                .insert_swarm_authority_bundle(bundle, trusted_witness_keys),
+        )
     }
 
     pub fn register_run(&self, run_id: &str) -> Result<bool, ChioRuntimeError> {

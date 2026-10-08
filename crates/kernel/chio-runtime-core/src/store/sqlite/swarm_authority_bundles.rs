@@ -1,21 +1,24 @@
+use chio_core_types::PublicKey;
 use chio_security_types::clock::ClockError;
 use chio_swarm_authority::SwarmAuthorityBundle;
-use rusqlite::{params, OptionalExtension, TransactionBehavior};
+use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 
 use super::{sqlite_error, SqliteRuntimeOrchestrationStore};
 use crate::hash::canonical_sha256;
+use crate::store::swarm_custody::{
+    resolve_stored_swarm_bundle, verify_swarm_bundle_for_custody, StoredSwarmBundleDisposition,
+};
 use crate::validation::validate_non_empty;
 use crate::ChioRuntimeError;
 
 impl SqliteRuntimeOrchestrationStore {
+    /// Stores a bundle only after it verifies against `trusted_witness_keys`.
     pub fn insert_swarm_authority_bundle(
         &self,
         bundle: SwarmAuthorityBundle,
+        trusted_witness_keys: &[PublicKey],
     ) -> Result<(), ChioRuntimeError> {
-        validate_non_empty(
-            &bundle.task_graph.graph_id,
-            "runtime_swarm_authority_empty_graph_id",
-        )?;
+        verify_swarm_bundle_for_custody(&bundle, trusted_witness_keys)?;
         let created_at =
             i64::try_from(self.clock.unix_millis()?.get()).map_err(|_| ClockError::Overflow)?;
         let bundle_sha256 = canonical_sha256(&bundle)?;
@@ -37,12 +40,41 @@ impl SqliteRuntimeOrchestrationStore {
                 tx.commit().map_err(sqlite_error)?;
                 return Ok(());
             }
-            return Err(ChioRuntimeError::Rejected {
-                code: "duplicate_swarm_authority_bundle_mismatch",
-                detail:
-                    "runtime swarm authority bundle graph id already exists with a different hash"
-                        .to_string(),
-            });
+            let stored = Self::load_swarm_authority_bundle(&tx, &bundle.task_graph.graph_id)?
+                .ok_or_else(|| {
+                    ChioRuntimeError::Store(
+                        "runtime swarm authority bundle row vanished inside its transaction"
+                            .to_string(),
+                    )
+                })?;
+            match resolve_stored_swarm_bundle(
+                &stored,
+                &existing,
+                &bundle_sha256,
+                trusted_witness_keys,
+            )? {
+                StoredSwarmBundleDisposition::Keep => {
+                    tx.commit().map_err(sqlite_error)?;
+                    return Ok(());
+                }
+                StoredSwarmBundleDisposition::Replace => {
+                    tx.execute(
+                        r#"
+                        UPDATE runtime_swarm_authority_bundles
+                        SET bundle_sha256 = ?2, raw_json = ?3, created_at_unix_ms = ?4
+                        WHERE task_graph_id = ?1
+                        "#,
+                        params![
+                            bundle.task_graph.graph_id,
+                            bundle_sha256,
+                            raw_json,
+                            created_at
+                        ],
+                    )
+                    .map_err(sqlite_error)?;
+                    return tx.commit().map_err(sqlite_error);
+                }
+            }
         }
         tx.execute(
             r#"
@@ -63,11 +95,10 @@ impl SqliteRuntimeOrchestrationStore {
     }
 
     pub(super) fn load_swarm_authority_bundle(
-        &self,
+        connection: &Connection,
         task_graph_id: &str,
     ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
         validate_non_empty(task_graph_id, "runtime_swarm_authority_empty_graph_id")?;
-        let connection = self.lock_connection()?;
         let row: Option<(String, String)> = connection
             .query_row(
                 "SELECT bundle_sha256, raw_json FROM runtime_swarm_authority_bundles WHERE task_graph_id = ?1",

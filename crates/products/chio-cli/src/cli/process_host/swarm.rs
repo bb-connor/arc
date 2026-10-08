@@ -209,7 +209,7 @@ pub(super) fn provision(
             graph, bundle, runtime, record, &admission, &source,
         )?);
         source
-            .insert_swarm_authority_bundle(bundle.clone())
+            .insert_swarm_authority_bundle(bundle.clone(), &[issuer.public_key()])
             .map_err(error)?;
     }
     let calls = serde_json::json!({

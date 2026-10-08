@@ -95,8 +95,9 @@ to it.
   and `RuntimeAdmissionDecision`; `ChioRuntimeAdmissionHook<S>` implements
   `RuntimeAdmissionHook` so the kernel can call into this crate as an
   admission-hook plugin.
-- `chio-swarm-authority` - `SwarmAuthorityBundle`, stored and returned by the
-  admission stores for swarm continuation admission.
+- `chio-swarm-authority` - `SwarmAuthorityBundle`, verified against trusted
+  witness keys before the admission stores keep it, and returned by them for
+  swarm continuation admission.
 - `chio-weights` - `card::ModelCard`, accepted by
   `generate_runtime_provider_health_report_with_model_cards` and
   `generate_runtime_provider_health_report_with_model_card_evidence`.

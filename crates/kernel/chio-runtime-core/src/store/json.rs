@@ -1,3 +1,6 @@
+use super::swarm_custody::{
+    resolve_stored_swarm_bundle, verify_swarm_bundle_for_custody, StoredSwarmBundleDisposition,
+};
 use super::traits::RuntimeAdmissionStore;
 use crate::validation::validate_non_empty;
 use crate::*;
@@ -95,32 +98,34 @@ impl JsonRuntimeAdmissionStore {
         self.persist_state(&state)
     }
 
+    /// Stores a bundle only after it verifies against `trusted_witness_keys`.
     pub fn insert_swarm_authority_bundle(
         &self,
         bundle: SwarmAuthorityBundle,
+        trusted_witness_keys: &[PublicKey],
     ) -> Result<(), ChioRuntimeError> {
-        validate_non_empty(
-            &bundle.task_graph.graph_id,
-            "runtime_swarm_authority_empty_graph_id",
-        )?;
+        verify_swarm_bundle_for_custody(&bundle, trusted_witness_keys)?;
         let bundle_sha256 = canonical_sha256(&bundle)?;
         let mut state = self.lock_state()?;
-        if let Some(existing) = state
+        match state
             .swarm_authority_bundles
-            .iter()
+            .iter_mut()
             .find(|existing| existing.task_graph.graph_id == bundle.task_graph.graph_id)
         {
-            if canonical_sha256(existing)? == bundle_sha256 {
-                return Ok(());
+            Some(stored) => {
+                let stored_sha256 = canonical_sha256(&*stored)?;
+                match resolve_stored_swarm_bundle(
+                    stored,
+                    &stored_sha256,
+                    &bundle_sha256,
+                    trusted_witness_keys,
+                )? {
+                    StoredSwarmBundleDisposition::Keep => return Ok(()),
+                    StoredSwarmBundleDisposition::Replace => *stored = bundle,
+                }
             }
-            return Err(ChioRuntimeError::Rejected {
-                code: "duplicate_swarm_authority_bundle_mismatch",
-                detail:
-                    "runtime swarm authority bundle graph id already exists with a different hash"
-                        .to_string(),
-            });
+            None => state.swarm_authority_bundles.push(bundle),
         }
-        state.swarm_authority_bundles.push(bundle);
         Self::validate_state(&state)?;
         self.persist_state(&state)
     }
