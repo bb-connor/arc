@@ -46,6 +46,31 @@ fn nested_event(keypair: &Keypair, completed: &Value, depth: usize) -> (Value, V
     (event, output)
 }
 
+/// Extend the genuinely signed output and mirror the adapter's MCP-shaped
+/// projection. Receipt identity, capability, request and admission checks remain.
+fn signed_extension(keypair: &Keypair, completed: &Value, field: &str, value: Value) -> Value {
+    let signed: ChioReceipt =
+        serde_json::from_value(completed["result"]["_meta"]["chioEvidence"]["receipt"].clone())
+            .unwrap();
+    assert_eq!(signed.kernel_key, keypair.public_key());
+    assert!(signed.verify_signature().unwrap());
+    let mut output = completed["result"]["_meta"]["chioEvidence"]["output"].clone();
+    assert!(output["content"].is_array() && output["isError"].is_boolean());
+    output[field] = value;
+    let mut body = signed.body();
+    body.content_hash = sha256_hex(&canonical_json_bytes(&output).unwrap());
+    let receipt = ChioReceipt::sign(body, keypair).unwrap();
+    let mut event = completed.clone();
+    // The existing value_to_tool_result branch clones an MCP-shaped object.
+    // These fixtures already contain content and isError, so no defaults or
+    // synthesized content are needed for that exact canonical projection.
+    event["result"] = output.clone();
+    event["result"]["_meta"] = completed["result"]["_meta"].clone();
+    event["result"]["_meta"]["chioEvidence"]["receipt"] = serde_json::to_value(receipt).unwrap();
+    event["result"]["_meta"]["chioEvidence"]["output"] = output;
+    event
+}
+
 /// The terminal row `finish_at` would persist for a verified completed event.
 fn wrapped_completion(pending: &CredentialCall, event: &Value) -> CredentialCall {
     let signed: ChioReceipt =
@@ -321,9 +346,16 @@ fn delivery_writer_refuses_event_sized_outcome_before_replacing_pending_rows() {
         false,
     )
     .unwrap();
-    response["result"]["padding"] = json!("");
-    let overhead = serde_json::to_vec(&response).unwrap().len();
-    response["result"]["padding"] = json!("x".repeat(MAX_SESSION_JSON_BYTES - overhead - 1));
+    response["result"]["_meta"]["chioEvidence"]["fixtureAlignment"] = json!(false);
+    let empty = signed_extension(&keypair, &response, "padding", json!(""));
+    let mut remaining = MAX_SESSION_JSON_BYTES - serde_json::to_vec(&empty).unwrap().len() - 1;
+    if remaining % 2 != 0 {
+        // Only a diagnostic boolean changes by one byte. Signed padding has two
+        // copies, and the exact original input ceiling remains unchanged.
+        response["result"]["_meta"]["chioEvidence"]["fixtureAlignment"] = json!(true);
+        remaining += 1;
+    }
+    response = signed_extension(&keypair, &response, "padding", json!("x".repeat(remaining / 2)));
     assert_eq!(
         serde_json::to_vec(&response).unwrap().len(),
         MAX_SESSION_JSON_BYTES - 1
@@ -371,9 +403,13 @@ fn delivery_writer_preserves_decoded_decimal_native_replay_and_acknowledgement()
         false,
     )
     .unwrap();
-    response["result"]["numbers"] =
+    response = signed_extension(
+        &keypair,
+        &response,
+        "numbers",
         crate::input::document::<Value>(br#"[0.50,21.0,1e-05,18446744073709551615]"#, 1024)
-            .unwrap();
+            .unwrap(),
+    );
     let delivered = finish_at(&path, &keypair, &pending, &response)
         .unwrap_or_else(|_| panic!("persist completed delivery"));
     let connection = open_db(&path).unwrap();
