@@ -475,13 +475,12 @@ async fn expired_overlay_whose_rollback_keeps_failing_spends_the_fault_budget() 
     let capture = AuditCapture::default();
     let _subscriber = tracing::subscriber::set_default(Registry::default().with(capture.clone()));
 
-    let teardown = faulted_host.run_detached_teardown_inline_for_test();
-    tokio::pin!(teardown);
+    let mut teardown = Box::pin(faulted_host.run_detached_teardown_inline_for_test());
     drop(healthy_host);
     faulted.expire();
     let expired_at = Instant::now();
     hold_after_expiry(
-        &mut teardown,
+        &mut teardown.as_mut(),
         &faulted,
         expired_at,
         PARK_OBSERVATION_TIMEOUT,
@@ -499,7 +498,7 @@ async fn expired_overlay_whose_rollback_keeps_failing_spends_the_fault_budget() 
     healthy.expire();
     let healthy_started = Instant::now();
     hold_after_expiry(
-        &mut teardown,
+        &mut teardown.as_mut(),
         &faulted,
         expired_at,
         HOST_LIFECYCLE_TEST_TIMEOUT,
@@ -510,9 +509,13 @@ async fn expired_overlay_whose_rollback_keeps_failing_spends_the_fault_budget() 
     let healthy_released = healthy.fixture.registry.snapshot().is_none()
         && !healthy.fixture.has_active_overlay_contributions();
 
-    hold_after_expiry(&mut teardown, &faulted, expired_at, HEALTHY_WAIT, || {
-        capture.parked()
-    })
+    hold_after_expiry(
+        &mut teardown.as_mut(),
+        &faulted,
+        expired_at,
+        HEALTHY_WAIT,
+        || capture.parked(),
+    )
     .await;
     let response = faulted.response();
     let failure_codes = rollback_failure_codes(&response);
