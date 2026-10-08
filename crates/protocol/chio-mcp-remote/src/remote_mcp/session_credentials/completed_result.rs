@@ -191,8 +191,13 @@ mod tests {
     #[test]
     fn optional_nonce_rejects_wrong_binding_issuer_and_operation_signature_domain(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let (keypair, pending, original) = fixture(false)?;
+        let (keypair, pending, mut original) = fixture(false)?;
         let receipt = verified_receipt(&keypair, &pending, &original).ok_or("verified receipt")?;
+        let mut body = receipt.body();
+        body.metadata.as_mut().ok_or("receipt metadata")?["admission_operation"]["operation_id"] =
+            json!("01".repeat(32));
+        let receipt = ChioReceipt::sign(body, &keypair)?;
+        original["result"]["_meta"]["chioEvidence"]["receipt"] = serde_json::to_value(&receipt)?;
         let signed = nonce(&keypair, &pending, &receipt)?;
         let mut foreign_binding = signed.clone();
         foreign_binding.nonce.bound_to.request_id = "other-logical-call".into();
