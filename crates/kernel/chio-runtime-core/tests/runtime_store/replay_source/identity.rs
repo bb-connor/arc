@@ -4,7 +4,8 @@ use super::*;
 fn seal_identity_matches_the_actual_open_database_descriptor() -> TestResult {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("descriptor-identity.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     let raw = Connection::open(&path)?;
     let seal = store.seal_legacy_replay_source(&binding()?)?;
     assert_eq!(
@@ -28,7 +29,10 @@ fn replacing_the_path_does_not_rebind_an_already_open_descriptor() -> TestResult
         let directory = tempfile::tempdir()?;
         let path = directory.path().join("original.sqlite3");
         let displaced = directory.path().join("displaced.sqlite3");
-        let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+        let store = SqliteRuntimeOrchestrationStore::open_with_clock(
+            &path,
+            chio_test_support::clock::clock(),
+        )?;
         seed_inventory(&store)?;
         let binding = binding()?;
         let seal = initially_sealed
@@ -70,7 +74,8 @@ fn copied_sealed_database_cannot_reuse_the_original_file_identity() -> TestResul
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("source.sqlite3");
     let copy = directory.path().join("copied.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     seed_inventory(&store)?;
     let seal = store.seal_legacy_replay_source(&binding()?)?;
     let raw = Connection::open(&path)?;
@@ -91,12 +96,14 @@ fn copied_sealed_database_cannot_reuse_the_original_file_identity() -> TestResul
         seal.file_identity(),
         &chio_sqlite_file_identity::main_database_file_identity(&copy_raw)?
     );
-    match SqliteRuntimeOrchestrationStore::open(&copy) {
+    match SqliteRuntimeOrchestrationStore::open_with_clock(&copy, chio_test_support::clock::clock())
+    {
         Err(error) => assert_eq!(error.code(), "runtime_replay_source_invalid"),
         Ok(_) => panic!("copied source seal was rebound to a different physical file"),
     }
     assert_eq!(raw_snapshot(&copy_raw)?, before);
-    SqliteRuntimeOrchestrationStore::open(&path)?.verify_legacy_replay_source_seal(&seal)?;
+    SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?
+        .verify_legacy_replay_source_seal(&seal)?;
     Ok(())
 }
 
@@ -107,7 +114,10 @@ fn hard_links_reject_initial_seal_and_invalidate_an_existing_seal() -> TestResul
         let directory = tempfile::tempdir()?;
         let path = directory.path().join("single-link.sqlite3");
         let alias = directory.path().join("hard-linked.sqlite3");
-        let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+        let store = SqliteRuntimeOrchestrationStore::open_with_clock(
+            &path,
+            chio_test_support::clock::clock(),
+        )?;
         let binding = binding()?;
         let seal = initially_sealed
             .then(|| store.seal_legacy_replay_source(&binding))
@@ -144,13 +154,19 @@ fn symlink_path_cannot_seal_or_validate_the_target_as_its_own_source() -> TestRe
         let directory = tempfile::tempdir()?;
         let path = directory.path().join("target.sqlite3");
         let alias = directory.path().join("symlink.sqlite3");
-        let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+        let store = SqliteRuntimeOrchestrationStore::open_with_clock(
+            &path,
+            chio_test_support::clock::clock(),
+        )?;
         let binding = binding()?;
         let seal = initially_sealed
             .then(|| store.seal_legacy_replay_source(&binding))
             .transpose()?;
         std::os::unix::fs::symlink(&path, &alias)?;
-        match SqliteRuntimeOrchestrationStore::open(&alias) {
+        match SqliteRuntimeOrchestrationStore::open_with_clock(
+            &alias,
+            chio_test_support::clock::clock(),
+        ) {
             Err(error) => assert_eq!(error.code(), "runtime_replay_source_invalid"),
             Ok(aliased) => {
                 assert!(

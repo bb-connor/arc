@@ -708,7 +708,10 @@ fn kernel_hook_denies_federated_runtime_request_without_treaty_context(
 fn kernel_hook_denies_cross_boundary_request_when_treaty_store_evidence_missing(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
-    let store = SqliteRuntimeOrchestrationStore::open(dir.path().join("treaty-hook.sqlite3"))?;
+    let store = SqliteRuntimeOrchestrationStore::open_with_clock(
+        dir.path().join("treaty-hook.sqlite3"),
+        chio_test_support::clock::clock(),
+    )?;
     let args = serde_json::json!({"record": "vendor-ledger-7", "value": "closed"});
     let mut bundle = bundle();
     bundle.binding.tool_args_sha256 = tool_args_sha256(&args)?;

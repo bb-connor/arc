@@ -48,7 +48,10 @@ impl RestartState {
                     path.join("locks"),
                     chio_test_support::clock::clock(),
                 )?,
-                source: SqliteRuntimeOrchestrationStore::open(path.join("runtime.sqlite3"))?,
+                source: SqliteRuntimeOrchestrationStore::open_with_clock(
+                    path.join("runtime.sqlite3"),
+                    chio_test_support::clock::clock(),
+                )?,
                 binding: RuntimeParticipantAuthorityBindingV1::new(
                     AdmissionIdentifier::try_new(
                         "runtime_authority_id",

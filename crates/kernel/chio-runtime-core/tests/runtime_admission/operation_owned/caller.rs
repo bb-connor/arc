@@ -142,7 +142,10 @@ fn caller_context_retains_exact_runtime_episode_and_released_predecessor_after_r
         _directory.path().join("locks"),
         chio_test_support::clock::clock(),
     )?;
-    let source = SqliteRuntimeOrchestrationStore::open(_directory.path().join("runtime.sqlite3"))?;
+    let source = SqliteRuntimeOrchestrationStore::open_with_clock(
+        _directory.path().join("runtime.sqlite3"),
+        chio_test_support::clock::clock(),
+    )?;
     let fixture = Fixture {
         _directory,
         authority,

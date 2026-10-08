@@ -53,7 +53,8 @@ fn early_profile() -> RuntimeSupervisorProfile {
 fn lease_expiry_checks_both_integer_ranges_before_publishing() -> TestResult {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("leases.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     let empty = snapshot(&path)?;
     for (now, ttl, code) in [
         (100, 0, "runtime_run_lease_invalid_ttl"),
@@ -78,7 +79,8 @@ fn lease_expiry_checks_both_integer_ranges_before_publishing() -> TestResult {
     assert_eq!(lease.fencing_token, 1);
     let before = snapshot(&path)?;
     drop(store);
-    let reopened = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let reopened =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     refused(
         reopened.acquire_run_lease("run", "other", i64::MAX as u64 - 1, 1),
         "runtime_run_lease_conflict",
@@ -91,7 +93,8 @@ fn lease_expiry_checks_both_integer_ranges_before_publishing() -> TestResult {
 fn fencing_exhaustion_and_invalid_tokens_survive_reopen_without_replacement() -> TestResult {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("leases.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     store.acquire_run_lease("run", "first", 10, 10)?;
     Connection::open(&path)?.execute(
         "UPDATE runtime_run_leases SET fencing_token = ?1",
@@ -106,7 +109,10 @@ fn fencing_exhaustion_and_invalid_tokens_survive_reopen_without_replacement() ->
             params![token],
         )?;
         let before = snapshot(&path)?;
-        let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+        let store = SqliteRuntimeOrchestrationStore::open_with_clock(
+            &path,
+            chio_test_support::clock::clock(),
+        )?;
         let code = if token == i64::MAX {
             "runtime_run_lease_fencing_exhausted"
         } else {
@@ -114,7 +120,10 @@ fn fencing_exhaustion_and_invalid_tokens_survive_reopen_without_replacement() ->
         };
         refused(store.acquire_run_lease("run", "next", 30, 10), code);
         drop(store);
-        let reopened = SqliteRuntimeOrchestrationStore::open(&path)?;
+        let reopened = SqliteRuntimeOrchestrationStore::open_with_clock(
+            &path,
+            chio_test_support::clock::clock(),
+        )?;
         refused(reopened.acquire_run_lease("run", "retry", 31, 10), code);
         assert_eq!(snapshot(&path)?, before);
     }
@@ -125,7 +134,8 @@ fn fencing_exhaustion_and_invalid_tokens_survive_reopen_without_replacement() ->
 fn refused_heartbeats_preserve_every_persisted_field() -> TestResult {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("leases.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     let first = store.acquire_run_lease("run", "owner", 100, 20)?;
     let before = snapshot(&path)?;
     for (owner, token, now, ttl, code) in [
@@ -176,7 +186,8 @@ fn refused_heartbeats_preserve_every_persisted_field() -> TestResult {
     assert_eq!(renewed.fencing_token, first.fencing_token);
     let after = snapshot(&path)?;
     drop(store);
-    let reopened = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let reopened =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     refused(
         reopened.heartbeat_run_lease("run", "owner", 1, 109, 30),
         "runtime_run_lease_clock_regressed",
@@ -189,7 +200,8 @@ fn refused_heartbeats_preserve_every_persisted_field() -> TestResult {
 fn a_late_scheduler_write_failure_rolls_back_expirations_claims_and_tick() -> TestResult {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("leases.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     for run in ["a-good", "z-bad"] {
         store.register_run(run)?;
     }
@@ -204,7 +216,8 @@ fn a_late_scheduler_write_failure_rolls_back_expirations_claims_and_tick() -> Te
     );
     assert_eq!(snapshot(&path)?, before);
     drop(store);
-    let reopened = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let reopened =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     assert_eq!(snapshot(&path)?, before);
     connection.execute_batch("DROP TRIGGER fail_late_claim;")?;
     let report = reopened.scheduler_tick_report(&early_profile(), "owner", 10, 2)?;
@@ -219,7 +232,8 @@ fn a_late_scheduler_write_failure_rolls_back_expirations_claims_and_tick() -> Te
 fn scheduler_fencing_exhaustion_rolls_back_an_earlier_claim() -> TestResult {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("leases.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     for run in ["a-good", "z-exhausted"] {
         store.register_run(run)?;
     }
@@ -241,13 +255,19 @@ fn scheduler_fencing_exhaustion_rolls_back_an_earlier_claim() -> TestResult {
 fn competing_schedulers_share_one_capacity_snapshot() -> TestResult {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("leases.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     for index in 0..8 {
         store.register_run(&format!("run-{index}"))?;
     }
     // Open every connection before starting workers so a failed open cannot strand a barrier.
     let handles = (0..4)
-        .map(|_| SqliteRuntimeOrchestrationStore::open(&path))
+        .map(|_| {
+            SqliteRuntimeOrchestrationStore::open_with_clock(
+                &path,
+                chio_test_support::clock::clock(),
+            )
+        })
         .collect::<Result<Vec<_>, _>>()?;
     let barrier = Arc::new(Barrier::new(handles.len()));
     let workers = handles
@@ -282,7 +302,12 @@ fn competing_owners_fence_once_and_old_heartbeats_cannot_revive_after_reopen() -
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("leases.sqlite3");
     let handles = (0..4)
-        .map(|_| SqliteRuntimeOrchestrationStore::open(&path))
+        .map(|_| {
+            SqliteRuntimeOrchestrationStore::open_with_clock(
+                &path,
+                chio_test_support::clock::clock(),
+            )
+        })
         .collect::<Result<Vec<_>, _>>()?;
     let barrier = Arc::new(Barrier::new(handles.len()));
     let workers = handles
@@ -310,7 +335,8 @@ fn competing_owners_fence_once_and_old_heartbeats_cannot_revive_after_reopen() -
     assert_eq!(winners.len(), 1);
     assert_eq!(conflicts, 3);
     assert_eq!(winners[0].fencing_token, 1);
-    let reopened = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let reopened =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     let next = reopened.acquire_run_lease("run", "next", 20, 10)?;
     assert_eq!(next.fencing_token, 2);
     let before = snapshot(&path)?;
@@ -326,7 +352,8 @@ fn competing_owners_fence_once_and_old_heartbeats_cannot_revive_after_reopen() -
 fn heartbeat_zero_is_not_stale_until_the_timeout_has_elapsed() -> TestResult {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("leases.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     let profile = RuntimeSupervisorProfile {
         stale_run_after_ms: 100,
         ..early_profile()

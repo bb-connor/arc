@@ -51,7 +51,8 @@ fn preopened_raw_connections_and_prepared_statements_cannot_mutate_any_replay_ta
 {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("prepared-legacy-writers.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     seed_inventory(&store)?;
     let prepared_connection = Connection::open(&path)?;
     let direct_connection = Connection::open(&path)?;
@@ -76,8 +77,10 @@ fn preopened_raw_connections_and_prepared_statements_cannot_mutate_any_replay_ta
 fn preopened_typed_legacy_handle_cannot_consume_or_release_after_seal() -> TestResult {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("typed-legacy-writer.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
-    let legacy = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
+    let legacy =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     seed_inventory(&legacy)?;
     let seal = store.seal_legacy_replay_source(&binding()?)?;
     let raw = Connection::open(&path)?;
@@ -104,7 +107,8 @@ fn preopened_typed_legacy_handle_cannot_consume_or_release_after_seal() -> TestR
 fn singleton_seal_rejects_direct_insert_replace_update_and_delete() -> TestResult {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("immutable-seal.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     let raw = Connection::open(&path)?;
     let seal = store.seal_legacy_replay_source(&binding()?)?;
     let before = raw_snapshot(&raw)?;
@@ -126,7 +130,8 @@ fn singleton_seal_rejects_direct_insert_replace_update_and_delete() -> TestResul
 fn stale_wal_reader_cannot_upgrade_to_a_legacy_writer_after_seal() -> TestResult {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("stale-wal.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     seed_inventory(&store)?;
     let stale = Connection::open(&path)?;
     stale.execute_batch("BEGIN DEFERRED")?;
@@ -172,7 +177,8 @@ fn stale_wal_reader_cannot_upgrade_to_a_legacy_writer_after_seal() -> TestResult
 fn concurrent_seal_includes_a_legacy_writer_committed_under_an_existing_write_lock() -> TestResult {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("competing-writer.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     let raw = Connection::open(&path)?;
     raw.execute_batch("BEGIN IMMEDIATE")?;
     raw.execute(

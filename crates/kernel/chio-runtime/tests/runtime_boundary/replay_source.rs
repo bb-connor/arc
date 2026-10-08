@@ -30,10 +30,16 @@ fn facade_source_port_preserves_exact_preview_seal_verify_and_rejection_errors(
 
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("facade-source.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
-    let core_store = chio_runtime_core::SqliteRuntimeOrchestrationStore::open(&path)?;
-    let other =
-        SqliteRuntimeOrchestrationStore::open(directory.path().join("other-source.sqlite3"))?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
+    let core_store = chio_runtime_core::SqliteRuntimeOrchestrationStore::open_with_clock(
+        &path,
+        chio_test_support::clock::clock(),
+    )?;
+    let other = SqliteRuntimeOrchestrationStore::open_with_clock(
+        directory.path().join("other-source.sqlite3"),
+        chio_test_support::clock::clock(),
+    )?;
     for source in [&store, &other] {
         source.consume_destructive_lease("lease", "historical-lease")?;
         source.consume_treaty_continuation("treaty", "historical-treaty")?;
@@ -150,7 +156,8 @@ fn facade_seal_preserves_markers_and_propagates_fail_closed_errors(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("runtime.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     let binding = RuntimeReplaySourceBinding::new("source", "runtime", "destination")?;
     assert!(store.load_legacy_replay_source_seal(&binding)?.is_none());
     store.consume_destructive_lease("lease", "admission")?;
@@ -183,7 +190,8 @@ fn facade_seal_preserves_markers_and_propagates_fail_closed_errors(
     };
     assert_eq!(error.code(), "runtime_replay_source_invalid");
     drop(store);
-    let reopened = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let reopened =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     assert_eq!(
         reopened.load_legacy_replay_source_seal(&binding)?,
         Some(seal.clone())
@@ -198,7 +206,8 @@ fn facade_propagates_unsupported_sealing_without_retiring_legacy_replay(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("unsupported-runtime.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     let binding = RuntimeReplaySourceBinding::new("source", "runtime", "destination")?;
     store.consume_destructive_lease("lease", "admission")?;
     store.consume_treaty_continuation("treaty", "admission")?;
@@ -212,7 +221,8 @@ fn facade_propagates_unsupported_sealing_without_retiring_legacy_replay(
     assert!(store.load_legacy_replay_source_seal(&binding)?.is_none());
     drop(store);
 
-    let reopened = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let reopened =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     assert!(reopened.load_legacy_replay_source_seal(&binding)?.is_none());
     reopened.release_destructive_lease("lease", "admission")?;
     reopened.release_treaty_continuation("treaty", "admission")?;

@@ -19,7 +19,10 @@ fn real_activated_source_and_destination_survive_owner_restart_without_resealing
     use chio_kernel::admission_operation::AdmissionOperationStore;
     let (directory, database, lock_root, authority) = destination_fixture()?;
     let source_path = directory.path().join("activated-runtime.sqlite3");
-    let source = SqliteRuntimeOrchestrationStore::open(&source_path)?;
+    let source = SqliteRuntimeOrchestrationStore::open_with_clock(
+        &source_path,
+        chio_test_support::clock::clock(),
+    )?;
     seed_inventory(&source)?;
     let store = authority.admission_operation_store();
     let fence = authority.mutation_fence();
@@ -54,7 +57,10 @@ fn real_activated_source_and_destination_survive_owner_restart_without_resealing
         chio_test_support::clock::clock(),
     )?;
     let store = authority.admission_operation_store();
-    let source = SqliteRuntimeOrchestrationStore::open(&source_path)?;
+    let source = SqliteRuntimeOrchestrationStore::open_with_clock(
+        &source_path,
+        chio_test_support::clock::clock(),
+    )?;
     let current = authority.mutation_fence();
     assert!(current.owner_epoch > fence.owner_epoch);
     assert!(store
@@ -202,7 +208,10 @@ fn assert_all_legacy_kinds_blocked(source: &SqliteRuntimeOrchestrationStore) {
 fn import_exact_source_and_reopen(populated: bool) -> TestResult {
     let (directory, database, lock_root, authority) = destination_fixture()?;
     let source_path = directory.path().join("legacy-source.sqlite3");
-    let source = SqliteRuntimeOrchestrationStore::open(&source_path)?;
+    let source = SqliteRuntimeOrchestrationStore::open_with_clock(
+        &source_path,
+        chio_test_support::clock::clock(),
+    )?;
     if populated {
         seed_inventory(&source)?;
     }
@@ -300,7 +309,10 @@ fn import_exact_source_and_reopen(populated: bool) -> TestResult {
     assert_eq!(reopened_fence.store_uuid, fence.store_uuid);
     assert!(reopened_fence.owner_epoch > fence.owner_epoch);
     let reopened_store = reopened_authority.admission_operation_store();
-    let reopened_source = SqliteRuntimeOrchestrationStore::open(&source_path)?;
+    let reopened_source = SqliteRuntimeOrchestrationStore::open_with_clock(
+        &source_path,
+        chio_test_support::clock::clock(),
+    )?;
     assert_eq!(
         reopened_store.load_runtime_replay_migration(
             &runtime_authority,
@@ -340,7 +352,10 @@ fn qualified_empty_pin_rejects_later_markers_without_sealing_or_importing() -> T
     for (table, key, _) in TABLES {
         let (directory, database, _lock_root, authority) = destination_fixture()?;
         let source_path = directory.path().join("changed-source.sqlite3");
-        let source = SqliteRuntimeOrchestrationStore::open(&source_path)?;
+        let source = SqliteRuntimeOrchestrationStore::open_with_clock(
+            &source_path,
+            chio_test_support::clock::clock(),
+        )?;
         let store = authority.admission_operation_store();
         let fence = authority.mutation_fence();
         let source_id = AdmissionIdentifier::try_new("source_id", "changing-source")?;

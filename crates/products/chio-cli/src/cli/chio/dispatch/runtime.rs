@@ -411,7 +411,10 @@ mod chio_orchestration_cli_tests {
         let store_path = dir.path().join("runtime.sqlite3");
         let evidence_dir = dir.path().join("evidence");
         let report_path = dir.path().join("report.json");
-        let store = chio_runtime::SqliteRuntimeOrchestrationStore::open(&store_path)?;
+        let store = chio_runtime::SqliteRuntimeOrchestrationStore::open_with_clock(
+            &store_path,
+            chio_test_support::clock::clock(),
+        )?;
         store.register_run(&contract.run_id)?;
         let held = store.acquire_current_run_lease(&contract.run_id, "other-owner", 60_000)?;
         store.record_run_state(&held, "running", None)?;
@@ -717,7 +720,10 @@ mod chio_orchestration_cli_tests {
         let dir = TempDir::new()?;
         let profile_path = write_profile(dir.path(), &orchestration_profile())?;
         let store_path = dir.path().join("runtime.sqlite3");
-        let store = chio_runtime::SqliteRuntimeOrchestrationStore::open(&store_path)?;
+        let store = chio_runtime::SqliteRuntimeOrchestrationStore::open_with_clock(
+            &store_path,
+            chio_test_support::clock::clock(),
+        )?;
         for run in ["run-good", "run-missing"] {
             store.register_run(run)?;
             let lease = store.acquire_current_run_lease(run, "fixture", 60_000)?;
@@ -748,7 +754,10 @@ mod chio_orchestration_cli_tests {
         let dir = TempDir::new()?;
         let profile_path = write_supervisor_profile(dir.path(), &supervisor_profile())?;
         let store_path = dir.path().join("runtime.sqlite3");
-        let store = chio_runtime::SqliteRuntimeOrchestrationStore::open(&store_path)?;
+        let store = chio_runtime::SqliteRuntimeOrchestrationStore::open_with_clock(
+            &store_path,
+            chio_test_support::clock::clock(),
+        )?;
         store.register_run("run-without-evidence")?;
         let lease = store.acquire_current_run_lease("run-without-evidence", "fixture", 60_000)?;
         store.complete_run_write(&lease, "planned", None, &[], &[])?;

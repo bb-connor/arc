@@ -117,7 +117,10 @@ mod tests {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let directory = tempfile::tempdir()?;
         let path = directory.path().join("unsupported-expected-source.sqlite3");
-        let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+        let store = SqliteRuntimeOrchestrationStore::open_with_clock(
+            &path,
+            chio_test_support::clock::clock(),
+        )?;
         let binding = RuntimeReplaySourceBinding::new("source", "runtime", "destination")?;
         let candidate = RuntimeReplaySourceSeal::from_inventory(
             binding.clone(),

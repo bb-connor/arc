@@ -623,7 +623,10 @@ fn runtime_orchestration_run_report_rejects_inconsistent_outcome(
 #[test]
 fn runtime_orchestration_status_rejects_stale_profile() -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
-    let store = SqliteRuntimeOrchestrationStore::open(dir.path().join("runtime-status.sqlite3"))?;
+    let store = SqliteRuntimeOrchestrationStore::open_with_clock(
+        dir.path().join("runtime-status.sqlite3"),
+        chio_test_support::clock::clock(),
+    )?;
     let profile = RuntimeOrchestrationProfile {
         schema: CHIO_RUNTIME_ORCHESTRATION_PROFILE_SCHEMA.to_string(),
         profile_id: "profile-runtime-orchestration".to_string(),
@@ -1023,7 +1026,8 @@ fn runtime_ops_run_lease_blocks_competing_owner_and_allows_stale_takeover(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("runtime-ops.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     store.register_run("runtime-run-1")?;
 
     let first = store.acquire_run_lease("runtime-run-1", "owner-a", 1_800_000_000_000, 60_000)?;
@@ -1095,7 +1099,8 @@ fn runtime_ops_scheduler_tick_claims_pending_runs_and_expires_stale_leases(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("runtime-ops-tick.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     store.register_run("runtime-run-a")?;
     store.register_run("runtime-run-b")?;
     store.register_run("runtime-run-c")?;
@@ -1123,7 +1128,8 @@ fn runtime_ops_scheduler_tick_limits_claims_by_active_leases(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("runtime-ops-active-capacity.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     store.register_run("runtime-run-a")?;
     store.register_run("runtime-run-b")?;
     store.acquire_run_lease(
@@ -1183,7 +1189,8 @@ fn runtime_ops_scheduler_tick_excludes_active_leased_runs_before_claim_limit(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("runtime-ops-active-filter.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     store.register_run("runtime-run-active")?;
     store.register_run("runtime-run-a")?;
     store.register_run("runtime-run-b")?;
@@ -1209,7 +1216,8 @@ fn runtime_ops_scheduler_tick_rejects_profile_at_exact_expiry(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("runtime-ops-expiry.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     store.register_run("runtime-run-a")?;
 
     let profile = supervisor_profile();
@@ -1233,7 +1241,8 @@ fn runtime_ops_scheduler_tick_rejects_profile_at_exact_expiry(
 fn runtime_ops_status_rejects_stale_supervisor_profile() -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("runtime-ops-status-stale-profile.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     let profile = supervisor_profile();
 
     let report = store.ops_status_report(&profile, profile.expires_at_unix_ms, true, true)?;
@@ -1287,7 +1296,8 @@ fn runtime_ops_recovery_drill_rejects_stale_supervisor_profile(
     let path = dir
         .path()
         .join("runtime-ops-recovery-stale-profile.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     let profile = supervisor_profile();
 
     let report = store.recovery_drill_report_for_profile(
@@ -1312,7 +1322,8 @@ fn runtime_ops_recovery_drill_blocks_terminal_failure_steps(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("runtime-ops-recovery-terminal.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     store.register_run("runtime-run-terminal")?;
     let lease =
         store.acquire_current_run_lease("runtime-run-terminal", "recovery-fixture", 60_000)?;
@@ -1353,7 +1364,8 @@ fn runtime_ops_recovery_drill_blocks_non_contiguous_reusable_steps(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("runtime-ops-recovery-gap.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     store.register_run("runtime-run-gap")?;
     let lease = store.acquire_current_run_lease("runtime-run-gap", "recovery-fixture", 60_000)?;
     store.record_run_state(&lease, "running", None)?;
@@ -1403,7 +1415,8 @@ fn runtime_ops_recovery_drill_preserves_earlier_terminal_failure_blocker(
     let path = dir
         .path()
         .join("runtime-ops-recovery-terminal-preserved.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     store.register_run("runtime-run-terminal-preserved")?;
     let lease = store.acquire_current_run_lease(
         "runtime-run-terminal-preserved",

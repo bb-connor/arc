@@ -8,7 +8,10 @@ const EXIT_AFTER_COMMIT: i32 = 73;
 fn committed_seal_survives_process_exit_without_acknowledgment() -> TestResult {
     if std::env::var_os(CHILD_ROLE).as_deref() == Some(std::ffi::OsStr::new("seal-and-exit")) {
         let path = std::env::var_os(CHILD_DATABASE).ok_or("child database path missing")?;
-        let store = SqliteRuntimeOrchestrationStore::open(std::path::PathBuf::from(path))?;
+        let store = SqliteRuntimeOrchestrationStore::open_with_clock(
+            std::path::PathBuf::from(path),
+            chio_test_support::clock::clock(),
+        )?;
         let binding = binding()?;
         assert!(store.load_legacy_replay_source_seal(&binding)?.is_none());
         let committed = store.seal_legacy_replay_source(&binding)?;
@@ -22,7 +25,8 @@ fn committed_seal_survives_process_exit_without_acknowledgment() -> TestResult {
 
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("unacknowledged-seal.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     seed_inventory(&store)?;
     drop(store);
 
@@ -45,7 +49,8 @@ fn committed_seal_survives_process_exit_without_acknowledgment() -> TestResult {
         String::from_utf8_lossy(&child.stderr)
     );
 
-    let recovered = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let recovered =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     let binding = binding()?;
     let seal = recovered
         .load_legacy_replay_source_seal(&binding)?

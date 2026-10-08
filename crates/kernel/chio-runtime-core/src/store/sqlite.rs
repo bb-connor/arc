@@ -25,13 +25,8 @@ pub struct SqliteRuntimeOrchestrationStore {
 }
 
 impl SqliteRuntimeOrchestrationStore {
-    pub fn open(path: impl AsRef<Path>) -> Result<Self, ChioRuntimeError> {
-        Self::open_with_clock(
-            path,
-            std::sync::Arc::new(chio_security_types::clock::SystemClock),
-        )
-    }
-
+    /// Every timestamp this store records or compares comes from `clock`.
+    /// There is no default: the composition root chooses the time source.
     pub fn open_with_clock(
         path: impl AsRef<Path>,
         clock: std::sync::Arc<dyn chio_security_types::clock::Clock>,

@@ -180,12 +180,23 @@ fn independent_sqlite_handles_linearize_conflicting_trust_floor_transitions() ->
         .path()
         .join("independent-runtime-trust-floor.sqlite3");
     let handles = (0..CONTENDERS)
-        .map(|_| SqliteRuntimeOrchestrationStore::open(&path))
+        .map(|_| {
+            SqliteRuntimeOrchestrationStore::open_with_clock(
+                &path,
+                chio_test_support::clock::clock(),
+            )
+        })
         .collect::<Result<Vec<_>, _>>()?;
     let stores: Vec<&dyn RuntimeTrustFloorStore> = handles
         .iter()
         .map(|store| store as &dyn RuntimeTrustFloorStore)
         .collect();
     let winners = assert_rounds(&stores)?;
-    assert_persisted_winners(&SqliteRuntimeOrchestrationStore::open(&path)?, &winners)
+    assert_persisted_winners(
+        &SqliteRuntimeOrchestrationStore::open_with_clock(
+            &path,
+            chio_test_support::clock::clock(),
+        )?,
+        &winners,
+    )
 }

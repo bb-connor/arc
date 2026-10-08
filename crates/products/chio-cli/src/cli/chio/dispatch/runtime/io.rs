@@ -5,6 +5,17 @@ use crate::CliError;
 
 use super::super::read_utf8_json_file;
 
+/// Composition root for runtime store time: every runtime command opens its
+/// orchestration store against the host clock here and nowhere else.
+pub(crate) fn open_runtime_store(
+    path: &Path,
+) -> Result<chio_runtime::SqliteRuntimeOrchestrationStore, chio_runtime::ChioRuntimeError> {
+    chio_runtime::SqliteRuntimeOrchestrationStore::open_with_clock(
+        path,
+        std::sync::Arc::new(chio_security_types::clock::SystemClock),
+    )
+}
+
 pub(crate) fn load_runtime_orchestration_profile(
     path: &Path,
 ) -> Result<chio_runtime::RuntimeOrchestrationProfile, CliError> {

@@ -37,6 +37,7 @@ COMPOSITION_CONTRACTS = {
     "crates/platform/chio-store-sqlite/src/serving_owner/relocation.rs::import_relocated::native-adapter": "f0f2c06c007834263426517aef7f35bb0116721a22cd1a1a2262b7749602f6af",
     "crates/platform/chio-store-sqlite/src/serving_owner/relocation.rs::import_relocated_checked::native-adapter": "40ed4ee61ff9b7829089e2ce264bd9910da76fd50ce0cba0f4c089f35efb7d11",
     "crates/platform/chio-store-sqlite/src/serving_owner/relocation.rs::import_relocated_checked_with_phase::native-adapter": "681a34d8c712e4e25d62bedd5fbfd3d5758697ec778451ae9f8f9cb520f1fbba",
+    "crates/products/chio-cli/src/cli/chio/dispatch/runtime/io.rs::open_runtime_store::native-adapter": "6f848a867bf79d8680db4bfe55b14a716147a57af8d20e1c960b891b10463ebd",
     "crates/products/chio-cli/src/cli/process_host/state.rs::kernel::native-adapter": "1a1e27fe9851cebb8ae6db218d7297c72a60a6d98488d6282751ab56f795512e",
     "crates/security/chio-keyring/src/sqlite/opening.rs::open::native-adapter": "4d2df0c6335cb27433bc3b8285f7cdd98732cf558a30b332a437e40f39c5c514",
     "crates/security/chio-keyring/src/sqlite/opening.rs::open_existing::native-adapter": "aa3e3ca20962313839c2fde37c412ff051ba431ce748a1d16c04356390b95c5b",

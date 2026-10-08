@@ -1,6 +1,8 @@
 use serde::Serialize;
 mod replay_source;
-use std::{fmt, path::Path};
+use std::{fmt, path::Path, sync::Arc};
+
+use chio_security_types::clock::Clock;
 
 use crate::{
     unwrap_runtime, wrap_runtime, ChioRuntimeError, RuntimeAdmissionBundle, RuntimeCoreError,
@@ -425,10 +427,15 @@ impl fmt::Debug for SqliteRuntimeOrchestrationStore {
 }
 
 impl SqliteRuntimeOrchestrationStore {
-    pub fn open(path: impl AsRef<Path>) -> Result<Self, ChioRuntimeError> {
-        wrap_runtime(chio_runtime_core::SqliteRuntimeOrchestrationStore::open(
-            path,
-        ))
+    /// Every timestamp this store records or compares comes from `clock`.
+    /// There is no default: the composition root chooses the time source.
+    pub fn open_with_clock(
+        path: impl AsRef<Path>,
+        clock: Arc<dyn Clock>,
+    ) -> Result<Self, ChioRuntimeError> {
+        wrap_runtime(
+            chio_runtime_core::SqliteRuntimeOrchestrationStore::open_with_clock(path, clock),
+        )
         .map(|inner| Self { inner })
     }
 

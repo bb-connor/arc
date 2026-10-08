@@ -5,7 +5,7 @@ use crate::CliError;
 use super::super::{read_utf8_json_file, write_pretty_json};
 use super::io::{
     ensure_runtime_evidence_dir, load_runtime_orchestration_profile, load_runtime_run_contract,
-    sorted_child_dirs,
+    open_runtime_store, sorted_child_dirs,
 };
 
 pub(crate) fn cmd_chio_runtime_orchestrate_lint(
@@ -50,7 +50,7 @@ pub(crate) fn cmd_chio_runtime_orchestrate_plan(
 ) -> Result<(), CliError> {
     let profile = load_runtime_orchestration_profile(profile)?;
     let run_contract = load_runtime_run_contract(run_contract)?;
-    let store = chio_runtime::SqliteRuntimeOrchestrationStore::open(store).map_err(|error| {
+    let store = open_runtime_store(store).map_err(|error| {
         CliError::cli_other_error(format!("Chio runtime orchestration store: {error}"))
     })?;
     ensure_runtime_evidence_dir(evidence_dir)?;
@@ -102,7 +102,7 @@ pub(crate) fn cmd_chio_runtime_orchestrate_run(
         chio_runtime::runtime_run_contract_sha256(&run_contract).map_err(|error| {
             CliError::cli_other_error(format!("Chio runtime run contract hash: {error}"))
         })?;
-    let store = chio_runtime::SqliteRuntimeOrchestrationStore::open(store).map_err(|error| {
+    let store = open_runtime_store(store).map_err(|error| {
         CliError::cli_other_error(format!("Chio runtime orchestration store: {error}"))
     })?;
     ensure_runtime_evidence_dir(evidence_dir)?;
@@ -246,7 +246,7 @@ pub(crate) fn cmd_chio_runtime_orchestrate_resume(
     chio_runtime::validate_runtime_orchestration_resume_plan(&resolved).map_err(|error| {
         CliError::cli_other_error(format!("Chio runtime orchestration resume plan: {error}"))
     })?;
-    let _store = chio_runtime::SqliteRuntimeOrchestrationStore::open(store).map_err(|error| {
+    let _store = open_runtime_store(store).map_err(|error| {
         CliError::cli_other_error(format!("Chio runtime orchestration store: {error}"))
     })?;
     ensure_runtime_evidence_dir(evidence_dir)?;
@@ -289,7 +289,7 @@ pub(crate) fn cmd_chio_runtime_orchestrate_status(
         chio_runtime::runtime_orchestration_profile_sha256(&profile).map_err(|error| {
             CliError::cli_other_error(format!("Chio runtime orchestration profile hash: {error}"))
         })?;
-    let store = chio_runtime::SqliteRuntimeOrchestrationStore::open(store).map_err(|error| {
+    let store = open_runtime_store(store).map_err(|error| {
         CliError::cli_other_error(format!("Chio runtime orchestration store: {error}"))
     })?;
     let evidence_sink_healthy = runtime_orchestration_recorded_evidence_healthy(

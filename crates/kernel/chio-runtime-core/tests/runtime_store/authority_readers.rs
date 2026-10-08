@@ -36,7 +36,8 @@ fn sqlite_bundle_readback_binds_digest_and_index_across_restart() -> Result<(), 
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("binding.sqlite3");
     let original = bundle();
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     store.insert_bundle(original.clone())?;
     assert_eq!(
         store
@@ -58,7 +59,8 @@ fn sqlite_bundle_readback_binds_digest_and_index_across_restart() -> Result<(), 
         ],
     )?;
     drop(store);
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     let error = store
         .bundle(&original.admission_id)
         .err()
@@ -103,7 +105,8 @@ fn sqlite_bundle_readback_binds_digest_and_index_across_restart() -> Result<(), 
 fn sqlite_swarm_and_treaty_readback_rejects_substitution() -> Result<(), Box<dyn Error>> {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("artifacts.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     let original = swarm_authority_bundle_fixture()?;
     store.insert_swarm_authority_bundle(original.clone())?;
     assert_eq!(
@@ -145,7 +148,8 @@ fn sqlite_swarm_and_treaty_readback_rejects_substitution() -> Result<(), Box<dyn
         [r#"{"scope":"substituted"}"#],
     )?;
     drop(store);
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     assert_eq!(
         store
             .treaty_runtime_artifact("scope", "scope-1")

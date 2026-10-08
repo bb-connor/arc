@@ -31,7 +31,10 @@ fn preview_is_read_only_and_unchanged_source_seals_and_retries_exactly() -> Test
     for populated in [false, true] {
         let directory = tempfile::tempdir()?;
         let path = directory.path().join("preview.sqlite3");
-        let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+        let store = SqliteRuntimeOrchestrationStore::open_with_clock(
+            &path,
+            chio_test_support::clock::clock(),
+        )?;
         if populated {
             seed_inventory(&store)?;
         }
@@ -79,7 +82,10 @@ fn preview_is_read_only_and_unchanged_source_seals_and_retries_exactly() -> Test
         // The original standalone API retains its exact-reseal semantics.
         assert_eq!(store.seal_legacy_replay_source(&binding)?, seal);
         drop(store);
-        let reopened = SqliteRuntimeOrchestrationStore::open(&path)?;
+        let reopened = SqliteRuntimeOrchestrationStore::open_with_clock(
+            &path,
+            chio_test_support::clock::clock(),
+        )?;
         RuntimeReplaySourcePort::verify_exact(&reopened, &expected)?;
         assert_eq!(
             reopened.seal_expected_legacy_replay_source(&expected)?,
@@ -95,7 +101,10 @@ fn every_inventory_mutation_after_preview_rejects_before_sealing() -> TestResult
         for mutation in ["insert", "update", "delete"] {
             let directory = tempfile::tempdir()?;
             let path = directory.path().join("changed-inventory.sqlite3");
-            let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+            let store = SqliteRuntimeOrchestrationStore::open_with_clock(
+                &path,
+                chio_test_support::clock::clock(),
+            )?;
             seed_inventory(&store)?;
             let expected = store.preview_legacy_replay_source(&binding()?)?;
             let raw = Connection::open(&path)?;
@@ -116,7 +125,10 @@ fn empty_preview_cannot_silently_seal_a_new_marker_of_any_kind() -> TestResult {
     for (table, key, _) in TABLES {
         let directory = tempfile::tempdir()?;
         let path = directory.path().join("empty-to-populated.sqlite3");
-        let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+        let store = SqliteRuntimeOrchestrationStore::open_with_clock(
+            &path,
+            chio_test_support::clock::clock(),
+        )?;
         let expected = store.preview_legacy_replay_source(&binding()?)?;
         let raw = Connection::open(&path)?;
         raw.execute(
@@ -135,8 +147,14 @@ fn identical_inventory_in_a_different_file_cannot_satisfy_a_preview() -> TestRes
     let directory = tempfile::tempdir()?;
     let original_path = directory.path().join("original.sqlite3");
     let replacement_path = directory.path().join("replacement.sqlite3");
-    let original = SqliteRuntimeOrchestrationStore::open(&original_path)?;
-    let replacement = SqliteRuntimeOrchestrationStore::open(&replacement_path)?;
+    let original = SqliteRuntimeOrchestrationStore::open_with_clock(
+        &original_path,
+        chio_test_support::clock::clock(),
+    )?;
+    let replacement = SqliteRuntimeOrchestrationStore::open_with_clock(
+        &replacement_path,
+        chio_test_support::clock::clock(),
+    )?;
     seed_inventory(&original)?;
     seed_inventory(&replacement)?;
     let expected = original.preview_legacy_replay_source(&binding()?)?;
@@ -155,7 +173,8 @@ fn hard_link_created_after_preview_rejects_without_retiring_the_source() -> Test
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("preview-link.sqlite3");
     let link = directory.path().join("additional-link.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     seed_inventory(&store)?;
     let expected = store.preview_legacy_replay_source(&binding()?)?;
     let raw = Connection::open(&path)?;
@@ -171,7 +190,8 @@ fn hard_link_created_after_preview_rejects_without_retiring_the_source() -> Test
 fn sealed_and_partially_sealed_sources_cannot_produce_a_fresh_preview() -> TestResult {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("sealed-preview.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     let binding = binding()?;
     let seal = store.seal_legacy_replay_source(&binding)?;
     let raw = Connection::open(&path)?;
@@ -196,7 +216,8 @@ fn sealed_and_partially_sealed_sources_cannot_produce_a_fresh_preview() -> TestR
 fn real_sqlite_source_port_has_no_unsealed_or_mismatched_success_fallback() -> TestResult {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("port.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     let binding = binding()?;
     let source = AdmissionIdentifier::try_new("source_id", binding.source_id())?;
     let runtime =
@@ -242,7 +263,8 @@ fn real_sqlite_source_port_has_no_unsealed_or_mismatched_success_fallback() -> T
 fn structurally_valid_rehashed_snapshot_data_cannot_authorize_a_different_source() -> TestResult {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("untrusted-snapshot.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     seed_inventory(&store)?;
     let expected = store.preview_legacy_replay_source(&binding()?)?;
     let raw = Connection::open(&path)?;
@@ -293,7 +315,7 @@ fn preview_rejects_invalid_inventory_and_noncanonical_legacy_schema_without_chan
     ] {
         let directory = tempfile::tempdir()?;
         let path = directory.path().join("invalid-preview.sqlite3");
-        let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+        let store = SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
         let raw = Connection::open(&path)?;
         raw.execute_batch(corruption)?;
         let before = raw_snapshot(&raw)?;

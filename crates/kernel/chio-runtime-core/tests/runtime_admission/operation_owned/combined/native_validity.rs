@@ -210,8 +210,9 @@ fn native_runtime_deadline_includes_every_selected_signed_time_bound() -> TestRe
         let hook = Arc::new(
             Hook::new(
                 profile,
-                SqliteRuntimeOrchestrationStore::open(
+                SqliteRuntimeOrchestrationStore::open_with_clock(
                     fixture._directory.path().join("runtime.sqlite3"),
+                    chio_test_support::clock::clock(),
                 )?,
             )
             .with_runtime_trust_input(SignedExportEnvelope::sign(trust, &verifier)?, keys)

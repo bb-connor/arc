@@ -123,8 +123,10 @@ impl Fixture {
             &locks,
             chio_test_support::clock::clock(),
         )?;
-        let source =
-            SqliteRuntimeOrchestrationStore::open(directory.path().join("runtime.sqlite3"))?;
+        let source = SqliteRuntimeOrchestrationStore::open_with_clock(
+            directory.path().join("runtime.sqlite3"),
+            chio_test_support::clock::clock(),
+        )?;
         let request = prepare(&source)?;
         let store = authority.admission_operation_store();
         let fence = authority.mutation_fence();
@@ -162,7 +164,10 @@ impl Fixture {
         let (trust, keys, report, policy, weights) = signed_policy_inputs(0.1)?;
         Ok(ChioRuntimeAdmissionHook::new(
             profile(),
-            SqliteRuntimeOrchestrationStore::open(self._directory.path().join("runtime.sqlite3"))?,
+            SqliteRuntimeOrchestrationStore::open_with_clock(
+                self._directory.path().join("runtime.sqlite3"),
+                chio_test_support::clock::clock(),
+            )?,
         )
         .with_runtime_trust_input(trust, keys)
         .with_pheromone_query_report(report)
@@ -299,8 +304,9 @@ fn owned_runtime_denies_fixed_clock_override_and_wrong_physical_source() -> Test
     for wrong_source in [false, true] {
         let fixture = Fixture::new(true)?;
         let hook = if wrong_source {
-            let other = SqliteRuntimeOrchestrationStore::open(
+            let other = SqliteRuntimeOrchestrationStore::open_with_clock(
                 fixture._directory.path().join("other-runtime.sqlite3"),
+                chio_test_support::clock::clock(),
             )?;
             ChioRuntimeAdmissionHook::new(profile(), other)
                 .with_operation_owned_runtime_replay(fixture.binding.clone())

@@ -78,7 +78,10 @@ fn authenticated_caller_report_uses_original_runtime_claim_after_lease_expiry() 
         _directory.path().join("locks"),
         chio_test_support::clock::clock(),
     )?;
-    let source = SqliteRuntimeOrchestrationStore::open(_directory.path().join("runtime.sqlite3"))?;
+    let source = SqliteRuntimeOrchestrationStore::open_with_clock(
+        _directory.path().join("runtime.sqlite3"),
+        chio_test_support::clock::clock(),
+    )?;
     let fixture = Fixture {
         _directory,
         authority,

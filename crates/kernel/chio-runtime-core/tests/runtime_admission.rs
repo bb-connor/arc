@@ -501,7 +501,7 @@ fn signed_runtime_admission_report_detects_tampering() -> Result<(), Box<dyn std
 fn treaty_runtime_hook_denies_missing_lineage_evidence_ref(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
-    let store = SqliteRuntimeOrchestrationStore::open(dir.path().join("treaty-hook.sqlite3"))?;
+    let store = support::open_store(dir.path().join("treaty-hook.sqlite3"))?;
     let args = serde_json::json!({"record": "vendor-ledger-7", "value": "closed"});
     let mut admission_bundle = bundle();
     admission_bundle.binding.tool_args_sha256 = tool_args_sha256(&args)?;
@@ -544,7 +544,7 @@ fn treaty_runtime_hook_denies_missing_lineage_evidence_ref(
 fn treaty_runtime_hook_denies_request_smuggled_trust_root() -> Result<(), Box<dyn std::error::Error>>
 {
     let dir = tempfile::tempdir()?;
-    let store = SqliteRuntimeOrchestrationStore::open(dir.path().join("treaty-hook.sqlite3"))?;
+    let store = support::open_store(dir.path().join("treaty-hook.sqlite3"))?;
     let args = serde_json::json!({"record": "vendor-ledger-7", "value": "closed"});
     let mut admission_bundle = bundle();
     admission_bundle.binding.tool_args_sha256 = tool_args_sha256(&args)?;
@@ -584,7 +584,7 @@ fn treaty_runtime_hook_denies_request_smuggled_trust_root() -> Result<(), Box<dy
 fn treaty_runtime_hook_denies_request_smuggled_dynamic_trust(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
-    let store = SqliteRuntimeOrchestrationStore::open(dir.path().join("treaty-hook.sqlite3"))?;
+    let store = support::open_store(dir.path().join("treaty-hook.sqlite3"))?;
     let args = serde_json::json!({"record": "vendor-ledger-7", "value": "closed"});
     let mut admission_bundle = bundle();
     admission_bundle.binding.tool_args_sha256 = tool_args_sha256(&args)?;
@@ -624,7 +624,7 @@ fn treaty_runtime_hook_denies_request_smuggled_dynamic_trust(
 fn treaty_runtime_hook_denies_missing_bilateral_invocation_evidence_ref(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
-    let store = SqliteRuntimeOrchestrationStore::open(dir.path().join("treaty-hook.sqlite3"))?;
+    let store = support::open_store(dir.path().join("treaty-hook.sqlite3"))?;
     let args = serde_json::json!({"record": "vendor-ledger-7", "value": "closed"});
     let mut admission_bundle = bundle();
     admission_bundle.binding.tool_args_sha256 = tool_args_sha256(&args)?;
@@ -664,7 +664,7 @@ fn treaty_runtime_hook_denies_missing_bilateral_invocation_evidence_ref(
 fn treaty_runtime_hook_requires_signed_bilateral_evidence_before_verification(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
-    let store = SqliteRuntimeOrchestrationStore::open(dir.path().join("treaty-hook.sqlite3"))?;
+    let store = support::open_store(dir.path().join("treaty-hook.sqlite3"))?;
     let args = serde_json::json!({"record": "vendor-ledger-7", "value": "closed"});
     let mut admission_bundle = bundle();
     admission_bundle.binding.tool_args_sha256 = tool_args_sha256(&args)?;
@@ -704,7 +704,7 @@ fn treaty_runtime_hook_requires_signed_bilateral_evidence_before_verification(
 fn treaty_runtime_hook_denies_mismatched_continuation_hash(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
-    let store = SqliteRuntimeOrchestrationStore::open(dir.path().join("treaty-hook.sqlite3"))?;
+    let store = support::open_store(dir.path().join("treaty-hook.sqlite3"))?;
     let args = serde_json::json!({"record": "vendor-ledger-7", "value": "closed"});
     let mut admission_bundle = bundle();
     admission_bundle.binding.tool_args_sha256 = tool_args_sha256(&args)?;
@@ -740,7 +740,7 @@ fn treaty_runtime_hook_denies_mismatched_continuation_hash(
 fn treaty_runtime_hook_denies_continuation_from_non_origin_source(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
-    let store = SqliteRuntimeOrchestrationStore::open(dir.path().join("treaty-hook.sqlite3"))?;
+    let store = support::open_store(dir.path().join("treaty-hook.sqlite3"))?;
     let args = serde_json::json!({"record": "vendor-ledger-7", "value": "closed"});
     let mut admission_bundle = bundle();
     admission_bundle.binding.tool_args_sha256 = tool_args_sha256(&args)?;
@@ -778,7 +778,7 @@ fn treaty_runtime_hook_denies_continuation_from_non_origin_source(
 fn treaty_runtime_hook_denies_bare_tool_continuation_audience(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
-    let store = SqliteRuntimeOrchestrationStore::open(dir.path().join("treaty-hook.sqlite3"))?;
+    let store = support::open_store(dir.path().join("treaty-hook.sqlite3"))?;
     let args = serde_json::json!({"record": "vendor-ledger-7", "value": "closed"});
     let mut admission_bundle = bundle();
     admission_bundle.binding.tool_args_sha256 = tool_args_sha256(&args)?;
@@ -816,7 +816,7 @@ fn treaty_runtime_hook_denies_bare_tool_continuation_audience(
 fn treaty_runtime_hook_denies_unverified_lineage_bundle_before_dispatch(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
-    let store = SqliteRuntimeOrchestrationStore::open(dir.path().join("treaty-hook.sqlite3"))?;
+    let store = support::open_store(dir.path().join("treaty-hook.sqlite3"))?;
     let args = serde_json::json!({"record": "vendor-ledger-7", "value": "closed"});
     let mut admission_bundle = bundle();
     admission_bundle.binding.tool_args_sha256 = tool_args_sha256(&args)?;
@@ -854,7 +854,7 @@ fn treaty_runtime_hook_denies_unverified_lineage_bundle_before_dispatch(
 fn treaty_runtime_hook_denies_stale_continuation_before_dispatch(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
-    let store = SqliteRuntimeOrchestrationStore::open(dir.path().join("treaty-hook.sqlite3"))?;
+    let store = support::open_store(dir.path().join("treaty-hook.sqlite3"))?;
     let args = serde_json::json!({"record": "vendor-ledger-7", "value": "closed"});
     let mut admission_bundle = bundle();
     admission_bundle.binding.tool_args_sha256 = tool_args_sha256(&args)?;
@@ -899,7 +899,7 @@ fn treaty_runtime_hook_denies_stale_continuation_before_dispatch(
 fn treaty_runtime_hook_preserves_millisecond_time_for_continuation_staleness(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
-    let store = SqliteRuntimeOrchestrationStore::open(dir.path().join("treaty-hook.sqlite3"))?;
+    let store = support::open_store(dir.path().join("treaty-hook.sqlite3"))?;
     let args = serde_json::json!({"record": "vendor-ledger-7", "value": "closed"});
     let mut admission_bundle = bundle();
     admission_bundle.binding.tool_args_sha256 = tool_args_sha256(&args)?;
@@ -943,7 +943,7 @@ fn treaty_runtime_hook_preserves_millisecond_time_for_continuation_staleness(
 #[test]
 fn treaty_runtime_hook_denies_replayed_continuation() -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
-    let store = SqliteRuntimeOrchestrationStore::open(dir.path().join("treaty-hook.sqlite3"))?;
+    let store = support::open_store(dir.path().join("treaty-hook.sqlite3"))?;
     let args = serde_json::json!({"record": "vendor-ledger-7", "value": "closed"});
     let mut admission_bundle = bundle();
     admission_bundle.binding.tool_args_sha256 = tool_args_sha256(&args)?;
@@ -991,7 +991,7 @@ fn treaty_runtime_hook_denies_replayed_continuation() -> Result<(), Box<dyn std:
 fn treaty_runtime_hook_releases_continuation_after_runtime_denial(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
-    let store = SqliteRuntimeOrchestrationStore::open(dir.path().join("treaty-hook.sqlite3"))?;
+    let store = support::open_store(dir.path().join("treaty-hook.sqlite3"))?;
     let good_args = serde_json::json!({"record": "vendor-ledger-7", "value": "closed"});
     let mut admission_bundle = bundle();
     admission_bundle.binding.tool_args_sha256 = tool_args_sha256(&good_args)?;
@@ -1042,7 +1042,7 @@ fn treaty_runtime_hook_releases_continuation_after_runtime_denial(
 fn treaty_runtime_hook_releases_reserved_state_after_kernel_abort(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
-    let store = SqliteRuntimeOrchestrationStore::open(dir.path().join("treaty-hook.sqlite3"))?;
+    let store = support::open_store(dir.path().join("treaty-hook.sqlite3"))?;
     let args = serde_json::json!({"record": "vendor-ledger-7", "value": "closed"});
     let mut admission_bundle = bundle();
     admission_bundle.binding.tool_args_sha256 = tool_args_sha256(&args)?;
@@ -1590,7 +1590,7 @@ fn chio_runtime_hook_denies_swarm_missing_route_metadata_before_dispatch(
 fn sqlite_runtime_hook_denies_stale_swarm_continuation_before_dispatch(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
-    let store = SqliteRuntimeOrchestrationStore::open(dir.path().join("swarm-hook.sqlite3"))?;
+    let store = support::open_store(dir.path().join("swarm-hook.sqlite3"))?;
     let mut admission_bundle = bundle();
     admission_bundle.schema = "chio.runtime.admission-bundle.v1".to_string();
     let args = serde_json::json!({"record": "vendor-ledger-7", "value": "closed"});
@@ -1743,7 +1743,7 @@ fn chio_runtime_hook_revalidates_resumable_swarm_continuation_without_replay_den
 fn sqlite_runtime_hook_denies_replayed_swarm_continuation_before_dispatch(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
-    let store = SqliteRuntimeOrchestrationStore::open(dir.path().join("swarm-replay.sqlite3"))?;
+    let store = support::open_store(dir.path().join("swarm-replay.sqlite3"))?;
     let mut admission_bundle = bundle();
     admission_bundle.schema = "chio.runtime.admission-bundle.v1".to_string();
     admission_bundle.destructive = false;

@@ -149,7 +149,8 @@ fn sqlite_runtime_orchestration_store_records_swarm_authority_bundle_created_at(
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("runtime-swarm-authority.sqlite3");
     let bundle = swarm_authority_bundle_fixture()?;
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
 
     store.insert_swarm_authority_bundle(bundle.clone())?;
 
@@ -169,7 +170,10 @@ fn sqlite_runtime_orchestration_store_persists_replay_fence_and_status(
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("runtime-orchestration.sqlite3");
     {
-        let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+        let store = SqliteRuntimeOrchestrationStore::open_with_clock(
+            &path,
+            chio_test_support::clock::clock(),
+        )?;
         store.insert_bundle(bundle())?;
         store.register_run("runtime-orchestration-1")?;
         let lease =
@@ -190,7 +194,8 @@ fn sqlite_runtime_orchestration_store_persists_replay_fence_and_status(
         store.consume_destructive_lease("lease-live-1", "adm-live-1")?;
     }
 
-    let reopened = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let reopened =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     let replay = reopened.consume_destructive_lease("lease-live-1", "adm-live-1");
     match replay {
         Ok(()) => panic!("expected destructive lease replay rejection"),
@@ -224,7 +229,10 @@ fn sqlite_runtime_orchestration_store_persists_treaty_evidence_idempotently(
     let treaty_sha256 = chio_runtime_core::treaty_scope_sha256(&treaty)?;
 
     {
-        let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+        let store = SqliteRuntimeOrchestrationStore::open_with_clock(
+            &path,
+            chio_test_support::clock::clock(),
+        )?;
         store.insert_treaty_runtime_artifact("treaty_scope", &treaty.treaty_id, &treaty)?;
         store.insert_treaty_runtime_artifact("treaty_scope", &treaty.treaty_id, &treaty)?;
 
@@ -238,7 +246,8 @@ fn sqlite_runtime_orchestration_store_persists_treaty_evidence_idempotently(
         }
     }
 
-    let reopened = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let reopened =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     let record = reopened
         .treaty_runtime_artifact("treaty_scope", &treaty.treaty_id)?
         .ok_or_else(|| std::io::Error::other("treaty evidence missing after restart"))?;
@@ -257,7 +266,8 @@ fn sqlite_runtime_orchestration_store_preserves_same_artifact_hash_per_run(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("runtime-artifacts.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     let entry = RuntimeEvidenceManifestEntry {
         role: "proof_package".to_string(),
         path: "proof-package.json".to_string(),
@@ -371,3 +381,28 @@ fn treaty_scope() -> TreatyScope {
 
 #[path = "runtime_store/authority_readers.rs"]
 mod authority_readers;
+
+#[test]
+fn sqlite_runtime_store_reads_time_only_from_its_supplied_clock(
+) -> Result<(), Box<dyn std::error::Error>> {
+    const SUPPLIED_UNIX_MS: u64 = 1_234_567_000;
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("supplied-clock.sqlite3");
+    let store = SqliteRuntimeOrchestrationStore::open_with_clock(
+        &path,
+        std::sync::Arc::new(chio_security_types::clock::FixedClock::from_millis(
+            SUPPLIED_UNIX_MS,
+        )),
+    )?;
+    assert!(store.register_run("supplied-clock-run")?);
+    let lease = store.acquire_current_run_lease("supplied-clock-run", "owner", 1_000)?;
+    assert_eq!(lease.acquired_at_unix_ms, SUPPLIED_UNIX_MS);
+    assert_eq!(lease.expires_at_unix_ms, SUPPLIED_UNIX_MS + 1_000);
+    let started: i64 = rusqlite::Connection::open(&path)?.query_row(
+        "SELECT started_at_unix_ms FROM runtime_runs WHERE run_id = 'supplied-clock-run'",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(u64::try_from(started)?, SUPPLIED_UNIX_MS);
+    Ok(())
+}

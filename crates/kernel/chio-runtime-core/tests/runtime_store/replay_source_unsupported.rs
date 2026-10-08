@@ -8,7 +8,8 @@ fn unsupported_platform_rejects_sealing_without_retiring_legacy_replay(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("unsupported-seal.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     let binding = RuntimeReplaySourceBinding::new("source", "runtime", "destination")?;
     store.consume_destructive_lease("lease", "admission")?;
     store.consume_treaty_continuation("treaty", "admission")?;
@@ -71,7 +72,8 @@ fn unsupported_platform_rejects_sealing_without_retiring_legacy_replay(
     drop(raw);
     drop(store);
 
-    let reopened = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let reopened =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     assert!(reopened.load_legacy_replay_source_seal(&binding)?.is_none());
     reopened.release_destructive_lease("lease", "admission")?;
     reopened.release_treaty_continuation("treaty", "admission")?;

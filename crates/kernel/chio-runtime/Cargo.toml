@@ -13,6 +13,7 @@ name = "chio_runtime"
 
 [dependencies]
 chio-runtime-core = { workspace = true }
+chio-security-types = { workspace = true, features = ["std"] }
 chio-core-types = { workspace = true }
 chio-kernel = { workspace = true }
 chio-swarm-authority = { workspace = true }
@@ -21,6 +22,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 
 [dev-dependencies]
+chio-test-support = { workspace = true }
 tempfile = { workspace = true }
 
 [lints]

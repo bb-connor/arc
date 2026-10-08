@@ -138,7 +138,8 @@ fn raw_snapshot(connection: &Connection) -> TestResult<RawSnapshot> {
 fn complete_inventory_reseals_and_reopens_exactly() -> TestResult {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("complete.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     let binding = binding()?;
     assert!(store.load_legacy_replay_source_seal(&binding)?.is_none());
     seed_inventory(&store)?;
@@ -156,7 +157,8 @@ fn complete_inventory_reseals_and_reopens_exactly() -> TestResult {
     );
     drop(store);
 
-    let reopened = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let reopened =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     let loaded = reopened
         .load_legacy_replay_source_seal(&binding)?
         .ok_or("retained seal disappeared on reopen")?;
@@ -177,7 +179,8 @@ fn complete_inventory_reseals_and_reopens_exactly() -> TestResult {
 fn empty_inventory_is_sealed_and_cannot_accept_a_later_legacy_marker() -> TestResult {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("empty.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     let binding = binding()?;
     let seal = store.seal_legacy_replay_source(&binding)?;
     assert!(seal.markers().is_empty());
@@ -193,7 +196,8 @@ fn empty_inventory_is_sealed_and_cannot_accept_a_later_legacy_marker() -> TestRe
         seal.canonical_bytes()?
     );
     drop(store);
-    let reopened = SqliteRuntimeOrchestrationStore::open(path)?;
+    let reopened =
+        SqliteRuntimeOrchestrationStore::open_with_clock(path, chio_test_support::clock::clock())?;
     reopened.verify_legacy_replay_source_seal(&seal)?;
     assert_eq!(
         reopened
@@ -209,7 +213,8 @@ fn empty_inventory_is_sealed_and_cannot_accept_a_later_legacy_marker() -> TestRe
 fn every_binding_component_is_checked_without_rebinding_the_source() -> TestResult {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("binding.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     seed_inventory(&store)?;
     let binding = binding()?;
     let seal = store.seal_legacy_replay_source(&binding)?;
@@ -254,9 +259,18 @@ fn every_binding_component_is_checked_without_rebinding_the_source() -> TestResu
 #[test]
 fn canonical_inventory_order_is_stable_but_each_seal_binds_its_physical_source() -> TestResult {
     let directory = tempfile::tempdir()?;
-    let first = SqliteRuntimeOrchestrationStore::open(directory.path().join("first.sqlite3"))?;
-    let second = SqliteRuntimeOrchestrationStore::open(directory.path().join("second.sqlite3"))?;
-    let changed = SqliteRuntimeOrchestrationStore::open(directory.path().join("changed.sqlite3"))?;
+    let first = SqliteRuntimeOrchestrationStore::open_with_clock(
+        directory.path().join("first.sqlite3"),
+        chio_test_support::clock::clock(),
+    )?;
+    let second = SqliteRuntimeOrchestrationStore::open_with_clock(
+        directory.path().join("second.sqlite3"),
+        chio_test_support::clock::clock(),
+    )?;
+    let changed = SqliteRuntimeOrchestrationStore::open_with_clock(
+        directory.path().join("changed.sqlite3"),
+        chio_test_support::clock::clock(),
+    )?;
     seed_inventory(&first)?;
     for resource_id in ["resource-a", "resource-z"] {
         second.consume_destructive_lease(resource_id, "admission-lease")?;

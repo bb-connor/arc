@@ -28,7 +28,8 @@ fn assert_sealed_corruption_rejected(
 ) -> TestResult {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("bounded-corruption.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     seed_inventory(&store)?;
     let binding = binding()?;
     let seal = store.seal_legacy_replay_source(&binding)?;
@@ -51,7 +52,8 @@ fn assert_sealed_corruption_rejected(
     assert_eq!(entire_catalog(&raw)?, catalog);
     drop(store);
     assert_invalid(
-        SqliteRuntimeOrchestrationStore::open(&path).map(|_| ()),
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())
+            .map(|_| ()),
         required_detail,
     );
     assert_eq!(raw_snapshot(&raw)?, before);
@@ -115,7 +117,8 @@ fn unknown_trigger_names_on_protected_tables_are_not_ignored() -> TestResult {
 
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("unknown-unsealed-catalog.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     let raw = Connection::open(&path)?;
     raw.execute_batch(statement)?;
     let before = raw_snapshot(&raw)?;

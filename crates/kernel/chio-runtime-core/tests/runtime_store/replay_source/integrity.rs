@@ -29,7 +29,8 @@ fn assert_corruption_not_repaired_with_code(
 ) -> TestResult {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("corrupt-seal.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     seed_inventory(&store)?;
     let binding = binding()?;
     let seal = store.seal_legacy_replay_source(&binding)?;
@@ -45,7 +46,8 @@ fn assert_corruption_not_repaired_with_code(
         "seal APIs must not repair corruption"
     );
     drop(store);
-    match SqliteRuntimeOrchestrationStore::open(&path) {
+    match SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())
+    {
         Err(error) => assert_eq!(error.code(), code),
         Ok(_) => panic!("reopening a corrupt sealed source must fail closed"),
     }
@@ -168,7 +170,8 @@ fn assert_invalid_inventory_rolls_back(
 ) -> TestResult {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("rejected-inventory.sqlite3");
-    let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let store =
+        SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
     let mut raw = Connection::open(&path)?;
     populate(&mut raw)?;
     let before = raw_snapshot(&raw)?;
@@ -300,7 +303,7 @@ fn uppercase_partial_seal_objects_are_not_mistaken_for_an_unsealed_source() -> T
     ] {
         let directory = tempfile::tempdir()?;
         let path = directory.path().join("uppercase-partial.sqlite3");
-        let store = SqliteRuntimeOrchestrationStore::open(&path)?;
+        let store = SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock())?;
         let raw = Connection::open(&path)?;
         raw.execute_batch(partial_schema)?;
         let before = raw_snapshot(&raw)?;
@@ -310,7 +313,7 @@ fn uppercase_partial_seal_objects_are_not_mistaken_for_an_unsealed_source() -> T
         assert_code(store.consume_destructive_lease("late-lease", "late-owner"), "runtime_replay_source_sealed");
         assert_eq!(raw_snapshot(&raw)?, before);
         drop(store);
-        match SqliteRuntimeOrchestrationStore::open(&path) {
+        match SqliteRuntimeOrchestrationStore::open_with_clock(&path, chio_test_support::clock::clock()) {
             Err(error) => assert_eq!(error.code(), "runtime_replay_source_invalid"),
             Ok(_) => panic!("uppercase partial seal schema was silently accepted"),
         }

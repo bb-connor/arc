@@ -87,7 +87,10 @@ fn owner_shared_import_guard_rejects_concurrency_without_blocking_destination_re
 {
     let (directory, database, _lock_root, authority) = destination_fixture()?;
     let source_path = directory.path().join("concurrent-source.sqlite3");
-    let inner = SqliteRuntimeOrchestrationStore::open(&source_path)?;
+    let inner = SqliteRuntimeOrchestrationStore::open_with_clock(
+        &source_path,
+        chio_test_support::clock::clock(),
+    )?;
     // Separately constructed adapters must share the same owner's guard.
     let first = authority.admission_operation_store();
     let second = authority.admission_operation_store();
@@ -231,8 +234,10 @@ impl RuntimeReplaySourcePort for ReentrantSource<'_> {
 #[test]
 fn owner_shared_import_guard_rejects_reentrant_seal_and_verify_callbacks() -> TestResult {
     let (directory, database, _lock_root, authority) = destination_fixture()?;
-    let inner =
-        SqliteRuntimeOrchestrationStore::open(directory.path().join("reentrant-source.sqlite3"))?;
+    let inner = SqliteRuntimeOrchestrationStore::open_with_clock(
+        directory.path().join("reentrant-source.sqlite3"),
+        chio_test_support::clock::clock(),
+    )?;
     let first = authority.admission_operation_store();
     let second = authority.admission_operation_store();
     let fence = authority.mutation_fence();
@@ -316,8 +321,10 @@ impl RuntimeReplaySourcePort for FailAfterSeal<'_> {
 
 fn assert_guard_released_after_failure(failure: Failure) -> TestResult {
     let (directory, database, _lock_root, authority) = destination_fixture()?;
-    let inner =
-        SqliteRuntimeOrchestrationStore::open(directory.path().join("failed-source.sqlite3"))?;
+    let inner = SqliteRuntimeOrchestrationStore::open_with_clock(
+        directory.path().join("failed-source.sqlite3"),
+        chio_test_support::clock::clock(),
+    )?;
     let first = authority.admission_operation_store();
     let second = authority.admission_operation_store();
     let fence = authority.mutation_fence();
@@ -380,7 +387,10 @@ fn owner_shared_import_guard_releases_after_committed_source_panics() -> TestRes
 fn pending_pin_survives_owner_restart_after_real_source_seal_before_import() -> TestResult {
     let (directory, database, lock_root, authority) = destination_fixture()?;
     let source_path = directory.path().join("interrupted-source.sqlite3");
-    let source = SqliteRuntimeOrchestrationStore::open(&source_path)?;
+    let source = SqliteRuntimeOrchestrationStore::open_with_clock(
+        &source_path,
+        chio_test_support::clock::clock(),
+    )?;
     let store = authority.admission_operation_store();
     let fence = authority.mutation_fence();
     let (runtime, expected) = pin_real_source(&store, &source, &fence)?;
@@ -409,7 +419,10 @@ fn pending_pin_survives_owner_restart_after_real_source_seal_before_import() -> 
     assert_eq!(reopened_fence.store_uuid, fence.store_uuid);
     assert!(reopened_fence.owner_epoch > fence.owner_epoch);
     let reopened_store = reopened_authority.admission_operation_store();
-    let reopened_source = SqliteRuntimeOrchestrationStore::open(&source_path)?;
+    let reopened_source = SqliteRuntimeOrchestrationStore::open_with_clock(
+        &source_path,
+        chio_test_support::clock::clock(),
+    )?;
     let pending = reopened_store
         .load_runtime_replay_migration(&runtime, &reopened_fence, now_ms()?)?
         .ok_or("pending expectation disappeared on owner restart")?;

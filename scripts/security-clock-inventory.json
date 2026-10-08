@@ -1397,6 +1397,7 @@
     "crates/platform/chio-store-sqlite/src/serving_owner/relocation.rs::import_relocated::native-adapter",
     "crates/platform/chio-store-sqlite/src/serving_owner/relocation.rs::import_relocated_checked::native-adapter",
     "crates/platform/chio-store-sqlite/src/serving_owner/relocation.rs::import_relocated_checked_with_phase::native-adapter",
+    "crates/products/chio-cli/src/cli/chio/dispatch/runtime/io.rs::open_runtime_store::native-adapter",
     "crates/products/chio-cli/src/cli/process_host/state.rs::kernel::native-adapter",
     "crates/security/chio-keyring/src/sqlite/opening.rs::open::native-adapter",
     "crates/security/chio-keyring/src/sqlite/opening.rs::open_existing::native-adapter",
