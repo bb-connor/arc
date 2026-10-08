@@ -481,6 +481,26 @@ impl PublicKey {
         }
     }
 
+    /// Verify an Ed25519 signature with loose cofactorless rules.
+    ///
+    /// Weak public keys and small-order signature points are accepted, so a
+    /// `true` result authenticates nothing. Forgery fixtures use it to show
+    /// that loose verification accepts a forgery the strict verifiers refuse.
+    /// Any non-Ed25519 key or signature returns `false`. Results never enter
+    /// the strict verification cache.
+    #[cfg(feature = "legacy-permissive-verification")]
+    #[must_use]
+    pub fn verify_legacy_permissive(&self, message: &[u8], signature: &Signature) -> bool {
+        use ed25519_dalek::Verifier;
+        match (&self.material, &signature.material) {
+            (
+                PublicKeyMaterial::Ed25519 { verifying_key },
+                SignatureMaterial::Ed25519 { inner },
+            ) => verifying_key.verify(message, inner).is_ok(),
+            _ => false,
+        }
+    }
+
     /// Verify a signature over the canonical JSON form of a serializable value.
     ///
     /// Applies the strict rules of [`PublicKey::verify`].

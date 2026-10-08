@@ -1,0 +1,5 @@
+# Loose Ed25519 verification accepts weak-key forgeries and authenticates
+# nothing. Only forgery fixtures may call it, each under an explicit allow.
+disallowed-methods = [
+    { path = "chio_core_types::crypto::PublicKey::verify_legacy_permissive", reason = "loose Ed25519 verification accepts weak-key forgeries; use PublicKey::verify", allow-invalid = true },
+]

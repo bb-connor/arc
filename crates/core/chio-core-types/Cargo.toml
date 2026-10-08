@@ -81,6 +81,11 @@ delegation = []
 # Alias of `delegation` so consumers pinning `features = ["delegation_v2"]`
 # continue to resolve. Both spellings are no-ops; new code should use `delegation`.
 delegation_v2 = ["delegation"]
+# Exposes `PublicKey::verify_legacy_permissive`, a loose Ed25519 verifier that
+# accepts weak-key forgeries. Only dev-dependencies enable it, so forgery
+# fixtures can prove loose verification accepts them; the workspace
+# clippy.toml rejects any call outside an explicit allow.
+legacy-permissive-verification = []
 
 [dev-dependencies]
 uuid = { workspace = true, features = ["serde"] }
