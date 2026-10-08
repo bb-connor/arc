@@ -39,34 +39,49 @@ class TrustedMainCodegenTests(unittest.TestCase):
                 env.update(REAL_RG=real_rg, PATH=str(tools) + os.pathsep + env["PATH"])
             return subprocess.run(["bash", str(script)], env=env, capture_output=True, text=True, check=False)
 
+    def assert_refused(self, result: subprocess.CompletedProcess, path: str) -> None:
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("Core capability or receipt v1 contract remnants found:", result.stderr)
+        self.assertIn("  %s:" % path, result.stderr)
+
     def test_exact_internal_authority_schema_in_real_auditor_is_allowed(self) -> None:
         result = self.gate(AUDITOR, (ROOT / AUDITOR).read_text())
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_real_auditor_with_any_other_authority_schema_is_rejected(self) -> None:
+        reviewed = '"chio.security-check-authority.v3"'
+        text = (ROOT / AUDITOR).read_text()
+        self.assertEqual(text.count(reviewed), 1)
+        for version in (2, 4):
+            with self.subTest(version=version):
+                other = '"chio.security-check-authority.v%s"' % version
+                self.assert_refused(self.gate(AUDITOR, text.replace(reviewed, other)), AUDITOR)
+
     def test_same_literal_in_another_producer_is_rejected(self) -> None:
-        result = self.gate("scripts/unreviewed-auditor.py", 'schema = "chio.security-check-authority.v2"\n')
-        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        result = self.gate("scripts/unreviewed-auditor.py", 'schema = "chio.security-check-authority.v3"\n')
+        self.assert_refused(result, "scripts/unreviewed-auditor.py")
 
     def test_neighboring_authority_schema_versions_are_rejected(self) -> None:
-        for version in (3, 20):
+        for version in (2, 4, 20, 30):
             with self.subTest(version=version):
                 result = self.gate(AUDITOR, 'schema = "chio.security-check-authority.v%s"\n' % version)
-                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assert_refused(result, AUDITOR)
 
     def test_allowed_tag_cannot_hide_adjacent_core_wire_or_normative_claims(self) -> None:
         # Construct negative fixture text here. The actual producer keeps its
         # literal schema identifier unchanged.
         for future in ('ReceiptV%s' % 2, 'CapabilityTokenV%s' % 2, 'Current protocol is v%s' % 2):
             with self.subTest(future=future):
-                result = self.gate(AUDITOR, 'schema = "chio.security-check-authority.v2"; ' + future + '\n')
-                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                result = self.gate(AUDITOR, 'schema = "chio.security-check-authority.v3"; ' + future + '\n')
+                self.assert_refused(result, AUDITOR)
 
     def test_recheck_scanner_failure_is_propagated_instead_of_treated_as_clean(self) -> None:
         for extra in ('', '; ReceiptV%s' % 2):
             with self.subTest(extra=extra):
-                result = self.gate(AUDITOR, 'schema = "chio.security-check-authority.v2"' + extra + '\n', recheck_error=True)
+                result = self.gate(AUDITOR, 'schema = "chio.security-check-authority.v3"' + extra + '\n', recheck_error=True)
                 self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
-                self.assertNotIn('No Chio-owned pre-release version remnants found', result.stdout)
+                self.assertIn("ripgrep failed while rechecking the trusted auditor schema line", result.stderr)
+                self.assertNotIn("Core capability and receipt surfaces remain v1-only.", result.stdout)
 
 
 if __name__ == "__main__":
