@@ -2221,5 +2221,52 @@ class AuditHistoryProjectionOriginalRedTests(unittest.TestCase):
                 self.assertNotEqual(run.result.returncode, 0)
 
 
+
+# Observed in the B.5 scratch run (pull requests #15 and #16 at one evidence
+# head): after #16 landed as L with parents [B, E], GitHub marked #15 merged two
+# seconds later with merge_commit_sha L, while commits/L/pulls listed only #16.
+# That listing is an observed API signal of which pull request landed L. It is
+# not an authorization record.
+SIBLING_LANDED_AT, SIBLING_MARKED_MERGED_AT = "2026-10-06T00:10:00Z", "2026-10-06T00:10:02Z"
+
+
+def landed_pull_listing(number: int) -> list[dict]:
+    repository = {"id": 1195888645, "full_name": REPOSITORY}
+    head_ref = HEAD_REF if number == PR else "evidence-copy"
+    return [{"number": number, "state": "closed", "merged_at": SIBLING_LANDED_AT, "merge_commit_sha": PROTECTED,
+             "head": {"ref": head_ref, "sha": EVIDENCE, "repo": repository},
+             "base": {"ref": "main", "sha": BASE, "repo": repository}}]
+
+
+def sibling_marked_merged_landing() -> dict:
+    data = snapshot()
+    prefix = f"repos/{REPOSITORY}"
+    data[f"{prefix}/pulls/{PR}"]["merged_at"] = SIBLING_MARKED_MERGED_AT
+    data[f"{prefix}/commits/{PROTECTED}/pulls"] = landed_pull_listing(OTHER_PR)
+    return data
+
+
+class AuditSiblingMarkedMergedOriginalRedTests(unittest.TestCase):
+    def test_a_sibling_marked_merged_by_another_landing_is_not_verified(self) -> None:
+        prefix = f"repos/{REPOSITORY}"
+        control_data = snapshot()
+        control_data[f"{prefix}/commits/{PROTECTED}/pulls"] = landed_pull_listing(PR)
+        control, control_report = run_logged_audit(control_data)
+        self.assertEqual(control_report.get("status"), "verified", control.result.stdout + control.result.stderr)
+        data = sibling_marked_merged_landing()
+        sibling = data[f"{prefix}/pulls/{PR}"]
+        self.assertEqual((sibling["state"], sibling["merged"], sibling["merge_commit_sha"], sibling["head"]["sha"]),
+                         ("closed", True, PROTECTED, EVIDENCE))
+        self.assertEqual([parent["sha"] for parent in data[f"{prefix}/git/commits/{PROTECTED}"]["parents"]],
+                         [BASE, EVIDENCE])
+        self.assertEqual([pull["number"] for pull in data[f"{prefix}/commits/{PROTECTED}/pulls"]], [OTHER_PR])
+        run, report = run_logged_audit(data)
+        self.assertIn(f"GET {prefix}/pulls/{PR}", run.calls)
+        self.assertEqual(report.get("status"), "unverified",
+                         f"pull request {PR} was verified as the landing of {PROTECTED} although GitHub lists only "
+                         f"pull request {OTHER_PR} for that commit")
+        self.assertNotIn("GitHub read failed", report.get("error", ""))
+        self.assertNotEqual(run.result.returncode, 0)
+
 if __name__ == "__main__":
     unittest.main()
