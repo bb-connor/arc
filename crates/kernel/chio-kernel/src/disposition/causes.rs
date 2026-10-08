@@ -13,6 +13,7 @@ use crate::admission_operation::{
     AdmissionCaptureError, AdmissionOperationError, AdmissionOperationStoreError,
     AdmissionRecoveryPortError, RemoteRecoveryFailureKind,
 };
+use crate::finding_pool::FindingPoolLedgerError;
 use crate::payment::PaymentJournalError;
 use crate::receipt_store::{
     AdmissionBudgetAuthorizationError, AdmissionPaymentJournalError, ReceiptStoreError,
@@ -147,6 +148,46 @@ impl AdmissionPaymentJournalError {
                 Disposition::Retry
             }
             Self::Fenced | Self::Invariant(_) => Disposition::Fatal,
+        }
+    }
+}
+
+impl FindingPoolLedgerError {
+    /// How a loop, worker or endpoint handles this failure. Ledger storage
+    /// and receipt failures are text that cannot separate an outage from
+    /// corruption, so they are fatal with the ledger's configuration faults.
+    #[must_use]
+    pub fn disposition(&self) -> Disposition {
+        match self {
+            Self::UntrustedInput(_)
+            | Self::ReplayConflict
+            | Self::AmountExceeded
+            | Self::AllocationNotLive
+            | Self::PoolBindingConflict
+            | Self::LedgerDomainMismatch
+            | Self::InvalidAllocationAuthority
+            | Self::ReservationMissing
+            | Self::ClaimDeadlineElapsed => Disposition::Deny,
+            Self::TerminalConflict => Disposition::Quarantine,
+            Self::Clock(_)
+            | Self::LedgerDomainInUse
+            | Self::LedgerStoreBindingMismatch
+            | Self::InvalidLedgerStoreIdentity
+            | Self::ReceiptSinkMismatch
+            | Self::InvalidReceiptSink
+            | Self::UnqualifiedRetentionArchive
+            | Self::ReceiptAuthorityMismatch
+            | Self::ReceiptConfigurationMismatch
+            | Self::InvalidReceiptAuthority
+            | Self::DurableAdmissionRequired
+            | Self::AlreadyConfigured
+            | Self::StartupAlreadyReconciled
+            | Self::ReceiptAuthorityMissing
+            | Self::ReceiptAuthorityAlreadyConfigured
+            | Self::DurableReceiptStoreMissing
+            | Self::Storage(_)
+            | Self::Receipt(_)
+            | Self::MutationReceiptFlushPoisoned => Disposition::Fatal,
         }
     }
 }
@@ -411,6 +452,30 @@ mod tests {
             }
             .disposition(),
             Disposition::Deny
+        );
+    }
+
+    #[test]
+    fn finding_pool_refusals_deny_and_ledger_faults_are_fatal() {
+        assert_eq!(
+            FindingPoolLedgerError::AmountExceeded.disposition(),
+            Disposition::Deny
+        );
+        assert_eq!(
+            FindingPoolLedgerError::ClaimDeadlineElapsed.disposition(),
+            Disposition::Deny
+        );
+        assert_eq!(
+            FindingPoolLedgerError::TerminalConflict.disposition(),
+            Disposition::Quarantine
+        );
+        assert_eq!(
+            FindingPoolLedgerError::Storage("disk".into()).disposition(),
+            Disposition::Fatal
+        );
+        assert_eq!(
+            FindingPoolLedgerError::ReceiptAuthorityMissing.disposition(),
+            Disposition::Fatal
         );
     }
 
