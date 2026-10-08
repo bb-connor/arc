@@ -1022,8 +1022,10 @@ impl ProductionActiveDefenseHost {
                 return Err(error);
             }
             teardown
+                .active_worker
                 .wait_for_tick_completion(
                     in_flight_sequence.ok_or(ResponseWorkerTickError::WorkerStopped)?,
+                    teardown.worker_loop,
                 )
                 .await?;
             teardown.prepare_worker_stop().await?;
@@ -1358,28 +1360,6 @@ impl DetachedActiveDefenseTeardown {
             .as_ref()
             .is_some_and(ProductionResponseWorkerHandle::is_running)
             && self.active_worker.recovery_progressing()
-    }
-
-    async fn wait_for_tick_completion(
-        &self,
-        started_sequence: u64,
-    ) -> Result<(), ResponseWorkerTickError> {
-        loop {
-            let health = self.active_worker.health();
-            if health
-                .last_tick_completed_sequence
-                .is_some_and(|completed| completed >= started_sequence)
-            {
-                return Ok(());
-            }
-            if matches!(
-                health.lifecycle,
-                ResponseWorkerLifecycle::Failed | ResponseWorkerLifecycle::Stopped
-            ) {
-                return Err(ResponseWorkerTickError::WorkerStopped);
-            }
-            tokio::task::yield_now().await;
-        }
     }
 
     async fn ensure_teardown_worker_running(&mut self) -> Result<(), ResponseWorkerTickError> {

@@ -11,6 +11,9 @@ pub(super) const WORKER_CLAIM_DOMAIN: &[u8] = b"chio.active-defense-worker-claim
 pub(super) const MIN_WORKER_PROGRESS_DEADLINE: Duration = Duration::from_secs(1);
 pub(super) const MAX_WORKER_PROGRESS_DEADLINE: Duration = Duration::from_secs(60);
 pub(super) const MAX_WORKER_TICK_INTERVAL: Duration = Duration::from_secs(30);
+/// Longest pause between polls of worker progress or between continuations
+/// of a bounded cleanup backlog.
+const MAX_WORKER_POLL_INTERVAL: Duration = Duration::from_millis(10);
 
 #[derive(Default)]
 pub(super) struct ResponseWorkerProgress {
@@ -39,6 +42,11 @@ impl ProductionResponseWorkerLoopConfig {
             .max(MIN_WORKER_PROGRESS_DEADLINE)
             .min(MAX_WORKER_PROGRESS_DEADLINE)
             .max(self.tick_interval.saturating_mul(2))
+    }
+
+    /// Pause between polls of worker progress, never longer than one tick.
+    pub(super) fn poll_interval(self) -> Duration {
+        self.tick_interval.min(MAX_WORKER_POLL_INTERVAL)
     }
 }
 
@@ -128,6 +136,39 @@ impl ProductionResponseWorker {
             return Err(ResponseWorkerTickError::WorkerNotReady(lifecycle));
         }
         self.port.ensure_ready()
+    }
+
+    /// Waits for the tick that started at `started_sequence` for at most the
+    /// loop's progress deadline. A tick that runs longer has stalled, which
+    /// the worker's own readiness reports as well.
+    pub(in crate::security) async fn wait_for_tick_completion(
+        &self,
+        started_sequence: u64,
+        config: ProductionResponseWorkerLoopConfig,
+    ) -> Result<(), ResponseWorkerTickError> {
+        let deadline = tokio::time::Instant::now() + config.progress_deadline();
+        loop {
+            let health = self.health();
+            if health
+                .last_tick_completed_sequence
+                .is_some_and(|completed| completed >= started_sequence)
+            {
+                return Ok(());
+            }
+            if matches!(
+                health.lifecycle,
+                ResponseWorkerLifecycle::Failed | ResponseWorkerLifecycle::Stopped
+            ) {
+                return Err(ResponseWorkerTickError::WorkerStopped);
+            }
+            if tokio::time::Instant::now() >= deadline {
+                return Err(ResponseWorkerTickError::WorkerProgressStalled {
+                    started_sequence: Some(started_sequence),
+                    completed_sequence: health.last_tick_completed_sequence,
+                });
+            }
+            tokio::time::sleep(config.poll_interval()).await;
+        }
     }
 
     /// Await the worker task's clean post-loop shutdown certificate.
@@ -225,13 +266,25 @@ impl ProductionResponseWorker {
                         completed_sequence: health.last_tick_completed_sequence,
                     });
                 }
-                Err(ResponseWorkerTickError::TerminalSchedulerCleanupPending)
+                // Each pass removed a bounded batch of expired terminal leases.
+                // Continue promptly, paced so the rest of the backlog cannot
+                // spin SQLite transactions on this thread.
+                Err(error @ ResponseWorkerTickError::TerminalSchedulerCleanupPending)
                     if elapsed < deadline =>
                 {
                     if shutdown_receiver.has_changed().is_err() || *shutdown_receiver.borrow() {
                         return Err(ResponseWorkerTickError::WorkerStopped);
                     }
-                    tokio::task::yield_now().await;
+                    let remaining = deadline.saturating_sub(elapsed);
+                    tokio::select! {
+                        changed = shutdown_receiver.changed() => {
+                            if changed.is_err() || *shutdown_receiver.borrow() {
+                                return Err(ResponseWorkerTickError::WorkerStopped);
+                            }
+                        }
+                        _ = tokio::time::sleep(config.poll_interval()) => {}
+                        _ = tokio::time::sleep(remaining) => return Err(error),
+                    }
                 }
                 Err(error @ ResponseWorkerTickError::WorkerCrash(_)) => return Err(error),
                 Err(error) => {
