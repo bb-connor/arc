@@ -39,4 +39,4 @@ Numbers ADR-0023 through ADR-0037 are reserved for the candidate decisions in
 the NVIDIA strategy input (pin N in the [desktop program map](../architecture/PROGRAM-MAP.md)).
 Reservation prevents numbering collisions; it does not accept those proposals.
 
-- [ADR-0038 Desktop Operator Program](ADR-0038-desktop-operator-program.md) - accepted for planning; shared operator surface and platform isolation adapters.
+- [ADR-0038 Native Host Integration](ADR-0038-desktop-operator-program.md) - accepted for planning; Chio kernel services, external consumers and qualified OS ports.
