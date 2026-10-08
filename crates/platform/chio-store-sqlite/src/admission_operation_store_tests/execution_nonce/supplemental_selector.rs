@@ -74,7 +74,6 @@ impl SelectionFixture {
             broker_attempt: true,
             budget_capture: true,
             execution_nonce: true,
-            supplemental_authorization: true,
             ..AdmissionParticipantRequirements::NONE
         };
         let (base, original) = retained_request::original_with_intent_and_signer(
