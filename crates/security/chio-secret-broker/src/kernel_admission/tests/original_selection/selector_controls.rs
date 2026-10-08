@@ -277,8 +277,8 @@ fn corrupt_duplicate_hold_index_never_selects_the_first_valid_original() -> Test
 #[test]
 fn oversized_hold_operation_index_refuses_without_an_original_result() -> TestResult {
     let fixture = CompletedOriginal::new()?;
-    // Corruption injection: a physical selector ID exceeds the512-byte
-    // persisted identifier bound; the signed original and hold remain intact.
+    // Corruption injection: a physical selector ID exceeds the 512-byte
+    // bound. The separately retained original request is unchanged.
     let connection = rusqlite::Connection::open(&fixture.store.database)?;
     assert_eq!(
         connection.execute(
