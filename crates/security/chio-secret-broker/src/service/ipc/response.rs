@@ -1,6 +1,6 @@
 use super::{
     canonical_json_bytes, failure_receipt_digest, verify_failure_receipt, BrokerError,
-    BrokerExecuteFailure, IpcOperation, IpcResponse, Result, Write, MAX_WIRE_BYTES,
+    BrokerExecuteFailure, IpcOperation, IpcResponse, Result, MAX_WIRE_BYTES,
 };
 #[cfg(unix)]
 use super::{
@@ -118,22 +118,18 @@ pub(in crate::service) fn write_broker_ipc_response(
     frame: &[u8],
     operation: IpcOperation,
 ) -> std::result::Result<(), BrokerIpcServeFailure> {
-    if frame.is_empty() || frame.len() > crate::service::response_wire_limit(operation) {
-        return Err(BrokerIpcServeFailure::Internal(BrokerError::Invariant(
-            "encoded IPC response frame is empty or oversized".to_string(),
-        )));
-    }
-    let length = u32::try_from(frame.len()).map_err(|_| {
-        BrokerIpcServeFailure::Internal(BrokerError::Invariant(
-            "encoded IPC response length overflow".to_string(),
-        ))
-    })?;
-    let write_result = stream
-        .write_all(&length.to_be_bytes())
-        .and_then(|()| stream.write_all(frame))
-        .and_then(|()| stream.flush());
-    let Err(error) = write_result else {
-        return Ok(());
+    let error = match chio_secure_ipc::frame::write_frame(
+        stream,
+        frame,
+        crate::service::response_wire_limit(operation),
+    ) {
+        Ok(()) => return Ok(()),
+        Err(chio_secure_ipc::frame::FrameError::Write(error)) => error,
+        Err(_) => {
+            return Err(BrokerIpcServeFailure::Internal(BrokerError::Invariant(
+                "encoded IPC response frame is empty or oversized".to_string(),
+            )))
+        }
     };
     match classify_broker_ipc_write_error(error.kind(), stream.write_deadline_setup_failed()) {
         BrokerIpcWriteFailureClass::Client => {
