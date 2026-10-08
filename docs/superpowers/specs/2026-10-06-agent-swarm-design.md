@@ -579,6 +579,12 @@ the integrator (or a builder janitor) runs one check train:
 One build verifies many lanes. `submit` therefore moves an item to
 `submitted` (awaiting a check train) instead of `review`.
 
+In landing mode (`swarm check-train --land`, integrator only) an all-green,
+fully attributed train is pushed to the integration branch as built, so the
+train's build is the integration build; a red lane, an unattributed failure or
+a running CI holds the push and leaves green lanes `ready` for the next train.
+Trains run on `config.train_host` (the builder) and the CLI reruns itself there.
+
 ### 14.5 Coordination: state first, messages for decisions
 
 The `swarm` branch is the shared environment. Items, claims, file ownership,

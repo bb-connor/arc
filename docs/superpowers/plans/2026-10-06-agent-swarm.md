@@ -5342,7 +5342,7 @@ ls ~/.swarm-logs/*/ | tail
 swarm metrics --no-ci
 ```
 
-Expected order for each item: `claimed`, `in-progress`, `review`, `ready`, `integrated`. If an item goes `blocked`, read its log section with `swarm brief <ID>` and the agent log path in its item log, then fix the brief or the process and `swarm status <ID> open` (as conductor).
+Expected order for each item (swarm v2): `claimed`, `in-progress`, `submitted`, then `integrated` when the integrator's `swarm check-train --land` lands it (or `in-progress` with a `## Check train` section when it fails). If an item goes `blocked`, read its log section with `swarm brief <ID>` and the agent log path in its item log, then fix the brief or the process and `swarm status <ID> open` (as conductor).
 
 - [ ] **Step 4: Open the standing train PR after the integrator's first push.**
 
