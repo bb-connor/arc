@@ -259,7 +259,8 @@ def janitor_iteration(ctx: Context) -> list[str]:
 
 def session_iteration(ctx: Context, *, wait_timeout: float = 1200) -> str:
     store, meta = ctx.store, ctx.meta
-    events = ctx.waiter(store, timeout=wait_timeout)
+    digest = {"digest_every": store.config()["digest_seconds"]} if meta["role"] == "conductor" else {}
+    events = ctx.waiter(store, timeout=wait_timeout, **digest)
     sid_path = state_dir() / f"{meta['id']}.session"
     sid = sid_path.read_text().strip() if sid_path.exists() else ""
     if sid:

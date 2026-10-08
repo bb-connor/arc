@@ -103,7 +103,7 @@ def cmd_inbox(store: Store, a: argparse.Namespace) -> int:
 
 
 def cmd_wait(store: Store, a: argparse.Namespace) -> int:
-    found = lifecycle.wait(store, timeout=a.timeout, interval=a.interval)
+    found = lifecycle.wait(store, timeout=a.timeout, interval=a.interval, digest_every=a.digest)
     for line in found:
         print(line)
     return 0 if found else 1
@@ -368,6 +368,7 @@ def parser() -> argparse.ArgumentParser:
     s = sub.add_parser("wait", help="block until a message or item change arrives")
     s.add_argument("--timeout", type=float, default=540)
     s.add_argument("--interval", type=float, default=30)
+    s.add_argument("--digest", type=float, help="hold routine events this many seconds; blockers still wake at once")
     s.set_defaults(fn=cmd_wait)
 
     s = sub.add_parser("next", help="resume or claim the next item for this agent")

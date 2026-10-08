@@ -141,6 +141,32 @@ class LifecycleTest(SwarmCase):
         msgs.inbox(self.worker)  # mark read
         self.assertEqual(lifecycle.wait(self.worker, timeout=60, interval=30, sleep=lambda _s: None), [])
 
+    def test_digest_holds_routine_events_until_the_interval(self):
+        sleeps = []
+
+        def deliver(seconds):
+            sleeps.append(seconds)
+            if len(sleeps) == 1:
+                msgs.send(self.conductor, "codex-ws2-worker1", "fyi", "", "routine note", "body")
+
+        events = lifecycle.wait(self.worker, timeout=600, interval=30, digest_every=90, sleep=deliver)
+        self.assertEqual(len(sleeps), 3)  # held until 90 s had passed
+        self.assertTrue(any("routine note" in e for e in events))
+
+    def test_blockers_and_urgent_subjects_wake_immediately(self):
+        for kind, subject in (("blocker", "disk full"), ("fyi", "URGENT: stop pushing")):
+            sleeps = []
+
+            def deliver(seconds, kind=kind, subject=subject):
+                sleeps.append(seconds)
+                if len(sleeps) == 1:
+                    msgs.send(self.conductor, "codex-ws2-worker1", kind, "", subject, "body")
+
+            events = lifecycle.wait(self.worker, timeout=600, interval=30, digest_every=1200, sleep=deliver)
+            self.assertEqual(len(sleeps), 1, subject)
+            self.assertTrue(any(subject in e for e in events))
+            msgs.inbox(self.worker)  # mark read before the next case
+
     # Review focus: a hand-edited, malformed item must not take down every command.
     def test_malformed_item_is_reported_not_fatal(self):
         self.add_item(self.conductor, "F1")

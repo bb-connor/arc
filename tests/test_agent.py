@@ -156,8 +156,15 @@ class LoopTest(SwarmCase):
             commands.append(command)
             return Execution(0, json.dumps({"type": "result", "session_id": "sess-1"}))
 
-        ctx = self.ctx(conductor, meta, fake, waiter=lambda store, timeout: ["item F1: open -> review"])
+        waits = []
+
+        def waiter(store, timeout, **kwargs):
+            waits.append(kwargs)
+            return ["item F1: open -> review"]
+
+        ctx = self.ctx(conductor, meta, fake, waiter=waiter)
         self.assertEqual(agent.session_iteration(ctx), "turn")
+        self.assertEqual(waits[0], {"digest_every": 1200})  # the conductor wakes on digests
         self.assertIn("conductor of the Chio swarm", commands[0][2])
         self.assertNotIn("--resume", commands[0])
         agent.session_iteration(ctx)

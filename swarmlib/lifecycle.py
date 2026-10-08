@@ -262,18 +262,24 @@ def _snapshot(store: Store) -> dict[str, tuple]:
 
 def wait(
     store: Store, *, timeout: float = 600, interval: float = 30, heartbeat_every: float = 600,
-    sleep: Callable[[float], None] = time.sleep,
+    digest_every: float | None = None, sleep: Callable[[float], None] = time.sleep,
 ) -> list[str]:
-    """Block until a new message or a change to the caller's items. [] on timeout."""
+    """Block until a new message or a change to the caller's items. [] on timeout.
+
+    With `digest_every`, routine events are held until that many seconds have passed and returned
+    together; a `blocker` message or a subject containing URGENT still returns at once.
+    """
     store.sync()
     before = _snapshot(store)
     waited = since_beat = 0.0
     while True:
-        events = [f"message from {m['from']} [{m['kind']}] {m['item']}: {m['subject']}"
-                  for m in msgs.inbox(store, mark=False, sync=False)]
+        messages = msgs.inbox(store, mark=False, sync=False)
+        events = [f"message from {m['from']} [{m['kind']}] {m['item']}: {m['subject']}" for m in messages]
         after = _snapshot(store)
         events += [f"item {key}: {before.get(key)} -> {value}" for key, value in after.items() if before.get(key) != value]
-        if events or waited >= timeout:
+        urgent = any(m["kind"] == "blocker" or "URGENT" in m["subject"].upper() for m in messages)
+        due = digest_every is None or waited >= digest_every
+        if (events and (due or urgent)) or waited >= timeout:
             return events
         sleep(interval)
         waited += interval
