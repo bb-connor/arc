@@ -252,6 +252,20 @@ const EXTRACTED_IMPLEMENTATION_SOURCES: &[RequiredSource] = &[
         ],
     },
 
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/budget_store/composite/transitions/capture.rs",
+        symbols: &[
+            "SqliteBudgetStore::capture_composite_invocation_with_diagnostic",
+        ],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/policy.rs",
+        symbols: &[
+            "Policy::validate_current_for_capture",
+            "Policy::validate_at_for_capture",
+        ],
+    },
+
 ];
 
 const DROP_CONSTRUCTION_SOURCES: &[RequiredSource] = &[

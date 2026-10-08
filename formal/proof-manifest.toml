@@ -3118,10 +3118,14 @@ model_file = "formal/apalache/PostAdmissionDropGuard.tla"
 model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/budget_store/composite/transitions/capture.rs"
-rust_symbols = ["SqliteBudgetStore::capture_composite_invocation_inner"]
-normalized_sha256 = "a39bce857aab2af66527b06bc91ad537c76d69c2e5913d876c55ea32a156f629"
+rust_symbols = [
+  "SqliteBudgetStore::capture_composite_invocation_inner",
+  "SqliteBudgetStore::capture_composite_invocation_with_diagnostic",
+]
+normalized_sha256 = "89c30ab32907faea0ae21abaa744b3373affa823e385706ab727970c0037c0e8"
 symbol_sha256 = [
-  { symbol = "SqliteBudgetStore::capture_composite_invocation_inner", sha256 = "cdc5d76f2a6b7082be360ab38291edb83b17662da4b28a3e84db0dd84089a905" },
+  { symbol = "SqliteBudgetStore::capture_composite_invocation_inner", sha256 = "4d1708efe74071241d2ad37a2f00d9002c4679a84b422e7e69d624b744661126" },
+  { symbol = "SqliteBudgetStore::capture_composite_invocation_with_diagnostic", sha256 = "b43d7429dd5c0c7ad90081fbef14d50ea7b3a8307292b932ed203859df6ed34f" },
 ]
 
 [[mirror]]
@@ -3222,8 +3226,10 @@ rust_symbols = [
   "Policy::validate_at",
   "Policy::validate_live_declassification",
   "Policy::validate_owned_declassification",
+  "Policy::validate_current_for_capture",
+  "Policy::validate_at_for_capture",
 ]
-normalized_sha256 = "1da210d2ece8d111d80bfd4286f1ad6242960e2b6b97a251ece95ae9399ba5b8"
+normalized_sha256 = "5f2e0c18aa99151b2828fa11ce67fbb55085b2fc8d683c42e6a946d2665d561a"
 symbol_sha256 = [
   { symbol = "MAX_POLICY_BYTES", sha256 = "494dae401728fb0d5a187127335fd99ca7727d1d81a970fb90a2a5a5cdf4ffa7" },
   { symbol = "Policy", sha256 = "4b7c4749cf8597a5935d3e677bf4950aba83e529a1525bf3d0e1cb952862790e" },
@@ -3232,10 +3238,12 @@ symbol_sha256 = [
   { symbol = "required_option", sha256 = "59effb3aa45154252ab9cf8552b01c093d626a66eacb2db101c6b0bd6b8ffab5" },
   { symbol = "decode", sha256 = "78299a167e1bd981e9cb26ceae51b92fbc5bee7d0fabe880a885cff327728674" },
   { symbol = "Policy::validate_binding", sha256 = "af7fd74f2ec7203aad00bfe7fa36370c1d2ccc89b0c99c79cbaf55603839ca7b" },
-  { symbol = "Policy::validate_current", sha256 = "594db5c568096e71ce619d2c7bea94e0aeab0817d375259fdbc57975618d261a" },
-  { symbol = "Policy::validate_at", sha256 = "ebefced3c5e96a144073fd24ad52df1183d556866fb8623d670f44cd2a1f6800" },
+  { symbol = "Policy::validate_current", sha256 = "a27e74ea5e92d32c4998bf867d180f8039ceaa3633d57a7bfbdc542078b2cdcf" },
+  { symbol = "Policy::validate_at", sha256 = "b0e3337c8b55d3b12e1699909f18f53c78f9f2d97933f0a6c5b9ddcd2156d217" },
   { symbol = "Policy::validate_live_declassification", sha256 = "f3332730dc05907d8f7a5a0c11a804625e243f9ee6b025333176663ddbfcb7cd" },
   { symbol = "Policy::validate_owned_declassification", sha256 = "d9240ae12716b28ac794dc83559d4da6dd1e12e26fa064591f85c2476999954a" },
+  { symbol = "Policy::validate_current_for_capture", sha256 = "5826a7aa4f026825ca59b50ffec43db534d0d13b6338ed742056c3c90dbfd71d" },
+  { symbol = "Policy::validate_at_for_capture", sha256 = "5642f498277e5c92022e8a74e96f2efb79acb34c59e3b94f6cab1ffe71d6a7a7" },
 ]
 
 [[mirror]]
@@ -3529,15 +3537,15 @@ rust_symbols = [
   "verify_capture_attachment_initialized",
   "verify_capture_record",
 ]
-normalized_sha256 = "c43de0e914c2cb21d040903b09b2bb4d5eeb28365ab0f7e3ed26ed36866ce26a"
+normalized_sha256 = "c3b48d1a26edfc2d913e16a21cb5d0d5c32f7ff19b4759bcbbd2b15e44f75504"
 symbol_sha256 = [
   { symbol = "NativeCaptureBinding", sha256 = "c5643577292db72c4dade8c727982a81f9f40e35b72d5556edc80950816c3624" },
-  { symbol = "VerifiedNativeCapture", sha256 = "8497246c6c4c9b56ba59591af7862b8980d688841519ed9e359021e2acba0a65" },
-  { symbol = "VerifiedNativeCapture::verify", sha256 = "fd7385062afe1c8aa8358a71c8c0af4652aaf4d2ce5675f7bfa8fc5f9fb78f77" },
+  { symbol = "VerifiedNativeCapture", sha256 = "de0e7b7fabeb60ee0b1b0773c3c421b1b0ad790fae615f14e5b9501428129bc8" },
+  { symbol = "VerifiedNativeCapture::verify", sha256 = "df9763196511709433a3fc517a914a4ce0701084d62fd9417b3ab8344e7c8a7c" },
   { symbol = "VerifiedNativeCapture::verify_owner", sha256 = "73540fe845fffe27990a2834f3e39162dec1ce413352a26020c610127a96df98" },
   { symbol = "VerifiedNativeCapture::verify_transition", sha256 = "08e8452fef5224cfcd506723a989c68c07a42d37ec75e24b80561a3bc6715d75" },
-  { symbol = "VerifiedNativeCapture::verify_deadline", sha256 = "3ea682e6f796d1673d2d67a35f3fdffe31f3681555d4ccdafda03090b69d9ae4" },
-  { symbol = "VerifiedNativeCapture::validate_time", sha256 = "ea7bc9cc20253f8983954098fc88e5e43cd1e3c4836e30e3aa829e77fd18da19" },
+  { symbol = "VerifiedNativeCapture::verify_deadline", sha256 = "560be21c925ce35eead41fefda57bae3869bd308adcf236ccbfd1738ce8136f8" },
+  { symbol = "VerifiedNativeCapture::validate_time", sha256 = "233abd0b89f0eace8158e9674463568bd925ecfe40e9018b7ba98d1d3eb58990" },
   { symbol = "verify_capture_attachment", sha256 = "4f0a07dc0d5e0d0db270c5c374c3195888c3363b9882b475bf8263549348214a" },
   { symbol = "verify_capture_attachment_initialized", sha256 = "de4c507256de80be7e2423ec6f2654670aa8b6cb4033a7705c10faf48cc8c6f4" },
   { symbol = "verify_capture_record", sha256 = "884eb723c3fff15e7645361b0f534c660eae4634a2ee43a6de6bd806c5eb9d01" },
