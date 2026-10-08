@@ -91,6 +91,17 @@ protected := chio.Protect(
 For a full runnable flow, pair this package with the `examples/hello-tool`
 tool server and drive traffic via the Chio CLI or any Chio client.
 
+## Wire types
+
+`types.go` is generated from `spec/schemas/chio-wire/v1` by
+`scripts/regen-types.sh`. Every record type whose schema is closed
+(`additionalProperties: false`) decodes strictly through `json.Unmarshal`:
+a property its schema does not declare, a repeated property name at any
+depth, and trailing data are refused. Primitives that carry signed bytes,
+such as receipts, capability tokens and execution nonces, also refuse
+`null` in place of an omitted property and bound their size and nesting.
+Decoding never verifies a signature.
+
 ## Status
 
 Version `0.1.0`, pre-1.0. Wire formats track the Chio `0.1.x` sidecar

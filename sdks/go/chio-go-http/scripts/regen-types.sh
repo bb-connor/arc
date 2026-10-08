@@ -655,11 +655,14 @@ awk '
 # Concatenate header + tail.
 cat "${HEADER_FILE}" "${TAIL_FILE}" > "${OUTPUT_FILE}"
 
-python3 - "${OUTPUT_FILE}" <<'PY'
+python3 - "${OUTPUT_FILE}" "${SCHEMAS_DIR}" <<'PY'
+import json
+import re
 import sys
 from pathlib import Path
 
 path = Path(sys.argv[1])
+schemas_dir = Path(sys.argv[2])
 text = path.read_text(encoding="utf-8")
 
 
@@ -1284,6 +1287,78 @@ text = text.replace(
     aggregate_decoder + "\tif err := validateAggregateBudgetJSON(b); err != nil {\n\t\treturn err\n\t}\n",
     1,
 )
+
+
+# Every closed top-level record type decodes strictly by default. A schema
+# with `additionalProperties: false` whose generated struct has no decoder
+# gets one that refuses unknown and duplicate properties (decodeRecordObject).
+# A generated decoder of such a record first checks its top-level members and
+# duplicate keys (checkRecordMembers). Hand-written decoders in this package
+# are strict already and stay as written.
+def pascalize(value: str) -> str:
+    return "".join(
+        part[:1].upper() + part[1:]
+        for part in value.replace("-", "_").replace(".", "_").split("_")
+        if part
+    )
+
+
+hand_written = "".join(
+    source.read_text(encoding="utf-8")
+    for source in sorted(path.parent.glob("*.go"))
+    if source.name != path.name and not source.name.endswith("_test.go")
+)
+closed_records = []
+record_types = []
+for schema_path in sorted(schemas_dir.rglob("*.schema.json")):
+    rel = schema_path.relative_to(schemas_dir)
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    if schema.get("additionalProperties") is not False:
+        continue
+    name = "".join(pascalize(part) for part in rel.parts[:-1]) + pascalize(
+        rel.parts[-1].removesuffix(".schema.json")
+    )
+    body = re.search(rf"^type {name} struct {{\n(.*?)^}}\n", text, re.M | re.S)
+    if body is None or re.search(r"^\tAdditionalProperties ", body.group(1), re.M):
+        continue
+    closed_records.append((rel.as_posix(), name))
+    header = f"func (t *{name}) UnmarshalJSON(b []byte) error {{\n"
+    if text.count(header) == 1:
+        members = ", ".join(json.dumps(member) for member in sorted(schema.get("properties", {})))
+        text = text.replace(
+            header,
+            header + f"\tif err := checkRecordMembers(b, {members}); err != nil {{\n\t\treturn err\n\t}}\n",
+            1,
+        )
+        continue
+    if re.search(rf"^func \(\w+ \*{name}\) UnmarshalJSON\(", hand_written, re.M):
+        continue
+    if re.search(r"^\tunion ", body.group(1), re.M):
+        raise SystemExit(f"regen-types.sh: closed union record {name} has no decoder")
+    record_types.append(name)
+if not record_types:
+    raise SystemExit("regen-types.sh: no closed record types found")
+for name in record_types:
+    text += f"""
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *{name}) UnmarshalJSON(b []byte) error {{
+\ttype wire {name}
+\tvar decoded wire
+\tif err := decodeRecordObject(b, &decoded); err != nil {{
+\t\treturn err
+\t}}
+\t*t = {name}(decoded)
+\treturn nil
+}}
+"""
+text += """
+// closedRecordTypes maps each closed top-level schema, relative to
+// spec/schemas/chio-wire/v1, to a constructor for its record type.
+var closedRecordTypes = map[string]func() any{
+"""
+for rel_path, name in closed_records:
+    text += f'\t"{rel_path}": func() any {{ return new({name}) }},\n'
+text += "}\n"
 
 path.write_text(text, encoding="utf-8")
 PY

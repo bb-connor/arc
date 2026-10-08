@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"slices"
 	"strings"
 	"unicode"
 )
@@ -160,6 +161,96 @@ func decodeProtocolObject(data []byte, target any) error {
 	decoder.UseNumber()
 	decoder.DisallowUnknownFields()
 	return decoder.Decode(target)
+}
+
+// recordNestingLimit equals encoding/json's own nesting limit, so the default
+// record decoder adds no depth bound that json.Unmarshal lacks.
+const recordNestingLimit = 10000
+
+// decodeRecordObject is the default decoder of every closed generated record
+// type. It refuses a repeated property name at any depth, a property that the
+// record's struct types do not declare, and trailing data. Presence, null and
+// number handling are those of encoding/json; primitives that need stricter
+// rules decode through decodeProtocolObject instead.
+func decodeRecordObject(data []byte, target any) error {
+	scanner := json.NewDecoder(bytes.NewReader(data))
+	scanner.UseNumber()
+	if err := rejectDuplicateKeys(scanner, 0); err != nil {
+		return err
+	}
+	if _, err := scanner.Token(); err != io.EOF {
+		return fmt.Errorf("trailing data after Chio record")
+	}
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	return decoder.Decode(target)
+}
+
+// checkRecordMembers refuses a repeated property name at any depth, a
+// top-level member outside allowed, and trailing data. Generated decoders of
+// closed records, whose branches encoding/json cannot check, call it first.
+func checkRecordMembers(data []byte, allowed ...string) error {
+	scanner := json.NewDecoder(bytes.NewReader(data))
+	scanner.UseNumber()
+	if err := rejectDuplicateKeys(scanner, 0); err != nil {
+		return err
+	}
+	if _, err := scanner.Token(); err != io.EOF {
+		return fmt.Errorf("trailing data after Chio record")
+	}
+	var members map[string]json.RawMessage
+	if err := json.Unmarshal(data, &members); err != nil {
+		return err
+	}
+	for name := range members {
+		if !slices.Contains(allowed, name) {
+			return fmt.Errorf("unknown chio record property")
+		}
+	}
+	return nil
+}
+
+// rejectDuplicateKeys reads one JSON value and refuses a repeated property
+// name in any object within it. It retains nothing.
+func rejectDuplicateKeys(decoder *json.Decoder, depth int) error {
+	if depth > recordNestingLimit {
+		return fmt.Errorf("chio record nesting exceeds %d", recordNestingLimit)
+	}
+	token, err := decoder.Token()
+	if err != nil {
+		return err
+	}
+	switch token {
+	case json.Delim('{'):
+		seen := make(map[string]struct{})
+		for decoder.More() {
+			key, err := decoder.Token()
+			if err != nil {
+				return err
+			}
+			name, ok := key.(string)
+			if !ok {
+				return fmt.Errorf("chio record property must be a string")
+			}
+			if _, exists := seen[name]; exists {
+				return fmt.Errorf("duplicate chio record property")
+			}
+			seen[name] = struct{}{}
+			if err := rejectDuplicateKeys(decoder, depth+1); err != nil {
+				return err
+			}
+		}
+	case json.Delim('['):
+		for decoder.More() {
+			if err := rejectDuplicateKeys(decoder, depth+1); err != nil {
+				return err
+			}
+		}
+	default:
+		return nil
+	}
+	_, err = decoder.Token()
+	return err
 }
 
 func (n *KernelExecutionNonce) UnmarshalJSON(data []byte) error {

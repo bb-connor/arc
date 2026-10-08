@@ -8863,6 +8863,9 @@ func (t JsonrpcNotification) MarshalJSON() ([]byte, error) {
 }
 
 func (t *JsonrpcNotification) UnmarshalJSON(b []byte) error {
+	if err := checkRecordMembers(b, "jsonrpc", "method", "params"); err != nil {
+		return err
+	}
 	object := make(map[string]json.RawMessage)
 	if err := json.Unmarshal(b, &object); err != nil {
 		return err
@@ -9069,6 +9072,9 @@ func (t JsonrpcRequest) MarshalJSON() ([]byte, error) {
 }
 
 func (t *JsonrpcRequest) UnmarshalJSON(b []byte) error {
+	if err := checkRecordMembers(b, "id", "jsonrpc", "method", "params"); err != nil {
+		return err
+	}
 	object := make(map[string]json.RawMessage)
 	if err := json.Unmarshal(b, &object); err != nil {
 		return err
@@ -9223,6 +9229,9 @@ func (t JsonrpcResponse) MarshalJSON() ([]byte, error) {
 }
 
 func (t *JsonrpcResponse) UnmarshalJSON(b []byte) error {
+	if err := checkRecordMembers(b, "error", "id", "jsonrpc", "result"); err != nil {
+		return err
+	}
 	err := t.union.UnmarshalJSON(b)
 	if err != nil {
 		return err
@@ -9929,6 +9938,9 @@ func (t ProvenanceVerdictLink) MarshalJSON() ([]byte, error) {
 }
 
 func (t *ProvenanceVerdictLink) UnmarshalJSON(b []byte) error {
+	if err := checkRecordMembers(b, "chainId", "evidenceClass", "guard", "reason", "receiptId", "renderedAt", "requestId", "verdict"); err != nil {
+		return err
+	}
 	err := t.union.UnmarshalJSON(b)
 	if err != nil {
 		return err
@@ -11512,6 +11524,9 @@ func (t SecurityCageReceiptBodyV1) MarshalJSON() ([]byte, error) {
 }
 
 func (t *SecurityCageReceiptBodyV1) UnmarshalJSON(b []byte) error {
+	if err := checkRecordMembers(b, "attempt_id", "bindings", "enforcement_record", "recorded_at_unix_ms", "schema", "stage", "started_at_unix_ms"); err != nil {
+		return err
+	}
 	err := t.union.UnmarshalJSON(b)
 	if err != nil {
 		return err
@@ -12404,6 +12419,9 @@ func (t SecurityKeyLogEnterpriseReceiptBodyV1) MarshalJSON() ([]byte, error) {
 }
 
 func (t *SecurityKeyLogEnterpriseReceiptBodyV1) UnmarshalJSON(b []byte) error {
+	if err := checkRecordMembers(b, "activation_commit_hash", "checkpoint_hash", "checkpoint_sequence", "event_envelope_hash", "event_id", "event_sequence", "event_signers", "issued_at", "log_id", "operator_key_id", "outcome", "receipt_id", "root_hash", "schema", "signing_epoch", "source_receipt_ids", "stage", "transaction_id", "tree_size", "witness_roster_id", "witness_signatures"); err != nil {
+		return err
+	}
 	err := t.union.UnmarshalJSON(b)
 	if err != nil {
 		return err
@@ -13442,4 +13460,1505 @@ func (t SecurityResponsePlanV1ApprovalRequirement) MarshalJSON() ([]byte, error)
 func (t *SecurityResponsePlanV1ApprovalRequirement) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *AgentGovernedTransactionIntent) UnmarshalJSON(b []byte) error {
+	type wire AgentGovernedTransactionIntent
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = AgentGovernedTransactionIntent(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *AgentHeartbeat) UnmarshalJSON(b []byte) error {
+	type wire AgentHeartbeat
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = AgentHeartbeat(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *AgentListCapabilities) UnmarshalJSON(b []byte) error {
+	type wire AgentListCapabilities
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = AgentListCapabilities(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *AnchorBatch) UnmarshalJSON(b []byte) error {
+	type wire AnchorBatch
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = AnchorBatch(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *CapabilityAggregateBudgetRoot) UnmarshalJSON(b []byte) error {
+	type wire CapabilityAggregateBudgetRoot
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = CapabilityAggregateBudgetRoot(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *CapabilityCapabilities) UnmarshalJSON(b []byte) error {
+	type wire CapabilityCapabilities
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = CapabilityCapabilities(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *CapabilityCumulativeApprovalRoot) UnmarshalJSON(b []byte) error {
+	type wire CapabilityCumulativeApprovalRoot
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = CapabilityCumulativeApprovalRoot(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *CapabilityRevocation) UnmarshalJSON(b []byte) error {
+	type wire CapabilityRevocation
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = CapabilityRevocation(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *CapabilitySecurityBinding) UnmarshalJSON(b []byte) error {
+	type wire CapabilitySecurityBinding
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = CapabilitySecurityBinding(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *CapabilityVerifiedApprovalSet) UnmarshalJSON(b []byte) error {
+	type wire CapabilityVerifiedApprovalSet
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = CapabilityVerifiedApprovalSet(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *ErrorCapabilityDenied) UnmarshalJSON(b []byte) error {
+	type wire ErrorCapabilityDenied
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = ErrorCapabilityDenied(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *ErrorCapabilityExpired) UnmarshalJSON(b []byte) error {
+	type wire ErrorCapabilityExpired
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = ErrorCapabilityExpired(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *ErrorCapabilityRevoked) UnmarshalJSON(b []byte) error {
+	type wire ErrorCapabilityRevoked
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = ErrorCapabilityRevoked(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *ErrorInternalError) UnmarshalJSON(b []byte) error {
+	type wire ErrorInternalError
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = ErrorInternalError(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *ErrorPolicyDenied) UnmarshalJSON(b []byte) error {
+	type wire ErrorPolicyDenied
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = ErrorPolicyDenied(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *ErrorToolServerError) UnmarshalJSON(b []byte) error {
+	type wire ErrorToolServerError
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = ErrorToolServerError(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *FederationBilateralSignatureSliceEnvelope) UnmarshalJSON(b []byte) error {
+	type wire FederationBilateralSignatureSliceEnvelope
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = FederationBilateralSignatureSliceEnvelope(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *FederationBilateralSignatureSlice) UnmarshalJSON(b []byte) error {
+	type wire FederationBilateralSignatureSlice
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = FederationBilateralSignatureSlice(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *KernelCapabilityList) UnmarshalJSON(b []byte) error {
+	type wire KernelCapabilityList
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = KernelCapabilityList(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *KernelCapabilityRevoked) UnmarshalJSON(b []byte) error {
+	type wire KernelCapabilityRevoked
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = KernelCapabilityRevoked(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *KernelDpopProof) UnmarshalJSON(b []byte) error {
+	type wire KernelDpopProof
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = KernelDpopProof(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *KernelHeartbeat) UnmarshalJSON(b []byte) error {
+	type wire KernelHeartbeat
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = KernelHeartbeat(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *KernelToolCallChunk) UnmarshalJSON(b []byte) error {
+	type wire KernelToolCallChunk
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = KernelToolCallChunk(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *KernelToolCallResponse) UnmarshalJSON(b []byte) error {
+	type wire KernelToolCallResponse
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = KernelToolCallResponse(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *ProvenanceAttestationBundle) UnmarshalJSON(b []byte) error {
+	type wire ProvenanceAttestationBundle
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = ProvenanceAttestationBundle(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *ProvenanceContext) UnmarshalJSON(b []byte) error {
+	type wire ProvenanceContext
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = ProvenanceContext(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *ProvenanceStamp) UnmarshalJSON(b []byte) error {
+	type wire ProvenanceStamp
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = ProvenanceStamp(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *ReceiptAdmissionMetadata) UnmarshalJSON(b []byte) error {
+	type wire ReceiptAdmissionMetadata
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = ReceiptAdmissionMetadata(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *ReceiptDeliveryContract) UnmarshalJSON(b []byte) error {
+	type wire ReceiptDeliveryContract
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = ReceiptDeliveryContract(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *ReceiptFindingDelivery) UnmarshalJSON(b []byte) error {
+	type wire ReceiptFindingDelivery
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = ReceiptFindingDelivery(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *ReceiptInclusionProof) UnmarshalJSON(b []byte) error {
+	type wire ReceiptInclusionProof
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = ReceiptInclusionProof(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *ReceiptLineageStatement) UnmarshalJSON(b []byte) error {
+	type wire ReceiptLineageStatement
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = ReceiptLineageStatement(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *ResultCancelled) UnmarshalJSON(b []byte) error {
+	type wire ResultCancelled
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = ResultCancelled(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *ResultErr) UnmarshalJSON(b []byte) error {
+	type wire ResultErr
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = ResultErr(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *ResultIncomplete) UnmarshalJSON(b []byte) error {
+	type wire ResultIncomplete
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = ResultIncomplete(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *ResultOk) UnmarshalJSON(b []byte) error {
+	type wire ResultOk
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = ResultOk(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *ResultStreamComplete) UnmarshalJSON(b []byte) error {
+	type wire ResultStreamComplete
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = ResultStreamComplete(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerAdminControlReceiptBodyV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerAdminControlReceiptBodyV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerAdminControlReceiptBodyV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerAdminControlReceiptEnvelopeV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerAdminControlReceiptEnvelopeV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerAdminControlReceiptEnvelopeV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerAdminMutationReceiptBodyV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerAdminMutationReceiptBodyV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerAdminMutationReceiptBodyV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerAdminMutationReceiptEnvelopeV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerAdminMutationReceiptEnvelopeV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerAdminMutationReceiptEnvelopeV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerAttemptRegistrationV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerAttemptRegistrationV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerAttemptRegistrationV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerAuditComparisonBodyV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerAuditComparisonBodyV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerAuditComparisonBodyV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerAuditComparisonEnvelopeV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerAuditComparisonEnvelopeV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerAuditComparisonEnvelopeV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerAuditRunnerAuthorizationBodyV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerAuditRunnerAuthorizationBodyV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerAuditRunnerAuthorizationBodyV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerAuditRunnerAuthorizationEnvelopeV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerAuditRunnerAuthorizationEnvelopeV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerAuditRunnerAuthorizationEnvelopeV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerAuthorityRequestBodyV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerAuthorityRequestBodyV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerAuthorityRequestBodyV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerAuthorityRequestEnvelopeV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerAuthorityRequestEnvelopeV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerAuthorityRequestEnvelopeV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerAuthorityResponseBodyV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerAuthorityResponseBodyV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerAuthorityResponseBodyV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerAuthorityResponseEnvelopeV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerAuthorityResponseEnvelopeV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerAuthorityResponseEnvelopeV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerCapabilityBodyV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerCapabilityBodyV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerCapabilityBodyV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerCapabilityEnvelopeV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerCapabilityEnvelopeV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerCapabilityEnvelopeV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerExecuteFailureV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerExecuteFailureV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerExecuteFailureV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerExecuteRequestV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerExecuteRequestV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerExecuteRequestV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerExecuteResponseV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerExecuteResponseV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerExecuteResponseV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerExecuteResponseV2) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerExecuteResponseV2
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerExecuteResponseV2(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerExecutionEvidenceV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerExecutionEvidenceV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerExecutionEvidenceV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerExecutionEvidenceV2) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerExecutionEvidenceV2
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerExecutionEvidenceV2(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerExecutionFailureReceiptBodyV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerExecutionFailureReceiptBodyV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerExecutionFailureReceiptBodyV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerExecutionFailureReceiptEnvelopeV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerExecutionFailureReceiptEnvelopeV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerExecutionFailureReceiptEnvelopeV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerExecutionReceiptBodyV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerExecutionReceiptBodyV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerExecutionReceiptBodyV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerExecutionReceiptBodyV2) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerExecutionReceiptBodyV2
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerExecutionReceiptBodyV2(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerExecutionReceiptEnvelopeV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerExecutionReceiptEnvelopeV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerExecutionReceiptEnvelopeV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerExecutionReceiptEnvelopeV2) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerExecutionReceiptEnvelopeV2
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerExecutionReceiptEnvelopeV2(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerPrepareDispatchAcknowledgementV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerPrepareDispatchAcknowledgementV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerPrepareDispatchAcknowledgementV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerPrivilegedAuditChallengeV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerPrivilegedAuditChallengeV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerPrivilegedAuditChallengeV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerPrivilegedAuditCommitV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerPrivilegedAuditCommitV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerPrivilegedAuditCommitV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerPrivilegedAuditEvidenceV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerPrivilegedAuditEvidenceV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerPrivilegedAuditEvidenceV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerPrivilegedAuditOpenV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerPrivilegedAuditOpenV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerPrivilegedAuditOpenV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerRegisterAttemptAcknowledgementV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerRegisterAttemptAcknowledgementV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerRegisterAttemptAcknowledgementV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerRegisterAttemptAuthorizationBodyV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerRegisterAttemptAuthorizationBodyV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerRegisterAttemptAuthorizationBodyV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerRegisterAttemptAuthorizationEnvelopeV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerRegisterAttemptAuthorizationEnvelopeV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerRegisterAttemptAuthorizationEnvelopeV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerReleaseAttemptAcknowledgementV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerReleaseAttemptAcknowledgementV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerReleaseAttemptAcknowledgementV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerRequestProofBodyV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerRequestProofBodyV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerRequestProofBodyV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityBrokerRequestProofEnvelopeV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityBrokerRequestProofEnvelopeV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityBrokerRequestProofEnvelopeV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityCageEnforcementFailureV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityCageEnforcementFailureV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityCageEnforcementFailureV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityCageEnforcementPreparedV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityCageEnforcementPreparedV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityCageEnforcementPreparedV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityCageEnforcementRecordV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityCageEnforcementRecordV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityCageEnforcementRecordV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityCageExecTransitionObservedV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityCageExecTransitionObservedV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityCageExecTransitionObservedV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityCageFullyEnforcedEvidenceV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityCageFullyEnforcedEvidenceV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityCageFullyEnforcedEvidenceV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityCageInitPlanV2) UnmarshalJSON(b []byte) error {
+	type wire SecurityCageInitPlanV2
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityCageInitPlanV2(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityCageProcessExitEvidenceV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityCageProcessExitEvidenceV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityCageProcessExitEvidenceV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityCageReceiptMetadataV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityCageReceiptMetadataV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityCageReceiptMetadataV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityCorrelatedFindingReceiptBodyV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityCorrelatedFindingReceiptBodyV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityCorrelatedFindingReceiptBodyV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityCorrelatedFindingV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityCorrelatedFindingV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityCorrelatedFindingV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityDeclassificationConsumptionReceiptBodyV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityDeclassificationConsumptionReceiptBodyV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityDeclassificationConsumptionReceiptBodyV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityDeclassificationGrant) UnmarshalJSON(b []byte) error {
+	type wire SecurityDeclassificationGrant
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityDeclassificationGrant(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityDeclassificationOutcomeReceiptBodyV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityDeclassificationOutcomeReceiptBodyV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityDeclassificationOutcomeReceiptBodyV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityDetectorHealthReceiptBodyV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityDetectorHealthReceiptBodyV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityDetectorHealthReceiptBodyV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityEffectTransitionReceiptBodyV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityEffectTransitionReceiptBodyV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityEffectTransitionReceiptBodyV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityFlowDenialReceiptBodyV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityFlowDenialReceiptBodyV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityFlowDenialReceiptBodyV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityKeyLogActivationCommitBodyV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityKeyLogActivationCommitBodyV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityKeyLogActivationCommitBodyV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityKeyLogActivationCommitEnvelopeV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityKeyLogActivationCommitEnvelopeV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityKeyLogActivationCommitEnvelopeV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityKeyLogArtifactTimeAnchorBodyV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityKeyLogArtifactTimeAnchorBodyV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityKeyLogArtifactTimeAnchorBodyV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityKeyLogArtifactTimeAnchorEnvelopeV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityKeyLogArtifactTimeAnchorEnvelopeV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityKeyLogArtifactTimeAnchorEnvelopeV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityKeyLogAuditReadinessBodyV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityKeyLogAuditReadinessBodyV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityKeyLogAuditReadinessBodyV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityKeyLogAuditReadinessProofV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityKeyLogAuditReadinessProofV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityKeyLogAuditReadinessProofV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityKeyLogCheckpointBodyV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityKeyLogCheckpointBodyV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityKeyLogCheckpointBodyV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityKeyLogCheckpointEnvelopeV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityKeyLogCheckpointEnvelopeV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityKeyLogCheckpointEnvelopeV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityKeyLogEnterpriseReceiptEnvelopeV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityKeyLogEnterpriseReceiptEnvelopeV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityKeyLogEnterpriseReceiptEnvelopeV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityKeyLogEventBodyV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityKeyLogEventBodyV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityKeyLogEventBodyV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityKeyLogEventEnvelopeV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityKeyLogEventEnvelopeV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityKeyLogEventEnvelopeV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityKeyLogSyncResponseV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityKeyLogSyncResponseV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityKeyLogSyncResponseV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityKeyLogWitnessReadinessBodyV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityKeyLogWitnessReadinessBodyV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityKeyLogWitnessReadinessBodyV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityKeyLogWitnessReadinessProofV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityKeyLogWitnessReadinessProofV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityKeyLogWitnessReadinessProofV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityKeyLogWitnessSignatureV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityKeyLogWitnessSignatureV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityKeyLogWitnessSignatureV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityKeyringArtifactSignatureV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityKeyringArtifactSignatureV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityKeyringArtifactSignatureV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityLiftRollbackCompletionReceiptBodyV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityLiftRollbackCompletionReceiptBodyV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityLiftRollbackCompletionReceiptBodyV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityMcpCageLaunchPolicyV2) UnmarshalJSON(b []byte) error {
+	type wire SecurityMcpCageLaunchPolicyV2
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityMcpCageLaunchPolicyV2(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityResponseCompletionReceiptBodyV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityResponseCompletionReceiptBodyV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityResponseCompletionReceiptBodyV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityResponseEffectV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityResponseEffectV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityResponseEffectV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityResponsePlanReceiptBodyV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityResponsePlanReceiptBodyV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityResponsePlanReceiptBodyV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityResponsePlanV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityResponsePlanV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityResponsePlanV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityResponseStateTransitionReceiptBodyV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityResponseStateTransitionReceiptBodyV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityResponseStateTransitionReceiptBodyV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecuritySchedulerHealthReceiptBodyV1) UnmarshalJSON(b []byte) error {
+	type wire SecuritySchedulerHealthReceiptBodyV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecuritySchedulerHealthReceiptBodyV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecuritySecurityEventBodyV1) UnmarshalJSON(b []byte) error {
+	type wire SecuritySecurityEventBodyV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecuritySecurityEventBodyV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecuritySignedSecurityEventEnvelopeV1) UnmarshalJSON(b []byte) error {
+	type wire SecuritySignedSecurityEventEnvelopeV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecuritySignedSecurityEventEnvelopeV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *SecurityTripwireObservationReceiptBodyV1) UnmarshalJSON(b []byte) error {
+	type wire SecurityTripwireObservationReceiptBodyV1
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = SecurityTripwireObservationReceiptBodyV1(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *TrustControlAttestation) UnmarshalJSON(b []byte) error {
+	type wire TrustControlAttestation
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = TrustControlAttestation(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *TrustControlBudgetSnapshotAnchorProvenance) UnmarshalJSON(b []byte) error {
+	type wire TrustControlBudgetSnapshotAnchorProvenance
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = TrustControlBudgetSnapshotAnchorProvenance(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *TrustControlHeartbeat) UnmarshalJSON(b []byte) error {
+	type wire TrustControlHeartbeat
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = TrustControlHeartbeat(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *TrustControlLease) UnmarshalJSON(b []byte) error {
+	type wire TrustControlLease
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = TrustControlLease(decoded)
+	return nil
+}
+
+// UnmarshalJSON refuses unknown or duplicate properties and trailing data.
+func (t *TrustControlTerminate) UnmarshalJSON(b []byte) error {
+	type wire TrustControlTerminate
+	var decoded wire
+	if err := decodeRecordObject(b, &decoded); err != nil {
+		return err
+	}
+	*t = TrustControlTerminate(decoded)
+	return nil
+}
+
+// closedRecordTypes maps each closed top-level schema, relative to
+// spec/schemas/chio-wire/v1, to a constructor for its record type.
+var closedRecordTypes = map[string]func() any{
+	"agent/active-response-governed-intent.schema.json":                      func() any { return new(AgentActiveResponseGovernedIntent) },
+	"agent/governed-transaction-intent.schema.json":                          func() any { return new(AgentGovernedTransactionIntent) },
+	"agent/heartbeat.schema.json":                                            func() any { return new(AgentHeartbeat) },
+	"agent/list_capabilities.schema.json":                                    func() any { return new(AgentListCapabilities) },
+	"anchor/batch.schema.json":                                               func() any { return new(AnchorBatch) },
+	"capability/aggregate-budget-root.schema.json":                           func() any { return new(CapabilityAggregateBudgetRoot) },
+	"capability/capabilities.schema.json":                                    func() any { return new(CapabilityCapabilities) },
+	"capability/cumulative-approval-root.schema.json":                        func() any { return new(CapabilityCumulativeApprovalRoot) },
+	"capability/governed-approval-token.schema.json":                         func() any { return new(CapabilityGovernedApprovalToken) },
+	"capability/revocation.schema.json":                                      func() any { return new(CapabilityRevocation) },
+	"capability/security-binding.schema.json":                                func() any { return new(CapabilitySecurityBinding) },
+	"capability/supplemental-authorization.schema.json":                      func() any { return new(CapabilitySupplementalAuthorization) },
+	"capability/threshold-approval-proposal.schema.json":                     func() any { return new(CapabilityThresholdApprovalProposal) },
+	"capability/token.schema.json":                                           func() any { return new(CapabilityToken) },
+	"capability/verified-approval-set.schema.json":                           func() any { return new(CapabilityVerifiedApprovalSet) },
+	"error/capability_denied.schema.json":                                    func() any { return new(ErrorCapabilityDenied) },
+	"error/capability_expired.schema.json":                                   func() any { return new(ErrorCapabilityExpired) },
+	"error/capability_revoked.schema.json":                                   func() any { return new(ErrorCapabilityRevoked) },
+	"error/internal_error.schema.json":                                       func() any { return new(ErrorInternalError) },
+	"error/policy_denied.schema.json":                                        func() any { return new(ErrorPolicyDenied) },
+	"error/tool_server_error.schema.json":                                    func() any { return new(ErrorToolServerError) },
+	"federation/bilateral-signature-slice-envelope.schema.json":              func() any { return new(FederationBilateralSignatureSliceEnvelope) },
+	"federation/bilateral-signature-slice.schema.json":                       func() any { return new(FederationBilateralSignatureSlice) },
+	"jsonrpc/notification.schema.json":                                       func() any { return new(JsonrpcNotification) },
+	"jsonrpc/request.schema.json":                                            func() any { return new(JsonrpcRequest) },
+	"jsonrpc/response.schema.json":                                           func() any { return new(JsonrpcResponse) },
+	"kernel/caller_delivery_report.schema.json":                              func() any { return new(KernelCallerDeliveryReport) },
+	"kernel/caller_dispatch_authorization.schema.json":                       func() any { return new(KernelCallerDispatchAuthorization) },
+	"kernel/capability_list.schema.json":                                     func() any { return new(KernelCapabilityList) },
+	"kernel/capability_revoked.schema.json":                                  func() any { return new(KernelCapabilityRevoked) },
+	"kernel/combined-capture-metadata.schema.json":                           func() any { return new(KernelCombinedCaptureMetadata) },
+	"kernel/dpop_proof.schema.json":                                          func() any { return new(KernelDpopProof) },
+	"kernel/execution_nonce.schema.json":                                     func() any { return new(KernelExecutionNonce) },
+	"kernel/heartbeat.schema.json":                                           func() any { return new(KernelHeartbeat) },
+	"kernel/tool_call_chunk.schema.json":                                     func() any { return new(KernelToolCallChunk) },
+	"kernel/tool_call_response.schema.json":                                  func() any { return new(KernelToolCallResponse) },
+	"provenance/attestation-bundle.schema.json":                              func() any { return new(ProvenanceAttestationBundle) },
+	"provenance/context.schema.json":                                         func() any { return new(ProvenanceContext) },
+	"provenance/stamp.schema.json":                                           func() any { return new(ProvenanceStamp) },
+	"provenance/verdict-link.schema.json":                                    func() any { return new(ProvenanceVerdictLink) },
+	"receipt/admission-metadata.schema.json":                                 func() any { return new(ReceiptAdmissionMetadata) },
+	"receipt/delivery-contract.schema.json":                                  func() any { return new(ReceiptDeliveryContract) },
+	"receipt/finding-delivery.schema.json":                                   func() any { return new(ReceiptFindingDelivery) },
+	"receipt/inclusion-proof.schema.json":                                    func() any { return new(ReceiptInclusionProof) },
+	"receipt/lineage_statement.schema.json":                                  func() any { return new(ReceiptLineageStatement) },
+	"receipt/record.schema.json":                                             func() any { return new(ReceiptRecord) },
+	"result/cancelled.schema.json":                                           func() any { return new(ResultCancelled) },
+	"result/err.schema.json":                                                 func() any { return new(ResultErr) },
+	"result/incomplete.schema.json":                                          func() any { return new(ResultIncomplete) },
+	"result/ok.schema.json":                                                  func() any { return new(ResultOk) },
+	"result/pending_approval.schema.json":                                    func() any { return new(ResultPendingApproval) },
+	"result/stream_complete.schema.json":                                     func() any { return new(ResultStreamComplete) },
+	"security/broker-admin-control-receipt-body-v1.schema.json":              func() any { return new(SecurityBrokerAdminControlReceiptBodyV1) },
+	"security/broker-admin-control-receipt-envelope-v1.schema.json":          func() any { return new(SecurityBrokerAdminControlReceiptEnvelopeV1) },
+	"security/broker-admin-mutation-receipt-body-v1.schema.json":             func() any { return new(SecurityBrokerAdminMutationReceiptBodyV1) },
+	"security/broker-admin-mutation-receipt-envelope-v1.schema.json":         func() any { return new(SecurityBrokerAdminMutationReceiptEnvelopeV1) },
+	"security/broker-attempt-registration-v1.schema.json":                    func() any { return new(SecurityBrokerAttemptRegistrationV1) },
+	"security/broker-audit-comparison-body-v1.schema.json":                   func() any { return new(SecurityBrokerAuditComparisonBodyV1) },
+	"security/broker-audit-comparison-envelope-v1.schema.json":               func() any { return new(SecurityBrokerAuditComparisonEnvelopeV1) },
+	"security/broker-audit-runner-authorization-body-v1.schema.json":         func() any { return new(SecurityBrokerAuditRunnerAuthorizationBodyV1) },
+	"security/broker-audit-runner-authorization-envelope-v1.schema.json":     func() any { return new(SecurityBrokerAuditRunnerAuthorizationEnvelopeV1) },
+	"security/broker-authority-request-body-v1.schema.json":                  func() any { return new(SecurityBrokerAuthorityRequestBodyV1) },
+	"security/broker-authority-request-envelope-v1.schema.json":              func() any { return new(SecurityBrokerAuthorityRequestEnvelopeV1) },
+	"security/broker-authority-response-body-v1.schema.json":                 func() any { return new(SecurityBrokerAuthorityResponseBodyV1) },
+	"security/broker-authority-response-envelope-v1.schema.json":             func() any { return new(SecurityBrokerAuthorityResponseEnvelopeV1) },
+	"security/broker-capability-body-v1.schema.json":                         func() any { return new(SecurityBrokerCapabilityBodyV1) },
+	"security/broker-capability-envelope-v1.schema.json":                     func() any { return new(SecurityBrokerCapabilityEnvelopeV1) },
+	"security/broker-execute-failure-v1.schema.json":                         func() any { return new(SecurityBrokerExecuteFailureV1) },
+	"security/broker-execute-request-v1.schema.json":                         func() any { return new(SecurityBrokerExecuteRequestV1) },
+	"security/broker-execute-response-v1.schema.json":                        func() any { return new(SecurityBrokerExecuteResponseV1) },
+	"security/broker-execute-response-v2.schema.json":                        func() any { return new(SecurityBrokerExecuteResponseV2) },
+	"security/broker-execution-evidence-v1.schema.json":                      func() any { return new(SecurityBrokerExecutionEvidenceV1) },
+	"security/broker-execution-evidence-v2.schema.json":                      func() any { return new(SecurityBrokerExecutionEvidenceV2) },
+	"security/broker-execution-failure-receipt-body-v1.schema.json":          func() any { return new(SecurityBrokerExecutionFailureReceiptBodyV1) },
+	"security/broker-execution-failure-receipt-envelope-v1.schema.json":      func() any { return new(SecurityBrokerExecutionFailureReceiptEnvelopeV1) },
+	"security/broker-execution-receipt-body-v1.schema.json":                  func() any { return new(SecurityBrokerExecutionReceiptBodyV1) },
+	"security/broker-execution-receipt-body-v2.schema.json":                  func() any { return new(SecurityBrokerExecutionReceiptBodyV2) },
+	"security/broker-execution-receipt-envelope-v1.schema.json":              func() any { return new(SecurityBrokerExecutionReceiptEnvelopeV1) },
+	"security/broker-execution-receipt-envelope-v2.schema.json":              func() any { return new(SecurityBrokerExecutionReceiptEnvelopeV2) },
+	"security/broker-prepare-dispatch-acknowledgement-v1.schema.json":        func() any { return new(SecurityBrokerPrepareDispatchAcknowledgementV1) },
+	"security/broker-privileged-audit-challenge-v1.schema.json":              func() any { return new(SecurityBrokerPrivilegedAuditChallengeV1) },
+	"security/broker-privileged-audit-commit-v1.schema.json":                 func() any { return new(SecurityBrokerPrivilegedAuditCommitV1) },
+	"security/broker-privileged-audit-evidence-v1.schema.json":               func() any { return new(SecurityBrokerPrivilegedAuditEvidenceV1) },
+	"security/broker-privileged-audit-open-v1.schema.json":                   func() any { return new(SecurityBrokerPrivilegedAuditOpenV1) },
+	"security/broker-register-attempt-acknowledgement-v1.schema.json":        func() any { return new(SecurityBrokerRegisterAttemptAcknowledgementV1) },
+	"security/broker-register-attempt-authorization-body-v1.schema.json":     func() any { return new(SecurityBrokerRegisterAttemptAuthorizationBodyV1) },
+	"security/broker-register-attempt-authorization-envelope-v1.schema.json": func() any { return new(SecurityBrokerRegisterAttemptAuthorizationEnvelopeV1) },
+	"security/broker-release-attempt-acknowledgement-v1.schema.json":         func() any { return new(SecurityBrokerReleaseAttemptAcknowledgementV1) },
+	"security/broker-request-proof-body-v1.schema.json":                      func() any { return new(SecurityBrokerRequestProofBodyV1) },
+	"security/broker-request-proof-envelope-v1.schema.json":                  func() any { return new(SecurityBrokerRequestProofEnvelopeV1) },
+	"security/cage-enforcement-failure-v1.schema.json":                       func() any { return new(SecurityCageEnforcementFailureV1) },
+	"security/cage-enforcement-prepared-v1.schema.json":                      func() any { return new(SecurityCageEnforcementPreparedV1) },
+	"security/cage-enforcement-record-v1.schema.json":                        func() any { return new(SecurityCageEnforcementRecordV1) },
+	"security/cage-exec-transition-observed-v1.schema.json":                  func() any { return new(SecurityCageExecTransitionObservedV1) },
+	"security/cage-fully-enforced-evidence-v1.schema.json":                   func() any { return new(SecurityCageFullyEnforcedEvidenceV1) },
+	"security/cage-init-plan-v2.schema.json":                                 func() any { return new(SecurityCageInitPlanV2) },
+	"security/cage-process-exit-evidence-v1.schema.json":                     func() any { return new(SecurityCageProcessExitEvidenceV1) },
+	"security/cage-receipt-body-v1.schema.json":                              func() any { return new(SecurityCageReceiptBodyV1) },
+	"security/cage-receipt-metadata-v1.schema.json":                          func() any { return new(SecurityCageReceiptMetadataV1) },
+	"security/correlated-finding-receipt-body-v1.schema.json":                func() any { return new(SecurityCorrelatedFindingReceiptBodyV1) },
+	"security/correlated-finding-v1.schema.json":                             func() any { return new(SecurityCorrelatedFindingV1) },
+	"security/declassification-consumption-receipt-body-v1.schema.json":      func() any { return new(SecurityDeclassificationConsumptionReceiptBodyV1) },
+	"security/declassification-grant.schema.json":                            func() any { return new(SecurityDeclassificationGrant) },
+	"security/declassification-outcome-receipt-body-v1.schema.json":          func() any { return new(SecurityDeclassificationOutcomeReceiptBodyV1) },
+	"security/detector-health-receipt-body-v1.schema.json":                   func() any { return new(SecurityDetectorHealthReceiptBodyV1) },
+	"security/effect-transition-receipt-body-v1.schema.json":                 func() any { return new(SecurityEffectTransitionReceiptBodyV1) },
+	"security/flow-denial-receipt-body-v1.schema.json":                       func() any { return new(SecurityFlowDenialReceiptBodyV1) },
+	"security/key-log-activation-commit-body-v1.schema.json":                 func() any { return new(SecurityKeyLogActivationCommitBodyV1) },
+	"security/key-log-activation-commit-envelope-v1.schema.json":             func() any { return new(SecurityKeyLogActivationCommitEnvelopeV1) },
+	"security/key-log-artifact-time-anchor-body-v1.schema.json":              func() any { return new(SecurityKeyLogArtifactTimeAnchorBodyV1) },
+	"security/key-log-artifact-time-anchor-envelope-v1.schema.json":          func() any { return new(SecurityKeyLogArtifactTimeAnchorEnvelopeV1) },
+	"security/key-log-audit-readiness-body-v1.schema.json":                   func() any { return new(SecurityKeyLogAuditReadinessBodyV1) },
+	"security/key-log-audit-readiness-proof-v1.schema.json":                  func() any { return new(SecurityKeyLogAuditReadinessProofV1) },
+	"security/key-log-checkpoint-body-v1.schema.json":                        func() any { return new(SecurityKeyLogCheckpointBodyV1) },
+	"security/key-log-checkpoint-envelope-v1.schema.json":                    func() any { return new(SecurityKeyLogCheckpointEnvelopeV1) },
+	"security/key-log-enterprise-receipt-body-v1.schema.json":                func() any { return new(SecurityKeyLogEnterpriseReceiptBodyV1) },
+	"security/key-log-enterprise-receipt-envelope-v1.schema.json":            func() any { return new(SecurityKeyLogEnterpriseReceiptEnvelopeV1) },
+	"security/key-log-event-body-v1.schema.json":                             func() any { return new(SecurityKeyLogEventBodyV1) },
+	"security/key-log-event-envelope-v1.schema.json":                         func() any { return new(SecurityKeyLogEventEnvelopeV1) },
+	"security/key-log-sync-response-v1.schema.json":                          func() any { return new(SecurityKeyLogSyncResponseV1) },
+	"security/key-log-witness-readiness-body-v1.schema.json":                 func() any { return new(SecurityKeyLogWitnessReadinessBodyV1) },
+	"security/key-log-witness-readiness-proof-v1.schema.json":                func() any { return new(SecurityKeyLogWitnessReadinessProofV1) },
+	"security/key-log-witness-signature-v1.schema.json":                      func() any { return new(SecurityKeyLogWitnessSignatureV1) },
+	"security/keyring-artifact-signature-v1.schema.json":                     func() any { return new(SecurityKeyringArtifactSignatureV1) },
+	"security/lift-rollback-completion-receipt-body-v1.schema.json":          func() any { return new(SecurityLiftRollbackCompletionReceiptBodyV1) },
+	"security/mcp-cage-launch-policy-v2.schema.json":                         func() any { return new(SecurityMcpCageLaunchPolicyV2) },
+	"security/response-completion-receipt-body-v1.schema.json":               func() any { return new(SecurityResponseCompletionReceiptBodyV1) },
+	"security/response-effect-v1.schema.json":                                func() any { return new(SecurityResponseEffectV1) },
+	"security/response-plan-receipt-body-v1.schema.json":                     func() any { return new(SecurityResponsePlanReceiptBodyV1) },
+	"security/response-plan-v1.schema.json":                                  func() any { return new(SecurityResponsePlanV1) },
+	"security/response-state-transition-receipt-body-v1.schema.json":         func() any { return new(SecurityResponseStateTransitionReceiptBodyV1) },
+	"security/scheduler-health-receipt-body-v1.schema.json":                  func() any { return new(SecuritySchedulerHealthReceiptBodyV1) },
+	"security/security-event-body-v1.schema.json":                            func() any { return new(SecuritySecurityEventBodyV1) },
+	"security/signed-security-event-envelope-v1.schema.json":                 func() any { return new(SecuritySignedSecurityEventEnvelopeV1) },
+	"security/signed-tool-manifest-v2.schema.json":                           func() any { return new(SecuritySignedToolManifestV2) },
+	"security/tool-flow-declaration.schema.json":                             func() any { return new(SecurityToolFlowDeclaration) },
+	"security/tool-manifest-v2.schema.json":                                  func() any { return new(SecurityToolManifestV2) },
+	"security/tripwire-observation-receipt-body-v1.schema.json":              func() any { return new(SecurityTripwireObservationReceiptBodyV1) },
+	"trust-control/attestation.schema.json":                                  func() any { return new(TrustControlAttestation) },
+	"trust-control/budget-snapshot-anchor-provenance.schema.json":            func() any { return new(TrustControlBudgetSnapshotAnchorProvenance) },
+	"trust-control/heartbeat.schema.json":                                    func() any { return new(TrustControlHeartbeat) },
+	"trust-control/lease.schema.json":                                        func() any { return new(TrustControlLease) },
+	"trust-control/terminate.schema.json":                                    func() any { return new(TrustControlTerminate) },
 }
