@@ -1,8 +1,8 @@
 //! Bounded local diagnostics. Reading status never opens a kernel or reconciles admission.
 
-use std::fs::{File, OpenOptions, TryLockError};
+use std::fs::{File, TryLockError};
 use std::io::Read;
-use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
+use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::Path;
 
 use chio_control_plane::{prepare_private_directory, PreparedPrivateDirectory};
@@ -124,22 +124,29 @@ impl Observer {
     }
 }
 
+/// Diagnostic inputs are singly linked regular files owned by the owner of
+/// their directory, with no group or other permissions.
+fn state_owner_policy(
+    directory: &PreparedPrivateDirectory,
+) -> Result<chio_secure_fs::OwnerPolicy, CliError> {
+    Ok(chio_secure_fs::OwnerPolicy {
+        owner: chio_secure_fs::Owner::Uid(directory.custody().metadata()?.uid()),
+        forbidden_mode: 0o077,
+        require_single_link: true,
+        reject_acl: false,
+    })
+}
+
 fn open_private(directory: &PreparedPrivateDirectory, name: &Path) -> Result<File, CliError> {
     directory.validate_path_identity()?;
-    let file = OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
-        .open(directory.path().join(name))?;
-    let metadata = file.metadata()?;
-    if !metadata.is_file()
-        || metadata.nlink() != 1
-        || metadata.uid() != std::fs::metadata(directory.path())?.uid()
-        || metadata.permissions().mode() & 0o077 != 0
-    {
-        return Err(error(
-            "diagnostics require private regular files owned by the state owner",
-        ));
-    }
+    let file = directory
+        .custody()
+        .open_private(name, &state_owner_policy(directory)?)
+        .map_err(|failure| match chio_secure_fs::refusal(&failure) {
+            Some(_) => error("diagnostics require private regular files owned by the state owner"),
+            None => CliError::from(failure),
+        })?
+        .into_file();
     directory.validate_path_identity()?;
     Ok(file)
 }
@@ -249,4 +256,65 @@ pub(super) fn logs(path: &Path, process: &str, attempt: u32) -> Result<(), CliEr
         })
     );
     Ok(())
+}
+
+#[cfg(test)]
+mod private_input_tests {
+    use super::*;
+
+    fn state() -> Result<(tempfile::TempDir, PreparedPrivateDirectory), Box<dyn std::error::Error>> {
+        let root = chio_test_support::private_tempdir()?;
+        let directory = prepare_private_directory(&root.path().join("state"))?;
+        directory.write_new_secret(Path::new("host.json"), b"{}")?;
+        Ok((root, directory))
+    }
+
+    #[test]
+    fn diagnostics_read_private_state_files() -> Result<(), Box<dyn std::error::Error>> {
+        let (_root, directory) = state()?;
+
+        let bytes = read_private(&directory, Path::new("host.json"), 2)?;
+        let oversized = read_private(&directory, Path::new("host.json"), 1)
+            .err()
+            .ok_or("an oversized diagnostic file was read")?;
+
+        assert_eq!(bytes, b"{}");
+        assert!(oversized
+            .to_string()
+            .contains("diagnostic file exceeds its size limit"));
+        Ok(())
+    }
+
+    #[test]
+    fn diagnostics_refuse_linked_shared_or_symlinked_files() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let (root, directory) = state()?;
+        let host = directory.path().join("host.json");
+        let alias = root.path().join("alias.json");
+
+        std::fs::hard_link(&host, &alias)?;
+        let linked = open_private(&directory, Path::new("host.json"))
+            .err()
+            .ok_or("a hard-linked diagnostic file was opened")?;
+        std::fs::remove_file(&alias)?;
+        std::fs::set_permissions(&host, std::fs::Permissions::from_mode(0o640))?;
+        let shared = open_private(&directory, Path::new("host.json"))
+            .err()
+            .ok_or("a group-readable diagnostic file was opened")?;
+        std::os::unix::fs::symlink(&host, directory.path().join("status.json"))?;
+        let symlinked = open_private(&directory, Path::new("status.json"))
+            .err()
+            .ok_or("a symlinked diagnostic file was opened")?;
+
+        for refused in [&linked, &shared] {
+            assert!(refused
+                .to_string()
+                .contains("diagnostics require private regular files owned by the state owner"));
+        }
+        assert!(matches!(
+            &symlinked,
+            CliError::Io(failure) if failure.kind() == std::io::ErrorKind::FilesystemLoop
+        ));
+        Ok(())
+    }
 }
