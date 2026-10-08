@@ -20,6 +20,7 @@ use chio_store_sqlite::SqliteSecurityStateStore;
 
 use super::*;
 
+#[path = "fence_lapse/composition.rs"]
 mod composition;
 
 const PLAN_TTL_MS: u64 = 120_000;

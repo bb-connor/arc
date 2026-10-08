@@ -355,7 +355,12 @@ fn delivery_writer_refuses_event_sized_outcome_before_replacing_pending_rows() {
         response["result"]["_meta"]["chioEvidence"]["fixtureAlignment"] = json!(true);
         remaining += 1;
     }
-    response = signed_extension(&keypair, &response, "padding", json!("x".repeat(remaining / 2)));
+    response = signed_extension(
+        &keypair,
+        &response,
+        "padding",
+        json!("x".repeat(remaining / 2)),
+    );
     assert_eq!(
         serde_json::to_vec(&response).unwrap().len(),
         MAX_SESSION_JSON_BYTES - 1
