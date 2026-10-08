@@ -19,6 +19,7 @@ mod event_consumer;
 mod migration;
 pub mod migration_evidence;
 mod orchestration;
+mod os_random;
 mod scheduler_worker;
 
 pub use active_response::{
