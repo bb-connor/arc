@@ -9,6 +9,9 @@ use chio_security_types::ports::{
 
 use super::*;
 
+#[path = "composition/preflight.rs"]
+mod preflight;
+
 fn second_action() -> ActionId {
     ActionId::new("freeze-composition-second")
         .unwrap_or_else(|error| panic!("second action: {error}"))
