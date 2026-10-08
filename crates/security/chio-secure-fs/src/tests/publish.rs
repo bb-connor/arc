@@ -220,7 +220,10 @@ fn locks_open_relative_to_any_directory_descriptor() -> TestResult {
     let directory = open_directory_nofollow(root.path())?;
     let outside = root.path().join("outside");
     fs::create_dir(&outside)?;
-    symlink(outside.join("target.lock"), root.path().join("redirected.lock"))?;
+    symlink(
+        outside.join("target.lock"),
+        root.path().join("redirected.lock"),
+    )?;
     let any_regular_file = OwnerPolicy {
         owner: Owner::Unchecked,
         forbidden_mode: 0,
@@ -229,7 +232,7 @@ fn locks_open_relative_to_any_directory_descriptor() -> TestResult {
     };
 
     let lock = open_lock_at(&directory, name("jobs.lock"), 0o600, &any_regular_file)?;
-    let redirected = os_error_kind(open_lock_at(
+    let redirected = os_error_code(open_lock_at(
         &directory,
         name("redirected.lock"),
         0o600,
@@ -237,7 +240,7 @@ fn locks_open_relative_to_any_directory_descriptor() -> TestResult {
     ))?;
 
     assert!(lock.metadata()?.file_type().is_file());
-    assert_eq!(redirected, io::ErrorKind::FilesystemLoop);
+    assert_eq!(redirected, symlink_loop());
     assert!(!outside.join("target.lock").exists());
     Ok(())
 }
