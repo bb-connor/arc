@@ -1,3 +1,7 @@
+//! Schema initialization, migrations and whole-store invariants.
+
+use super::*;
+
 // Schema initialization, migration ladder, and catalog checks.
 
 pub(crate) fn initialize_finding_challenge_schema(
@@ -142,7 +146,7 @@ pub(crate) fn initialize_finding_challenge_schema(
     }
 }
 
-fn migrate_recent_finding_challenge_schema(
+pub(super) fn migrate_recent_finding_challenge_schema(
     connection: &mut Connection,
     on_disk: i32,
 ) -> Result<(), FindingChallengeStoreError> {
@@ -259,7 +263,7 @@ fn migrate_recent_finding_challenge_schema(
     }
 }
 
-fn migrate_finding_challenge_schema(
+pub(super) fn migrate_finding_challenge_schema(
     connection: &mut Connection,
 ) -> Result<(), FindingChallengeStoreError> {
     let transaction = connection
@@ -467,7 +471,7 @@ fn migrate_finding_challenge_schema(
     transaction.commit().map_err(sqlite_error)
 }
 
-fn table_has_column(
+pub(super) fn table_has_column(
     connection: &Connection,
     table: &str,
     column: &str,
@@ -481,7 +485,7 @@ fn table_has_column(
         .map_err(sqlite_error)
 }
 
-fn table_has_rows_where(
+pub(super) fn table_has_rows_where(
     connection: &Connection,
     table: &str,
     predicate: &str,
@@ -624,9 +628,9 @@ pub(crate) fn verify_finding_challenge_invariants(
     Ok(())
 }
 
-type SchemaCatalogEntry = (String, String, String, Option<String>);
+pub(super) type SchemaCatalogEntry = (String, String, String, Option<String>);
 
-fn finding_challenge_schema_catalog(
+pub(super) fn finding_challenge_schema_catalog(
     connection: &Connection,
 ) -> Result<Vec<SchemaCatalogEntry>, FindingChallengeStoreError> {
     let mut statement = connection
