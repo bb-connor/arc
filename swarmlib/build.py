@@ -27,6 +27,19 @@ class BuildRefused(RuntimeError):
     """The scheduler will not start (or prune) this build; the message says why."""
 
 
+def host_settings() -> dict[str, str]:
+    """KEY=VALUE defaults from ~/.swarm/build.env (or $SWARM_BUILD_ENV); the environment wins."""
+    path = Path(os.environ.get("SWARM_BUILD_ENV", str(Path.home() / ".swarm" / "build.env"))).expanduser()
+    if not path.is_file():
+        return {}
+    pairs = (line.split("=", 1) for line in path.read_text().splitlines() if "=" in line and not line.lstrip().startswith("#"))
+    return {key.strip(): value.strip() for key, value in pairs}
+
+
+def setting(name: str, default: str) -> str:
+    return os.environ.get(name) or host_settings().get(name) or default
+
+
 def slot_dir() -> Path:
     path = Path(os.environ.get("SWARM_BUILD_DIR", str(Path.home() / ".swarm-build"))).expanduser()
     path.mkdir(parents=True, exist_ok=True)
@@ -34,7 +47,7 @@ def slot_dir() -> Path:
 
 
 def slot_count() -> int:
-    return max(1, int(os.environ.get("SWARM_BUILD_SLOTS", "2")))
+    return max(1, int(setting("SWARM_BUILD_SLOTS", "2")))
 
 
 def class_for_role(role: str) -> str:
@@ -72,32 +85,32 @@ def release(fd: int) -> None:
 
 def scope_prefix(build_class: str = "coder") -> list[str]:
     """systemd user scope with a class CPU weight and a memory ceiling, when available."""
-    if os.environ.get("SWARM_BUILD_CGROUP", "1") == "0" or not shutil.which("systemd-run"):
+    if setting("SWARM_BUILD_CGROUP", "1") == "0" or not shutil.which("systemd-run"):
         return []
     default_weight = "100" if build_class == "integrator" else "20"
-    weight = os.environ.get(f"SWARM_BUILD_CPU_WEIGHT_{build_class.upper()}", default_weight)
+    weight = setting(f"SWARM_BUILD_CPU_WEIGHT_{build_class.upper()}", default_weight)
     return [
         "systemd-run", "--user", "--scope", "--quiet",
         "-p", f"CPUWeight={weight}",
-        "-p", f"MemoryMax={os.environ.get('SWARM_BUILD_MEMORY_MAX', '14G')}",
+        "-p", f"MemoryMax={setting('SWARM_BUILD_MEMORY_MAX', '14G')}",
         "--",
     ]
 
 
 def build_env(base: dict[str, str]) -> dict[str, str]:
     env = dict(base)
-    if shutil.which("sccache"):
+    if setting("SWARM_SCCACHE", "1") != "0" and shutil.which("sccache"):
         env.setdefault("RUSTC_WRAPPER", "sccache")
         env.setdefault("SCCACHE_CACHE_SIZE", "60G")
     env["CARGO_INCREMENTAL"] = "0"
-    cap = int(os.environ.get("SWARM_BUILD_JOBS", "5"))
+    cap = int(setting("SWARM_BUILD_JOBS", "5"))
     requested = int(env.get("CARGO_BUILD_JOBS") or cap)
     env["CARGO_BUILD_JOBS"] = str(max(1, min(requested, cap)))
     return env
 
 
 def check_disk(path: Path) -> None:
-    floor = float(os.environ.get("SWARM_BUILD_DISK_FLOOR_GB", "25"))
+    floor = float(setting("SWARM_BUILD_DISK_FLOOR_GB", "25"))
     free = shutil.disk_usage(path).free / 2**30
     if free < floor:
         raise BuildRefused(f"{free:.1f} GB free, floor {floor:g} GB: prune a target or wait before building")
@@ -131,8 +144,9 @@ def prune_target(target: Path, *, older_than_hours: float, dry_run: bool = False
     Returns (files removed, bytes removed, profiles skipped because in use).
     """
     tag = target / "CACHEDIR.TAG"
-    if not target.is_dir() or not tag.is_file() or CARGO_TAG not in tag.read_text(errors="replace"):
-        raise BuildRefused(f"{target} is not a cargo target directory (no CACHEDIR.TAG)")
+    tagged = tag.is_file() and CARGO_TAG in tag.read_text(errors="replace")
+    if not target.is_dir() or not (tagged or (target / ".rustc_info.json").is_file()):
+        raise BuildRefused(f"{target} is not a cargo target directory (no CACHEDIR.TAG or .rustc_info.json)")
     cutoff = time.time() - older_than_hours * 3600
     removed = freed = 0
     busy: list[str] = []

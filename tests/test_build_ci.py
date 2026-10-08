@@ -223,3 +223,29 @@ class PruneTest(SwarmCase):
         plain.mkdir()
         with self.assertRaises(build.BuildRefused):
             build.prune_target(plain, older_than_hours=48)
+
+
+class HostMarkerTest(SwarmCase):
+    def test_accepts_a_target_marked_only_by_rustc_info(self):
+        target = self.tmp / "target"
+        (target / "debug" / "deps").mkdir(parents=True)
+        (target / ".rustc_info.json").write_text("{}")
+        self.assertEqual(build.prune_target(target, older_than_hours=48), (0, 0, []))
+
+    def test_sccache_can_be_switched_off(self):
+        with mock.patch.object(build.shutil, "which", return_value="/usr/bin/sccache"), \
+                mock.patch.dict(os.environ, {"SWARM_SCCACHE": "0"}):
+            self.assertNotIn("RUSTC_WRAPPER", build.build_env({}))
+
+
+class HostSettingsTest(SwarmCase):
+    def test_host_file_supplies_defaults_and_env_overrides_it(self):
+        host = self.tmp / "build.env"
+        host.write_text("# host build settings\nSWARM_SCCACHE=0\nSWARM_BUILD_JOBS=3\n")
+        with mock.patch.dict(os.environ, {"SWARM_BUILD_ENV": str(host)}), \
+                mock.patch.object(build.shutil, "which", return_value="/usr/bin/sccache"):
+            env = build.build_env({})
+            self.assertNotIn("RUSTC_WRAPPER", env)
+            self.assertEqual(env["CARGO_BUILD_JOBS"], "3")
+            with mock.patch.dict(os.environ, {"SWARM_BUILD_JOBS": "4"}):
+                self.assertEqual(build.build_env({})["CARGO_BUILD_JOBS"], "4")

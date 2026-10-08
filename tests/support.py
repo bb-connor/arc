@@ -33,6 +33,7 @@ class SwarmCase(unittest.TestCase):
         patcher = mock.patch.dict(os.environ, {
             "SWARM_STATE_DIR": str(self.tmp / "state"),
             "SWARM_BUILD_DIR": str(self.tmp / "build"),
+            "SWARM_BUILD_ENV": str(self.tmp / "no-host-build.env"),
             "SWARM_LOG_DIR": str(self.tmp / "logs"),
             "SWARM_FAKE_NOW": "2026-10-06T12:00:00Z",
             "GH_TOKEN": "",
