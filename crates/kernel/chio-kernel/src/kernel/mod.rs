@@ -82,8 +82,8 @@ pub use active_response_policy::{
 
 pub use construction::KernelBuildError;
 pub use error::{
-    AdmissionReason, DurableAdmissionError, HotPathStage, KernelError, OverloadResource,
-    ReplayClockDirection, SettlementRuntimeConfigError, StructuredErrorReport,
+    ActiveResponseError, AdmissionReason, DurableAdmissionError, HotPathStage, KernelError,
+    OverloadResource, ReplayClockDirection, SettlementRuntimeConfigError, StructuredErrorReport,
 };
 pub use evaluation::{CallerExecutionReport, CallerStartCredentials, CallerStartResponse};
 pub use kernel_struct::{

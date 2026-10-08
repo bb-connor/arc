@@ -668,7 +668,7 @@ pub use kernel::{
     ActiveResponseArtifactAuthorityAttestationError,
     ActiveResponseArtifactAuthorityAttestationInput, ActiveResponseAuthorizationRequest,
     ActiveResponseCommittedDispatch, ActiveResponseDispatchIdError, ActiveResponseEffectEvidence,
-    ActiveResponseExecutionApproval, ActiveResponseExecutionEvidence,
+    ActiveResponseError, ActiveResponseExecutionApproval, ActiveResponseExecutionEvidence,
     ActiveResponseExecutionEvidenceParts, ActiveResponseExecutionOrigin,
     ActiveResponseExecutionOutcome, ActiveResponseExecutionRequest,
     ActiveResponseExecutorAuthority, ActiveResponseExecutorAuthorityIdentity,

@@ -1,7 +1,9 @@
 use super::*;
 
+mod active_response;
 mod classify;
 mod durable_admission;
+pub use active_response::ActiveResponseError;
 pub use durable_admission::{AdmissionReason, DurableAdmissionError};
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize)]
@@ -349,6 +351,11 @@ pub enum KernelError {
 
     #[error("internal error: {0}")]
     Internal(String),
+
+    /// A governed active-response failure with its typed cause. It reads and
+    /// reports exactly as [`Self::Internal`] with the same reason.
+    #[error("internal error: {0}")]
+    ActiveResponse(#[source] Box<ActiveResponseError>),
 
     #[error("{0}")]
     ApprovalReplay(#[from] crate::governed_approval_replay::ApprovalReplayError),
@@ -777,6 +784,11 @@ impl KernelError {
             Self::Internal(reason) => self.report_with_context(
                 "CHIO-KERNEL-INTERNAL",
                 serde_json::json!({ "reason": reason }),
+                "Capture the error report and kernel logs, then treat this as a reproducible kernel bug if it persists.",
+            ),
+            Self::ActiveResponse(failure) => self.report_with_context(
+                "CHIO-KERNEL-INTERNAL",
+                serde_json::json!({ "reason": failure.to_string() }),
                 "Capture the error report and kernel logs, then treat this as a reproducible kernel bug if it persists.",
             ),
             Self::ApprovalReplay(error) => self.report_with_context(

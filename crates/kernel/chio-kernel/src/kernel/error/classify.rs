@@ -14,6 +14,7 @@ impl KernelError {
     pub fn disposition(&self) -> Disposition {
         match self {
             Self::Admission(error) => error.disposition(),
+            Self::ActiveResponse(error) => error.disposition(),
             Self::AdmissionRecovery(error) => error.disposition(),
             Self::ReceiptPersistence(error) => error.disposition(),
             Self::RevocationStore(error) => error.disposition(),
