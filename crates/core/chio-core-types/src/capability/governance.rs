@@ -788,21 +788,23 @@ impl GovernedResponseEffect {
 }
 
 /// Protocol-owned binding for a governed active-response plan.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(deny_unknown_fields)]
+/// Fields are private: every instance passes [`Self::validate`], whether it
+/// was built with [`Self::new`] or deserialized.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "GovernedResponsePlanIntentBodyWire")]
 pub struct GovernedResponsePlanIntentBody {
-    pub plan_schema: String,
-    pub plan_id: String,
-    pub operator_capability_id: String,
-    pub operator_capability_hash: String,
-    pub operator_capability_expires_at: u64,
-    pub executor_subject: PublicKey,
-    pub canonical_plan_body: serde_json::Value,
-    pub plan_body_hash: String,
-    pub target_binding: serde_json::Value,
-    pub ordered_effects: Vec<GovernedResponseEffect>,
-    pub expires_at: u64,
-    pub rollback_binding: serde_json::Value,
+    plan_schema: String,
+    plan_id: String,
+    operator_capability_id: String,
+    operator_capability_hash: String,
+    operator_capability_expires_at: u64,
+    executor_subject: PublicKey,
+    canonical_plan_body: serde_json::Value,
+    plan_body_hash: String,
+    target_binding: serde_json::Value,
+    ordered_effects: Vec<GovernedResponseEffect>,
+    expires_at: u64,
+    rollback_binding: serde_json::Value,
 }
 
 #[derive(Deserialize)]
@@ -822,30 +824,24 @@ struct GovernedResponsePlanIntentBodyWire {
     rollback_binding: serde_json::Value,
 }
 
-impl<'de> Deserialize<'de> for GovernedResponsePlanIntentBody {
-    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        use serde::de::Error as _;
+impl TryFrom<GovernedResponsePlanIntentBodyWire> for GovernedResponsePlanIntentBody {
+    type Error = Error;
 
-        let wire = GovernedResponsePlanIntentBodyWire::deserialize(deserializer)?;
-        let body = Self {
-            plan_schema: wire.plan_schema,
-            plan_id: wire.plan_id,
-            operator_capability_id: wire.operator_capability_id,
-            operator_capability_hash: wire.operator_capability_hash,
-            operator_capability_expires_at: wire.operator_capability_expires_at,
-            executor_subject: wire.executor_subject,
-            canonical_plan_body: wire.canonical_plan_body,
-            plan_body_hash: wire.plan_body_hash,
-            target_binding: wire.target_binding,
-            ordered_effects: wire.ordered_effects,
-            expires_at: wire.expires_at,
-            rollback_binding: wire.rollback_binding,
-        };
-        body.validate().map_err(D::Error::custom)?;
-        Ok(body)
+    fn try_from(wire: GovernedResponsePlanIntentBodyWire) -> Result<Self> {
+        Self::new(
+            wire.plan_schema,
+            wire.plan_id,
+            wire.operator_capability_id,
+            wire.operator_capability_hash,
+            wire.operator_capability_expires_at,
+            wire.executor_subject,
+            wire.canonical_plan_body,
+            wire.plan_body_hash,
+            wire.target_binding,
+            wire.ordered_effects,
+            wire.expires_at,
+            wire.rollback_binding,
+        )
     }
 }
 

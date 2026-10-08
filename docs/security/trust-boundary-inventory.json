@@ -2236,7 +2236,6 @@
     "crates/core/chio-core-types/src/canonical/untrusted.rs::decode_signed::from_value",
     "crates/core/chio-core-types/src/capability/caveat.rs::security_binding::from_slice",
     "crates/core/chio-core-types/src/capability/governance.rs::explicit_continuation_token::from_value",
-    "crates/core/chio-core-types/src/capability/governance.rs::tool_name::custom_deserialize",
     "crates/core/chio-core-types/src/capability/governance.rs::upstream_call_chain_proof::from_value",
     "crates/core/chio-core-types/src/capability/governance.rs::validate::custom_deserialize",
     "crates/core/chio-core-types/src/crypto.rs::serialize::custom_deserialize",
@@ -4723,7 +4722,6 @@
     "crates/core/chio-core-types/src/canonical/untrusted.rs::decode_signed::from_value": "Shared wrapper keeps original text until its chosen contract is enforced: strict external I-JSON before typed projection, duplicate-aware lossless native decode, or exact canonical typed equality. Safe Debug/Display retain native local sources. Callers own byte limits and authentication. Unsigned document decoding shares the original duplicate-aware value visitor but permits ordinary Serde numeric coercions for approximate embedding vectors. Existing signed, external and canonical numeric contracts are unchanged and explicitly required for authoritative records.",
     "crates/core/chio-core-types/src/capability/caveat.rs::security_binding::from_slice": "Security binding verifies strict I-JSON canonical bytes equal original predicate before typed reparse and binding validation.",
     "crates/core/chio-core-types/src/capability/governance.rs::explicit_continuation_token::from_value": "Typed Value conversions and validating custom deserializers for governance DTOs. Signed outer readers and authority verification remain mandatory.",
-    "crates/core/chio-core-types/src/capability/governance.rs::tool_name::custom_deserialize": "Typed Value conversions and validating custom deserializers for governance DTOs. Signed outer readers and authority verification remain mandatory.",
     "crates/core/chio-core-types/src/capability/governance.rs::upstream_call_chain_proof::from_value": "Typed Value conversions and validating custom deserializers for governance DTOs. Signed outer readers and authority verification remain mandatory.",
     "crates/core/chio-core-types/src/capability/governance.rs::validate::custom_deserialize": "Typed Value conversions and validating custom deserializers for governance DTOs. Signed outer readers and authority verification remain mandatory.",
     "crates/core/chio-core-types/src/crypto.rs::serialize::custom_deserialize": "Custom key/signature deserializers validate encoding and lengths; no original JSON text entry point.",
@@ -5602,7 +5600,6 @@
     ],
     "crates/core/chio-core-types/src/capability/governance.rs": [
       "explicit_continuation_token::from_value",
-      "tool_name::custom_deserialize",
       "upstream_call_chain_proof::from_value",
       "validate::custom_deserialize"
     ],
@@ -6796,8 +6793,7 @@
           "apis": [
             "serde::Deserializer"
           ],
-          "checked": true,
-          "instances": 2
+          "checked": true
         },
         {
           "reader": "explicit_continuation_token",
@@ -13804,7 +13800,6 @@
       "migrations": [],
       "retained_typed_conversions": [
         "explicit_continuation_token::from_value",
-        "tool_name::custom_deserialize",
         "upstream_call_chain_proof::from_value",
         "validate::custom_deserialize"
       ]

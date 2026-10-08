@@ -186,3 +186,101 @@ fn response_plan_hashing_enforces_the_exact_canonical_byte_ceiling() {
     assert!(GovernedResponsePlanIntentBody::compute_plan_body_hash(&at_limit).is_ok());
     assert!(GovernedResponsePlanIntentBody::compute_plan_body_hash(&above_limit).is_err());
 }
+
+#[test]
+fn response_plan_wire_bytes_are_unchanged_and_round_trip() {
+    let executor = Keypair::from_seed(&[7; 32]).public_key();
+    let canonical_plan_body = json!({"actionId": "action-1"});
+    let plan_body_hash =
+        GovernedResponsePlanIntentBody::compute_plan_body_hash(&canonical_plan_body).unwrap();
+    let plan = GovernedResponsePlanIntentBody::new(
+        CHIO_RESPONSE_PLAN_SCHEMA,
+        "action-1",
+        "operator-capability-1",
+        "b".repeat(64),
+        1_300,
+        executor.clone(),
+        canonical_plan_body,
+        plan_body_hash.clone(),
+        json!({"tenant": "tenant-1"}),
+        vec![GovernedResponseEffect::FreezeIssuance],
+        1_200,
+        json!({"mode": "remove_contribution"}),
+    )
+    .unwrap();
+    let expected = format!(
+        concat!(
+            r#"{{"plan_schema":"chio.response-plan.v1","plan_id":"action-1","#,
+            r#""operator_capability_id":"operator-capability-1","#,
+            r#""operator_capability_hash":"{capability_hash}","#,
+            r#""operator_capability_expires_at":1300,"executor_subject":"{executor}","#,
+            r#""canonical_plan_body":{{"actionId":"action-1"}},"plan_body_hash":"{plan_body_hash}","#,
+            r#""target_binding":{{"tenant":"tenant-1"}},"ordered_effects":["freeze_issuance"],"#,
+            r#""expires_at":1200,"rollback_binding":{{"mode":"remove_contribution"}}}}"#,
+        ),
+        capability_hash = "b".repeat(64),
+        executor = executor.to_hex(),
+        plan_body_hash = plan_body_hash,
+    );
+
+    assert_eq!(serde_json::to_string(&plan).unwrap(), expected);
+    let decoded: GovernedResponsePlanIntentBody = serde_json::from_str(&expected).unwrap();
+    assert_eq!(decoded, plan);
+    assert_eq!(serde_json::to_string(&decoded).unwrap(), expected);
+    assert_eq!(
+        canonical_json_bytes(&decoded).unwrap(),
+        canonical_json_bytes(&plan).unwrap()
+    );
+}
+
+#[test]
+fn response_plan_decoding_returns_the_constructor_error() {
+    let duplicate_effects = || {
+        vec![
+            GovernedResponseEffect::SuspendSession,
+            GovernedResponseEffect::SuspendSession,
+        ]
+    };
+    let original = valid_response_plan_body();
+    let constructed = GovernedResponsePlanIntentBody::new(
+        original.plan_schema(),
+        original.plan_id(),
+        original.operator_capability_id(),
+        original.operator_capability_hash(),
+        original.operator_capability_expires_at(),
+        original.executor_subject().clone(),
+        original.canonical_plan_body().clone(),
+        original.plan_body_hash_value(),
+        original.target_binding().clone(),
+        duplicate_effects(),
+        original.expires_at(),
+        original.rollback_binding().clone(),
+    )
+    .unwrap_err();
+    let mut duplicate = response_plan_json();
+    duplicate["ordered_effects"] = json!(duplicate_effects());
+    let decoded = serde_json::from_value::<GovernedResponsePlanIntentBody>(duplicate).unwrap_err();
+    assert_eq!(
+        constructed.to_string(),
+        "canonical JSON error: governed response plan effects must be unique"
+    );
+    assert_eq!(decoded.to_string(), constructed.to_string());
+
+    let mut empty_target = response_plan_json();
+    empty_target["target_binding"] = json!({});
+    assert_eq!(
+        serde_json::from_value::<GovernedResponsePlanIntentBody>(empty_target)
+            .unwrap_err()
+            .to_string(),
+        "canonical JSON error: governed response plan target binding must be a nonempty object"
+    );
+
+    let mut long_identifier = response_plan_json();
+    long_identifier["plan_id"] = json!("x".repeat(257));
+    assert_eq!(
+        serde_json::from_value::<GovernedResponsePlanIntentBody>(long_identifier)
+            .unwrap_err()
+            .to_string(),
+        "canonical JSON error: governed response plan plan id is not canonical bounded text"
+    );
+}

@@ -82,22 +82,21 @@ impl LegacyResponseFixture<'_> {
             autonomy: None,
             context: None,
             body: GovernedTransactionIntentBody::ActiveResponsePlan(Box::new(
-                GovernedResponsePlanIntentBody {
-                    plan_schema: GOVERNED_RESPONSE_PLAN_SCHEMA.to_owned(),
-                    plan_id: request_id.to_owned(),
-                    operator_capability_id: capability.id.clone(),
-                    operator_capability_hash: sha256_hex(
-                        &canonical_json_bytes(&capability).test_unwrap(),
-                    ),
-                    operator_capability_expires_at: capability.expires_at,
-                    executor_subject: capability.subject.clone(),
+                GovernedResponsePlanIntentBody::new(
+                    GOVERNED_RESPONSE_PLAN_SCHEMA,
+                    request_id,
+                    capability.id.clone(),
+                    sha256_hex(&canonical_json_bytes(&capability).test_unwrap()),
+                    capability.expires_at,
+                    capability.subject.clone(),
                     canonical_plan_body,
                     plan_body_hash,
-                    target_binding: serde_json::json!({"sessionId": "session-active-1"}),
-                    ordered_effects: effects,
+                    serde_json::json!({"sessionId": "session-active-1"}),
+                    effects,
                     expires_at,
-                    rollback_binding: serde_json::json!({"mode": "remove_contributions"}),
-                },
+                    serde_json::json!({"mode": "remove_contributions"}),
+                )
+                .test_unwrap(),
             )),
         };
         let governed_intent_hash = intent.binding_hash().test_unwrap();
@@ -271,18 +270,20 @@ fn legacy_active_response_commit_refuses_without_consuming_approval() {
     };
     let request = fixture.request("active-response-1", effects.clone(), grants);
 
-    let mut mismatched = request.clone();
-    let GovernedTransactionIntentBody::ActiveResponsePlan(plan) =
-        &mut mismatched.governed_intent.body
+    // A substituted body under the original hash cannot be decoded, so it
+    // never reaches admission.
+    let GovernedTransactionIntentBody::ActiveResponsePlan(plan) = &request.governed_intent.body
     else {
         panic!("active-response body");
     };
-    plan.canonical_plan_body["actionId"] = serde_json::json!("substituted-response");
-    assert!(kernel
-        .admit_governed_active_response(&mismatched)
-        .test_unwrap_err()
-        .to_string()
-        .contains("body hash"));
+    let mut substituted = serde_json::to_value(&**plan).test_unwrap();
+    substituted["canonical_plan_body"]["actionId"] = serde_json::json!("substituted-response");
+    assert_eq!(
+        serde_json::from_value::<GovernedResponsePlanIntentBody>(substituted)
+            .test_unwrap_err()
+            .to_string(),
+        "canonical JSON error: governed response plan body hash does not match its canonical body"
+    );
 
     let mut mismatched_effects = fixture.request(
         "active-response-mismatched-effects",
@@ -297,12 +298,16 @@ fn legacy_active_response_commit_refuses_without_consuming_approval() {
     else {
         panic!("active-response body");
     };
-    plan.canonical_plan_body["effects"] = serde_json::json!([
+    let mut rebound = serde_json::to_value(&**plan).test_unwrap();
+    rebound["canonical_plan_body"]["effects"] = serde_json::json!([
         GovernedResponseEffect::RestrictEgress,
         GovernedResponseEffect::SuspendSession
     ]);
-    plan.plan_body_hash =
-        GovernedResponsePlanIntentBody::plan_body_hash(&plan.canonical_plan_body).test_unwrap();
+    let rebound_hash =
+        GovernedResponsePlanIntentBody::plan_body_hash(&rebound["canonical_plan_body"])
+            .test_unwrap();
+    rebound["plan_body_hash"] = serde_json::json!(rebound_hash);
+    **plan = serde_json::from_value::<GovernedResponsePlanIntentBody>(rebound).test_unwrap();
     assert!(kernel
         .admit_governed_active_response(&mismatched_effects)
         .test_unwrap_err()
@@ -315,7 +320,7 @@ fn legacy_active_response_commit_refuses_without_consuming_approval() {
     else {
         panic!("active-response body");
     };
-    let substituted_hash = plan.plan_body_hash.clone();
+    let substituted_hash = plan.plan_body_hash_value().to_owned();
     let mut substituted_proposal = raw_plan_hash.threshold_approval_proposal.body.clone();
     substituted_proposal.governed_intent_hash = substituted_hash.clone();
     raw_plan_hash.threshold_approval_proposal =

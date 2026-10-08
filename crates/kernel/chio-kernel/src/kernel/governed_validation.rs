@@ -131,15 +131,15 @@ impl ChioKernel {
                 "operator capability is not canonical: {error}"
             ))
         })?);
-        if intent.id != plan.plan_id
-            || request.request_id != plan.plan_id
+        if intent.id != plan.plan_id()
+            || request.request_id != plan.plan_id()
             || intent.server_id != ACTIVE_RESPONSE_SERVER_ID
             || intent.tool_name != ACTIVE_RESPONSE_PLAN_TOOL_NAME
-            || plan.operator_capability_id != cap.id
-            || plan.operator_capability_hash != capability_hash
-            || plan.operator_capability_expires_at != cap.expires_at
-            || plan.executor_subject != cap.subject
-            || now >= plan.expires_at
+            || plan.operator_capability_id() != cap.id
+            || plan.operator_capability_hash() != capability_hash
+            || plan.operator_capability_expires_at() != cap.expires_at
+            || plan.executor_subject() != &cap.subject
+            || now >= plan.expires_at()
         {
             return Err(KernelError::GovernedTransactionDenied(
                 "active-response intent does not match its request or operator capability"
@@ -147,7 +147,7 @@ impl ChioKernel {
             ));
         }
         let plan_body_effects = plan
-            .canonical_plan_body
+            .canonical_plan_body()
             .get("effects")
             .ok_or_else(|| {
                 KernelError::GovernedTransactionDenied(
@@ -164,12 +164,12 @@ impl ChioKernel {
                     )
                 })
             })?;
-        if plan_body_effects != plan.ordered_effects {
+        if plan_body_effects != plan.ordered_effects() {
             return Err(KernelError::GovernedTransactionDenied(
                 "active-response plan body effects do not match ordered effects".to_string(),
             ));
         }
-        for effect in &plan.ordered_effects {
+        for effect in plan.ordered_effects() {
             let covered = cap.scope.grants.iter().any(|grant| {
                 grant.server_id == ACTIVE_RESPONSE_SERVER_ID
                     && grant.tool_name == effect.tool_name()

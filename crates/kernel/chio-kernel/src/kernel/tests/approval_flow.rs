@@ -61,22 +61,21 @@ impl ActiveResponseFixture<'_> {
             autonomy: None,
             context: None,
             body: GovernedTransactionIntentBody::ActiveResponsePlan(Box::new(
-                GovernedResponsePlanIntentBody {
-                    plan_schema: GOVERNED_RESPONSE_PLAN_SCHEMA.to_owned(),
-                    plan_id: request_id.to_owned(),
-                    operator_capability_id: capability.id.clone(),
-                    operator_capability_hash: sha256_hex(
-                        &canonical_json_bytes(&capability).unwrap(),
-                    ),
-                    operator_capability_expires_at: capability.expires_at,
-                    executor_subject: capability.subject.clone(),
+                GovernedResponsePlanIntentBody::new(
+                    GOVERNED_RESPONSE_PLAN_SCHEMA,
+                    request_id,
+                    capability.id.clone(),
+                    sha256_hex(&canonical_json_bytes(&capability).unwrap()),
+                    capability.expires_at,
+                    capability.subject.clone(),
                     canonical_plan_body,
                     plan_body_hash,
-                    target_binding: serde_json::json!({"sessionId": "session-active-1"}),
-                    ordered_effects: effects,
+                    serde_json::json!({"sessionId": "session-active-1"}),
+                    effects,
                     expires_at,
-                    rollback_binding: serde_json::json!({"mode": "remove_contributions"}),
-                },
+                    serde_json::json!({"mode": "remove_contributions"}),
+                )
+                .unwrap(),
             )),
         };
         let governed_intent_hash = intent.binding_hash().unwrap();
