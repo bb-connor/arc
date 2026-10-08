@@ -78,6 +78,7 @@ fn source_revision(path: &Path) -> AnchoredTestResult<i32> {
 
 fn require_current_writer() -> AnchoredTestResult {
     let probe = tempfile::tempdir()?;
+    secure_directory(probe.path());
     let path = probe.path().join("current-writer.db");
     drop(crate::SqliteSecurityStateStore::open(&path)?);
     assert_eq!(
