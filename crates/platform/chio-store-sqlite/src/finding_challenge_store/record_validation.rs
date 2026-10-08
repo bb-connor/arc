@@ -1,3 +1,7 @@
+//! Record matching, input validation and state-name codecs.
+
+use super::*;
+
 // Record matching, validation, and state-name parsing.
 
 /// Reject a natural key already bound to a different row. The unique
@@ -6,7 +10,7 @@
 ///
 /// `query` is a compile-time-fixed statement from this module, never
 /// caller input.
-fn reject_bound_identifier(
+pub(super) fn reject_bound_identifier(
     transaction: &Transaction<'_>,
     query: &str,
     value: &str,
@@ -34,7 +38,7 @@ fn reject_bound_identifier(
 /// carries a later value than the durable row and comparing them would
 /// strand the submission it is retrying. The stored row is returned
 /// untouched, so the first submission time remains the durable one.
-fn challenge_matches(
+pub(super) fn challenge_matches(
     existing: &FindingChallengeRecord,
     input: &FindingChallengeSubmission<'_>,
 ) -> bool {
@@ -46,7 +50,7 @@ fn challenge_matches(
         && existing.challenger_hex.as_deref() == input.challenger_hex
 }
 
-fn dispute_lock_reservation_matches(
+pub(super) fn dispute_lock_reservation_matches(
     transaction: &Transaction<'_>,
     input: &FindingDisputeLockInput<'_>,
 ) -> Result<Option<bool>, FindingChallengeStoreError> {
@@ -105,7 +109,7 @@ fn dispute_lock_reservation_matches(
 /// `expires_at` and `locked_at` are both clock-derived, so neither is
 /// part of identity; the durable row keeps the expiry the first lock
 /// fenced.
-fn dispute_lock_matches(
+pub(super) fn dispute_lock_matches(
     existing: &FindingDisputeLockRecord,
     input: &FindingDisputeLockInput<'_>,
 ) -> bool {
@@ -119,7 +123,10 @@ fn dispute_lock_matches(
         && existing.pool_authority_epoch == input.pool_authority_epoch
 }
 
-fn liability_matches(existing: &FindingLiabilityRecord, input: &FindingLiabilityInput<'_>) -> bool {
+pub(super) fn liability_matches(
+    existing: &FindingLiabilityRecord,
+    input: &FindingLiabilityInput<'_>,
+) -> bool {
     existing.defect_key == input.defect_key
         && existing.finding_id == input.finding_id
         && existing.listing_id == input.listing_id
@@ -131,7 +138,7 @@ fn liability_matches(existing: &FindingLiabilityRecord, input: &FindingLiability
         && existing.vault_id == input.vault_id
 }
 
-fn governance_case_matches(
+pub(super) fn governance_case_matches(
     existing: &FindingGovernanceCaseRecord,
     input: &FindingGovernanceCaseInput<'_>,
 ) -> bool {
@@ -144,7 +151,7 @@ fn governance_case_matches(
         && existing.supersedes_case_id.as_deref() == input.supersedes_case_id
 }
 
-fn claim_snapshot_matches(
+pub(super) fn claim_snapshot_matches(
     existing: &FindingClaimSnapshotRecord,
     input: &FindingClaimSnapshotInput<'_>,
 ) -> bool {
@@ -157,7 +164,7 @@ fn claim_snapshot_matches(
         && existing.community_fund_units == input.community_fund_units
 }
 
-fn validate_dispute_lock(
+pub(super) fn validate_dispute_lock(
     input: &FindingDisputeLockInput<'_>,
 ) -> Result<(), FindingChallengeStoreError> {
     require_identifier(input.lock_id, "lock_id")?;
@@ -179,7 +186,9 @@ fn validate_dispute_lock(
     Ok(())
 }
 
-fn validate_liability(input: &FindingLiabilityInput<'_>) -> Result<(), FindingChallengeStoreError> {
+pub(super) fn validate_liability(
+    input: &FindingLiabilityInput<'_>,
+) -> Result<(), FindingChallengeStoreError> {
     require_hex64(input.liability_key, "liability_key")?;
     require_hex64(input.defect_key, "defect_key")?;
     require_hex64(input.finding_id, "finding_id")?;
@@ -193,7 +202,7 @@ fn validate_liability(input: &FindingLiabilityInput<'_>) -> Result<(), FindingCh
     require_trusted_time(input.opened_at, "opened_at")
 }
 
-fn validate_governance_case(
+pub(super) fn validate_governance_case(
     input: &FindingGovernanceCaseInput<'_>,
 ) -> Result<(), FindingChallengeStoreError> {
     require_identifier(input.case_id, "case_id")?;
@@ -221,7 +230,7 @@ fn validate_governance_case(
     require_trusted_time(input.recorded_at, "recorded_at")
 }
 
-fn validate_claim_snapshot(
+pub(super) fn validate_claim_snapshot(
     input: &FindingClaimSnapshotInput<'_>,
 ) -> Result<(), FindingChallengeStoreError> {
     require_hex64(input.liability_key, "liability_key")?;
@@ -244,7 +253,7 @@ fn validate_claim_snapshot(
 /// already reached, which is what lets an honest replay of one verdict
 /// succeed while a different verdict against the same closed challenge
 /// rejects.
-const fn verdict_admits_state(
+pub(super) const fn verdict_admits_state(
     verdict: FindingChallengeVerdict,
     state: FindingChallengeState,
 ) -> bool {
@@ -259,7 +268,7 @@ const fn verdict_admits_state(
     }
 }
 
-const fn is_terminal_challenge_state(state: FindingChallengeState) -> bool {
+pub(super) const fn is_terminal_challenge_state(state: FindingChallengeState) -> bool {
     matches!(
         state,
         FindingChallengeState::Rejected
@@ -268,14 +277,14 @@ const fn is_terminal_challenge_state(state: FindingChallengeState) -> bool {
     )
 }
 
-const fn is_terminal_liability_state(state: FindingLiabilityState) -> bool {
+pub(super) const fn is_terminal_liability_state(state: FindingLiabilityState) -> bool {
     matches!(
         state,
         FindingLiabilityState::Settled | FindingLiabilityState::ReversedBeforeImpairment
     )
 }
 
-const fn disposed_lock_state(
+pub(super) const fn disposed_lock_state(
     disposition: FindingDisputeLockDisposition,
 ) -> FindingDisputeLockState {
     match disposition {
@@ -286,7 +295,7 @@ const fn disposed_lock_state(
 
 /// The effect-intent lifecycle, mirroring the schema trigger so an
 /// illegal edge is a typed conflict rather than a constraint abort.
-const fn effect_intent_edge_is_legal(
+pub(super) const fn effect_intent_edge_is_legal(
     from: FindingEffectIntentState,
     to: FindingEffectIntentState,
 ) -> bool {
@@ -309,7 +318,7 @@ const fn effect_intent_edge_is_legal(
     )
 }
 
-const fn challenge_state_name(state: FindingChallengeState) -> &'static str {
+pub(super) const fn challenge_state_name(state: FindingChallengeState) -> &'static str {
     match state {
         FindingChallengeState::Submitted => "submitted",
         FindingChallengeState::Evaluating => "evaluating",
@@ -320,7 +329,7 @@ const fn challenge_state_name(state: FindingChallengeState) -> &'static str {
     }
 }
 
-fn challenge_state_from_name(
+pub(super) fn challenge_state_from_name(
     name: &str,
 ) -> Result<FindingChallengeState, FindingChallengeStoreError> {
     match name {
@@ -334,14 +343,16 @@ fn challenge_state_from_name(
     }
 }
 
-const fn authorization_branch_name(branch: FindingChallengeAuthorizationBranch) -> &'static str {
+pub(super) const fn authorization_branch_name(
+    branch: FindingChallengeAuthorizationBranch,
+) -> &'static str {
     match branch {
         FindingChallengeAuthorizationBranch::BuyerSubmission => "buyer_submission",
         FindingChallengeAuthorizationBranch::VenueAudit => "venue_audit",
     }
 }
 
-fn authorization_branch_from_name(
+pub(super) fn authorization_branch_from_name(
     name: &str,
 ) -> Result<FindingChallengeAuthorizationBranch, FindingChallengeStoreError> {
     match name {
@@ -351,7 +362,7 @@ fn authorization_branch_from_name(
     }
 }
 
-const fn evidence_class_name(class: FindingChallengeEvidenceClass) -> &'static str {
+pub(super) const fn evidence_class_name(class: FindingChallengeEvidenceClass) -> &'static str {
     match class {
         FindingChallengeEvidenceClass::DigestMismatch => "digest_mismatch",
         FindingChallengeEvidenceClass::EvidenceInvalid => "evidence_invalid",
@@ -359,7 +370,7 @@ const fn evidence_class_name(class: FindingChallengeEvidenceClass) -> &'static s
     }
 }
 
-fn evidence_class_from_name(
+pub(super) fn evidence_class_from_name(
     name: &str,
 ) -> Result<FindingChallengeEvidenceClass, FindingChallengeStoreError> {
     match name {
@@ -370,7 +381,7 @@ fn evidence_class_from_name(
     }
 }
 
-const fn dispute_lock_state_name(state: FindingDisputeLockState) -> &'static str {
+pub(super) const fn dispute_lock_state_name(state: FindingDisputeLockState) -> &'static str {
     match state {
         FindingDisputeLockState::Locked => "locked",
         FindingDisputeLockState::Returned => "returned",
@@ -378,7 +389,7 @@ const fn dispute_lock_state_name(state: FindingDisputeLockState) -> &'static str
     }
 }
 
-fn dispute_lock_state_from_name(
+pub(super) fn dispute_lock_state_from_name(
     name: &str,
 ) -> Result<FindingDisputeLockState, FindingChallengeStoreError> {
     match name {
@@ -389,7 +400,7 @@ fn dispute_lock_state_from_name(
     }
 }
 
-const fn liability_state_name(state: FindingLiabilityState) -> &'static str {
+pub(super) const fn liability_state_name(state: FindingLiabilityState) -> &'static str {
     match state {
         FindingLiabilityState::Open => "open",
         FindingLiabilityState::UpheldPendingClaims => "upheld_pending_claims",
@@ -400,7 +411,7 @@ const fn liability_state_name(state: FindingLiabilityState) -> &'static str {
     }
 }
 
-fn liability_state_from_name(
+pub(super) fn liability_state_from_name(
     name: &str,
 ) -> Result<FindingLiabilityState, FindingChallengeStoreError> {
     match name {
@@ -414,14 +425,14 @@ fn liability_state_from_name(
     }
 }
 
-const fn case_kind_name(kind: FindingGovernanceCaseKind) -> &'static str {
+pub(super) const fn case_kind_name(kind: FindingGovernanceCaseKind) -> &'static str {
     match kind {
         FindingGovernanceCaseKind::Sanction => "sanction",
         FindingGovernanceCaseKind::Appeal => "appeal",
     }
 }
 
-fn case_kind_from_name(
+pub(super) fn case_kind_from_name(
     name: &str,
 ) -> Result<FindingGovernanceCaseKind, FindingChallengeStoreError> {
     match name {
@@ -431,7 +442,7 @@ fn case_kind_from_name(
     }
 }
 
-const fn effect_intent_kind_name(kind: FindingEffectIntentKind) -> &'static str {
+pub(super) const fn effect_intent_kind_name(kind: FindingEffectIntentKind) -> &'static str {
     match kind {
         FindingEffectIntentKind::SellerImpair => "seller_impair",
         FindingEffectIntentKind::ChallengeBond => "challenge_bond",
@@ -441,7 +452,7 @@ const fn effect_intent_kind_name(kind: FindingEffectIntentKind) -> &'static str 
     }
 }
 
-fn effect_intent_kind_from_name(
+pub(super) fn effect_intent_kind_from_name(
     name: &str,
 ) -> Result<FindingEffectIntentKind, FindingChallengeStoreError> {
     match name {
@@ -454,7 +465,7 @@ fn effect_intent_kind_from_name(
     }
 }
 
-const fn effect_intent_state_name(state: FindingEffectIntentState) -> &'static str {
+pub(super) const fn effect_intent_state_name(state: FindingEffectIntentState) -> &'static str {
     match state {
         FindingEffectIntentState::Pending => "pending",
         FindingEffectIntentState::Dispatched => "dispatched",
@@ -464,7 +475,7 @@ const fn effect_intent_state_name(state: FindingEffectIntentState) -> &'static s
     }
 }
 
-fn effect_intent_state_from_name(
+pub(super) fn effect_intent_state_from_name(
     name: &str,
 ) -> Result<FindingEffectIntentState, FindingChallengeStoreError> {
     match name {
