@@ -713,5 +713,218 @@ class AttestationRegenerationOriginalTests(unittest.TestCase):
                 self.assertEqual(run.result.returncode, 1)
 
 
+class AttestationBindingPreservationTests(unittest.TestCase):
+    """preservation (GREEN today).
+
+    The binding's ordered parents and tree, and each certificate source digest,
+    refuse any value other than the tested merge's, and the refusal comes from
+    that exact check.
+    """
+
+    def test_binding_with_other_or_swapped_parents_is_refused_at_the_parent_check(self) -> None:
+        expected = producer_line(".merge.parents")
+        for label, parents in (("swapped [E, B]", (REGEN_HEAD, REGEN_BASE)),
+                               ("other base [B2, E]", (LANDING.ADVANCED_MAIN, REGEN_HEAD))):
+            with self.subTest(parents=label):
+                run = verify_binding(merge_binding(CAPTURE_MERGE, parents=parents))
+                self.assertIn(f"GET {PREFIX}/actions/artifacts/{BINDING_ARTIFACT_ID}/zip", run.calls)
+                self.assertEqual(refusal(run), expected)
+                self.assertEqual(run.result.returncode, 1)
+                self.assertEqual(run.result.stdout, "")
+
+    def test_binding_with_another_tree_is_refused_at_the_tree_check(self) -> None:
+        run = verify_binding(merge_binding(CAPTURE_MERGE, tree=OTHER_TREE))
+        self.assertIn(f"GET {PREFIX}/actions/artifacts/{BINDING_ARTIFACT_ID}/zip", run.calls)
+        self.assertEqual(refusal(run), producer_line(".merge.tree_sha"))
+        self.assertEqual(run.result.returncode, 1)
+        self.assertEqual(run.result.stdout, "")
+
+    def test_certificate_digest_of_the_evidence_head_or_an_unrelated_commit_is_refused(self) -> None:
+        for label, value in (("evidence head", REGEN_HEAD), ("unrelated commit", OTHER_HEAD_MERGE)):
+            for field in CERTIFICATE_DIGESTS:
+                with self.subTest(value=label, field=field):
+                    digests = dict.fromkeys(CERTIFICATE_DIGESTS, CAPTURE_MERGE) | {field: value}
+                    run = verify_certificate(merge_binding(CAPTURE_MERGE), digests)
+                    self.assertEqual(refusal(run), producer_line("." + field))
+                    self.assertEqual(run.result.returncode, 1)
+                    self.assertEqual(run.result.stdout, "")
+
+
+# A live test merge for the same evidence head built on main after it advanced
+# (the c2b advance), or with its parents in the wrong order.
+OTHER_PARENT_MERGE, SWAPPED_PARENT_MERGE = "2b" * 20, "3c" * 20
+
+
+def foreign_merges(base: str, head: str, tree: str) -> dict[str, tuple[str, tuple[str, str], str]]:
+    return {
+        "other base parent": (OTHER_PARENT_MERGE, (LANDING.ADVANCED_MAIN, head), tree),
+        "swapped parents": (SWAPPED_PARENT_MERGE, (head, base), tree),
+        "other tree": (OTHER_TREE_MERGE, (base, head), OTHER_TREE),
+    }
+
+
+RECHECK_PROBE = "stable merge recheck passed"
+
+
+def recheck_attestation_merge(data: dict, *, capture_merge: str = CAPTURE_MERGE, ci_merge: str = CAPTURE_MERGE):
+    """Run the attestation step's final live pull request and test merge recheck."""
+    script, environment = render_step(*ATTESTATION_STEP, attestation_context(capture_merge, ci_merge))
+    start = script.index('stable_pr="$({')
+    script = script[start:script.index('\n{\n  echo "attestation_bundle_sha256=', start)]
+    return LANDING.run_offline_step(
+        REFUSAL_TRACE + "set -euo pipefail\nshopt -s inherit_errexit\n" + script + f'\necho "{RECHECK_PROBE}"\n',
+        data, environment)
+
+
+class LiveMergeIdentityPreservationTests(unittest.TestCase):
+    """preservation (GREEN today).
+
+    A live refs/pull/N/merge whose commit has other or swapped parents, or
+    another tree, is refused at the live test merge check of every positive
+    boundary: finalizer capture validation, capture authorization, CI
+    authentication, the attestation recheck and
+    `revalidate_live_publication_head`.
+    """
+
+    def assert_refused_at_live_merge(self, run, live: str) -> None:
+        self.assertNotIn("unprovided API", run.result.stderr)
+        self.assertEqual(run.result.returncode, 1, run.result.stderr)
+        self.assertIn(run.calls[-1], {merge_ref_get(), f"GET {PREFIX}/git/commits/{live}"}, run.calls)
+        self.assertEqual(run.output, "")
+
+    def foreign_live_merges(self):
+        for label, (sha, parents, tree) in foreign_merges(REGEN_BASE, REGEN_HEAD, REGEN_TREE).items():
+            data = regeneration_tuple(sha)
+            add_merge_commit(data, sha, parents, tree)
+            yield label, sha, data
+
+    def test_capture_validation_refuses_a_live_merge_with_other_parents_or_tree(self) -> None:
+        self.assertEqual(validate_capture(regeneration_tuple(CAPTURE_MERGE)).result.returncode, 0)
+        for label, sha, data in self.foreign_live_merges():
+            with self.subTest(live_merge=label):
+                self.assert_refused_at_live_merge(validate_capture(data), sha)
+
+    def test_capture_authorization_refuses_a_live_merge_with_other_parents_or_tree(self) -> None:
+        self.assertEqual(authorize_capture(regeneration_tuple(CAPTURE_MERGE)).result.returncode, 0)
+        for label, sha, data in self.foreign_live_merges():
+            with self.subTest(live_merge=label):
+                self.assert_refused_at_live_merge(authorize_capture(data), sha)
+
+    def test_ci_authentication_refuses_a_live_merge_with_other_parents_or_tree(self) -> None:
+        control = authenticate_ci_step(LANDING.ci_authentication_fixture())
+        self.assertEqual(control.result.returncode, 0, control.result.stderr)
+        self.assertIn(f"ci_run_id={LANDING.CI_RUN}\n", control.output)
+        for label, (sha, parents, tree) in foreign_merges(LANDING.BASE, LANDING.EVIDENCE, LANDING.TREE).items():
+            with self.subTest(live_merge=label):
+                data = LANDING.ci_authentication_fixture(live_merge=sha)
+                add_merge_commit(data, sha, parents, tree)
+                run = authenticate_ci_step(data)
+                self.assertEqual(polls(run), [])
+                self.assert_refused_at_live_merge(run, sha)
+
+    def test_attestation_recheck_refuses_a_live_merge_with_other_parents_or_tree(self) -> None:
+        control = recheck_attestation_merge(regeneration_tuple(CAPTURE_MERGE))
+        self.assertEqual(control.result.returncode, 0, control.result.stderr)
+        self.assertEqual(control.result.stdout, f"{RECHECK_PROBE}\n")
+        for label, sha, data in self.foreign_live_merges():
+            with self.subTest(live_merge=label):
+                run = recheck_attestation_merge(data)
+                self.assertEqual(run.result.stdout, "")
+                self.assert_refused_at_live_merge(run, sha)
+
+    def test_publication_refuses_a_live_merge_with_other_parents_or_tree(self) -> None:
+        recorded = (REGEN_HEAD, CAPTURE_MERGE, REGEN_BASE, REGEN_TREE)
+        control = LANDING.revalidate_publication_head(regeneration_tuple(CAPTURE_MERGE), *recorded)
+        self.assertEqual(control.result.returncode, 0, control.result.stderr)
+        self.assertEqual(control.result.stdout, f"{LANDING.PUBLICATION_PROBE}\n")
+        for label, sha, data in self.foreign_live_merges():
+            with self.subTest(live_merge=label):
+                run = LANDING.revalidate_publication_head(data, *recorded)
+                self.assertEqual(run.result.stdout, "")
+                self.assert_refused_at_live_merge(run, sha)
+
+
+def bad_ci_tuple(*, main_advanced: bool = False, open_sibling: bool = False,
+                 existing: list[dict] | None = None) -> dict:
+    """A failed CI run on E under the recorded merge, with main, a sibling and the namespace as given."""
+    data = LANDING.bad_ci_fixture(LANDING.prior_failed_ci_run(LANDING.MERGE))
+    data[f"{PREFIX}/git/commits/{LANDING.EVIDENCE}"] = {
+        "sha": LANDING.EVIDENCE, "parents": [{"sha": SOURCE}], "tree": {"sha": "e0" * 20}}
+    if main_advanced:
+        data[f"{PREFIX}/git/ref/heads/main"]["object"]["sha"] = LANDING.ADVANCED_MAIN
+    if open_sibling:
+        sibling = LANDING.second_pull_request_on_evidence()
+        data[f"{PREFIX}/pulls/{sibling['number']}"] = copy.deepcopy(sibling)
+        data[f"{PREFIX}/pulls"].append(copy.deepcopy(sibling))
+        data[f"{PREFIX}/commits/{LANDING.EVIDENCE}/pulls"].append(copy.deepcopy(sibling))
+    if existing is not None:
+        data[f"{PREFIX}/commits/{LANDING.MERGE}/check-runs"] = {"total_count": len(existing),
+                                                               "check_runs": copy.deepcopy(existing)}
+    return data
+
+
+DENIAL_IDENTITY = ("Security contract", LANDING.MERGE, {"id": LANDING.APP_ID, "slug": "chio-security-authority"},
+                   LANDING.EXTERNAL_ID, "completed", "failure")
+
+
+def denial_identity(check: dict) -> tuple:
+    return (check["name"], check["head_sha"], check["app"], check["external_id"], check["status"], check["conclusion"])
+
+
+class BadCiDenialCurrencyPreservationTests(unittest.TestCase):
+    """preservation (GREEN today).
+
+    Currency gates positive publication only. The publisher's bad-CI branch
+    (`reconcile_bad_ci`, `normalize_bad_ci_namespace`) creates the dedicated
+    Security contract tombstone on M when main has advanced past B or another
+    pull request shares E, keeps an existing tombstone exactly as it is, and
+    denies an existing success in place.
+    """
+
+    def assert_denied(self, run) -> list[dict]:
+        self.assertIn(CI_HISTORY_GET, run.calls)
+        self.assertNotIn("unprovided API", run.result.stderr)
+        dedicated = [check for key, store in run.data.items() if key.startswith(f"{PREFIX}/commits/")
+                     and key.endswith("/check-runs") for check in store["check_runs"]
+                     if check["app"]["id"] == LANDING.APP_ID]
+        self.assertEqual([denial_identity(check) for check in dedicated], [DENIAL_IDENTITY], run.result.stderr)
+        self.assertEqual(run.result.returncode, 1, run.result.stderr)
+        return dedicated
+
+    def test_bad_ci_tombstone_is_created_when_main_advanced_or_another_pull_request_shares_the_evidence(self) -> None:
+        for label, changes in (("main advanced past B", {"main_advanced": True}),
+                               ("second open pull request on E", {"open_sibling": True}),
+                               ("both", {"main_advanced": True, "open_sibling": True})):
+            with self.subTest(live_state=label):
+                data = bad_ci_tuple(**changes)
+                self.assertEqual(LANDING.security_contract_failures(data), [])
+                run = publish_without_stubs(data)
+                denial = self.assert_denied(run)[0]
+                self.assertEqual(LANDING.check_mutations(run)[0], f"POST {PREFIX}/check-runs")
+                text = json.loads(denial["output"]["text"])
+                self.assertEqual((text["reason"], text["bad_ci_runs"]),
+                                 ("ci-regression", [{"conclusion": "failure", "run_attempt": 1,
+                                                     "run_id": LANDING.PRIOR_CI_RUN, "workflow_id": LANDING.CI_WORKFLOW}]))
+
+    def test_existing_tombstone_is_preserved_and_existing_authority_denied_when_main_advanced(self) -> None:
+        created = publish_without_stubs(bad_ci_tuple())
+        tombstone = self.assert_denied(created)[0]
+        authority = [check for check in LANDING.positive_authority_checks() if check["name"] == "Security contract"]
+        self.assertEqual(len(authority), 1)
+        for label, existing in (("existing tombstone", [tombstone]), ("existing success authority", authority)):
+            with self.subTest(existing=label):
+                data = bad_ci_tuple(main_advanced=True, existing=existing)
+                self.assertEqual(data[f"{PREFIX}/git/ref/heads/main"]["object"]["sha"], LANDING.ADVANCED_MAIN)
+                run = publish_without_stubs(data)
+                denial = self.assert_denied(run)[0]
+                self.assertEqual((denial["id"], denial["output"]["text"]), (existing[0]["id"], existing[0]["output"]["text"]))
+                in_place = f"PATCH {PREFIX}/check-runs/{existing[0]['id']}"
+                if label == "existing tombstone":
+                    self.assertEqual(denial, existing[0])
+                    self.assertNotIn(in_place, LANDING.check_mutations(run))
+                else:
+                    self.assertEqual(LANDING.check_mutations(run)[0], in_place)
+
+
 if __name__ == "__main__":
     unittest.main()
