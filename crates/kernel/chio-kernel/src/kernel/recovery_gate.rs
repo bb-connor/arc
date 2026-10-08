@@ -481,7 +481,7 @@ impl ChioKernel {
             &request.arguments,
             request.model_metadata.as_ref(),
         )
-        .map_err(|error| super::KernelError::DurableAdmission(error.to_string()))?;
+        .map_err(super::KernelError::admission)?;
         let selected_grant = matching_grants
             .iter()
             .find(|matching| matching.index == matched_grant_index)
@@ -507,9 +507,10 @@ impl ChioKernel {
                     snapshot.clone(),
                 )
                 .map_err(|reason| {
-                    super::KernelError::DurableAdmission(format!(
-                        "recovery replay snapshot could not be captured: {reason}"
-                    ))
+                    super::KernelError::admission_in(
+                        "recovery replay snapshot could not be captured",
+                        reason,
+                    )
                 })?;
                 serde_json::to_value(snapshot)
                     .map(|snapshot| {
@@ -518,7 +519,7 @@ impl ChioKernel {
                                 snapshot
                         }))
                     })
-                    .map_err(|error| super::KernelError::DurableAdmission(error.to_string()))
+                    .map_err(super::KernelError::admission)
             }
             (true, None) => Err(super::KernelError::FindingDenied(
                 FindingDenial::unavailable(
@@ -553,15 +554,17 @@ impl ChioKernel {
             (true, Some(snapshot)) => {
                 let snapshot: FindingRecoveryReplaySnapshotV1 = serde_json::from_value(snapshot)
                     .map_err(|error| {
-                        super::KernelError::DurableAdmission(format!(
-                            "durable recovery snapshot is malformed: {error}"
-                        ))
+                        super::KernelError::admission_in(
+                            "durable recovery snapshot is malformed",
+                            error,
+                        )
                     })?;
                 self.validate_recovery_replay_snapshot(grant, request, snapshot)
                     .map_err(|reason| {
-                        super::KernelError::DurableAdmission(format!(
-                            "durable recovery snapshot was rejected: {reason}"
-                        ))
+                        super::KernelError::admission_in(
+                            "durable recovery snapshot was rejected",
+                            reason,
+                        )
                     })
             }
             (true, None) => Err(super::KernelError::FindingDenied(

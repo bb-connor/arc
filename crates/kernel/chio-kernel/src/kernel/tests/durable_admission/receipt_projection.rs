@@ -130,8 +130,17 @@ fn existing_admission_projections_use_verified_batch_without_point_reads_or_appe
     let error = kernel
         .reconcile_durable_admission_receipt_projections()
         .expect_err("reject changed projection");
-    assert!(error
-        .to_string()
-        .contains("conflicts with the canonical admission receipt"));
+    assert!(
+        matches!(
+            error.durable_admission(),
+            Some(crate::DurableAdmissionError::Record(reason))
+                if reason.as_ref()
+                    == format!(
+                        "receipt projection {} conflicts with the canonical admission receipt",
+                        completed.receipt.id
+                    )
+        ),
+        "{error:?}"
+    );
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
 }

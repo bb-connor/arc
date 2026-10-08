@@ -72,7 +72,7 @@ impl ChioKernel {
         verified_purchase: Option<&VerifiedFindingPurchase>,
     ) -> Result<Option<serde_json::Value>, KernelError> {
         if verified_purchase.is_some() {
-            return Err(KernelError::DurableAdmission(MARKET_DISABLED.to_owned()));
+            return Err(KernelError::admission_unsupported(MARKET_DISABLED));
         }
         Ok(None)
     }
@@ -84,7 +84,7 @@ impl ChioKernel {
         verified_recovery: Option<&VerifiedFindingRecoveryAdmission>,
     ) -> Result<Option<serde_json::Value>, KernelError> {
         if verified_recovery.is_some() {
-            return Err(KernelError::DurableAdmission(MARKET_DISABLED.to_owned()));
+            return Err(KernelError::admission_unsupported(MARKET_DISABLED));
         }
         Ok(None)
     }
@@ -104,7 +104,7 @@ impl ChioKernel {
                     )
                 });
         if market_marked(grant) || carries_snapshot {
-            return Err(KernelError::DurableAdmission(MARKET_DISABLED.to_owned()));
+            return Err(KernelError::admission_unsupported(MARKET_DISABLED));
         }
         Ok(None)
     }
@@ -124,7 +124,7 @@ impl ChioKernel {
                     )
                 });
         if market_marked(grant) || carries_snapshot {
-            return Err(KernelError::DurableAdmission(MARKET_DISABLED.to_owned()));
+            return Err(KernelError::admission_unsupported(MARKET_DISABLED));
         }
         Ok(None)
     }
@@ -213,7 +213,7 @@ impl ChioKernel {
         _purchase: &VerifiedFindingPurchase,
         _disposition: &crate::tool_outcome::SettlementDispositionV1,
     ) -> Result<(), KernelError> {
-        Err(KernelError::DurableAdmission(MARKET_DISABLED.to_owned()))
+        Err(KernelError::admission_unsupported(MARKET_DISABLED))
     }
 
     pub(crate) fn require_finding_pool_delivery_terminal(
@@ -221,6 +221,6 @@ impl ChioKernel {
         _purchase: &VerifiedFindingPurchase,
         _disposition: &crate::tool_outcome::SettlementDispositionV1,
     ) -> Result<(), KernelError> {
-        Err(KernelError::DurableAdmission(MARKET_DISABLED.to_owned()))
+        Err(KernelError::admission_unsupported(MARKET_DISABLED))
     }
 }

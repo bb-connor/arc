@@ -14,10 +14,9 @@ fn require_receipt_body_fields_coupled(
 }
 
 fn receipts_match(left: &ChioReceipt, right: &ChioReceipt) -> Result<bool, KernelError> {
-    let left = chio_core::canonical::canonical_json_bytes(left)
-        .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-    let right = chio_core::canonical::canonical_json_bytes(right)
-        .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+    let left = chio_core::canonical::canonical_json_bytes(left).map_err(KernelError::admission)?;
+    let right =
+        chio_core::canonical::canonical_json_bytes(right).map_err(KernelError::admission)?;
     Ok(left == right)
 }
 
@@ -402,7 +401,7 @@ impl ChioKernel {
                     .with_receipt_store(|store| {
                         match store.load_retained_chio_receipt(&receipt.id)? {
                             Some(existing) if receipts_match(&existing, receipt)? => Ok(false),
-                            Some(_) => Err(KernelError::DurableAdmission(format!(
+                            Some(_) => Err(KernelError::admission_record(format!(
                                 "receipt projection {} conflicts with retained durable history",
                                 receipt.id
                             ))),
@@ -506,14 +505,14 @@ impl ChioKernel {
             return Ok(());
         };
         if existing.len() != receipts.len() {
-            return Err(KernelError::DurableAdmission(
-                "receipt projection store returned an incomplete lookup batch".to_owned(),
+            return Err(KernelError::admission_invariant(
+                "receipt projection store returned an incomplete lookup batch",
             ));
         }
         for (receipt, existing) in receipts.iter().zip(existing) {
             match existing {
                 Some(existing) if !receipts_match(&existing, receipt)? => {
-                    return Err(KernelError::DurableAdmission(format!(
+                    return Err(KernelError::admission_record(format!(
                         "receipt projection {} conflicts with the canonical admission receipt",
                         receipt.id
                     )));
@@ -556,7 +555,7 @@ impl ChioKernel {
                 if receipts_match(&existing, receipt)? {
                     Ok(())
                 } else {
-                    Err(KernelError::DurableAdmission(format!(
+                    Err(KernelError::admission_record(format!(
                         "receipt projection {} conflicts with the canonical admission receipt",
                         receipt.id
                     )))
@@ -598,7 +597,7 @@ impl ChioKernel {
                 if receipts_match(&existing, receipt)? {
                     Ok(())
                 } else {
-                    Err(KernelError::DurableAdmission(format!(
+                    Err(KernelError::admission_record(format!(
                         "local receipt mirror {} conflicts with the canonical admission receipt",
                         receipt.id
                     )))

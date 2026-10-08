@@ -1038,23 +1038,25 @@ impl ChioKernel {
             let drained = self
                 .drain_finding_pool_mutation_receipts(ledger)
                 .map_err(|error| {
-                    crate::KernelError::DurableAdmission(format!(
-                        "finding pool receipt outbox reconciliation failed: {error}"
-                    ))
+                    crate::KernelError::admission_in(
+                        "finding pool receipt outbox reconciliation failed",
+                        error,
+                    )
                 })?;
             reconciled = reconciled.checked_add(drained).ok_or_else(|| {
-                crate::KernelError::DurableAdmission(
-                    "finding pool receipt reconciliation count overflow".to_owned(),
+                crate::KernelError::admission_invariant(
+                    "finding pool receipt reconciliation count overflow",
                 )
             })?;
             if drained < FINDING_POOL_OUTBOX_BATCH_LIMIT {
                 if ledger.has_pending_mutation_receipts().map_err(|error| {
-                    crate::KernelError::DurableAdmission(format!(
-                        "finding pool receipt outbox state check failed: {error}"
-                    ))
+                    crate::KernelError::admission_in(
+                        "finding pool receipt outbox state check failed",
+                        error,
+                    )
                 })? {
-                    return Err(crate::KernelError::DurableAdmission(
-                        "finding pool receipt outbox reconciliation is still leased".to_owned(),
+                    return Err(crate::KernelError::admission_pending(
+                        "finding pool receipt outbox reconciliation is still leased",
                     ));
                 }
                 return Ok(reconciled);
@@ -1271,9 +1273,10 @@ impl ChioKernel {
     ) -> Result<(), crate::KernelError> {
         self.settle_finding_pool_delivery(durable_admission_operation_id, purchase, disposition)
             .map_err(|error| {
-                crate::KernelError::DurableAdmission(format!(
-                    "finding pool terminal could not be committed: {error}"
-                ))
+                crate::KernelError::admission_in(
+                    "finding pool terminal could not be committed",
+                    error,
+                )
             })
     }
 
@@ -1284,9 +1287,10 @@ impl ChioKernel {
     ) -> Result<(), crate::KernelError> {
         self.require_finding_pool_delivery_disposition(purchase, disposition)
             .map_err(|error| {
-                crate::KernelError::DurableAdmission(format!(
-                    "finding pool terminal conflicts before payment settlement: {error}"
-                ))
+                crate::KernelError::admission_in(
+                    "finding pool terminal conflicts before payment settlement",
+                    error,
+                )
             })
     }
 }

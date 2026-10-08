@@ -971,9 +971,15 @@ fn startup_reconciliation_does_not_complete_behind_an_active_outbox_lease() {
         .unwrap_or_else(|error| panic!("claim pending receipt: {error}"));
     assert_eq!(claimed.len(), 1);
 
-    assert!(kernel
-        .reconcile_finding_pool_mutation_receipts()
-        .is_err_and(|error| error.to_string().contains("still leased")));
+    let leased = kernel.reconcile_finding_pool_mutation_receipts();
+    assert!(
+        matches!(
+            leased.as_ref().map_err(crate::KernelError::durable_admission),
+            Err(Some(crate::DurableAdmissionError::Pending(reason)))
+                if reason == "finding pool receipt outbox reconciliation is still leased"
+        ),
+        "{leased:?}"
+    );
     assert!(ledger
         .pending_mutation_receipts()
         .is_ok_and(|receipts| receipts.len() == 1));

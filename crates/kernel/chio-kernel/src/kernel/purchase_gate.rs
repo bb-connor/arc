@@ -466,7 +466,7 @@ impl ChioKernel {
             &request.arguments,
             request.model_metadata.as_ref(),
         )
-        .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        .map_err(KernelError::admission)?;
         let selected_grant = matching_grants
             .iter()
             .find(|matching| matching.index == matched_grant_index)
@@ -487,9 +487,10 @@ impl ChioKernel {
                     snapshot.clone(),
                 )
                 .map_err(|reason| {
-                    KernelError::DurableAdmission(format!(
-                        "purchase replay snapshot could not be captured: {reason}"
-                    ))
+                    KernelError::admission_in(
+                        "purchase replay snapshot could not be captured",
+                        reason,
+                    )
                 })?;
                 serde_json::to_value(snapshot)
                     .map(|snapshot| {
@@ -498,7 +499,7 @@ impl ChioKernel {
                                 snapshot
                         }))
                     })
-                    .map_err(|error| KernelError::DurableAdmission(error.to_string()))
+                    .map_err(KernelError::admission)
             }
             (true, None) => Err(KernelError::FindingDenied(FindingDenial::unavailable(
                 "durable purchase return has no frozen dispatch snapshot",
@@ -529,22 +530,18 @@ impl ChioKernel {
             (true, Some(snapshot)) => {
                 let snapshot: FindingPurchaseReplaySnapshotV1 = serde_json::from_value(snapshot)
                     .map_err(|error| {
-                        KernelError::DurableAdmission(format!(
-                            "durable purchase snapshot is malformed: {error}"
-                        ))
+                        KernelError::admission_in("durable purchase snapshot is malformed", error)
                     })?;
                 self.validate_purchase_replay_snapshot(grant, request, snapshot)
                     .map_err(|reason| {
-                        KernelError::DurableAdmission(format!(
-                            "durable purchase snapshot was rejected: {reason}"
-                        ))
+                        KernelError::admission_in("durable purchase snapshot was rejected", reason)
                     })
             }
             (true, None) => Err(KernelError::FindingDenied(FindingDenial::unavailable(
                 "durable purchase return has no frozen authority snapshot",
             ))),
-            (false, Some(_)) => Err(KernelError::DurableAdmission(
-                "unmarked durable return carries a purchase snapshot".to_owned(),
+            (false, Some(_)) => Err(KernelError::admission_record(
+                "unmarked durable return carries a purchase snapshot",
             )),
             (false, None) => Ok(None),
         }
