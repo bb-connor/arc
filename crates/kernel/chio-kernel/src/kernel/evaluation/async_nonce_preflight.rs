@@ -85,9 +85,7 @@ impl ChioKernel {
                     cap,
                     budget_mutation,
                     payment_authorization: None,
-                    durable_operation: durable_admission
-                        .as_ref()
-                        .map(DurableToolAdmission::operation),
+                    durable_operation: durable_operation(durable_admission.as_ref()),
                     runtime_admission_metadata: extra_metadata.clone(),
                     verified_payee_binding: verified_governed_payee_binding.as_ref(),
                     budget_lease_acquired,
@@ -136,9 +134,7 @@ impl ChioKernel {
                             cap,
                             budget_mutation,
                             payment_authorization: None,
-                            durable_operation: durable_admission
-                                .as_ref()
-                                .map(DurableToolAdmission::operation),
+                            durable_operation: durable_operation(durable_admission.as_ref()),
                             runtime_admission_metadata: extra_metadata.clone(),
                             verified_payee_binding: verified_governed_payee_binding.as_ref(),
                             budget_lease_acquired,
@@ -164,11 +160,7 @@ impl ChioKernel {
                 },
                 budget_lease_acquired,
             )
-            .with_durable_operation(
-                durable_admission
-                    .as_ref()
-                    .map(DurableToolAdmission::operation),
-            );
+            .with_durable_operation(durable_operation(durable_admission.as_ref()));
             let result = self
                 .wait_for_runtime_admission_dispatch_readiness(request)
                 .await;
@@ -222,9 +214,7 @@ impl ChioKernel {
                     cap,
                     budget_mutation,
                     payment_authorization: None,
-                    durable_operation: durable_admission
-                        .as_ref()
-                        .map(DurableToolAdmission::operation),
+                    durable_operation: durable_operation(durable_admission.as_ref()),
                     runtime_admission_metadata: error.denied_metadata(&extra_metadata),
                     verified_payee_binding: verified_governed_payee_binding.as_ref(),
                     budget_lease_acquired,
@@ -256,9 +246,7 @@ impl ChioKernel {
                     cap,
                     budget_mutation,
                     payment_authorization: None,
-                    durable_operation: durable_admission
-                        .as_ref()
-                        .map(DurableToolAdmission::operation),
+                    durable_operation: durable_operation(durable_admission.as_ref()),
                     runtime_admission_metadata: extra_metadata.clone(),
                     verified_payee_binding: verified_governed_payee_binding.as_ref(),
                     budget_lease_acquired,
@@ -310,9 +298,7 @@ impl ChioKernel {
                                 cap,
                                 budget_mutation,
                                 payment_authorization: None,
-                                durable_operation: durable_admission
-                                    .as_ref()
-                                    .map(DurableToolAdmission::operation),
+                                durable_operation: durable_operation(durable_admission.as_ref()),
                                 runtime_admission_metadata: extra_metadata.clone(),
                                 verified_payee_binding: verified_governed_payee_binding.as_ref(),
                                 budget_lease_acquired,
@@ -349,9 +335,7 @@ impl ChioKernel {
                                 payment_authorization: settled_prepayment
                                     .as_ref()
                                     .map(|prepayment| &prepayment.authorization),
-                                durable_operation: durable_admission
-                                    .as_ref()
-                                    .map(DurableToolAdmission::operation),
+                                durable_operation: durable_operation(durable_admission.as_ref()),
                                 runtime_admission_metadata: extra_metadata.clone(),
                                 verified_payee_binding: verified_governed_payee_binding.as_ref(),
                                 budget_lease_acquired,

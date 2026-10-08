@@ -915,9 +915,7 @@ impl ChioKernel {
     ) -> Result<ToolCallResponse, KernelError> {
         let (runtime_admission_metadata, runtime_release_confirmed) = self
             .release_runtime_admission_reservations_for_pre_dispatch_denial(
-                durable_admission
-                    .as_deref()
-                    .map(DurableToolAdmission::operation),
+                durable_operation(durable_admission.as_deref()),
                 runtime_admission_metadata,
             );
         // Release this evaluation's sibling-sum child-budget lease only when it

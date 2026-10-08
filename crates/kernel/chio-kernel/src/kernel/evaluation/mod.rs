@@ -28,6 +28,13 @@ mod sync_evaluation_wrapper;
 
 pub use caller_execution::{CallerExecutionReport, CallerStartCredentials, CallerStartResponse};
 
+/// The admission operation an optional durable admission owns.
+fn durable_operation(
+    admission: Option<&DurableToolAdmission>,
+) -> Option<&crate::admission_operation::AdmissionOperationV1> {
+    admission.map(DurableToolAdmission::operation)
+}
+
 /// Disposition of the pre-execution budget hold when a strict-nonce preflight
 /// is reached (nonce required, no nonce presented on the request).
 ///
