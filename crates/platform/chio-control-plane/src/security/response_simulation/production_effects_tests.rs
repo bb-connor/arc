@@ -1684,3 +1684,58 @@ fn egress_restriction_composition_keeps_its_refusals() {
         CompositionRefusals::kept(&first)
     );
 }
+
+#[test]
+fn session_throttle_composition_keeps_its_refusals() {
+    let fixture = ProductionEffectsFixture::new();
+    let shared_session = session("production-effects-throttle-controls-session");
+    let throttle = |max_invocations: u32| {
+        let mut spec = fixture.throttle_spec(&shared_session);
+        let (canonical_contribution, contribution_hash) = canonical(&SessionThrottleLimits {
+            window_ms: 5_000,
+            max_invocations,
+        });
+        spec.canonical_contribution = canonical_contribution;
+        spec.contribution_hash = contribution_hash;
+        spec
+    };
+    let (first_plan, first_work) = fixture.dispatch(
+        "production-effects-throttle-controls-first",
+        vec![record(shared_session.as_str())],
+        vec![throttle(10)],
+    );
+    let (second_plan, second_work) = fixture.dispatch(
+        "production-effects-throttle-controls-second",
+        vec![record(shared_session.as_str())],
+        vec![throttle(3)],
+    );
+    let first = LeasedEffect {
+        plan: &first_plan,
+        work: &first_work,
+        ordinal: 0,
+    };
+    let second = LeasedEffect {
+        plan: &second_plan,
+        work: &second_work,
+        ordinal: 0,
+    };
+    let throttle_key = SessionThrottleKey {
+        tenant_id: tenant(),
+        session_id: shared_session.clone(),
+    };
+    let version = || throttle_version(&fixture.store, &throttle_key);
+    let installed = || throttle_effect_ids(&fixture.store, &throttle_key);
+    let effects = fixture.effects();
+    assert_eq!(
+        composition_refusals(
+            effects.as_ref(),
+            &SharedKey {
+                version: &version,
+                installed: &installed,
+            },
+            &first,
+            &second,
+        ),
+        CompositionRefusals::kept(&first)
+    );
+}
