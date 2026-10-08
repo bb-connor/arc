@@ -294,7 +294,8 @@ impl AdmissionOperationStore for TestAdmissionOperationStore {
         _: &crate::admission_operation::NativeSecurityAuthorityBindingV1,
         fence: &StoreMutationFence,
         _: u64,
-    ) -> Result<Option<AdmissionDigest>, AdmissionOperationStoreError> {
+    ) -> Result<Option<crate::admission_operation::AdmissionDigest>, AdmissionOperationStoreError>
+    {
         self.require_fence(fence)?;
         self.native_egress.require_enabled("history maintenance")?;
         // This test backend retains one observation/acquisition, without a
