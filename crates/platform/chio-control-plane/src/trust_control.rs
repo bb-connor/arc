@@ -297,6 +297,8 @@ use crate::{
 
 #[path = "trust_control/authority_handlers.rs"]
 mod authority_handlers;
+#[path = "trust_control/blocking.rs"]
+mod blocking;
 #[path = "trust_control/budget_handlers.rs"]
 mod budget_handlers;
 #[path = "trust_control/capital_and_liability.rs"]
@@ -377,6 +379,7 @@ pub use self::service_types::*;
 // The domain handler modules and credit_and_loss expose only crate-internal
 // (`pub(crate)`) items, so they are re-exported with crate visibility.
 pub(crate) use self::authority_handlers::*;
+pub(crate) use self::blocking::blocking_response;
 pub(crate) use self::budget_handlers::*;
 pub use self::capital_and_liability::*;
 pub(crate) use self::certification_handlers::*;
