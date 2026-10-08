@@ -38,6 +38,11 @@ or safely dispose of its own stale socket; bind never removes existing paths.
 
 ## Frames and operations
 
+The normative wire contract is [PROTOCOL.md section 8.6](../../../spec/PROTOCOL.md#86-local-process-worker-protocol-chioprocessv1),
+with schemas under [`spec/schemas/chio-process/v1`](../../../spec/schemas/chio-process/v1)
+and the shared conformance corpus [`spec/fixtures/chio-process-v1.json`](../../../spec/fixtures/chio-process-v1.json)
+that this crate's tests and both clients consume. This section summarizes it.
+
 Each request is UTF-8 JSON followed by one newline. Maximum request size is
 2 MiB including that newline. Maximum response size is 8 MiB including its
 newline. Extra operations require separate connections. Unknown request and
@@ -51,6 +56,7 @@ operation fields, duplicate struct fields and unsupported versions reject.
 | --- | --- | --- |
 | `inspect` | None | Own process id, parent/root ids, state, depth, limits, shared call count, own checkpoint and storage capability/usage. No capability token. |
 | `invoke` | `operation_key`, `server_id`, `tool_name`, `arguments`, optional object `governed_intent`, optional boolean `known_outcome_only` | Kernel verdict, output, request id, reason, terminal state, original `receipt_json`, optional `execution_nonce_json`. |
+| `prepare_invocation` | `operation_key`, `server_id`, `tool_name`, `arguments` | The host-prepared envelope, retained under the key without dispatching. Hosts without a preparation service return `runtime_error`. |
 | `checkpoint` | `expected_revision` as a decimal string, `value` | New decimal revision and value, or conflict. |
 | `blob_put` | `sha256` (64 lowercase hex), `data_base64` (canonical padded standard base64) | Immutable process-owned `{sha256, bytes}`. |
 | `blob_read` | `sha256` | Own `{sha256, bytes, data_base64}`, or missing/corrupt failure. |
