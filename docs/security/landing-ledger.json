@@ -131080,94 +131080,9 @@
         "Finish F077 protected merge/App/ruleset evidence, current independent review, default/PQ/platform/cold/trusted/hosted checks and protected landing."
       ]
     },
-    "incoming-pr1160-review-20261008:reconciliation:EF-FINALITY": {
-      "state": "genuine-original-red-approved-finite-producer-in-progress",
-      "source_checkpoint": "34443073624f6ee016d1c2599faeb2aefbb3a1cb",
-      "audit_checkpoint": "ebdf52364cbafed33bd04e17c25be57ab055755b",
-      "audit_path": "docs/security/audits/repair-batch-local-checkpoint-20261008.json",
-      "source_repair": null,
-      "focused_green": false,
-      "qualified": false,
-      "merged": false,
-      "previous_checkpoint_state": "proposed-effect-repair-regression-confirmed-original-and-producer-pending",
-      "full_qualified": false,
-      "owning_pending": true,
-      "native_pending": true,
-      "trusted_pending": true,
-      "hosted_pending": true,
-      "verification_evidence": [
-        {
-          "path": "docs/security/audits/repair-batch-local-checkpoint-20261008.json",
-          "sha256": "6e3781eb1b9e8eeb56f7d31ad10ef2cb9bd609bf7013c1477e998326a16a21b9",
-          "scope": "Per-campaign source/binary/log receipts, preserving failing Original/setup/fixture records separately. Current whole-candidate acceptance remains open."
-        }
-      ],
-      "remaining_acceptance": [
-        "Complete effect finality, same-lineage freeze and authenticated historical result-query repairs with Original and preservation controls.",
-        "Complete MCP genuine-v2 positive fixture and extra broker integrity controls; fresh owning and strict checks for the composed source.",
-        "Measure and qualify actual production native trajectory with eight receipts, the unchanged10000ms fence and current enforcing artifacts; bounded journal tests do not establish this.",
-        "Finish F077 protected merge/App/ruleset evidence, current independent review, default/PQ/platform/cold/trusted/hosted checks and protected landing."
-      ]
-    },
-    "incoming-pr1160-review-20261008:reconciliation:EF-FREEZE": {
-      "state": "genuine-original-red-approved-finite-producer-in-progress",
-      "source_checkpoint": "34443073624f6ee016d1c2599faeb2aefbb3a1cb",
-      "audit_checkpoint": "ebdf52364cbafed33bd04e17c25be57ab055755b",
-      "audit_path": "docs/security/audits/repair-batch-local-checkpoint-20261008.json",
-      "source_repair": null,
-      "focused_green": false,
-      "qualified": false,
-      "merged": false,
-      "previous_checkpoint_state": "effect-composition-gap-confirmed-original-and-producer-proposal-pending",
-      "full_qualified": false,
-      "owning_pending": true,
-      "native_pending": true,
-      "trusted_pending": true,
-      "hosted_pending": true,
-      "verification_evidence": [
-        {
-          "path": "docs/security/audits/repair-batch-local-checkpoint-20261008.json",
-          "sha256": "6e3781eb1b9e8eeb56f7d31ad10ef2cb9bd609bf7013c1477e998326a16a21b9",
-          "scope": "Per-campaign source/binary/log receipts, preserving failing Original/setup/fixture records separately. Current whole-candidate acceptance remains open."
-        }
-      ],
-      "remaining_acceptance": [
-        "Complete effect finality, same-lineage freeze and authenticated historical result-query repairs with Original and preservation controls.",
-        "Complete MCP genuine-v2 positive fixture and extra broker integrity controls; fresh owning and strict checks for the composed source.",
-        "Measure and qualify actual production native trajectory with eight receipts, the unchanged10000ms fence and current enforcing artifacts; bounded journal tests do not establish this.",
-        "Finish F077 protected merge/App/ruleset evidence, current independent review, default/PQ/platform/cold/trusted/hosted checks and protected landing."
-      ]
-    },
-    "incoming-pr1160-review-20261008:reconciliation:EF-REPLAY": {
-  "state": "genuine-historical-query-red-no-remove-preservation-green-producer-pending",
-  "source_checkpoint": "ef23fba41cd3d0d8743621ee989d9bc9f5b74903",
-  "audit_checkpoint": "a43226e8e4af96f96fb3a768047796891e0a06cb",
-  "audit_path": "docs/security/audits/fixture-correction-checkpoint-20261008.json",
-  "source_repair": null,
-  "focused_green": false,
-  "qualified": false,
-  "merged": false,
-  "remaining_acceptance": [
-    "Complete and review effect finality, same-lineage freeze and authenticated historical-query repairs with preserved legacy source evidence.",
-    "Recheck test-future ownership and strict owning lint.",
-    "Complete current owning/default/PQ/platform/cold/native/trusted and exact-source hosted qualification.",
-    "Qualify protected finalizer and independent review, then protected landing."
-  ],
-  "checkpoint_history": [
-    {
-      "state": "genuine-original-red-repair-and-tamper-preservation-control-pending",
-      "audit_path": "docs/security/audits/repair-batch-local-checkpoint-20261008.json",
-      "source_checkpoint": "29e9a39d19ec944a60ebf2f0c813eccbf54b8d9e"
-    }
-  ],
-  "verification_evidence": [
-    {
-      "path": "docs/security/audits/fixture-correction-checkpoint-20261008.json",
-      "sha256": "72540d5201a1c396a60b4a6051247ca0908ab32276ef2fb6b11dc83bd214cd11",
-      "scope": "Per-campaign source, binary and log identity. Earlier failed records and corrected diagnostic history retained."
-    }
-  ]
-}
+    "incoming-pr1160-review-20261008:reconciliation:EF-FINALITY": {"state":"source-integrated-focused-and-compatibility-green-final-qualification-pending","source_checkpoint":"52d98f4bea87df7fe5acdf424a29f5e10e5365cb","audit_checkpoint":"ebdf52364cbafed33bd04e17c25be57ab055755b","audit_path":"docs/security/audits/finality-and-legacy-import-checkpoint-20261008.json","source_repair":["2ebf718dcc","a8fdeb457c"],"focused_green":true,"qualified":false,"merged":false,"previous_checkpoint_state":"proposed-effect-repair-regression-confirmed-original-and-producer-pending","full_qualified":false,"owning_pending":true,"native_pending":true,"trusted_pending":true,"hosted_pending":true,"verification_evidence":[{"path":"docs/security/audits/repair-batch-local-checkpoint-20261008.json","sha256":"6e3781eb1b9e8eeb56f7d31ad10ef2cb9bd609bf7013c1477e998326a16a21b9","scope":"Per-campaign source/binary/log receipts, preserving failing Original/setup/fixture records separately. Current whole-candidate acceptance remains open."},{"path":"docs/security/audits/finality-and-legacy-import-checkpoint-20261008.json","sha256":"411c736e203c65fd9f003e31ffbee6164ba52a0809972432faaea0defd90264e","scope":"Exact per-campaign source/binary/log evidence; includes genuine regression and separately classified setup/cache failures."}],"remaining_acceptance":["Complete trusted workflow producer repairs and independent review; qualify dedicated publisher and per-PR protected landing boundary.","Complete remaining owning/default/PQ/platform/cold coverage; reconcile all review obligations without reimplementing integrated work.","Run current enforcing native trajectory with eight receipts, unchanged 10000ms fence and execution nonces; any debugging run remains nonfinal.","Freeze final source, obtain exact-source native/trusted/hosted evidence, refresh reviews and threads, and land through protections."],"checkpoint_history":[{"state":"genuine-original-red-approved-finite-producer-in-progress","source_checkpoint":"34443073624f6ee016d1c2599faeb2aefbb3a1cb","audit_path":"docs/security/audits/repair-batch-local-checkpoint-20261008.json"}]},
+    "incoming-pr1160-review-20261008:reconciliation:EF-FREEZE": {"state":"source-integrated-focused-and-compatibility-green-final-qualification-pending","source_checkpoint":"52d98f4bea87df7fe5acdf424a29f5e10e5365cb","audit_checkpoint":"ebdf52364cbafed33bd04e17c25be57ab055755b","audit_path":"docs/security/audits/finality-and-legacy-import-checkpoint-20261008.json","source_repair":["2ebf718dcc","a8fdeb457c"],"focused_green":true,"qualified":false,"merged":false,"previous_checkpoint_state":"effect-composition-gap-confirmed-original-and-producer-proposal-pending","full_qualified":false,"owning_pending":true,"native_pending":true,"trusted_pending":true,"hosted_pending":true,"verification_evidence":[{"path":"docs/security/audits/repair-batch-local-checkpoint-20261008.json","sha256":"6e3781eb1b9e8eeb56f7d31ad10ef2cb9bd609bf7013c1477e998326a16a21b9","scope":"Per-campaign source/binary/log receipts, preserving failing Original/setup/fixture records separately. Current whole-candidate acceptance remains open."},{"path":"docs/security/audits/finality-and-legacy-import-checkpoint-20261008.json","sha256":"411c736e203c65fd9f003e31ffbee6164ba52a0809972432faaea0defd90264e","scope":"Exact per-campaign source/binary/log evidence; includes genuine regression and separately classified setup/cache failures."}],"remaining_acceptance":["Complete trusted workflow producer repairs and independent review; qualify dedicated publisher and per-PR protected landing boundary.","Complete remaining owning/default/PQ/platform/cold coverage; reconcile all review obligations without reimplementing integrated work.","Run current enforcing native trajectory with eight receipts, unchanged 10000ms fence and execution nonces; any debugging run remains nonfinal.","Freeze final source, obtain exact-source native/trusted/hosted evidence, refresh reviews and threads, and land through protections."],"checkpoint_history":[{"state":"genuine-original-red-approved-finite-producer-in-progress","source_checkpoint":"34443073624f6ee016d1c2599faeb2aefbb3a1cb","audit_path":"docs/security/audits/repair-batch-local-checkpoint-20261008.json"}]},
+    "incoming-pr1160-review-20261008:reconciliation:EF-REPLAY": {"state":"source-integrated-focused-and-compatibility-green-final-qualification-pending","source_checkpoint":"52d98f4bea87df7fe5acdf424a29f5e10e5365cb","audit_checkpoint":"a43226e8e4af96f96fb3a768047796891e0a06cb","audit_path":"docs/security/audits/finality-and-legacy-import-checkpoint-20261008.json","source_repair":["2ebf718dcc","a8fdeb457c"],"focused_green":true,"qualified":false,"merged":false,"remaining_acceptance":["Complete trusted workflow producer repairs and independent review; qualify dedicated publisher and per-PR protected landing boundary.","Complete remaining owning/default/PQ/platform/cold coverage; reconcile all review obligations without reimplementing integrated work.","Run current enforcing native trajectory with eight receipts, unchanged 10000ms fence and execution nonces; any debugging run remains nonfinal.","Freeze final source, obtain exact-source native/trusted/hosted evidence, refresh reviews and threads, and land through protections."],"checkpoint_history":[{"state":"genuine-original-red-repair-and-tamper-preservation-control-pending","audit_path":"docs/security/audits/repair-batch-local-checkpoint-20261008.json","source_checkpoint":"29e9a39d19ec944a60ebf2f0c813eccbf54b8d9e"},{"state":"genuine-historical-query-red-no-remove-preservation-green-producer-pending","source_checkpoint":"ef23fba41cd3d0d8743621ee989d9bc9f5b74903","audit_path":"docs/security/audits/fixture-correction-checkpoint-20261008.json"}],"verification_evidence":[{"path":"docs/security/audits/fixture-correction-checkpoint-20261008.json","sha256":"72540d5201a1c396a60b4a6051247ca0908ab32276ef2fb6b11dc83bd214cd11","scope":"Per-campaign source, binary and log identity. Earlier failed records and corrected diagnostic history retained."},{"path":"docs/security/audits/finality-and-legacy-import-checkpoint-20261008.json","sha256":"411c736e203c65fd9f003e31ffbee6164ba52a0809972432faaea0defd90264e","scope":"Exact per-campaign source/binary/log evidence; includes genuine regression and separately classified setup/cache failures."}],"full_qualified":false,"owning_pending":true,"native_pending":true,"trusted_pending":true,"hosted_pending":true}
   },
   "current_view_refresh_488_observations_20261007": {
     "at": "2026-10-07T02:40:40.721349+00:00",
@@ -132528,5 +132443,6 @@
   "requirement_count": 1793,
   "qualified": false,
   "merged": false
-}
+},
+  "finality_and_legacy_import_checkpoint_20261008": {"source_checkpoint":"52d98f4bea87df7fe5acdf424a29f5e10e5365cb","audit_path":"docs/security/audits/finality-and-legacy-import-checkpoint-20261008.json","requirement_count":1793,"qualified":false,"merged":false}
 }

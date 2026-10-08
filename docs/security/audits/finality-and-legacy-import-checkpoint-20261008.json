@@ -1,0 +1,426 @@
+{
+  "schema": "chio.security.finality-local-checkpoint.v1",
+  "observed_at": "2026-10-08T07:41:33.198809+00:00",
+  "observed_source": "52d98f4bea87df7fe5acdf424a29f5e10e5365cb",
+  "qualified": false,
+  "published": false,
+  "merged": false,
+  "published_source": "89d79ac6ab79de5d55b99a7c8ec611bc8b021cb2",
+  "campaigns": [
+    {
+      "source": "ad78d9505f8e926f329f6c7da091482c4eb34089",
+      "exit_code": 0,
+      "elapsed_seconds": 250.00683116912842,
+      "log_sha256": "400813f6dc13a4b63161a1ea02b959f0ccc04e5d1e83e47c9aa3fc796463e5c5",
+      "receipt": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/mixed-12-build-receipt.json",
+      "receipt_sha256": "afb21a6ba6f1ac9c83c87214ec74fbf86ee5bedf8965ea021280d2c6307bdb6d"
+    },
+    {
+      "source": "ad78d9505f8e926f329f6c7da091482c4eb34089",
+      "exit_code": 0,
+      "counts": [
+        [
+          "30",
+          "0",
+          "0"
+        ]
+      ],
+      "elapsed_seconds": 16.285528421401978,
+      "binary_sha256": "014b834cbfa6c45cf521ffba8305355d2d621cb35b492f588938f54be0c188fa",
+      "log_sha256": "63a5a2e56fc275835825e853a52ea5c27e9ba192d080d5a3a94313d2ef070930",
+      "scope": "Exact emitted test artifact; independent of overall build completion. Owning, native and hosted gates recorded separately.",
+      "receipt": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/cp-effects-finality-12-receipt.json",
+      "receipt_sha256": "e338813f295c42a82c50f3efa1df64b126f67377f8db0329c81ec63a5d59e1dc"
+    },
+    {
+      "source": "ad78d9505f8e926f329f6c7da091482c4eb34089",
+      "exit_code": 101,
+      "counts": [
+        [
+          "22",
+          "1",
+          "0"
+        ]
+      ],
+      "elapsed_seconds": 7.658381223678589,
+      "binary_sha256": "c946f9a120520af006e4839c4b20cfdee16ac31bd6f0a20718b741883c5b6fc8",
+      "log_sha256": "06f918e6232b9bac2f193b8dea0d484897348d94134f537a8802a26995d75044",
+      "scope": "Exact emitted test artifact; independent of overall build completion. Owning, native and hosted gates recorded separately.",
+      "receipt": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/issuance-finality-12-receipt.json",
+      "receipt_sha256": "4422dfd77881bc6697aee9fb6b7aa09608c30399bee71dfaba78776104e35842"
+    },
+    {
+      "source": "ad78d9505f8e926f329f6c7da091482c4eb34089",
+      "exit_code": 0,
+      "counts": [
+        [
+          "36",
+          "0",
+          "0"
+        ]
+      ],
+      "elapsed_seconds": 39.11093354225159,
+      "binary_sha256": "a6a97379a86de4e28260699dadfddd21577a9a9a5c095503a4fefa343e22bc78",
+      "log_sha256": "d0183ca13df4967e91a1052049b9952d9bfb292f643e35d654fd0ff1981a075c",
+      "scope": "Exact emitted test artifact; independent of overall build completion. Owning, native and hosted gates recorded separately.",
+      "receipt": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/store-participant-source-12-receipt.json",
+      "receipt_sha256": "10f66836db545c8349422636f5f9db8acd051ab4f6f9a6daf5cb3c3ec586bef9"
+    },
+    {
+      "source": "ad78d9505f8e926f329f6c7da091482c4eb34089",
+      "exit_code": 0,
+      "counts": [
+        [
+          "21",
+          "0",
+          "0"
+        ]
+      ],
+      "elapsed_seconds": 166.0881404876709,
+      "binary_sha256": "a6a97379a86de4e28260699dadfddd21577a9a9a5c095503a4fefa343e22bc78",
+      "log_sha256": "dd1160b9a2b61a51873ac6aefb1ef025694f9ff0f24ab49c36022e7784af01ac",
+      "scope": "Exact emitted test artifact; independent of overall build completion. Owning, native and hosted gates recorded separately.",
+      "receipt": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/store-participant-migration-12-corrected-receipt.json",
+      "receipt_sha256": "0ce42ac19b6c5b2203d8c61fecceddbfe68f1f225ee5ec1fddbe973c9924c626"
+    },
+    {
+      "source": "ad78d9505f8e926f329f6c7da091482c4eb34089",
+      "exit_code": 0,
+      "counts": [
+        [
+          "33",
+          "0",
+          "0"
+        ]
+      ],
+      "elapsed_seconds": 147.05773496627808,
+      "binary_sha256": "679f7c86bbb16d9e8ede8b06e48b6b941185ff67ed6cc21f03389ef627975470",
+      "log_sha256": "731d4ae3b0b0a8d9352b26bc96d217382823cbd7505607272f658a42c7f14e14",
+      "scope": "Exact emitted test artifact; independent of overall build completion. Owning, native and hosted gates recorded separately.",
+      "receipt": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/store-nonce-caller-owning-12-receipt.json",
+      "receipt_sha256": "e6e8129e3d5becfffaf2ebd1f284cf67c21a09c5ec76af9feefff75bb2bad835"
+    },
+    {
+      "source": "f2bb8c91d36fb17f51700b0f9692f2f7ed14b12b",
+      "exit_code": 0,
+      "elapsed_seconds": 213.3416178226471,
+      "log_sha256": "1ed57e50010b565e10093d852bc841037d834064eb889b0511b1398950e98481",
+      "receipt": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/mixed13-owning-clippy-receipt.json",
+      "receipt_sha256": "74dca192aa32c45117377428587e2fb2cfad5847ce3a6108dcc10b21c674cf43"
+    },
+    {
+      "source": "844b1356508935d48d1d4ef50371f7811206b3e8",
+      "tree": "cef78d19ea73e23365374134a95afc8fa716ad46",
+      "exit_code": 0,
+      "counts": [
+        [
+          "1",
+          "0",
+          "0"
+        ]
+      ],
+      "elapsed_seconds": 2.857227087020874,
+      "binary_sha256": "50375832b9e99c5204463ecfd7994b6031e32f0b668334bb18fc561b2a31a5ba",
+      "log_sha256": "f0cfbde61df8e0c267c089290414ecfeb4c010cb1d4df51fe537ae4e38906d04",
+      "phase_marker": true,
+      "receipt": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/legacy-owner-pair-capture-receipt.json",
+      "receipt_sha256": "a40e47455392d4921469ddd322e1f0a485595fb9539c21212c2009e7d85555e0"
+    },
+    {
+      "source": "f2bb8c91d36fb17f51700b0f9692f2f7ed14b12b",
+      "exit_code": 101,
+      "elapsed_seconds": 79.73575615882874,
+      "log_sha256": "253b2addd96d8ee4cc248baac4be4e7aeccedd9446579ae462176b00f59b9870",
+      "receipt": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/mixed-13-build-receipt.json",
+      "receipt_sha256": "0740d85dc8d2ae2817980f3677dfcc7fefe0186b0a74ed5397faedb45433e9c3"
+    },
+    {
+      "source": "f2bb8c91d36fb17f51700b0f9692f2f7ed14b12b",
+      "exit_code": 0,
+      "elapsed_seconds": 360.6547689437866,
+      "log_sha256": "9e935a2adff60e34f8767a8143a5fb0eaf642ce161133b93bedfd3656703e6da",
+      "receipt": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/mixed-14-build-receipt.json",
+      "receipt_sha256": "a561fc17902190737fca31ca1ce687696f034322ea9c95562c1f90a4ee2ebd24"
+    },
+    {
+      "source": "f2bb8c91d36fb17f51700b0f9692f2f7ed14b12b",
+      "exit_code": 0,
+      "counts": [
+        [
+          "30",
+          "0",
+          "0"
+        ]
+      ],
+      "elapsed_seconds": 15.75251817703247,
+      "binary_sha256": "ceefad72d5b03fb30c998170ed24a41b1c682dedaf9fbfefe8a2dfccd68beacd",
+      "log_sha256": "8723a74bb1e6855aa7bd10a4dc6f96c497b160ba9fa4f4995dc9cc268820a8ab",
+      "scope": "Exact emitted test artifact; independent of overall build completion. Owning, native and hosted gates recorded separately.",
+      "receipt": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/cp-production-effects-13-receipt.json",
+      "receipt_sha256": "d41b07bec4c188b482b7c77e94a6bcd51709acff7ac656543816395c61f32f77"
+    },
+    {
+      "source": "f2bb8c91d36fb17f51700b0f9692f2f7ed14b12b",
+      "exit_code": 0,
+      "counts": [
+        [
+          "25",
+          "0",
+          "0"
+        ]
+      ],
+      "elapsed_seconds": 7.7367894649505615,
+      "binary_sha256": "fb07db41b632ec9849beafd1a23e71f928336195c554e4f2104d3232dd89e8ba",
+      "log_sha256": "de978bd1406c7555544c7c4c59609cf0d92afaf7ad73d5b6d99f8a5ff98699e6",
+      "scope": "Exact emitted test artifact; independent of overall build completion. Owning, native and hosted gates recorded separately.",
+      "receipt": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/issuance-freeze-whole-13-receipt.json",
+      "receipt_sha256": "1ed646c41e3070563cbd23650f4c6ad9513bf21a6c8f32790d4d97d9b95c3f8e"
+    },
+    {
+      "source": "f2bb8c91d36fb17f51700b0f9692f2f7ed14b12b",
+      "exit_code": 0,
+      "counts": [
+        [
+          "26",
+          "0",
+          "0"
+        ]
+      ],
+      "elapsed_seconds": 0.12470364570617676,
+      "binary_sha256": "3c8cd93764b3310e1fadd4fecec072d10f1da5b50c64fb8332b0d503259ca8ba",
+      "log_sha256": "865922f4ca39bfe67801f983038332cd143ed15ffb298eb8166259f063b1018f",
+      "scope": "Exact emitted test artifact; independent of overall build completion. Owning, native and hosted gates recorded separately.",
+      "receipt": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/security-types-whole-14-receipt.json",
+      "receipt_sha256": "16552b9e35ec672e1d1ba78f8bd7bdd9124ac74c38140cb3afd4ce2fbe2a1b49"
+    },
+    {
+      "source": "f2bb8c91d36fb17f51700b0f9692f2f7ed14b12b",
+      "exit_code": 0,
+      "counts": [
+        [
+          "18",
+          "0",
+          "0"
+        ]
+      ],
+      "elapsed_seconds": 0.029052257537841797,
+      "binary_sha256": "bc1d45004bc67374a9042d36916d62391f92e97aa184ecf174d549c65666170f",
+      "log_sha256": "01990d45bd81d23a0591a154d8ac7ff6c8ba9565c2cd275adc2ca15852c6b680",
+      "scope": "Exact emitted test artifact; independent of overall build completion. Owning, native and hosted gates recorded separately.",
+      "receipt": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/security-plan-shape-whole-14-receipt.json",
+      "receipt_sha256": "d0ac90bce39e5173488bbb287848f02ee53755affad7aed8e9e87c8e9eabfc4d"
+    },
+    {
+      "source": "f2bb8c91d36fb17f51700b0f9692f2f7ed14b12b",
+      "exit_code": 0,
+      "counts": [
+        [
+          "8",
+          "0",
+          "0"
+        ]
+      ],
+      "elapsed_seconds": 0.00859379768371582,
+      "binary_sha256": "fc6ecbb3d215ec916ffb6ffade92836ad6918766a31434d80365f0811885a507",
+      "log_sha256": "ec6ab1f60d5b70262247eff395807ecfc86e3892ff04ca9b7eb805233ffb0cf7",
+      "scope": "Exact emitted test artifact; independent of overall build completion. Owning, native and hosted gates recorded separately.",
+      "receipt": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/security-dispatch-whole-14-receipt.json",
+      "receipt_sha256": "55adc0f3fda80b9256b0bf0bd327085a6ed2c7ba6c3994fe57c8986c5c5c96af"
+    },
+    {
+      "source": "f2bb8c91d36fb17f51700b0f9692f2f7ed14b12b",
+      "exit_code": 0,
+      "counts": [
+        [
+          "23",
+          "0",
+          "0"
+        ]
+      ],
+      "elapsed_seconds": 15.513314247131348,
+      "binary_sha256": "a33b5eda5f961ee68900d34c55a248fd4f3b43de690e258b43750b7d914685e7",
+      "log_sha256": "d233a24f67625f3002206f6bcb057d199ab36f09603f445c19d07a1166af77aa",
+      "scope": "Exact emitted test artifact; independent of overall build completion. Owning, native and hosted gates recorded separately.",
+      "receipt": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/quarantine-whole-14-receipt.json",
+      "receipt_sha256": "a0168303197a127c48b2bbbf1a19e0234daa15dab04626531ce69297a2e34d5b"
+    },
+    {
+      "source": "f2bb8c91d36fb17f51700b0f9692f2f7ed14b12b",
+      "exit_code": 0,
+      "counts": [
+        [
+          "12",
+          "0",
+          "0"
+        ]
+      ],
+      "elapsed_seconds": 0.22753572463989258,
+      "binary_sha256": "ad02f25527aef39fc88d952053fc88790f1fe5d170bea26a04859c1484d36f00",
+      "log_sha256": "63626368f7785f34fbf017b667df78c818a81b3d38c9f0c79f162e3485dc1ef7",
+      "scope": "Exact emitted test artifact; independent of overall build completion. Owning, native and hosted gates recorded separately.",
+      "receipt": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/quarantine-dispatch-whole-14-receipt.json",
+      "receipt_sha256": "26571d36803f466162be182a8c70fa9d01f9d3c4883252e488bcc6d290fe7838"
+    },
+    {
+      "source": "f2bb8c91d36fb17f51700b0f9692f2f7ed14b12b",
+      "tree": "697dfd9e00084cc12e4e40a3cfbbd687c1ecf685",
+      "exit_code": 101,
+      "counts": [
+        [
+          "0",
+          "1",
+          "0"
+        ]
+      ],
+      "elapsed_seconds": 0.07672882080078125,
+      "binary_sha256": "5de8c8f653a798af99f5ce890995bd04eb6f1c457148760a32471091de59bb56",
+      "log_sha256": "33fff3d126cc25ce4cf4f0ec2c9afad99a812047cc88ef82fa31e5e4fc6ffa1e",
+      "phase_marker": false,
+      "receipt": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/legacy-owner-pair-verify-receipt.json",
+      "receipt_sha256": "a13356867a19c860b20d462363942222d96132d577192bf715c5d03f74b775e5"
+    },
+    {
+      "source": "52d98f4bea87df7fe5acdf424a29f5e10e5365cb",
+      "exit_code": 0,
+      "elapsed_seconds": 78.10600304603577,
+      "log_sha256": "0cefe442504e7bb0e6390f1b9729b1ac07b5e042e59601d902d5ac1960f32878",
+      "receipt": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/mixed-15-build-receipt.json",
+      "receipt_sha256": "5c097a7954c38f6b7af5bea01b6f4bdbdd157124f9eec99720515257222644ab"
+    },
+    {
+      "source": "52d98f4bea87df7fe5acdf424a29f5e10e5365cb",
+      "tree": "4256f8f01f02c0eb3cb38ac9f44514ba73b35551",
+      "exit_code": 0,
+      "counts": [
+        [
+          "1",
+          "0",
+          "0"
+        ]
+      ],
+      "elapsed_seconds": 2.298874616622925,
+      "binary_sha256": "14512ad7548f114100f2dc6d46017e2ec34f828231e7855bece49e57e5db0114",
+      "log_sha256": "390f9024558af6db26a43dde7f69ee77a53563e7db0da61c0195e2fe020850e8",
+      "phase_marker": true,
+      "receipt": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/legacy-owner-pair-verify-02-receipt.json",
+      "receipt_sha256": "02591eaa67a84c825441074a225b0a78f5b0a3818c083198f5648a6891983cbb"
+    }
+  ],
+  "source_gates": [
+    {
+      "source": "f2bb8c91d36fb17f51700b0f9692f2f7ed14b12b",
+      "argv": [
+        "python3",
+        "scripts/check-trust-boundaries.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 93.2527687549591,
+      "log_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/mixed13-trust.log",
+      "log_sha256": "c3eb48b19579ef3f04aeb17da0f19d8163dc0194f0a5d29ed8147bfa75a32e5c"
+    },
+    {
+      "source": "f2bb8c91d36fb17f51700b0f9692f2f7ed14b12b",
+      "argv": [
+        "python3",
+        "scripts/check-rust-file-hygiene.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 4.209181070327759,
+      "log_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/mixed13-hygiene.log",
+      "log_sha256": "0715b85e49b8aaf42f381475a6717b222d880dbc98b754f223e3b072604649aa"
+    },
+    {
+      "source": "f2bb8c91d36fb17f51700b0f9692f2f7ed14b12b",
+      "argv": [
+        "python3",
+        "scripts/check-negative-assertions.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.2780323028564453,
+      "log_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/mixed13-negative.log",
+      "log_sha256": "49516e4ccc9c034cbb5fd748bdcae89b35f56d06d12a4c5e01ea61c0e17c45a6"
+    },
+    {
+      "source": "f2bb8c91d36fb17f51700b0f9692f2f7ed14b12b",
+      "argv": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 27.74619150161743,
+      "log_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/mixed13-fmt.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "source_equivalence": {
+    "runtime_source": "f2bb8c91d36fb17f51700b0f9692f2f7ed14b12b",
+    "observed_source": "52d98f4bea87df7fe5acdf424a29f5e10e5365cb",
+    "diff_paths": [
+      "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/security_participant_migration/legacy_owner_pair.rs"
+    ],
+    "scope": "One test-only private-directory setup correction. Production code is identical; this does not relabel historical execution as current execution."
+  },
+  "repairs": {
+    "finality": "2ebf718dcc",
+    "freeze_preflight": "a8fdeb457c",
+    "freeze_preflight_controls": "53fbc2346a",
+    "paired_old_owner_test": "b3d6d1273e",
+    "private_probe_setup": "52d98f4bea"
+  },
+  "compatibility": {
+    "old_source": "844b1356508935d48d1d4ef50371f7811206b3e8",
+    "old_production_base": "04f6d7fc6d861aad9d5819a6c913e74e1890a64b",
+    "current_import_source": "52d98f4bea87df7fe5acdf424a29f5e10e5365cb",
+    "capture_directory": "/tmp/pr1160-legacy-owner-pair-evidence/capture",
+    "contract": "Actual Legacy0 producer and real UUIDv7 destination; same retained source inode/seal/rows; existing Expected record before import; fresh real owner fence; ImportedInactive/global commit +1; exact replay without source or history mutation. Earlier placeholder-destination capture remains unchanged and supplies read verification only.",
+    "initial_verify_setup_failure": {
+      "path": "/tmp/pr1160-legacy-owner-pair-evidence/diagnosis-probe-private-parent.json",
+      "sha256": "188a67ce51522964bd8ecc12c48f6b54b46847391cfa6bceec7207c171ce3f10"
+    }
+  },
+  "cache_incident": {
+    "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/mixed13-cross-worktree-cache-incident.json",
+    "sha256": "f73ac66dce5404331a409afe5cb334c652c91a214a1b7d4608caae4302e299ef"
+  },
+  "failure_classification": {
+    "issuance-finality-12": "Genuine regression: expected Conflict, observed Unavailable. Repaired and whole25 passes later.",
+    "mixed-13-build": "Stale cross-worktree dependency artifact; current trait method existed. Build101 retained, three changed crate caches rebuilt without source changes.",
+    "legacy-owner-pair-verify": "Test setup refused an unsecured fresh probe directory before the retained source was opened. Fixture-only correction; not a migration rejection."
+  },
+  "f077": {
+    "state": "originals-integrated-producers-and-activation-pending",
+    "originals_source": "1d219f0250",
+    "total_tests": 77,
+    "failing_assertions": 22,
+    "new_failing_tests": 18,
+    "preexisting_passing_tests": 59,
+    "fixture_errors": 0,
+    "originals_manifest": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/f077-originals/SHA256SUMS",
+      "sha256": "a1920f3e4b714ecc5f95aa0d510c1f64d318c5871e944746f4bf04a5ae393b8d"
+    },
+    "scratch_b5_manifest": {
+      "path": "/tmp/pr1160-f077-b5/SHA256SUMS",
+      "sha256": "22dec0e9887270d116e325faa9f8121688b0fe052ae8d021cddf60ec7479b717"
+    },
+    "limits": "Actions-only scratch transport evidence. Dedicated-App H2 and prevent-before-merge per-PR authorization remain unqualified. No production rule, variable, key, or trusted definition changed."
+  },
+  "hosted": {
+    "success": 118,
+    "failure": 21,
+    "skipped": 12,
+    "receipt": {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/hosted-refresh-13.json",
+      "sha256": "0c8d0de84b6310ed57780e71c4f03a3226747ee5961a7f299b48d82c2e6797ea"
+    }
+  },
+  "remaining_acceptance": [
+    "Complete trusted workflow producer repairs and independent review; qualify dedicated publisher and per-PR protected landing boundary.",
+    "Complete remaining owning/default/PQ/platform/cold coverage; reconcile all review obligations without reimplementing integrated work.",
+    "Run current enforcing native trajectory with eight receipts, unchanged 10000ms fence and execution nonces; any debugging run remains nonfinal.",
+    "Freeze final source, obtain exact-source native/trusted/hosted evidence, refresh reviews and threads, and land through protections."
+  ]
+}

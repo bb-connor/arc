@@ -1,12 +1,22 @@
 # Security and process landing ledger
 
-## Corrected fixture and owning checkpoint (2026-10-08)
+## Current finality and legacy import checkpoint (2026-10-08)
+
+The [finality and legacy import checkpoint](audits/finality-and-legacy-import-checkpoint-20261008.json) records the integrated effect-finality, shared-lineage freeze and authenticated historical-replay repairs. At `f2bb8c91d3`, all 30 production-effect tests and the whole 25-test issuance target pass, including the original refusal regression and zero-external-call controls. Eight-owner strict Clippy and all four unchanged source gates pass. Security-type and quarantine targets add 87 passing tests.
+
+At `52d98f4bea`, the current code imports an actual Legacy0 source created by the pre-migration producer into its original independently provisioned destination. The test preserves the existing expectation, source inode, seal and row bytes; verifies the new owner fence and inactive import; and proves replay does not append history. The earlier probe-permission setup failure and cross-worktree Cargo-cache failure remain recorded separately from genuine regressions.
+
+F077 now has 18 reproduced workflow regressions, with 22 failing assertions and all 59 existing tests passing. Their production repairs and protected-publisher qualification are in progress. Published #1160 remains `89d79ac6ab` with 118 successful, 21 failed and 12 skipped checks. The local batch is unpublished and unqualified. Current native, default/PQ/platform/cold, trusted, hosted and protected landing acceptance remain open. All 1,793 original requirement rows remain unchanged.
+
+Earlier checkpoints below preserve their original source and outcomes.
+
+## Earlier fixture and owning checkpoint (2026-10-08)
 
 The [current correction checkpoint](audits/fixture-correction-checkpoint-20261008.json) records the whole remote MCP library passing 192 cases and the egress integration target passing five at `e5853308c9`. Broker integrity controls pass four cases, the private selector guards pass three, and the missing-plan router passes three. Historical-query tamper refusal remains covered before the pending authenticated-removal repair.
 
 The earlier nonce-cleanup diagnosis was incorrect: ordinary MCP calls never retain that native request artifact. The corrected test uses coherent metadata through public validation and mint APIs. Earlier setup failures remain retained. Eight-owner strict lint found a test-only future ownership issue; its correction is committed and awaiting recheck. Finality, native/trusted/hosted qualification and protected landing remain open. All 1,793 prior requirement rows are preserved.
 
-## Latest integration checkpoint (2026-10-08)
+## Earlier integration checkpoint (2026-10-08)
 
 The [current local repair checkpoint](audits/repair-batch-local-checkpoint-20261008.json) retains 31 exact-source campaigns. Bounded recovery/FX, correlation, overlay rollback, broker selection and runner lifetime repairs have passing local evidence; the whole runner module passes 34 cases. Remote MCP has 191 passes and one new nonce-fixture failure with a test-only correction awaiting recheck. The 16-call participant-history test passes without losing prior custody, while actual production native performance remains unqualified.
 
