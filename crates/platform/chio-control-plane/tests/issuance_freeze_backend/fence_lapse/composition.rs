@@ -2,7 +2,8 @@ use chio_control_plane::security::adapters::effect_port::CapabilitySetSuspension
 use chio_quarantine::SchedulerTickRequest;
 use chio_security_types::ports::{
     capability_set_suspension_version_hash, empty_capability_set_suspension_snapshot,
-    CapabilitySetSuspensionKey, CapabilitySetSuspensionSpec, CapabilitySetSuspensionStore,
+    issuance_freeze_installed_version_hash, CapabilitySetSuspensionKey,
+    CapabilitySetSuspensionSpec, CapabilitySetSuspensionStore, EffectPort,
     LINEAGE_FENCE_RENEWAL_MARGIN_MS,
 };
 
@@ -182,6 +183,43 @@ fn tick(
         .unwrap_or_else(|error| panic!("composition tick {label}: {error}"))
 }
 
+fn raw_freeze_state(
+    harness: &FenceLapseHarness,
+) -> Vec<(String, Vec<Vec<rusqlite::types::Value>>)> {
+    let connection = rusqlite::Connection::open(harness._directory.path().join("fence-lapse.db"))
+        .unwrap_or_else(|error| panic!("open freeze state snapshot: {error}"));
+    let mut statement = connection.prepare(
+        "SELECT name FROM sqlite_schema WHERE type = 'table' AND name LIKE 'security_%' ORDER BY name",
+    ).unwrap_or_else(|error| panic!("prepare freeze table names: {error}"));
+    let names = statement
+        .query_map([], |row| row.get::<_, String>(0))
+        .unwrap_or_else(|error| panic!("freeze table names: {error}"))
+        .map(|row| row.unwrap_or_else(|error| panic!("freeze table name: {error}")))
+        .collect::<Vec<_>>();
+    names
+        .into_iter()
+        .map(|name| {
+            assert!(name
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_'));
+            let mut statement = connection
+                .prepare(&format!("SELECT * FROM {name} ORDER BY rowid"))
+                .unwrap_or_else(|error| panic!("prepare raw freeze {name}: {error}"));
+            let count = statement.column_count();
+            let rows = statement
+                .query_map([], |row| {
+                    (0..count)
+                        .map(|index| row.get::<_, rusqlite::types::Value>(index))
+                        .collect::<rusqlite::Result<Vec<_>>>()
+                })
+                .unwrap_or_else(|error| panic!("read raw freeze {name}: {error}"))
+                .map(|row| row.unwrap_or_else(|error| panic!("raw freeze {name}: {error}")))
+                .collect();
+            (name, rows)
+        })
+        .collect()
+}
+
 #[test]
 fn same_lineage_plans_survive_renewal_restart_and_the_first_freeze_lift() {
     let harness = FenceLapseHarness::new();
@@ -339,5 +377,117 @@ fn same_lineage_plans_survive_renewal_restart_and_the_first_freeze_lift() {
     assert_eq!(
         suspension.contributions.as_slice()[0].effect_id,
         second.effects.as_slice()[1].effect_id
+    );
+}
+
+#[test]
+fn lifted_freeze_refuses_fresh_apply_while_original_window_and_lease_are_live() {
+    let harness = FenceLapseHarness::new();
+    let authority: Arc<dyn ResponseSchedulerStore> = harness.store.clone();
+    let effects = ActiveResponseEffectPort::from_backends(vec![
+        Arc::new(harness.backend()) as Arc<dyn ResponseEffectBackend>
+    ])
+    .unwrap_or_else(|error| panic!("freeze finality router: {error}"))
+    .with_plan_authority(authority);
+    let planned = &harness.plan.effects.as_slice()[0];
+    let apply = EffectRequest {
+        tenant_id: tenant(),
+        action_id: action(),
+        plan_hash: harness.plan.plan_hash,
+        effect_id: planned.effect_id.clone(),
+        effect_kind: planned.kind,
+        target: planned.target.clone(),
+        plan_expires_at_unix_ms: harness.plan.expires_at_unix_ms,
+        operation: EffectOperation::Apply,
+        idempotency_key: record("response_effect_command:freeze-finality-apply"),
+        expected_version_hash: planned.observed_base_version_hash,
+        scheduler_lease_owner_id: harness.initial_work.lease_owner_id.clone(),
+        scheduler_fencing_token: harness.initial_work.fencing_token,
+        canonical_contribution: planned.canonical_contribution.clone(),
+        contribution_hash: planned.contribution_hash,
+    };
+    let applied = effects
+        .execute(&apply)
+        .unwrap_or_else(|error| panic!("original freeze Apply: {error}"));
+    assert!(applied.applied);
+    let current = harness.local_contributions();
+    assert_eq!(current.len(), 1);
+    let installed = issuance_freeze_installed_version_hash(&key(), &current[0])
+        .unwrap_or_else(|error| panic!("exact installed freeze hash: {error}"));
+    assert_eq!(installed, applied.resulting_version_hash);
+    let mut remove = apply.clone();
+    remove.operation = EffectOperation::Remove;
+    remove.expected_version_hash = installed;
+    remove.idempotency_key = record("response_effect_command:freeze-finality-remove");
+    let removed = effects
+        .execute(&remove)
+        .unwrap_or_else(|error| panic!("original freeze Remove: {error}"));
+    assert!(!removed.applied);
+    assert!(harness.local_contributions().is_empty());
+    assert_eq!(harness.external_fence(), None);
+    let before = harness.response();
+    let pending = harness
+        .store
+        .load_pending_issuance_freeze_release(&key(), &action(), &planned.effect_id)
+        .unwrap_or_else(|error| panic!("pending freeze release: {error}"));
+    assert_eq!(pending, None);
+    let completed = harness
+        .store
+        .load_completed_issuance_freeze_release(
+            &key(),
+            &action(),
+            &planned.effect_id,
+            harness.plan.plan_hash,
+        )
+        .unwrap_or_else(|error| panic!("completed freeze release: {error}"))
+        .unwrap_or_else(|| panic!("genuine completed Remove evidence missing"));
+    assert_eq!(completed.request, remove);
+    assert_eq!(completed.result, removed);
+    let original_spec: IssuanceFreezeSpec =
+        serde_json::from_slice(apply.canonical_contribution.as_bytes())
+            .unwrap_or_else(|error| panic!("original freeze spec: {error}"));
+    assert!(harness.clock.now() < original_spec.acquisition.expires_at_unix_ms);
+    assert!(harness.clock.now() < apply.plan_expires_at_unix_ms);
+    assert!(harness.clock.now() < harness.initial_work.lease_expires_at_unix_ms);
+    harness
+        .store
+        .validate_lease(&harness.initial_work)
+        .unwrap_or_else(|error| panic!("still-live original lease: {error}"));
+    let durable_before = raw_freeze_state(&harness);
+    let mut fresh = apply;
+    fresh.idempotency_key = record("response_effect_command:freeze-finality-fresh-apply");
+    let refused = effects.execute(&fresh).err().unwrap_or_else(|| {
+        panic!("a lifted freeze was admitted again under live original authority")
+    });
+    assert_eq!(refused.kind(), PortErrorKind::Conflict);
+    assert_eq!(refused.code().as_str(), "store.conflict");
+    assert_eq!(raw_freeze_state(&harness), durable_before);
+    assert_eq!(harness.response(), before);
+    assert!(harness.local_contributions().is_empty());
+    assert_eq!(harness.external_fence(), None);
+    assert_eq!(
+        effects
+            .load_result(&query(&fresh))
+            .unwrap_or_else(|error| panic!("fresh freeze readback: {error}")),
+        EffectExecutionStatus::NotExecuted
+    );
+    assert_eq!(
+        effects
+            .execute(&remove)
+            .unwrap_or_else(|error| panic!("exact Remove replay: {error}")),
+        removed
+    );
+    assert_eq!(raw_freeze_state(&harness), durable_before);
+    assert_eq!(
+        harness
+            .store
+            .load_completed_issuance_freeze_release(
+                &key(),
+                &action(),
+                &planned.effect_id,
+                harness.plan.plan_hash
+            )
+            .unwrap_or_else(|error| panic!("unchanged completed release: {error}")),
+        Some(completed)
     );
 }
