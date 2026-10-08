@@ -483,7 +483,7 @@ fn nonce_only_tampered_artifact_member_refuses_instead_of_appearing_unselected()
     let before = fixture.counts()?;
     assert!(
         matches!(fixture.select(), Err(AdmissionOperationStoreError::Invariant(ref reason))
-        if reason == "supplemental nonce artifact differs from its original custody")
+        if reason == "budget state invariant violated: nonce preflight authorization identity changed")
     );
     assert_eq!(fixture.counts()?, before);
     Ok(())
