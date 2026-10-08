@@ -6,6 +6,19 @@ This annex implements [ADR-0038](../../../adr/ADR-0038-desktop-operator-program.
 
 The previous numbered macOS specifications, plans, protocol schemas, and fixture catalog are superseded. Historical research remains source evidence only. In particular, `native-descendant-v1` is **retired**, not relaxed or renamed to Seatbelt. It cannot be selected, migrated into another profile, or advertised as qualified. Any future descendant-ES proposal needs a new decision and independent qualification including its original ES/NE and network-containment concerns.
 
+Apply FIRST-CLASS-INTEGRATIONS' catalog scope explicitly: individual harness
+promotion uses its own H01-H05/H06a/H08a; a Herdr/harness tuple uses its own
+H07/H08b. H06b and the complete four-selection Herdr matrix gate aggregate
+completion only. M10 tests removal of unrelated records versus removal of the
+selected tuple's own mandatory subcase at the actual release owner.
+
+Selected model routes also consume HOST-CONTRACT's model-provider resource
+boundary: any token/spend dimension required by grant, policy or profile needs
+an enforceable route bound and its actual-owner reservation/uncertainty tests.
+Missing bounds refuse before dispatch; a separately approved narrower profile
+cannot become an automatic fallback. OS confinement and provider accounting
+remain separate qualification dimensions.
+
 ## Product and boundary
 
 **Chio is a Rust kernel for building agentic operating systems.** Applications and harnesses use it to coordinate work, share resources, and cooperate across organizational boundaries. On macOS, existing native owners and their Darwin ports provide the systems layer through supported bindings and services. They must work with every Chio graphical client absent. Applications, agent harnesses and Herdr own their frontend, planning and coordination strategy; Chio retains its authority, resource/process custody, governed work, recovery and evidence contracts.
@@ -45,7 +58,7 @@ The [first-class integration contract](../2026-10-07-desktop-integration/FIRST-C
 
 ## First-class macOS integration acceptance
 
-All five rows are required delivery targets with `runtime_evidence: unavailable` until their own installed cases pass. FIRST-CLASS-INTEGRATIONS H01-H05/H08 apply to each of the four Mac harness cells; each must qualify at least one scoped protected profile. H06 additionally proves same-harness controls and mixed coordination involving all four, and H07 covers Herdr with each of the four selections. The harness rows bind exact executable/plugin/configuration, native service/API, principal/deployment context, backend and OS/CPU tuple. Observation, protected execution and any selected W1 capability remain distinct evidence cells. A narrower passing release may ship with named gaps; it cannot claim the complete first-class integration program.
+All five rows are required delivery targets with `runtime_evidence: unavailable` until their own installed cases pass. FIRST-CLASS-INTEGRATIONS H01-H05/H06a/H08a apply to each of the four Mac harness cells; each must qualify at least one scoped protected profile. H06 additionally proves same-harness controls and mixed coordination involving all four, and H07 covers Herdr with each of the four selections. The harness rows bind exact executable/plugin/configuration, native service/API, principal/deployment context, backend and OS/CPU tuple. Observation, protected execution and any selected W1 capability remain distinct evidence cells. A narrower passing release may ship with named gaps; it cannot claim the complete first-class integration program.
 
 | Required target | Independent installed Mac acceptance |
 | --- | --- |

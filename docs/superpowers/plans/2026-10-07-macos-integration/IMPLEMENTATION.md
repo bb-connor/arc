@@ -12,6 +12,20 @@
 
 **Shared native contracts:** [HOST-CONTRACT](../../specs/2026-10-07-desktop-integration/HOST-CONTRACT.md), [CONSUMERS](../../specs/2026-10-07-desktop-integration/CONSUMERS.md), [CAPABILITIES](../../specs/2026-10-07-desktop-integration/CAPABILITIES.md), [FIRST-CLASS-INTEGRATIONS](../../specs/2026-10-07-desktop-integration/FIRST-CLASS-INTEGRATIONS.md), the proposed [RELEASE owner extension](../../specs/2026-10-07-desktop-integration/RELEASE.md), and [native service research](../../specs/2026-10-07-macos-integration/research/native-host-services.md).
 
+Apply FIRST-CLASS-INTEGRATIONS' catalog scope explicitly: individual harness
+promotion uses its own H01-H05/H06a/H08a; a Herdr/harness tuple uses its own
+H07/H08b. H06b and the complete four-selection Herdr matrix gate aggregate
+completion only. M10 tests removal of unrelated records versus removal of the
+selected tuple's own mandatory subcase at the actual release owner.
+
+M0 inventories each selected inference route's host/model/account, resource
+owner and required grant/policy/profile dimensions. M3-M7 implement applicable
+HOST-CONTRACT provider-limit admission at the actual owner; M9/M10 require useful
+bounded inference and missing/ineffective limit, route/account substitution,
+concurrent exhaustion and lost-reply reservation tests. A required token/spend
+bound unavailable at that route refuses before dispatch, with no automatic
+narrower-profile or billing fallback. Confinement alone cannot qualify accounting.
+
 ## Global constraints
 
 - `runtime_evidence: unavailable` applies to every work packet in this plan. No implementation/test step below has been run by writing it.
