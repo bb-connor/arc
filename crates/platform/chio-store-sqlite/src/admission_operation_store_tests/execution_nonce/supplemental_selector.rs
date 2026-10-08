@@ -439,3 +439,52 @@ fn unowned_reserved_prefix_cannot_be_discarded_as_authenticated_nonce_custody() 
     assert_eq!(fixture.counts()?, before);
     Ok(())
 }
+
+#[test]
+fn nonce_only_tampered_artifact_member_refuses_instead_of_appearing_unselected() -> TestResult {
+    let mut fixture = SelectionFixture::new()?;
+    let operation = fixture.own_preflight(&fixture.prepare("nonce-member-corruption")?)?;
+    assert!(fixture.select()?.is_none());
+    let identity = AdmissionNoncePreflightIdentityV1::for_operation(&operation, 0)?;
+    let changed = "f".repeat(64);
+    assert_ne!(changed, fixture.digest);
+    let mut artifacts = vec![
+        operation
+            .binding()
+            .authorization_capability_hash()
+            .as_str()
+            .to_owned(),
+        changed.clone(),
+    ];
+    artifacts.sort();
+    {
+        // Owner-connection corruption changes only current physical members.
+        // The original parent, ownership, authorization event and commit remain.
+        let connection = fixture.fixture.store.connection()?;
+        assert_eq!(connection.execute(
+            "UPDATE budget_authorization_holds SET supplemental_artifact_digest = ?1 WHERE hold_id = ?2",
+            params![changed, identity.hold_id().as_str()],
+        )?, 1);
+        assert_eq!(
+            connection.execute(
+                "DELETE FROM budget_hold_authorization_artifacts WHERE hold_id = ?1",
+                [identity.hold_id().as_str()],
+            )?,
+            2
+        );
+        for (index, artifact) in artifacts.iter().enumerate() {
+            assert_eq!(connection.execute(
+                "INSERT INTO budget_hold_authorization_artifacts (hold_id, artifact_index, artifact_digest) VALUES (?1, ?2, ?3)",
+                params![identity.hold_id().as_str(), i64::try_from(index)?, artifact],
+            )?, 1);
+        }
+    }
+    fixture.digest = changed;
+    let before = fixture.counts()?;
+    assert!(
+        matches!(fixture.select(), Err(AdmissionOperationStoreError::Invariant(ref reason))
+        if reason == "supplemental nonce artifact differs from its original custody")
+    );
+    assert_eq!(fixture.counts()?, before);
+    Ok(())
+}
