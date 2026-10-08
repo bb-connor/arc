@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/capability/security-binding.schema.json",
+  "title": "Chio Capability Security Binding",
+  "description": "Decoded predicate of a bind_security_context caveat. The caveat predicate is the RFC 8785 canonical JSON text of this object, and the caveat carries no sig.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "tenantId",
+    "lineageId",
+    "sessionId",
+    "principalId",
+    "isolationEpochId",
+    "contextGeneration",
+    "workloadId",
+    "serverId",
+    "workloadSignerPublicKey"
+  ],
+  "properties": {
+    "schema": { "const": "chio.capability-security-binding.v1" },
+    "tenantId": { "$ref": "#/$defs/securityBindingText" },
+    "lineageId": { "$ref": "#/$defs/securityBindingText" },
+    "sessionId": { "$ref": "#/$defs/securityBindingText" },
+    "principalId": { "$ref": "#/$defs/securityBindingText" },
+    "isolationEpochId": { "$ref": "#/$defs/securityBindingText" },
+    "contextGeneration": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 18446744073709551615
+    },
+    "workloadId": { "$ref": "#/$defs/securityBindingText" },
+    "serverId": { "$ref": "#/$defs/securityBindingText" },
+    "workloadSignerPublicKey": {
+      "description": "Canonical lowercase PublicKey hex form, without a 0x prefix.",
+      "type": "string",
+      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    }
+  },
+  "$defs": {
+    "securityBindingText": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    }
+  }
+}

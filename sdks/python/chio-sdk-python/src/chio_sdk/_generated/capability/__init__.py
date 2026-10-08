@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: b084ae0e56e427c850264660383c6f883d46db68902f81ec769714701f82dd9e
+# Schema sha256: 98badc519c6787931e288dad66023f0515a7bda8b0be5b4370b5b906713f8c3e
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -17,6 +17,7 @@ from .cumulative_approval_root_schema import Body, ChioCumulativeApprovalRootBin
 from .governed_approval_token_schema import Algorithm, ChioGovernedApprovalToken, Decision, GovernedApprovalPublicKey, GovernedApprovalSignature
 from .grant_schema import ChioCapabilityGrant, Constraint, MonetaryAmount, Operation, PromptGrant, ResourceGrant, ToolGrant
 from .revocation_schema import ChioCapabilityRevocationEntry
+from .security_binding_schema import ChioCapabilitySecurityBinding, SecurityBindingText
 from .supplemental_authorization_schema import ChioOpaqueSupplementalAuthorization
 from .threshold_approval_proposal_schema import Algorithm, ChioThresholdApprovalProposal, ThresholdProposalPublicKey, ThresholdProposalSignature
 from .token_schema import Algorithm, Attenuation, AttenuationProof, AttenuationWitness, Caveat, ChioCapabilitytoken, ChioScope, Constraint, CumulativeApprovalDelegableConstraint, CumulativeApprovalDirectConstraint, DelegationLink, GenericConstraint, GrantKind, GrantSubsetRelation, Kind, LegacyApprovalConstraint, MonetaryAmount, Operation, PromptGrant, ResourceGrant, ScopeAttenuation, Subset, ToolGrant, Value, Value1, Value2
@@ -39,6 +40,7 @@ __all__ = [
     "ChioCapabilityGrant",
     "ChioCapabilityNegotiationV1",
     "ChioCapabilityRevocationEntry",
+    "ChioCapabilitySecurityBinding",
     "ChioCapabilitytoken",
     "ChioCumulativeApprovalRootBinding",
     "ChioGovernedApprovalToken",
@@ -67,6 +69,7 @@ __all__ = [
     "PromptGrant",
     "ResourceGrant",
     "ScopeAttenuation",
+    "SecurityBindingText",
     "Subset",
     "ThresholdProposalPublicKey",
     "ThresholdProposalSignature",

@@ -74,7 +74,7 @@ schema files across eleven subtrees.
 | `error/policy_denied.schema.json`     |    27 |
 | `error/tool_server_error.schema.json` |    16 |
 
-### capability (11)
+### capability (12)
 
 Capability tokens, grants, revocation envelopes, and the capability list
 projection. See `capability/README.md`.
@@ -88,9 +88,10 @@ projection. See `capability/README.md`.
 | `capability/governed-approval-token.schema.json`       |    41 |
 | `capability/grant.schema.json`                         |   140 |
 | `capability/revocation.schema.json`                    |    20 |
+| `capability/security-binding.schema.json`              |    47 |
 | `capability/supplemental-authorization.schema.json`    |    17 |
 | `capability/threshold-approval-proposal.schema.json`   |    48 |
-| `capability/token.schema.json`                         |   604 |
+| `capability/token.schema.json`                         |   627 |
 | `capability/verified-approval-set.schema.json`         |    44 |
 
 ### receipt (6)

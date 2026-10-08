@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: e2eb7358a787fec1024579c76920c12b43ce91f1f4f63648d86a3ad9500e95e1
+// Schema content SHA-256: 04f4f68718332d904d53bca5708863fa1698d18ab1379586aa8792f0c7a21392
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -160,6 +160,11 @@ const (
 	CapabilityGrantOperationRead       CapabilityGrantOperation = "read"
 	CapabilityGrantOperationReadResult CapabilityGrantOperation = "read_result"
 	CapabilityGrantOperationSubscribe  CapabilityGrantOperation = "subscribe"
+)
+
+// Defines values for CapabilitySecurityBindingSchema.
+const (
+	CapabilitySecurityBindingSchemaChioCapabilitySecurityBindingV1 CapabilitySecurityBindingSchema = "chio.capability-security-binding.v1"
 )
 
 // Defines values for CapabilityThresholdApprovalProposalAlgorithm.
@@ -2690,6 +2695,28 @@ type CapabilityRevocation struct {
 	RevokedAt int64 `json:"revoked_at"`
 }
 
+// CapabilitySecurityBinding Decoded predicate of a bind_security_context caveat. The caveat predicate is the RFC 8785 canonical JSON text of this object, and the caveat carries no sig.
+type CapabilitySecurityBinding struct {
+	ContextGeneration int64                                        `json:"contextGeneration"`
+	IsolationEpochId  CapabilitySecurityBindingSecurityBindingText `json:"isolationEpochId"`
+	LineageId         CapabilitySecurityBindingSecurityBindingText `json:"lineageId"`
+	PrincipalId       CapabilitySecurityBindingSecurityBindingText `json:"principalId"`
+	Schema            CapabilitySecurityBindingSchema              `json:"schema"`
+	ServerId          CapabilitySecurityBindingSecurityBindingText `json:"serverId"`
+	SessionId         CapabilitySecurityBindingSecurityBindingText `json:"sessionId"`
+	TenantId          CapabilitySecurityBindingSecurityBindingText `json:"tenantId"`
+	WorkloadId        CapabilitySecurityBindingSecurityBindingText `json:"workloadId"`
+
+	// WorkloadSignerPublicKey Canonical lowercase PublicKey hex form, without a 0x prefix.
+	WorkloadSignerPublicKey string `json:"workloadSignerPublicKey"`
+}
+
+// CapabilitySecurityBindingSchema defines model for CapabilitySecurityBinding.Schema.
+type CapabilitySecurityBindingSchema string
+
+// CapabilitySecurityBindingSecurityBindingText defines model for CapabilitySecurityBindingSecurityBindingText.
+type CapabilitySecurityBindingSecurityBindingText = string
+
 // CapabilitySupplementalAuthorization defines model for CapabilitySupplementalAuthorization.
 type CapabilitySupplementalAuthorization struct {
 	// SignedExtension Opaque authenticated extension bytes. Adapters must not interpret these bytes as quota authority.
@@ -2733,7 +2760,9 @@ type CapabilityToken struct {
 	AttenuationProof          *CapabilityTokenAttenuationProof     `json:"attenuation_proof,omitempty"`
 
 	// BudgetShareBps Fixed-point child share in basis points. Values above 10000 re-amplify budget and fail closed.
-	BudgetShareBps  *int64                           `json:"budget_share_bps,omitempty"`
+	BudgetShareBps *int64 `json:"budget_share_bps,omitempty"`
+
+	// Caveats At most one caveat, which must be bind_security_context.
 	Caveats         *[]CapabilityTokenCaveat         `json:"caveats,omitempty"`
 	DelegationChain *[]CapabilityTokenDelegationLink `json:"delegation_chain,omitempty"`
 	ExpiresAt       int64                            `json:"expires_at"`
@@ -2778,9 +2807,11 @@ type CapabilityTokenAttenuationWitness struct {
 
 // CapabilityTokenCaveat defines model for CapabilityTokenCaveat.
 type CapabilityTokenCaveat struct {
-	Kind      CapabilityTokenCaveatKind `json:"kind"`
-	Predicate string                    `json:"predicate"`
-	Sig       *string                   `json:"sig,omitempty"`
+	Kind CapabilityTokenCaveatKind `json:"kind"`
+
+	// Predicate For bind_security_context, the RFC 8785 canonical JSON text of a capability/security-binding.schema.json object.
+	Predicate string  `json:"predicate"`
+	Sig       *string `json:"sig,omitempty"`
 }
 
 // CapabilityTokenCaveatKind defines model for CapabilityTokenCaveat.Kind.

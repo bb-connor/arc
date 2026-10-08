@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: b084ae0e56e427c850264660383c6f883d46db68902f81ec769714701f82dd9e
+# Schema sha256: 98badc519c6787931e288dad66023f0515a7bda8b0be5b4370b5b906713f8c3e
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -113,7 +113,10 @@ class Caveat(BaseModel):
         extra="forbid",
     )
     kind: Kind
-    predicate: constr(min_length=1)
+    predicate: constr(min_length=1) = Field(
+        ...,
+        description="For bind_security_context, the RFC 8785 canonical JSON text of a capability/security-binding.schema.json object.",
+    )
     sig: (
         constr(
             pattern=r"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\+mldsa65)$"
@@ -317,7 +320,11 @@ class ChioCapabilitytoken(BaseModel):
         aggregate_invocation_budget_schema.ChioAggregateInvocationBudget | None
     ) = None
     algorithm: Algorithm | None = None
-    caveats: list[Caveat] | None = None
+    caveats: list[Caveat] | None = Field(
+        None,
+        description="At most one caveat, which must be bind_security_context.",
+        max_length=1,
+    )
     scope_attenuations: list[ScopeAttenuation] | None = None
     attenuation_proof: AttenuationProof | None = None
     budget_share_bps: conint(strict=True, ge=0, le=10000) | None = Field(

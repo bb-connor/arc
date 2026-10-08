@@ -8,11 +8,10 @@ lock. Written by `scripts/check-wire-schemas.py --update`; the gate fails
 when an unpinned constant is missing from this list, and an entry that has
 since been pinned is removed by the next `--update`.
 
-166 of 527 identifier constants in the security crates are unpinned.
+163 of 527 identifier constants in the security crates are unpinned.
 
-## crates/core/chio-core-types (26)
+## crates/core/chio-core-types (25)
 
-- `crates/core/chio-core-types/src/capability/caveat.rs:10` `CAPABILITY_SECURITY_BINDING_SCHEMA` = `chio.capability-security-binding.v1`
 - `crates/core/chio-core-types/src/declassification.rs:12` `DECLASSIFICATION_GRANT_SIGNATURE_DOMAIN` = `chio:declassification-grant:v1`
 - `crates/core/chio-core-types/src/economic_continuity.rs:27` `RESOURCE_HEAD_DIGEST_DOMAIN` = `chio.economy.resource-head.digest.v1`
 - `crates/core/chio-core-types/src/economic_continuity.rs:28` `EFFECT_SLOT_ID_DOMAIN` = `chio.economy.effect-slot.id.v1`
@@ -39,7 +38,7 @@ since been pinned is removed by the next `--update`.
 - `crates/core/chio-core-types/src/receipt/economics.rs:16` `CHIO_CHANNEL_RECEIPT_METADATA_SCHEMA` = `chio.channel.receipt-metadata.v1`
 - `crates/core/chio-core-types/src/receipt/metadata.rs:483` `FINDING_RECOVERY_SCHEMA` = `chio.finding.recovery.v1`
 
-## crates/kernel/chio-kernel (48)
+## crates/kernel/chio-kernel (46)
 
 - `crates/kernel/chio-kernel/src/admission_operation.part1.inc:9` `ADMISSION_OPERATION_SCHEMA` = `chio.security-admission-operation.v1`
 - `crates/kernel/chio-kernel/src/admission_operation.rs:91` `ADMISSION_REQUEST_NAMESPACE_SCHEMA` = `chio.admission-request-namespace.v1`
@@ -59,11 +58,9 @@ since been pinned is removed by the next `--update`.
 - `crates/kernel/chio-kernel/src/kernel/active_response_admission.rs:21` `ACTIVE_RESPONSE_SUBMISSION_SCHEMA` = `chio.active-response-submission.v1`
 - `crates/kernel/chio-kernel/src/kernel/active_response_artifact.rs:16` `ACTIVE_RESPONSE_ARTIFACT_AUTHORITY_ATTESTATION_SCHEMA` = `chio.active-response-artifact-authority-attestation.v1`
 - `crates/kernel/chio-kernel/src/kernel/active_response_artifact.rs:18` `ACTIVE_RESPONSE_ADMISSION_ARTIFACT_PAYLOAD_SCHEMA` = `chio.attested-finding-admission-artifact-payload.v1`
-- `crates/kernel/chio-kernel/src/kernel/active_response_executor.rs:21` `ACTIVE_RESPONSE_EXECUTOR_AUTHORITY_SCHEMA` = `chio.active-response-executor-authority.v1`
-- `crates/kernel/chio-kernel/src/kernel/active_response_executor.rs:25` `ACTIVE_RESPONSE_DISPATCH_SCHEMA` = `chio.active-response-dispatch.v1`
+- `crates/kernel/chio-kernel/src/kernel/active_response_executor.rs:23` `ACTIVE_RESPONSE_EXECUTOR_AUTHORITY_SCHEMA` = `chio.active-response-executor-authority.v1`
 - `crates/kernel/chio-kernel/src/kernel/active_response_policy.rs:22` `ACTIVE_RESPONSE_POLICY_DECISION_SCHEMA` = `chio.active-response-policy-decision.v1`
 - `crates/kernel/chio-kernel/src/kernel/admission_cleanup.rs:17` `APPROVAL_CLEANUP_SCHEMA` = `chio.admission-cleanup.approval.v2`
-- `crates/kernel/chio-kernel/src/kernel/admission_cleanup.rs:18` `ACTIVE_RESPONSE_APPROVAL_CLEANUP_SCHEMA` = `chio.admission-cleanup.active-response-approval.v2`
 - `crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller.rs:11` `LEGACY_SCHEMA` = `chio.kernel-caller-return-context.v1`
 - `crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller.rs:12` `SIGNING_SCHEMA` = `chio.kernel-caller-return-context.v2`
 - `crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller.rs:13` `PARTICIPANT_SCHEMA` = `chio.kernel-caller-return-context.v3`
@@ -107,7 +104,7 @@ since been pinned is removed by the next `--update`.
 - `crates/platform/chio-control-plane/src/scim_lifecycle.rs:13` `SCIM_LIFECYCLE_REGISTRY_VERSION` = `chio.scim-lifecycle-registry.v1`
 - `crates/platform/chio-control-plane/src/scim_lifecycle.rs:14` `SCIM_LIFECYCLE_RECORD_SCHEMA` = `chio.scim-lifecycle-record.v1`
 - `crates/platform/chio-control-plane/src/security/event_consumer/admission.rs:43` `ATTESTED_FINDING_ADMISSION_ARTIFACT_BUNDLE_SCHEMA` = `chio.attested-finding-admission-artifacts.v1`
-- `crates/platform/chio-control-plane/src/security/event_consumer/verification.rs:12` `SECURITY_EVENT_RECEIPT_PROJECTION_VERSION` = `chio.security-event-receipt-projection.v1`
+- `crates/platform/chio-control-plane/src/security/event_consumer/verification.rs:14` `SECURITY_EVENT_RECEIPT_PROJECTION_VERSION` = `chio.security-event-receipt-projection.v1`
 - `crates/platform/chio-control-plane/src/security/migration_evidence.rs:11` `ENTERPRISE_MIGRATION_CANARY_EVIDENCE_SCHEMA` = `chio.enterprise-migration-canary-evidence.v1`
 - `crates/platform/chio-control-plane/src/security/migration_evidence.rs:13` `ENTERPRISE_MIGRATION_CUTOVER_ATTESTATION_SCHEMA` = `chio.enterprise-migration-cutover-attestation.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_challenge_coordinator.rs:145` `DEFECT_DOMAIN` = `chio.finding.defect.v1`
@@ -186,11 +183,11 @@ since been pinned is removed by the next `--update`.
 - `crates/security/chio-keyring/src/ipc.rs:20` `KEY_LOG_WITNESS_IPC_RESPONSE_SCHEMA` = `chio.key-log.witness-ipc-response.v1`
 - `crates/security/chio-keyring/src/ipc.rs:22` `KEY_LOG_AUDIT_IPC_REQUEST_SCHEMA` = `chio.key-log.audit-ipc-request.v1`
 - `crates/security/chio-keyring/src/ipc.rs:23` `KEY_LOG_AUDIT_IPC_RESPONSE_SCHEMA` = `chio.key-log.audit-ipc-response.v1`
-- `crates/security/chio-keyring/src/service.rs:15` `KEY_LOG_POLICY_DOCUMENT_SCHEMA` = `chio.key-log.policy.v1`
-- `crates/security/chio-keyring/src/service.rs:16` `KEY_LOG_WITNESS_REQUEST_SCHEMA` = `chio.key-log.witness-request.v1`
-- `crates/security/chio-keyring/src/service.rs:17` `KEY_LOG_WITNESS_RESPONSE_SCHEMA` = `chio.key-log.witness-response.v1`
-- `crates/security/chio-keyring/src/service.rs:18` `KEY_LOG_AUDIT_COMMAND_SCHEMA` = `chio.key-log.audit-command.v1`
-- `crates/security/chio-keyring/src/service.rs:19` `KEY_LOG_AUDIT_RESPONSE_SCHEMA` = `chio.key-log.audit-response.v1`
+- `crates/security/chio-keyring/src/service.rs:14` `KEY_LOG_POLICY_DOCUMENT_SCHEMA` = `chio.key-log.policy.v1`
+- `crates/security/chio-keyring/src/service.rs:15` `KEY_LOG_WITNESS_REQUEST_SCHEMA` = `chio.key-log.witness-request.v1`
+- `crates/security/chio-keyring/src/service.rs:16` `KEY_LOG_WITNESS_RESPONSE_SCHEMA` = `chio.key-log.witness-response.v1`
+- `crates/security/chio-keyring/src/service.rs:17` `KEY_LOG_AUDIT_COMMAND_SCHEMA` = `chio.key-log.audit-command.v1`
+- `crates/security/chio-keyring/src/service.rs:18` `KEY_LOG_AUDIT_RESPONSE_SCHEMA` = `chio.key-log.audit-response.v1`
 - `crates/security/chio-keyring/src/witness.rs:15` `CHECKPOINT_EQUIVOCATION_SCHEMA` = `chio.key-log.equivocation.v1`
 
 ## crates/security/chio-secret-broker (11)

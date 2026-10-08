@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 44f813044befbe4d908990d6021ff75d61b898ab7295da4c344579449e179a8d
+// Schema SHA: 4f39eabbd86b8d0e7e106b8f4d598450c0cdb44c08289aab246cfd331f4a8b68
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -231,7 +231,12 @@ export namespace Agent_ToolCallRequest {
     delegation_chain?: DelegationLink[];
     aggregate_invocation_budget?: ChioAggregateInvocationBudget;
     algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
-    caveats?: Caveat[];
+    /**
+     * At most one caveat, which must be bind_security_context.
+     *
+     * @maxItems 1
+     */
+    caveats?: [] | [Caveat];
     scope_attenuations?: {
       type: string;
       [k: string]: unknown;
@@ -254,6 +259,22 @@ export namespace Agent_ToolCallRequest {
         max_invocations: number;
         root_binding: ChioAggregateBudgetRootBinding;
       };
+  export type Caveat = {
+    [k: string]: unknown;
+  } & {
+    kind:
+      | "restrict_tool"
+      | "bind_session"
+      | "restrict_audience"
+      | "restrict_geo"
+      | "restrict_time_window"
+      | "bind_security_context";
+    /**
+     * For bind_security_context, the RFC 8785 canonical JSON text of a capability/security-binding.schema.json object.
+     */
+    predicate: string;
+    sig?: string;
+  };
 
   /**
    * What a capability token authorizes. Mirrors `ChioScope` in `chio-core-types`.
@@ -404,17 +425,6 @@ export namespace Agent_ToolCallRequest {
     };
     algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
-  }
-  export interface Caveat {
-    kind:
-      | "restrict_tool"
-      | "bind_session"
-      | "restrict_audience"
-      | "restrict_geo"
-      | "restrict_time_window"
-      | "bind_security_context";
-    predicate: string;
-    sig?: string;
   }
   export interface AttenuationProof {
     parentScopeHash: string;
@@ -875,6 +885,31 @@ export namespace Capability_Revocation {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/capability/security-binding.schema.json
+export namespace Capability_SecurityBinding {
+  export type SecurityBindingText = string;
+
+  /**
+   * Decoded predicate of a bind_security_context caveat. The caveat predicate is the RFC 8785 canonical JSON text of this object, and the caveat carries no sig.
+   */
+  export interface ChioCapabilitySecurityBinding {
+    schema: "chio.capability-security-binding.v1";
+    tenantId: SecurityBindingText;
+    lineageId: SecurityBindingText;
+    sessionId: SecurityBindingText;
+    principalId: SecurityBindingText;
+    isolationEpochId: SecurityBindingText;
+    contextGeneration: number;
+    workloadId: SecurityBindingText;
+    serverId: SecurityBindingText;
+    /**
+     * Canonical lowercase PublicKey hex form, without a 0x prefix.
+     */
+    workloadSignerPublicKey: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/capability/supplemental-authorization.schema.json
 export namespace Capability_SupplementalAuthorization {
   export interface ChioOpaqueSupplementalAuthorization {
@@ -928,7 +963,12 @@ export namespace Capability_Token {
     delegation_chain?: DelegationLink[];
     aggregate_invocation_budget?: ChioAggregateInvocationBudget;
     algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
-    caveats?: Caveat[];
+    /**
+     * At most one caveat, which must be bind_security_context.
+     *
+     * @maxItems 1
+     */
+    caveats?: [] | [Caveat];
     scope_attenuations?: {
       type: string;
       [k: string]: unknown;
@@ -957,6 +997,22 @@ export namespace Capability_Token {
         max_invocations: number;
         root_binding: ChioAggregateBudgetRootBinding;
       };
+  export type Caveat = {
+    [k: string]: unknown;
+  } & {
+    kind:
+      | "restrict_tool"
+      | "bind_session"
+      | "restrict_audience"
+      | "restrict_geo"
+      | "restrict_time_window"
+      | "bind_security_context";
+    /**
+     * For bind_security_context, the RFC 8785 canonical JSON text of a capability/security-binding.schema.json object.
+     */
+    predicate: string;
+    sig?: string;
+  };
 
   /**
    * What a capability token authorizes. Mirrors `ChioScope` in `chio-core-types`.
@@ -1093,17 +1149,6 @@ export namespace Capability_Token {
     };
     algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
-  }
-  export interface Caveat {
-    kind:
-      | "restrict_tool"
-      | "bind_session"
-      | "restrict_audience"
-      | "restrict_geo"
-      | "restrict_time_window"
-      | "bind_security_context";
-    predicate: string;
-    sig?: string;
   }
   export interface AttenuationProof {
     parentScopeHash: string;
@@ -1509,7 +1554,12 @@ export namespace Kernel_CapabilityList {
     delegation_chain?: DelegationLink[];
     aggregate_invocation_budget?: ChioAggregateInvocationBudget;
     algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
-    caveats?: Caveat[];
+    /**
+     * At most one caveat, which must be bind_security_context.
+     *
+     * @maxItems 1
+     */
+    caveats?: [] | [Caveat];
     scope_attenuations?: {
       type: string;
       [k: string]: unknown;
@@ -1532,6 +1582,22 @@ export namespace Kernel_CapabilityList {
         max_invocations: number;
         root_binding: ChioAggregateBudgetRootBinding;
       };
+  export type Caveat = {
+    [k: string]: unknown;
+  } & {
+    kind:
+      | "restrict_tool"
+      | "bind_session"
+      | "restrict_audience"
+      | "restrict_geo"
+      | "restrict_time_window"
+      | "bind_security_context";
+    /**
+     * For bind_security_context, the RFC 8785 canonical JSON text of a capability/security-binding.schema.json object.
+     */
+    predicate: string;
+    sig?: string;
+  };
 
   export interface ChioKernelMessageCapabilityList {
     type: "capability_list";
@@ -1686,17 +1752,6 @@ export namespace Kernel_CapabilityList {
     };
     algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
-  }
-  export interface Caveat {
-    kind:
-      | "restrict_tool"
-      | "bind_session"
-      | "restrict_audience"
-      | "restrict_geo"
-      | "restrict_time_window"
-      | "bind_security_context";
-    predicate: string;
-    sig?: string;
   }
   export interface AttenuationProof {
     parentScopeHash: string;

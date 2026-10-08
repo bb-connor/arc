@@ -1,0 +1,173 @@
+{
+  "version": 1,
+  "description": "bind_security_context caveat vectors. native_valid is the verdict of CapabilityToken::validate_schema; schema_valid is the verdict of capability/token.schema.json on the token together with capability/security-binding.schema.json on each decoded bind_security_context predicate. The canonical-bytes rule is the only native rule the schemas cannot state.",
+  "binding_schema": "chio.capability-security-binding.v1",
+  "workload_signer_seed_hex": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+  "cases": [
+    {
+      "id": "bound-workload",
+      "caveats": [
+        {
+          "kind": "bind_security_context",
+          "predicate": "{\"contextGeneration\":7,\"isolationEpochId\":\"epoch-1\",\"lineageId\":\"lineage-1\",\"principalId\":\"agent-1\",\"schema\":\"chio.capability-security-binding.v1\",\"serverId\":\"server-1\",\"sessionId\":\"session-1\",\"tenantId\":\"tenant-1\",\"workloadId\":\"workload-1\",\"workloadSignerPublicKey\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\"}"
+        }
+      ],
+      "native_valid": true,
+      "schema_valid": true
+    },
+    {
+      "id": "no-caveats",
+      "caveats": [],
+      "native_valid": true,
+      "schema_valid": true
+    },
+    {
+      "id": "detached-signature",
+      "caveats": [
+        {
+          "kind": "bind_security_context",
+          "predicate": "{\"contextGeneration\":7,\"isolationEpochId\":\"epoch-1\",\"lineageId\":\"lineage-1\",\"principalId\":\"agent-1\",\"schema\":\"chio.capability-security-binding.v1\",\"serverId\":\"server-1\",\"sessionId\":\"session-1\",\"tenantId\":\"tenant-1\",\"workloadId\":\"workload-1\",\"workloadSignerPublicKey\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\"}",
+          "sig": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ],
+      "native_valid": false,
+      "schema_valid": false
+    },
+    {
+      "id": "noncanonical-whitespace",
+      "caveats": [
+        {
+          "kind": "bind_security_context",
+          "predicate": "{\"contextGeneration\": 7, \"isolationEpochId\": \"epoch-1\", \"lineageId\": \"lineage-1\", \"principalId\": \"agent-1\", \"schema\": \"chio.capability-security-binding.v1\", \"serverId\": \"server-1\", \"sessionId\": \"session-1\", \"tenantId\": \"tenant-1\", \"workloadId\": \"workload-1\", \"workloadSignerPublicKey\": \"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\"}"
+        }
+      ],
+      "native_valid": false,
+      "schema_valid": true
+    },
+    {
+      "id": "noncanonical-key-order",
+      "caveats": [
+        {
+          "kind": "bind_security_context",
+          "predicate": "{\"schema\":\"chio.capability-security-binding.v1\",\"tenantId\":\"tenant-1\",\"lineageId\":\"lineage-1\",\"sessionId\":\"session-1\",\"principalId\":\"agent-1\",\"isolationEpochId\":\"epoch-1\",\"contextGeneration\":7,\"workloadId\":\"workload-1\",\"serverId\":\"server-1\",\"workloadSignerPublicKey\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\"}"
+        }
+      ],
+      "native_valid": false,
+      "schema_valid": true
+    },
+    {
+      "id": "unknown-binding-field",
+      "caveats": [
+        {
+          "kind": "bind_security_context",
+          "predicate": "{\"contextGeneration\":7,\"isolationEpochId\":\"epoch-1\",\"lineageId\":\"lineage-1\",\"principalId\":\"agent-1\",\"region\":\"eu-1\",\"schema\":\"chio.capability-security-binding.v1\",\"serverId\":\"server-1\",\"sessionId\":\"session-1\",\"tenantId\":\"tenant-1\",\"workloadId\":\"workload-1\",\"workloadSignerPublicKey\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\"}"
+        }
+      ],
+      "native_valid": false,
+      "schema_valid": false
+    },
+    {
+      "id": "missing-server-id",
+      "caveats": [
+        {
+          "kind": "bind_security_context",
+          "predicate": "{\"contextGeneration\":7,\"isolationEpochId\":\"epoch-1\",\"lineageId\":\"lineage-1\",\"principalId\":\"agent-1\",\"schema\":\"chio.capability-security-binding.v1\",\"sessionId\":\"session-1\",\"tenantId\":\"tenant-1\",\"workloadId\":\"workload-1\",\"workloadSignerPublicKey\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\"}"
+        }
+      ],
+      "native_valid": false,
+      "schema_valid": false
+    },
+    {
+      "id": "zero-context-generation",
+      "caveats": [
+        {
+          "kind": "bind_security_context",
+          "predicate": "{\"contextGeneration\":0,\"isolationEpochId\":\"epoch-1\",\"lineageId\":\"lineage-1\",\"principalId\":\"agent-1\",\"schema\":\"chio.capability-security-binding.v1\",\"serverId\":\"server-1\",\"sessionId\":\"session-1\",\"tenantId\":\"tenant-1\",\"workloadId\":\"workload-1\",\"workloadSignerPublicKey\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\"}"
+        }
+      ],
+      "native_valid": false,
+      "schema_valid": false
+    },
+    {
+      "id": "foreign-binding-schema",
+      "caveats": [
+        {
+          "kind": "bind_security_context",
+          "predicate": "{\"contextGeneration\":7,\"isolationEpochId\":\"epoch-1\",\"lineageId\":\"lineage-1\",\"principalId\":\"agent-1\",\"schema\":\"chio.capability-security-binding.v2\",\"serverId\":\"server-1\",\"sessionId\":\"session-1\",\"tenantId\":\"tenant-1\",\"workloadId\":\"workload-1\",\"workloadSignerPublicKey\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\"}"
+        }
+      ],
+      "native_valid": false,
+      "schema_valid": false
+    },
+    {
+      "id": "padded-tenant-id",
+      "caveats": [
+        {
+          "kind": "bind_security_context",
+          "predicate": "{\"contextGeneration\":7,\"isolationEpochId\":\"epoch-1\",\"lineageId\":\"lineage-1\",\"principalId\":\"agent-1\",\"schema\":\"chio.capability-security-binding.v1\",\"serverId\":\"server-1\",\"sessionId\":\"session-1\",\"tenantId\":\" tenant-1\",\"workloadId\":\"workload-1\",\"workloadSignerPublicKey\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\"}"
+        }
+      ],
+      "native_valid": false,
+      "schema_valid": false
+    },
+    {
+      "id": "control-character-session-id",
+      "caveats": [
+        {
+          "kind": "bind_security_context",
+          "predicate": "{\"contextGeneration\":7,\"isolationEpochId\":\"epoch-1\",\"lineageId\":\"lineage-1\",\"principalId\":\"agent-1\",\"schema\":\"chio.capability-security-binding.v1\",\"serverId\":\"server-1\",\"sessionId\":\"session\\u00071\",\"tenantId\":\"tenant-1\",\"workloadId\":\"workload-1\",\"workloadSignerPublicKey\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\"}"
+        }
+      ],
+      "native_valid": false,
+      "schema_valid": false
+    },
+    {
+      "id": "uppercase-workload-key",
+      "caveats": [
+        {
+          "kind": "bind_security_context",
+          "predicate": "{\"contextGeneration\":7,\"isolationEpochId\":\"epoch-1\",\"lineageId\":\"lineage-1\",\"principalId\":\"agent-1\",\"schema\":\"chio.capability-security-binding.v1\",\"serverId\":\"server-1\",\"sessionId\":\"session-1\",\"tenantId\":\"tenant-1\",\"workloadId\":\"workload-1\",\"workloadSignerPublicKey\":\"66BE7E332C7A453332BD9D0A7F7DB055F5C5EF1A06ADA66D98B39FB6810C473A\"}"
+        }
+      ],
+      "native_valid": false,
+      "schema_valid": false
+    },
+    {
+      "id": "prefixed-workload-key",
+      "caveats": [
+        {
+          "kind": "bind_security_context",
+          "predicate": "{\"contextGeneration\":7,\"isolationEpochId\":\"epoch-1\",\"lineageId\":\"lineage-1\",\"principalId\":\"agent-1\",\"schema\":\"chio.capability-security-binding.v1\",\"serverId\":\"server-1\",\"sessionId\":\"session-1\",\"tenantId\":\"tenant-1\",\"workloadId\":\"workload-1\",\"workloadSignerPublicKey\":\"0x66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\"}"
+        }
+      ],
+      "native_valid": false,
+      "schema_valid": false
+    },
+    {
+      "id": "two-bindings",
+      "caveats": [
+        {
+          "kind": "bind_security_context",
+          "predicate": "{\"contextGeneration\":7,\"isolationEpochId\":\"epoch-1\",\"lineageId\":\"lineage-1\",\"principalId\":\"agent-1\",\"schema\":\"chio.capability-security-binding.v1\",\"serverId\":\"server-1\",\"sessionId\":\"session-1\",\"tenantId\":\"tenant-1\",\"workloadId\":\"workload-1\",\"workloadSignerPublicKey\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\"}"
+        },
+        {
+          "kind": "bind_security_context",
+          "predicate": "{\"contextGeneration\":7,\"isolationEpochId\":\"epoch-1\",\"lineageId\":\"lineage-1\",\"principalId\":\"agent-1\",\"schema\":\"chio.capability-security-binding.v1\",\"serverId\":\"server-1\",\"sessionId\":\"session-1\",\"tenantId\":\"tenant-1\",\"workloadId\":\"workload-1\",\"workloadSignerPublicKey\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\"}"
+        }
+      ],
+      "native_valid": false,
+      "schema_valid": false
+    },
+    {
+      "id": "unenforced-caveat-kind",
+      "caveats": [
+        {
+          "kind": "restrict_tool",
+          "predicate": "server-1/tool-1"
+        }
+      ],
+      "native_valid": false,
+      "schema_valid": false
+    }
+  ]
+}

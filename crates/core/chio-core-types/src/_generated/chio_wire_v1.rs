@@ -1028,6 +1028,7 @@ pub mod agent_tool_call_request {
     ///      ]
     ///    },
     ///    "predicate": {
+    ///      "description": "For bind_security_context, the RFC 8785 canonical JSON text of a capability/security-binding.schema.json object.",
     ///      "type": "string",
     ///      "minLength": 1
     ///    },
@@ -1044,6 +1045,7 @@ pub mod agent_tool_call_request {
     #[serde(deny_unknown_fields)]
     pub struct Caveat {
         pub kind: CaveatKind,
+        ///For bind_security_context, the RFC 8785 canonical JSON text of a capability/security-binding.schema.json object.
         pub predicate: CaveatPredicate,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub sig: ::std::option::Option<CaveatSig>,
@@ -1150,12 +1152,13 @@ pub mod agent_tool_call_request {
             value.parse()
         }
     }
-    ///`CaveatPredicate`
+    ///For bind_security_context, the RFC 8785 canonical JSON text of a capability/security-binding.schema.json object.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
+    ///  "description": "For bind_security_context, the RFC 8785 canonical JSON text of a capability/security-binding.schema.json object.",
     ///  "type": "string",
     ///  "minLength": 1
     ///}
@@ -1598,10 +1601,12 @@ pub mod agent_tool_call_request {
     ///          "minimum": 0.0
     ///        },
     ///        "caveats": {
+    ///          "description": "At most one caveat, which must be bind_security_context.",
     ///          "type": "array",
     ///          "items": {
     ///            "$ref": "#/$defs/caveat"
-    ///          }
+    ///          },
+    ///          "maxItems": 1
     ///        },
     ///        "delegation_chain": {
     ///          "type": "array",
@@ -3107,10 +3112,12 @@ pub mod agent_tool_call_request {
     ///      "minimum": 0.0
     ///    },
     ///    "caveats": {
+    ///      "description": "At most one caveat, which must be bind_security_context.",
     ///      "type": "array",
     ///      "items": {
     ///        "$ref": "#/$defs/caveat"
-    ///      }
+    ///      },
+    ///      "maxItems": 1
     ///    },
     ///    "delegation_chain": {
     ///      "type": "array",
@@ -3183,6 +3190,7 @@ pub mod agent_tool_call_request {
         ///Fixed-point child share in basis points. Values above 10000 re-amplify budget and fail closed.
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub budget_share_bps: ::std::option::Option<i64>,
+        ///At most one caveat, which must be bind_security_context.
         #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
         pub caveats: ::std::vec::Vec<Caveat>,
         #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
@@ -15018,6 +15026,306 @@ pub mod capability_revocation {
         }
     }
 }
+pub mod capability_security_binding {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///Decoded predicate of a bind_security_context caveat. The caveat predicate is the RFC 8785 canonical JSON text of this object, and the caveat carries no sig.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/capability/security-binding.schema.json",
+    ///  "title": "Chio Capability Security Binding",
+    ///  "description": "Decoded predicate of a bind_security_context caveat. The caveat predicate is the RFC 8785 canonical JSON text of this object, and the caveat carries no sig.",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "contextGeneration",
+    ///    "isolationEpochId",
+    ///    "lineageId",
+    ///    "principalId",
+    ///    "schema",
+    ///    "serverId",
+    ///    "sessionId",
+    ///    "tenantId",
+    ///    "workloadId",
+    ///    "workloadSignerPublicKey"
+    ///  ],
+    ///  "properties": {
+    ///    "contextGeneration": {
+    ///      "type": "integer",
+    ///      "maximum": 1.8446744073709552e+19,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "isolationEpochId": {
+    ///      "$ref": "#/$defs/securityBindingText"
+    ///    },
+    ///    "lineageId": {
+    ///      "$ref": "#/$defs/securityBindingText"
+    ///    },
+    ///    "principalId": {
+    ///      "$ref": "#/$defs/securityBindingText"
+    ///    },
+    ///    "schema": {
+    ///      "const": "chio.capability-security-binding.v1"
+    ///    },
+    ///    "serverId": {
+    ///      "$ref": "#/$defs/securityBindingText"
+    ///    },
+    ///    "sessionId": {
+    ///      "$ref": "#/$defs/securityBindingText"
+    ///    },
+    ///    "tenantId": {
+    ///      "$ref": "#/$defs/securityBindingText"
+    ///    },
+    ///    "workloadId": {
+    ///      "$ref": "#/$defs/securityBindingText"
+    ///    },
+    ///    "workloadSignerPublicKey": {
+    ///      "description": "Canonical lowercase PublicKey hex form, without a 0x prefix.",
+    ///      "type": "string",
+    ///      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioCapabilitySecurityBinding {
+        #[serde(rename = "contextGeneration")]
+        pub context_generation: ::std::num::NonZeroU64,
+        #[serde(rename = "isolationEpochId")]
+        pub isolation_epoch_id: SecurityBindingText,
+        #[serde(rename = "lineageId")]
+        pub lineage_id: SecurityBindingText,
+        #[serde(rename = "principalId")]
+        pub principal_id: SecurityBindingText,
+        pub schema: ::serde_json::Value,
+        #[serde(rename = "serverId")]
+        pub server_id: SecurityBindingText,
+        #[serde(rename = "sessionId")]
+        pub session_id: SecurityBindingText,
+        #[serde(rename = "tenantId")]
+        pub tenant_id: SecurityBindingText,
+        #[serde(rename = "workloadId")]
+        pub workload_id: SecurityBindingText,
+        ///Canonical lowercase PublicKey hex form, without a 0x prefix.
+        #[serde(rename = "workloadSignerPublicKey")]
+        pub workload_signer_public_key: ChioCapabilitySecurityBindingWorkloadSignerPublicKey,
+    }
+    impl ::std::convert::From<&ChioCapabilitySecurityBinding> for ChioCapabilitySecurityBinding {
+        fn from(value: &ChioCapabilitySecurityBinding) -> Self {
+            value.clone()
+        }
+    }
+    ///Canonical lowercase PublicKey hex form, without a 0x prefix.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "Canonical lowercase PublicKey hex form, without a 0x prefix.",
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioCapabilitySecurityBindingWorkloadSignerPublicKey(::std::string::String);
+    impl ::std::ops::Deref for ChioCapabilitySecurityBindingWorkloadSignerPublicKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioCapabilitySecurityBindingWorkloadSignerPublicKey>
+        for ::std::string::String
+    {
+        fn from(value: ChioCapabilitySecurityBindingWorkloadSignerPublicKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioCapabilitySecurityBindingWorkloadSignerPublicKey>
+        for ChioCapabilitySecurityBindingWorkloadSignerPublicKey
+    {
+        fn from(value: &ChioCapabilitySecurityBindingWorkloadSignerPublicKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioCapabilitySecurityBindingWorkloadSignerPublicKey {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioCapabilitySecurityBindingWorkloadSignerPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioCapabilitySecurityBindingWorkloadSignerPublicKey
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioCapabilitySecurityBindingWorkloadSignerPublicKey
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioCapabilitySecurityBindingWorkloadSignerPublicKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`SecurityBindingText`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct SecurityBindingText(::std::string::String);
+    impl ::std::ops::Deref for SecurityBindingText {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SecurityBindingText> for ::std::string::String {
+        fn from(value: SecurityBindingText) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SecurityBindingText> for SecurityBindingText {
+        fn from(value: &SecurityBindingText) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for SecurityBindingText {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SecurityBindingText {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SecurityBindingText {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SecurityBindingText {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SecurityBindingText {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+}
 pub mod capability_verified_approval_set {
     /// Error types.
     pub mod error {
@@ -23468,6 +23776,7 @@ pub mod kernel_capability_list {
     ///      ]
     ///    },
     ///    "predicate": {
+    ///      "description": "For bind_security_context, the RFC 8785 canonical JSON text of a capability/security-binding.schema.json object.",
     ///      "type": "string",
     ///      "minLength": 1
     ///    },
@@ -23484,6 +23793,7 @@ pub mod kernel_capability_list {
     #[serde(deny_unknown_fields)]
     pub struct Caveat {
         pub kind: CaveatKind,
+        ///For bind_security_context, the RFC 8785 canonical JSON text of a capability/security-binding.schema.json object.
         pub predicate: CaveatPredicate,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub sig: ::std::option::Option<CaveatSig>,
@@ -23590,12 +23900,13 @@ pub mod kernel_capability_list {
             value.parse()
         }
     }
-    ///`CaveatPredicate`
+    ///For bind_security_context, the RFC 8785 canonical JSON text of a capability/security-binding.schema.json object.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
+    ///  "description": "For bind_security_context, the RFC 8785 canonical JSON text of a capability/security-binding.schema.json object.",
     ///  "type": "string",
     ///  "minLength": 1
     ///}
@@ -24422,10 +24733,12 @@ pub mod kernel_capability_list {
     ///      "minimum": 0.0
     ///    },
     ///    "caveats": {
+    ///      "description": "At most one caveat, which must be bind_security_context.",
     ///      "type": "array",
     ///      "items": {
     ///        "$ref": "#/$defs/caveat"
-    ///      }
+    ///      },
+    ///      "maxItems": 1
     ///    },
     ///    "delegation_chain": {
     ///      "type": "array",
@@ -24498,6 +24811,7 @@ pub mod kernel_capability_list {
         ///Fixed-point child share in basis points. Values above 10000 re-amplify budget and fail closed.
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub budget_share_bps: ::std::option::Option<i64>,
+        ///At most one caveat, which must be bind_security_context.
         #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
         pub caveats: ::std::vec::Vec<Caveat>,
         #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
@@ -25805,10 +26119,12 @@ pub mod kernel_capability_list {
     ///            "minimum": 0.0
     ///          },
     ///          "caveats": {
+    ///            "description": "At most one caveat, which must be bind_security_context.",
     ///            "type": "array",
     ///            "items": {
     ///              "$ref": "#/$defs/caveat"
-    ///            }
+    ///            },
+    ///            "maxItems": 1
     ///          },
     ///          "delegation_chain": {
     ///            "type": "array",
