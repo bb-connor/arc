@@ -66,6 +66,157 @@ fn rollback_at(path: &FsPath, keypair: &Keypair, pending: &CredentialCall) -> Re
 mod tests {
     use super::*;
 
+    struct UnusedTransport;
+
+    impl McpTransport for UnusedTransport {
+        fn list_tools(&self) -> Result<Vec<chio_mcp_adapter::edge::McpToolInfo>, AdapterError> {
+            Ok(vec![])
+        }
+
+        fn call_tool(
+            &self,
+            _name: &str,
+            _arguments: Value,
+        ) -> Result<chio_mcp_adapter::edge::McpToolResult, AdapterError> {
+            Err(AdapterError::ConnectionFailed(
+                "no test dispatch is permitted".into(),
+            ))
+        }
+    }
+
+    #[test]
+    fn disconnected_inbox_proves_non_enqueue_and_releases_the_exact_signed_reservation(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let directory = chio_test_support::private_tempdir()?;
+        let path = directory.path().join("sessions.sqlite3");
+        let _lease = crate::tests::acquire_test_session_store(&path);
+        let keypair = Keypair::generate();
+        let credential = super::super::tests::record();
+        let request = json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{
+            "name":"write_file","arguments":{},"_meta":{"chioRequestId":"disconnected-inbox"}}});
+        let Ok(CallReservation::Pending(pending)) =
+            reserve_at(&path, &keypair, &credential, &request, 100)
+        else {
+            return Err("pending reservation failed".into());
+        };
+        let (input_tx, input_rx) = mcp_inbox();
+        // Admission succeeds first. The receiver then disappears before the
+        // owning send, which is the definite failed-send case the HTTP rollback
+        // consumes, rather than a decode refusal before call reservation.
+        let message = input_tx.account(request.clone())?;
+        let (event_tx, _) = broadcast::channel(8);
+        let session = RemoteSession::new(RemoteSessionInit {
+            clock: RemoteClock::default(),
+            session_id: credential.session_id.clone(),
+            agent_id: "agent".into(),
+            capabilities: vec![],
+            issued_capabilities: vec![],
+            auth_context: SessionAuthContext::streamable_http_static_bearer("agent", "token", None),
+            auth_mode_fingerprint: "auth".into(),
+            policy_fingerprint: "policy".into(),
+            runtime_contract_fingerprint: "runtime".into(),
+            hosted_isolation: RemoteHostedIsolationMode::DedicatedPerSession,
+            lifecycle_policy: SessionLifecyclePolicy {
+                idle_expiry_millis: DEFAULT_SESSION_IDLE_EXPIRY_MILLIS,
+                drain_grace_millis: DEFAULT_SESSION_DRAIN_GRACE_MILLIS,
+                reaper_interval_millis: DEFAULT_SESSION_REAPER_INTERVAL_MILLIS,
+                tombstone_retention_millis: DEFAULT_SESSION_TOMBSTONE_RETENTION_MILLIS,
+            },
+            protocol_version: None,
+            peer_capabilities: None,
+            initialize_params: None,
+            lifecycle_snapshot: None,
+            input_tx: input_tx.clone(),
+            event_tx,
+            retained_notification_events: Arc::new(StdMutex::new(VecDeque::new())),
+            next_event_id: Arc::new(AtomicU64::new(0)),
+            session_db_path: None,
+            approval_redemption: None,
+            session_store_lease: None,
+            resume_hmac_keyring: None,
+            resume_generation: 0,
+            upstream_transport: Arc::new(UnusedTransport),
+        })?;
+        session.mark_ready(
+            Some("2025-11-25".into()),
+            json!({}),
+            PeerCapabilities::default(),
+        )?;
+        drop(input_rx);
+        let Err(proof) = session.send_accounted(message) else {
+            return Err("disconnected inbox accepted a request".into());
+        };
+        assert!(matches!(
+            proof.into_error(),
+            CliError::Adapter(AdapterError::ConnectionFailed(_))
+        ));
+        rollback_at(&path, &keypair, &pending).map_err(|_| "definite failed-send rollback")?;
+        assert_eq!(
+            input_tx.usage()?,
+            chio_mcp_adapter::edge::ingress::IngressUsage::default()
+        );
+        let conn = open_db(&path)?;
+        assert!(read_latch(&conn, &keypair, &credential.session_id)
+            .map_err(|_| "read rolled-back latch")?
+            .is_none());
+        assert!(matches!(
+            reserve_at(&path, &keypair, &credential, &request, 100),
+            Ok(CallReservation::Pending(_))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn legacy_signed_row_without_reservation_id_preserves_its_canonical_bytes_and_fence(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let directory = chio_test_support::private_tempdir()?;
+        let path = directory.path().join("sessions.sqlite3");
+        let _lease = crate::tests::acquire_test_session_store(&path);
+        let keypair = Keypair::generate();
+        let credential = super::super::tests::record();
+        let request = json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{
+            "name":"write_file","arguments":{},"_meta":{"chioRequestId":"legacy-pending"}}});
+        let Ok(CallReservation::Pending(pending)) =
+            reserve_at(&path, &keypair, &credential, &request, 100)
+        else {
+            return Err("pending reservation failed".into());
+        };
+        // Sign the historical JSON shape itself, which has no new field. This
+        // is retained signed data, not a new-type signature accepted by fiat.
+        let mut legacy_body = serde_json::to_value(&pending)?;
+        legacy_body
+            .as_object_mut()
+            .ok_or("legacy call object")?
+            .remove("reservationId");
+        let encoded = serde_json::to_string(&legacy_body)?;
+        let (signature, legacy_bytes) = keypair.sign_canonical(&legacy_body)?;
+        let conn = open_db(&path)?;
+        for table in [CALL_TABLE, LATCH_TABLE] {
+            conn.execute(
+                &format!("UPDATE {table} SET record_json=?1,signature=?2 WHERE session_id=?3 AND request_id=?4"),
+                params![encoded, signature.to_hex(), pending.session_id, pending.request_id],
+            )?;
+        }
+        let reopened = read_latch(&conn, &keypair, &credential.session_id)
+            .map_err(|_| "legacy signed latch read")?
+            .ok_or("legacy signed latch missing")?;
+        assert!(reopened.reservation_id.is_none());
+        assert_eq!(canonical_json_bytes(&reopened)?, legacy_bytes);
+        assert!(keypair
+            .public_key()
+            .verify(&canonical_json_bytes(&reopened)?, &signature));
+        assert!(!input::encode_session(&reopened)?.contains("reservationId"));
+        assert!(rollback_at(&path, &keypair, &reopened).is_err());
+        let retained: (String, String) = conn.query_row(
+            &format!("SELECT record_json,signature FROM {LATCH_TABLE} WHERE session_id=?1"),
+            [&credential.session_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?;
+        assert_eq!(retained, (encoded, signature.to_hex()));
+        assert!(reserve_at(&path, &keypair, &credential, &request, 100).is_err());
+        Ok(())
+    }
+
     #[test]
     fn stale_refusal_cannot_remove_a_rebound_reservation_with_identical_request_bytes(
     ) -> Result<(), Box<dyn std::error::Error>> {
