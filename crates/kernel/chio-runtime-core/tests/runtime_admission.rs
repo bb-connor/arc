@@ -71,8 +71,8 @@ mod swarm_fixtures;
 use swarm_fixtures::{
     canonical_test_hash, runtime_swarm_continuation, runtime_swarm_join_parent_set_hash,
     runtime_swarm_revocation_root, runtime_swarm_route_plan_receipt, runtime_swarm_scope,
-    runtime_swarm_terminal_graph_receipt, runtime_swarm_witness_chain, swarm_witness_issuer,
-    swarm_witness_keypair, trusted_swarm_witness_keys,
+    runtime_swarm_terminal_graph_receipt, runtime_swarm_witness_chain, swarm_bundle_before_expiry,
+    swarm_route_metadata, swarm_witness_issuer, swarm_witness_keypair, trusted_swarm_witness_keys,
 };
 
 fn emit_threat_matrix_code(code: &str) {
@@ -2437,24 +2437,6 @@ fn treaty_runtime_request(
         body: Default::default(),
     });
     Ok(request)
-}
-
-fn swarm_route_metadata() -> serde_json::Value {
-    serde_json::json!({
-        "route": {
-            "bridge": "mcp",
-            "protocolTarget": "mcp://provider-runtime",
-            "selectedRoute": "mcp:task-child-a"
-        }
-    })
-}
-
-/// The bundle as stored while its continuations were still live, so only
-/// admission observes the expiry.
-fn swarm_bundle_before_expiry(bundle: &SwarmAuthorityBundle) -> SwarmAuthorityBundle {
-    let mut stored = bundle.clone();
-    stored.now_unix_ms = 1_800_000_000_500;
-    stored
 }
 
 fn runtime_swarm_bundle(

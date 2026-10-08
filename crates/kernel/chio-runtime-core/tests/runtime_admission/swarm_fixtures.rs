@@ -224,3 +224,21 @@ pub(super) fn runtime_swarm_revocation_root(
         "revokedTaskIds": revoked_task_ids,
     }))
 }
+
+pub(super) fn swarm_route_metadata() -> serde_json::Value {
+    serde_json::json!({
+        "route": {
+            "bridge": "mcp",
+            "protocolTarget": "mcp://provider-runtime",
+            "selectedRoute": "mcp:task-child-a"
+        }
+    })
+}
+
+/// The bundle as stored while its continuations were still live, so only
+/// admission observes the expiry.
+pub(super) fn swarm_bundle_before_expiry(bundle: &SwarmAuthorityBundle) -> SwarmAuthorityBundle {
+    let mut stored = bundle.clone();
+    stored.now_unix_ms = 1_800_000_000_500;
+    stored
+}
