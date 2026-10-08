@@ -1,10 +1,11 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::{
+    canonical::canonical_json_bytes,
     capability::{
         governance::{
             GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
-            GovernedTransactionIntent,
+            GovernedTransactionIntent, GovernedTransactionIntentBody,
         },
         scope::{ChioScope, Constraint, MonetaryAmount, Operation, ToolGrant},
     },
@@ -59,6 +60,8 @@ impl ToolServerConnection for CostServer {
     }
 }
 
+const APPROVAL_TENANT: &str = "durable-approval-replay-tenant";
+
 fn kernel_config(keypair: Keypair) -> KernelConfig {
     KernelConfig {
         keypair,
@@ -104,6 +107,9 @@ fn governed_dispatch_replay_is_denied_after_store_reopen() {
     first_kernel.set_governed_approval_replay_store(Box::new(
         SqliteGovernedApprovalReplayStore::open(&path).test_expect("replay store opens"),
     ));
+    first_kernel
+        .set_governed_approval_policy(APPROVAL_TENANT.into(), vec![kernel_keypair.public_key()])
+        .test_expect("approval policy installs");
 
     let amount = MonetaryAmount {
         units: 10,
@@ -135,6 +141,9 @@ fn governed_dispatch_replay_is_denied_after_store_reopen() {
         )
         .test_expect("capability issues");
     let request_id = "durable-approval-replay-request";
+    let arguments = serde_json::json!({"operation": "settle"});
+    let parameters_hash =
+        chio_core::sha256(&canonical_json_bytes(&arguments).test_expect("arguments canonicalize"));
     let intent = GovernedTransactionIntent {
         id: "durable-approval-replay-intent".to_string(),
         server_id: server.to_string(),
@@ -147,14 +156,38 @@ fn governed_dispatch_replay_is_denied_after_store_reopen() {
         call_chain: None,
         autonomy: None,
         context: None,
-        body: Default::default(),
+        body: GovernedTransactionIntentBody::BoundToolInvocation {
+            capability_id: capability.id.clone(),
+            parameters_hash,
+        },
     };
+    let mut request = ToolCallRequest {
+        request_id: request_id.to_string(),
+        capability,
+        tool_name: tool.to_string(),
+        server_id: server.to_string(),
+        agent_id: agent.public_key().to_hex(),
+        arguments,
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: Some(intent),
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        supplemental_authorization: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+        declassification_grant: None,
+    };
+    let intent = first_kernel
+        .bind_tool_approval_intent(&request)
+        .test_expect("approval intent binds to the tool invocation");
     let now = now_secs();
     let approval_token = GovernedApprovalToken::sign(
         GovernedApprovalTokenBody {
             id: format!("approval-{request_id}"),
             approver: kernel_keypair.public_key(),
-            subject: capability.subject.clone(),
+            subject: request.capability.subject.clone(),
             governed_intent_hash: intent.binding_hash().test_expect("intent hashes"),
             request_id: request_id.to_string(),
             threshold_proposal_hash: None,
@@ -165,24 +198,8 @@ fn governed_dispatch_replay_is_denied_after_store_reopen() {
         &kernel_keypair,
     )
     .test_expect("approval token signs");
-    let request = ToolCallRequest {
-        request_id: request_id.to_string(),
-        capability,
-        tool_name: tool.to_string(),
-        server_id: server.to_string(),
-        agent_id: agent.public_key().to_hex(),
-        arguments: serde_json::json!({"operation": "settle"}),
-        dpop_proof: None,
-        execution_nonce: None,
-        governed_intent: Some(intent),
-        approval_token: Some(approval_token),
-        approval_tokens: Vec::new(),
-        threshold_approval_proposal: None,
-        supplemental_authorization: None,
-        model_metadata: None,
-        federated_origin_kernel_id: None,
-        declassification_grant: None,
-    };
+    request.governed_intent = Some(intent);
+    request.approval_token = Some(approval_token);
 
     let pre_dispatch_denial = first_kernel
         .evaluate_tool_call_blocking(&request)
@@ -215,13 +232,16 @@ fn governed_dispatch_replay_is_denied_after_store_reopen() {
     drop(first_kernel);
 
     let mut reopened_kernel = ChioKernel::new_with_clock(
-        kernel_config(kernel_keypair),
+        kernel_config(kernel_keypair.clone()),
         chio_test_support::clock::clock(),
     );
     reopened_kernel.enable_unsafe_ephemeral_financial_dispatch_for_development();
     reopened_kernel.set_governed_approval_replay_store(Box::new(
         SqliteGovernedApprovalReplayStore::open(&path).test_expect("replay store reopens"),
     ));
+    reopened_kernel
+        .set_governed_approval_policy(APPROVAL_TENANT.into(), vec![kernel_keypair.public_key()])
+        .test_expect("approval policy reinstalls");
     reopened_kernel.register_tool_server(Box::new(CostServer {
         id: server.to_string(),
     }));
