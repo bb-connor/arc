@@ -42,11 +42,12 @@ fn qualified_open_rejects_anchor_on_the_database_snapshot_device() {
         } else {
             anchor_root.path()
         };
-        let error = SqliteFindingPoolLedger::open_qualified(
+        let error = SqliteFindingPoolLedger::open_qualified_with_clock(
             database_root.path().join("pool.sqlite3"),
             format!("ledger:test-snapshot-domain:{suffix}"),
             &identity,
             selected_anchor,
+            chio_test_support::clock::clock(),
         )
         .err()
         .test_expect("co-located rollback anchor must fail qualification");
@@ -70,7 +71,13 @@ fn open_qualified(
             .test_expect("secure pool ledger parent");
     }
     let identity = Ed25519Backend::new(Keypair::from_seed(&[70_u8; 32]));
-    SqliteFindingPoolLedger::open_qualified(path, ledger_domain, &identity, rollback_anchor_root())
+    SqliteFindingPoolLedger::open_qualified_with_clock(
+        path,
+        ledger_domain,
+        &identity,
+        rollback_anchor_root(),
+        chio_test_support::clock::clock(),
+    )
 }
 
 #[test]
@@ -190,6 +197,48 @@ fn outbox_lease_clock_is_injected_checked_and_preserves_its_high_water() {
 }
 
 #[test]
+fn qualified_ledger_reads_lease_time_from_its_supplied_clock() {
+    use chio_security_types::clock::ClockError;
+    let directory = tempfile::tempdir().test_expect("create pool ledger directory");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))
+            .test_expect("secure pool ledger parent");
+    }
+    let identity = Ed25519Backend::new(Keypair::from_seed(&[70_u8; 32]));
+    let source = crate::replay_clock::tests::ManualClock::new(10_000);
+    let ledger = SqliteFindingPoolLedger::open_qualified_with_clock(
+        directory.path().join("pool.sqlite3"),
+        "ledger:test-supplied-clock",
+        &identity,
+        rollback_anchor_root(),
+        source.clone(),
+    )
+    .test_expect("open qualified pool ledger");
+    assert_eq!(
+        ledger
+            .outbox_lease_clock
+            .nondecreasing_now(10_000)
+            .test_expect("initialize supplied clock"),
+        10_000
+    );
+    source.set(10_001, 1);
+    assert_eq!(
+        ledger
+            .outbox_lease_clock
+            .nondecreasing_now(1)
+            .test_expect("elapsed supplied clock"),
+        11_000
+    );
+    source.fail(ClockError::Unavailable);
+    assert!(matches!(
+        ledger.outbox_lease_clock.nondecreasing_now(1),
+        Err(FindingPoolLedgerError::Clock(ClockError::Unavailable))
+    ));
+}
+
+#[test]
 fn leased_outbox_rows_remain_observable_as_pending() {
     let directory = tempfile::tempdir().test_expect("create pool ledger directory");
     let ledger = open_qualified(
@@ -244,11 +293,12 @@ fn qualified_ledger_rejects_a_writable_parent_directory() {
     std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o777))
         .test_expect("make pool ledger parent unsafe");
     let identity = Ed25519Backend::new(Keypair::from_seed(&[70_u8; 32]));
-    let error = SqliteFindingPoolLedger::open_qualified(
+    let error = SqliteFindingPoolLedger::open_qualified_with_clock(
         directory.path().join("pool.sqlite3"),
         "ledger:test-unsafe-parent",
         &identity,
         rollback_anchor_root(),
+        chio_test_support::clock::clock(),
     )
     .test_expect_err("writable parent must not qualify");
     assert!(error.to_string().contains("parent has unsafe ownership"));

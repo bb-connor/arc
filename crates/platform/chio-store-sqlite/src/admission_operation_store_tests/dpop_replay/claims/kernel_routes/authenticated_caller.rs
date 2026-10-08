@@ -82,10 +82,11 @@ fn authenticated_caller_start_retains_physical_dpop_and_reports_after_proof_expi
     assert!(history
         .iter()
         .any(|claim| claim.disposition == DpopReplayClaimDisposition::RetainedAfterDispatchCommit));
-    let ledger = SqliteCallerExecutionLedger::provision(
+    let ledger = SqliteCallerExecutionLedger::provision_with_clock(
         &route.fixture._temp.path().join("executor.db"),
         executor.clone(),
         4,
+        chio_test_support::clock::clock(),
     )?;
     let report = ledger.execute_once(
         &authorization,

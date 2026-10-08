@@ -136,21 +136,6 @@ impl SqliteFindingPoolLedger {
     /// filesystem device so the same storage snapshot cannot roll back both
     /// records. The identity's live proof, canonical identity, and external
     /// anchor instance id bind it globally, so a copy cannot qualify elsewhere.
-    pub fn open_qualified(
-        path: impl AsRef<Path>,
-        ledger_domain: impl Into<String>,
-        store_identity: &dyn chio_core::crypto::SigningBackend,
-        rollback_anchor_root: impl AsRef<Path>,
-    ) -> Result<Self, FindingPoolLedgerError> {
-        Self::open_qualified_with_clock(
-            path,
-            ledger_domain,
-            store_identity,
-            rollback_anchor_root,
-            Arc::new(chio_security_types::clock::SystemClock),
-        )
-    }
-
     pub fn open_qualified_with_clock(
         path: impl AsRef<Path>,
         ledger_domain: impl Into<String>,

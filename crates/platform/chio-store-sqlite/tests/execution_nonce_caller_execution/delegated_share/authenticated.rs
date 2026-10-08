@@ -5,10 +5,11 @@ use chio_store_sqlite::caller_execution_ledger::SqliteCallerExecutionLedger;
 #[test]
 fn lost_authenticated_report_retains_sibling_share_until_original_settlement() -> TestResult {
     let (fixture, executor_key) = fixture()?;
-    let ledger = SqliteCallerExecutionLedger::provision(
+    let ledger = SqliteCallerExecutionLedger::provision_with_clock(
         &fixture.directory.path().join("delegated-executor.db"),
         fixture.caller_executor.clone().ok_or("executor")?,
         4,
+        chio_test_support::clock::clock(),
     )?;
     let (siblings, first, authorization, report) = {
         let mut runtime = fixture.open()?;

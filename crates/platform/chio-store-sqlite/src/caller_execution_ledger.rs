@@ -9,7 +9,7 @@ use std::fs::{self, OpenOptions};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use chio_security_types::clock::{Clock, SystemClock};
+use chio_security_types::clock::Clock;
 
 use chio_core::crypto::{Keypair, PublicKey};
 use chio_kernel::admission_operation::AdmissionIdentifier;
@@ -60,16 +60,8 @@ impl SqliteCallerExecutionLedger {
     /// Create a new private ledger. Never call this automatically on restart or
     /// when an existing ledger is unavailable. No populated store is migrated.
     /// At most 64 operations are retained (about 66 MiB of bounded payloads).
-    pub fn provision(
-        path: &Path,
-        executor: CallerExecutorIdentityV1,
-        max_operations: u32,
-    ) -> Result<Self> {
-        Self::provision_with_clock(path, executor, max_operations, Arc::new(SystemClock))
-    }
-
-    /// Provision with the executor's trusted clock. All claim and report reads
-    /// share this clock and its fence; persisted wall-time custody survives reopen.
+    /// All claim and report reads share the executor's trusted clock and its
+    /// fence; persisted wall-time custody survives reopen.
     pub fn provision_with_clock(
         path: &Path,
         executor: CallerExecutorIdentityV1,
@@ -135,12 +127,7 @@ impl SqliteCallerExecutionLedger {
 
     /// Open only an already provisioned exact executor/key epoch. Rotation
     /// needs an explicit history-preserving migration, never a fresh ledger.
-    pub fn open(path: &Path, executor: CallerExecutorIdentityV1) -> Result<Self> {
-        Self::open_with_clock(path, executor, Arc::new(SystemClock))
-    }
-
-    /// Reopen using the executor's configured trusted clock. A clock behind the
-    /// durable high-water mark cannot serve the existing ledger.
+    /// A clock behind the durable high-water mark cannot serve the ledger.
     pub fn open_with_clock(
         path: &Path,
         executor: CallerExecutorIdentityV1,

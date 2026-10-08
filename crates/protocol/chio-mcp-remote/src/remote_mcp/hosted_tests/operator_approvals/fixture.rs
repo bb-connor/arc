@@ -72,8 +72,17 @@ capabilities:
     let store = authority.admission_operation_store();
     let fence = authority.mutation_fence();
     let replay = directory.join("approval-replay.sqlite3");
-    drop(chio_store_sqlite::SqliteGovernedApprovalReplayStore::open_with_capacity(&replay, 128)?);
-    let source = chio_store_sqlite::SqliteGovernedApprovalReplaySource::open(&replay)?;
+    drop(
+        chio_store_sqlite::SqliteGovernedApprovalReplayStore::open_with_clock(
+            &replay,
+            128,
+            chio_test_support::clock::clock(),
+        )?,
+    );
+    let source = chio_store_sqlite::SqliteGovernedApprovalReplaySource::open_with_clock(
+        &replay,
+        chio_test_support::clock::clock(),
+    )?;
     let authority_id = AdmissionIdentifier::try_new("approval_authority", "mcp-operator")?;
     let source_id = AdmissionIdentifier::try_new("approval_source", "mcp-replay")?;
     let now = config.clock.millis()?;

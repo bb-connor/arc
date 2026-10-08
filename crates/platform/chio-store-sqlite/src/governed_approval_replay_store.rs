@@ -1,6 +1,6 @@
 //! Durable replay prevention for governed approval dispatches.
 
-use chio_security_types::clock::{Clock, ClockError, SystemClock};
+use chio_security_types::clock::{Clock, ClockError};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -166,15 +166,11 @@ const GOVERNED_APPROVAL_STORE_LEGACY_ANCHOR_TABLES: &[&str] =
     &["chio_governed_approval_replay_entries"];
 
 impl SqliteGovernedApprovalReplayStore {
-    pub fn open(path: impl AsRef<Path>) -> Result<Self, SqliteGovernedApprovalReplayStoreError> {
-        Self::open_with_capacity(path, DEFAULT_GOVERNED_APPROVAL_REPLAY_CAPACITY)
-    }
-
-    pub fn open_with_capacity(
+    pub fn open(
         path: impl AsRef<Path>,
-        capacity: usize,
+        clock: Arc<dyn Clock>,
     ) -> Result<Self, SqliteGovernedApprovalReplayStoreError> {
-        Self::open_with_clock(path, capacity, Arc::new(SystemClock))
+        Self::open_with_clock(path, DEFAULT_GOVERNED_APPROVAL_REPLAY_CAPACITY, clock)
     }
 
     pub fn open_with_clock(
@@ -204,14 +200,10 @@ impl SqliteGovernedApprovalReplayStore {
         Ok(store)
     }
 
-    pub fn open_in_memory() -> Result<Self, SqliteGovernedApprovalReplayStoreError> {
-        Self::open_in_memory_with_capacity(DEFAULT_GOVERNED_APPROVAL_REPLAY_CAPACITY)
-    }
-
-    pub fn open_in_memory_with_capacity(
-        capacity: usize,
+    pub fn open_in_memory(
+        clock: Arc<dyn Clock>,
     ) -> Result<Self, SqliteGovernedApprovalReplayStoreError> {
-        Self::open_in_memory_with_clock(capacity, Arc::new(SystemClock))
+        Self::open_in_memory_with_clock(DEFAULT_GOVERNED_APPROVAL_REPLAY_CAPACITY, clock)
     }
 
     pub fn open_in_memory_with_clock(
@@ -488,21 +480,6 @@ impl SqliteGovernedApprovalReplayStore {
     /// Deliberately lower a latched clock high-water after the host clock has
     /// been corrected. The exact old value is a compare-and-swap guard, and
     /// recovery never deletes retained approval markers.
-    /// Standalone native composition entry. Services sharing an authority clock
-    /// must use `recover_clock_high_water_with_clock` instead.
-    pub fn recover_clock_high_water(
-        path: impl AsRef<Path>,
-        expected_high_water: i64,
-        corrected_high_water: i64,
-    ) -> Result<(), SqliteGovernedApprovalReplayStoreError> {
-        Self::recover_clock_high_water_with_clock(
-            path,
-            expected_high_water,
-            corrected_high_water,
-            &SystemClock,
-        )
-    }
-
     pub fn recover_clock_high_water_with_clock(
         path: impl AsRef<Path>,
         expected_high_water: i64,
@@ -855,7 +832,13 @@ fn kernel_store_error(error: SqliteGovernedApprovalReplayStoreError) -> KernelEr
 )]
 fn now_secs() -> i64 {
     use chio_security_types::clock::Clock;
-    i64::try_from(SystemClock.unix_millis().unwrap().as_secs()).unwrap()
+    i64::try_from(
+        chio_security_types::clock::SystemClock
+            .unix_millis()
+            .unwrap()
+            .as_secs(),
+    )
+    .unwrap()
 }
 
 #[cfg(test)]
@@ -881,7 +864,9 @@ mod tests {
         let path = unique_db_path("chio-approval-replay-committed");
         let expires_at = u64::try_from(now_secs()).unwrap().saturating_add(60);
         {
-            let store = SqliteGovernedApprovalReplayStore::open(&path).unwrap();
+            let store =
+                SqliteGovernedApprovalReplayStore::open(&path, chio_test_support::clock::clock())
+                    .unwrap();
             assert!(store
                 .reserve_for_dispatch("subject", "request", "intent", expires_at, "owner")
                 .unwrap());
@@ -889,7 +874,9 @@ mod tests {
                 .commit_dispatch_reservation("subject", "request", "intent", "owner")
                 .unwrap());
         }
-        let reopened = SqliteGovernedApprovalReplayStore::open(&path).unwrap();
+        let reopened =
+            SqliteGovernedApprovalReplayStore::open(&path, chio_test_support::clock::clock())
+                .unwrap();
         assert!(!reopened
             .reserve_for_dispatch("subject", "request", "intent", expires_at, "other")
             .unwrap());
@@ -901,12 +888,16 @@ mod tests {
         let path = unique_db_path("chio-approval-replay-reserved");
         let expires_at = u64::try_from(now_secs()).unwrap().saturating_add(60);
         {
-            let store = SqliteGovernedApprovalReplayStore::open(&path).unwrap();
+            let store =
+                SqliteGovernedApprovalReplayStore::open(&path, chio_test_support::clock::clock())
+                    .unwrap();
             assert!(store
                 .reserve_for_dispatch("subject", "request", "intent", expires_at, "owner")
                 .unwrap());
         }
-        let reopened = SqliteGovernedApprovalReplayStore::open(&path).unwrap();
+        let reopened =
+            SqliteGovernedApprovalReplayStore::open(&path, chio_test_support::clock::clock())
+                .unwrap();
         assert!(!reopened
             .reserve_for_dispatch("subject", "request", "intent", expires_at, "other")
             .unwrap());
@@ -915,7 +906,9 @@ mod tests {
 
     #[test]
     fn rollback_and_commit_require_exact_owner() {
-        let store = SqliteGovernedApprovalReplayStore::open_in_memory().unwrap();
+        let store =
+            SqliteGovernedApprovalReplayStore::open_in_memory(chio_test_support::clock::clock())
+                .unwrap();
         let expires_at = u64::try_from(now_secs()).unwrap().saturating_add(60);
         assert!(store
             .reserve_for_dispatch("subject", "request-a", "intent-a", expires_at, "owner-a",)
@@ -940,7 +933,9 @@ mod tests {
 
     #[test]
     fn identical_request_and_intent_are_scoped_by_subject() {
-        let store = SqliteGovernedApprovalReplayStore::open_in_memory().unwrap();
+        let store =
+            SqliteGovernedApprovalReplayStore::open_in_memory(chio_test_support::clock::clock())
+                .unwrap();
         let expires_at = u64::try_from(now_secs()).unwrap().saturating_add(60);
         assert!(store
             .reserve_for_dispatch("subject-a", "request", "intent", expires_at, "owner-a",)
@@ -952,7 +947,9 @@ mod tests {
 
     #[test]
     fn bounded_stale_observation_is_accepted_without_lowering_high_water() {
-        let store = SqliteGovernedApprovalReplayStore::open_in_memory().unwrap();
+        let store =
+            SqliteGovernedApprovalReplayStore::open_in_memory(chio_test_support::clock::clock())
+                .unwrap();
         let base = now_secs();
         assert!(store
             .try_reserve_at(
@@ -1023,7 +1020,9 @@ mod tests {
     #[test]
     fn open_seeds_high_water_before_first_reservation() {
         let before_open = now_secs();
-        let store = SqliteGovernedApprovalReplayStore::open_in_memory().unwrap();
+        let store =
+            SqliteGovernedApprovalReplayStore::open_in_memory(chio_test_support::clock::clock())
+                .unwrap();
         let expires_at = u64::try_from(before_open).unwrap().saturating_add(60);
         let error = store
             .try_reserve_at(
@@ -1050,7 +1049,9 @@ mod tests {
         let base = now_secs();
         let expiry = u64::try_from(base).unwrap().saturating_add(10_000);
         {
-            let store = SqliteGovernedApprovalReplayStore::open(&path).unwrap();
+            let store =
+                SqliteGovernedApprovalReplayStore::open(&path, chio_test_support::clock::clock())
+                    .unwrap();
             assert!(store
                 .try_reserve_at(
                     "subject",
@@ -1073,10 +1074,12 @@ mod tests {
             .unwrap();
         drop(connection);
 
-        let error = match SqliteGovernedApprovalReplayStore::open(&path) {
-            Ok(_) => panic!("a latched future high-water must require recovery"),
-            Err(error) => error,
-        };
+        let error =
+            match SqliteGovernedApprovalReplayStore::open(&path, chio_test_support::clock::clock())
+            {
+                Ok(_) => panic!("a latched future high-water must require recovery"),
+                Err(error) => error,
+            };
         assert!(matches!(
             error,
             SqliteGovernedApprovalReplayStoreError::ClockAnomaly {
@@ -1086,13 +1089,16 @@ mod tests {
             } if high_water_unix_secs == latched_high_water
         ));
 
-        SqliteGovernedApprovalReplayStore::recover_clock_high_water(
+        SqliteGovernedApprovalReplayStore::recover_clock_high_water_with_clock(
             &path,
             latched_high_water,
             now_secs(),
+            &*chio_test_support::clock::clock(),
         )
         .unwrap();
-        let reopened = SqliteGovernedApprovalReplayStore::open(&path).unwrap();
+        let reopened =
+            SqliteGovernedApprovalReplayStore::open(&path, chio_test_support::clock::clock())
+                .unwrap();
         assert!(!reopened
             .try_reserve_at(
                 "subject",
@@ -1112,7 +1118,9 @@ mod tests {
         let base = now_secs();
         let expiry = base.saturating_add(100);
         {
-            let store = SqliteGovernedApprovalReplayStore::open(&path).unwrap();
+            let store =
+                SqliteGovernedApprovalReplayStore::open(&path, chio_test_support::clock::clock())
+                    .unwrap();
             assert!(store
                 .try_reserve_at(
                     "subject",
@@ -1144,9 +1152,13 @@ mod tests {
         advanced.validate_retained_row_capacity().unwrap();
         drop(advanced);
 
-        let error =
-            SqliteGovernedApprovalReplayStore::recover_clock_high_water(&path, jumped, now_secs())
-                .unwrap_err();
+        let error = SqliteGovernedApprovalReplayStore::recover_clock_high_water_with_clock(
+            &path,
+            jumped,
+            now_secs(),
+            &*chio_test_support::clock::clock(),
+        )
+        .unwrap_err();
         assert!(error.to_string().contains("below pruned-through"));
         let _ = fs::remove_file(path);
     }
@@ -1172,7 +1184,11 @@ mod tests {
 
     #[test]
     fn capacity_does_not_evict_live_markers_and_expiry_reclaims_space() {
-        let store = SqliteGovernedApprovalReplayStore::open_in_memory_with_capacity(1).unwrap();
+        let store = SqliteGovernedApprovalReplayStore::open_in_memory_with_clock(
+            1,
+            chio_test_support::clock::clock(),
+        )
+        .unwrap();
         let base = now_secs();
         let first_expiry = u64::try_from(base).unwrap().saturating_add(1);
         let second_expiry = u64::try_from(base).unwrap().saturating_add(100);
@@ -1223,7 +1239,11 @@ mod tests {
 
     #[test]
     fn expiry_reclaims_crash_owned_reservation_and_capacity() {
-        let store = SqliteGovernedApprovalReplayStore::open_in_memory_with_capacity(1).unwrap();
+        let store = SqliteGovernedApprovalReplayStore::open_in_memory_with_clock(
+            1,
+            chio_test_support::clock::clock(),
+        )
+        .unwrap();
         let base = now_secs();
         let first_expiry = u64::try_from(base).unwrap().saturating_add(1);
         let second_expiry = u64::try_from(base).unwrap().saturating_add(100);
@@ -1274,7 +1294,12 @@ mod tests {
         let path = unique_db_path("chio-approval-replay-capacity-reopen");
         let expires_at = u64::try_from(now_secs()).unwrap().saturating_add(60);
         {
-            let store = SqliteGovernedApprovalReplayStore::open_with_capacity(&path, 2).unwrap();
+            let store = SqliteGovernedApprovalReplayStore::open_with_clock(
+                &path,
+                2,
+                chio_test_support::clock::clock(),
+            )
+            .unwrap();
             assert!(store
                 .reserve_for_dispatch("subject", "request-a", "intent", expires_at, "owner-a",)
                 .unwrap());
@@ -1282,7 +1307,11 @@ mod tests {
                 .reserve_for_dispatch("subject", "request-b", "intent", expires_at, "owner-b",)
                 .unwrap());
         }
-        let error = match SqliteGovernedApprovalReplayStore::open_with_capacity(&path, 1) {
+        let error = match SqliteGovernedApprovalReplayStore::open_with_clock(
+            &path,
+            1,
+            chio_test_support::clock::clock(),
+        ) {
             Ok(_) => panic!("open must reject a capacity below retained rows"),
             Err(error) => error,
         };
@@ -1293,8 +1322,18 @@ mod tests {
     #[test]
     fn independently_opened_handles_can_only_increase_persisted_capacity() {
         let path = unique_db_path("chio-approval-replay-capacity-handle-mismatch");
-        let store = SqliteGovernedApprovalReplayStore::open_with_capacity(&path, 1).unwrap();
-        let larger = SqliteGovernedApprovalReplayStore::open_with_capacity(&path, 2).unwrap();
+        let store = SqliteGovernedApprovalReplayStore::open_with_clock(
+            &path,
+            1,
+            chio_test_support::clock::clock(),
+        )
+        .unwrap();
+        let larger = SqliteGovernedApprovalReplayStore::open_with_clock(
+            &path,
+            2,
+            chio_test_support::clock::clock(),
+        )
+        .unwrap();
 
         let expires_at = u64::try_from(now_secs()).unwrap().saturating_add(60);
         assert!(store
@@ -1305,7 +1344,11 @@ mod tests {
             .unwrap());
         drop(larger);
 
-        let error = match SqliteGovernedApprovalReplayStore::open_with_capacity(&path, 1) {
+        let error = match SqliteGovernedApprovalReplayStore::open_with_clock(
+            &path,
+            1,
+            chio_test_support::clock::clock(),
+        ) {
             Ok(_) => panic!("a later handle must not shrink the persisted capacity"),
             Err(error) => error,
         };
@@ -1347,7 +1390,9 @@ mod tests {
                 )
                 .unwrap();
         }
-        let store = SqliteGovernedApprovalReplayStore::open(&path).unwrap();
+        let store =
+            SqliteGovernedApprovalReplayStore::open(&path, chio_test_support::clock::clock())
+                .unwrap();
         assert!(!store
             .reserve_for_dispatch(
                 "subject-a",
@@ -1371,7 +1416,9 @@ mod tests {
 
     #[test]
     fn every_pooled_connection_has_busy_timeout() {
-        let store = SqliteGovernedApprovalReplayStore::open_in_memory().unwrap();
+        let store =
+            SqliteGovernedApprovalReplayStore::open_in_memory(chio_test_support::clock::clock())
+                .unwrap();
         let connection = store.pool.get().unwrap();
         let timeout = connection
             .query_row("PRAGMA busy_timeout", [], |row| row.get::<_, i64>(0))
@@ -1381,7 +1428,13 @@ mod tests {
 
     #[test]
     fn zero_capacity_is_rejected() {
-        assert!(SqliteGovernedApprovalReplayStore::open_in_memory_with_capacity(0).is_err());
+        assert!(
+            SqliteGovernedApprovalReplayStore::open_in_memory_with_clock(
+                0,
+                chio_test_support::clock::clock()
+            )
+            .is_err()
+        );
     }
 }
 

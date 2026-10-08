@@ -43,7 +43,10 @@ fn imports_complete_inventory_inactive_with_anchored_read_only_retries() -> Anch
                 Some("private-owner")
             );
         }
-        let legacy = SqliteGovernedApprovalReplayStore::open(&source.path)?;
+        let legacy = SqliteGovernedApprovalReplayStore::open(
+            &source.path,
+            chio_test_support::clock::clock(),
+        )?;
         use chio_kernel::GovernedApprovalReplayStore;
         assert!(legacy
             .reserve_for_dispatch("subject", "new", "intent", now_ms() / 1000 + 100, "owner")

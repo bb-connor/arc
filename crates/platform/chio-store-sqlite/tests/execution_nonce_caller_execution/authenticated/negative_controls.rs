@@ -42,10 +42,11 @@ fn unused_expired_reservation_cannot_publish_start_authority() -> TestResult {
 #[test]
 fn changed_executor_pin_cannot_adopt_original_start_or_report() -> TestResult {
     let (mut fixture, key) = fixture()?;
-    let ledger = SqliteCallerExecutionLedger::provision(
+    let ledger = SqliteCallerExecutionLedger::provision_with_clock(
         &fixture.directory.path().join("executor.db"),
         fixture.caller_executor.clone().ok_or("executor")?,
         4,
+        chio_test_support::clock::clock(),
     )?;
     let (request, authorization, report) = {
         let runtime = fixture.open()?;
@@ -83,10 +84,11 @@ fn revocation_blocks_historical_output_and_completed_receipt_replay() -> TestRes
         let runtime = fixture.open()?;
         let request = reserve(&fixture, &runtime, "revoked-output")?;
         let authorization = start(&runtime, &request)?;
-        let ledger = SqliteCallerExecutionLedger::provision(
+        let ledger = SqliteCallerExecutionLedger::provision_with_clock(
             &fixture.directory.path().join("executor.db"),
             fixture.caller_executor.clone().ok_or("executor")?,
             4,
+            chio_test_support::clock::clock(),
         )?;
         let report = ledger.execute_once(
             &authorization,

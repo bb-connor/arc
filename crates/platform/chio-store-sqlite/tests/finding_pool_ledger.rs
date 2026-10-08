@@ -108,11 +108,12 @@ fn open_qualified(
     path: impl AsRef<std::path::Path>,
     ledger_domain: impl Into<String>,
 ) -> Result<SqliteFindingPoolLedger, FindingPoolLedgerError> {
-    SqliteFindingPoolLedger::open_qualified(
+    SqliteFindingPoolLedger::open_qualified_with_clock(
         path,
         ledger_domain,
         &store_identity(),
         rollback_anchor_root(),
+        chio_test_support::clock::clock(),
     )
 }
 

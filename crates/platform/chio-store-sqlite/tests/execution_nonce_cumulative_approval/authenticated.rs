@@ -17,10 +17,11 @@ fn authenticated_caller_retains_cumulative_approval_and_settles_historical_cost(
         key_epoch: 9,
     };
     fixture.caller_executor = Some(executor.clone());
-    let ledger = SqliteCallerExecutionLedger::provision(
+    let ledger = SqliteCallerExecutionLedger::provision_with_clock(
         &fixture.directory.path().join("executor.db"),
         executor,
         4,
+        chio_test_support::clock::clock(),
     )?;
     let (request, authorization, report) = {
         let runtime = fixture.open()?;

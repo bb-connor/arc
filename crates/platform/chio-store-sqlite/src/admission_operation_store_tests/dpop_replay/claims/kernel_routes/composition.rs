@@ -14,8 +14,15 @@ fn add_approval(route: &mut Route, request: &mut ToolCallRequest) -> AnchoredTes
         .kernel
         .set_governed_approval_policy(tenant_id.into(), vec![route.signer.public_key()])?;
     let path = route.fixture._temp.path().join("composed-approval.db");
-    drop(crate::SqliteGovernedApprovalReplayStore::open_with_capacity(&path, 16)?);
-    let source = Arc::new(crate::SqliteGovernedApprovalReplaySource::open(&path)?);
+    drop(crate::SqliteGovernedApprovalReplayStore::open_with_clock(
+        &path,
+        16,
+        chio_test_support::clock::clock(),
+    )?);
+    let source = Arc::new(crate::SqliteGovernedApprovalReplaySource::open_with_clock(
+        &path,
+        chio_test_support::clock::clock(),
+    )?);
     let authority = identifier("authority", "composed-approval");
     let expected = route.fixture.store.expect_governed_approval_replay_source(
         &identifier("source", "composed-approval-source"),

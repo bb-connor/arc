@@ -199,7 +199,11 @@ fn ap23_mcp_startup_rejects_invalid_roster_or_unactivated_replay_source() -> Tes
     config.approval = Some(good);
     let unrelated = directory.path().join("unactivated.sqlite3");
     drop(
-        chio_store_sqlite::SqliteGovernedApprovalReplayStore::open_with_capacity(&unrelated, 128)?,
+        chio_store_sqlite::SqliteGovernedApprovalReplayStore::open_with_clock(
+            &unrelated,
+            128,
+            chio_test_support::clock::clock(),
+        )?,
     );
     config
         .approval

@@ -16,7 +16,8 @@ fn partial_or_substituted_seals_fail_live_retry_and_startup_without_repair() -> 
     ] {
         let directory = tempfile::tempdir()?;
         let path = directory.path().join("approval.db");
-        let store = SqliteGovernedApprovalReplayStore::open(&path)?;
+        let store =
+            SqliteGovernedApprovalReplayStore::open(&path, chio_test_support::clock::clock())?;
         assert!(reserve(&store, "reserved")?);
         let expected = store.preview_legacy_replay_source(&binding()?)?;
         store.seal_expected_legacy_replay_source(&expected)?;
@@ -28,7 +29,10 @@ fn partial_or_substituted_seals_fail_live_retry_and_startup_without_repair() -> 
         );
         assert!(store.seal_expected_legacy_replay_source(&expected).is_err());
         assert!(reserve(&store, "new").is_err());
-        assert!(SqliteGovernedApprovalReplayStore::open(&path).is_err());
+        assert!(
+            SqliteGovernedApprovalReplayStore::open(&path, chio_test_support::clock::clock())
+                .is_err()
+        );
     }
     Ok(())
 }
@@ -48,7 +52,8 @@ fn restored_barriers_do_not_hide_changed_inventory_or_changed_artifact() -> Test
     ] {
         let directory = tempfile::tempdir()?;
         let path = directory.path().join("approval.db");
-        let store = SqliteGovernedApprovalReplayStore::open(&path)?;
+        let store =
+            SqliteGovernedApprovalReplayStore::open(&path, chio_test_support::clock::clock())?;
         assert!(reserve(&store, "reserved")?);
         let expected = store.preview_legacy_replay_source(&binding()?)?;
         store.seal_expected_legacy_replay_source(&expected)?;
@@ -69,7 +74,10 @@ fn restored_barriers_do_not_hide_changed_inventory_or_changed_artifact() -> Test
         connection.execute_batch(&format!("DROP TRIGGER {trigger}; UPDATE chio_governed_approval_replay_{table} SET {column} = {new_value}; {sql}"))?;
         schema::verify(&connection, true)?;
         assert!(store.verify_legacy_replay_source_seal(&expected).is_err());
-        assert!(SqliteGovernedApprovalReplayStore::open(&path).is_err());
+        assert!(
+            SqliteGovernedApprovalReplayStore::open(&path, chio_test_support::clock::clock())
+                .is_err()
+        );
     }
     Ok(())
 }
@@ -83,13 +91,19 @@ fn unexpected_catalog_objects_and_incomplete_evidence_are_not_repaired() -> Test
     ] {
         let directory = tempfile::tempdir()?;
         let path = directory.path().join("approval.db");
-        let store = SqliteGovernedApprovalReplayStore::open(&path)?;
+        let store = SqliteGovernedApprovalReplayStore::open(
+            &path,
+            chio_test_support::clock::clock(),
+        )?;
         let connection = Connection::open(&path)?;
         connection.execute_batch(sql)?;
         assert!(store.preview_legacy_replay_source(&binding()?).is_err());
         if schema::has_evidence(&connection)? {
             assert!(reserve(&store, "new").is_err());
-            assert!(SqliteGovernedApprovalReplayStore::open(&path).is_err());
+            assert!(SqliteGovernedApprovalReplayStore::open(
+                &path,
+                chio_test_support::clock::clock(),
+            ).is_err());
         }
     }
     Ok(())
@@ -99,21 +113,30 @@ fn unexpected_catalog_objects_and_incomplete_evidence_are_not_repaired() -> Test
 fn copied_file_is_not_the_sealed_source_and_aliases_are_refused() -> TestResult {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("approval.db");
-    let store = SqliteGovernedApprovalReplayStore::open(&path)?;
+    let store = SqliteGovernedApprovalReplayStore::open(&path, chio_test_support::clock::clock())?;
     assert!(reserve(&store, "reserved")?);
     let expected = store.preview_legacy_replay_source(&binding()?)?;
     store.seal_expected_legacy_replay_source(&expected)?;
     drop(store);
     let copy = directory.path().join("copy.db");
     std::fs::copy(&path, &copy)?;
-    assert!(SqliteGovernedApprovalReplayStore::open(&copy).is_err());
+    assert!(
+        SqliteGovernedApprovalReplayStore::open(&copy, chio_test_support::clock::clock()).is_err()
+    );
     let symbolic = directory.path().join("symbolic.db");
     std::os::unix::fs::symlink(&path, &symbolic)?;
-    assert!(SqliteGovernedApprovalReplayStore::open(&symbolic).is_err());
+    assert!(
+        SqliteGovernedApprovalReplayStore::open(&symbolic, chio_test_support::clock::clock())
+            .is_err()
+    );
     let hard = directory.path().join("hard.db");
     std::fs::hard_link(&path, &hard)?;
-    assert!(SqliteGovernedApprovalReplayStore::open(&hard).is_err());
-    assert!(SqliteGovernedApprovalReplayStore::open(&path).is_err());
+    assert!(
+        SqliteGovernedApprovalReplayStore::open(&hard, chio_test_support::clock::clock()).is_err()
+    );
+    assert!(
+        SqliteGovernedApprovalReplayStore::open(&path, chio_test_support::clock::clock()).is_err()
+    );
     Ok(())
 }
 
@@ -121,13 +144,15 @@ fn copied_file_is_not_the_sealed_source_and_aliases_are_refused() -> TestResult 
 fn changed_journal_mode_is_refused_without_startup_normalization() -> TestResult {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("approval.db");
-    let store = SqliteGovernedApprovalReplayStore::open(&path)?;
+    let store = SqliteGovernedApprovalReplayStore::open(&path, chio_test_support::clock::clock())?;
     let expected = store.preview_legacy_replay_source(&binding()?)?;
     store.seal_expected_legacy_replay_source(&expected)?;
     drop(store);
     let connection = Connection::open(&path)?;
     connection.pragma_update(None, "journal_mode", "DELETE")?;
-    assert!(SqliteGovernedApprovalReplayStore::open(&path).is_err());
+    assert!(
+        SqliteGovernedApprovalReplayStore::open(&path, chio_test_support::clock::clock()).is_err()
+    );
     let journal: String = connection.pragma_query_value(None, "journal_mode", |row| row.get(0))?;
     assert_eq!(journal, "delete");
     Ok(())
@@ -135,11 +160,12 @@ fn changed_journal_mode_is_refused_without_startup_normalization() -> TestResult
 
 #[test]
 fn path_replacement_and_memory_sources_cannot_be_sealed() -> TestResult {
-    let memory = SqliteGovernedApprovalReplayStore::open_in_memory()?;
+    let memory =
+        SqliteGovernedApprovalReplayStore::open_in_memory(chio_test_support::clock::clock())?;
     assert!(memory.preview_legacy_replay_source(&binding()?).is_err());
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("approval.db");
-    let store = SqliteGovernedApprovalReplayStore::open(&path)?;
+    let store = SqliteGovernedApprovalReplayStore::open(&path, chio_test_support::clock::clock())?;
     let expected = store.preview_legacy_replay_source(&binding()?)?;
     std::fs::rename(&path, directory.path().join("moved.db"))?;
     std::fs::File::create(&path)?;

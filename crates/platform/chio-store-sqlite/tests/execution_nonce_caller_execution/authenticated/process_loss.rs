@@ -52,7 +52,11 @@ fn process_loss_retains_capture_and_never_reexecutes_original_attempt() -> TestR
             &root.join("authorization.json"),
             &authorization.canonical_bytes()?,
         )?;
-        let ledger = SqliteCallerExecutionLedger::open(&root.join("executor.db"), executor)?;
+        let ledger = SqliteCallerExecutionLedger::open_with_clock(
+            &root.join("executor.db"),
+            executor,
+            chio_test_support::clock::clock(),
+        )?;
         ledger.execute_once(
             &authorization,
             &fixture.signer.public_key(),
@@ -81,10 +85,11 @@ fn process_loss_retains_capture_and_never_reexecutes_original_attempt() -> TestR
         let (fixture, executor_key) = fixture()?;
         let root = fixture.directory.path();
         let executor = fixture.caller_executor.clone().ok_or("executor")?;
-        drop(SqliteCallerExecutionLedger::provision(
+        drop(SqliteCallerExecutionLedger::provision_with_clock(
             &root.join("executor.db"),
             executor.clone(),
             4,
+            chio_test_support::clock::clock(),
         )?);
         let mut child = Command::new(std::env::current_exe()?)
             .args(["--exact", "authenticated::process_loss::process_loss_retains_capture_and_never_reexecutes_original_attempt", "--nocapture"])
@@ -138,7 +143,11 @@ fn process_loss_retains_capture_and_never_reexecutes_original_attempt() -> TestR
                 .verdict,
             Verdict::Deny
         );
-        let ledger = SqliteCallerExecutionLedger::open(&root.join("executor.db"), executor)?;
+        let ledger = SqliteCallerExecutionLedger::open_with_clock(
+            &root.join("executor.db"),
+            executor,
+            chio_test_support::clock::clock(),
+        )?;
         let calls = std::sync::atomic::AtomicUsize::new(0);
         let recovered = ledger.execute_once(
             &authorization,

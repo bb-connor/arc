@@ -53,10 +53,11 @@ fn authenticated_caller_start_retains_approval_without_legacy_replay_or_reacquis
         "start cannot acquire another approval episode"
     );
     assert!(history.iter().any(|claim| claim.disposition == chio_kernel::admission_operation::governed_approval_claim::GovernedApprovalClaimDisposition::RetainedAfterDispatchCommit));
-    let ledger = SqliteCallerExecutionLedger::provision(
+    let ledger = SqliteCallerExecutionLedger::provision_with_clock(
         &route.fixture._temp.path().join("executor.db"),
         executor.clone(),
         4,
+        chio_test_support::clock::clock(),
     )?;
     let report = ledger.execute_once(
         &authorization,

@@ -21,13 +21,6 @@ impl SqliteGovernedApprovalReplaySource {
     /// Open an existing, canonical source without migration, pruning, clock
     /// advancement, capacity changes or file creation. This is required when
     /// resuming a pinned but not yet sealed source after process loss.
-    pub fn open(path: impl AsRef<Path>) -> Result<Self, Error> {
-        Self::open_with_clock(
-            path,
-            std::sync::Arc::new(chio_security_types::clock::SystemClock),
-        )
-    }
-
     pub fn open_with_clock(
         path: impl AsRef<Path>,
         clock: std::sync::Arc<dyn chio_security_types::clock::Clock>,

@@ -51,7 +51,12 @@ fn authenticated_report_finalizes_after_expiry_and_restart_without_readmission()
     let (fixture, executor_key) = fixture()?;
     let executor = fixture.caller_executor.clone().ok_or("executor")?;
     let ledger_path = fixture.directory.path().join("executor.db");
-    let ledger = SqliteCallerExecutionLedger::provision(&ledger_path, executor.clone(), 4)?;
+    let ledger = SqliteCallerExecutionLedger::provision_with_clock(
+        &ledger_path,
+        executor.clone(),
+        4,
+        chio_test_support::clock::clock(),
+    )?;
     let (request, authorization, report) = {
         let runtime = fixture.open()?;
         let request = reserve(&fixture, &runtime, "late-authenticated-report")?;

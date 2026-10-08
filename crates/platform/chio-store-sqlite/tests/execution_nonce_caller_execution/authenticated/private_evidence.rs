@@ -10,10 +10,11 @@ fn private_delivery_evidence_rejects_tampering_and_schema_confusion() -> TestRes
     let runtime = fixture.open()?;
     let request = reserve(&fixture, &runtime, "private-delivery-evidence")?;
     let authorization = start(&runtime, &request)?;
-    let ledger = SqliteCallerExecutionLedger::provision(
+    let ledger = SqliteCallerExecutionLedger::provision_with_clock(
         &fixture.directory.path().join("executor.db"),
         fixture.caller_executor.clone().ok_or("executor")?,
         2,
+        chio_test_support::clock::clock(),
     )?;
     let report = ledger.execute_once(
         &authorization,

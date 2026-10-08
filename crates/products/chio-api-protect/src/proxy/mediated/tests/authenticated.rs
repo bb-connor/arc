@@ -83,8 +83,12 @@ async fn public_caller_routes_require_commit_and_authenticated_durable_delivery(
     )
     .await;
     assert_eq!(started, retry);
-    let ledger =
-        SqliteCallerExecutionLedger::provision(&directory.path().join("executor.db"), executor, 4)?;
+    let ledger = SqliteCallerExecutionLedger::provision_with_clock(
+        &directory.path().join("executor.db"),
+        executor,
+        4,
+        chio_test_support::clock::clock(),
+    )?;
     let effects = AtomicUsize::new(0);
     let report = ledger.execute_once(
         &authorization,

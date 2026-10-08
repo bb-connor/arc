@@ -53,8 +53,10 @@ struct Source {
 impl Source {
     fn new(fixture: &Fixture, empty: bool) -> AnchoredTestResult<Self> {
         let path = fixture._temp.path().join("approval-source.db");
-        drop(SqliteGovernedApprovalReplayStore::open_with_capacity(
-            &path, 8,
+        drop(SqliteGovernedApprovalReplayStore::open_with_clock(
+            &path,
+            8,
+            chio_test_support::clock::clock(),
         )?);
         let connection = Connection::open(&path)?;
         // Deliberately historical clock and expired retained rows. Migration
@@ -84,7 +86,10 @@ impl Source {
 
     fn reopen(path: PathBuf, store: &SqliteAdmissionOperationStore) -> AnchoredTestResult<Self> {
         Ok(Self {
-            raw: SqliteGovernedApprovalReplaySource::open(&path)?,
+            raw: SqliteGovernedApprovalReplaySource::open_with_clock(
+                &path,
+                chio_test_support::clock::clock(),
+            )?,
             path,
             destination: Arc::clone(&store.connection),
             state: Mutex::default(),

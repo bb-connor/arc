@@ -39,8 +39,13 @@ fn provisioned() -> (TempDir, SqliteCallerExecutionLedger) {
         public_key: Keypair::generate().public_key(),
         key_epoch: 1,
     };
-    let ledger = SqliteCallerExecutionLedger::provision(&database(&directory), executor, 4)
-        .expect("provision the ledger");
+    let ledger = SqliteCallerExecutionLedger::provision_with_clock(
+        &database(&directory),
+        executor,
+        4,
+        chio_test_support::clock::clock(),
+    )
+    .expect("provision the ledger");
     (directory, ledger)
 }
 

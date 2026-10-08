@@ -13,10 +13,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 fn an_external_effect_with_a_lost_report_cannot_be_refunded_at_nonce_expiry() -> TestResult {
     let (fixture, executor_key) = super::authenticated::fixture()?;
     let effect = fixture.directory.path().join("external-effect");
-    let ledger = SqliteCallerExecutionLedger::provision(
+    let ledger = SqliteCallerExecutionLedger::provision_with_clock(
         &fixture.directory.path().join("executor.db"),
         fixture.caller_executor.clone().ok_or("executor")?,
         4,
+        chio_test_support::clock::clock(),
     )?;
     let execution = {
         let runtime = fixture.open()?;

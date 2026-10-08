@@ -18,7 +18,10 @@ fn invalid_storage_rows_and_metadata_refuse_sealing_without_pruning() -> TestRes
     ] {
         let directory = tempfile::tempdir()?;
         let path = directory.path().join("approval.db");
-        let store = SqliteGovernedApprovalReplayStore::open(&path)?;
+        let store = SqliteGovernedApprovalReplayStore::open(
+            &path,
+            chio_test_support::clock::clock(),
+        )?;
         assert!(reserve(&store, "reserved")?);
         let expected = store.preview_legacy_replay_source(&binding()?)?;
         let connection = Connection::open(&path)?;
@@ -35,8 +38,11 @@ fn invalid_storage_rows_and_metadata_refuse_sealing_without_pruning() -> TestRes
 fn oversized_inventory_is_refused_without_partial_evidence() -> TestResult {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("approval.db");
-    let store =
-        SqliteGovernedApprovalReplayStore::open_with_capacity(&path, evidence::MAX_MARKERS + 1)?;
+    let store = SqliteGovernedApprovalReplayStore::open_with_clock(
+        &path,
+        evidence::MAX_MARKERS + 1,
+        chio_test_support::clock::clock(),
+    )?;
     let connection = Connection::open(&path)?;
     connection.execute_batch("WITH RECURSIVE ids(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM ids WHERE n < 16385)
         INSERT INTO chio_governed_approval_replay_entries SELECT 'subject', 'request-' || n, 'intent', 9223372036854775807, NULL FROM ids")?;
@@ -49,7 +55,7 @@ fn oversized_inventory_is_refused_without_partial_evidence() -> TestResult {
 fn canonical_codec_rejects_unknown_fields_corruption_and_lossy_numbers() -> TestResult {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("approval.db");
-    let store = SqliteGovernedApprovalReplayStore::open(&path)?;
+    let store = SqliteGovernedApprovalReplayStore::open(&path, chio_test_support::clock::clock())?;
     assert!(reserve(&store, "reserved")?);
     Connection::open(&path)?.execute(
         "UPDATE chio_governed_approval_replay_entries SET expires_at = 9223372036854775807",
@@ -103,7 +109,7 @@ fn canonical_codec_rejects_unknown_fields_corruption_and_lossy_numbers() -> Test
 fn marker_payload_byte_bound_is_enforced_before_inventory_allocation() -> TestResult {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("approval.db");
-    let store = SqliteGovernedApprovalReplayStore::open(&path)?;
+    let store = SqliteGovernedApprovalReplayStore::open(&path, chio_test_support::clock::clock())?;
     let connection = Connection::open(&path)?;
     connection.execute_batch("WITH RECURSIVE ids(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM ids WHERE n < 6000)
         INSERT INTO chio_governed_approval_replay_entries SELECT replace(hex(zeroblob(256)), '0', 'a'),
@@ -117,7 +123,10 @@ fn marker_payload_byte_bound_is_enforced_before_inventory_allocation() -> TestRe
 #[test]
 fn valid_digest_cannot_hide_duplicate_unordered_or_over_capacity_markers() -> TestResult {
     let directory = tempfile::tempdir()?;
-    let store = SqliteGovernedApprovalReplayStore::open(directory.path().join("approval.db"))?;
+    let store = SqliteGovernedApprovalReplayStore::open(
+        directory.path().join("approval.db"),
+        chio_test_support::clock::clock(),
+    )?;
     assert!(reserve(&store, "first")?);
     assert!(reserve(&store, "second")?);
     let snapshot = store.preview_legacy_replay_source(&binding()?)?;
@@ -165,7 +174,7 @@ fn migrated_subjectless_markers_keep_wildcard_semantics_in_frozen_inventory() ->
         [super::super::super::now_secs() + 3600],
     )?;
     drop(legacy);
-    let store = SqliteGovernedApprovalReplayStore::open(&path)?;
+    let store = SqliteGovernedApprovalReplayStore::open(&path, chio_test_support::clock::clock())?;
     assert!(!reserve(&store, "reserved")?);
     assert!(!store.reserve_for_dispatch(
         "other-subject",

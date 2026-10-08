@@ -19,10 +19,11 @@ fn payment(fixture: &Fixture) -> TestResult<(i64, String, i64)> {
 fn monetary_exposure_survives_lost_report_and_settles_original_authenticated_cost() -> TestResult {
     let (mut fixture, key) = fixture()?;
     fixture.local_payment_rail = true;
-    let ledger = SqliteCallerExecutionLedger::provision(
+    let ledger = SqliteCallerExecutionLedger::provision_with_clock(
         &fixture.directory.path().join("executor.db"),
         fixture.caller_executor.clone().ok_or("executor")?,
         4,
+        chio_test_support::clock::clock(),
     )?;
     let (request, authorization, report) = {
         let runtime = fixture.open()?;

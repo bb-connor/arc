@@ -121,6 +121,7 @@ fn durable_nonce_domain_rejects_legacy_consumption_after_admission() -> TestResu
     let nonce = signed(&fixture)?;
     let legacy = SqliteExecutionNonceStore::open(
         fixture.fixture._temp.path().join("independent-legacy.db"),
+        chio_test_support::clock::clock(),
     )?;
     assert!(
         verify_execution_nonce(
@@ -143,6 +144,7 @@ fn durable_nonce_domain_rejects_admission_after_legacy_consumption() -> TestResu
     let nonce = legacy_packet(&fixture)?;
     let legacy = SqliteExecutionNonceStore::open(
         fixture.fixture._temp.path().join("independent-legacy.db"),
+        chio_test_support::clock::clock(),
     )?;
     verify_execution_nonce(
         &nonce,
@@ -241,7 +243,7 @@ fn durable_nonce_domain_requires_exact_operation_signature_context() -> TestResu
 #[test]
 fn durable_nonce_domain_rejects_schema_relabeling() -> TestResult {
     let fixture = nonce_fixture()?;
-    let legacy = SqliteExecutionNonceStore::open_in_memory()?;
+    let legacy = SqliteExecutionNonceStore::open_in_memory(chio_test_support::clock::clock())?;
     let mut downgraded = signed(&fixture)?;
     downgraded.nonce.schema = "chio.execution_nonce.v1".into();
     assert!(verify_execution_nonce(

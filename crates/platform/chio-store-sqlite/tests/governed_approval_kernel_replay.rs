@@ -105,7 +105,8 @@ fn governed_dispatch_replay_is_denied_after_store_reopen() {
     );
     first_kernel.enable_unsafe_ephemeral_financial_dispatch_for_development();
     first_kernel.set_governed_approval_replay_store(Box::new(
-        SqliteGovernedApprovalReplayStore::open(&path).test_expect("replay store opens"),
+        SqliteGovernedApprovalReplayStore::open(&path, chio_test_support::clock::clock())
+            .test_expect("replay store opens"),
     ));
     first_kernel
         .set_governed_approval_policy(APPROVAL_TENANT.into(), vec![kernel_keypair.public_key()])
@@ -237,7 +238,8 @@ fn governed_dispatch_replay_is_denied_after_store_reopen() {
     );
     reopened_kernel.enable_unsafe_ephemeral_financial_dispatch_for_development();
     reopened_kernel.set_governed_approval_replay_store(Box::new(
-        SqliteGovernedApprovalReplayStore::open(&path).test_expect("replay store reopens"),
+        SqliteGovernedApprovalReplayStore::open(&path, chio_test_support::clock::clock())
+            .test_expect("replay store reopens"),
     ));
     reopened_kernel
         .set_governed_approval_policy(APPROVAL_TENANT.into(), vec![kernel_keypair.public_key()])

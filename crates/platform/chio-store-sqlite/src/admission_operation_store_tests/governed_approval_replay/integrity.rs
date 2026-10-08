@@ -134,7 +134,11 @@ fn sealed_sources_cannot_be_discovered_or_repaired_after_import() -> AnchoredTes
     assert!(import(&fixture, &source, &expected).is_err());
     assert_eq!(&source.calls()[calls..], ["verify"]);
     assert_eq!(global_count(&fixture), before);
-    assert!(SqliteGovernedApprovalReplaySource::open(&source.path).is_err());
+    assert!(SqliteGovernedApprovalReplaySource::open_with_clock(
+        &source.path,
+        chio_test_support::clock::clock()
+    )
+    .is_err());
     let remains_missing: bool = connection.query_row(
         "SELECT NOT EXISTS(SELECT 1 FROM sqlite_schema WHERE name = ?1)",
         [barrier],
@@ -171,7 +175,11 @@ fn destination_immutable_guards_reject_replace_update_and_delete() -> AnchoredTe
 fn migration_opener_does_not_create_or_repair_sources() -> AnchoredTestResult {
     let fixture = fixture();
     let absent = fixture._temp.path().join("absent.db");
-    assert!(SqliteGovernedApprovalReplaySource::open(&absent).is_err());
+    assert!(SqliteGovernedApprovalReplaySource::open_with_clock(
+        &absent,
+        chio_test_support::clock::clock()
+    )
+    .is_err());
     assert!(!absent.exists());
     let source = Source::new(&fixture, false)
         .map_err(|error| format!("prepare migration fixture source: {error}"))?;
@@ -185,7 +193,11 @@ fn migration_opener_does_not_create_or_repair_sources() -> AnchoredTestResult {
         FixtureJournalMode::Delete,
         std::time::Duration::from_secs(5),
     )?;
-    assert!(SqliteGovernedApprovalReplaySource::open(&path).is_err());
+    assert!(SqliteGovernedApprovalReplaySource::open_with_clock(
+        &path,
+        chio_test_support::clock::clock()
+    )
+    .is_err());
     let mode: String = connection.pragma_query_value(None, "journal_mode", |row| row.get(0))?;
     assert_eq!(mode, "delete");
     establish_fixture_journal_mode(
@@ -196,7 +208,11 @@ fn migration_opener_does_not_create_or_repair_sources() -> AnchoredTestResult {
     connection
         .execute_batch("DROP TABLE chio_governed_approval_replay_limits;")
         .map_err(|error| format!("establish missing-schema fixture: {error}"))?;
-    assert!(SqliteGovernedApprovalReplaySource::open(&path).is_err());
+    assert!(SqliteGovernedApprovalReplaySource::open_with_clock(
+        &path,
+        chio_test_support::clock::clock()
+    )
+    .is_err());
     assert_eq!(connection.query_row("SELECT COUNT(*) FROM sqlite_schema WHERE name = 'chio_governed_approval_replay_limits'", [], |row| row.get::<_, i64>(0))?, 0);
     Ok(())
 }
@@ -209,7 +225,11 @@ fn ordinary_sealed_reopen_must_not_repair_a_cleared_application_identity() -> An
     import(&fixture, &source, &expected)?;
     let connection = Connection::open(&source.path)?;
     connection.execute_batch("PRAGMA application_id = 0")?;
-    assert!(SqliteGovernedApprovalReplayStore::open(&source.path).is_err());
+    assert!(SqliteGovernedApprovalReplayStore::open(
+        &source.path,
+        chio_test_support::clock::clock()
+    )
+    .is_err());
     assert_eq!(
         connection.pragma_query_value(None, "application_id", |row| row.get::<_, i32>(0))?,
         0
@@ -230,7 +250,10 @@ fn source_inspection_rejects_damaged_metadata_without_adopting_or_stamping_it() 
         connection.execute_batch(mutation)?;
         let app_id: i32 = connection.pragma_query_value(None, "application_id", |row| row.get(0))?;
         assert!(pin(&fixture, &source).is_err());
-        assert!(SqliteGovernedApprovalReplaySource::open(&path).is_err());
+        assert!(SqliteGovernedApprovalReplaySource::open_with_clock(
+            &path,
+            chio_test_support::clock::clock(),
+        ).is_err());
         assert_eq!(connection.pragma_query_value(None, "application_id", |row| row.get::<_, i32>(0))?, app_id);
         assert_eq!(counts(&fixture), [0, 0, 0]);
     }

@@ -29,7 +29,7 @@
 //! );
 //! ```
 
-use chio_security_types::clock::{Clock, ClockError, SystemClock};
+use chio_security_types::clock::{Clock, ClockError};
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
@@ -188,21 +188,17 @@ const EXECUTION_NONCE_STORE_ANCHOR_TABLES: &[&str] = &["chio_execution_nonces"];
 impl SqliteExecutionNonceStore {
     /// Open the store at the given path. Creates the parent directory
     /// if needed.
-    pub fn open(path: impl AsRef<Path>) -> Result<Self, SqliteExecutionNonceStoreError> {
-        Self::open_with_capacity(path, DEFAULT_EXECUTION_NONCE_STORE_CAPACITY)
+    pub fn open(
+        path: impl AsRef<Path>,
+        clock: Arc<dyn Clock>,
+    ) -> Result<Self, SqliteExecutionNonceStoreError> {
+        Self::open_with_clock(path, DEFAULT_EXECUTION_NONCE_STORE_CAPACITY, clock)
     }
 
     /// Open the store with a hard store-wide retained-row capacity.
     ///
     /// Expired rows are pruned before the limit is checked. Live replay
     /// markers are never evicted to make room for a new reservation.
-    pub fn open_with_capacity(
-        path: impl AsRef<Path>,
-        capacity: usize,
-    ) -> Result<Self, SqliteExecutionNonceStoreError> {
-        Self::open_with_clock(path, capacity, Arc::new(SystemClock))
-    }
-
     pub fn open_with_clock(
         path: impl AsRef<Path>,
         capacity: usize,
@@ -230,17 +226,11 @@ impl SqliteExecutionNonceStore {
     }
 
     /// Open an in-memory store for tests.
-    pub fn open_in_memory() -> Result<Self, SqliteExecutionNonceStoreError> {
-        Self::open_in_memory_with_capacity(DEFAULT_EXECUTION_NONCE_STORE_CAPACITY)
+    pub fn open_in_memory(clock: Arc<dyn Clock>) -> Result<Self, SqliteExecutionNonceStoreError> {
+        Self::open_in_memory_with_clock(DEFAULT_EXECUTION_NONCE_STORE_CAPACITY, clock)
     }
 
     /// Open an in-memory store with a hard retained-row capacity.
-    pub fn open_in_memory_with_capacity(
-        capacity: usize,
-    ) -> Result<Self, SqliteExecutionNonceStoreError> {
-        Self::open_in_memory_with_clock(capacity, Arc::new(SystemClock))
-    }
-
     pub fn open_in_memory_with_clock(
         capacity: usize,
         clock: Arc<dyn Clock>,
@@ -456,21 +446,6 @@ impl SqliteExecutionNonceStore {
     /// Deliberately lower a latched clock high-water after the host clock has
     /// been corrected. The exact old value is a compare-and-swap guard, and
     /// recovery never deletes retained nonce rows.
-    /// Standalone native composition entry. Services sharing an authority clock
-    /// must use `recover_clock_high_water_with_clock` instead.
-    pub fn recover_clock_high_water(
-        path: impl AsRef<Path>,
-        expected_high_water: i64,
-        corrected_high_water: i64,
-    ) -> Result<(), SqliteExecutionNonceStoreError> {
-        Self::recover_clock_high_water_with_clock(
-            path,
-            expected_high_water,
-            corrected_high_water,
-            &SystemClock,
-        )
-    }
-
     pub fn recover_clock_high_water_with_clock(
         path: impl AsRef<Path>,
         expected_high_water: i64,
@@ -824,7 +799,13 @@ impl ExecutionNonceStore for SqliteExecutionNonceStore {
 )]
 fn now_secs() -> i64 {
     use chio_security_types::clock::Clock;
-    i64::try_from(SystemClock.unix_millis().unwrap().as_secs()).unwrap()
+    i64::try_from(
+        chio_security_types::clock::SystemClock
+            .unix_millis()
+            .unwrap()
+            .as_secs(),
+    )
+    .unwrap()
 }
 
 #[cfg(test)]
@@ -847,7 +828,8 @@ mod tests {
 
     #[test]
     fn fresh_nonce_is_reserved() {
-        let store = SqliteExecutionNonceStore::open_in_memory().unwrap();
+        let store =
+            SqliteExecutionNonceStore::open_in_memory(chio_test_support::clock::clock()).unwrap();
         assert!(
             <SqliteExecutionNonceStore as ExecutionNonceStore>::reserve_until(
                 &store,
@@ -860,7 +842,10 @@ mod tests {
 
     #[test]
     fn zero_capacity_is_rejected() {
-        let error = match SqliteExecutionNonceStore::open_in_memory_with_capacity(0) {
+        let error = match SqliteExecutionNonceStore::open_in_memory_with_clock(
+            0,
+            chio_test_support::clock::clock(),
+        ) {
             Ok(_) => panic!("zero-capacity store must not open"),
             Err(error) => error,
         };
@@ -869,7 +854,11 @@ mod tests {
 
     #[test]
     fn live_capacity_pressure_fails_closed_without_evicting_markers() {
-        let store = SqliteExecutionNonceStore::open_in_memory_with_capacity(2).unwrap();
+        let store = SqliteExecutionNonceStore::open_in_memory_with_clock(
+            2,
+            chio_test_support::clock::clock(),
+        )
+        .unwrap();
         let now = now_secs();
         let expires_at = now.saturating_add(100);
         assert!(store.try_reserve("capacity-a", now, expires_at).unwrap());
@@ -895,8 +884,10 @@ mod tests {
     #[test]
     fn concurrent_writers_cannot_exceed_capacity() {
         let path = unique_db_path("chio-exec-nonce-capacity-concurrent");
-        let store =
-            std::sync::Arc::new(SqliteExecutionNonceStore::open_with_capacity(&path, 1).unwrap());
+        let store = std::sync::Arc::new(
+            SqliteExecutionNonceStore::open_with_clock(&path, 1, chio_test_support::clock::clock())
+                .unwrap(),
+        );
         let barrier = std::sync::Arc::new(std::sync::Barrier::new(3));
         let now = now_secs();
         let mut writers = Vec::new();
@@ -947,7 +938,8 @@ mod tests {
     #[test]
     fn every_pooled_connection_has_busy_timeout() {
         let path = unique_db_path("chio-exec-nonce-busy-timeout");
-        let store = SqliteExecutionNonceStore::open(&path).unwrap();
+        let store =
+            SqliteExecutionNonceStore::open(&path, chio_test_support::clock::clock()).unwrap();
         let first = store.pool.get().unwrap();
         let second = store.pool.get().unwrap();
 
@@ -966,7 +958,11 @@ mod tests {
 
     #[test]
     fn owned_rollback_frees_capacity() {
-        let store = SqliteExecutionNonceStore::open_in_memory_with_capacity(1).unwrap();
+        let store = SqliteExecutionNonceStore::open_in_memory_with_clock(
+            1,
+            chio_test_support::clock::clock(),
+        )
+        .unwrap();
         let expires_at = now_secs().saturating_add(300);
         assert!(store
             .reserve_for_dispatch("rollback-a", expires_at, "owner-a")
@@ -990,7 +986,11 @@ mod tests {
 
     #[test]
     fn retention_expiry_reclaims_crash_owned_reservation_and_capacity() {
-        let store = SqliteExecutionNonceStore::open_in_memory_with_capacity(1).unwrap();
+        let store = SqliteExecutionNonceStore::open_in_memory_with_clock(
+            1,
+            chio_test_support::clock::clock(),
+        )
+        .unwrap();
         let base = now_secs();
 
         assert!(store
@@ -1028,7 +1028,8 @@ mod tests {
 
     #[test]
     fn duplicate_nonce_is_rejected() {
-        let store = SqliteExecutionNonceStore::open_in_memory().unwrap();
+        let store =
+            SqliteExecutionNonceStore::open_in_memory(chio_test_support::clock::clock()).unwrap();
         let now = now_secs();
         assert!(store
             .try_reserve("a", now, now.saturating_add(100))
@@ -1040,7 +1041,8 @@ mod tests {
 
     #[test]
     fn bounded_stale_observation_keeps_high_water_monotonic() {
-        let store = SqliteExecutionNonceStore::open_in_memory().unwrap();
+        let store =
+            SqliteExecutionNonceStore::open_in_memory(chio_test_support::clock::clock()).unwrap();
         let base = now_secs();
         assert!(store
             .try_reserve("newer", base.saturating_add(1), base.saturating_add(100))
@@ -1064,7 +1066,8 @@ mod tests {
 
     #[test]
     fn dispatch_reservation_rolls_back_only_for_its_owner() {
-        let store = SqliteExecutionNonceStore::open_in_memory().unwrap();
+        let store =
+            SqliteExecutionNonceStore::open_in_memory(chio_test_support::clock::clock()).unwrap();
         let now = now_secs();
         assert!(store
             .reserve_for_dispatch("dispatch-owned", now.saturating_add(100), "owner-a")
@@ -1081,7 +1084,8 @@ mod tests {
 
     #[test]
     fn padded_nonce_id_is_rejected() {
-        let store = SqliteExecutionNonceStore::open_in_memory().unwrap();
+        let store =
+            SqliteExecutionNonceStore::open_in_memory(chio_test_support::clock::clock()).unwrap();
         let now = now_secs();
         let error = store
             .try_reserve(" nonce", now, now.saturating_add(100))
@@ -1095,7 +1099,8 @@ mod tests {
 
     #[test]
     fn expired_row_is_pruned_and_slot_reusable() {
-        let store = SqliteExecutionNonceStore::open_in_memory().unwrap();
+        let store =
+            SqliteExecutionNonceStore::open_in_memory(chio_test_support::clock::clock()).unwrap();
         let now = now_secs();
         assert!(store.try_reserve("a", now, now.saturating_add(30)).unwrap());
         // The explicit local API preserves caller-controlled prune and reuse.
@@ -1110,7 +1115,8 @@ mod tests {
         let base_time = now_secs();
         let high_water_before;
         {
-            let store = SqliteExecutionNonceStore::open(&path).unwrap();
+            let store =
+                SqliteExecutionNonceStore::open(&path, chio_test_support::clock::clock()).unwrap();
             assert!(store
                 .try_reserve_signed_entry(
                     "used",
@@ -1165,7 +1171,8 @@ mod tests {
             .unwrap();
         drop(connection);
 
-        let error = match SqliteExecutionNonceStore::open(&path) {
+        let error = match SqliteExecutionNonceStore::open(&path, chio_test_support::clock::clock())
+        {
             Ok(_) => panic!("a latched future high-water must require recovery"),
             Err(error) => error,
         };
@@ -1179,13 +1186,15 @@ mod tests {
         ));
 
         let corrected_high_water = now_secs();
-        SqliteExecutionNonceStore::recover_clock_high_water(
+        SqliteExecutionNonceStore::recover_clock_high_water_with_clock(
             &path,
             latched_high_water,
             corrected_high_water,
+            &*chio_test_support::clock::clock(),
         )
         .unwrap();
-        let reopened = SqliteExecutionNonceStore::open(&path).unwrap();
+        let reopened =
+            SqliteExecutionNonceStore::open(&path, chio_test_support::clock::clock()).unwrap();
         assert!(!reopened
             .try_reserve("used", now_secs(), base_time.saturating_add(10_060),)
             .unwrap());
@@ -1220,7 +1229,7 @@ mod tests {
         }
 
         assert!(matches!(
-            SqliteExecutionNonceStore::open(&path),
+            SqliteExecutionNonceStore::open(&path, chio_test_support::clock::clock()),
             Err(SqliteExecutionNonceStoreError::Storage(_))
         ));
         let connection = Connection::open(&path).unwrap();
@@ -1250,7 +1259,8 @@ mod tests {
         let path = unique_db_path("chio-exec-nonce-pruned-through");
         let base = now_secs();
         {
-            let store = SqliteExecutionNonceStore::open(&path).unwrap();
+            let store =
+                SqliteExecutionNonceStore::open(&path, chio_test_support::clock::clock()).unwrap();
             assert!(store
                 .try_reserve_signed_entry(
                     "used",
@@ -1277,8 +1287,13 @@ mod tests {
         advanced.validate_retained_row_capacity().unwrap();
         drop(advanced);
 
-        let error = SqliteExecutionNonceStore::recover_clock_high_water(&path, jumped, now_secs())
-            .unwrap_err();
+        let error = SqliteExecutionNonceStore::recover_clock_high_water_with_clock(
+            &path,
+            jumped,
+            now_secs(),
+            &*chio_test_support::clock::clock(),
+        )
+        .unwrap_err();
         assert!(error.to_string().contains("below pruned-through"));
         let _ = fs::remove_file(path);
     }
@@ -1305,14 +1320,16 @@ mod tests {
         let now = now_secs();
         let expires_at = now.saturating_add(120);
         {
-            let store = SqliteExecutionNonceStore::open(&path).unwrap();
+            let store =
+                SqliteExecutionNonceStore::open(&path, chio_test_support::clock::clock()).unwrap();
             let now = now_secs();
             assert!(store
                 .try_reserve("persistent-nonce", now, expires_at)
                 .unwrap());
             assert!(store.is_consumed("persistent-nonce").unwrap());
         }
-        let reopened = SqliteExecutionNonceStore::open(&path).unwrap();
+        let reopened =
+            SqliteExecutionNonceStore::open(&path, chio_test_support::clock::clock()).unwrap();
         assert!(reopened.is_consumed("persistent-nonce").unwrap());
         assert!(!reopened
             .try_reserve("persistent-nonce", now, expires_at)
@@ -1322,7 +1339,8 @@ mod tests {
 
     #[test]
     fn consumed_lookup_ignores_expired_rows() {
-        let store = SqliteExecutionNonceStore::open_in_memory().unwrap();
+        let store =
+            SqliteExecutionNonceStore::open_in_memory(chio_test_support::clock::clock()).unwrap();
         let now = now_secs();
         store
             .pool

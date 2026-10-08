@@ -61,16 +61,18 @@ impl Fixture {
         self.directory.path().join("executor.sqlite3")
     }
     fn provision(&self, capacity: u32) -> TestResult<SqliteCallerExecutionLedger> {
-        Ok(SqliteCallerExecutionLedger::provision(
+        Ok(SqliteCallerExecutionLedger::provision_with_clock(
             &self.path(),
             self.authorization.authorization.executor.clone(),
             capacity,
+            chio_test_support::clock::clock(),
         )?)
     }
     fn open(&self) -> TestResult<SqliteCallerExecutionLedger> {
-        Ok(SqliteCallerExecutionLedger::open(
+        Ok(SqliteCallerExecutionLedger::open_with_clock(
             &self.path(),
             self.authorization.authorization.executor.clone(),
+            chio_test_support::clock::clock(),
         )?)
     }
     fn execute(
@@ -178,7 +180,12 @@ fn substituted_key_epoch_or_physical_ledger_fails_closed() -> TestResult {
         } else {
             identity.key_epoch += 1;
         }
-        assert!(SqliteCallerExecutionLedger::open(&fixture.path(), identity).is_err());
+        assert!(SqliteCallerExecutionLedger::open_with_clock(
+            &fixture.path(),
+            identity,
+            chio_test_support::clock::clock()
+        )
+        .is_err());
     }
     let connection = rusqlite::Connection::open(fixture.path())?;
     let copy = fixture.directory.path().join("substituted.sqlite3");
@@ -190,9 +197,10 @@ fn substituted_key_epoch_or_physical_ledger_fails_closed() -> TestResult {
     copied.execute_batch("PRAGMA journal_mode=WAL")?;
     drop(copied);
     assert!(
-        matches!(SqliteCallerExecutionLedger::open(
+        matches!(SqliteCallerExecutionLedger::open_with_clock(
             &copy,
             fixture.authorization.authorization.executor.clone(),
+            chio_test_support::clock::clock(),
         ), Err(CallerExecutionLedgerError::Storage(message)) if message.contains("physical ledger")),
         "a copied ledger cannot acquire the original physical identity"
     );
@@ -414,9 +422,10 @@ fn claimed_attempt_survives_process_death_without_redispatch() -> TestResult {
         let authorization = SignedCallerDispatchAuthorizationV1::from_canonical_bytes(
             &std::fs::read(root.join("authorization.json"))?,
         )?;
-        let ledger = SqliteCallerExecutionLedger::open(
+        let ledger = SqliteCallerExecutionLedger::open_with_clock(
             &root.join("executor.sqlite3"),
             authorization.authorization.executor.clone(),
+            chio_test_support::clock::clock(),
         )?;
         let cut = std::env::var(CHILD_CUT)?;
         ledger.execute_once(

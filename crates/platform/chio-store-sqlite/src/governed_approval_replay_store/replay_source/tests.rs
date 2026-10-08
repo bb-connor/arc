@@ -62,7 +62,11 @@ fn read_value(
 fn seals_complete_inventory_and_reopens_without_pruning_or_reconfiguration() -> TestResult {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("approval.db");
-    let store = SqliteGovernedApprovalReplayStore::open_with_capacity(&path, 8)?;
+    let store = SqliteGovernedApprovalReplayStore::open_with_clock(
+        &path,
+        8,
+        chio_test_support::clock::clock(),
+    )?;
     assert!(reserve(&store, "reserved")?);
     assert!(reserve(&store, "committed")?);
     assert!(store.commit_dispatch_reservation(
@@ -101,7 +105,11 @@ fn seals_complete_inventory_and_reopens_without_pruning_or_reconfiguration() -> 
     assert!(!format!("{seal:?}").contains("historical-owner"));
     drop(store);
     // Sealed sources ignore requested capacity; they cannot resume service.
-    let reopened = SqliteGovernedApprovalReplayStore::open_with_capacity(&path, 1)?;
+    let reopened = SqliteGovernedApprovalReplayStore::open_with_clock(
+        &path,
+        1,
+        chio_test_support::clock::clock(),
+    )?;
     assert_eq!(
         reopened.load_legacy_replay_source_seal(&binding()?)?,
         Some(seal)
@@ -115,8 +123,8 @@ fn seals_complete_inventory_and_reopens_without_pruning_or_reconfiguration() -> 
 fn old_connections_and_typed_noops_cannot_mutate_a_sealed_source() -> TestResult {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("approval.db");
-    let store = SqliteGovernedApprovalReplayStore::open(&path)?;
-    let old = SqliteGovernedApprovalReplayStore::open(&path)?;
+    let store = SqliteGovernedApprovalReplayStore::open(&path, chio_test_support::clock::clock())?;
+    let old = SqliteGovernedApprovalReplayStore::open(&path, chio_test_support::clock::clock())?;
     let connection = Connection::open(&path)?;
     assert!(reserve(&store, "reserved")?);
     let expected = store.preview_legacy_replay_source(&binding()?)?;
@@ -154,7 +162,12 @@ fn old_connections_and_typed_noops_cannot_mutate_a_sealed_source() -> TestResult
         "UPDATE chio_governed_approval_replay_source_seal SET canonical_bytes = canonical_bytes",
     ] { assert!(connection.execute(sql, []).is_err(), "{sql}"); }
     let now = super::super::now_secs();
-    let recovery = SqliteGovernedApprovalReplayStore::recover_clock_high_water(&path, now + 1, now);
+    let recovery = SqliteGovernedApprovalReplayStore::recover_clock_high_water_with_clock(
+        &path,
+        now + 1,
+        now,
+        &*chio_test_support::clock::clock(),
+    );
     assert!(recovery
         .err()
         .is_some_and(|error| error.to_string().contains("sealed")));
@@ -166,7 +179,7 @@ fn old_connections_and_typed_noops_cannot_mutate_a_sealed_source() -> TestResult
 fn changed_candidate_remains_unsealed_and_exact_binding_is_required() -> TestResult {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("approval.db");
-    let store = SqliteGovernedApprovalReplayStore::open(&path)?;
+    let store = SqliteGovernedApprovalReplayStore::open(&path, chio_test_support::clock::clock())?;
     let stale = store.preview_legacy_replay_source(&binding()?)?;
     assert!(reserve(&store, "new")?);
     assert!(store.seal_expected_legacy_replay_source(&stale).is_err());
@@ -190,7 +203,8 @@ fn sql_cutpoints_roll_back_all_evidence_and_allow_exact_retry() -> TestResult {
     for stage in 1..=4 {
         let directory = tempfile::tempdir()?;
         let path = directory.path().join("approval.db");
-        let store = SqliteGovernedApprovalReplayStore::open(&path)?;
+        let store =
+            SqliteGovernedApprovalReplayStore::open(&path, chio_test_support::clock::clock())?;
         assert!(reserve(&store, "reserved")?);
         let expected = store.preview_legacy_replay_source(&binding()?)?;
         FAIL_AFTER.set(stage);
@@ -213,7 +227,7 @@ fn lost_seal_acknowledgement_is_resolved_by_reopen_and_exact_readback() -> TestR
     let _reset = ResetCutpoint;
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("approval.db");
-    let store = SqliteGovernedApprovalReplayStore::open(&path)?;
+    let store = SqliteGovernedApprovalReplayStore::open(&path, chio_test_support::clock::clock())?;
     assert!(reserve(&store, "reserved")?);
     let expected = store.preview_legacy_replay_source(&binding()?)?;
     FAIL_AFTER.set(5);
@@ -224,7 +238,8 @@ fn lost_seal_acknowledgement_is_resolved_by_reopen_and_exact_readback() -> TestR
         .is_some_and(|error| error.to_string().contains("injected seal cutpoint")));
     assert!(reserve(&store, "new").is_err());
     drop(store);
-    let reopened = SqliteGovernedApprovalReplayStore::open(&path)?;
+    let reopened =
+        SqliteGovernedApprovalReplayStore::open(&path, chio_test_support::clock::clock())?;
     reopened.verify_legacy_replay_source_seal(&expected)?;
     assert_eq!(
         reopened
@@ -239,7 +254,10 @@ fn lost_seal_acknowledgement_is_resolved_by_reopen_and_exact_readback() -> TestR
 fn racing_legacy_reservation_and_seal_have_one_serialized_outcome() -> TestResult {
     for _ in 0..8 {
         let directory = tempfile::tempdir()?;
-        let store = SqliteGovernedApprovalReplayStore::open(directory.path().join("approval.db"))?;
+        let store = SqliteGovernedApprovalReplayStore::open(
+            directory.path().join("approval.db"),
+            chio_test_support::clock::clock(),
+        )?;
         let expected = store.preview_legacy_replay_source(&binding()?)?;
         let barrier = Arc::new(Barrier::new(2));
         std::thread::scope(|scope| -> TestResult {
