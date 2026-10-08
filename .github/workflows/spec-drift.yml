@@ -40,7 +40,9 @@ jobs:
           packages: ripgrep
 
       - name: Assert Chio-owned schemas stay v1-only before release
-        run: bash scripts/check-chio-owned-v1-only.sh
+        run: |
+          bash scripts/tests/check-chio-owned-v1-only.test.sh
+          bash scripts/check-chio-owned-v1-only.sh
 
       - name: Install Rust toolchain
         run: |
