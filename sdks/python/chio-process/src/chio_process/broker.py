@@ -48,6 +48,8 @@ def decode_broker_output(value):
         raise ValueError("nonfinite JSON")
 
     try:
-        return json.loads(bytes(body), object_pairs_hook=unique, parse_constant=nonfinite)
+        return json.loads(
+            bytes(body).decode("utf-8"), object_pairs_hook=unique, parse_constant=nonfinite
+        )
     except (ValueError, UnicodeError, RecursionError) as error:
         raise WorkerError("invalid_broker_body") from error

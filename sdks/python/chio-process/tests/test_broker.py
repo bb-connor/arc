@@ -36,7 +36,15 @@ class BrokerTests(unittest.TestCase):
 
         value = {"output": "native", "returncode": 0}
         self.assertEqual(decode_broker_output(response(json.dumps(value).encode())), value)
-        for body in (b'{"x":1,"x":2}', b'{"x":NaN}', b"\xff", b"{"):
+        for body in (
+            b'{"x":1,"x":2}',
+            b'{"y":{"x":1,"\\u0078":2}}',
+            b'{"x":NaN}',
+            b"\xff",
+            b"{",
+            b"\xef\xbb\xbf{}",
+            b'"\xed\xa0\x80"',
+        ):
             with self.subTest(body=body), self.assertRaises(WorkerError):
                 decode_broker_output(response(body))
         for field, value in (("status", 500), ("evidence", {}), ("body", [True])):
