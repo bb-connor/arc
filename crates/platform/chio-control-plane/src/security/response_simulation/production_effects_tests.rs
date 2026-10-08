@@ -1564,3 +1564,123 @@ fn session_suspension_composition_keeps_its_refusals() {
     assert_eq!(restored, 1);
     assert_eq!(effective_posture_rank(&fixture.store, &shared_session), 3);
 }
+
+/// Refusals and removal scope a composed second contribution must keep.
+#[derive(Debug, Eq, PartialEq)]
+struct CompositionRefusals {
+    rebased_onto_live_version: Result<bool, PortErrorKind>,
+    stale_scheduler_fence: Result<bool, PortErrorKind>,
+    installed_after_refusals: Vec<String>,
+    composed: Result<bool, PortErrorKind>,
+    installed_after_second_lift: Vec<String>,
+}
+
+impl CompositionRefusals {
+    fn kept(first: &LeasedEffect<'_>) -> Self {
+        Self {
+            rebased_onto_live_version: Err(PortErrorKind::IntegrityFailure),
+            stale_scheduler_fence: Err(PortErrorKind::Conflict),
+            installed_after_refusals: vec![first.id()],
+            composed: Ok(true),
+            installed_after_second_lift: vec![first.id()],
+        }
+    }
+}
+
+/// With the first contribution installed, send the second plan's command
+/// rebased onto the live version and under a stale scheduler fence, then
+/// compose it and lift it again.
+fn composition_refusals(
+    effects: &dyn EffectPort,
+    key: &SharedKey<'_>,
+    first: &LeasedEffect<'_>,
+    second: &LeasedEffect<'_>,
+) -> CompositionRefusals {
+    let outcome = |request: &EffectRequest| {
+        effects
+            .execute(request)
+            .map(|result| result.applied)
+            .map_err(|error| error.kind())
+    };
+    let first_applied = effects
+        .execute(&first.request("composition-controls-first"))
+        .unwrap_or_else(|error| panic!("healthy single contribution: {error}"));
+    assert!(first_applied.applied);
+    assert_eq!((key.installed)(), vec![first.id()]);
+
+    let mut rebased = second.request("composition-controls-rebased");
+    rebased.expected_version_hash = (key.version)();
+    let rebased_onto_live_version = outcome(&rebased);
+    let mut stale_fence = second.request("composition-controls-stale-fence");
+    stale_fence.scheduler_fencing_token = second.work.fencing_token.saturating_add(1);
+    let stale_scheduler_fence = outcome(&stale_fence);
+    let installed_after_refusals = (key.installed)();
+
+    let composed = effects.execute(&second.request("composition-controls-second"));
+    if let Ok(result) = &composed {
+        let mut lift = second.request("composition-controls-lift-second");
+        lift.operation = EffectOperation::Remove;
+        lift.expected_version_hash = result.resulting_version_hash;
+        let lifted = effects
+            .execute(&lift)
+            .unwrap_or_else(|error| panic!("lift the second contribution: {error}"));
+        assert!(!lifted.applied);
+    }
+    CompositionRefusals {
+        rebased_onto_live_version,
+        stale_scheduler_fence,
+        installed_after_refusals,
+        composed: composed
+            .map(|result| result.applied)
+            .map_err(|error| error.kind()),
+        installed_after_second_lift: (key.installed)(),
+    }
+}
+
+#[test]
+fn egress_restriction_composition_keeps_its_refusals() {
+    let fixture = ProductionEffectsFixture::new();
+    let shared_session = session("production-effects-egress-controls-session");
+    let (first_plan, first_work) = fixture.dispatch(
+        "production-effects-egress-controls-first",
+        vec![record(shared_session.as_str())],
+        vec![fixture.egress_spec(&shared_session, &["server-a"])],
+    );
+    let (second_plan, second_work) = fixture.dispatch(
+        "production-effects-egress-controls-second",
+        vec![record(shared_session.as_str())],
+        vec![fixture.egress_spec(&shared_session, &["server-b"])],
+    );
+    let first = LeasedEffect {
+        plan: &first_plan,
+        work: &first_work,
+        ordinal: 0,
+    };
+    let second = LeasedEffect {
+        plan: &second_plan,
+        work: &second_work,
+        ordinal: 0,
+    };
+    let egress_key = EgressRestrictionSessionKey {
+        tenant_id: tenant(),
+        session_id: shared_session.clone(),
+    };
+    let version = || {
+        egress_restriction_version_hash(fixture.store.as_ref(), &egress_key)
+            .unwrap_or_else(|error| panic!("egress version: {error}"))
+    };
+    let installed = || egress_effect_ids(&fixture.store, &egress_key);
+    let effects = fixture.effects();
+    assert_eq!(
+        composition_refusals(
+            effects.as_ref(),
+            &SharedKey {
+                version: &version,
+                installed: &installed,
+            },
+            &first,
+            &second,
+        ),
+        CompositionRefusals::kept(&first)
+    );
+}
