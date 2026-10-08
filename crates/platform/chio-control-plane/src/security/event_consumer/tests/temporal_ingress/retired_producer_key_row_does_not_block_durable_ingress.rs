@@ -1,5 +1,7 @@
 use super::*;
 
+mod quarantine_controls;
+
 const BOUNDED_LATENESS_MS: u64 = 200;
 
 fn bystander_tenant() -> TenantId {
@@ -87,11 +89,20 @@ fn start_runtime(
     clock: &Arc<MutableClock>,
     producers: Vec<TrustedSecurityEventProducer>,
 ) -> IngressRuntime {
+    start_runtime_with_receipts(store, clock, producers, Vec::new())
+}
+
+fn start_runtime_with_receipts(
+    store: &Arc<SqliteSecurityStateStore>,
+    clock: &Arc<MutableClock>,
+    producers: Vec<TrustedSecurityEventProducer>,
+    receipt_producers: Vec<TrustedSecurityEventReceiptProducer>,
+) -> IngressRuntime {
     let verifier = Arc::new(
         NativeSecurityEventVerifier::new(
             Arc::clone(clock) as Arc<dyn Clock>,
             producers,
-            Vec::new(),
+            receipt_producers,
             60_000,
             BOUNDED_LATENESS_MS,
         )
