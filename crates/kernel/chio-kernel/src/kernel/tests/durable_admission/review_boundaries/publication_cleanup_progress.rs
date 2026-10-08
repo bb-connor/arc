@@ -19,10 +19,19 @@ use crate::security_admission_operation::{
 const CLEANUP_LEASE_MS: u64 = 30_000;
 const FOREIGN_CLAIM_TOKEN: &str = "other";
 
+/// A corrupted journal readback of one operation's completed receipt outbox.
+#[derive(Clone)]
+enum ReceiptReadbackFault {
+    Missing,
+    Duplicated,
+    Substituted(AdmissionCleanupAction),
+}
+
 struct DurableOperations {
     inner: InMemoryAdmissionOperationStore,
     fail_compensation_inventory: AtomicBool,
     fail_receipt_inventory: AtomicBool,
+    receipt_readback_fault: std::sync::Mutex<Option<(String, ReceiptReadbackFault)>>,
     candidate_pages: AtomicUsize,
 }
 
@@ -38,6 +47,44 @@ impl AdmissionOperationStore for DurableOperations {
         operation: AdmissionOperation,
     ) -> Result<AdmissionOperationCreateOutcome, AdmissionOperationError> {
         self.inner.create_prepared(operation)
+    }
+    fn load_cleanup_actions(
+        &self,
+        operation_id: &str,
+    ) -> Result<Vec<AdmissionCleanupAction>, AdmissionOperationError> {
+        let mut actions = self.inner.load_cleanup_actions(operation_id)?;
+        let fault = self
+            .receipt_readback_fault
+            .lock()
+            .map_err(|_| AdmissionOperationError::Unavailable("readback fault poisoned".into()))?
+            .clone();
+        let Some((target, fault)) = fault else {
+            return Ok(actions);
+        };
+        if target != operation_id {
+            return Ok(actions);
+        }
+        let Some(receipt) = actions
+            .iter()
+            .find(|action| {
+                action.kind() == AdmissionCleanupActionKind::TerminalReceipt
+                    && action.state() == AdmissionCleanupActionState::Completed
+            })
+            .cloned()
+        else {
+            return Ok(actions);
+        };
+        match fault {
+            ReceiptReadbackFault::Missing => {
+                actions.retain(|action| action.kind() != receipt.kind());
+            }
+            ReceiptReadbackFault::Duplicated => actions.push(receipt),
+            ReceiptReadbackFault::Substituted(other) => {
+                actions.retain(|action| action.kind() != receipt.kind());
+                actions.push(other);
+            }
+        }
+        Ok(actions)
     }
     fn load(&self, id: &str) -> Result<Option<AdmissionOperation>, AdmissionOperationError> {
         self.inner.load(id)
@@ -305,6 +352,7 @@ impl Harness {
             inner: InMemoryAdmissionOperationStore::new(),
             fail_compensation_inventory: AtomicBool::new(false),
             fail_receipt_inventory: AtomicBool::new(false),
+            receipt_readback_fault: std::sync::Mutex::new(None),
             candidate_pages: AtomicUsize::new(0),
         });
         let approvals = Arc::new(DurableApprovals {
@@ -523,15 +571,42 @@ impl Harness {
         &self,
         request_id: &str,
     ) -> TestResult<(AdmissionOperation, u64)> {
-        let prepared =
-            prepared_active_response(&self.kernel, self.executor.authority_id(), request_id, None)?;
+        let terminal = self.seed_terminal_receipt(self.executor.authority_id(), request_id)?;
+        let outbox = self.terminal_receipt_action(&terminal)?;
+        let deadline = self
+            .started_at_ms
+            .checked_add(CLEANUP_LEASE_MS)
+            .ok_or("lease deadline overflow")?;
+        let claimed = self.operations.claim_cleanup_action(
+            outbox.action_id(),
+            FOREIGN_CLAIM_TOKEN,
+            self.started_at_ms,
+            deadline,
+        )?;
+        assert!(
+            matches!(&claimed, AdmissionCleanupActionClaimOutcome::Claimed(action)
+                if action.claim_token() == Some(FOREIGN_CLAIM_TOKEN)
+                    && action.claim_deadline_unix_ms() == Some(deadline)),
+            "{claimed:?}"
+        );
+        Ok((terminal, deadline))
+    }
+
+    /// A compensated operation whose signed receipt outbox was inserted by
+    /// the atomic terminal transition and is still unclaimed.
+    fn seed_terminal_receipt(
+        &self,
+        authority_id: &str,
+        request_id: &str,
+    ) -> TestResult<AdmissionOperation> {
+        let prepared = prepared_active_response(&self.kernel, authority_id, request_id, None)?;
         self.operations.create_prepared(prepared.clone())?;
         let staged = self
             .kernel
             .stage_compensation_pending_with_terminal_receipt(
                 self.operations.as_ref(),
                 &prepared,
-                "terminal receipt lease held by another worker",
+                "compensated before dispatch with a signed receipt outbox",
             )?;
         let outbox = self.terminal_receipt_action(&staged)?;
         let AdmissionOperationCasOutcome::Applied(terminal) =
@@ -550,23 +625,11 @@ impl Harness {
         else {
             return Err("atomic terminal receipt transition".into());
         };
-        let deadline = self
-            .started_at_ms
-            .checked_add(CLEANUP_LEASE_MS)
-            .ok_or("lease deadline overflow")?;
-        let claimed = self.operations.claim_cleanup_action(
-            outbox.action_id(),
-            FOREIGN_CLAIM_TOKEN,
-            self.started_at_ms,
-            deadline,
-        )?;
-        assert!(
-            matches!(&claimed, AdmissionCleanupActionClaimOutcome::Claimed(action)
-                if action.claim_token() == Some(FOREIGN_CLAIM_TOKEN)
-                    && action.claim_deadline_unix_ms() == Some(deadline)),
-            "{claimed:?}"
+        assert_eq!(
+            self.terminal_receipt_action(&terminal)?.state(),
+            AdmissionCleanupActionState::Pending
         );
-        Ok((terminal, deadline))
+        Ok(terminal)
     }
 
     fn assert_receipt_lease_retained(
@@ -1040,6 +1103,201 @@ fn publication_keeps_a_receipt_inventory_fault_fatal_beside_a_busy_lease() -> Te
     assert_eq!(
         harness.kernel.governed_security_runtime_status(),
         unpublished
+    );
+    Ok(())
+}
+
+fn receipt_item_refusal(failing_operation_id: &str) -> String {
+    let item = KernelError::Internal(format!(
+        "terminal receipt operation {failing_operation_id} belongs to a different coordinator authority"
+    ));
+    format!(
+        "one or more terminal receipt outboxes remain unfinished: 1 failed, first operation {failing_operation_id}: {item}"
+    )
+}
+
+#[test]
+fn compensated_recovery_resolves_its_own_receipt_beside_a_busy_receipt() -> TestResult {
+    let started_at_secs = current_unix_timestamp() + 1;
+    let _started = chio_test_support::clock::scope_unix_secs(started_at_secs);
+    let harness = Harness::new(started_at_secs)?;
+    let authority = harness.executor.authority_id().to_owned();
+    let (busy, lease_deadline) = harness.seed_busy_terminal_receipt("coordinator-busy-receipt")?;
+    let own = harness.seed_terminal_receipt(&authority, "coordinator-own-receipt")?;
+
+    assert!(harness
+        .kernel
+        .recover_compensated_admission_operation(own.operation_id())?);
+    assert_eq!(
+        harness.terminal_receipt_action(&own)?.state(),
+        AdmissionCleanupActionState::Completed
+    );
+    harness.assert_receipt_lease_busy(&busy, lease_deadline)?;
+
+    assert!(!harness
+        .kernel
+        .recover_compensated_admission_operation(busy.operation_id())?);
+    harness.assert_receipt_lease_busy(&busy, lease_deadline)?;
+
+    let _at_deadline = chio_test_support::clock::scope_unix_secs(lease_deadline / 1_000);
+    assert!(harness
+        .kernel
+        .recover_compensated_admission_operation(busy.operation_id())?);
+    assert_eq!(
+        harness.terminal_receipt_action(&busy)?.state(),
+        AdmissionCleanupActionState::Completed
+    );
+    Ok(())
+}
+
+#[test]
+fn compensated_recovery_fails_closed_on_a_corrupt_own_receipt_readback() -> TestResult {
+    let started_at_secs = current_unix_timestamp() + 1;
+    let _started = chio_test_support::clock::scope_unix_secs(started_at_secs);
+    for case in ["missing", "duplicated", "substituted"] {
+        let harness = Harness::new(started_at_secs)?;
+        let authority = harness.executor.authority_id().to_owned();
+        let (busy, lease_deadline) =
+            harness.seed_busy_terminal_receipt(&format!("readback-busy-{case}"))?;
+        let own = harness.seed_terminal_receipt(&authority, &format!("readback-own-{case}"))?;
+        let (fault, expected) = match case {
+            "missing" => (
+                ReceiptReadbackFault::Missing,
+                format!(
+                    "compensated operation {} does not have exactly one terminal receipt outbox",
+                    own.operation_id()
+                ),
+            ),
+            "duplicated" => (
+                ReceiptReadbackFault::Duplicated,
+                format!(
+                    "compensated operation {} does not have exactly one terminal receipt outbox",
+                    own.operation_id()
+                ),
+            ),
+            _ => (
+                ReceiptReadbackFault::Substituted(harness.terminal_receipt_action(&busy)?),
+                format!(
+                    "terminal receipt outbox for operation {} changed its immutable binding",
+                    own.operation_id()
+                ),
+            ),
+        };
+        *harness
+            .operations
+            .receipt_readback_fault
+            .lock()
+            .map_err(|_| "readback fault lock")? = Some((own.operation_id().to_owned(), fault));
+
+        let result = harness
+            .kernel
+            .recover_compensated_admission_operation(own.operation_id());
+        assert!(
+            matches!(&result, Err(KernelError::Internal(detail)) if *detail == expected),
+            "{case}: {result:?}"
+        );
+        harness.assert_receipt_lease_busy(&busy, lease_deadline)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn a_busy_receipt_retried_until_its_lease_expires_is_one_logical_receipt() -> TestResult {
+    let started_at_secs = current_unix_timestamp() + 1;
+    let _started = chio_test_support::clock::scope_unix_secs(started_at_secs);
+    let mut harness = Harness::new(started_at_secs)?;
+    let (busy, lease_deadline) = harness.seed_busy_terminal_receipt("retried-busy-receipt")?;
+    assert_cleanup_pending(harness.publish(), &busy);
+    let _before_deadline = chio_test_support::clock::scope_unix_secs(lease_deadline / 1_000 - 1);
+    assert_cleanup_pending(harness.publish(), &busy);
+    harness.assert_receipt_lease_busy(&busy, lease_deadline)?;
+    let _at_deadline = chio_test_support::clock::scope_unix_secs(lease_deadline / 1_000);
+    harness.publish()?;
+
+    let outboxes = harness
+        .operations
+        .load_cleanup_actions(busy.operation_id())?
+        .into_iter()
+        .filter(|action| action.kind() == AdmissionCleanupActionKind::TerminalReceipt)
+        .collect::<Vec<_>>();
+    let [outbox] = outboxes.as_slice() else {
+        return Err(format!("{} terminal receipt outboxes", outboxes.len()).into());
+    };
+    assert_eq!(outbox.state(), AdmissionCleanupActionState::Completed);
+    let receipts = harness.kernel.receipt_log().receipts();
+    let first = receipts.first().ok_or("recorded terminal receipt")?;
+    assert!(receipts.len() > 1, "{} receipt appends", receipts.len());
+    let first_bytes = canonical_json_bytes(first)?;
+    for receipt in &receipts {
+        assert_eq!(receipt.id, first.id);
+        assert_eq!(canonical_json_bytes(receipt)?, first_bytes);
+    }
+    Ok(())
+}
+
+#[test]
+fn publication_stops_before_candidates_after_a_terminal_receipt_item_failure() -> TestResult {
+    let started_at_secs = current_unix_timestamp() + 1;
+    let _started = chio_test_support::clock::scope_unix_secs(started_at_secs);
+    let mut harness = Harness::new(started_at_secs)?;
+    let unpublished = harness.kernel.governed_security_runtime_status();
+    let authority = harness.executor.authority_id().to_owned();
+    let local = harness.seed_terminal_receipt(&authority, "local-receipt-beside-foreign")?;
+    let foreign = harness.seed_terminal_receipt(
+        &sha256_hex(b"foreign-receipt-authority"),
+        "foreign-receipt-beside-local",
+    )?;
+    let healthy = harness.seed_reserved(&authority, "healthy-behind-receipt-failure")?;
+
+    let result = harness.publish();
+    let expected =
+        receipt_item_refusal(std::cmp::max(local.operation_id(), foreign.operation_id()));
+    assert!(
+        matches!(&result, Err(KernelError::Internal(detail)) if *detail == expected),
+        "{result:?}"
+    );
+    assert_eq!(harness.operations.candidate_pages.load(Ordering::SeqCst), 0);
+    assert_eq!(harness.state(&healthy)?, AdmissionOperationState::Prepared);
+    assert_eq!(
+        harness.approvals.state(healthy.operation_id())?,
+        ReplayReservationState::Reserved
+    );
+    assert_eq!(
+        harness.kernel.governed_security_runtime_status(),
+        unpublished
+    );
+    Ok(())
+}
+
+#[test]
+fn activation_stops_before_candidates_after_a_receipt_item_failure_beside_a_busy_lease(
+) -> TestResult {
+    let started_at_secs = current_unix_timestamp() + 1;
+    let _started = chio_test_support::clock::scope_unix_secs(started_at_secs);
+    let mut harness = Harness::new(started_at_secs)?;
+    harness.install_independent_authorities()?;
+    let authority = harness.executor.authority_id().to_owned();
+    let (busy, lease_deadline) =
+        harness.seed_busy_terminal_receipt("activation-busy-beside-item")?;
+    let foreign = harness.seed_terminal_receipt(
+        &sha256_hex(b"foreign-receipt-authority"),
+        "activation-foreign-receipt",
+    )?;
+    let healthy = harness.seed_reserved(&authority, "activation-behind-receipt-failure")?;
+
+    let result = harness.kernel.enable_governed_active_response_plans();
+    let expected = receipt_item_refusal(foreign.operation_id());
+    assert!(
+        matches!(&result, Err(KernelError::Internal(detail)) if *detail == expected),
+        "{result:?}"
+    );
+    assert!(!harness.kernel.governed_active_response_plans_enabled);
+    assert_eq!(harness.operations.candidate_pages.load(Ordering::SeqCst), 0);
+    harness.assert_receipt_lease_busy(&busy, lease_deadline)?;
+    assert_eq!(harness.state(&healthy)?, AdmissionOperationState::Prepared);
+    assert_eq!(
+        harness.approvals.state(healthy.operation_id())?,
+        ReplayReservationState::Reserved
     );
     Ok(())
 }
