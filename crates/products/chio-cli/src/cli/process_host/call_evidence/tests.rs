@@ -294,3 +294,236 @@ fn real_unknown_call_preserves_uncertainty_and_retained_custody() -> Result<(), 
     .is_err());
     Ok(())
 }
+
+#[cfg(target_os = "linux")]
+mod retained_selection {
+    use std::sync::Mutex;
+
+    use chio_kernel::admission_operation::{
+        AdmissionBeginResult, AdmissionCommandResult, AdmissionIdentifier,
+        AdmissionOperationCommand, AdmissionOperationId, AdmissionOperationStore,
+        AdmissionOperationStoreError, AdmissionOperationV1, AdmissionReplayKey,
+        RetainedToolAdmissionRequestV1, StoreMutationFence, UntrustedAdmissionRecoveryClaim,
+    };
+
+    use super::*;
+
+    type Retained = Option<(AdmissionOperationV1, RetainedToolAdmissionRequestV1)>;
+
+    /// Records which selector the exporter used. The bare request-ID lookup
+    /// reports the collision another caller reusing the ID would cause.
+    #[derive(Default)]
+    struct SelectorProbe {
+        selected: Mutex<Vec<String>>,
+    }
+
+    impl SelectorProbe {
+        fn record(&self, selector: String) -> Result<(), AdmissionOperationStoreError> {
+            self.selected
+                .lock()
+                .map_err(|_| AdmissionOperationStoreError::Unavailable("probe poisoned".into()))?
+                .push(selector);
+            Ok(())
+        }
+
+        fn selected(&self) -> Result<Vec<String>, CliError> {
+            Ok(self
+                .selected
+                .lock()
+                .map_err(|_| error("probe poisoned"))?
+                .clone())
+        }
+    }
+
+    fn unused<T>() -> Result<T, AdmissionOperationStoreError> {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "not used by selection".into(),
+        ))
+    }
+
+    impl AdmissionOperationStore for SelectorProbe {
+        fn load_retained_tool_request_by_execution_nonce(
+            &self,
+            nonce_id: &AdmissionIdentifier,
+            _fence: &StoreMutationFence,
+            _trusted_now_unix_ms: u64,
+        ) -> Result<Retained, AdmissionOperationStoreError> {
+            self.record(format!("nonce:{}", nonce_id.as_str()))?;
+            Ok(None)
+        }
+
+        fn load_unambiguous_retained_tool_request(
+            &self,
+            request_id: &AdmissionIdentifier,
+            _fence: &StoreMutationFence,
+            _trusted_now_unix_ms: u64,
+        ) -> Result<Retained, AdmissionOperationStoreError> {
+            self.record(format!("request:{}", request_id.as_str()))?;
+            Err(AdmissionOperationStoreError::Invariant(
+                "request ID is shared with another caller".into(),
+            ))
+        }
+
+        fn load_retained_tool_request(
+            &self,
+            operation_id: &AdmissionOperationId,
+            _fence: &StoreMutationFence,
+            _trusted_now_unix_ms: u64,
+        ) -> Result<Retained, AdmissionOperationStoreError> {
+            self.record(format!("operation:{}", operation_id.as_str()))?;
+            Ok(None)
+        }
+
+        fn begin(
+            &self,
+            _operation: &AdmissionOperationV1,
+            _fence: &StoreMutationFence,
+            _trusted_now_unix_ms: u64,
+        ) -> Result<AdmissionBeginResult, AdmissionOperationStoreError> {
+            unused()
+        }
+
+        fn load_by_operation_id(
+            &self,
+            _operation_id: &AdmissionOperationId,
+        ) -> Result<Option<AdmissionOperationV1>, AdmissionOperationStoreError> {
+            unused()
+        }
+
+        fn load_by_replay_key(
+            &self,
+            _replay_key: &AdmissionReplayKey,
+        ) -> Result<Option<AdmissionOperationV1>, AdmissionOperationStoreError> {
+            unused()
+        }
+
+        fn compare_and_swap(
+            &self,
+            _command: &AdmissionOperationCommand,
+            _trusted_now_unix_ms: u64,
+        ) -> Result<AdmissionCommandResult, AdmissionOperationStoreError> {
+            unused()
+        }
+
+        fn claim_recovery_untrusted(
+            &self,
+            _operation_id: &AdmissionOperationId,
+            _expected_version: u64,
+            _claimant_id: &AdmissionIdentifier,
+            _trusted_now_unix_ms: u64,
+            _expires_at_unix_ms: u64,
+            _fence: &StoreMutationFence,
+        ) -> Result<UntrustedAdmissionRecoveryClaim, AdmissionOperationStoreError> {
+            unused()
+        }
+
+        fn revalidate_recovery_claim(
+            &self,
+            _operation: &AdmissionOperationV1,
+            _claim: &UntrustedAdmissionRecoveryClaim,
+            _trusted_now_unix_ms: u64,
+            _current_store_fence: &StoreMutationFence,
+        ) -> Result<(), AdmissionOperationStoreError> {
+            unused()
+        }
+
+        fn list_recoverable(
+            &self,
+            _not_after_unix_ms: u64,
+            _limit: usize,
+        ) -> Result<Vec<AdmissionOperationV1>, AdmissionOperationStoreError> {
+            unused()
+        }
+
+        fn load_terminal_replay(
+            &self,
+            _replay_key: &AdmissionReplayKey,
+        ) -> Result<Option<AdmissionTerminalReplay>, AdmissionOperationStoreError> {
+            unused()
+        }
+    }
+
+    fn fence() -> StoreMutationFence {
+        StoreMutationFence {
+            store_uuid: "store".into(),
+            lease_id: "lease".into(),
+            owner_epoch: 1,
+        }
+    }
+
+    fn fixture_call(text: &str, key: &str) -> Result<(ChioReceipt, Value), CliError> {
+        let key = PublicKey::from_hex(key.trim()).map_err(error)?;
+        let signed = crate::receipt_verify::verify_original_receipt(text, &key)?;
+        let evidence: Evidence =
+            serde_json::from_value(signed.action.parameters.clone()).map_err(error)?;
+        let call = crate::process_response_verify::verify_values(
+            &evidence.request,
+            &evidence.context,
+            &evidence.response,
+            &key,
+        )?;
+        Ok((call, evidence.response))
+    }
+
+    fn select(call: &ChioReceipt, response: &Value) -> Result<Vec<String>, CliError> {
+        let probe = SelectorProbe::default();
+        let retained =
+            super::super::exporting::select_retained_request(&probe, call, response, &fence(), 1)?;
+        assert!(retained.is_none());
+        probe.selected()
+    }
+
+    #[test]
+    fn signed_operation_reference_selects_by_operation_id() -> Result<(), CliError> {
+        let (call, response) = fixture_call(
+            include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/process-call-observation/interrupted.json"
+            )),
+            include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/process-call-observation/interrupted-kernel.pub"
+            )),
+        )?;
+        let operation_id = super::super::super::nonce_evidence::operation_id(&call)?
+            .ok_or_else(|| error("fixture carries a signed operation reference"))?;
+        assert_eq!(
+            select(&call, &response)?,
+            vec![format!("operation:{}", operation_id.as_str())]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn unprojected_denial_selects_by_its_issued_nonce() -> Result<(), CliError> {
+        let (call, response) = fixture_call(
+            include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/process-call-observation/issued-denial.json"
+            )),
+            "b4cdc34f12b6f9b4bca630d008b3c15333b82df760f801516c40c921b9257534",
+        )?;
+        assert!(super::super::super::nonce_evidence::operation_id(&call)?.is_none());
+        let nonce = crate::process_response_verify::response_nonce(&response)?
+            .ok_or_else(|| error("fixture carries an issued nonce"))?;
+        assert_eq!(
+            select(&call, &response)?,
+            vec![format!("nonce:{}", nonce.nonce_id())]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn call_without_signed_identity_never_selects_by_request_id() -> Result<(), CliError> {
+        let (call, mut response) = fixture_call(
+            include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/process-call-observation/issued-denial.json"
+            )),
+            "b4cdc34f12b6f9b4bca630d008b3c15333b82df760f801516c40c921b9257534",
+        )?;
+        response["execution_nonce_json"] = Value::Null;
+        assert!(select(&call, &response)?.is_empty());
+        Ok(())
+    }
+}

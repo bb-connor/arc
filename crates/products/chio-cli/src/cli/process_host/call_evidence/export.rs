@@ -1,5 +1,8 @@
 use chio_core::receipt::decision::ToolCallAction;
-use chio_kernel::admission_operation::{AdmissionIdentifier, AdmissionOperationStore};
+use chio_kernel::admission_operation::{
+    AdmissionIdentifier, AdmissionOperationStore, AdmissionOperationV1,
+    RetainedToolAdmissionRequestV1, StoreMutationFence,
+};
 
 use super::super::state::{read_json, write_secret, Host};
 use super::*;
@@ -46,6 +49,35 @@ pub(crate) fn export(
     Ok(())
 }
 
+/// Selects the retained original by an identity the kernel signed for this
+/// call: the admission operation its receipt projects or claims, else the
+/// execution nonce it issued. A request ID is not an identity, since other
+/// callers may reuse it, so a call carrying neither claims no retained custody.
+pub(super) fn select_retained_request<S>(
+    store: &S,
+    call: &ChioReceipt,
+    response: &Value,
+    fence: &StoreMutationFence,
+    now: u64,
+) -> Result<Option<(AdmissionOperationV1, RetainedToolAdmissionRequestV1)>, CliError>
+where
+    S: AdmissionOperationStore + ?Sized,
+{
+    if let Some(operation_id) = super::super::nonce_evidence::operation_id(call)? {
+        return store
+            .load_retained_tool_request(&operation_id, fence, now)
+            .map_err(error);
+    }
+    let Some(nonce) = crate::process_response_verify::response_nonce(response)? else {
+        return Ok(None);
+    };
+    let selector =
+        AdmissionIdentifier::try_new("execution_nonce_id", nonce.nonce_id()).map_err(error)?;
+    store
+        .load_retained_tool_request_by_execution_nonce(&selector, fence, now)
+        .map_err(error)
+}
+
 /// Read the same anchored state under the caller's existing stopped-host lease.
 pub(super) fn observe(
     host: &Host,
@@ -86,9 +118,7 @@ pub(super) fn observe(
         .authority
         .local_runtime_participant()
         .ok_or_else(|| error("missing local custody authority"))?;
-    let retained = store
-        .load_unambiguous_retained_tool_request(&request_id, &fence, now)
-        .map_err(error)?;
+    let retained = select_retained_request(&store, &call, &response, &fence, now)?;
     let operation = if let Some((operation, private_request)) = retained {
         // Validate through the anchored private store. Never export these request bytes.
         private_request
