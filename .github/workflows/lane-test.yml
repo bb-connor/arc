@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       target_ref:
-        description: Branch or commit to test
+        description: Full 40-character commit SHA to test (the swarm CLI resolves branches)
         required: true
         type: string
       item:
@@ -41,6 +41,9 @@ concurrency:
 permissions:
   contents: read
 
+# Lanes run on main's cache scope but execute lane code: restore only, never save.
+cache-mode: read
+
 env:
   CARGO_TERM_COLOR: always
   CHIO_CI_RUSTFLAGS: "-D warnings -C link-arg=-Wl,--threads=1"
@@ -53,6 +56,7 @@ jobs:
     steps:
       - name: Validate inputs
         env:
+          TARGET_REF: ${{ inputs.target_ref }}
           ITEM: ${{ inputs.item }}
           PACKAGES: ${{ inputs.packages }}
           FILTER: ${{ inputs.filter }}
@@ -60,6 +64,8 @@ jobs:
           NONCE: ${{ inputs.nonce }}
         run: |
           set -euo pipefail
+          # An immutable commit, so a green result cannot attach to code pushed after the run.
+          [[ "$TARGET_REF" =~ ^[0-9a-f]{40}$ ]] || { echo "target_ref must be a full commit SHA"; exit 1; }
           [[ "$ITEM" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]] || { echo "bad item"; exit 1; }
           [[ "$PACKAGES" =~ ^[A-Za-z0-9_\ -]+$ ]] || { echo "bad packages"; exit 1; }
           # A leading '-' would reach libtest as an option (for example --include-ignored), not a name filter.
@@ -94,6 +100,18 @@ jobs:
             sleep $((attempt * 10))
           done
           exit 1
+
+      # Same contract dependencies as ci.yml: chio-settle devnet and web3 tests
+      # otherwise skip silently and count as passed.
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Install web3 contract dependencies
+        run: pnpm --dir contracts install --frozen-lockfile
 
       # Same pinned Bun as ci.yml's workspace tests (chio-formal-diff-tests requires it).
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
