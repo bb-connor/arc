@@ -771,9 +771,9 @@ rust_source = "crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_
 rust_symbols = [
   "ChioKernel::evaluate_tool_call_async_with_session_context_scoped",
 ]
-normalized_sha256 = "923814d94499286cba454d7590d171aa50d075de73927c4a934e10dd8e79d9a5"
+normalized_sha256 = "913b0b93f9e5841059eaa51dcfe59a9ec7a93af39f446fdd319ad43ba12e78c2"
 symbol_sha256 = [
-  { symbol = "ChioKernel::evaluate_tool_call_async_with_session_context_scoped", sha256 = "34db8f7af6022e1398519ba924ba683a39fee7348d17399e8fd2c8d64e5e18fa" },
+  { symbol = "ChioKernel::evaluate_tool_call_async_with_session_context_scoped", sha256 = "628ffa1c384d2f83367919f382404436cd8ba0d58cee0c7058e518dcdc1b0e1e" },
 ]
 
 [[mirror]]
@@ -786,11 +786,11 @@ rust_symbols = [
   "ChioKernel::evaluate_tool_call_with_nested_flow_client_async_and_security_context",
   "ChioKernel::evaluate_tool_call_with_nested_flow_client_async_scoped",
 ]
-normalized_sha256 = "c42617c4712aa6fa11eea226dd266bf667b6a2d7ded35c6e4c1090292583e553"
+normalized_sha256 = "67521eabecc4bcce669db0135eb77730372368ef0d38b0a4b1d839e06bee7296"
 symbol_sha256 = [
   { symbol = "ChioKernel::evaluate_tool_call_with_nested_flow_client_async", sha256 = "9d4a04abfbb6eee0a2326d4f5a9dd1eb49361c0aaa19535dc2a2af1877fe4f6d" },
   { symbol = "ChioKernel::evaluate_tool_call_with_nested_flow_client_async_and_security_context", sha256 = "50ec56cd5f5d047926fed17b8d2f55157183f157a0fece691c6328cc29c29708" },
-  { symbol = "ChioKernel::evaluate_tool_call_with_nested_flow_client_async_scoped", sha256 = "9ed5f2f9dcb5b8831375f107029c2891f4d487f99cc6df1f403c4e3b4b311735" },
+  { symbol = "ChioKernel::evaluate_tool_call_with_nested_flow_client_async_scoped", sha256 = "25cae06b271bd3e36056da23b3eeafa506198bc91551777c675cdb0630de9062" },
 ]
 
 [[mirror]]
@@ -1109,9 +1109,9 @@ rust_source = "crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_
 rust_symbols = [
   "ChioKernel::evaluate_tool_call_async_with_session_context_scoped",
 ]
-normalized_sha256 = "923814d94499286cba454d7590d171aa50d075de73927c4a934e10dd8e79d9a5"
+normalized_sha256 = "913b0b93f9e5841059eaa51dcfe59a9ec7a93af39f446fdd319ad43ba12e78c2"
 symbol_sha256 = [
-  { symbol = "ChioKernel::evaluate_tool_call_async_with_session_context_scoped", sha256 = "34db8f7af6022e1398519ba924ba683a39fee7348d17399e8fd2c8d64e5e18fa" },
+  { symbol = "ChioKernel::evaluate_tool_call_async_with_session_context_scoped", sha256 = "628ffa1c384d2f83367919f382404436cd8ba0d58cee0c7058e518dcdc1b0e1e" },
 ]
 
 [[mirror]]
@@ -1124,11 +1124,11 @@ rust_symbols = [
   "ChioKernel::evaluate_tool_call_with_nested_flow_client_async_and_security_context",
   "ChioKernel::evaluate_tool_call_with_nested_flow_client_async_scoped",
 ]
-normalized_sha256 = "c42617c4712aa6fa11eea226dd266bf667b6a2d7ded35c6e4c1090292583e553"
+normalized_sha256 = "67521eabecc4bcce669db0135eb77730372368ef0d38b0a4b1d839e06bee7296"
 symbol_sha256 = [
   { symbol = "ChioKernel::evaluate_tool_call_with_nested_flow_client_async", sha256 = "9d4a04abfbb6eee0a2326d4f5a9dd1eb49361c0aaa19535dc2a2af1877fe4f6d" },
   { symbol = "ChioKernel::evaluate_tool_call_with_nested_flow_client_async_and_security_context", sha256 = "50ec56cd5f5d047926fed17b8d2f55157183f157a0fece691c6328cc29c29708" },
-  { symbol = "ChioKernel::evaluate_tool_call_with_nested_flow_client_async_scoped", sha256 = "9ed5f2f9dcb5b8831375f107029c2891f4d487f99cc6df1f403c4e3b4b311735" },
+  { symbol = "ChioKernel::evaluate_tool_call_with_nested_flow_client_async_scoped", sha256 = "25cae06b271bd3e36056da23b3eeafa506198bc91551777c675cdb0630de9062" },
 ]
 
 [[mirror]]
@@ -1512,9 +1512,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/caller_budget.rs"
 rust_symbols = ["SqliteAdmissionOperationStore::caller_budget_shares"]
-normalized_sha256 = "c8a0e246978c93a6faa7257ab3a26432d882499120437685a2304c2818f25bc4"
+normalized_sha256 = "951fa738fd856a433a4fc54c56319e0d04a53376873a513dc6c678700589f642"
 symbol_sha256 = [
-  { symbol = "SqliteAdmissionOperationStore::caller_budget_shares", sha256 = "112a06140953f8abb014a6cdf3eb032248a1fe5616348474c24f55e665346036" },
+  { symbol = "SqliteAdmissionOperationStore::caller_budget_shares", sha256 = "943f4c5159c8309bcb4f9878ab3e9c1a4e7e3dd17238893faf0dbd0e6c23c227" },
 ]
 
 [[mirror]]
@@ -1523,14 +1523,14 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context.rs"
 rust_symbols = ["DurableDispatchCommitError", "ChioKernel::freeze_and_commit_durable_dispatch", "ChioKernel::freeze_durable_tool_return_context", "DurableToolReturnContext", "DurableToolReturnContext::validate_binding", "DurableToolReturnContext::bind_native_dispatch"]
-normalized_sha256 = "9e21dc1a87cf2fb8fac061f34eb65aa2cdfd3ff99adac701ec9729d4cfa96836"
+normalized_sha256 = "02cf6a4d426e1cfd964a83c5ad42750d52687c527f6fe8fc185f9e8702edd15e"
 symbol_sha256 = [
   { symbol = "DurableDispatchCommitError", sha256 = "0bc681863068bcfc98fb6031f417b37883b902a264382a091e41fa06e1b898a5" },
   { symbol = "ChioKernel::freeze_and_commit_durable_dispatch", sha256 = "df7d8ea6deea4825a720d23533f637c0ed258952c25d24fe1a8ece4bbf36b552" },
-  { symbol = "ChioKernel::freeze_durable_tool_return_context", sha256 = "2d4c80cb78cbac8afe7d980b9c2abbe029e494d045485d7e526d455f21cc8bbe" },
-  { symbol = "DurableToolReturnContext", sha256 = "09aacf292ab0b301583406b45dd85e58b8616f8fadfdbec5af1f7e9aa6fe2bd7" },
-  { symbol = "DurableToolReturnContext::validate_binding", sha256 = "643c4843310942a72afabbb6be3b1c820d5c4584f456ac93a3e990aa5006e4b1" },
-  { symbol = "DurableToolReturnContext::bind_native_dispatch", sha256 = "4ced1273ef07b56c2ca7c781a05a784fc8395391f3e79291e3ab37e7354862e7" },
+  { symbol = "ChioKernel::freeze_durable_tool_return_context", sha256 = "7678a25f05006eeb5e3e2ff6dfb54dcde58f4e4fa28988f73e8f57dafce4f198" },
+  { symbol = "DurableToolReturnContext", sha256 = "86efbdeb1d5b83f7090b5802a35ddfbb3da2206b3f59d210a9c457bf4e964837" },
+  { symbol = "DurableToolReturnContext::validate_binding", sha256 = "ecd5b23ea51d61860409b562c5f5fd0f03189ebeeb02e5df3c9e84961f7faa98" },
+  { symbol = "DurableToolReturnContext::bind_native_dispatch", sha256 = "fd88d774007b72b9fdd74c9adcde69b7e5016dc5176a427fd63bf5b5cc605b2a" },
 ]
 
 [[mirror]]
@@ -1555,13 +1555,13 @@ rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator/return
 rust_symbols = ["CallerReturnWire", "ChioKernel::frame_caller_return_context", "ChioKernel::restore_caller_return_context", "ChioKernel::decode_caller_return_context", "ChioKernel::decode_caller_return_payload", "SCHEMA", "SIGNING_SCHEMA", "LEGACY_SCHEMA",
   "ChioKernel::frame_caller_return_context_with_native",
 ]
-normalized_sha256 = "43847c1d1a7ee529f86b13aed2e2c19413fd915b77f9d2ecdbb4fc605e3e59c6"
+normalized_sha256 = "2798fab3b53f5f031e2a12a691d9f0211d2ab72dc2255b7e5d98b4642af3eb71"
 symbol_sha256 = [
   { symbol = "CallerReturnWire", sha256 = "40dfab3270b53219f74caa53d447e3d584f5d813733b6f2fdf9928aa964a197e" },
   { symbol = "ChioKernel::frame_caller_return_context", sha256 = "9a05135367e81037462f8f397001628ef8f0a207cc39e1cffa7f5132f6882a56" },
   { symbol = "ChioKernel::restore_caller_return_context", sha256 = "b4b83d1c6d03e63b80790a37aea2f11c2c977e17399091eab36424aa21e7cc10" },
   { symbol = "ChioKernel::decode_caller_return_context", sha256 = "28d387eb093ef79454dbc2f0abedad55d18341e3116285488b288d7eec2388bc" },
-  { symbol = "ChioKernel::decode_caller_return_payload", sha256 = "978c7d3dd8c338598559546fcce625adb5e06e8b98116bc36615f3b71976706a" },
+  { symbol = "ChioKernel::decode_caller_return_payload", sha256 = "15e7778ba7a2d01234a3f11e28b8e3119debd163d406785c820bf54a3af900a2" },
   { symbol = "SCHEMA", sha256 = "c4ff8c9162e8ab992dac7f5952b596837710779900a823fdd5d3faea87e2609e" },
   { symbol = "SIGNING_SCHEMA", sha256 = "e9509f2944d2ccdae2d8dd95e75fc48354482a5e6d43f685dac75120429040b9" },
   { symbol = "LEGACY_SCHEMA", sha256 = "b827cd68710746f0dd1aae05baae57502a976673a660081207a8aa7329d76f8f" },
@@ -1574,10 +1574,10 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs"
 rust_symbols = ["ChioKernel::capture_and_commit_durable_dispatch","ChioKernel::begin_durable_tool_admission_for_transport","ChioKernel::native_security_authority_binding","immutable_tool_admission_request_hash"]
-normalized_sha256 = "234ff7e6808e4428781c33a48711a31388aa4d08ba1e7b6856d19690f3d102e7"
+normalized_sha256 = "babc7be420b375525e034e76ad10924f2e5b4718c4acf06a7b0719771e3b13cf"
 symbol_sha256 = [
   { symbol = "ChioKernel::capture_and_commit_durable_dispatch", sha256 = "2635594043d1fe8f02fd56099d3bc52b2277aae6f4b921210ca7af647dbaaf2d" },
-  { symbol = "ChioKernel::begin_durable_tool_admission_for_transport", sha256 = "156ce18c112026e1e680d995e5b632dc0ffe4f4b2ad43a0e9fcbfab27e9fccc3" },
+  { symbol = "ChioKernel::begin_durable_tool_admission_for_transport", sha256 = "0eeb6c587dad6c7efd1ed451f1c8d528ba704ee994a65e08a35e248d473002fb" },
   { symbol = "ChioKernel::native_security_authority_binding", sha256 = "db50adade9669310b59adce0cd240a97fa3daa22ed31d8cb4278576b74cefcb2" },
   { symbol = "immutable_tool_admission_request_hash", sha256 = "2223fc6166bfa3bee87a1917c2cac027781b898493de814f27cd7cb2371d06a0" },
 ]
@@ -1844,17 +1844,26 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal.rs"
 rust_symbols = [
-  "ChioKernel::record_durable_tool_return",
   "ChioKernel::completed_durable_tool_response",
   "ChioKernel::validate_completed_durable_receipt",
   "ChioKernel::finalize_durable_tool_return_with_security_release",
 ]
-normalized_sha256 = "e78209ec7e8d2f4820bbd1581bb9e6357a881189834b976c6adf8b0ff6477720"
+normalized_sha256 = "7cb099f57b5305f49e805380723ae2f928af261ef8ee092c4a9844c3582bd104"
 symbol_sha256 = [
-  { symbol = "ChioKernel::record_durable_tool_return", sha256 = "3608ec888ea86e618adcc9b42819c74ef02cdaf068ec88184dfb92d417267f77" },
-  { symbol = "ChioKernel::completed_durable_tool_response", sha256 = "a67b610acdb99b54bc30d8d8da6503ef27441f8713770923a9688df7ae1ffb18" },
-  { symbol = "ChioKernel::validate_completed_durable_receipt", sha256 = "95a5d1492465afb29fe2f4867ee44a196e0511dce331330f61ef14bade42ab83" },
-  { symbol = "ChioKernel::finalize_durable_tool_return_with_security_release", sha256 = "3ff5ec1ba3852aea264b90f3844b0f0beb04e699811d1d815b48306822883aee" },
+  { symbol = "ChioKernel::completed_durable_tool_response", sha256 = "c5eca031da75b34e0504e5103fffc4edb9a4fd02b2982a5f60a0bdb3722e2ce8" },
+  { symbol = "ChioKernel::validate_completed_durable_receipt", sha256 = "38a3e2a698263515b702a8321ce7d4b1c3898515da4f65be41d728bd2ee19112" },
+  { symbol = "ChioKernel::finalize_durable_tool_return_with_security_release", sha256 = "ef6bf7b1b8ade3cf1aed082df551008760be2887a80309ca6becdbbe7369858b" },
+]
+
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/record_return.rs"
+rust_symbols = ["ChioKernel::record_durable_tool_return"]
+normalized_sha256 = "662eaf4db1ae6bef24a6461ea31ce37fb3fdbfded1e4f9e41ae962cebc1a23a6"
+symbol_sha256 = [
+  { symbol = "ChioKernel::record_durable_tool_return", sha256 = "0bccd716a55feefa86dad175a22df86509ec3261d7f2c55427e5002814b0f4be" },
 ]
 
 [[mirror]]
@@ -1873,8 +1882,9 @@ rust_symbols = [
   "SecurityReleaseRecordV1::validate_against",
   "SecurityReleaseRecordV1::validate_retained_against",
   "RawInvocationOutcomeV1::security_dispatch_commitment_id",
+  "RawInvocationOutcomeV1::retained_security_dispatch_commitment_id",
 ]
-normalized_sha256 = "9e114d48596bd538cefb7ec69a3f7437c35ef4bd29ab1658644273ac5f0653ac"
+normalized_sha256 = "f9291a3f35f99cb4a220a7ccfdc018ae8a94c3bb438c4cec371ed24132f4beec"
 symbol_sha256 = [
   { symbol = "SecurityReleaseArtifacts", sha256 = "e03c8ada9d40e4f2247a5fcb39102eb71f74aa3a492abb49b91ce511b71753f3" },
   { symbol = "SecurityReleaseRecordV1", sha256 = "24e6b20d457b67075aa2168346d6d97a5aa5ba14fe2561897dbd7bdb119da8ff" },
@@ -1884,9 +1894,10 @@ symbol_sha256 = [
   { symbol = "SecurityReleaseRecordV1::pending", sha256 = "8e4aaf1d7cb0de1bcab9bd845fbe8b709340eb49d5448bf1432f48a22bc71269" },
   { symbol = "SecurityReleaseRecordV1::canonical_bytes", sha256 = "b49b8f98eeaabd0caed5302a00afb79b38e8bb383b30b23e7936508f795f9b9c" },
   { symbol = "SecurityReleaseRecordV1::from_canonical_bytes", sha256 = "4c689abe77824d6bc0e0f969d4af89bc4814e14de3b09596d3328f91fa496885" },
-  { symbol = "SecurityReleaseRecordV1::validate_against", sha256 = "5ddace1c79cede1172dd43f84401b9a9d50475962ae691365a1e08eb0acf2544" },
+  { symbol = "SecurityReleaseRecordV1::validate_against", sha256 = "37d5fe3f00bbef7cd5a0de7bc1076a91f54f088c3d3a086b4725a4532656213f" },
   { symbol = "SecurityReleaseRecordV1::validate_retained_against", sha256 = "77f8b00aca8ac261a852987a9df37e19875ea9e89df9fbc1ca8d627f1f78fe8d" },
-  { symbol = "RawInvocationOutcomeV1::security_dispatch_commitment_id", sha256 = "55eebfabae19278c80f31854a619fb9ec0a3f0d65b91982a8503d97636e58533" },
+  { symbol = "RawInvocationOutcomeV1::security_dispatch_commitment_id", sha256 = "d8153225271e36bad6dccec2c7c943a22347ff52697982eb0e23c594d3cc86b1" },
+  { symbol = "RawInvocationOutcomeV1::retained_security_dispatch_commitment_id", sha256 = "20ddc2be19bce17ed3ffbb282099b575bb19848c1ba3f1e4102705b542a6df9f" },
 ]
 
 # Source-drift coverage only. The lifecycle abstraction does not prove output
@@ -1902,10 +1913,10 @@ rust_symbols = [
   "DurableSecurityReleaseContext::output",
   "DurableSecurityReleaseContext::signing_preimage",
 ]
-normalized_sha256 = "2398713784d8744e6027468868a6b88dc184df277b7577aa69fbd25400c67038"
+normalized_sha256 = "c85dbf05052e63bf6c7234e99207dbc26fe2b7682808eb907d61a62daa828e0c"
 symbol_sha256 = [
   { symbol = "DurableSecurityReleaseContext", sha256 = "bce192d9fe3452727963620329fe3de747eab09320e3f164e0309bb7f1fdb63e" },
-  { symbol = "DurableSecurityReleaseContext::new", sha256 = "07b1361147f718ec06d65efe34e9ee548b3879996b1dc24e1bd98cce31090e6d" },
+  { symbol = "DurableSecurityReleaseContext::new", sha256 = "bb9edab37b118c4b44e775482377fdbc0dd2a6b4c7d6b44c2b87eba757a0f773" },
   { symbol = "DurableSecurityReleaseContext::output", sha256 = "712b18d3a9fa6c4dff80b73cf314c01e364426b3d51c03c19d468f07bf4ec703" },
   { symbol = "DurableSecurityReleaseContext::signing_preimage", sha256 = "10d8bb48ceb505bc992ebd04607a0a658dd4ff30bb04175852432a4b78f64ea8" },
 ]
@@ -1916,14 +1927,14 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/tool_outcome/receipt_signing.rs"
 rust_symbols = ["FrozenReceiptSigningIdentityV1", "FrozenReceiptSigningIdentityV1::new", "FrozenReceiptSigningIdentityV1::validate", "FrozenReceiptSigningIdentityV1::public_key", "FrozenReceiptSigningIdentityV1::crypto_floor", "RawInvocationOutcomeV1::with_receipt_signing_identity", "RawInvocationOutcomeV1::receipt_signing_identity"]
-normalized_sha256 = "6e72f13530922e5165cbc075d1cb750b03efd5f1a1e00de088e0a764653aa6b3"
+normalized_sha256 = "9ce86b6eee45e77501b5af1ec4e10d2b9f20b5dc922633b68d4e69038aef3fa1"
 symbol_sha256 = [
   { symbol = "FrozenReceiptSigningIdentityV1", sha256 = "65d73771b128b3acc12aba7f812d231678f9f3417fbcbac628d44bc6e995ab0e" },
   { symbol = "FrozenReceiptSigningIdentityV1::new", sha256 = "e6607122d3d922cb2b4fb89aa8853d3b4070a3fe29dae3a34bde82aeabd1633a" },
   { symbol = "FrozenReceiptSigningIdentityV1::validate", sha256 = "03aadab43126f5f271b18e53e947ae59105297569dd26de812b699393468e48f" },
   { symbol = "FrozenReceiptSigningIdentityV1::public_key", sha256 = "9333df3a2d8c2787b2294a24f48674ae794daa7263392fdfe96fc99b57a2da7b" },
   { symbol = "FrozenReceiptSigningIdentityV1::crypto_floor", sha256 = "0256f898dbdb0a145550abb54d5c21a2f9511fc924c5a5f4e40437643dd3b8e0" },
-  { symbol = "RawInvocationOutcomeV1::with_receipt_signing_identity", sha256 = "22202ac27eb178a3c1051454f33db5bfa439e607b5d7a4b9688c573f61a1a090" },
+  { symbol = "RawInvocationOutcomeV1::with_receipt_signing_identity", sha256 = "4e8adbc5468e5cbfdbebd2858cd6a3dc68aa28fc74b19ec87ed6d1a714aa8eee" },
   { symbol = "RawInvocationOutcomeV1::receipt_signing_identity", sha256 = "b5bd3df0fd338fcca99653342f0ddf79f07b46ed0b942b31feee283a087e60d4" },
 ]
 
@@ -1933,11 +1944,11 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/signing_authority.rs"
 rust_symbols = ["ChioKernel::freeze_receipt_signing_identity", "ChioKernel::durable_return_signing_identity", "ChioKernel::require_original_receipt_signer"]
-normalized_sha256 = "82c0fc06051d86728200838d4547e41a329493be233861d0da6b1a2cdbbf0216"
+normalized_sha256 = "e8d1a5620d37c2f27cdf1ddc3e937b873179506d42c4cfe76b4f6aab4119b97e"
 symbol_sha256 = [
   { symbol = "ChioKernel::freeze_receipt_signing_identity", sha256 = "20cfccbe1cf57a6d1fa3ea2d1a6ed7f0babcc171175bf4d66f606159d0d57f46" },
   { symbol = "ChioKernel::durable_return_signing_identity", sha256 = "9fa6b66d03489e90a4c15470557b13da2a84bd4013cab5dffc5cb0aad5e0025e" },
-  { symbol = "ChioKernel::require_original_receipt_signer", sha256 = "9d3f0adffefd210c43c0e491c68068fdc9733c1c293dc0912c9c5803d9beb13f" },
+  { symbol = "ChioKernel::require_original_receipt_signer", sha256 = "2149a23069299a0d38c47d289cc252d8647293b25d4732219d74667ee1bf078f" },
 ]
 
 [[mirror]]
@@ -1967,23 +1978,32 @@ rust_symbols = [
   "RawInvocationOutcomeV1::with_security_release_requirement",
   "RawInvocationOutcomeV1::requires_security_release",
   "ToolOutcomeStore",
-  "RawInvocationOutcomeV1::from_persisted_fields",
   "RawInvocationOutcomeV1::from_canonical_bytes",
 ]
-normalized_sha256 = "59b56563b43940f3d0a507822477171bf475000a2958348291f5efbe14805370"
+normalized_sha256 = "f1e35062483c42c4f62320c1b94976136d1ea17ad366c354ec7f879e097db7ac"
 symbol_sha256 = [
-  { symbol = "RawInvocationOutcomeV1", sha256 = "39381c0bfb606c8e59a273296e337dc572d989232404ff20b09dc65be16deddf" },
-  { symbol = "PersistedRawInvocationOutcomeV1", sha256 = "f7082c827b455b7f7fcd10d176ba4ad562f3889941d034fdeb93107218a532fb" },
-  { symbol = "RawInvocationOutcomeV1::from_committed_dispatch_parts", sha256 = "5fe3fa79a4027d50c4d63edecbbcbabebafd4014bf3c4f24158baddcf5e0b5bd" },
+  { symbol = "RawInvocationOutcomeV1", sha256 = "1d62dd8c330031745d3dae089f93740ebfc56f85d14831f04477610d18861efb" },
+  { symbol = "PersistedRawInvocationOutcomeV1", sha256 = "913792149a60987cebe85a5a651860169825968d3b7f4386d89c8b7af2a80a57" },
+  { symbol = "RawInvocationOutcomeV1::from_committed_dispatch_parts", sha256 = "2183dd1e8262125bbb4015f92efab9c7de07f68a2616408d6855c09d62564f50" },
   { symbol = "RawInvocationOutcomeV1::from_persisted", sha256 = "b104ffeefe31e12ab30672b3d32cd35287130c479ec57fe43ed4b7712fdc11a8" },
-  { symbol = "RawInvocationOutcomeV1::to_persisted", sha256 = "22a2dba50784b0f5d3763e77f664abca4a3113dc652538b79fc1e0e662971363" },
-  { symbol = "RawInvocationOutcomeV1::canonical_blob_bounded", sha256 = "7a90ee0d0bf59d75ef7132edbdf9eea8c33160e0c315ff8c45428b6f93759cad" },
+  { symbol = "RawInvocationOutcomeV1::to_persisted", sha256 = "181c498e0eea9b7712e7892ccce3608ca8f8ed7f3fc3cb97e404395fed298732" },
+  { symbol = "RawInvocationOutcomeV1::canonical_blob_bounded", sha256 = "d715d6eb98bb5952739f0a16227267624a20c5a0ca78f59410d3a3b5d6a86e99" },
   { symbol = "RawInvocationOutcomeV1::with_federation_context_json", sha256 = "4cfa9ea3f9f6af1209c85a95f46089481d9e023da39d515b874207bce27dadff" },
   { symbol = "RawInvocationOutcomeV1::with_security_release_requirement", sha256 = "d3d9a90bd299575199e6babc05df6d89baf95923e4420c71f4c8624dbec9f181" },
   { symbol = "RawInvocationOutcomeV1::requires_security_release", sha256 = "46116d09d1d842b8adfd24cae358fa9fd35d579be525bc7df19995f362610b9e" },
   { symbol = "ToolOutcomeStore", sha256 = "9bd4195732fc89e845185b7aafbe5cafb040ee683c4f8d72508d52c57b5d085f" },
-  { symbol = "RawInvocationOutcomeV1::from_persisted_fields", sha256 = "b293796f7a4f9bd822f39cd12ee7267ee680827b719a55eae5057166b30e3362" },
   { symbol = "RawInvocationOutcomeV1::from_canonical_bytes", sha256 = "15db4b9efd11cb2aacaf2a6942d4dcd1613c3f00686de90ddbf3b401ddec6fc2" },
+]
+
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/kernel/chio-kernel/src/tool_outcome/original_security_dispatch.rs"
+rust_symbols = ["RawInvocationOutcomeV1::from_persisted_fields"]
+normalized_sha256 = "fc71f63430964fd51065b034eff4e8437e3293e7315875f906793e12b0b3e561"
+symbol_sha256 = [
+  { symbol = "RawInvocationOutcomeV1::from_persisted_fields", sha256 = "2c64ff91722df9dd8025bed521ffc68871b46b03db2a7a1ba6fc3766195efc05" },
 ]
 
 [[mirror]]
@@ -2002,7 +2022,7 @@ rust_symbols = [
   "require_terminal_release",
   "SqliteToolOutcomeStore::persist_security_release",
 ]
-normalized_sha256 = "9b0d2812b706033dc4329181b6ed0ac42c24b62ae3f399b2acc29382cfdf6f0b"
+normalized_sha256 = "b702b8ce63f6947c9c975a8d8cce0f3cfadd7e3b0883647ee0aaa490481bf9a1"
 symbol_sha256 = [
   { symbol = "has_release_namespace", sha256 = "71ed3bd52b4e107adf8aa1867d8678ec2eb4a8ba0c03cb72169fcea2908f008a" },
   { symbol = "verify_unstamped_source", sha256 = "8755e74d57934bd55bbfb32c26b642c8468e9bba50027a1bd4232bd92eabbccd" },
@@ -2012,7 +2032,7 @@ symbol_sha256 = [
   { symbol = "load", sha256 = "c21a4a60a9e799edb92b80d4abd41843be2d30ec167abb3ed44a1bac60d5159a" },
   { symbol = "verify_projection", sha256 = "d22a72c488995fda7930b31a9e1a18acc23e5d2a67e1d26cca010fe4b9b98ec3" },
   { symbol = "require_terminal_release", sha256 = "0f0a31f9658bf8d861c5536d6b741beafc52ba26b24a04a8db1aa388d934c563" },
-  { symbol = "SqliteToolOutcomeStore::persist_security_release", sha256 = "81ebeb078fc14780ba658f22a3e1b546afe7955477df945a4b9247a46f1db241" },
+  { symbol = "SqliteToolOutcomeStore::persist_security_release", sha256 = "5b0fd3816cd972e42503a8bd7ff297b82c56fa17495cfb1add45b2cb8ef8db48" },
 ]
 
 [[mirror]]
@@ -2026,14 +2046,16 @@ rust_symbols = [
   "SqliteToolOutcomeStore::lookup_security_release",
   "initialize_tool_outcome_schema",
   "verify_tool_outcome_invariants",
+  "verify_tool_outcome_data_invariants",
 ]
-normalized_sha256 = "a2e04233cbc7c70befb51c7610b313fc0f0b870e8e4735a524831897a39fd782"
+normalized_sha256 = "d47967d9ffeea0bba0347fa084772e437ddfcb296c1520321523e850cbe83434"
 symbol_sha256 = [
   { symbol = "SqliteToolOutcomeStore::require_security_release_checkpoint_support", sha256 = "cbf49359b0aa14f5549fe6e1fb787b9fe1565ca27319ef120cb0baa20f9c75df" },
   { symbol = "SqliteToolOutcomeStore::record_security_release", sha256 = "d95908fa37f96e5c10dbda7d8b7f396ddc99420e3ad86c08a1a394610a909a65" },
   { symbol = "SqliteToolOutcomeStore::lookup_security_release", sha256 = "3315ac8508a69f3aa77e42d00c478dcc98b734e98d5a5265e1d076fa8517da1e" },
-  { symbol = "initialize_tool_outcome_schema", sha256 = "0f485f42d0fcecdba24dd55e5267c3c172a24a5e353a97599d402049228f4b7f" },
-  { symbol = "verify_tool_outcome_invariants", sha256 = "426da34443b27932c9e0a1445c7679a60f556d9c778fce37080dda77d29a235a" },
+  { symbol = "initialize_tool_outcome_schema", sha256 = "01c78c538fa03581454573e1ce39e762a4cacc9ec964b60a51ae5b6bbc8d798b" },
+  { symbol = "verify_tool_outcome_invariants", sha256 = "c4591c11808b4e426b17cc461a13ab66a20c5700e2cd5452d19504fe3de12d5c" },
+  { symbol = "verify_tool_outcome_data_invariants", sha256 = "5c71f770b78fcacc10df25ff3ad452f3a07424b073ccc409ae3894215a9dbeb2" },
 ]
 
 [[mirror]]
@@ -2125,7 +2147,7 @@ rust_source = "crates/kernel/chio-kernel/src/kernel/credential_reservation/prepa
 rust_symbols = ["CredentialPreparationInput", "PreparedDispatchCredentials", "PreparedDispatchCredentials::refresh", "PreparedDispatchCredentials::validate_origin", "PreparedDispatchCredentials::approval_credential", "ChioKernel::prepare_dispatch_credentials", "ChioKernel::prepare_credentials", "PreparedDispatchCredentials::dpop_credential",
   "PreparedDispatchCredentials::valid_until_unix_ms",
 ]
-normalized_sha256 = "b0f69bf8b0f9ece7c6cf4891ae010f1dab13205801bc765b3ef1b24affa5f9bf"
+normalized_sha256 = "5ed77c6dc6c309391715e15198407b1ee5d730d7926f93a3a23b397e43db856d"
 symbol_sha256 = [
   { symbol = "CredentialPreparationInput", sha256 = "6af5d477391bc3a8a511434d9e4ab3ef1e0e50ba90fee55e52def0c3bbce30de" },
   { symbol = "PreparedDispatchCredentials", sha256 = "910302244973c35530ba0c5da826806ab55781c8701f17ab7c9c7dcb598584dc" },
@@ -2135,7 +2157,7 @@ symbol_sha256 = [
   { symbol = "ChioKernel::prepare_dispatch_credentials", sha256 = "fbe2f0b8a24ddf9ae51fe59c5e1620afd5a647ac40166a996b2ddd3654e4b89f" },
   { symbol = "ChioKernel::prepare_credentials", sha256 = "f997bcf263cbbc46922cf709aca688ffdac8e2544a9b90716d416c9b7726c2c9" },
   { symbol = "PreparedDispatchCredentials::dpop_credential", sha256 = "c88b814fa1c20660ec9904ec654c153436d9e840c1c80d1d0e71dd98dd0d3ffb" },
-  { symbol = "PreparedDispatchCredentials::valid_until_unix_ms", sha256 = "83f439f2f97d66c212d7e8ca405b33c4cd2b1db8d2b88b4088f1526ab83dc1d4" },
+  { symbol = "PreparedDispatchCredentials::valid_until_unix_ms", sha256 = "125e6ac23dce1608097a13e270035deb1b0fe65595a00c52afe0c8b5d0ad8a1a" },
 ]
 
 [[mirror]]
@@ -2240,9 +2262,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/evaluation_contract.rs"
 rust_symbols = ["ChioKernel::durable_evaluation_contract"]
-normalized_sha256 = "725689a34231b3e399e749d34557f95ee844eab7e8a3df8b385e8b90bc4b6a54"
+normalized_sha256 = "7a0981efaa9398c2ed67fbcbeacd4142e2eced891c60fd5073ededbc15834a02"
 symbol_sha256 = [
-  { symbol = "ChioKernel::durable_evaluation_contract", sha256 = "dee6f9d8fc76bc32272394986d3517497fa39a5afa92919bc500570a34241485" },
+  { symbol = "ChioKernel::durable_evaluation_contract", sha256 = "fd0936bb7e314f93cf286810420759bae824b16759c80cfb265b93cd0d167d68" },
 ]
 
 [[mirror]]
@@ -2288,7 +2310,7 @@ rust_symbols = [
   "RetainedToolAdmissionRequestV1::validate_request_material",
   "RetainedToolAdmissionRequestV1::matching_grants_require_dpop",
 ]
-normalized_sha256 = "5ae665014252e239b741affa622a00b77204da55c24acc4f31b2ec4dc149b038"
+normalized_sha256 = "83c4b71845a101fdc97e68325cd1e726a95dfb426eedc2c02f50b3daf4aed101"
 symbol_sha256 = [
   { symbol = "RetainedToolAdmissionRequestV1", sha256 = "6fc1dd53ae89a56806be6db03e7d24aea5abb688ef44253f7ab2c6f0dfebada3" },
   { symbol = "RetainedRequestWire", sha256 = "79b171231fadddfd7e88c6d286c7dc155eb70a519626e8da9965310537aadf9f" },
@@ -2296,7 +2318,7 @@ symbol_sha256 = [
   { symbol = "immutable_tool_request_hash_with_profile", sha256 = "ec7bebe0d716fbc4f5184cbeaa315a19fde7ec447a489ad121876be364ee646b" },
   { symbol = "RetainedToolAdmissionRequestV1::from_admission", sha256 = "d33d58fcfeb881876fa83d957ec948e23e1e70afdaa38cbd1ab8c01e50d023eb" },
   { symbol = "RetainedToolAdmissionRequestV1::from_canonical_bytes", sha256 = "decac0186c2927ff44b9e44c8e79b77c5c21378f993daf1cd208dd32e629835c" },
-  { symbol = "RetainedToolAdmissionRequestV1::request_without_transient_credentials", sha256 = "ed36fb5246dea756f3a69bd7857c74f75980c660dcd0c3ecde689e832c823fea" },
+  { symbol = "RetainedToolAdmissionRequestV1::request_without_transient_credentials", sha256 = "64c5fea3a56ebebc32cf2a0e82e073c9c44afc3d53fb8d37abcea4bb00815853" },
   { symbol = "SCHEMA", sha256 = "c99c6a81f9006e5096525478714f51dcd8d7721821e204ed854c1d315cd5327f" },
   { symbol = "RetainedToolAdmissionRequestV1::authority_profile", sha256 = "84fc58704f973b7f663bc3502f4857806aa30ecf602838fe0f3e168dd59c96b8" },
   { symbol = "RetainedToolAdmissionRequestV1::security_binding", sha256 = "486c0a28935145e735d94973d4ecbc50575a4ebc60029269eb8ac6dbac556bed" },
@@ -2406,9 +2428,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/admission_operation/store.rs"
 rust_symbols = ["AdmissionOperationStore", "QualifiedAdmissionOperationStoreExt"]
-normalized_sha256 = "982c919f715eccc1e14f43ee4359bbea84f1b76f50fe85e900a6622545f938ec"
+normalized_sha256 = "2eba9b1c7a0764b81bb7da6275535d7ef4551f8d65e6c34079e76e1ddd6809c7"
 symbol_sha256 = [
-  { symbol = "AdmissionOperationStore", sha256 = "f253bf97c311478cdcde5819a827db85ed3aa081d33203c3d49a3cb999d8c8cd" },
+  { symbol = "AdmissionOperationStore", sha256 = "9888dd12ee47cec9c1f785a3e21bf7ca9482b6a5fa6187ba1da93642992386e4" },
   { symbol = "QualifiedAdmissionOperationStoreExt", sha256 = "ee66d1c294c98dbb92981bbb6176ef3d1b767fcb7f91e7d65a9a36233bf5111f" },
 ]
 
@@ -2418,7 +2440,7 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_acquisition.rs"
 rust_symbols = ["NativeSecurityFlowJoinAuthority","NativeSecurityFlowJoinAuthority::binding","NativeSecurityFlowJoinAuthority::join","NativeSecurityFlowJoinAuthority::join_once","NativeSecurityFlowJoinAuthority::read_history","NativeSecurityFlowJoinAuthority::finish","ChioKernel::run_native_admission_preparation","store_call","NativeSecurityFlowJoinAuthority::key","NativeSecurityFlowJoinAuthority::attempt","NativeSecurityFlowJoinAuthority::with_join_custody","NativeSecurityFlowJoinAuthority::confirm","NativeSecurityFlowJoinAuthority::finish_with"]
-normalized_sha256 = "ed5bec5899a93b5f855563ef3b4b6d03eedd306302d251ff89663a28be22ea4a"
+normalized_sha256 = "50f53ba1556209f370b3978f76b64ce7104b740f82146283fc76b0f7280d435e"
 symbol_sha256 = [
   { symbol = "NativeSecurityFlowJoinAuthority", sha256 = "010c9a8d82c0f4123e4b79dce965aacedb273d2bbd64034d3fbeb940b96f359e" },
   { symbol = "NativeSecurityFlowJoinAuthority::binding", sha256 = "14049021dc015636223ed8129e1287a65636272beec21d8662509aa91ff1c81a" },
@@ -2426,7 +2448,7 @@ symbol_sha256 = [
   { symbol = "NativeSecurityFlowJoinAuthority::join_once", sha256 = "a3b4ca1eabf8fe2348a0958e20b66c796e180e178d66267ac6bebbaa482c370c" },
   { symbol = "NativeSecurityFlowJoinAuthority::read_history", sha256 = "6d12100fbf1c9a5ece653c8ea10f48adc310b94cbfd5b74cf8b1410a280d14b1" },
   { symbol = "NativeSecurityFlowJoinAuthority::finish", sha256 = "afca380f9076ce2765aa5250aec9efcb5291692c1117dcf479c5bc436563b458" },
-  { symbol = "ChioKernel::run_native_admission_preparation", sha256 = "8a68e34558062e931b63747df991f8a850112d315ea7e391dbb1fc52ce997f16" },
+  { symbol = "ChioKernel::run_native_admission_preparation", sha256 = "891cae24ad8f8332a2e967281281141b060258cabb4ab5fbb51f2f2f56e12f2b" },
   { symbol = "store_call", sha256 = "6112a8825e2480911a8f7c0bd1f0b53a94e6ac4018eb93e135783ac8891907e8" },
   { symbol = "NativeSecurityFlowJoinAuthority::key", sha256 = "b43bfae3bb10bb0fd9571c58d20a8a697de6b8fd9bebc1cc96b3d4e34f42c499" },
   { symbol = "NativeSecurityFlowJoinAuthority::attempt", sha256 = "1bfa5f6273361b7d4bf93b20aa357ee1b23403757a4aa4952f7a9fe89492f3ad" },
@@ -2570,7 +2592,7 @@ rust_symbols = ["Record::validate","load","load_operation","Record::format",
   "load_initialized",
   "load_operation_inner",
 ]
-normalized_sha256 = "e22f6ea7b451419ee480b9a0cedcfcc04d27393502cf4eff886be90e9ce9e295"
+normalized_sha256 = "6bba90b404891e82bd5ff2c056c198937fd2c635b37424c5cda8c5a61b09e5b2"
 symbol_sha256 = [
   { symbol = "Record::validate", sha256 = "bcf3d3af30f7f20049a077b640c9bc74c4f0cd6db269f1ac7623402815a8a239" },
   { symbol = "load", sha256 = "ad1f1499792b5013c8c000670961f423cba1e8274c2ee76cd22fc9e1a91a22c6" },
@@ -2579,7 +2601,7 @@ symbol_sha256 = [
   { symbol = "Record::validate_initialized", sha256 = "3562f0a4ae62a4dbc872d2afff084d5622a1a41fbbebbcf3d94fdaef7ac95b15" },
   { symbol = "load_inner", sha256 = "0e799e27025eed749e21f0b023d43ebfd39bf82fa7d25474903048d2af11e801" },
   { symbol = "load_initialized", sha256 = "24ead910d31fcd47c36248512c60d66e2113661ddf0ccbc8ae17a711ea07486d" },
-  { symbol = "load_operation_inner", sha256 = "6eb32845b0124c00b9d19db9fef714305ee491d679005b5dca42c73561c2707d" },
+  { symbol = "load_operation_inner", sha256 = "6c2b60d5e109320287572d52272d54cfe14c2f32f4fdc374ec770d22fa2951ec" },
 ]
 
 [[mirror]]
@@ -2598,12 +2620,22 @@ model_file = "formal/apalache/PostAdmissionDropGuard.tla"
 model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs"
-rust_symbols = ["visit","latest_totals","validate_history_bounds"]
-normalized_sha256 = "21ee91b1d234a635509c65160467fe74bc6a36e0ae0f313a0a51b8861cc08ea2"
+rust_symbols = [
+  "visit",
+  "latest_totals",
+  "validate_history_bounds",
+  "family_head",
+  "segment_totals",
+  "join_precedes",
+]
+normalized_sha256 = "41ed4c5912a89b25987876e85c6c7955b1bcf73d0e6c048741b54101002fcc03"
 symbol_sha256 = [
-  { symbol = "visit", sha256 = "59344d2ec6b61324bbbf5ef912371305c4616375fb9e9082f48f7a457831cb04" },
-  { symbol = "latest_totals", sha256 = "96c9ee94d8a1cc0d07780b3272e43c2b1223cbe55820078a355459347a0e1186" },
-  { symbol = "validate_history_bounds", sha256 = "c2461ff900e06565c8a1c75271701520c555efb01e6f63e67e5452053bb0a614" },
+  { symbol = "visit", sha256 = "176f85266d0e88253cd1ebed4d03e0c4900354bac8d07c83e908c10d304e9beb" },
+  { symbol = "latest_totals", sha256 = "6e5de234370380e17748e7ad29c8ac425bca86dede2b0eea0f8065f53be9f890" },
+  { symbol = "validate_history_bounds", sha256 = "29bdb38ddf45c4bfb42f1511947e25cdcd08a84d1728ece575879acaecf3f929" },
+  { symbol = "family_head", sha256 = "e0dea299c5743bb996900220e06e462969513c077b1b4444a22078a7ab40983b" },
+  { symbol = "segment_totals", sha256 = "9e3514bb57bedc8f5f8fd6e1e23cb55ad3beef50c970316a68dfd0d874c39051" },
+  { symbol = "join_precedes", sha256 = "dada92b4dd173780d9800611b76e3b5f278903de073edf292ffcd510360974e0" },
 ]
 
 [[mirror]]
@@ -2861,7 +2893,7 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-control-plane/src/security/adapters/native_flow.rs"
 rust_symbols = ["NativeFlowError","NativeFlowResolver","PreparedNativeFlowDispatch","NativeFlowCustody","NativeFlowResolver::new","NativeFlowResolver::prepare_dispatch","NativeFlowResolver::policy","PreparedNativeFlowDispatch::admission","PreparedNativeFlowDispatch::commit_custody","NativeFlowCustody::operation_id","NativeFlowCustody::observation","NativeFlowCustody::live_request_digest","NativeFlowCustody::admission","NativeFlowCustody::egress_history","require_time","policy_call","NativeFlowResolver::name","NativeFlowResolver::native_authority_binding","NativeFlowResolver::prepare_native_admission","NativeFlowResolver::prepare_native_output","NativeFlowResolver::commit","PreparedNativeFlowDispatch::policy_evidence","NativeFlowCustody::policy_evidence","PreparedNativeFlowDispatch::commit_custody_with_dispatch_ledger","PreparedNativeFlowDispatch::commit_custody_inner","NativeFlowCustody::dispatch_ledger","PreparedNativeFlowDispatch::capture_invocation","NativeFlowResolver::with_captured_lifecycle","NativeFlowResolver::supports_native_dispatch","NativeFlowResolver::commit_native_dispatch","NativeFlowResolver::classify_admission_input","NativeFlowResolver::prepare_native_nonce_preflight","NativeFlowResolver::validate_declassification_issuer"]
-normalized_sha256 = "618c58285c61d88b0a8708f7336ec41d96243ab66385576c2c9299e0c3ab202a"
+normalized_sha256 = "e1dfe5b87e22dd683cfbdba4a2d5e25f09ff0f0f69d1e22ca21b628bcc973752"
 symbol_sha256 = [
   { symbol = "NativeFlowError", sha256 = "034eb01d1c1ba4ac1d75e79532d13f465a4af400b400bd1fa61a16db68d15dc7" },
   { symbol = "NativeFlowResolver", sha256 = "ab08fe9ed77d609f60022212bfa5421a7061df5a82f529500a5bc7b44f107d05" },
@@ -2889,7 +2921,7 @@ symbol_sha256 = [
   { symbol = "PreparedNativeFlowDispatch::commit_custody_with_dispatch_ledger", sha256 = "fdf66acd4ecc5bc4494f9c3e6db61e8a09ef1bd8049b38cbbd43f57fd0420501" },
   { symbol = "PreparedNativeFlowDispatch::commit_custody_inner", sha256 = "0b21fd402188e6f255bd85b524e7db8df8fea4477c9fe5407fc6d276f26bb522" },
   { symbol = "NativeFlowCustody::dispatch_ledger", sha256 = "6305d7728ca4b8e92bbdb3bdb1ec26a82f5a7f0b1306a0a063bc67fca0f0942d" },
-  { symbol = "PreparedNativeFlowDispatch::capture_invocation", sha256 = "9b4a98eb6b7e69b5f5f37a48f10984656a5f5f061a3445b0813aa2656e5abbb5" },
+  { symbol = "PreparedNativeFlowDispatch::capture_invocation", sha256 = "f9f888bc022815d3a941511bc4f5027801008113f1320c34e519837250ac9b10" },
   { symbol = "NativeFlowResolver::with_captured_lifecycle", sha256 = "9d652dc38aec6a2ffd893840cc351cb8d940fda48962981a0f0102b54d4d03aa" },
   { symbol = "NativeFlowResolver::supports_native_dispatch", sha256 = "64b3f7faa41e707331fec92541156b3e0cc095c7ce7387ac74eb3cc37072c42f" },
   { symbol = "NativeFlowResolver::commit_native_dispatch", sha256 = "4726650337396d5d8b4d7893c2237bcc39d8241d7d0e0ebc199cfe6f76de573f" },
@@ -2973,7 +3005,7 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history.rs"
 rust_symbols = ["Record","FORMAT","INPUT_FORMAT","MAX_RECORD_BYTES","Record::join_record","Record::input_record","Record::bytes","Record::digest","Record::validate","Record::insert","format","load","head","load_for_operation"]
-normalized_sha256 = "3c3f6c46e036c3ceae913742f6abb433cea982dbfd7738ad74bbf074ec433755"
+normalized_sha256 = "3afeebeab282170cf95cca44250594f1d1c8a22620f091b66f140b19e4dbb160"
 symbol_sha256 = [
   { symbol = "Record", sha256 = "069a9c682eafec02ac99481b79ad763f5d0b5d4456789b539b38d7b73a5e4617" },
   { symbol = "FORMAT", sha256 = "1d499af20c0d3463a84cd55e3b54116ae024a6f52c0a66e879140abbbf96f30a" },
@@ -2987,8 +3019,8 @@ symbol_sha256 = [
   { symbol = "Record::insert", sha256 = "3a46c0b7266f6cdf262534f1b6fd0febb97090c471ee85e1d40d03d48234b4a4" },
   { symbol = "format", sha256 = "850b37895d3d49e6d30ce5d397d637918b98b157b593f1dac90c5edb1a3270b1" },
   { symbol = "load", sha256 = "07580e8a6b4440b20b8001914c6979d4a6486984c0b6ef6c29509e505303db4c" },
-  { symbol = "head", sha256 = "e8bc3a8beeadd91efe23e686ad4e4ae7d46aa1868390a0f9062cc455a7ec8196" },
-  { symbol = "load_for_operation", sha256 = "7115153edc99b4d8c0ebb0f980d38d01ade4e9d2a79d48c55746d2325254c82f" },
+  { symbol = "head", sha256 = "6f7bdc15aac78900c674807d2bdfedd776c7fe926df563d7b52bc46ac44d27ce" },
+  { symbol = "load_for_operation", sha256 = "0694f5ada9b4f65cf1d36e84da281fd5e9dc7f2a112274554b7129fb0147d8f9" },
 ]
 
 # Signed-expiry standalone nonce custody replaced the deferred legacy path.
@@ -3129,18 +3161,30 @@ model_file = "formal/apalache/PostAdmissionDropGuard.tla"
 model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/ledger.rs"
-rust_symbols = ["PreparedNativeSecurityEgress::acquire_and_commit_with_dispatch_ledger","PreparedNativeSecurityEgress::validate_ledger_input","PreparedNativeSecurityEgress::retain_dispatch_ledger","PreparedNativeSecurityEgress::retain_dispatch_ledger_current","PreparedNativeSecurityEgress::validate_ledger","AcquiredNativeSecurityEgress::commit_with_dispatch_ledger","PreparedNativeSecurityEgress::retain_for_capture","PreparedNativeSecurityEgress::retain_for_declassified_capture","PreparedNativeSecurityEgress::retain_for_capture_inner"]
-normalized_sha256 = "1137c7b20e684c44443373cacc3124a5c4b3bd8f6efedf049f0e14485535ac88"
+rust_symbols = [
+  "PreparedNativeSecurityEgress::acquire_and_commit_with_dispatch_ledger",
+  "PreparedNativeSecurityEgress::validate_ledger_input",
+  "PreparedNativeSecurityEgress::retain_dispatch_ledger",
+  "PreparedNativeSecurityEgress::retain_dispatch_ledger_current",
+  "PreparedNativeSecurityEgress::validate_ledger",
+  "AcquiredNativeSecurityEgress::commit_with_dispatch_ledger",
+  "PreparedNativeSecurityEgress::retain_for_capture",
+  "PreparedNativeSecurityEgress::retain_for_declassified_capture",
+  "PreparedNativeSecurityEgress::retain_for_capture_inner",
+  "PreparedNativeSecurityEgress::validate_retention_input",
+]
+normalized_sha256 = "1133b1cd1051c4615df39c80ec178f7c6d1bc4b907d200b9472ce2cc59bd8434"
 symbol_sha256 = [
   { symbol = "PreparedNativeSecurityEgress::acquire_and_commit_with_dispatch_ledger", sha256 = "10d3dfe7f570383702ec9c686580a3d43e4c3485bf5a5139b09d753fd808aa6b" },
   { symbol = "PreparedNativeSecurityEgress::validate_ledger_input", sha256 = "ddd121ced9739a1d48a77499bd49bcd53878ddbef7f2423ff1b7e43f39a6e49b" },
   { symbol = "PreparedNativeSecurityEgress::retain_dispatch_ledger", sha256 = "8f2ca493359cd72864d4240c8a1bd5b36fc6f8dba58a06f121ebb73ab34b7fb0" },
   { symbol = "PreparedNativeSecurityEgress::retain_dispatch_ledger_current", sha256 = "ac0fc8c4ca959219629a4cb393d7bfb1a265f7c6222a93018eadc4c0452a069c" },
-  { symbol = "PreparedNativeSecurityEgress::validate_ledger", sha256 = "f06a0a8aee35356b47e5f4a0e8fb96261ef2d083e0951531fd2d9140b1103ac0" },
+  { symbol = "PreparedNativeSecurityEgress::validate_ledger", sha256 = "1557b4ad3d300b2dd66532505c84344ac271ab3a88d741d30b5918045d11adab" },
   { symbol = "AcquiredNativeSecurityEgress::commit_with_dispatch_ledger", sha256 = "fa98e02fb5bd7e7949290f1ac31f73fafbcc2249e91f743ab615344fe935a84e" },
   { symbol = "PreparedNativeSecurityEgress::retain_for_capture", sha256 = "93fd90ef3b3b27c93eb1171554642086b76a088fa9a9606d5f95535bb3a6a293" },
   { symbol = "PreparedNativeSecurityEgress::retain_for_declassified_capture", sha256 = "92835f739c9840d07fe79545470f61cc1883c19d0aaf9421d1e0e6ef8258fae1" },
-  { symbol = "PreparedNativeSecurityEgress::retain_for_capture_inner", sha256 = "181341e9cfe456107753c0d0a2d1c64bdb2c8a7eb680b98d92ed448cdf7a2053" },
+  { symbol = "PreparedNativeSecurityEgress::retain_for_capture_inner", sha256 = "b36f0c1f0c2adbabf722b73fc73abd05599fd8c74734a53a41b2fb3d2e737a64" },
+  { symbol = "PreparedNativeSecurityEgress::validate_retention_input", sha256 = "6cf0039df60c2a9ecfae58b8ee35ad83efac865cceab038754cc35c80dc02b49" },
 ]
 
 [[mirror]]
@@ -3149,9 +3193,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger.rs"
 rust_symbols = ["SCHEMA","PROJECTION","MUTATION","MAX_RECORD_BYTES","sql","require_operation","projection_reference","SqliteAdmissionOperationStore::load_native_dispatch_ledger"]
-normalized_sha256 = "7c20047c0ec7702c1d5a8f7d4691e0c17445046d56f1ba06b9af78376f71cf08"
+normalized_sha256 = "3a75fb948c3bc461c3ae1093c306d9ab1776c8e490372973e8702dc9e1fa0010"
 symbol_sha256 = [
-  { symbol = "SCHEMA", sha256 = "3dfe2b4f6742407457f025b483fee9af213eb57e95bfef6981c0be18f681986c" },
+  { symbol = "SCHEMA", sha256 = "a21d1ba4762070cbeb0978d346f98d787c1d48a98e4a31ce170fa83a41be343a" },
   { symbol = "PROJECTION", sha256 = "d34bfe173529a8437eaeb6b1afd8b507f52c9c58195865710fcc1105d5cbb90a" },
   { symbol = "MUTATION", sha256 = "94401020b3200a89454119136c1b5937d007eadefc49a27faa70ccc6cfa9108c" },
   { symbol = "MAX_RECORD_BYTES", sha256 = "d1193cab0d947b13d056d07ed13a10c9201f2eb7be18f2b6c6f0d85cbafda7ee" },
@@ -3202,14 +3246,14 @@ rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/s
 rust_symbols = ["Record","Record::bytes","Record::digest","Record::evidence","Record::validate",
   "Record::validate_initialized",
 ]
-normalized_sha256 = "d49f796fdfd9a5ece935d4f7a92b8357d12ee1b88b05040f42cab9c316c303f5"
+normalized_sha256 = "10467566deb3267bd4fde3f61bbd6b06e3b271714ccc669bed4aebccff3fb60e"
 symbol_sha256 = [
-  { symbol = "Record", sha256 = "655d4331533885406cfb8dbb7e7681f56ed4bdd73bb4abb8509fce103a0fae9a" },
+  { symbol = "Record", sha256 = "0d98b816fa30b1b277054dde0e3e4c69cd0c56bb19889528df76b84d6249327a" },
   { symbol = "Record::bytes", sha256 = "505f7994eb251645f6e219b0eb04379faf02626211c224fa64b13cdcf086ded3" },
   { symbol = "Record::digest", sha256 = "287dcf65c24bbd7942ffc572e8082f2d4d0326cbe367bcf664efddb70b36a739" },
   { symbol = "Record::evidence", sha256 = "938490e4fcdde8f2b609770de67c895d1ad03b18263aeccd492872b94e1f5ff2" },
   { symbol = "Record::validate", sha256 = "ff73d20837a1fbe71c02c0722a8bcbebec925265b9640f0f859176d4259e2a0a" },
-  { symbol = "Record::validate_initialized", sha256 = "f4bfcf015773ea3a4d0c9ffdafc651b75cbbe8f3716ff326b139d2e50028ef71" },
+  { symbol = "Record::validate_initialized", sha256 = "66ea7f9c839e1f5d917d36dd6807e4f49b922ee02d722cf774d5bb83c3cddc9d" },
 ]
 
 [[mirror]]
@@ -3233,9 +3277,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/write.rs"
 rust_symbols = ["SqliteAdmissionOperationStore::retain_native_dispatch_ledger"]
-normalized_sha256 = "011b462a8fa0edba3c563cddf1eccaf291d1f7852bb88331d819450acbbcb8f9"
+normalized_sha256 = "3119243ead32678bd35dc4053752735c0428c1c0757ad531f69e09ab0b3c1276"
 symbol_sha256 = [
-  { symbol = "SqliteAdmissionOperationStore::retain_native_dispatch_ledger", sha256 = "b3022bc86e03c7792480f1a7bc5d40e987d30a5fd90afad817abe6e54c945636" },
+  { symbol = "SqliteAdmissionOperationStore::retain_native_dispatch_ledger", sha256 = "0c0f150b7e1d6b915ec3a858d650acb4ca8bed4624945a19b4b1c1b2073b210f" },
 ]
 
 [[mirror]]
@@ -3291,13 +3335,13 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs"
 rust_symbols = ["initialize_admission_operation_schema","migrate_schema","verify_admission_operation_invariants","verify_admission_operation_schema","admission_operation_schema_catalog"]
-normalized_sha256 = "04b32b0a1eb7c9e244aac97d37211e850cee5ae09ce917e2e5bed057d37741eb"
+normalized_sha256 = "fe2e660b47c4199e59887bff5b6f12c5b9fdb31c46204a3608a4141fb2044acf"
 symbol_sha256 = [
   { symbol = "initialize_admission_operation_schema", sha256 = "3300140793f096b312bb38b8f914f620cf13e0e75b65ec2fac5c469079e6e69b" },
-  { symbol = "migrate_schema", sha256 = "e0520ade609fc41dd7b0dbd8b75efafa1cc85af0dd5692d26827616836c6769d" },
-  { symbol = "verify_admission_operation_invariants", sha256 = "35ae1f8e27d97ac182859265b4ca263555ad3afecd5506830d963b4b008d3820" },
+  { symbol = "migrate_schema", sha256 = "8b0421859a0fa8d461864fccc2aebcf9d47af58d61a0da440bf41945fe1caec1" },
+  { symbol = "verify_admission_operation_invariants", sha256 = "18787ed9735847d76aee61618f3779b1c0fb43382c9080e050ef34eeeb55a863" },
   { symbol = "verify_admission_operation_schema", sha256 = "a668153da33e6b5518dd1de6053bf6e8de089238180a476ccc776ca27db6db5c" },
-  { symbol = "admission_operation_schema_catalog", sha256 = "faa1b327ae9c2b13074be7478289bb6ad38918b49fb49e324a69ca989ae78655" },
+  { symbol = "admission_operation_schema_catalog", sha256 = "4a8cba51f37d8fc12954a905486130a1e772b734099c64a6ee56cd23a8f239fb" },
 ]
 
 [[mirror]]
@@ -3306,9 +3350,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/schema.rs"
 rust_symbols = ["recorded_version", "digest_version", "expected", "verify_version"]
-normalized_sha256 = "d6296abd0c3f8e0f8739f15a98f41ab0864495231343d440bea18fb82c6a23f1"
+normalized_sha256 = "ce0a836d0fdd117ca73ee8ae30db70a89160c8d6ddd6795ed39b052f3d53d56f"
 symbol_sha256 = [
-  { symbol = "recorded_version", sha256 = "939215376e1419c6e963b01743774423abe28a8d21bc5408e62bbd6ab581b10c" },
+  { symbol = "recorded_version", sha256 = "e6bcc16b36a6f24efb6ff5160d0c1b0d873daaf7b23bcfc3c3803e98072599e2" },
   { symbol = "digest_version", sha256 = "7c870a429ee25a6915150d2fc96ddecf7fade1a327d91a8b1b6c21c52240e6d0" },
   { symbol = "expected", sha256 = "8d0bba92e02cdf38e31e65bf91585b85a95fc1759ab5b7c6194082a05515b886" },
   { symbol = "verify_version", sha256 = "5f57ebc4e2f4bb9253efdd59a285f66510f338253a22e4ed1cf290f78186a993" },
@@ -3320,9 +3364,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store.rs"
 rust_symbols = ["ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION","SqliteAdmissionOperationStore::capture_native_invocation_and_commit_dispatch"]
-normalized_sha256 = "e3f1a7b630442f72b404a8d6637ac20ff84252afd3fcccf14c1228b8523e0f38"
+normalized_sha256 = "3dedc5c4b6460569ffa136bfefa3337e7c6841a56970808907f1426d98db659b"
 symbol_sha256 = [
-  { symbol = "ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION", sha256 = "eaad73f8208c1738f7553ecea638dc7b3daf2f17ac80931733cdd812592861ba" },
+  { symbol = "ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION", sha256 = "ef242e61776f850c43dce9c69093d05b75012231ef1098994a705a1993470f40" },
   { symbol = "SqliteAdmissionOperationStore::capture_native_invocation_and_commit_dispatch", sha256 = "deaac50e9990fa4ae3b07274654b432549acbfd8ce86cd2b0a6cd1b4a6fea160" },
 ]
 
@@ -3332,9 +3376,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain.rs"
 rust_symbols = ["GLOBAL_COMMIT_SCHEMA","budget_event_reference_digest"]
-normalized_sha256 = "17128ec115a2f545f9f509c7f5df77d78a0e5c5d1e4d34d6a816f93dc0013e6a"
+normalized_sha256 = "c3501d4c39cf5b5efddf5d955930f63647123d5abf55224df8520560ecc6317b"
 symbol_sha256 = [
-  { symbol = "GLOBAL_COMMIT_SCHEMA", sha256 = "aaa6745ab7a26cc1808bc348daf062f0064b3410a72d8ba9ffe329a61931571d" },
+  { symbol = "GLOBAL_COMMIT_SCHEMA", sha256 = "522add17afd776516e637ff2d18a475b24bc9b6e8106a8a2bae33a253bfef2e9" },
   { symbol = "budget_event_reference_digest", sha256 = "4b3a4210201b80e3b8f384bc041d173aa01edf63d81cc1ccfb229a8ea1340ee0" },
 ]
 
@@ -3344,9 +3388,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain/schema_migration.rs"
 rust_symbols = ["migrate_previous_global_commit_schema"]
-normalized_sha256 = "5f40f2e42133be8fbe81c6a8e4a11a16e0c722ba521f1ce7bba9d2b855aa2db5"
+normalized_sha256 = "d5f778e135a1bddd35533901c10611c97bfabc324e06a76ad3f629e930a95861"
 symbol_sha256 = [
-  { symbol = "migrate_previous_global_commit_schema", sha256 = "8d10787409c484bb6afc2a084d1afd2a2ff8b673297812344fe35229582c416b" },
+  { symbol = "migrate_previous_global_commit_schema", sha256 = "933eddef8ab2206c3dbbcbb7363749df8e995141f11c09b6354ef6fb390f60df" },
 ]
 
 [[mirror]]
@@ -3355,9 +3399,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain/projection_reference.rs"
 rust_symbols = ["projection_reference_digest"]
-normalized_sha256 = "f3ca157f184747328096a02e67bfdff6c5e2abb2fa87536c54b3b13f08fbe633"
+normalized_sha256 = "940239e9d99c73b443fd828a3f52e07802fc0a1846bfbbc0d421c4b4a0896c50"
 symbol_sha256 = [
-  { symbol = "projection_reference_digest", sha256 = "cba29201112ab5a2a81d9b10c24f7b30f753f60c7f14ffb21e394fb4dc3ee499" },
+  { symbol = "projection_reference_digest", sha256 = "d1f3d4cfefd3bccaf9cee9b183c618a953a53f7d5d76ed85cf6ff087f5853719" },
 ]
 
 # Native capture entries track source drift only. The lifecycle model does not
@@ -3426,15 +3470,15 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/credential_reservation/native_dispatch.rs"
 rust_symbols = ["VerifiedNativeDispatchCredentials","VerifiedNativeDispatchCredentials::validate_binding","DispatchCredentialReservation::verify_native_dispatch","VerifiedNativeDispatchCredentials::runtime_validity","VerifiedNativeDispatchCredentials::valid_until_unix_ms","VerifiedNativeDispatchCredentials::execution_nonce","DispatchCredentialReservation::verify_native_execution_nonce"]
-normalized_sha256 = "131b8a1f24ec2e8ee94deedf9b523464dcf8597a4f6601b3dc935a4479466f05"
+normalized_sha256 = "328983d96ec75a86ec7aad80780d454b70edf4c3c5194bd26e72ee3ef9544b53"
 symbol_sha256 = [
-  { symbol = "VerifiedNativeDispatchCredentials", sha256 = "180fe5c9e5fba974803710e35bfb83608a589b0caaa5a3063861de0d47687858" },
+  { symbol = "VerifiedNativeDispatchCredentials", sha256 = "232bfb61a9e0688b450983ae09058cb7d42cf1c2850b5ddb5ad2af4c839b43a2" },
   { symbol = "VerifiedNativeDispatchCredentials::validate_binding", sha256 = "eae9b8b89c1086ff5423ad37f43f54efd0cf590eaeaf6efaacadf4a2cbbc1ef5" },
-  { symbol = "DispatchCredentialReservation::verify_native_dispatch", sha256 = "5ed252e428f46a02e87d353607d2016d8abb70dd4b4430f4c2ae158755221b4e" },
+  { symbol = "DispatchCredentialReservation::verify_native_dispatch", sha256 = "8e5321e57c46e4650a48041c68eecb74687ece84cb157c29dbd4903fbbbcc9a4" },
   { symbol = "VerifiedNativeDispatchCredentials::runtime_validity", sha256 = "439134aeb1b38a051b3eeb151126e7710237717ab450a098363866ff9be1878f" },
   { symbol = "VerifiedNativeDispatchCredentials::valid_until_unix_ms", sha256 = "cfae51c52a590324b44a2bb1e5dab64de68d4724a8249011f1939b73313b3c9f" },
   { symbol = "VerifiedNativeDispatchCredentials::execution_nonce", sha256 = "112cf951c5179de649241b16d6c92be4d42603b465ae731a795f1c13da0539e9" },
-  { symbol = "DispatchCredentialReservation::verify_native_execution_nonce", sha256 = "2137133c40e798031cacf650dae08803fa41aebdbfefb6e3226a0c5561898d84" },
+  { symbol = "DispatchCredentialReservation::verify_native_execution_nonce", sha256 = "c98dbd1436eb28bfe545b56a105e8f0ba73e3dcc482ae0543de70a0976a52385" },
 ]
 
 [[mirror]]
@@ -3442,17 +3486,30 @@ model_file = "formal/apalache/PostAdmissionDropGuard.tla"
 model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/capture.rs"
-rust_symbols = ["NativeSecurityDispatchCaptureAuthority","NativeSecurityDispatchCaptureAuthority::prepare_egress","NativeSecurityDispatchCaptureAuthority::capture","ChioKernel::reach_native_capture_checkpoint","NativeCaptureCheckpointInput",
+rust_symbols = [
+  "NativeSecurityDispatchCaptureAuthority",
+  "NativeSecurityDispatchCaptureAuthority::prepare_egress",
+  "NativeSecurityDispatchCaptureAuthority::capture",
+  "ChioKernel::reach_native_capture_checkpoint",
+  "NativeCaptureCheckpointInput",
   "NativeSecurityDispatchCaptureAuthority::capture_once",
+  "NativeSecurityDispatchCaptureAuthority::retain_for_capture",
+  "NativeSecurityDispatchCaptureAuthority::retain_once",
+  "NativeSecurityDispatchCaptureAuthority::classify_failure",
+  "NativeSecurityDispatchCaptureAuthority::holds_committed_egress",
 ]
-normalized_sha256 = "4c36af0ddc5e689c0df1dbdd05ae59637eb4d439c8a007c9c46c1ee9f9580f1f"
+normalized_sha256 = "b7e403c903eeb66c89bf7aa76bdaef70b30d00549c4fae8c6c8982cfee96ba46"
 symbol_sha256 = [
-  { symbol = "NativeSecurityDispatchCaptureAuthority", sha256 = "0aee1e0ecc3172c6918416354574d1c0704ec4106f80f757ef864f3a9a32c649" },
+  { symbol = "NativeSecurityDispatchCaptureAuthority", sha256 = "d707b3a25e2396dd87c2f7d566d6d6d5a0eccdd79581d55507839a558ae316d4" },
   { symbol = "NativeSecurityDispatchCaptureAuthority::prepare_egress", sha256 = "1b1e580c9834c18545a9c4caccc8c256e554111910710bbf68adbcdc842d60ed" },
-  { symbol = "NativeSecurityDispatchCaptureAuthority::capture", sha256 = "0d04a4844ab7a59944ff2a81672a714dfe350253c0ce5caefcf691d9552a5f44" },
-  { symbol = "ChioKernel::reach_native_capture_checkpoint", sha256 = "ea054dcf74a7f1388ffe125c2558234dab5bbf4df6a6f3192ded2f1c8d9cfced" },
+  { symbol = "NativeSecurityDispatchCaptureAuthority::capture", sha256 = "4fe6f6420e6e4c93518b9b45146751b3770fad239ca7d344548b81bd4434da3e" },
+  { symbol = "ChioKernel::reach_native_capture_checkpoint", sha256 = "e059b2f3d9fa43821f8bf414789f8868964068db9846c1dabd2051c4fb2a557f" },
   { symbol = "NativeCaptureCheckpointInput", sha256 = "3003f659fecbed1ca763f3052eb43833d3afe134e93253853eea1420ed50c7d3" },
-  { symbol = "NativeSecurityDispatchCaptureAuthority::capture_once", sha256 = "185a34c13bc4221b757166f3477279bb6186233c6e7c4803884bb18a522f3dae" },
+  { symbol = "NativeSecurityDispatchCaptureAuthority::capture_once", sha256 = "7675026931c4c0423994c5fb8932e16df66f947b85bfd8ef309b923d9408b01e" },
+  { symbol = "NativeSecurityDispatchCaptureAuthority::retain_for_capture", sha256 = "05d1699ec3795f2f2102ddf361f1750942df64d0fff514088700fc8b2d4149f0" },
+  { symbol = "NativeSecurityDispatchCaptureAuthority::retain_once", sha256 = "f281776c22983c3f775aa3a36f25135f0fc7890706dfb7bff9e9878009165cbc" },
+  { symbol = "NativeSecurityDispatchCaptureAuthority::classify_failure", sha256 = "4216e9fb95959cd168e2e11f84c6bf0eaf03ba7f792bdef6e7c89f2330f2c857" },
+  { symbol = "NativeSecurityDispatchCaptureAuthority::holds_committed_egress", sha256 = "bb33501db1ab06b9b77edb7b0a677be7f1edc852b03074bc5e33644121a9cda6" },
 ]
 
 [[mirror]]
@@ -3460,20 +3517,30 @@ model_file = "formal/apalache/PostAdmissionDropGuard.tla"
 model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/capture.rs"
-rust_symbols = ["NativeCaptureBinding","VerifiedNativeCapture","VerifiedNativeCapture::verify","VerifiedNativeCapture::verify_owner","VerifiedNativeCapture::verify_transition","VerifiedNativeCapture::verify_deadline","VerifiedNativeCapture::validate_time","verify_capture_attachment",
+rust_symbols = [
+  "NativeCaptureBinding",
+  "VerifiedNativeCapture",
+  "VerifiedNativeCapture::verify",
+  "VerifiedNativeCapture::verify_owner",
+  "VerifiedNativeCapture::verify_transition",
+  "VerifiedNativeCapture::verify_deadline",
+  "VerifiedNativeCapture::validate_time",
+  "verify_capture_attachment",
   "verify_capture_attachment_initialized",
+  "verify_capture_record",
 ]
-normalized_sha256 = "3c0c2c8b7af11df949a983eafe0bbd7c388867a44c7a84362e623fe389887d3a"
+normalized_sha256 = "c43de0e914c2cb21d040903b09b2bb4d5eeb28365ab0f7e3ed26ed36866ce26a"
 symbol_sha256 = [
   { symbol = "NativeCaptureBinding", sha256 = "c5643577292db72c4dade8c727982a81f9f40e35b72d5556edc80950816c3624" },
-  { symbol = "VerifiedNativeCapture", sha256 = "be26927665e385c61d62d28b7a24b94b64c59a1f37a151d90b73a266aa54a2bb" },
-  { symbol = "VerifiedNativeCapture::verify", sha256 = "db78bda43d4b879fbfe52ce52c5e5cd7b125a801e54816f9921c22964808549a" },
+  { symbol = "VerifiedNativeCapture", sha256 = "8497246c6c4c9b56ba59591af7862b8980d688841519ed9e359021e2acba0a65" },
+  { symbol = "VerifiedNativeCapture::verify", sha256 = "fd7385062afe1c8aa8358a71c8c0af4652aaf4d2ce5675f7bfa8fc5f9fb78f77" },
   { symbol = "VerifiedNativeCapture::verify_owner", sha256 = "73540fe845fffe27990a2834f3e39162dec1ce413352a26020c610127a96df98" },
   { symbol = "VerifiedNativeCapture::verify_transition", sha256 = "08e8452fef5224cfcd506723a989c68c07a42d37ec75e24b80561a3bc6715d75" },
-  { symbol = "VerifiedNativeCapture::verify_deadline", sha256 = "1b30a998afd4cfd7a72a756321f3b5a83246cdaca5a1156daa7fa408ed996eb9" },
+  { symbol = "VerifiedNativeCapture::verify_deadline", sha256 = "3ea682e6f796d1673d2d67a35f3fdffe31f3681555d4ccdafda03090b69d9ae4" },
   { symbol = "VerifiedNativeCapture::validate_time", sha256 = "ea7bc9cc20253f8983954098fc88e5e43cd1e3c4836e30e3aa829e77fd18da19" },
   { symbol = "verify_capture_attachment", sha256 = "4f0a07dc0d5e0d0db270c5c374c3195888c3363b9882b475bf8263549348214a" },
-  { symbol = "verify_capture_attachment_initialized", sha256 = "f86d85028a0be5404011a075d8ecc8039500e19c456e325dbc37ade8748192ec" },
+  { symbol = "verify_capture_attachment_initialized", sha256 = "de4c507256de80be7e2423ec6f2654670aa8b6cb4033a7705c10faf48cc8c6f4" },
+  { symbol = "verify_capture_record", sha256 = "884eb723c3fff15e7645361b0f534c660eae4634a2ee43a6de6bd806c5eb9d01" },
 ]
 
 [[mirror]]
@@ -3639,13 +3706,13 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/session_ops/nested_tool_call.rs"
 rust_symbols = ["NestedToolCallProofs", "ChioKernel::evaluate_tool_call_operation_with_nested_flow_client", "ChioKernel::evaluate_tool_call_operation_with_nested_flow_client_async", "ChioKernel::evaluate_tool_call_operation_with_nested_flow_client_and_proofs", "ChioKernel::evaluate_tool_call_operation_with_nested_flow_client_and_proofs_async", "nested_tool_request"]
-normalized_sha256 = "5a0c8ae65b625efdcace67347b88e17cb2cc458708fc219c94b411259089a132"
+normalized_sha256 = "c8fa4a85b22445262a03627e3e58570f4644f6a34742cd79e582da0f0d34731b"
 symbol_sha256 = [
   { symbol = "NestedToolCallProofs", sha256 = "b239d047346c021e34a9f8ff0df9690b82fa9cb6d83be8e7a2b02f0b74a9dda3" },
   { symbol = "ChioKernel::evaluate_tool_call_operation_with_nested_flow_client", sha256 = "dae801b1a404705c4de49c8bcdea0913ba047aae0702fe082c5b819be8b29ecc" },
   { symbol = "ChioKernel::evaluate_tool_call_operation_with_nested_flow_client_async", sha256 = "52194896ff624b95f0846a92a9e03aead049871993012da1170c5aa994d21eb6" },
-  { symbol = "ChioKernel::evaluate_tool_call_operation_with_nested_flow_client_and_proofs", sha256 = "17bca33aa5e6b42e61d1f92f8c56bf89d1aff2d150dd28a7c40c337204a77e0f" },
-  { symbol = "ChioKernel::evaluate_tool_call_operation_with_nested_flow_client_and_proofs_async", sha256 = "bd4304c7c33bd6cfb5e9c532ccbbd2d302d2cf8b084531f17e68b5a88cc17db2" },
+  { symbol = "ChioKernel::evaluate_tool_call_operation_with_nested_flow_client_and_proofs", sha256 = "130b3d068780fafdc09ade84c18699a047ea9b510977fe1f368d9fc2d397744e" },
+  { symbol = "ChioKernel::evaluate_tool_call_operation_with_nested_flow_client_and_proofs_async", sha256 = "ae3fa4f9e59614b9d30949b6a545277cae173fdbf6710ace5b809475ea8d2785" },
   { symbol = "nested_tool_request", sha256 = "d3089c70e608499292b4a71228e31a01ad351b883ce0f61c62b00841ab01802a" },
 ]
 
@@ -3748,7 +3815,7 @@ rust_symbols = ["FORMAT","Record","Record::bytes","Record::digest","Record::evid
   "load_inner",
   "load_initialized",
 ]
-normalized_sha256 = "1963c3b5613e166f148b67890a230ac5d3e01e9bea42714a053d580f35b87c51"
+normalized_sha256 = "aac5d8196cab2b9fac28288de1259612ee100d65902f228a7ba765704a2d6a14"
 symbol_sha256 = [
   { symbol = "FORMAT", sha256 = "fabd072ccfa7681c3fc37a26b0dc4f2220bf991e5799aad11e341e123f302612" },
   { symbol = "Record", sha256 = "ce3bf3423c76f371bbd3ec4603dd721a084df945e6c71443504389e76c1af53e" },
@@ -3757,9 +3824,9 @@ symbol_sha256 = [
   { symbol = "Record::evidence", sha256 = "9b9026198563b42c3fa181ab77a23d1351f93d644064be4663b736caad95ec6d" },
   { symbol = "Record::validate", sha256 = "dc529dd4ecb447e5360684b465ce78e56461bbc6f6295e37eb002dd18d5ad504" },
   { symbol = "Record::insert", sha256 = "37207b37c80dc47c9528acdebcae422f0aa8c4559d986cc8cebae7128c923cb8" },
-  { symbol = "head", sha256 = "684489a804819061a694cc8e724eae8fc616574ff7a5c166f1e1b56fa01eeb27" },
+  { symbol = "head", sha256 = "634c992b89204ff2c2dcd342c8272d66aeb8c4b389c904a6e6b4b898d9bf39df" },
   { symbol = "load", sha256 = "ad1f1499792b5013c8c000670961f423cba1e8274c2ee76cd22fc9e1a91a22c6" },
-  { symbol = "load_operation", sha256 = "91c79b305328b4e440e6f431dba51dd932ec60ed05be7b4c4492b4cb195d4ef3" },
+  { symbol = "load_operation", sha256 = "de2ce14f4063fede221bac9a521af616ba2f1f3d30ba9b60d46f07a5ebe02f26" },
   { symbol = "Record::validate_initialized", sha256 = "cdc51a01c2d185b318d2ffcc5921754bf42f7125101630ca8215cbf2eeefdf10" },
   { symbol = "load_inner", sha256 = "c10d21694a07ef859f93fe8b48c887983ba6d0408803336aa6a98b1922590dc1" },
   { symbol = "load_initialized", sha256 = "24ead910d31fcd47c36248512c60d66e2113661ddf0ccbc8ae17a711ea07486d" },
@@ -3796,9 +3863,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/rows.rs"
 rust_symbols = ["verify_rows","apply_image"]
-normalized_sha256 = "f3b6fdde540e2a88571a5663c35666050d816ce287c27c05c276de1dd1431aa3"
+normalized_sha256 = "fa9d98c2c06b5d9b606d534be237749486554819ea30ca9e40d0c5f4d2cb9e4d"
 symbol_sha256 = [
-  { symbol = "verify_rows", sha256 = "d308715d76012e8b58a314bb47ed85ee1cdff5b13ac10cfee9221085deb34242" },
+  { symbol = "verify_rows", sha256 = "916180e96408fb82116dff55e3d8e905a66cfbfd7a74666ebd9835c935fdaf39" },
   { symbol = "apply_image", sha256 = "eebeed683c70bfec9296b9a4c975a36bd3d4a49e49d44dc9f66c28be5012f070" },
 ]
 
@@ -3819,14 +3886,14 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/lifecycle.rs"
 rust_symbols = ["CapturedLifecycle", "CapturedLifecycle::finish", "NativeReleaseOwner", "NativeReleaseOwner::ensure_final_release", "NativeReleaseOwner::ensure_final_release_with_output", "ChioKernel::freeze_and_commit_evaluation_dispatch", "policy_deadline"]
-normalized_sha256 = "2c5cd1e069743224b451c3889aa70a2985a0df0cf31c29e5c7b624944c27f129"
+normalized_sha256 = "2205ae7cfbbc3c7d43cd53e0f6c27ae6a4ccb4ca42d0c142054cd3f56ded8fd7"
 symbol_sha256 = [
   { symbol = "CapturedLifecycle", sha256 = "72011119f92775ff21e4dee3a3ded9b351d41bd6c4a8e4387adee2814e342b5a" },
-  { symbol = "CapturedLifecycle::finish", sha256 = "f9d18373541a442606108908d72f863f77cc98c37585c5f3ab4d691f44d64efe" },
+  { symbol = "CapturedLifecycle::finish", sha256 = "bf623b1f68852d16194f26e4db5d91c8e6534eae3d44324f8d96f39aa7c6a118" },
   { symbol = "NativeReleaseOwner", sha256 = "0b4c2cda96e6057f97fdefb1b4b6a708f1bfa0c673d7bc68ccaebdb2080767cb" },
   { symbol = "NativeReleaseOwner::ensure_final_release", sha256 = "75928702d93b415fabd98f0ac64c510d020ccb5a3961a7549a47423de4af65f2" },
   { symbol = "NativeReleaseOwner::ensure_final_release_with_output", sha256 = "e87a54cbee564df5d9fcc27a152cdd6b9c6b4c06cdd113c4d2de85c858d1ea7d" },
-  { symbol = "ChioKernel::freeze_and_commit_evaluation_dispatch", sha256 = "0920a3bc40c886212ffdabf53e5728a567dd9d960d505761ec9184eecf1a4bbe" },
+  { symbol = "ChioKernel::freeze_and_commit_evaluation_dispatch", sha256 = "3cf34b8967f8a94e32cbd7ceb8166e759cc4408c9fd6dc31060f04721286bdf5" },
   { symbol = "policy_deadline", sha256 = "8bf031f888d5de3d88f72598439d452b1c895055b8a0dbbbf9f3960f046092c0" },
 ]
 
@@ -3901,11 +3968,11 @@ rust_symbols = ["Record::validate","load","load_operation","Record::format",
   "load_inner",
   "load_initialized",
 ]
-normalized_sha256 = "3cb0a7ebd077700bad57786ff530b73367bf7f87f4c4cd126332e540846f91e6"
+normalized_sha256 = "9df8747f1b0c676a9f4a4c09e5d5a88fca2cd303d5b12e761e4767ded537e851"
 symbol_sha256 = [
   { symbol = "Record::validate", sha256 = "460ef6f2d7be3abb113495c9f1344ee4304fe3a9d63b92789b34a43ea11dcca6" },
   { symbol = "load", sha256 = "ad1f1499792b5013c8c000670961f423cba1e8274c2ee76cd22fc9e1a91a22c6" },
-  { symbol = "load_operation", sha256 = "bb4385eb16a0ffe253b849d60306ef2c8af3074adc6904685a7c89c8e118c41c" },
+  { symbol = "load_operation", sha256 = "87e0cf5aac2a7af86210292822a13cd7f5803b523295076a3020bfe7b242e2ca" },
   { symbol = "Record::format", sha256 = "49c31e09891dfcd6fdfe3062e2b76e08af5dc7c95b90f7aae6f880018addd4ef" },
   { symbol = "Record::validate_initialized", sha256 = "c2cd081f4909b5e15d55cd08f4f931b366148fbfd953c2df12d09252dd67bec4" },
   { symbol = "load_inner", sha256 = "fe8ff899d7f35f1d80528345b56982cfbb9f94be44ac99e5ecec34ec7c39f0d7" },
@@ -3929,9 +3996,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/tool_outcome_native_output.rs"
 rust_symbols = ["verify_native_output_artifacts"]
-normalized_sha256 = "a8d469586b70ef8728902b78bd1bbac29f1fc935ea3b7666525fa2c2e25a8925"
+normalized_sha256 = "3784cb17e96d52303e568a3cd0213c1ac70379d0b08d849974b019e5b005505d"
 symbol_sha256 = [
-  { symbol = "verify_native_output_artifacts", sha256 = "b80bca7dc9a7825831ee970662cc2c28b321871a64f981b51aeb0747c6dd6496" },
+  { symbol = "verify_native_output_artifacts", sha256 = "a71e8f596b648fa0d4226040194c69ff30bc9b1fc93a6c1b625830907100df9f" },
 ]
 
 [[mirror]]
@@ -3940,13 +4007,13 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/session_ops/nested_tool_call.rs"
 rust_symbols = ["NestedToolCallProofs", "ChioKernel::evaluate_tool_call_operation_with_nested_flow_client", "ChioKernel::evaluate_tool_call_operation_with_nested_flow_client_async", "ChioKernel::evaluate_tool_call_operation_with_nested_flow_client_and_proofs", "ChioKernel::evaluate_tool_call_operation_with_nested_flow_client_and_proofs_async", "nested_tool_request"]
-normalized_sha256 = "5a0c8ae65b625efdcace67347b88e17cb2cc458708fc219c94b411259089a132"
+normalized_sha256 = "c8fa4a85b22445262a03627e3e58570f4644f6a34742cd79e582da0f0d34731b"
 symbol_sha256 = [
   { symbol = "NestedToolCallProofs", sha256 = "b239d047346c021e34a9f8ff0df9690b82fa9cb6d83be8e7a2b02f0b74a9dda3" },
   { symbol = "ChioKernel::evaluate_tool_call_operation_with_nested_flow_client", sha256 = "dae801b1a404705c4de49c8bcdea0913ba047aae0702fe082c5b819be8b29ecc" },
   { symbol = "ChioKernel::evaluate_tool_call_operation_with_nested_flow_client_async", sha256 = "52194896ff624b95f0846a92a9e03aead049871993012da1170c5aa994d21eb6" },
-  { symbol = "ChioKernel::evaluate_tool_call_operation_with_nested_flow_client_and_proofs", sha256 = "17bca33aa5e6b42e61d1f92f8c56bf89d1aff2d150dd28a7c40c337204a77e0f" },
-  { symbol = "ChioKernel::evaluate_tool_call_operation_with_nested_flow_client_and_proofs_async", sha256 = "bd4304c7c33bd6cfb5e9c532ccbbd2d302d2cf8b084531f17e68b5a88cc17db2" },
+  { symbol = "ChioKernel::evaluate_tool_call_operation_with_nested_flow_client_and_proofs", sha256 = "130b3d068780fafdc09ade84c18699a047ea9b510977fe1f368d9fc2d397744e" },
+  { symbol = "ChioKernel::evaluate_tool_call_operation_with_nested_flow_client_and_proofs_async", sha256 = "ae3fa4f9e59614b9d30949b6a545277cae173fdbf6710ace5b809475ea8d2785" },
   { symbol = "nested_tool_request", sha256 = "d3089c70e608499292b4a71228e31a01ad351b883ce0f61c62b00841ab01802a" },
 ]
 
@@ -4029,9 +4096,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator/recovery.rs"
 rust_symbols = ["ChioKernel::reconcile_recoverable_admissions"]
-normalized_sha256 = "7aaad32c3ef6a765dbf301a7b80b984be0d0729c6603a6c480723da0d07ac855"
+normalized_sha256 = "7f70df07606f182869cd5e3d0b08454b6c96daea84d02507c345d29fe8c2e137"
 symbol_sha256 = [
-  { symbol = "ChioKernel::reconcile_recoverable_admissions", sha256 = "6566d7735f4e362e0363110e5a4bb9aae60a82b9622936d3a72d63c77a441235" },
+  { symbol = "ChioKernel::reconcile_recoverable_admissions", sha256 = "00d1496160a2fb5ceddd46b5cc4ef5f8757efa6637a22c6f74e1f10c93c53144" },
 ]
 
 [[mirror]]
@@ -4043,12 +4110,16 @@ rust_symbols = [
   "VerifiedProjection",
   "verify_outcome_projection",
   "load_verified_projection",
+  "load_projection_artifacts",
+  "load_verified_projection_with_retained_inputs",
 ]
-normalized_sha256 = "7535472b69538204adacc5a51950d8fcc17e2bc94971d43b2687c93613b33aed"
+normalized_sha256 = "e08415417f4e44214a774a37160f4e137bfe175632f730ead7ba5313fd815079"
 symbol_sha256 = [
   { symbol = "VerifiedProjection", sha256 = "fa8e67b84d7039deb7bff7615ebf2e2d08cceb177cce6adea8dd5d338c30f1b6" },
   { symbol = "verify_outcome_projection", sha256 = "7503d84ffa40939c1e958c9737e2fbff46e0ec226cdee78c2ec16cd302970ad2" },
-  { symbol = "load_verified_projection", sha256 = "2eeb1a17ee6ee0de05e4e3d66cb405d75d96974b2106b01c3b20bdc9d481a31f" },
+  { symbol = "load_verified_projection", sha256 = "03e2130fb1df3a9346212711a5852e2db6b19808c0a59972e44ef94cc110e3ef" },
+  { symbol = "load_projection_artifacts", sha256 = "0ca068dbc34ea30ff463e10259a8684bb7e068bb6cd1841919935fdf5c476132" },
+  { symbol = "load_verified_projection_with_retained_inputs", sha256 = "7995619eab406503583c6a13f96232e1fc1588a8985e0f64c4dd92a8ba98b828" },
 ]
 
 [[mirror]]
@@ -4071,9 +4142,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/deadline.rs"
 rust_symbols = ["ChioKernel::freeze_caller_start_deadline", "CallerReturnWire::valid_deadline_shape", "CallerReturnWire::start_deadline"]
-normalized_sha256 = "c356a0347acd019392b94e01a2ceda756d41ab0b2e21a2f1041507e1041d9031"
+normalized_sha256 = "b3825528b53d9e7ebf039e7b9d5a12bb6b35e11ea34120fdfd29dcbf198d04df"
 symbol_sha256 = [
-  { symbol = "ChioKernel::freeze_caller_start_deadline", sha256 = "5bdef6caa04adff364dffa41b460c02ac2c796788471dfd2f35d0d958f56ad1d" },
+  { symbol = "ChioKernel::freeze_caller_start_deadline", sha256 = "dc0f29a1b0bcf45cf589d9552ecb31ffebbc9aed370238615829ff29d9585782" },
   { symbol = "CallerReturnWire::valid_deadline_shape", sha256 = "bc8d657bfcd6dd9e3cafa9033d6434528838946aabfe9afa47c36cbd18eed370" },
   { symbol = "CallerReturnWire::start_deadline", sha256 = "ab745400651a0f8288eb9123e88393e478b758b8b2da855e9c3e56524b30b95f" },
 ]
@@ -4088,4 +4159,278 @@ symbol_sha256 = [
   { symbol = "read", sha256 = "63854af18068c8e793e296a65339166b3ba0900bed1c1e0559cdb02293d0bdfb" },
   { symbol = "ChioKernel::read_authority_time", sha256 = "2d599609f757003d63b7d0b4b3f0dd97bb6f67a5802e733ab002d3a1ff3fcdb1" },
   { symbol = "ChioKernel::trusted_now_millis", sha256 = "ab8122d3d1594a3141c54818610e67f03b6e1711146f0b812a900e1bd620a579" },
+]
+
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/kernel/chio-kernel/src/kernel/evaluation/return_recording.rs"
+rust_symbols = ["EvaluationReturnRecording", "ChioKernel::record_evaluation_return"]
+normalized_sha256 = "fd041beb1170fdbefd0dd0d969df8eac0fe3a04e822b3bd7dba815650ad8b2bf"
+symbol_sha256 = [
+  { symbol = "EvaluationReturnRecording", sha256 = "bd9d64559dd447c8edbf518c18111b036ee716398ffa24463a8c67c5433fa325" },
+  { symbol = "ChioKernel::record_evaluation_return", sha256 = "cbd2eabf2593cfa2d93f5c566fbb72904ce9b114b78da71f3e2d7aa85e89eddb" },
+]
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint.rs"
+rust_symbols = [
+  "latest",
+  "floors",
+  "visit_rows",
+  "verify_all",
+  "verify_coverage",
+  "projection_reference",
+  "SqliteAdmissionOperationStore::checkpoint_history",
+]
+normalized_sha256 = "853b3f32e2db091290ecafaf8d5e9d9c7edac6f38512e4ebc9898fb589a4c091"
+symbol_sha256 = [
+  { symbol = "latest", sha256 = "8bcc883405de49f5006032dc3b69313c6309e7912dec81d7700f53ef07eb9adb" },
+  { symbol = "floors", sha256 = "5ef170b97e751b4ef540cae25f77e85a034e0908a76e7f744a4e639864867d52" },
+  { symbol = "visit_rows", sha256 = "b29914062e538997b829ec3d7c4c2fd784ced324c83d02e2bae9f06e9cfb0ac1" },
+  { symbol = "verify_all", sha256 = "5f5c41a6282ab47ba06df60589c29e70f6fc6baa22e5e269c9ee6816e91dc921" },
+  { symbol = "verify_coverage", sha256 = "2c3a8815af1e9bfc4b221c111a6fed3af553098eabee3c0e69c6f38a5ff241f9" },
+  { symbol = "projection_reference", sha256 = "91c68ff8a648975a7f3a5635178b2c8f61745bbd3d5c276079d4be29e7e8d2f7" },
+  { symbol = "SqliteAdmissionOperationStore::checkpoint_history", sha256 = "f5a3263c77af7061366784c388f599b72a4e0fdbbbb5b1b6248247cc31ee051e" },
+]
+
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/record.rs"
+rust_symbols = [
+  "latest",
+  "verify_reference",
+]
+normalized_sha256 = "f5fe897a0f1f407dcbae23d7fc7f909f3488f907bb25817250b9b091704355fb"
+symbol_sha256 = [
+  { symbol = "latest", sha256 = "23da581fe619ddb1d558888864c2264a1ce42764aa5649b81a3d340314c76cd4" },
+  { symbol = "verify_reference", sha256 = "3aaa49caed13e1996bc0297d80a5fad9cce7da7d87949e07f1559cae479921ec" },
+]
+
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/rows.rs"
+rust_symbols = [
+  "visit",
+]
+normalized_sha256 = "862deefa587de178bbabae94e8ce4914edcdc64b22f2cd053190276d4db34024"
+symbol_sha256 = [
+  { symbol = "visit", sha256 = "9ed5bde4b3a5d64e301c3a58b26eebd3ce7c28af613ad44402dcfb6c3dbb5eb5" },
+]
+
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/schema.rs"
+rust_symbols = [
+  "sql",
+  "require_absent",
+  "verify_catalog",
+]
+normalized_sha256 = "311b0243456d1d30d22a1c401358d976459f0667fbc1160b964fd4ce57aa4400"
+symbol_sha256 = [
+  { symbol = "sql", sha256 = "9b9091a5ef9cc285f4e894be4efeb5ac2e5a7820658d1fd573e573bd75223a3a" },
+  { symbol = "require_absent", sha256 = "248a40cd5afcd392c8fc96246720013db5f7da74e1db1061357cfecbd5db83c6" },
+  { symbol = "verify_catalog", sha256 = "9e34e60341d0fb6201e2aa167b15056853ac38df6fc1436659968badf7c47eb2" },
+]
+
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/kernel/chio-kernel/src/admission_operation/native_dispatch_binding.rs"
+rust_symbols = [
+  "NATIVE_DISPATCH_LEDGER_SCHEMA",
+  "NATIVE_DISPATCH_LEDGER_LEGACY_SCHEMA",
+  "NativeSecurityDispatchRequestBindingV1::from_live_request",
+  "NativeSecurityDispatchRequestBindingV1::from_ledger",
+]
+normalized_sha256 = "7a09c5d87f3d4d49062ae976fd7bed7dfeec95948a4b9ac6dfc4f99a6853d270"
+symbol_sha256 = [
+  { symbol = "NATIVE_DISPATCH_LEDGER_SCHEMA", sha256 = "6aa2bdf2f13f21763b6b2bc74d0bd5fe74080c77e63f4cb066f5046557d28de0" },
+  { symbol = "NATIVE_DISPATCH_LEDGER_LEGACY_SCHEMA", sha256 = "f25bdf30bf430b269aa1dd245671887883ae9164deb66eb871fc049ab8f4e0d0" },
+  { symbol = "NativeSecurityDispatchRequestBindingV1::from_live_request", sha256 = "4865d959a05f7ec49b1759a1fb481a82879413c2e7c81ca8fb7c05e0832186a0" },
+  { symbol = "NativeSecurityDispatchRequestBindingV1::from_ledger", sha256 = "88bb7760cfd384fa2ec3a3787519bf72170714ad58db6116e76409b7143e6e6c" },
+]
+
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/return_binding.rs"
+rust_symbols = [
+  "SqliteAdmissionOperationStore::verify_original_native_return_tx",
+]
+normalized_sha256 = "158a3c9cf5d0b9c4fda109de6dd4911709a10ad8a1fb3c1ec279c08ae7784893"
+symbol_sha256 = [
+  { symbol = "SqliteAdmissionOperationStore::verify_original_native_return_tx", sha256 = "058105a3bfee54d72536ebbbdb8d69bb96eb17708a1b2d2a84066de54d904e29" },
+]
+
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/integrity.rs"
+rust_symbols = [
+  "verify_event_reference",
+]
+normalized_sha256 = "1ddd347487f6e7dd06bf1400735ce2c26e297b344d12cd2bbd9d5ac6786b955b"
+symbol_sha256 = [
+  { symbol = "verify_event_reference", sha256 = "268b4876b8661e1977db85ad5ee62c19528a0f51defa039d34ae76d7e0f6f6ce" },
+]
+
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/history_scope.rs"
+rust_symbols = [
+  "CheckedHistoryScope",
+  "CheckedHistoryScope::qualify",
+  "CheckedHistoryScope::require_connection",
+]
+normalized_sha256 = "0b6311bbbefa65422cbb6a0c4f7a4a5ba69d7d78cd7aeb27cf85d1cd0f1eb739"
+symbol_sha256 = [
+  { symbol = "CheckedHistoryScope", sha256 = "ccb5ccc5ef146a108231877bfafc7e7c55e0db0d28f1f9086b49ffc9fd24cd4d" },
+  { symbol = "CheckedHistoryScope::qualify", sha256 = "32474e27634030626a0e544e5843caa49bf8502c90edbf8c8c20c03c1a06a7fc" },
+  { symbol = "CheckedHistoryScope::require_connection", sha256 = "26e71828630d8e57ee779def9ca3e4a4c1e438ee622598201b6f3fa2cbac2cf6" },
+]
+
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs"
+rust_symbols = [
+  "verify_stored_terminal_projection_with_history",
+]
+normalized_sha256 = "72729e456498ac3c613e2c889ab21910524a5acd9c188bb00852ca5aa5ae5d3f"
+symbol_sha256 = [
+  { symbol = "verify_stored_terminal_projection_with_history", sha256 = "56f6fd273cf27566f864b68993ae2c647079d0e3d1b078cb61b2e9dd9ecb6b67" },
+]
+
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/schema/migration_v35.rs"
+rust_symbols = [
+  "verify_pre_migration_schema",
+  "migrate",
+]
+normalized_sha256 = "c9e8a41ab1d51c0b68c0109b6983276e967b5c0d681a933d694ffc105b1784e1"
+symbol_sha256 = [
+  { symbol = "verify_pre_migration_schema", sha256 = "8cd819816671f83537dd576c1293c14e7338a72bd713f98962b2cb67916de0ff" },
+  { symbol = "migrate", sha256 = "8db0bb2d8b32a392e3bb63f5d0370e1cbba7287a808286f39dcb28c25d02c1e2" },
+]
+
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/schema/migration_v36.rs"
+rust_symbols = [
+  "verify_pre_migration_schema",
+]
+normalized_sha256 = "7480121acf9d52d047011a3e55edfaf657e3e8fc13b1aab64f85293898a7401e"
+symbol_sha256 = [
+  { symbol = "verify_pre_migration_schema", sha256 = "5cb5a1ca79716a79c7adbcded4261728325aeefa60ca3daa4730d1718edba86f" },
+]
+
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery.rs"
+rust_symbols = [
+  "verify_all",
+  "verify_outcome_recovery_status",
+  "SqliteAdmissionOperationStore::persist_recovery_deferral",
+  "SqliteAdmissionOperationStore::persist_recovery_deferral_clear",
+]
+normalized_sha256 = "cbce91c845c6cbf995dbdef2fb18541e57385490036ac7ab100dc4a454031a1e"
+symbol_sha256 = [
+  { symbol = "verify_all", sha256 = "3a355fe05de571843a23937c675eb399f5dd1d7caa0564e7e3cbfdfef7dac772" },
+  { symbol = "verify_outcome_recovery_status", sha256 = "2aca5332712d72dd79a5ff7fdf1e4e0a25d5ff5216b85d9aecbc7484db1c11d2" },
+  { symbol = "SqliteAdmissionOperationStore::persist_recovery_deferral", sha256 = "7f1e6c4090d428f06167a6ab815e74a138c105d906da9e4f6014da832b876fee" },
+  { symbol = "SqliteAdmissionOperationStore::persist_recovery_deferral_clear", sha256 = "a546c510f094b18beb0061acbf14f2361e97187288fdb57d1f178d45170e8b4f" },
+]
+
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/threshold_approval/nonce_capture.rs"
+rust_symbols = [
+  "reserved_nonce_capture_approval",
+  "ReservedThresholdApproval::binds",
+  "ReservedThresholdApproval::validate_at",
+  "nonce_verification_time_unix_ms",
+]
+normalized_sha256 = "8a8e299c1a599fc6ab2c39ffeb26bc91e714e4160a45c61fcf6bfa75398f5f42"
+symbol_sha256 = [
+  { symbol = "reserved_nonce_capture_approval", sha256 = "bd566f27851a9a574ba0ca8f9e8868adae5b28db6d8c2e94c323270a5eb18b78" },
+  { symbol = "ReservedThresholdApproval::binds", sha256 = "0fd592b3f55ab44aaab94532bf0ffa08d934b34a374306ebcaeb8cb4d539e658" },
+  { symbol = "ReservedThresholdApproval::validate_at", sha256 = "3e775f68d35029f6b96732e8a30c98378ccdf303739c38ef5449ac2b36fafd35" },
+  { symbol = "nonce_verification_time_unix_ms", sha256 = "b9c7f2d7b1af7ea91386a29b9db59b2912d3c16c760b84524f5a7fb6632567d0" },
+]
+
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/financial_receipt.rs"
+rust_symbols = [
+  "ChioKernel::validate_retained_financial_receipt",
+]
+normalized_sha256 = "32fddf180aee7c4af32557389270a5ce06f53181d27e737ed5e3b0379f4cd200"
+symbol_sha256 = [
+  { symbol = "ChioKernel::validate_retained_financial_receipt", sha256 = "ff19457b8072835c6804b5cb0bf11c455be055c4c9675f572bffcd215b1fa30c" },
+]
+
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/payment_pricing.rs"
+rust_symbols = [
+  "payment_cost_breakdown",
+]
+normalized_sha256 = "e3502d1489d2e6490a8f59cbb74a3bdf04c1b86761b9c746daa29cb7338538a7"
+symbol_sha256 = [
+  { symbol = "payment_cost_breakdown", sha256 = "32afdeac6f58afed7392b658126e9e7c818558b2338feb7be9d59601bc92a812" },
+]
+
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator/recovery/page.rs"
+rust_symbols = [
+  "ChioKernel::reconcile_admission_recovery_page",
+]
+normalized_sha256 = "2e36d5fb8ead3716ad98df7d7ba8bf91a61b7729eb25831cfd55be969a6fba59"
+symbol_sha256 = [
+  { symbol = "ChioKernel::reconcile_admission_recovery_page", sha256 = "83eda21b94654ac883e001a6c665c117848425dece2dc2422e1f6d839dce1ea8" },
+]
+
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator/recovery/operation.rs"
+rust_symbols = [
+  "ChioKernel::recover_one_admission",
+]
+normalized_sha256 = "0f2d54d6df697b8241043c16c96fc91761afad37415bc8803ca743809276fffe"
+symbol_sha256 = [
+  { symbol = "ChioKernel::recover_one_admission", sha256 = "fb17f24c64fc1bdd31e4ca110725282222b687022b07e0e614fcc3e48bcf3b70" },
 ]

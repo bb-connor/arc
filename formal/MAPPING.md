@@ -53,11 +53,16 @@ checks preserve append-only identity; SQL atomicity and strict timestamp
 ordering remain the registered model assumptions, not consequences of hashes.
 
 The drop-guard outcome-store projection anchor follows
-`tool_outcome_projection.rs`, including `load_verified_projection` behind its
-validation wrapper. The verified payload is reused only within the current
-read; outcome attachment, evaluation and release digests, commit-chain binding
-and resolved-output completeness are still checked. These are concrete readback
+`tool_outcome_projection.rs`, including its artifact loader and retained-input
+maintenance reader alongside `load_verified_projection`. Verified retained
+bytes can be reused within the checked maintenance transaction; outcome
+attachment, evaluation and release digests, commit-chain binding and
+resolved-output completeness are still checked. Recovery deferral and clearance
+have separate fenced journal commits and status verification; those commits do
+not replace the outcome attachment's commit binding. These are concrete readback
 boundaries, not modeled SQL recovery transitions or a proof of durable custody.
+The outcome schema anchor also installs `tool_outcome_payload_compaction.sql`;
+hashing the Rust entry point does not prove that SQL migration.
 Native policy schema literals are anchored at the shared
 `chio_security_types::flow` constants used by both the producer and storage
 validator; centralizing those unchanged v1/v2 literals adds no model state.
@@ -127,9 +132,14 @@ callers: raw outcome reconstruction, caller deadlines, credential deadlines,
 flow-label joining, and initialized native history readers and validators.
 Read-local initialization reuse must still check authority, canonical bytes,
 relational indexes, operation ownership and history binding. Ordered history
-checks the exact global commit after loading each event. These anchors preserve
-review coverage across the extraction; the drop-guard model does not prove the
-SQL, parser, caller-authentication or deadline implementation.
+checks an authenticated retained checkpoint plus its subsequent suffix, with the
+exact global commit checked after loading each suffix event. The 65,536-event
+and 64 MiB limits apply to that suffix, not to total lifetime history. Checkpoint
+reference verification and reconstruction, original native return binding,
+checked transaction scope, approval-bound nonce validation and v35/v36 schema
+enforcement are explicit helper anchors alongside their callers. These anchors
+preserve source coverage; the drop-guard model does not prove the SQL, parser,
+caller-authentication, checkpoint custody or deadline implementation.
 
 The configured single-approval profile now acquires operation-owned custody at
 selected-grant admission before budget authorization. Credential reservation
@@ -294,7 +304,9 @@ requirement, the opaque acknowledged-owner value, kernel terminal/replay entry
 points, and SQLite checkpoint persistence, migration and commitment verification.
 Output evaluation and monetary settlement do not substitute for this checkpoint.
 The checkpoint is appended to the fenced admission journal before a completed
-projection can expose output. Process-crash and lost-acknowledgement tests are
+projection can expose output. Recovery deferral and clearance use independent
+fenced commits with explicit status verification; they do not rewrite the
+outcome commitment or grant dispatch authority. Process-crash and lost-acknowledgement tests are
 concrete execution evidence; this aggregate model does not prove checkpoint
 atomicity, source migration, current release policy or recovery of native owners.
 No proof assumption or bound is weakened to represent those missing properties.
@@ -366,7 +378,7 @@ model establishes complete callback containment or external dispatch authority.
 
 The native preparation coordinator and portable store contracts are additional
 drift anchors. They cover the kernel-created one-shot handle, exact original
-request check, independent complete-history readback and the SQLite forwarding
+request check, independent checkpoint-and-suffix readback and the SQLite forwarding
 boundary. A selected native hook cannot skip its join or hide a callback/store
 failure before dispatch budget capture. The physical journal phase, row-write
 whitelist and one-join-per-operation rule are unchanged; nonce preflight still

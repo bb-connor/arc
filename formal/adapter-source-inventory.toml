@@ -18,6 +18,7 @@ explicit_roots = [
 contract_sources = [
   "crates/kernel/chio-kernel/src/provider_verdict.rs",
   "crates/kernel/chio-kernel/src/kernel/validation.rs",
+  "crates/kernel/chio-kernel/src/kernel/validation/capability_evidence.rs",
   "crates/kernel/chio-kernel/src/kernel/validation/caller_budget.rs",
   "crates/kernel/chio-runtime-core/src/admission_hook.rs",
   "crates/kernel/chio-runtime-core/src/admission_hook/preparation.rs",
@@ -625,13 +626,6 @@ target = ".evaluate_tool_call_operation"
 references = 1
 
 [[dispatch_sites]]
-id = "D063"
-path = "crates/protocol/chio-mcp-edge/src/runtime/tasks.rs"
-symbol = "ChioMcpEdge::handle_tasks_result_with_transport"
-target = ".evaluate_tool_call_operation_with_transport"
-references = 1
-
-[[dispatch_sites]]
 id = "D064"
 path = "crates/protocol/chio-mcp-edge/src/runtime/tasks.rs"
 symbol = "ChioMcpEdge::handle_tasks_result_with_transport_channel"
@@ -653,13 +647,6 @@ target = ".evaluate_tool_call_operation_with_transport_channel"
 references = 1
 
 [[dispatch_sites]]
-id = "D067"
-path = "crates/protocol/chio-mcp-edge/src/runtime/tool_calls.rs"
-symbol = "ChioMcpEdge::evaluate_tool_call_operation_with_transport"
-target = ".evaluate_tool_call_operation_with_nested_flow_client"
-references = 1
-
-[[dispatch_sites]]
 id = "D068"
 path = "crates/protocol/chio-mcp-edge/src/runtime/tool_calls.rs"
 symbol = "ChioMcpEdge::evaluate_tool_call_operation_with_transport_channel"
@@ -671,13 +658,6 @@ id = "D069"
 path = "crates/protocol/chio-mcp-edge/src/runtime/tool_calls.rs"
 symbol = "ChioMcpEdge::handle_tools_call"
 target = ".evaluate_tool_call_operation"
-references = 1
-
-[[dispatch_sites]]
-id = "D070"
-path = "crates/protocol/chio-mcp-edge/src/runtime/tool_calls.rs"
-symbol = "ChioMcpEdge::handle_tools_call_with_transport"
-target = ".evaluate_tool_call_operation_with_transport"
 references = 1
 
 [[dispatch_sites]]

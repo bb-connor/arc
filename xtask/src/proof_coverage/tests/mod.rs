@@ -24,7 +24,7 @@ fn current_mapping_parses_without_warnings() {
     let parsed = parse_mapping(include_str!("../../../../formal/MAPPING.md"));
 
     assert!(parsed.warnings.is_empty(), "{:?}", parsed.warnings);
-    assert_eq!(parsed.rows.len(), 106);
+    assert_eq!(parsed.rows.len(), 112);
     for property in [
         "verify_captured_invocation_count_monotonic",
         "verify_replay_fingerprint_uniqueness",

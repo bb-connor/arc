@@ -11,8 +11,8 @@ struct RequiredSource {
     symbols: &'static [&'static str],
 }
 
-// These bodies were extracted from previously inline drift anchors. Requiring
-// the callers alone would silently discard the validation they still perform.
+// These reviewed bodies cover extracted implementations and additional authority
+// checks. Keep their callers: a forwarding wrapper cannot cover a helper body.
 const EXTRACTED_IMPLEMENTATION_SOURCES: &[RequiredSource] = &[
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/credential_reservation.rs",
@@ -28,9 +28,12 @@ const EXTRACTED_IMPLEMENTATION_SOURCES: &[RequiredSource] = &[
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/tool_outcome.rs",
         symbols: &[
-            "RawInvocationOutcomeV1::from_persisted_fields",
             "RawInvocationOutcomeV1::from_canonical_bytes",
         ],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/tool_outcome/original_security_dispatch.rs",
+        symbols: &["RawInvocationOutcomeV1::from_persisted_fields"],
     },
     RequiredSource {
         path: "crates/security/chio-flow/src/engine.rs",
@@ -83,6 +86,172 @@ const EXTRACTED_IMPLEMENTATION_SOURCES: &[RequiredSource] = &[
         path: "crates/platform/chio-control-plane/src/security/adapters/native_flow/output.rs",
         symbols: &["classification_payload"],
     },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/tool_outcome_store.rs",
+        symbols: &[
+            "verify_tool_outcome_data_invariants",
+        ],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs",
+        symbols: &[
+            "family_head",
+            "segment_totals",
+            "join_precedes",
+        ],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint.rs",
+        symbols: &[
+            "latest",
+            "floors",
+            "visit_rows",
+            "verify_all",
+            "verify_coverage",
+            "projection_reference",
+            "SqliteAdmissionOperationStore::checkpoint_history",
+        ],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/record.rs",
+        symbols: &[
+            "latest",
+            "verify_reference",
+        ],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/rows.rs",
+        symbols: &[
+            "visit",
+        ],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/schema.rs",
+        symbols: &[
+            "sql",
+            "require_absent",
+            "verify_catalog",
+        ],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/capture.rs",
+        symbols: &[
+            "NativeSecurityDispatchCaptureAuthority::retain_for_capture",
+            "NativeSecurityDispatchCaptureAuthority::retain_once",
+            "NativeSecurityDispatchCaptureAuthority::classify_failure",
+            "NativeSecurityDispatchCaptureAuthority::holds_committed_egress",
+        ],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/ledger.rs",
+        symbols: &[
+            "PreparedNativeSecurityEgress::validate_retention_input",
+        ],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/admission_operation/native_dispatch_binding.rs",
+        symbols: &[
+            "NATIVE_DISPATCH_LEDGER_SCHEMA",
+            "NATIVE_DISPATCH_LEDGER_LEGACY_SCHEMA",
+            "NativeSecurityDispatchRequestBindingV1::from_live_request",
+            "NativeSecurityDispatchRequestBindingV1::from_ledger",
+        ],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/capture.rs",
+        symbols: &[
+            "verify_capture_record",
+        ],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/tool_outcome_projection.rs",
+        symbols: &[
+            "load_projection_artifacts",
+            "load_verified_projection_with_retained_inputs",
+        ],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/return_binding.rs",
+        symbols: &[
+            "SqliteAdmissionOperationStore::verify_original_native_return_tx",
+        ],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/integrity.rs",
+        symbols: &[
+            "verify_event_reference",
+        ],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/history_scope.rs",
+        symbols: &[
+            "CheckedHistoryScope",
+            "CheckedHistoryScope::qualify",
+            "CheckedHistoryScope::require_connection",
+        ],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs",
+        symbols: &[
+            "verify_stored_terminal_projection_with_history",
+        ],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/schema/migration_v35.rs",
+        symbols: &[
+            "verify_pre_migration_schema",
+            "migrate",
+        ],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/schema/migration_v36.rs",
+        symbols: &[
+            "verify_pre_migration_schema",
+        ],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery.rs",
+        symbols: &[
+            "verify_all",
+            "verify_outcome_recovery_status",
+            "SqliteAdmissionOperationStore::persist_recovery_deferral",
+            "SqliteAdmissionOperationStore::persist_recovery_deferral_clear",
+        ],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/threshold_approval/nonce_capture.rs",
+        symbols: &[
+            "reserved_nonce_capture_approval",
+            "ReservedThresholdApproval::binds",
+            "ReservedThresholdApproval::validate_at",
+            "nonce_verification_time_unix_ms",
+        ],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/financial_receipt.rs",
+        symbols: &[
+            "ChioKernel::validate_retained_financial_receipt",
+        ],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/payment_pricing.rs",
+        symbols: &[
+            "payment_cost_breakdown",
+        ],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/recovery/page.rs",
+        symbols: &[
+            "ChioKernel::reconcile_admission_recovery_page",
+        ],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/recovery/operation.rs",
+        symbols: &[
+            "ChioKernel::recover_one_admission",
+        ],
+    },
+
 ];
 
 const DROP_CONSTRUCTION_SOURCES: &[RequiredSource] = &[
@@ -306,6 +475,13 @@ const CALLER_SHARE_SOURCES: &[RequiredSource] = &[
 
 const DISPATCH_COMMIT_SOURCES: &[RequiredSource] = &[
     RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/evaluation/return_recording.rs",
+        symbols: &[
+            "EvaluationReturnRecording",
+            "ChioKernel::record_evaluation_return",
+        ],
+    },
+    RequiredSource {
         path: "crates/platform/chio-control-plane/src/security/adapters/flow_dispatch.rs",
         symbols: &[
             "PreparedFlowDispatch",
@@ -354,11 +530,14 @@ const DISPATCH_COMMIT_SOURCES: &[RequiredSource] = &[
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal.rs",
         symbols: &[
-            "ChioKernel::record_durable_tool_return",
             "ChioKernel::completed_durable_tool_response",
             "ChioKernel::validate_completed_durable_receipt",
             "ChioKernel::finalize_durable_tool_return_with_security_release",
         ],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/record_return.rs",
+        symbols: &["ChioKernel::record_durable_tool_return"],
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/evaluation_contract.rs",
@@ -376,6 +555,7 @@ const DISPATCH_COMMIT_SOURCES: &[RequiredSource] = &[
             "SecurityReleaseRecordV1::validate_against",
             "SecurityReleaseRecordV1::validate_retained_against",
             "RawInvocationOutcomeV1::security_dispatch_commitment_id",
+            "RawInvocationOutcomeV1::retained_security_dispatch_commitment_id",
         ],
     },
     RequiredSource {

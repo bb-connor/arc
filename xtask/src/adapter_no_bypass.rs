@@ -17,6 +17,8 @@ mod source;
 const SOURCE_INVENTORY_PATH: &str = "formal/adapter-source-inventory.toml";
 const MCP_LAUNCH_SOURCE: &str =
     "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc";
+const MAINTENANCE_SUPERVISION_SOURCE: &str =
+    "crates/products/chio-api-protect/src/proxy/state/admission_maintenance.rs";
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -84,6 +86,15 @@ struct ExceptionRule {
 }
 
 const EXCEPTION_RULES: &[ExceptionRule] = &[
+    ExceptionRule {
+        path: MAINTENANCE_SUPERVISION_SOURCE,
+        function: "AdmissionMaintenance::spawn",
+        kind: DangerousKind::Spawn,
+        receiver: Some(
+            "thread::Builder::new().name(\"chio-protect-admission-maintenance\".into())",
+        ),
+        class: "API-protect original-kernel maintenance supervision",
+    },
     // These exact thread builders supervise an already admitted process. Their
     // closures are still visited, so this does not authorize nested tool launches.
     mcp_thread_rule(
@@ -289,12 +300,6 @@ const CALL_CONTRACTS: &[CallContract] = &[
     },
     CallContract {
         path: "crates/protocol/chio-mcp-edge/src/runtime/tool_calls.rs",
-        function: "ChioMcpEdge::evaluate_tool_call_operation_with_transport",
-        target: "self.kernel.evaluate_tool_call_operation_with_nested_flow_client",
-        minimum: 1,
-    },
-    CallContract {
-        path: "crates/protocol/chio-mcp-edge/src/runtime/tool_calls.rs",
         function: "ChioMcpEdge::evaluate_tool_call_operation_with_transport_channel",
         target: "self.kernel.evaluate_tool_call_operation_with_nested_flow_client",
         minimum: 1,
@@ -362,6 +367,12 @@ const CALL_CONTRACTS: &[CallContract] = &[
     CallContract {
         path: "crates/kernel/chio-kernel/src/kernel/validation.rs",
         function: "ChioKernel::verify_capability_full_pre_admit",
+        target: "self.verify_capability_full_pre_admit_with_clock",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/kernel/chio-kernel/src/kernel/validation/capability_evidence.rs",
+        function: "ChioKernel::verify_capability_full_pre_admit_with_clock",
         target: "chio_kernel_core::verify_capability_full_with_evidence",
         minimum: 1,
     },
@@ -430,13 +441,7 @@ fn validate_workspace(root: &Path) -> Result<(), String> {
         "RequestEvaluator::match_route_with_status",
         "PolicyDecision::DenyByDefault",
     )?;
-    require_path(
-        parsed
-            .get("crates/kernel/chio-kernel/src/kernel/validation.rs")
-            .ok_or_else(|| "kernel validation source was not parsed".to_string())?,
-        "ChioKernel::verify_capability_full_pre_admit",
-        "chio_kernel_core::NoopBudgetRegistry",
-    )?;
+    require_pre_admit_budget_registry(&parsed)?;
     require_call_tokens(
         parsed
             .get("crates/kernel/chio-runtime-core/src/admission_hook/swarm_ref.rs")
@@ -456,6 +461,16 @@ fn validate_workspace(root: &Path) -> Result<(), String> {
         ],
     )?;
     Ok(())
+}
+
+fn require_pre_admit_budget_registry(parsed: &BTreeMap<String, SourceFacts>) -> Result<(), String> {
+    require_path(
+        parsed
+            .get("crates/kernel/chio-kernel/src/kernel/validation/capability_evidence.rs")
+            .ok_or_else(|| "kernel capability evidence source was not parsed".to_string())?,
+        "ChioKernel::verify_capability_full_pre_admit_with_clock",
+        "chio_kernel_core::NoopBudgetRegistry",
+    )
 }
 
 fn require_native_launch_gate(source: &SourceFacts) -> Result<(), String> {
@@ -888,6 +903,7 @@ fn validate_dangerous_calls(
     require_all_rules: bool,
 ) -> Result<(), String> {
     let mut observed = vec![0_usize; EXCEPTION_RULES.len()];
+    let mut failures = Vec::new();
     for (path, source) in sources {
         for (function, facts) in &source.functions {
             for call in &facts.dangerous {
@@ -903,27 +919,35 @@ fn validate_dangerous_calls(
                     })
                     .collect();
                 if matching.len() != 1 {
-                    return Err(format!(
+                    failures.push(format!(
                         "unregistered production side effect {} in {path}::{function}",
                         call.kind.label()
                     ));
+                    continue;
                 }
                 let index = matching[0];
                 observed[index] += 1;
             }
         }
     }
+    if !failures.is_empty() {
+        return Err(failures.join("\n"));
+    }
     if require_all_rules {
         for (rule, count) in EXCEPTION_RULES.iter().zip(observed) {
             if count != 1 {
-                return Err(format!(
+                failures.push(format!(
                     "side-effect exception must match exactly once: {} {}::{} matched {count}",
                     rule.class, rule.path, rule.function
                 ));
             }
         }
     }
-    Ok(())
+    if failures.is_empty() {
+        Ok(())
+    } else {
+        Err(failures.join("\n"))
+    }
 }
 
 fn require_call(source: &SourceFacts, contract: &CallContract) -> Result<(), String> {
@@ -1008,26 +1032,253 @@ mod tests {
     use super::*;
 
     #[test]
+    fn maintenance_supervisor_exception_is_exact_and_keeps_nested_checks() -> Result<(), String> {
+        let root = workspace_root().map_err(|error| error.to_string())?;
+        let mut paths = EXCEPTION_RULES
+            .iter()
+            .map(|rule| rule.path.to_owned())
+            .collect::<BTreeSet<_>>();
+        paths.insert(MAINTENANCE_SUPERVISION_SOURCE.to_owned());
+        let parsed = source::parse_repo_sources(&root, &paths.into_iter().collect::<Vec<_>>())?;
+        validate_dangerous_calls(&parsed, true)?;
+        let actual = fs::read_to_string(root.join(MAINTENANCE_SUPERVISION_SOURCE))
+            .map_err(|error| error.to_string())?;
+        let expected = format!(
+            "unregistered production side effect .spawn in {MAINTENANCE_SUPERVISION_SOURCE}::AdmissionMaintenance::spawn"
+        );
+        let wrong_name = actual.replace(
+            "chio-protect-admission-maintenance",
+            "unreviewed-maintenance",
+        );
+        assert_ne!(wrong_name, actual);
+        let mut altered = parsed.clone();
+        altered.insert(
+            MAINTENANCE_SUPERVISION_SOURCE.to_owned(),
+            parse_source(&wrong_name, MAINTENANCE_SUPERVISION_SOURCE)?,
+        );
+        assert_eq!(validate_dangerous_calls(&altered, false), Err(expected));
+
+        let mut altered = parsed.clone();
+        let facts = altered
+            .remove(MAINTENANCE_SUPERVISION_SOURCE)
+            .ok_or_else(|| "maintenance source was not parsed".to_owned())?;
+        let wrong_path = "crates/products/chio-api-protect/src/proxy/state/other.rs";
+        altered.insert(wrong_path.to_owned(), facts);
+        assert_eq!(
+            validate_dangerous_calls(&altered, false),
+            Err(format!(
+                "unregistered production side effect .spawn in {wrong_path}::AdmissionMaintenance::spawn"
+            )),
+        );
+
+        let mut altered = parsed.clone();
+        let owner = altered
+            .get_mut(MAINTENANCE_SUPERVISION_SOURCE)
+            .ok_or_else(|| "maintenance source was not parsed".to_owned())?;
+        let facts = owner
+            .functions
+            .remove("AdmissionMaintenance::spawn")
+            .ok_or_else(|| "maintenance spawn owner was not parsed".to_owned())?;
+        owner
+            .functions
+            .insert("AdmissionMaintenance::other_spawn".to_owned(), facts);
+        assert_eq!(
+            validate_dangerous_calls(&altered, false),
+            Err(format!(
+                "unregistered production side effect .spawn in {MAINTENANCE_SUPERVISION_SOURCE}::AdmissionMaintenance::other_spawn"
+            )),
+        );
+
+        let mut altered = parsed.clone();
+        let facts = altered
+            .get_mut(MAINTENANCE_SUPERVISION_SOURCE)
+            .and_then(|source| source.functions.get_mut("AdmissionMaintenance::spawn"))
+            .ok_or_else(|| "maintenance spawn owner was not parsed".to_owned())?;
+        assert_eq!(facts.dangerous.len(), 1);
+        facts.dangerous.push(facts.dangerous[0].clone());
+        assert_eq!(
+            validate_dangerous_calls(&altered, true),
+            Err(format!(
+                "side-effect exception must match exactly once: API-protect original-kernel maintenance supervision {MAINTENANCE_SUPERVISION_SOURCE}::AdmissionMaintenance::spawn matched 2"
+            )),
+        );
+
+        let entry = "let _entered_original_runtime = runtime.enter();";
+        assert_eq!(actual.matches(entry).count(), 1);
+        let nested = actual.replace(
+            entry,
+            "std::process::Command::new(\"unadmitted-tool\").spawn(); let _entered_original_runtime = runtime.enter();",
+        );
+        let mut altered = parsed;
+        altered.insert(
+            MAINTENANCE_SUPERVISION_SOURCE.to_owned(),
+            parse_source(&nested, MAINTENANCE_SUPERVISION_SOURCE)?,
+        );
+        let error = match validate_dangerous_calls(&altered, false) {
+            Ok(()) => return Err("nested unadmitted process launch was accepted".to_owned()),
+            Err(error) => error,
+        };
+        assert_eq!(error.lines().count(), 2);
+        for kind in ["Command::new", ".spawn"] {
+            assert!(error.lines().any(|line| line == format!(
+                "unregistered production side effect {kind} in {MAINTENANCE_SUPERVISION_SOURCE}::AdmissionMaintenance::spawn"
+            )));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn dangerous_call_census_reports_every_violation() -> Result<(), String> {
+        let path = "crates/protocol/chio-fixture-edge/src/lib.rs";
+        let mut parsed = BTreeMap::new();
+        parsed.insert(
+            path.to_owned(),
+            parse_source(
+                "fn first() { Command::new(\"first\").spawn(); } fn second() { Command::new(\"second\").spawn(); }",
+                path,
+            )?,
+        );
+        let error = match validate_dangerous_calls(&parsed, false) {
+            Ok(()) => return Err("unregistered side effects were accepted".to_owned()),
+            Err(error) => error,
+        };
+        assert_eq!(error.lines().count(), 4);
+        for function in ["first", "second"] {
+            for kind in ["Command::new", ".spawn"] {
+                assert!(error.lines().any(|line| line
+                    == format!(
+                        "unregistered production side effect {kind} in {path}::{function}"
+                    )));
+            }
+        }
+        parsed.insert(
+            path.to_owned(),
+            parse_source("fn single() { Command::new(\"single\"); }", path)?,
+        );
+        assert_eq!(
+            validate_dangerous_calls(&parsed, false),
+            Err(format!(
+                "unregistered production side effect Command::new in {path}::single"
+            )),
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn pre_admit_budget_registry_guard_follows_its_extracted_owner() -> Result<(), String> {
+        let root = workspace_root().map_err(|error| error.to_string())?;
+        let owner = "crates/kernel/chio-kernel/src/kernel/validation/capability_evidence.rs";
+        let mut parsed = BTreeMap::new();
+        for path in ["crates/kernel/chio-kernel/src/kernel/validation.rs", owner] {
+            let source = fs::read_to_string(root.join(path)).map_err(|error| error.to_string())?;
+            parsed.insert(path.to_owned(), parse_source(&source, path)?);
+        }
+        require_pre_admit_budget_registry(&parsed)?;
+        let source = fs::read_to_string(root.join(owner)).map_err(|error| error.to_string())?;
+        let registry = "chio_kernel_core::NoopBudgetRegistry";
+        assert_eq!(source.matches(registry).count(), 1);
+        let mutated = source.replacen(registry, "unapproved_budget_registry()", 1);
+        assert_ne!(mutated, source);
+        let facts = parse_source(&mutated, owner)?;
+        require_call(
+            &facts,
+            &CallContract {
+                path: owner,
+                function: "ChioKernel::verify_capability_full_pre_admit_with_clock",
+                target: "chio_kernel_core::verify_capability_full_with_evidence",
+                minimum: 1,
+            },
+        )?;
+        parsed.insert(owner.to_owned(), facts);
+        let error = match require_pre_admit_budget_registry(&parsed) {
+            Ok(()) => return Err("unapproved pre-admit budget registry was accepted".to_owned()),
+            Err(error) => error,
+        };
+        assert_eq!(
+            error,
+            "mediation contract path missing: ChioKernel::verify_capability_full_pre_admit_with_clock requires chio_kernel_core::NoopBudgetRegistry",
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn transport_channel_successor_keeps_its_required_kernel_mediation() -> Result<(), String> {
+        let contract = CallContract {
+            path: "crates/protocol/chio-mcp-edge/src/runtime/tool_calls.rs",
+            function: "ChioMcpEdge::evaluate_tool_call_operation_with_transport_channel",
+            target: "self.kernel.evaluate_tool_call_operation_with_nested_flow_client",
+            minimum: 1,
+        };
+        assert_eq!(
+            CALL_CONTRACTS
+                .iter()
+                .filter(|current| current.path == contract.path
+                    && current.function == contract.function
+                    && current.target == contract.target
+                    && current.minimum == contract.minimum)
+                .count(),
+            1,
+            "the live transport channel must retain its independent mediation contract",
+        );
+        let root = workspace_root().map_err(|error| error.to_string())?;
+        let source =
+            fs::read_to_string(root.join(contract.path)).map_err(|error| error.to_string())?;
+        let mut facts = parse_source(&source, contract.path)?;
+        require_call(&facts, &contract)?;
+        let function = facts
+            .functions
+            .get_mut(contract.function)
+            .ok_or_else(|| format!("missing positive function {}", contract.function))?;
+        function.calls.retain(|call| call.target != contract.target);
+        let error = match require_call(&facts, &contract) {
+            Ok(()) => return Err("removed transport channel kernel call was accepted".to_string()),
+            Err(error) => error,
+        };
+        assert_eq!(
+            error,
+            format!(
+                "mediation contract call missing: {}::{} requires {} at least {} time(s)",
+                contract.path, contract.function, contract.target, contract.minimum,
+            ),
+        );
+        Ok(())
+    }
+
+    #[test]
     fn every_current_mediation_contract_detects_a_removed_required_call() -> Result<(), String> {
         let root = workspace_root().map_err(|error| error.to_string())?;
+        let mut failures = Vec::new();
         for contract in CALL_CONTRACTS {
             let source =
                 fs::read_to_string(root.join(contract.path)).map_err(|error| error.to_string())?;
             let mut facts = parse_source(&source, contract.path)?;
-            require_call(&facts, contract)?;
+            if let Err(error) = require_call(&facts, contract) {
+                failures.push(error);
+                continue;
+            }
             let function = facts
                 .functions
                 .get_mut(contract.function)
                 .ok_or_else(|| format!("missing positive function {}", contract.function))?;
             function.calls.retain(|call| call.target != contract.target);
-            assert!(
-                require_call(&facts, contract).is_err(),
-                "removed {} from {} did not break the required contract",
-                contract.target,
-                contract.function,
+            let expected = format!(
+                "mediation contract call missing: {}::{} requires {} at least {} time(s)",
+                contract.path, contract.function, contract.target, contract.minimum,
             );
+            match require_call(&facts, contract) {
+                Err(error) if error == expected => {}
+                Err(error) => failures.push(format!("unexpected mutation refusal: {error}")),
+                Ok(()) => failures.push(format!(
+                    "removed {} from {} did not break the required contract",
+                    contract.target, contract.function,
+                )),
+            }
         }
-        Ok(())
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures.join("\n"))
+        }
     }
 
     fn validate_fixture(path: &str, source: &str) -> Result<(), String> {

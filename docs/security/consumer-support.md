@@ -375,8 +375,8 @@ separate requirements; this table alone does not qualify a deployment.
 | D057 | `crates/products/chio-cli/src/cli/mcp/governed_sim.rs` | Simulation harness, no provider authority | C14 |
 | D058 | `crates/products/chio-cli/src/cli/mcp/wrap.rs` | Ordinary MCP wrap, constrained profiles reject | C13, wrap compatibility gate |
 | D059-D061 | `crates/protocol/chio-cross-protocol/src/execution.rs` | Verified registry and host-context mediated projection | P03-P06, live consumer and sidecar negatives |
-| D062-D066 | `crates/protocol/chio-mcp-edge/src/runtime/tasks.rs` | MCP task continuation through the retained prepared operation | P02, MCP library and live consumer gates |
-| D067-D073 | `crates/protocol/chio-mcp-edge/src/runtime/tool_calls.rs` | MCP mediated direct/nested/bridge entry | P02, MCP library and live consumer gates |
+| D062, D064-D066 | `crates/protocol/chio-mcp-edge/src/runtime/tasks.rs` | MCP task continuation through the retained prepared operation | P02, MCP library and live consumer gates |
+| D068-D069, D071-D073 | `crates/protocol/chio-mcp-edge/src/runtime/tool_calls.rs` | MCP mediated direct/nested/bridge entry | P02, MCP library and live consumer gates |
 | D074 | `crates/protocol/chio-openai-adapter/src/lib.rs` | Ordinary OpenAI host, peer preflight and flow rejection | P06, OpenAI exact cases |
 | D075 | `crates/protocol/chio-tower/src/kernel_service.rs` | Ordinary Tower host, peer preflight; no native custody API | P06, Tower exact case |
 | D076 | `crates/tooling/chio-conformance/src/native_suite.rs` | Conformance harness, no deployment authority | C21-C22 |
@@ -388,6 +388,10 @@ separate requirements; this table alone does not qualify a deployment.
 | D087, D089 | `crates/kernel/chio-process/src/lib.rs::ProcessRuntime::invoke_with_recovery` | Original operation/request and ancestor capability binding; optional trusted security context is refreshed before kernel evaluation | C30, `host_flow_identity_is_bound_to_the_original_process_operation`, nonce and crash/recovery gates |
 | D088 | `crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/process_recovery/restart.rs::caller_lookup_waits_for_original_coordinator` | Included reconciliation fixture | P01/P07, native process restart and exact M3 dependency gate |
 | D090-D091 | `examples/rust-runtime-consumer/src/main.rs::{initial,recover}` | Two initial kernel calls (allow/deny) and original-outcome recovery | C31, offline Rust package consumer with independently counted effect |
+
+D063, D067 and D070 are retired with the removed transport-only methods.
+The surviving transport-channel methods retain mediated dispatch; stable IDs
+are not renumbered.
 
 The September 29 enforced-native batch teaches the constructor inventory to
 recognize `new_*` constructors, including injected clocks and function pointers.
