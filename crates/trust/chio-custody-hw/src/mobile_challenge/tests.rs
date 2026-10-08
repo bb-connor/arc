@@ -204,6 +204,49 @@ fn sqlite_registration_reclaims_expired_challenges_before_the_capacity_check() {
     assert_registration_reclaims_only_expired_capacity(&store);
 }
 
+/// The store is empty and has capacity one.
+fn assert_live_challenge_is_never_evicted_for_capacity(store: &dyn MobileChallengeStore) {
+    let live = challenge(play_binding(), 6, 5_000);
+    assert!(matches!(store.register_if_absent(&live), Ok(true)));
+    let newcomer = challenge(play_binding(), 7, 5_299);
+    assert!(matches!(
+        store.register_if_absent(&newcomer),
+        Err(MobileChallengeError::StoreUnavailable(_))
+    ));
+    assert!(matches!(
+        store.load_active(&live.challenge_id, 5_299),
+        Ok(snapshot) if snapshot.challenge == live
+    ));
+    assert!(matches!(
+        store.load_active(&newcomer.challenge_id, 5_299),
+        Err(MobileChallengeError::Invalid(_))
+    ));
+}
+
+#[test]
+fn in_memory_registration_never_evicts_a_live_challenge_for_capacity() {
+    let store = match InMemoryMobileChallengeStore::with_limits(1, 1) {
+        Ok(store) => store,
+        Err(error) => panic!("bounded store must construct: {error}"),
+    };
+    assert_live_challenge_is_never_evicted_for_capacity(&store);
+}
+
+#[cfg(all(feature = "sqlite-store", unix))]
+#[test]
+fn sqlite_registration_never_evicts_a_live_challenge_for_capacity() {
+    let directory = secure_sqlite_tempdir();
+    let store = match SqliteMobileChallengeStore::open_with_limits(
+        &directory.path().join("mobile-challenges.sqlite3"),
+        1,
+        1,
+    ) {
+        Ok(store) => store,
+        Err(error) => panic!("bounded SQLite store must open: {error}"),
+    };
+    assert_live_challenge_is_never_evicted_for_capacity(&store);
+}
+
 #[test]
 fn mobile_challenge_errors_keep_stable_urns() {
     assert_eq!(
