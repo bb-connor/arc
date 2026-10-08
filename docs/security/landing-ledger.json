@@ -6,6 +6,7 @@
   "main_snapshot": "f5566d9a765c21cb36652a99c79de64968a656bf",
   "semantics": "Source claims are historical unless separately qualified. Coverage is bookkeeping, not proof of security. Null repair or PR means not established or not yet assigned; it never means complete.",
   "active_landing_prs": [
+    1195,
     1160
   ],
   "waiting_foundation_pr": null,
@@ -36,7 +37,8 @@
     "economy-m0": 957,
     "settlement-approval": 956,
     "trusted-definitions-update": 1175,
-    "trusted-runtime-definitions": 1176
+    "trusted-runtime-definitions": 1176,
+    "trusted-v3-definitions": 1195
   },
   "sources": [
     {

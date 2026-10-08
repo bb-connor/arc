@@ -1,5 +1,7 @@
 # Security and process landing ledger
 
+Current protected landing queue: [#1195](https://github.com/bb-connor/arc/pull/1195) then #1160. The trusted v3 definition prerequisite is published at `8e689abfa7`; at this recorded handoff its ordinary hosted checks remain pending and the PR is unmerged. Publication has not activated Source, definition or evidence authorization. The older `3764d4ac48` reconciliation below remains a scoped snapshot; final source, native, trusted, hosted and protected landing acceptance remain open.
+
 ## Current source reconciliation (2026-10-08, Source `3764d4ac48`)
 
 The [finite source reconciliation](audits/current-source-reconciliation-20261008.json) updates 24 existing current-view keys and the two effect-clock/shared-freeze aliases. It adds NRB001 once, bringing the total to 1,794 requirements while preserving all 1,793 prior canonical rows, their raw bytes, and every historical/evidence field. Earlier sections retain their capture dates and outcomes; their older current labels do not override this scoped checkpoint.
