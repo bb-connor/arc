@@ -51,7 +51,7 @@ curl -fsSL https://www.chio.computer/install.sh | sh
 > A2A tells agents how to talk to each other.<br>
 > **Chio proves what an agent was allowed to do, what it cost, and what happened.**
 
-Chio is a Rust kernel for agentic operating systems. It gives agents a shared foundation for
+Chio is a Rust kernel for agentic operating systems that coordinate work, share resources, and cooperate across organizational boundaries. It gives agents a shared foundation for
 permissions, delegation, resource accounting, and verifiable work. Signed capabilities
 control what an agent may do; signed receipts connect its work to policy, cost, and payment.
 

@@ -2,7 +2,7 @@
 
 ## What is Chio?
 
-Chio is a protocol for secure, attested tool access in AI agent systems. It replaces ad-hoc MCP-style wiring with a ground-up design built on capability-based security, cryptographic attestation, and privilege separation. For calls routed through Chio, the kernel checks time-bounded capabilities, evaluates input/output guards and records signed decisions in an append-only receipt log. Native host activity outside those routes is not mediated; hook diagnostics are `detect_only`, and preventing alternate access requires a separately qualified host/runtime profile. Policy and guards ship as first-class native components (`chio-policy`, `chio-guards`, `chio-data-guards`, `chio-external-guards`, `chio-wasm-guards`); no external policy engine is required.
+Chio is a Rust kernel for agentic operating systems that coordinate work, share resources, and cooperate across organizational boundaries. Applications and agent harnesses own planning and user experience; Chio supplies reusable identity, delegated authority, resource accounting, execution rules and verifiable evidence. Native host integration connects these owners to OS services through explicitly qualified profiles. For calls routed through Chio, the kernel checks time-bounded capabilities, evaluates input/output guards and records signed decisions in an append-only receipt log. Native host activity outside those routes is not mediated; hook diagnostics are `detect_only`, and preventing alternate access requires a separately qualified host/runtime profile. Policy and guards ship as first-class native components (`chio-policy`, `chio-guards`, `chio-data-guards`, `chio-external-guards`, `chio-wasm-guards`); no external policy engine is required.
 
 ## Five Components
 

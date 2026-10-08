@@ -1,21 +1,32 @@
-# Chio operator projection design
+# Optional Chio operator projection design
 
-Status: **PROPOSED OWNER PROJECTION DESIGN**, 2026-10-07. `chio.operator.v1` is
-the reserved design name, not an implemented endpoint or frozen wire ABI.
+Status: **OPTIONAL PROPOSED OWNER PROJECTION**, amended 2026-10-08 UTC.
+`chio.operator.v1` is a reserved composition name, not an implemented endpoint,
+frozen wire ABI, mandatory host daemon or primary application/harness interface.
 Confidence: high in the verified ownership map; moderate in integration design;
 platform and runtime qualification remains unestablished by this document.
 The [program map](../../../architecture/PROGRAM-MAP.md) and
-[desktop ADR](../../../adr/ADR-0038-desktop-operator-program.md) govern sequencing.
+[native host contract](HOST-CONTRACT.md) and
+[ADR](../../../adr/ADR-0038-desktop-operator-program.md) govern sequencing.
 Normative MUST/REJECT statements below are acceptance obligations for the named
 owners, not claims that their proposed interfaces have shipped.
 
 ## 1. Placement and authority
 
-Chio is a modern Rust kernel for agentic operating systems. Its operator surface
-lets a person inspect, approve and control work through the existing authorities.
-The workbench is the first client; Omarchy QML, macOS menu bar and CLI are later
-clients of the same controller. Proposed implementation homes are
-`crates/products/chio-operator` and `tests/integration/operator`.
+Chio is a Rust kernel for agentic operating systems that coordinate work, share
+resources, and cooperate across organizational boundaries. Applications and agent
+harnesses use supported L0 kernel, L1 process, L2 work, L3 recovery and existing
+protocol-owner bindings. Those APIs freeze at their owning native boundary with
+independent installed consumer evidence, without waiting for this projection or
+any frontend.
+
+This optional surface composes inspect/review/control views for consumers that
+need it. Workbench, Herdr, Omarchy QML, macOS menu bar and CLI tools may consume
+the projection or an existing supported owner binding. No workbench-first order
+or common controller is required. A possible implementation home remains
+`crates/products/chio-operator`, with `tests/integration/operator`, only if the
+selected consumers justify it. This design creates no central authority ingress.
+[CONSUMERS](CONSUMERS.md) qualifies the primary headless application/harness path.
 
 Under S1 the controller is C-layer, outside the TCB, in a separate process from
 the gateway and process host. Neither controller nor UI holds authority signing
@@ -24,12 +35,16 @@ maintains a competing task, recovery, budget or authority ledger. It may retain
 bounded disposable presentation data and original owner references. Their loss
 cannot renew authority, erase an effect, free capacity or manufacture a result.
 Owner services authenticate requests, verify signed artifacts and decide effects.
-The desktop user and installed client remain trusted within the desktop profile;
-same-user IPC access alone is not proof of a particular application's identity.
+Each consumer is authenticated under its selected embedded, user-session or
+service-host context. The trusted components and credential context are declared
+per profile; same-user IPC access alone is not a particular application identity.
+A trusted embedded application may hold native custody roles, but those roles
+remain in its declared TCB and are never attributed to this advisory projection.
 
 ## 2. Owner contracts and function mapping
 
-Names in the first column describe product functions, not approved RPC spellings.
+Names in the first column describe optional composed functions, not approved RPC spellings.
+This table does not replace or interpose on any primary owner API.
 Wire schemas MUST import the landed closed owner types and generated bindings.
 No desktop `WorkPhase`, replacement `WorkHandleV1`, recovery enum, retry enum,
 approval format, event log or stop state machine is permitted.
@@ -41,7 +56,7 @@ approval format, event log or stop state machine is permitted.
 | Observe budget usage and revocation status | Trust-control `GET /v1/budgets` and `GET /v1/revocations`; `handle_list_budgets` / `handle_list_revocations` | Preserve capability/grant-index usage, exposure versus realized spend, and the owner's revocation result. Usage is not a complete limit contract; no missing-value-to-unlimited inference. |
 | Observe hook-session activity and provenance | Host plugin owns the session bond and hook record; inspected Claude owner: `src/state/store.ts`, `hooks/pretooluse.mjs`, `hooks/posttooluse.mjs`. Bridge `src/receipts.ts` reads trust-control receipts | Bind the host session/tool-use identity to its exact recorded capability and separately verified receipt. Post-tool success remains `host-reported-success-unverified` and `detect_only`; trust-control receipt reads do not establish a host session inventory, liveness or completeness. A bounded authenticated host observation adapter is required before this function ships. |
 | Choose work terms | W1 `WorkQueryV1::Catalog { catalog_ref, cursor }`, then `Profile { profile_ref }` | Render the authorized immutable source-generation basis; no arbitrary discovery URL or issuer selection. |
-| Prepare and start sealed work | W1 `WorkClient::prepare`, `submit`, `query`; `WorkPreparationV1` and `WorkCommandV1` | The host-generic single-owner recipe uses the owner's preparation, selection, sealing and `WorkActionV1::Submit { commitment }` sequence; no direct agent launch or desktop signer. |
+| Prepare and start sealed work | W1 `WorkClient::prepare`, `submit`, `query`; `WorkPreparationV1` and `WorkCommandV1` | Use the owner's preparation, selection, sealing and `WorkActionV1::Submit { commitment }` sequence for the selected work profile. A fixed single-owner recipe is one workload, not a prerequisite for other qualified owner clients; no projection-owned launch or signer. |
 | Inspect work | W1 `WorkQueryV1::Work { handle }` | Render `WorkViewV1`; `Applied` means command processing, not successful work. |
 | Recover lost preparation/command reply | W1 `Preparation { preparation_ref }` or `Command { command_ref }` | Query the original ID even if no work handle was returned; follow the retained owner operation. |
 | Reconcile historical work | W1 `WorkActionV1::Reconcile { handle }` | Historical settlement/evidence only; cannot execute or release result bytes. |
@@ -106,17 +121,19 @@ execution-profile obligation, not a prerequisite for basic observation.
 
 ## 3. IPC, negotiation and correlation
 
-Linux MUST reuse `chio-secure-ipc` listener custody, peer authentication and
-bounded framing. Its pinned implementation checks the configured PID/UID/GID,
+For a separately hosted projection, Linux MUST reuse `chio-secure-ipc` listener
+custody, peer authentication and bounded framing. Its pinned implementation checks the configured PID/UID/GID,
 socket identity and lifecycle, and refuses non-Linux platforms. The multi-client
 operator authentication profile needs an owner-approved adaptation, not weaker
 ad hoc UID checks. Darwin MUST add and qualify its peer-credential/custody path
 in that same crate; the choice of Darwin mechanism is still a design gate.
 No unauthenticated local fallback, separate XPC authority or in-guest operator
-endpoint is allowed. Platform annexes define path/launch/session custody.
+endpoint is allowed. Platform annexes define path/launch/session or service-principal
+custody. Direct native bindings retain their own qualified authentication
+contracts; an embedded pure call does not require this projection socket.
 
-The browser/workbench route additionally requires browser-enforceable authentication
-of the intended controller before releasing reusable session material or private
+If a browser/workbench route is selected, it additionally requires
+browser-enforceable authentication of the intended controller before releasing reusable session material or private
 request bytes. A permitted loopback origin, cookie, same UID or successful TCP
 connection is not server identity. The native transport/session and browser
 delivery owners must supply the supported binding; an absent binding disables
@@ -126,7 +143,7 @@ and captured material must not authenticate to the genuine restored controller.
 Authenticating the controller does not authenticate a browser request. Before any
 protected read, subscription or mutation, the existing native transport/session
 owner MUST require non-ambient request/session proof and bind it to the exact
-intended workbench origin and authenticated session. Validate that origin and
+intended application origin and authenticated session. Validate that origin and
 proof on the supported HTTP request or WebSocket handshake, and retain the
 binding for messages on an admitted connection. A live cookie, permitted Origin,
 CORS policy or loopback address alone is insufficient. Missing, null, substituted
@@ -135,15 +152,19 @@ native effects; no cookie-only, origin-only or weaker transport fallback is
 allowed. The browser delivery/session owners define and qualify this through
 their existing authentication contract, not a desktop-private proof protocol.
 
-Each connection negotiates the exact operator version and required owner profiles
-before other requests. Reconnect always renegotiates. Unsupported or inconsistent
+Each projection connection negotiates the exact operator version and required
+owner profiles before other requests. Reconnect always renegotiates. Unsupported or inconsistent
 versions close the connection with a bounded non-authorizing diagnostic and zero
 native dispatch; never strip required fields or fall back to an older profile.
-S5 Part B and its kernel-owned generated wire schemas MUST land before operator
-wire freeze. The workbench is the second consuming surface that triggers Part B.
+A profile exposing S5 Part B hints requires its kernel-owned generated wire
+schemas before that capability freezes. Name the actual second wire consumer,
+which may be an independent headless application or harness; it need not be the
+workbench. A bounded read-only owner binding that exposes no unified hints does
+not inherit a streaming prerequisite. No projection event protocol substitutes
+for S5, and freezing this projection cannot qualify other owner bindings.
 
-Freeze requires strict raw-byte decoding, closed method/result variants, duplicate
-member rejection, Unicode/numeric checks and explicit aggregate byte/depth/count
+Each selected wire freeze requires strict raw-byte decoding, closed method/result
+variants, duplicate member rejection, Unicode/numeric checks and explicit aggregate byte/depth/count
 bounds compatible with each embedded owner type. Do not coerce opaque owner IDs
 to UUIDs, truncate them, rewrite signed bytes, or round-trip lossless owner values
 through floating-point JSON. Controller labels and display digests confer no trust.
@@ -225,8 +246,8 @@ A deny must never retain an approved credential. Missing, mismatched, expired,
 replaced or revoked bindings refuse; stale UI consent cannot approve a new basis.
 OS consent, a Chio grant and exact endorsement remain separate facts.
 
-An attributable approval UI requires S8 S28's principal/roster foundation and the
-recovery approval owner's production verifier and credential custody. S28 is not
+Any attributable approval consumer requires S8 S28's principal/roster foundation
+and the recovery approval owner's production verifier and credential custody. S28 is not
 itself the approval protocol. Until attribution is implemented, shared-credential
 records remain `SharedCredential`; never label a sidecar signature as the person's
 signature. The installed approval utility must pass deny and mismatch regressions.
@@ -235,9 +256,11 @@ Successful operator health responses MUST contain a nonempty set of explicitly
 named supported profiles, with required prerequisites and component identities.
 An empty set cannot masquerade as readiness. Each relevant observation binds its
 owner, boot/login/session identity, observed time, maximum age and validity basis.
-Unknown, expired, future/clock-inconsistent or wrong-session evidence cannot enable
+Unknown, expired, future/clock-inconsistent or wrong-principal/session evidence cannot enable
 a sensitive view or mutation. Disconnect marks data stale. The owner rechecks
-session ownership/lock state and authority at admission independently of UI age.
+the selected session/service ownership and authority at admission independently
+of presentation age. A service-host profile declares its separate credential and
+unattended-continuation policy; it cannot inherit a human login or lock exemption.
 
 Reviewed scope MUST resolve typed principal, authority/trust root, project and
 selection, policy, host/provider/account/credential reference, verification recipe,
@@ -285,18 +308,35 @@ Heartbeat/link liveness never extends a grant or the freshness of an owner fact.
 
 ## 7. Protocol-freeze acceptance and evidence
 
-Owners add executable coverage beside their implementation; operator integration
-tests exercise composition. Reuse native vectors and test harnesses. The retired
-desktop fixture corpora are review history, not a second conformance authority.
-Apply the matrix to the exact exposed capabilities, with the mandatory Observe
-cases and separately selected mutation/W1/recovery cases in QUALIFICATION. Unexposed mutation
-cases remain owner obligations for later capabilities; they do not block a
-read-only freeze or become accepted by that freeze.
+Native owners add executable contract coverage beside their implementations and
+freeze their selected client surfaces there. The primary acceptance is a real
+application plus an independently implemented agent harness using installed owner
+bindings with all Chio frontends and this projection absent. Run useful work,
+shared resource limits and original-identity recovery through those bindings;
+observe downstream effects independently. Exact and changed-intent concurrent
+submissions must exercise native arbitration, not a controller cache. Each chosen
+embedded/user-session/service context needs its own qualification.
+
+If this projection is implemented, its integration tests exercise only its
+selected composition, after those owner gates. Reuse native vectors and test
+harnesses. The retired desktop fixture corpora are review history, not a second
+conformance authority. Apply the matrix below only to exposed capabilities and
+selected consumers: browser authentication/rendering and native presentation
+cases apply when those clients are included. Work, mutation and recovery cases
+remain separately gated. A read-only projection does not require a W1 execution
+product; a successful UI suite does not qualify a general harness binding.
+
+A projection candidate remains provisional until its actual independent clients
+pass the selected wire/security cases against the real owners. Its freeze and
+any optional `spec/OPERATOR.md` promotion are separate from owner ABI freeze,
+headless release and platform-native qualification. No caller may remove required
+security fields or silently route through a weaker profile when a projection is
+absent.
 
 | Acceptance case | Responsible owner and decisive evidence |
 | --- | --- |
-| Wrong peer, replaced/symlinked socket, guest access, Darwin unsupported path; reconnect/version mismatch | IPC owner plus operator: real process probes, bounded transcripts and zero unauthorized dispatch. |
-| Enrolled browser meets an impostor at its permitted origin; captured material is replayed with an allowed Origin; a malicious origin targets the genuine controller using a live ambient-cookie session through HTTP or cross-site WebSocket | Browser delivery/session owners: no private bytes or reusable credentials at the impostor, no replayed admission, and no protected read/subscription bytes or effects for cross-site requests. Require exact-origin binding plus non-ambient owner proof; legitimate authenticated requests and reconnect succeed. |
+| Wrong peer, replaced/symlinked socket, guest access, Darwin unsupported path; reconnect/version mismatch | Selected IPC owner plus consumer: real process probes, bounded transcripts and zero unauthorized dispatch. Direct bindings use their own equivalent owner tests; in-process pure evaluation does not fabricate an IPC claim. |
+| For a selected browser consumer: enrolled browser meets an impostor at its permitted origin; captured material is replayed with an allowed Origin; a malicious origin targets the genuine controller using a live ambient-cookie session through HTTP or cross-site WebSocket | Browser delivery/session owners: no private bytes or reusable credentials at the impostor, no replayed admission, and no protected read/subscription bytes or effects for cross-site requests. Require exact-origin binding plus non-ambient owner proof; legitimate authenticated requests and reconnect succeed. |
 | Duplicate keys, invalid numeric/Unicode tokens, maximal escaping, one-over aggregate size; wrong method/request/session result | Owner decoders plus operator: original-byte rejection and dispatch counters; no truncated identity. |
 | For every exposed effecting mutation in the profile inventory: same ID with each semantic field changed; exact replay after restart, revision advance and full capacity; barrier-synchronized concurrent exact and changed intent | Each owning native service: atomic full-body lookup/retention with one original operation/outcome or its retained uncertainty and no duplicate downstream effects; no duplicate protected dispatch, concurrent changed intent conflicts before retention, and current audience rejection still works. |
 | Crash before dispatch, after native effect and before response/index persistence | Owning mutation services: independent effect marker, original-ID lookup before handle, no duplicate protected dispatch. |
@@ -308,9 +348,10 @@ read-only freeze or become accepted by that freeze.
 | Deny retaining approve material; changed proposal, recipient, decision ID or revision; revoked approver | Approval owner: installed verifier rejects each mismatch with zero protected effect. |
 | Per-task closure races dispatch/release and descendant spawn/exec/reparent; kernel stop reply lost; unsupported tenant/recovery scope | S4/S8/process owners: exact closure coverage, independent exit evidence, retained unknown outcome and no scope escalation. |
 | Leading-dash operands, option aliases and Git pathspec magic/globs reach each exposed native helper | Helper/tool owner: the actual parser rejects them or treats them as bounded literal data, with no unintended file reads, execution or egress; ordinary operands still perform the intended operation. |
-| Long-lived idle/active workbench with recovery hints and redacted errors | S5/recovery/operator: no command-poll quota drain, bounded refresh cost, no secrets in argv, logs, events, crash data or caches. |
+| Long-lived idle/active selected consumer with recovery hints and redacted errors | S5/recovery/operator: no command-poll quota drain, bounded refresh cost, no secrets in argv, logs, events, crash data or caches. |
 
-Agent text, filenames, tool output, URLs and labels are untrusted presentation.
+For each selected presentation consumer, agent text, filenames, tool output, URLs
+and labels are untrusted presentation.
 Render inertly; trusted controls/review origins are distinct. Native helpers use
 a fixed trusted executable/options, literal argv and bounded stdin, never shell
 interpolation. Literal argv alone does not prevent option or pathspec injection.
@@ -334,19 +375,24 @@ they establish exact proposed contracts/code locations, not release qualificatio
 | --- | --- |
 | Existing trust-control observation and dashboard | `6573b8980a1e5331028b7e688169f033a39d0384`: under `crates/platform/chio-control-plane/src/trust_control/`, `service_types/paths.rs`, `service_runtime/router.rs` (mounted GETs versus POSTs), `receipt_handlers.rs`, `budget_handlers.rs`, `authority_handlers.rs`; `crates/products/chio-cli/dashboard/src/api.ts` (`fetchReceipts`, `fetchReceiptAnalytics`, `fetchLineage`, `fetchDelegationChain`). |
 | Host-session provenance and bridge client | Claude plugin `65ac8390c57a5292c055fba50caa1aafbd915848`: `src/state/store.ts`, `src/state/bridge.ts`, `hooks/{pretooluse,posttooluse,_receipt}.mjs`. Bridge local inspected source `f0f21945484b3e2a9ed79a5b2063bda98754ac80`: `src/receipts.ts` (`listReceipts`, polling `streamReceipts`). These are separate source pins, not a qualified installed combination. |
-| W1 work surface (#1173) | `a0447e36ae55014a59aad2ae0c489ab4551f6389`: `docs/superpowers/specs/2026-10-03-work-runtime-design.md`; `2026-10-03-work-developer-surface-design.md` in the same directory. |
+| W1 work and independent consumers (#1173) | `a0447e36ae55014a59aad2ae0c489ab4551f6389`: `docs/superpowers/specs/2026-10-03-work-runtime-design.md`; `2026-10-03-work-owner-services-design.md`; `2026-10-03-work-developer-surface-design.md` (planned two-application and installed LangGraph acceptance with external planning/checkpoints); `2026-10-03-agentic-work-kernel-design.md`. These public facade contracts remain planned. |
 | North-star owners (#1174) | `8dffff3da53dfb56da8e60019af5e3ae896f7f5b`, `docs/superpowers/specs/`: S1 `2026-10-04-closed-kernel-abi-design.md`; S3 `2026-10-04-typed-reservations-design.md`; S4 `2026-10-04-authority-space-teardown-design.md`; S5 `2026-10-04-unified-event-queue-design.md`; S8 `2026-10-04-durable-stop-epoch-design.md`; S9 M20 `2026-10-04-pure-admission-machine-design.md`. |
 | Recovery | `59138e12edac6d4d039bfd91e4a14a491ceda227`: `docs/architecture/recoverable-agent-runtime/08-protocol-operations.md`; `crates/security/chio-security-types/src/recovery/commands.rs`; `crates/platform/chio-control-plane/src/recovery/{runtime,transport}.rs`; `crates/kernel/chio-kernel/src/kernel/admission_coordinator/recovery_runtime.rs`; `crates/kernel/chio-kernel/src/knowledge.rs:203-213` (`ArtifactReleaseSink`). |
 | Foundation IPC | `1267f9bf31d81947eee5cad838b1e3b4332ab4ab`: `crates/security/chio-secure-ipc/src/lib.rs`. |
+| Public application and operator consumer | Megastart archive SHA-256 `9dcbecec5bf9681c301ffd0bf7a2eeea685ec8b8b5911ac180692f66cf292050`, retrieved 2026-10-08 UTC; `herdr/CONTRACT.md`, `src/operator.rs`, `src/authority.rs` and `src/agents/service.rs`. Application-specific routes, retained allowance and detached-host behavior do not define `chio.operator.v1` or qualify service-principal hosting. PROGRAM-MAP records retrieval and checked-file provenance. |
 | Review basis | [Architecture review revision 2](../2026-10-07-omarchy-integration/reviews/2026-10-07-architecture-review.md); [ADR-0011](../../../adr/ADR-0011-boundary-taxonomy-product-wording.md). |
 
-An Observe-only candidate can proceed after S5 Parts A/B, authenticated bounded
-non-persisting reads, truthful hook attribution, the selected trust-control read
-bindings, platform IPC and generated schema/transport bounds qualify. Recovery
-hints additionally require their landed recovery source and read adapter; W1 views
-require their landed W1 query. Optional capabilities negotiate explicitly and
-remain unavailable when their predecessors are absent. Selected mutations add
-their own S3/M20, work/recovery, stop/closure, production approval identity and live
-process-control gates. Final freeze requires the implemented-client acceptance
-for the exposed profile. Review acceptance does not establish Linux or macOS
-qualification. The program map records the current dependency evidence.
+A direct bounded authenticated read binding can proceed after its native owner,
+source attribution, selected identity/IPC, correlation and decode/bounds checks
+qualify. Unified-hint capabilities add S5 Parts A/B; recovery hints additionally
+require their landed source and non-persisting read adapter; W1 views require the
+landed W1 query. Optional capabilities negotiate explicitly and remain unavailable
+when their predecessors are absent. Selected mutations add their own S3/M20,
+work/recovery, resource, stop/closure, production approval and live process gates.
+
+Primary native contract freeze uses direct installed application/harness evidence
+and is independent of this document's optional projection. If exposed, the
+projection freezes only for the capabilities its actual clients qualify. Review
+acceptance establishes neither Linux/macOS native support nor general kernel,
+work or harness qualification. PROGRAM-MAP and HOST-CONTRACT retain each owner,
+deployment context and remaining source dependency.

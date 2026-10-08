@@ -1,5 +1,7 @@
 # Architecture review: Chio desktop integration (Omarchy and macOS)
 
+Historical review input. The 2026-10-08 native-host amendment in ADR-0038 and HOST-CONTRACT supersedes this review's workbench-first and sealed-first recommendations. Retained source findings and native safety obligations still inform the current program.
+
 > Historical review input. The owner has since approved consolidation, recorded in [ADR-0038](../../../../adr/ADR-0038-desktop-operator-program.md). Its decision and the shared program supersede the pending-decision language below. Source verification also corrects S8 phase 1 to kernel scope only (tenant phase 4, recovery phase 5), and treats old recovery finding counts as historical, not current unresolved totals.
 
 Status: review input, revision 2, 2026-10-07. Not normative. Requested by the

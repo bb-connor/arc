@@ -1,91 +1,96 @@
-# Chio desktop operator program
+# Chio native host integration program
 
-`boundary_class: advisory_only` for the desktop projection; `planning_status: ready_after_adr`. Native actions retain the per-profile boundaries in ADR-0038.
+**Chio is a Rust kernel for agentic operating systems that coordinate work,
+share resources, and cooperate across organizational boundaries.**
 
-Status: accepted architecture for planning, 2026-10-07. No desktop runtime,
-backend, native approval path or release is qualified by this package.
+This program makes that kernel useful as a native systems layer on Linux/Omarchy
+and macOS. External applications, agent harnesses and Herdr own their workflows
+and interfaces. Chio supplies reusable authority, process/resource custody,
+work evidence and recovery through qualified owner contracts above the OS.
 
-Chio gives an operator a consistent view of agent work: what was requested,
-what was authorized, what ran, what evidence was produced, and whether the
-result was accepted. The desktop makes the existing kernel contracts usable;
-it does not create another runtime or authority.
+Status: accepted planning direction, amended 2026-10-08 UTC. The specifications
+do not qualify an implementation, installed profile or release.
+`planning_status: ready_after_adr`; `boundary_class` belongs to each operation.
+Consumer presentation and the optional operator projection are `advisory_only`.
 
 ## Read in order
 
-1. [Accepted decision](../../../adr/ADR-0038-desktop-operator-program.md).
-2. [Program map and pinned source owners](../../../architecture/PROGRAM-MAP.md).
-3. [Shared operator projection](OPERATOR.md).
-4. [Qualification and acceptance](QUALIFICATION.md).
-5. [Delivery plan](../../plans/2026-10-07-desktop-integration.md).
-6. [Omarchy annex](../2026-10-07-omarchy-integration/ANNEX.md).
+1. [Accepted native host decision](../../../adr/ADR-0038-desktop-operator-program.md).
+2. [Product research and alternatives](research/product-grounding.md).
+3. [Capability and roadmap traceability](CAPABILITIES.md).
+4. [Native host contract and architecture](HOST-CONTRACT.md).
+5. [Pinned source owners and dependency gates](../../../architecture/PROGRAM-MAP.md).
+6. [Independent consumer acceptance](CONSUMERS.md).
+7. [Optional operator projection](OPERATOR.md).
+8. [Native qualification and release evidence](QUALIFICATION.md).
+9. [Shared delivery plan](../../plans/2026-10-07-desktop-integration.md).
+10. [Omarchy/Linux annex](../2026-10-07-omarchy-integration/ANNEX.md).
 
-The macOS annex is a dependent review change at
-`docs/superpowers/specs/2026-10-07-macos-integration/ANNEX.md`. It is intentionally
-absent from the shared-program branch until that change is integrated.
+The dependent macOS annex lives at
+`docs/superpowers/specs/2026-10-07-macos-integration/ANNEX.md`; it is absent from
+the shared branch until integrated. The directory name is retained for review
+continuity, not as a product requirement to ship a Chio desktop.
 
-## First complete workflow
+## What a valuable integration proves
 
-Observe existing sessions with truthful boundary labels. When the owner gates
-are qualified, create a sealed single-owner work commitment from the workbench:
-choose a project, fixed recipe, host/profile, limits and acceptance rules;
-review the exact scope; launch using an eligible restricted host; inspect the
-artifact and independent work observations, including acceptance derived from
-the original evaluator contract. Human patch-application approval and publishing
-to any external destination are separately scoped operations; neither sets W1
-acceptance by a caller-provided boolean.
+Install the native candidate. Start the selected owner services or embed the
+qualified library profile. Connect an external harness and a materially different
+application without a Chio UI. Each performs useful authorized work, encounters
+an independently observed refusal, reconnects after a lost reply without duplicate
+effects, and reads the same owner evidence. Remove the frontend and repeat.
 
-The CLI, Omarchy plugin and macOS menu bar open or control this same workflow.
-The existing `chio` binary receives its operator consumer in delivery packet 4a; source and installed CLI conformance are required before this promised client counts as delivered. They share recovery and status semantics. They never infer acceptance from a
-successful process exit, authorize an operation from a notification click, or
-turn a lost reply into a fresh execution.
+Then prove the ambition's three dimensions through their proper owners:
 
-## Product and interaction requirements
+- **Coordinate work:** stable agent/process identities, bounded delegated authority,
+  accepted dependencies and original-operation recovery let applications divide
+  work without implementing a second authority or recovery machine.
+- **Share resources:** concurrent agents use one authoritative allowance/resource
+  owner, current assignment fences and explicit limits. Native resource denial
+  remains effective if clients crash or misreport their counters.
+- **Cooperate across organizations:** enrolled independent owners retain their
+  keys and policy, verify the other's evidence, refuse unauthorized work or
+  disclosure, and reconcile loss without inventing new rights or effects.
 
-- Show sessions, pending native approval requests, work results, receipt links,
-  resource budgets, recovery state and service health. Keep all six work
-  observations distinct; unavailable data must be labeled, not represented by
-  zero or success.
-- Show the boundary before launch and alongside activity. Hook-mode sessions
-  are observations; allowed local effects inside a boundary sandbox are not
-  individually mediated. No generic "secure" status joins unlike profiles.
-- Disable a control with the exact failed prerequisite and a useful next action.
-  Observation remains available when an execution profile is unavailable.
-  A missing backend never launches the task without confinement.
-- Native approval presents exact project, operation, destination, identity,
-  policy/version, limits, expiry and review artifact. Changing any bound input
-  invalidates the decision. OS consent, Chio authority and operator endorsement
-  remain separate facts.
-- Background notifications reveal no project content, prompt text, paths,
-  credentials or artifact bodies. Opening a notification reauthenticates and
-  re-reads owner state. It cannot execute or approve directly.
-- Support keyboard-only operation, screen readers, explicit focus and text
-  status independent of color. Confirm the scope of destructive actions in the
-  native owner flow. Loss of the UI cannot prevent an owner stop command.
-- Local-first operation is the default. Cloud accounts, commercial settlement,
-  telemetry, external publication and managed-device enrollment are separate
-  opt-ins. W1's unpaid work does not require the W2-W4 market stack.
+Basic Observe, process/control and other narrow capabilities can ship independently
+with truthful scope. They do not alone complete the above ambition. Two local
+clients prove reuse; two independent organizations prove a separate trust boundary.
+Passports are credentials, OS identity identifies a local peer, and a current
+capability authorizes a specific action. The integration must preserve all three.
 
-## Coverage and ownership
+## Deployment and consumer scope
+
+Embedded, user-session and separately enrolled service-principal profiles have
+different trust, credential and lifecycle requirements. Headless means a frontend
+is unnecessary; it does not automatically mean work may survive logout or boot.
+Platform plans own those distinctions and their tests.
+
+Existing Rust/SDK/CLI/native owner surfaces come first. `chio.operator.v1` is an
+optional view composition, not the generic kernel API or a required daemon.
+Megastart and Herdr demonstrate the application/host split; their mission API,
+coordinator logic and task layout remain application-specific. Workbench, menu
+bar, Omarchy plugin and notifications may consume qualified contracts later.
+
+Selected graphical clients retain keyboard/screen-reader access, inert artifact
+rendering, private notifications, exact native approvals and browser-origin
+security. Selected coding workloads retain evaluator confinement, safe patch
+export and separate publication authority. Those obligations do not become
+prerequisites for unrelated headless resource or process capabilities.
+
+## Coverage and change discipline
 
 | Concern | Governing artifact |
 | --- | --- |
-| Product scope, authority, isolation, host ladder, retired scope | ADR-0038 |
-| Work/status, recovery, events, cancellation, identity, process and secret custody | PROGRAM-MAP and OPERATOR owner references |
-| Request correlation, exact decisions, lost replies, concurrency, stale state | OPERATOR |
-| Threat cases, host/version tuples, source evidence, safe export, limits, release gates | QUALIFICATION |
-| Implementation order, predecessor handoffs, protocol freeze, common client | Delivery plan |
-| Native UI, IPC adapter, service lifecycle, packaging, compatibility, update/uninstall | Platform annex and platform plan |
-| macOS Seatbelt/VM selection, consent, signing/notarization, ES/NE, Clawdstrike reuse | Dependent macOS annex and retained primary-source research |
+| Product direction, trusted core, external application role | ADR-0038 and HOST-CONTRACT |
+| Passports, recursive delegation, swarm authority, work, recovery and competitive choices | CAPABILITIES, product research and PROGRAM-MAP |
+| Real APIs/ABI, native owners, current versus proposed status | PROGRAM-MAP; owner source controls |
+| Native deployment, OS ports, credentials, IPC, lifecycle, resource custody | HOST-CONTRACT plus platform annexes |
+| Harness/application reuse, shared resources and independent-owner cooperation | CONSUMERS and QUALIFICATION |
+| Optional view correlation, approval display and browser/native clients | OPERATOR; only for consumers selecting this projection |
+| Native adversarial cases, measured budgets, release/update/removal | QUALIFICATION and platform executable case manifests |
+| Dependency order, owner handoffs and acceptance evidence | Shared and platform implementation plans |
 
-## Research and supersession
-
-This package supersedes the two independent October 7 programs. Their numbered
-specifications, private protocol schemas, synthetic fixture validators and
-P0-P7/M0-M8 style implementation breakdowns are retired. The new plan references
-existing owner work instead of carrying forward hundreds of duplicate
-requirements. The platform research remains historical evidence, with explicit
-amendments where direction changed.
-
-The architecture review is retained as input, not a competing normative plan.
-The accepted ADR controls conflicts. Historical validation results apply only
-to the old document/schema proposals and never qualify the replacement.
+Every addition names its owner, native boundary, consumer benefit, selected
+profile, source status and independent acceptance. Missing owner semantics go
+back to that owner. A UI need cannot create a second signer, ledger, scheduler
+or retry model. [Review records](REVIEW.md) distinguish document validation from
+runtime and public release evidence.

@@ -1,5 +1,7 @@
 # Linux platform and distribution research
 
+> Historical research, superseded for product scope and delivery ordering on 2026-10-08 UTC. Follow [HOST-CONTRACT](../../2026-10-07-desktop-integration/HOST-CONTRACT.md), the [current annex](../ANNEX.md) and [native Linux findings](native-host-services.md). Native services and supported bindings are primary; the workbench, operator projection and QML are optional. Sealed coding is a conformance workload, not a prerequisite release for protected harnesses. Preserve applicable native acceptance and the pinned source observations below; this document does not establish current runtime support.
+
 Status: Proposed research baseline, inspected 2026-10-07.
 
 Confidence: high in the distinctions below because they follow inspected implementation and upstream manuals; moderate in the proposed Omarchy deployment because no clean x86_64 Omarchy runtime was exercised during this research. This is source research, not confinement, install, update or release qualification.
