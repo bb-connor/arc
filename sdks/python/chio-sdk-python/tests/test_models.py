@@ -199,6 +199,52 @@ class TestGeneratedWireModels:
             model.model_validate(wire)
         assert error.value.code == "INVALID_RESPONSE"
 
+    def test_active_response_plan_rejects_native_validator_bounds(self) -> None:
+        corpus = json.loads(
+            (
+                Path(__file__).resolve().parents[4]
+                / "tests/bindings/fixtures/protocol-primitives-v1.json"
+            ).read_text(encoding="utf-8")
+        )
+        base = next(
+            case["instance"] for case in corpus["cases"] if case["name"] == "active-response-intent"
+        )
+
+        def with_field(field: str, value: Any) -> dict[str, Any]:
+            instance = json.loads(json.dumps(base))
+            instance[field] = value
+            return instance
+
+        all_effects = [
+            "throttle_session",
+            "restrict_egress",
+            "suspend_session",
+            "suspend_capability_set",
+            "freeze_issuance",
+        ]
+        ChioGovernedActiveResponseIntentBody.model_validate(
+            with_field("ordered_effects", all_effects)
+        )
+        rejected = {
+            "duplicate effects": with_field(
+                "ordered_effects", ["throttle_session", "throttle_session"]
+            ),
+            "six effects": with_field("ordered_effects", [*all_effects, "throttle_session"]),
+            "empty target binding": with_field("target_binding", {}),
+            "empty rollback binding": with_field("rollback_binding", {}),
+            "empty plan body": with_field("canonical_plan_body", {}),
+            "camel-case hashed plan body": with_field(
+                "canonical_plan_body", {"action": "throttle", "planHash": "a"}
+            ),
+            "snake-case hashed plan body": with_field(
+                "canonical_plan_body", {"action": "throttle", "plan_hash": "a"}
+            ),
+        }
+        for label, instance in rejected.items():
+            with pytest.raises(ValidationError):
+                ChioGovernedActiveResponseIntentBody.model_validate(instance)
+                pytest.fail(f"accepted active-response plan with {label}")
+
     def test_top_level_capability_token_alias_is_canonical(self) -> None:
         token = GeneratedCapabilityToken.model_validate(_generated_v1_token())
         assert isinstance(token, ChioCapabilitytoken)

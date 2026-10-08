@@ -79,6 +79,26 @@ describe("protocol primitive generated schemas", () => {
         expect(JSON.parse(JSON.stringify(fixture.instance))).toEqual(fixture.instance);
       }
     }
+
+    const activeResponse = corpus.cases.find((fixture) => fixture.name === "active-response-intent");
+    expect(activeResponse?.valid).toBe(true);
+    const activeResponseSchema = JSON.parse(
+      readFileSync(resolve(schemaRoot, "agent/active-response-governed-intent.schema.json"), "utf8"),
+    ) as { $id: string };
+    const structuralBounds: Record<string, Record<string, unknown>> = {
+      "duplicate effects": { ordered_effects: ["throttle_session", "throttle_session"] },
+      "empty target binding": { target_binding: {} },
+      "empty rollback binding": { rollback_binding: {} },
+      "empty plan body": { canonical_plan_body: {} },
+      "camel-case hashed plan body": { canonical_plan_body: { action: "throttle", planHash: "a" } },
+      "snake-case hashed plan body": { canonical_plan_body: { action: "throttle", plan_hash: "a" } },
+    };
+    for (const [label, mutation] of Object.entries(structuralBounds)) {
+      expect(
+        validateWire(activeResponseSchema.$id, { ...activeResponse?.instance, ...mutation }),
+        label,
+      ).toBe(false);
+    }
   });
 
   for (const fixture of corpus.raw_cases) {

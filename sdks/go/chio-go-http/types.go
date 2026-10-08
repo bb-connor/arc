@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: 62f91ec250845ba35867c0b27fa5a74727d665e1c243d9b7341d3410f1586e5b
+// Schema content SHA-256: e2eb7358a787fec1024579c76920c12b43ce91f1f4f63648d86a3ad9500e95e1
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -2302,18 +2302,29 @@ const (
 
 // AgentActiveResponseGovernedIntent defines model for AgentActiveResponseGovernedIntent.
 type AgentActiveResponseGovernedIntent struct {
-	CanonicalPlanBody           map[string]interface{}                            `json:"canonical_plan_body"`
-	ExecutorSubject             string                                            `json:"executor_subject"`
-	ExpiresAt                   int64                                             `json:"expires_at"`
-	OperatorCapabilityExpiresAt int64                                             `json:"operator_capability_expires_at"`
-	OperatorCapabilityHash      string                                            `json:"operator_capability_hash"`
-	OperatorCapabilityId        string                                            `json:"operator_capability_id"`
-	OrderedEffects              []AgentActiveResponseGovernedIntentOrderedEffects `json:"ordered_effects"`
-	PlanBodyHash                string                                            `json:"plan_body_hash"`
-	PlanId                      string                                            `json:"plan_id"`
-	PlanSchema                  AgentActiveResponseGovernedIntentPlanSchema       `json:"plan_schema"`
-	RollbackBinding             map[string]interface{}                            `json:"rollback_binding"`
-	TargetBinding               map[string]interface{}                            `json:"target_binding"`
+	// CanonicalPlanBody Plan body hashed into plan_body_hash. Its RFC 8785 canonical form is at most 65536 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.
+	CanonicalPlanBody map[string]interface{} `json:"canonical_plan_body"`
+	ExecutorSubject   string                 `json:"executor_subject"`
+
+	// ExpiresAt Must not exceed operator_capability_expires_at.
+	ExpiresAt                   int64  `json:"expires_at"`
+	OperatorCapabilityExpiresAt int64  `json:"operator_capability_expires_at"`
+	OperatorCapabilityHash      string `json:"operator_capability_hash"`
+
+	// OperatorCapabilityId At most 256 UTF-8 bytes, without control characters or surrounding whitespace.
+	OperatorCapabilityId string                                            `json:"operator_capability_id"`
+	OrderedEffects       []AgentActiveResponseGovernedIntentOrderedEffects `json:"ordered_effects"`
+	PlanBodyHash         string                                            `json:"plan_body_hash"`
+
+	// PlanId At most 256 UTF-8 bytes, without control characters or surrounding whitespace.
+	PlanId     string                                      `json:"plan_id"`
+	PlanSchema AgentActiveResponseGovernedIntentPlanSchema `json:"plan_schema"`
+
+	// RollbackBinding Its RFC 8785 canonical form is at most 16384 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.
+	RollbackBinding map[string]interface{} `json:"rollback_binding"`
+
+	// TargetBinding Its RFC 8785 canonical form is at most 16384 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.
+	TargetBinding map[string]interface{} `json:"target_binding"`
 }
 
 // AgentActiveResponseGovernedIntentOrderedEffects defines model for AgentActiveResponseGovernedIntent.OrderedEffects.

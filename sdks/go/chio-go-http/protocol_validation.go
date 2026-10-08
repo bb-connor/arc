@@ -12,6 +12,7 @@ import (
 	"io"
 	"reflect"
 	"strings"
+	"unicode"
 )
 
 // readProtocolValue retains exact numbers and rejects duplicate keys at every
@@ -226,18 +227,40 @@ func (a *AgentActiveResponseGovernedIntent) UnmarshalJSON(data []byte) error {
 	if err := decodeProtocolObject(data, &decoded); err != nil {
 		return err
 	}
-	if decoded.PlanSchema != "chio.response-plan.v1" || decoded.ExpiresAt < 1 || decoded.OperatorCapabilityExpiresAt < 1 || len(decoded.OrderedEffects) < 1 || len(decoded.OrderedEffects) > 32 {
+	if decoded.PlanSchema != "chio.response-plan.v1" || decoded.ExpiresAt < 1 || decoded.OperatorCapabilityExpiresAt < 1 || len(decoded.OrderedEffects) < 1 || len(decoded.OrderedEffects) > 5 {
 		return fmt.Errorf("invalid governed response domain")
 	}
+	if !boundedPlanIdentifier(decoded.PlanId) || !boundedPlanIdentifier(decoded.OperatorCapabilityId) {
+		return fmt.Errorf("invalid governed response identifier")
+	}
+	seen := make(map[AgentActiveResponseGovernedIntentOrderedEffects]bool, len(decoded.OrderedEffects))
 	for _, effect := range decoded.OrderedEffects {
 		switch effect {
 		case "throttle_session", "restrict_egress", "suspend_session", "suspend_capability_set", "freeze_issuance":
 		default:
 			return fmt.Errorf("unknown governed response effect")
 		}
+		if seen[effect] {
+			return fmt.Errorf("duplicate governed response effect")
+		}
+		seen[effect] = true
+	}
+	_, camelHash := decoded.CanonicalPlanBody["planHash"]
+	_, snakeHash := decoded.CanonicalPlanBody["plan_hash"]
+	if len(decoded.CanonicalPlanBody) == 0 || camelHash || snakeHash || len(decoded.TargetBinding) == 0 || len(decoded.RollbackBinding) == 0 {
+		return fmt.Errorf("invalid governed response binding")
 	}
 	*a = AgentActiveResponseGovernedIntent(decoded)
 	return nil
+}
+
+// boundedPlanIdentifier holds 1 to 256 UTF-8 bytes with no control character
+// and no surrounding whitespace, matching the native response-plan validator.
+func boundedPlanIdentifier(value string) bool {
+	if value == "" || len(value) > 256 || strings.TrimSpace(value) != value {
+		return false
+	}
+	return strings.IndexFunc(value, unicode.IsControl) < 0
 }
 
 func (m *KernelCombinedCaptureMetadata) UnmarshalJSON(data []byte) error {

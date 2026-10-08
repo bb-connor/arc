@@ -108,6 +108,7 @@ func TestAggregatePublicUnionRejectsUnknownAndForbiddenRootProperties(t *testing
 
 func TestProtocolWireBoundsAndOpaqueDuplicatesReject(t *testing.T) {
 	checkCallerWireMutations(t)
+	checkActiveResponsePlanBounds(t)
 	for _, payload := range []string{
 		`{"value":1,"value":2}`,
 		strings.Repeat(`[`, 66) + `0` + strings.Repeat(`]`, 66),
@@ -121,6 +122,53 @@ func TestProtocolWireBoundsAndOpaqueDuplicatesReject(t *testing.T) {
 	var extension CapabilitySupplementalAuthorization
 	if err := json.Unmarshal([]byte(`{"signed_extension":"`+strings.Repeat("a", 1<<20)+`"}`), &extension); err == nil {
 		t.Fatal("accepted oversized security artifact")
+	}
+}
+
+func checkActiveResponsePlanBounds(t *testing.T) {
+	t.Helper()
+	valid := protocolFixture(t, "active-response-intent")
+	mutate := func(field string, value string) []byte {
+		var object map[string]json.RawMessage
+		if err := json.Unmarshal(valid, &object); err != nil {
+			t.Fatal(err)
+		}
+		object[field] = json.RawMessage(value)
+		encoded, err := json.Marshal(object)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return encoded
+	}
+	var intent AgentActiveResponseGovernedIntent
+	accepted := [][]byte{
+		mutate("ordered_effects", `["throttle_session","restrict_egress","suspend_session","suspend_capability_set","freeze_issuance"]`),
+		mutate("plan_id", `"`+strings.Repeat("p", 256)+`"`),
+		mutate("operator_capability_id", `"operator cap 1"`),
+	}
+	for index, payload := range accepted {
+		if err := json.Unmarshal(payload, &intent); err != nil {
+			t.Fatalf("rejected at-bound active-response plan %d: %v", index, err)
+		}
+	}
+	rejected := map[string][]byte{
+		"duplicate effects":                mutate("ordered_effects", `["throttle_session","throttle_session"]`),
+		"six effects":                      mutate("ordered_effects", `["throttle_session","restrict_egress","suspend_session","suspend_capability_set","freeze_issuance","throttle_session"]`),
+		"overlong plan id":                 mutate("plan_id", `"`+strings.Repeat("p", 257)+`"`),
+		"multibyte plan id over 256 bytes": mutate("plan_id", `"`+strings.Repeat("é", 129)+`"`),
+		"padded plan id":                   mutate("plan_id", `"plan-1 "`),
+		"control character capability id":  mutate("operator_capability_id", `"operator\u0007cap"`),
+		"empty capability id":              mutate("operator_capability_id", `""`),
+		"empty target binding":             mutate("target_binding", `{}`),
+		"empty rollback binding":           mutate("rollback_binding", `{}`),
+		"empty plan body":                  mutate("canonical_plan_body", `{}`),
+		"camel-case hashed plan body":      mutate("canonical_plan_body", `{"action":"throttle","planHash":"a"}`),
+		"snake-case hashed plan body":      mutate("canonical_plan_body", `{"action":"throttle","plan_hash":"a"}`),
+	}
+	for label, payload := range rejected {
+		if err := json.Unmarshal(payload, &intent); err == nil {
+			t.Fatalf("accepted active-response plan with %s", label)
+		}
 	}
 }
 

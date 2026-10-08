@@ -791,6 +791,32 @@ moving the binding into advisory context. Session ownership remains the
 responsibility of the authenticated host coordinator; this intent body does
 not claim a kernel session binding.
 
+An active-response governed intent carries
+`body { kind: "active_response_plan", value }`, where `value` follows
+`agent/active-response-governed-intent.schema.json` with
+`plan_schema = "chio.response-plan.v1"`. Receivers MUST reject the value
+during deserialization unless:
+
+- `plan_id` and `operator_capability_id` are 1 to 256 UTF-8 bytes, with no
+  control characters and no leading or trailing whitespace
+- `operator_capability_hash` and `plan_body_hash` are lowercase hexadecimal
+  SHA-256 digests
+- `ordered_effects` holds 1 to 5 distinct effects
+- `expires_at` and `operator_capability_expires_at` are nonzero and
+  `expires_at` does not exceed `operator_capability_expires_at`
+- `canonical_plan_body` is a nonempty object without a top-level `planHash` or
+  `plan_hash` key, and its RFC 8785 canonical form is at most 65,536 bytes
+- `target_binding` and `rollback_binding` are nonempty objects whose canonical
+  forms are at most 16,384 bytes each
+- each of those three objects nests at most 32 levels below its root and holds
+  at most 4,096 JSON values, counting the root
+- `plan_body_hash` is the SHA-256 of the bytes `chio:response-plan:v1`, one
+  zero byte and the canonical plan body
+
+The schema states the remaining structural bounds. It cannot state the byte,
+nesting and value-count ceilings, the UTF-8 byte limit on identifiers (its
+`maxLength` counts characters), the expiry ordering or the hash binding.
+
 Chio's normative provenance model now distinguishes three evidence classes:
 
 - `asserted`: caller-supplied context that Chio preserves but has not

@@ -1911,13 +1911,24 @@ pub mod agent_tool_call_request {
     ///                  ],
     ///                  "properties": {
     ///                    "canonical_plan_body": {
-    ///                      "type": "object"
+    ///                      "description": "Plan body hashed into plan_body_hash. Its RFC 8785 canonical form is at most 65536 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.",
+    ///                      "type": "object",
+    ///                      "minProperties": 1,
+    ///                      "propertyNames": {
+    ///                        "not": {
+    ///                          "enum": [
+    ///                            "planHash",
+    ///                            "plan_hash"
+    ///                          ]
+    ///                        }
+    ///                      }
     ///                    },
     ///                    "executor_subject": {
     ///                      "type": "string",
     ///                      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///                    },
     ///                    "expires_at": {
+    ///                      "description": "Must not exceed operator_capability_expires_at.",
     ///                      "type": "integer",
     ///                      "minimum": 1.0
     ///                    },
@@ -1930,8 +1941,11 @@ pub mod agent_tool_call_request {
     ///                      "pattern": "^[0-9a-f]{64}$"
     ///                    },
     ///                    "operator_capability_id": {
+    ///                      "description": "At most 256 UTF-8 bytes, without control characters or surrounding whitespace.",
     ///                      "type": "string",
-    ///                      "minLength": 1
+    ///                      "maxLength": 256,
+    ///                      "minLength": 1,
+    ///                      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
     ///                    },
     ///                    "ordered_effects": {
     ///                      "type": "array",
@@ -1944,25 +1958,33 @@ pub mod agent_tool_call_request {
     ///                          "freeze_issuance"
     ///                        ]
     ///                      },
-    ///                      "maxItems": 32,
-    ///                      "minItems": 1
+    ///                      "maxItems": 5,
+    ///                      "minItems": 1,
+    ///                      "uniqueItems": true
     ///                    },
     ///                    "plan_body_hash": {
     ///                      "type": "string",
     ///                      "pattern": "^[0-9a-f]{64}$"
     ///                    },
     ///                    "plan_id": {
+    ///                      "description": "At most 256 UTF-8 bytes, without control characters or surrounding whitespace.",
     ///                      "type": "string",
-    ///                      "minLength": 1
+    ///                      "maxLength": 256,
+    ///                      "minLength": 1,
+    ///                      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
     ///                    },
     ///                    "plan_schema": {
     ///                      "const": "chio.response-plan.v1"
     ///                    },
     ///                    "rollback_binding": {
-    ///                      "type": "object"
+    ///                      "description": "Its RFC 8785 canonical form is at most 16384 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.",
+    ///                      "type": "object",
+    ///                      "minProperties": 1
     ///                    },
     ///                    "target_binding": {
-    ///                      "type": "object"
+    ///                      "description": "Its RFC 8785 canonical form is at most 16384 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.",
+    ///                      "type": "object",
+    ///                      "minProperties": 1
     ///                    }
     ///                  },
     ///                  "additionalProperties": false
@@ -4313,6 +4335,67 @@ pub mod agent_tool_call_request {
                 })
         }
     }
+    ///`ChioGovernedActiveResponseIntentBodyCanonicalPlanBodyKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "not": {
+    ///    "enum": [
+    ///      "planHash",
+    ///      "plan_hash"
+    ///    ]
+    ///  }
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioGovernedActiveResponseIntentBodyCanonicalPlanBodyKey(::std::string::String);
+    impl ::std::ops::Deref for ChioGovernedActiveResponseIntentBodyCanonicalPlanBodyKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioGovernedActiveResponseIntentBodyCanonicalPlanBodyKey>
+        for ::std::string::String
+    {
+        fn from(value: ChioGovernedActiveResponseIntentBodyCanonicalPlanBodyKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioGovernedActiveResponseIntentBodyCanonicalPlanBodyKey>
+        for ChioGovernedActiveResponseIntentBodyCanonicalPlanBodyKey
+    {
+        fn from(value: &ChioGovernedActiveResponseIntentBodyCanonicalPlanBodyKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioGovernedActiveResponseIntentBodyCanonicalPlanBodyKey
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if ["planHash".to_string(), "plan_hash".to_string()].contains(&value) {
+                Err("invalid value".into())
+            } else {
+                Ok(Self(value))
+            }
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioGovernedActiveResponseIntentBodyCanonicalPlanBodyKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            Self::try_from(<::std::string::String>::deserialize(deserializer)?)
+                .map_err(|e| <D::Error as ::serde::de::Error>::custom(e.to_string()))
+        }
+    }
     ///`ChioGovernedActiveResponseIntentBodyExecutorSubject`
     ///
     /// <details><summary>JSON schema</summary>
@@ -4488,14 +4571,17 @@ pub mod agent_tool_call_request {
                 })
         }
     }
-    ///`ChioGovernedActiveResponseIntentBodyOperatorCapabilityId`
+    ///At most 256 UTF-8 bytes, without control characters or surrounding whitespace.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
+    ///  "description": "At most 256 UTF-8 bytes, without control characters or surrounding whitespace.",
     ///  "type": "string",
-    ///  "minLength": 1
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
     ///}
     /// ```
     /// </details>
@@ -4525,8 +4611,25 @@ pub mod agent_tool_call_request {
     impl ::std::str::FromStr for ChioGovernedActiveResponseIntentBodyOperatorCapabilityId {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
             if value.chars().count() < 1usize {
                 return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
             }
             Ok(Self(value.to_string()))
         }
@@ -4747,14 +4850,17 @@ pub mod agent_tool_call_request {
                 })
         }
     }
-    ///`ChioGovernedActiveResponseIntentBodyPlanId`
+    ///At most 256 UTF-8 bytes, without control characters or surrounding whitespace.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
+    ///  "description": "At most 256 UTF-8 bytes, without control characters or surrounding whitespace.",
     ///  "type": "string",
-    ///  "minLength": 1
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
     ///}
     /// ```
     /// </details>
@@ -4782,8 +4888,25 @@ pub mod agent_tool_call_request {
     impl ::std::str::FromStr for ChioGovernedActiveResponseIntentBodyPlanId {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
             if value.chars().count() < 1usize {
                 return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
             }
             Ok(Self(value.to_string()))
         }
@@ -5454,13 +5577,24 @@ pub mod agent_tool_call_request {
     ///              ],
     ///              "properties": {
     ///                "canonical_plan_body": {
-    ///                  "type": "object"
+    ///                  "description": "Plan body hashed into plan_body_hash. Its RFC 8785 canonical form is at most 65536 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.",
+    ///                  "type": "object",
+    ///                  "minProperties": 1,
+    ///                  "propertyNames": {
+    ///                    "not": {
+    ///                      "enum": [
+    ///                        "planHash",
+    ///                        "plan_hash"
+    ///                      ]
+    ///                    }
+    ///                  }
     ///                },
     ///                "executor_subject": {
     ///                  "type": "string",
     ///                  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///                },
     ///                "expires_at": {
+    ///                  "description": "Must not exceed operator_capability_expires_at.",
     ///                  "type": "integer",
     ///                  "minimum": 1.0
     ///                },
@@ -5473,8 +5607,11 @@ pub mod agent_tool_call_request {
     ///                  "pattern": "^[0-9a-f]{64}$"
     ///                },
     ///                "operator_capability_id": {
+    ///                  "description": "At most 256 UTF-8 bytes, without control characters or surrounding whitespace.",
     ///                  "type": "string",
-    ///                  "minLength": 1
+    ///                  "maxLength": 256,
+    ///                  "minLength": 1,
+    ///                  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
     ///                },
     ///                "ordered_effects": {
     ///                  "type": "array",
@@ -5487,25 +5624,33 @@ pub mod agent_tool_call_request {
     ///                      "freeze_issuance"
     ///                    ]
     ///                  },
-    ///                  "maxItems": 32,
-    ///                  "minItems": 1
+    ///                  "maxItems": 5,
+    ///                  "minItems": 1,
+    ///                  "uniqueItems": true
     ///                },
     ///                "plan_body_hash": {
     ///                  "type": "string",
     ///                  "pattern": "^[0-9a-f]{64}$"
     ///                },
     ///                "plan_id": {
+    ///                  "description": "At most 256 UTF-8 bytes, without control characters or surrounding whitespace.",
     ///                  "type": "string",
-    ///                  "minLength": 1
+    ///                  "maxLength": 256,
+    ///                  "minLength": 1,
+    ///                  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
     ///                },
     ///                "plan_schema": {
     ///                  "const": "chio.response-plan.v1"
     ///                },
     ///                "rollback_binding": {
-    ///                  "type": "object"
+    ///                  "description": "Its RFC 8785 canonical form is at most 16384 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.",
+    ///                  "type": "object",
+    ///                  "minProperties": 1
     ///                },
     ///                "target_binding": {
-    ///                  "type": "object"
+    ///                  "description": "Its RFC 8785 canonical form is at most 16384 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.",
+    ///                  "type": "object",
+    ///                  "minProperties": 1
     ///                }
     ///              },
     ///              "additionalProperties": false
@@ -5660,13 +5805,24 @@ pub mod agent_tool_call_request {
     ///          ],
     ///          "properties": {
     ///            "canonical_plan_body": {
-    ///              "type": "object"
+    ///              "description": "Plan body hashed into plan_body_hash. Its RFC 8785 canonical form is at most 65536 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.",
+    ///              "type": "object",
+    ///              "minProperties": 1,
+    ///              "propertyNames": {
+    ///                "not": {
+    ///                  "enum": [
+    ///                    "planHash",
+    ///                    "plan_hash"
+    ///                  ]
+    ///                }
+    ///              }
     ///            },
     ///            "executor_subject": {
     ///              "type": "string",
     ///              "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///            },
     ///            "expires_at": {
+    ///              "description": "Must not exceed operator_capability_expires_at.",
     ///              "type": "integer",
     ///              "minimum": 1.0
     ///            },
@@ -5679,8 +5835,11 @@ pub mod agent_tool_call_request {
     ///              "pattern": "^[0-9a-f]{64}$"
     ///            },
     ///            "operator_capability_id": {
+    ///              "description": "At most 256 UTF-8 bytes, without control characters or surrounding whitespace.",
     ///              "type": "string",
-    ///              "minLength": 1
+    ///              "maxLength": 256,
+    ///              "minLength": 1,
+    ///              "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
     ///            },
     ///            "ordered_effects": {
     ///              "type": "array",
@@ -5693,25 +5852,33 @@ pub mod agent_tool_call_request {
     ///                  "freeze_issuance"
     ///                ]
     ///              },
-    ///              "maxItems": 32,
-    ///              "minItems": 1
+    ///              "maxItems": 5,
+    ///              "minItems": 1,
+    ///              "uniqueItems": true
     ///            },
     ///            "plan_body_hash": {
     ///              "type": "string",
     ///              "pattern": "^[0-9a-f]{64}$"
     ///            },
     ///            "plan_id": {
+    ///              "description": "At most 256 UTF-8 bytes, without control characters or surrounding whitespace.",
     ///              "type": "string",
-    ///              "minLength": 1
+    ///              "maxLength": 256,
+    ///              "minLength": 1,
+    ///              "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
     ///            },
     ///            "plan_schema": {
     ///              "const": "chio.response-plan.v1"
     ///            },
     ///            "rollback_binding": {
-    ///              "type": "object"
+    ///              "description": "Its RFC 8785 canonical form is at most 16384 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.",
+    ///              "type": "object",
+    ///              "minProperties": 1
     ///            },
     ///            "target_binding": {
-    ///              "type": "object"
+    ///              "description": "Its RFC 8785 canonical form is at most 16384 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.",
+    ///              "type": "object",
+    ///              "minProperties": 1
     ///            }
     ///          },
     ///          "additionalProperties": false
@@ -5747,18 +5914,26 @@ pub mod agent_tool_call_request {
         ToolInvocation,
         #[serde(rename = "active_response_plan")]
         ActiveResponsePlan {
-            canonical_plan_body: ::serde_json::Map<::std::string::String, ::serde_json::Value>,
+            ///Plan body hashed into plan_body_hash. Its RFC 8785 canonical form is at most 65536 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.
+            canonical_plan_body: ::std::collections::HashMap<
+                ChioGovernedActiveResponseIntentBodyCanonicalPlanBodyKey,
+                ::serde_json::Value,
+            >,
             executor_subject: ChioGovernedActiveResponseIntentBodyExecutorSubject,
+            ///Must not exceed operator_capability_expires_at.
             expires_at: ::std::num::NonZeroU64,
             operator_capability_expires_at: ::std::num::NonZeroU64,
             operator_capability_hash: ChioGovernedActiveResponseIntentBodyOperatorCapabilityHash,
+            ///At most 256 UTF-8 bytes, without control characters or surrounding whitespace.
             operator_capability_id: ChioGovernedActiveResponseIntentBodyOperatorCapabilityId,
-            ordered_effects:
-                ::std::vec::Vec<ChioGovernedActiveResponseIntentBodyOrderedEffectsItem>,
+            ordered_effects: Vec<ChioGovernedActiveResponseIntentBodyOrderedEffectsItem>,
             plan_body_hash: ChioGovernedActiveResponseIntentBodyPlanBodyHash,
+            ///At most 256 UTF-8 bytes, without control characters or surrounding whitespace.
             plan_id: ChioGovernedActiveResponseIntentBodyPlanId,
             plan_schema: ::serde_json::Value,
+            ///Its RFC 8785 canonical form is at most 16384 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.
             rollback_binding: ::serde_json::Map<::std::string::String, ::serde_json::Value>,
+            ///Its RFC 8785 canonical form is at most 16384 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.
             target_binding: ::serde_json::Map<::std::string::String, ::serde_json::Value>,
         },
         ///Chio Bound Tool Invocation

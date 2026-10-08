@@ -35,7 +35,7 @@ schema files across eleven subtrees.
 
 | File                                                 | Lines |
 |------------------------------------------------------|-------|
-| `agent/active-response-governed-intent.schema.json`  |    51 |
+| `agent/active-response-governed-intent.schema.json`  |    81 |
 | `agent/governed-transaction-intent.schema.json`      |    48 |
 | `agent/heartbeat.schema.json`                        |    12 |
 | `agent/list_capabilities.schema.json`                |    12 |

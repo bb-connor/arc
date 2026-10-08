@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 67efd95f8fba5bacf75bfc6b1a98b744c1c20e1926e9d9e813e27d8193058364
+# Schema sha256: b084ae0e56e427c850264660383c6f883d46db68902f81ec769714701f82dd9e
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -16,7 +16,7 @@ from typing import Any, Literal
 
 from chio_sdk._manifest_wire import SecurityWireModel as BaseModel
 
-from pydantic import ConfigDict, Field, conint, constr
+from pydantic import ConfigDict, Field, conint, constr, model_validator
 
 
 class OrderedEffect(Enum):
@@ -32,16 +32,51 @@ class ChioGovernedActiveResponseIntentBody(BaseModel):
         extra="forbid",
     )
     plan_schema: Literal["chio.response-plan.v1"]
-    plan_id: constr(min_length=1)
-    operator_capability_id: constr(min_length=1)
+    plan_id: constr(
+        pattern=r"^[^\s\u0000-\u001F\u007F-\u009F](?:[^\u0000-\u001F\u007F-\u009F]*[^\s\u0000-\u001F\u007F-\u009F])?$",
+        min_length=1,
+        max_length=256,
+    ) = Field(
+        ...,
+        description="At most 256 UTF-8 bytes, without control characters or surrounding whitespace.",
+    )
+    operator_capability_id: constr(
+        pattern=r"^[^\s\u0000-\u001F\u007F-\u009F](?:[^\u0000-\u001F\u007F-\u009F]*[^\s\u0000-\u001F\u007F-\u009F])?$",
+        min_length=1,
+        max_length=256,
+    ) = Field(
+        ...,
+        description="At most 256 UTF-8 bytes, without control characters or surrounding whitespace.",
+    )
     operator_capability_hash: constr(pattern=r"^[0-9a-f]{64}$")
     operator_capability_expires_at: conint(strict=True, ge=1)
     executor_subject: constr(
         pattern=r"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\+mldsa65)$"
     )
-    canonical_plan_body: dict[str, Any]
+    canonical_plan_body: dict[str, Any] = Field(
+        ...,
+        description="Plan body hashed into plan_body_hash. Its RFC 8785 canonical form is at most 65536 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.",
+    )
     plan_body_hash: constr(pattern=r"^[0-9a-f]{64}$")
-    target_binding: dict[str, Any]
-    ordered_effects: list[OrderedEffect] = Field(..., max_length=32, min_length=1)
-    expires_at: conint(strict=True, ge=1)
-    rollback_binding: dict[str, Any]
+    target_binding: dict[str, Any] = Field(
+        ...,
+        description="Its RFC 8785 canonical form is at most 16384 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.",
+    )
+    ordered_effects: list[OrderedEffect] = Field(..., max_length=5, min_length=1)
+    expires_at: conint(strict=True, ge=1) = Field(
+        ..., description="Must not exceed operator_capability_expires_at."
+    )
+    rollback_binding: dict[str, Any] = Field(
+        ...,
+        description="Its RFC 8785 canonical form is at most 16384 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.",
+    )
+
+    @model_validator(mode="after")
+    def _validate_plan_shape(self) -> "ChioGovernedActiveResponseIntentBody":
+        if len(set(self.ordered_effects)) != len(self.ordered_effects):
+            raise ValueError("ordered_effects must be unique")
+        if not (self.canonical_plan_body and self.target_binding and self.rollback_binding):
+            raise ValueError("plan body and bindings must be nonempty objects")
+        if "planHash" in self.canonical_plan_body or "plan_hash" in self.canonical_plan_body:
+            raise ValueError("canonical_plan_body must not carry a plan hash")
+        return self

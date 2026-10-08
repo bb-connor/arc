@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: e419015f6043565519de9036b8f265c77ac9cd64a1fc27a065c2bb712186a6f7
+// Schema SHA: 44f813044befbe4d908990d6021ff75d61b898ab7295da4c344579449e179a8d
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -17,23 +17,61 @@
 export namespace Agent_ActiveResponseGovernedIntent {
   export interface ChioGovernedActiveResponseIntentBody {
     plan_schema: "chio.response-plan.v1";
+    /**
+     * At most 256 UTF-8 bytes, without control characters or surrounding whitespace.
+     */
     plan_id: string;
+    /**
+     * At most 256 UTF-8 bytes, without control characters or surrounding whitespace.
+     */
     operator_capability_id: string;
     operator_capability_hash: string;
     operator_capability_expires_at: number;
     executor_subject: string;
+    /**
+     * Plan body hashed into plan_body_hash. Its RFC 8785 canonical form is at most 65536 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.
+     */
     canonical_plan_body: {};
     plan_body_hash: string;
+    /**
+     * Its RFC 8785 canonical form is at most 16384 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.
+     */
     target_binding: {};
     /**
      * @minItems 1
-     * @maxItems 32
+     * @maxItems 5
      */
-    ordered_effects: [
-      "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
-      ...("throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance")[]
-    ];
+    ordered_effects:
+      | ["throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance"]
+      | [
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance"
+        ]
+      | [
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance"
+        ]
+      | [
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance"
+        ]
+      | [
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance"
+        ];
+    /**
+     * Must not exceed operator_capability_expires_at.
+     */
     expires_at: number;
+    /**
+     * Its RFC 8785 canonical form is at most 16384 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.
+     */
     rollback_binding: {};
   }
 }
@@ -68,23 +106,61 @@ export namespace Agent_GovernedTransactionIntent {
   }
   export interface ChioGovernedActiveResponseIntentBody {
     plan_schema: "chio.response-plan.v1";
+    /**
+     * At most 256 UTF-8 bytes, without control characters or surrounding whitespace.
+     */
     plan_id: string;
+    /**
+     * At most 256 UTF-8 bytes, without control characters or surrounding whitespace.
+     */
     operator_capability_id: string;
     operator_capability_hash: string;
     operator_capability_expires_at: number;
     executor_subject: string;
+    /**
+     * Plan body hashed into plan_body_hash. Its RFC 8785 canonical form is at most 65536 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.
+     */
     canonical_plan_body: {};
     plan_body_hash: string;
+    /**
+     * Its RFC 8785 canonical form is at most 16384 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.
+     */
     target_binding: {};
     /**
      * @minItems 1
-     * @maxItems 32
+     * @maxItems 5
      */
-    ordered_effects: [
-      "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
-      ...("throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance")[]
-    ];
+    ordered_effects:
+      | ["throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance"]
+      | [
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance"
+        ]
+      | [
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance"
+        ]
+      | [
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance"
+        ]
+      | [
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance"
+        ];
+    /**
+     * Must not exceed operator_capability_expires_at.
+     */
     expires_at: number;
+    /**
+     * Its RFC 8785 canonical form is at most 16384 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.
+     */
     rollback_binding: {};
   }
   export interface ChioBoundToolInvocation {
@@ -384,23 +460,61 @@ export namespace Agent_ToolCallRequest {
   }
   export interface ChioGovernedActiveResponseIntentBody {
     plan_schema: "chio.response-plan.v1";
+    /**
+     * At most 256 UTF-8 bytes, without control characters or surrounding whitespace.
+     */
     plan_id: string;
+    /**
+     * At most 256 UTF-8 bytes, without control characters or surrounding whitespace.
+     */
     operator_capability_id: string;
     operator_capability_hash: string;
     operator_capability_expires_at: number;
     executor_subject: string;
+    /**
+     * Plan body hashed into plan_body_hash. Its RFC 8785 canonical form is at most 65536 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.
+     */
     canonical_plan_body: {};
     plan_body_hash: string;
+    /**
+     * Its RFC 8785 canonical form is at most 16384 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.
+     */
     target_binding: {};
     /**
      * @minItems 1
-     * @maxItems 32
+     * @maxItems 5
      */
-    ordered_effects: [
-      "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
-      ...("throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance")[]
-    ];
+    ordered_effects:
+      | ["throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance"]
+      | [
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance"
+        ]
+      | [
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance"
+        ]
+      | [
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance"
+        ]
+      | [
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance"
+        ];
+    /**
+     * Must not exceed operator_capability_expires_at.
+     */
     expires_at: number;
+    /**
+     * Its RFC 8785 canonical form is at most 16384 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.
+     */
     rollback_binding: {};
   }
   export interface ChioBoundToolInvocation {
