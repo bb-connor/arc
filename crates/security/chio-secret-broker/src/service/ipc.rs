@@ -129,6 +129,17 @@ impl UnixBrokerEndpoint {
         }
     }
 
+    /// Wait up to `wait` for one connection and serve it. `None` means no
+    /// connection arrived; the caller rechecks its stop request and waits
+    /// again.
+    pub fn serve_one_within(&self, wait: Duration) -> Result<Option<BrokerIpcServeOutcome>> {
+        match self.listener.accept_authenticated_within(wait) {
+            Ok(None) => Ok(None),
+            Ok(Some(stream)) => self.serve_accepted(Ok(stream)).map(Some),
+            Err(error) => self.serve_accepted(Err(error)).map(Some),
+        }
+    }
+
     /// Serve one accepted connection. A client the peer policy refuses is a
     /// contained client fault; every other accept failure reaches supervision.
     fn serve_accepted(

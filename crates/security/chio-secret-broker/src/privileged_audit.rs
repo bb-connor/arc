@@ -725,14 +725,18 @@ impl BrokerPrivilegedAuditEndpoint {
         })
     }
 
-    pub(crate) fn set_nonblocking(&self, nonblocking: bool) -> Result<()> {
-        self.listener
-            .set_nonblocking(nonblocking)
-            .map_err(audit_listener_error)
-    }
-
+    #[cfg(test)]
     pub(crate) fn try_serve_one(&self) -> Result<Option<BrokerPrivilegedAuditServeOutcome>> {
         self.serve_accepted(self.listener.try_accept_authenticated())
+    }
+
+    /// Wait up to `wait` for one session and serve it. `None` means no session
+    /// arrived; the caller rechecks its stop request and waits again.
+    pub(crate) fn serve_one_within(
+        &self,
+        wait: Duration,
+    ) -> Result<Option<BrokerPrivilegedAuditServeOutcome>> {
+        self.serve_accepted(self.listener.accept_authenticated_within(wait))
     }
 
     fn serve_accepted(

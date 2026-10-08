@@ -23,6 +23,7 @@ use super::{BrokerIpcHandler, Ed25519Backend, Keypair, Write};
 pub(super) struct PreparedIpcSlot {
     busy: Arc<std::sync::atomic::AtomicBool>,
     pending: Mutex<Option<PreparedIpcConnection>>,
+    stored: std::sync::Condvar,
 }
 
 #[cfg(unix)]
@@ -121,8 +122,33 @@ impl UnixBrokerEndpoint {
                 deadline,
                 _permit: permit,
             });
+            self.prepared.stored.notify_all();
         }
         Ok(())
+    }
+
+    /// Wait up to `wait` for the prepared slot to need service: a stored
+    /// connection with bytes, end of stream or an error to observe, or one
+    /// whose lifetime ends. The slot lock is held while waiting on a stored
+    /// connection; no other worker can store one until it is released.
+    pub fn wait_prepared(&self, wait: Duration) -> Result<()> {
+        let slot_fault = || BrokerError::Storage("prepared connection slot lock failed".into());
+        let pending = self.prepared.pending.lock().map_err(|_| slot_fault())?;
+        let (pending, _) = self
+            .prepared
+            .stored
+            .wait_timeout_while(pending, wait, |pending| pending.is_none())
+            .map_err(|_| slot_fault())?;
+        let Some(connection) = pending.as_ref() else {
+            return Ok(());
+        };
+        let bound = connection
+            .deadline
+            .saturating_duration_since(Instant::now())
+            .min(wait);
+        chio_secure_ipc::listener::wait_readable(&connection.stream, bound)
+            .map(|_ready| ())
+            .map_err(|_| BrokerError::Storage("prepared connection readiness wait failed".into()))
     }
 
     /// Drive the single prepared execution slot from a dedicated bounded
