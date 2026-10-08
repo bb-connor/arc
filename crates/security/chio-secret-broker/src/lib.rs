@@ -100,16 +100,63 @@ pub enum BrokerError {
     Custody(String),
 }
 
+/// How a serving endpoint or the daemon treats a failed request or session.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BrokerFaultDisposition {
+    /// The peer's own request is malformed, unauthorized or conflicting. The
+    /// request is denied and the service keeps serving.
+    Reject,
+    /// Referenced state, an adapter or a validity window refused this
+    /// request. The request is denied and the service keeps serving.
+    Deny,
+    /// A dependency is unavailable. The request is denied, the service keeps
+    /// serving, and the same request may later succeed.
+    Retry,
+    /// The broker can no longer trust its own state or custody, so no later
+    /// request may be served.
+    Fatal,
+}
+
 impl BrokerError {
+    /// The one classification every endpoint and the daemon loop apply.
+    #[must_use]
+    pub const fn disposition(&self) -> BrokerFaultDisposition {
+        use chio_security_types::clock::ClockError;
+        match self {
+            Self::UntrustedInput(_)
+            | Self::AuditInput(_)
+            | Self::InvalidRequest(_)
+            | Self::AuthorizationDenied(_)
+            | Self::Conflict(_) => BrokerFaultDisposition::Reject,
+            Self::AdapterAuthorizationDenied(_)
+            | Self::CredentialUnavailable(_)
+            | Self::ResponseRejected(_)
+            | Self::Clock(
+                ClockError::Expired | ClockError::NotYetValid | ClockError::InvalidWindow,
+            ) => BrokerFaultDisposition::Deny,
+            Self::Clock(
+                ClockError::Unavailable
+                | ClockError::BeforeEpoch
+                | ClockError::Overflow
+                | ClockError::WallClockRegression
+                | ClockError::MonotonicRegression,
+            )
+            | Self::AuthorityUnavailable(_)
+            | Self::Upstream(_)
+            | Self::AdapterUpstream(_) => BrokerFaultDisposition::Retry,
+            Self::Invariant(_)
+            | Self::Storage(_)
+            | Self::CredentialStorage(_)
+            | Self::Custody(_) => BrokerFaultDisposition::Fatal,
+        }
+    }
+
     /// Faults that end a serving endpoint because the broker can no longer
     /// trust its own state. Every other error is contained to its request or
     /// session.
     #[must_use]
     pub(crate) const fn is_service_fault(&self) -> bool {
-        matches!(
-            self,
-            Self::Invariant(_) | Self::Storage(_) | Self::CredentialStorage(_) | Self::Custody(_)
-        )
+        matches!(self.disposition(), BrokerFaultDisposition::Fatal)
     }
 
     /// Bounded broker wire reason. Typed error sources retain their registered
@@ -176,6 +223,10 @@ impl BrokerError {
 }
 
 pub type Result<T> = std::result::Result<T, BrokerError>;
+
+#[cfg(test)]
+#[path = "disposition_tests.rs"]
+mod disposition_tests;
 
 #[cfg(test)]
 pub(crate) fn private_tempdir() -> std::io::Result<tempfile::TempDir> {
