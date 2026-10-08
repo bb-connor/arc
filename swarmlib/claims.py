@@ -58,6 +58,8 @@ def claim(
     owner = owner or store.agent
     if owner != store.agent and store.role != "conductor":
         raise SwarmError("only the conductor claims on behalf of another agent")
+    if store.role == "integrator":
+        raise SwarmError("the integrator fixes integration breaks in place but never claims implementation items")
 
     def mutate() -> bool:
         now = clock.now()

@@ -6,7 +6,7 @@ from . import agents, claims, clock, frontmatter, items
 from .store import Store
 
 STATUS_ORDER = (
-    "blocked", "disputed", "in-progress", "claimed", "review", "ready", "open",
+    "blocked", "disputed", "in-progress", "claimed", "submitted", "review", "ready", "open",
     "integrated", "done", "deferred", "wontfix",
 )
 

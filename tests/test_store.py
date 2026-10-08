@@ -70,6 +70,8 @@ class StoreTest(SwarmCase):
     def test_config_defaults_and_override(self):
         conductor = self.clone("claude-ws2-conductor", role="conductor", vendor="claude")
         self.assertEqual(conductor.config()["base_branch"], "integration/beta-next")
+        self.assertEqual({k: conductor.config()[k] for k in ("digest_seconds", "session_max_turns", "train_max_lanes", "train_host")},
+                         {"digest_seconds": 1200, "session_max_turns": 40, "train_max_lanes": 12, "train_host": ""})
         set_config(conductor, "active_waves", "[1, 2]")
         conductor.sync()
         self.assertEqual(conductor.config()["active_waves"], [1, 2])
@@ -106,6 +108,11 @@ class StoreTest(SwarmCase):
         worker = self.clone("codex-ws2-worker1")
         with self.assertRaises(SwarmError):
             record(worker, "decision", "x", "y")
+        integrator = self.clone("codex-ws2-integrator", role="integrator")
+        self.assertEqual(record(integrator, "digest", "codex-ws2-integrator-handoff-1", "state"),
+                         "digests/codex-ws2-integrator-handoff-1.md")
+        with self.assertRaises(SwarmError):
+            record(integrator, "decision", "x", "y")
         conductor = self.clone("claude-ws2-conductor", role="conductor", vendor="claude")
         with self.assertRaises(SwarmError):
             record(conductor, "digest", "../escape", "y")

@@ -44,6 +44,19 @@ class LifecycleTest(SwarmCase):
         self.worker.sync()
         self.assertIsNone(claims.read(self.worker, "F1"))
 
+    def test_submitted_items_move_only_by_the_integrator(self):
+        self.add_item(self.conductor, "F1")
+        claims.claim(self.worker, "F1", [])
+        lifecycle.status(self.worker, "F1", "in-progress")
+        lifecycle.status(self.worker, "F1", "submitted")
+        with self.assertRaisesRegex(SwarmError, "may not move"):
+            lifecycle.status(self.worker, "F1", "ready")
+        lifecycle.status(self.integrator, "F1", "in-progress", "check train T1: E0425 in crates/f1/src/lib.rs")
+        lifecycle.status(self.worker, "F1", "submitted")
+        lifecycle.status(self.integrator, "F1", "integrated", "landed in train T2")
+        self.worker.sync()
+        self.assertEqual(items.load(self.worker, "F1").status, "integrated")
+
     def test_review_accept_cross_vendor_only(self):
         self.add_item(self.conductor, "F1")
         self._to_review("F1")
@@ -168,8 +181,8 @@ class SubmitTest(SwarmCase):
         self.assertEqual(git(self.arc, "rev-parse", "lane/F1-stop-the-bleed"), commits[0])
         self.worker.sync()
         item = items.load(self.worker, "F1")
-        self.assertEqual((item.status, item.meta["author_vendor"]), ("review", "codex"))
-        self.assertTrue(list(self.worker.path("msgs", "reviewer").glob("*.md")))
+        self.assertEqual((item.status, item.meta["author_vendor"]), ("submitted", "codex"))
+        self.assertFalse(list(self.worker.path("msgs", "reviewer").glob("*.md")))  # check trains, not item reviews
 
     def test_submit_without_commits_refused(self):
         self.add_item(self.conductor, "F1")

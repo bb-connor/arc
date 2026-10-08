@@ -24,6 +24,10 @@ CONFIG_DEFAULTS = {
     "base_branch": "integration/beta-next",
     "ci_max_in_flight": 10,
     "train_pr": 0,
+    "digest_seconds": 1200,
+    "session_max_turns": 40,
+    "train_max_lanes": 12,
+    "train_host": "",
 }
 
 
@@ -182,10 +186,11 @@ RECORD_KINDS = {"decision": "decisions", "digest": "digests"}
 
 def record(store: Store, kind: str, name: str, text: str) -> str:
     """Write a conductor decision (auto-numbered) or digest. Returns its path in the store."""
-    if store.role != "conductor":
-        raise SwarmError("only the conductor records decisions and digests")
     if kind not in RECORD_KINDS:
         raise SwarmError(f"kind must be one of {', '.join(RECORD_KINDS)}")
+    allowed = ("conductor",) if kind == "decision" else ("conductor", "integrator")
+    if store.role not in allowed:
+        raise SwarmError(f"only the {' or the '.join(allowed)} records {kind}s")
     if not name or not all(c.isalnum() or c in "-." for c in name):
         raise SwarmError("name may contain only letters, digits, '-' and '.'")
     written: list[str] = []

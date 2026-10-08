@@ -12,7 +12,7 @@ from .agents import TIERS
 from .store import Store, SwarmError
 
 STATUSES = (
-    "open", "claimed", "in-progress", "review", "ready", "integrated", "done",
+    "open", "claimed", "in-progress", "submitted", "review", "ready", "integrated", "done",
     "blocked", "disputed", "deferred", "wontfix",
 )
 SEVERITIES = ("P0", "P1", "P2", "P3")
@@ -33,6 +33,11 @@ DEFAULTS: dict = {
 # The conductor may make any move.
 TRANSITIONS: dict[tuple[str, str], frozenset[str]] = {
     ("claimed", "in-progress"): frozenset({"owner"}),
+    ("in-progress", "submitted"): frozenset({"owner"}),
+    ("submitted", "ready"): frozenset({"integrator"}),
+    ("submitted", "integrated"): frozenset({"integrator"}),
+    ("submitted", "in-progress"): frozenset({"integrator"}),
+    ("submitted", "blocked"): frozenset({"integrator"}),
     ("in-progress", "review"): frozenset({"owner"}),
     ("review", "ready"): frozenset({"reviewer"}),
     ("review", "in-progress"): frozenset({"reviewer"}),

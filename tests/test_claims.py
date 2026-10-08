@@ -110,6 +110,12 @@ class ClaimsTest(SwarmCase):
         self.assertEqual(len(msgs.inbox(self.a)), 1)
         self.assertEqual(len(msgs.inbox(self.b)), 1)
 
+    def test_the_integrator_never_claims_implementation_items(self):
+        self.add_item(self.conductor, "F1")
+        integrator = self.clone("codex-ws2-integrator", role="integrator")
+        with self.assertRaisesRegex(SwarmError, "never claims implementation items"):
+            claims.claim(integrator, "F1", [])
+
     def test_conductor_only_claims_for_others(self):
         self.add_item(self.conductor, "F1")
         with self.assertRaises(SwarmError):

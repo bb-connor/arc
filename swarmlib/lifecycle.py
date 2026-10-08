@@ -53,7 +53,7 @@ def record_evidence(store: Store, item_id: str, entry: dict, *, ci_failed: bool 
 
 
 def submit(store: Store, item_id: str, worktree: Path, *, repo_url: str, base_branch: str) -> list[str]:
-    """Push the lane branch and hand the item to review."""
+    """Push the lane branch and queue the item for the next check train."""
     store.sync()
     item = items.load(store, item_id)
     owner = item.meta["owner"]
@@ -77,11 +77,9 @@ def submit(store: Store, item_id: str, worktree: Path, *, repo_url: str, base_br
         fresh = items.load(store, item_id)
         if fresh.status != "in-progress":
             raise SwarmError(f"{item_id} moved to {fresh.status} while submitting")
-        fresh.meta.update(branch=branch, commits=[c[:12] for c in commits], author_vendor=vendor, status="review")
-        fresh.meta["review"].update(verdict="", reviewer="")
-        fresh.log(store.agent, f"status in-progress -> review: {len(commits)} commits on {branch}")
+        fresh.meta.update(branch=branch, commits=[c[:12] for c in commits], author_vendor=vendor, status="submitted")
+        fresh.log(store.agent, f"status in-progress -> submitted: {len(commits)} commits on {branch}")
         items.save(store, fresh)
-        msgs.write(store, "reviewer", "request", item_id, f"review {item_id}", f"Branch {branch}, {len(commits)} commits.")
         return True
 
     store.transact(f"submit {item_id}", mutate)
