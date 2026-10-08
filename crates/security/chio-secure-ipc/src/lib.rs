@@ -16,25 +16,27 @@
 
 //! Shared custody primitives for Linux Unix-domain IPC services.
 //!
-//! The listener retains an exclusive lifecycle lock, authenticates kernel
-//! peer credentials before returning a stream, detects pathname replacement,
-//! and removes only the exact socket inode it created.
+//! [`listener`] binds service sockets under one custody contract and
+//! authenticates every peer before returning a stream; [`frame`] is the one
+//! length-prefixed framing every service uses.
 
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 #[cfg(unix)]
 use std::os::fd::{FromRawFd, OwnedFd};
 #[cfg(unix)]
-use std::os::unix::fs::{FileTypeExt, MetadataExt, OpenOptionsExt, PermissionsExt};
+use std::os::unix::fs::{MetadataExt, PermissionsExt};
 #[cfg(unix)]
-use std::os::unix::net::{UnixListener, UnixStream};
+use std::os::unix::net::UnixStream;
 
 use serde::{Deserialize, Serialize};
 
 pub mod credentials;
 pub mod frame;
+#[cfg(unix)]
+pub mod listener;
 
 pub const MAX_UNIX_SOCKET_PATH_BYTES: usize = 100;
 pub const MAX_INHERITED_DESCRIPTOR: u32 = 65_535;
@@ -75,12 +77,6 @@ impl PeerIdentity {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct SocketIdentity {
-    device: u64,
-    inode: u64,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SecureUnixListenerConfig {
     pub socket_path: PathBuf,
@@ -101,12 +97,10 @@ impl SecureUnixListenerConfig {
     }
 }
 
+/// A private service socket that admits exactly one peer process.
 #[cfg(unix)]
 pub struct SecureUnixListener {
-    listener: UnixListener,
-    config: SecureUnixListenerConfig,
-    socket_identity: SocketIdentity,
-    _lifecycle_lock: File,
+    inner: listener::CustodialUnixListener,
 }
 
 #[cfg(unix)]
@@ -118,134 +112,50 @@ impl SecureUnixListener {
             ));
         }
         config.validate()?;
-        validate_private_parent(&config.socket_path, config.trusted_service_uid)?;
-        let lifecycle_lock =
-            acquire_lifecycle_lock(&config.socket_path, config.trusted_service_uid)?;
-        if config.socket_path.exists() {
-            return Err(SecureIpcError::Custody(
-                "socket path already exists".to_string(),
-            ));
-        }
-        let listener = UnixListener::bind(&config.socket_path)
-            .map_err(|error| SecureIpcError::Io(format!("socket bind failed: {error}")))?;
-        let mut provisional = ProvisionalSocketCleanup::new(&config.socket_path)?;
-        std::fs::set_permissions(&config.socket_path, std::fs::Permissions::from_mode(0o600))
-            .map_err(|error| SecureIpcError::Io(format!("socket chmod failed: {error}")))?;
-        let socket_identity =
-            validate_socket_identity(&config.socket_path, config.trusted_service_uid)?;
-        if socket_identity != provisional.identity {
-            return Err(SecureIpcError::Custody(
-                "socket identity changed during bind".to_string(),
-            ));
-        }
-        let endpoint = Self {
-            listener,
-            config,
-            socket_identity,
-            _lifecycle_lock: lifecycle_lock,
-        };
-        provisional.armed = false;
-        Ok(endpoint)
+        let inner = listener::CustodialUnixListener::bind(listener::SocketCustody {
+            socket_path: config.socket_path,
+            trusted_service_uid: config.trusted_service_uid,
+            access: listener::SocketAccess::Owner,
+            peer: listener::PeerPolicy::Process(config.expected_peer),
+        })?;
+        Ok(Self { inner })
     }
 
     pub fn accept_authenticated(&self) -> Result<UnixStream> {
-        let (stream, _) = self
-            .listener
-            .accept()
-            .map_err(|error| SecureIpcError::Io(format!("socket accept failed: {error}")))?;
-        self.authenticate(&stream)?;
-        Ok(stream)
+        Ok(self.inner.accept_authenticated()?)
     }
 
     pub fn try_accept_authenticated(&self) -> Result<Option<UnixStream>> {
-        let stream = match self.listener.accept() {
-            Ok((stream, _)) => stream,
-            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => return Ok(None),
-            Err(error) => return Err(SecureIpcError::Io(format!("socket accept failed: {error}"))),
-        };
-        self.authenticate(&stream)?;
-        Ok(Some(stream))
+        Ok(self.inner.try_accept_authenticated()?)
     }
 
     pub fn set_nonblocking(&self, nonblocking: bool) -> Result<()> {
-        self.listener
-            .set_nonblocking(nonblocking)
-            .map_err(|error| SecureIpcError::Io(format!("listener mode failed: {error}")))
+        Ok(self.inner.set_nonblocking(nonblocking)?)
     }
 
     #[must_use]
     pub fn socket_path(&self) -> &Path {
-        &self.config.socket_path
-    }
-
-    fn authenticate(&self, stream: &UnixStream) -> Result<()> {
-        let observed = peer_identity(stream)?;
-        if observed != self.config.expected_peer {
-            return Err(SecureIpcError::UnauthorizedPeer);
-        }
-        let current =
-            validate_socket_identity(&self.config.socket_path, self.config.trusted_service_uid)?;
-        if current != self.socket_identity {
-            return Err(SecureIpcError::Custody(
-                "socket path identity changed after bind".to_string(),
-            ));
-        }
-        Ok(())
+        self.inner.socket_path()
     }
 }
 
 #[cfg(unix)]
-impl Drop for SecureUnixListener {
-    fn drop(&mut self) {
-        if validate_socket_identity(&self.config.socket_path, self.config.trusted_service_uid)
-            .is_ok_and(|identity| identity == self.socket_identity)
-        {
-            let _remove_result = std::fs::remove_file(&self.config.socket_path);
-        }
-    }
-}
-
-#[cfg(unix)]
-struct ProvisionalSocketCleanup {
-    path: PathBuf,
-    identity: SocketIdentity,
-    armed: bool,
-}
-
-#[cfg(unix)]
-impl ProvisionalSocketCleanup {
-    fn new(path: &Path) -> Result<Self> {
-        let metadata = std::fs::symlink_metadata(path)
-            .map_err(|error| SecureIpcError::Io(format!("socket metadata failed: {error}")))?;
-        if !metadata.file_type().is_socket() {
-            return Err(SecureIpcError::Custody(
-                "bound path is not a socket".to_string(),
-            ));
-        }
-        Ok(Self {
-            path: path.to_path_buf(),
-            identity: SocketIdentity {
-                device: metadata.dev(),
-                inode: metadata.ino(),
-            },
-            armed: true,
-        })
-    }
-}
-
-#[cfg(unix)]
-impl Drop for ProvisionalSocketCleanup {
-    fn drop(&mut self) {
-        if !self.armed {
-            return;
-        }
-        let exact = std::fs::symlink_metadata(&self.path).is_ok_and(|metadata| {
-            metadata.file_type().is_socket()
-                && metadata.dev() == self.identity.device
-                && metadata.ino() == self.identity.inode
-        });
-        if exact {
-            let _remove_result = std::fs::remove_file(&self.path);
+impl From<listener::ListenerError> for SecureIpcError {
+    fn from(error: listener::ListenerError) -> Self {
+        use listener::ListenerError;
+        match error {
+            ListenerError::UnauthorizedPeer { .. } => Self::UnauthorizedPeer,
+            ListenerError::InvalidPath | ListenerError::InvalidPeerPolicy(_) => {
+                Self::InvalidConfig(error.to_string())
+            }
+            ListenerError::Io { .. } => Self::Io(error.to_string()),
+            ListenerError::Unsupported
+            | ListenerError::DirectoryCustody
+            | ListenerError::LockHeld(_)
+            | ListenerError::LockCustody
+            | ListenerError::PathOccupied
+            | ListenerError::SocketCustody
+            | ListenerError::SocketReplaced => Self::Custody(error.to_string()),
         }
     }
 }
@@ -270,86 +180,6 @@ pub fn peer_identity(_stream: &UnixStream) -> Result<PeerIdentity> {
     Err(SecureIpcError::Custody(
         "kernel-authenticated peer credentials require Linux".to_string(),
     ))
-}
-
-#[cfg(unix)]
-fn validate_socket_identity(path: &Path, trusted_service_uid: u32) -> Result<SocketIdentity> {
-    let metadata = std::fs::symlink_metadata(path)
-        .map_err(|error| SecureIpcError::Io(format!("socket metadata failed: {error}")))?;
-    if !metadata.file_type().is_socket()
-        || metadata.uid() != trusted_service_uid
-        || metadata.nlink() != 1
-        || metadata.permissions().mode() & 0o077 != 0
-    {
-        return Err(SecureIpcError::Custody(
-            "socket ownership, link count, or permissions are invalid".to_string(),
-        ));
-    }
-    Ok(SocketIdentity {
-        device: metadata.dev(),
-        inode: metadata.ino(),
-    })
-}
-
-#[cfg(unix)]
-fn validate_private_parent(path: &Path, trusted_service_uid: u32) -> Result<()> {
-    let parent = path.parent().ok_or_else(|| {
-        SecureIpcError::InvalidConfig("socket path has no parent directory".to_string())
-    })?;
-    let metadata = std::fs::symlink_metadata(parent)
-        .map_err(|error| SecureIpcError::Io(format!("socket parent metadata failed: {error}")))?;
-    if !metadata.file_type().is_dir()
-        || metadata.uid() != trusted_service_uid
-        || metadata.permissions().mode() & 0o077 != 0
-    {
-        return Err(SecureIpcError::Custody(
-            "socket parent must be a private directory owned by the service UID".to_string(),
-        ));
-    }
-    Ok(())
-}
-
-#[cfg(unix)]
-fn acquire_lifecycle_lock(path: &Path, trusted_service_uid: u32) -> Result<File> {
-    let mut lock_path = path.as_os_str().to_os_string();
-    lock_path.push(".lifecycle.lock");
-    let lock_path = PathBuf::from(lock_path);
-    let mut options = OpenOptions::new();
-    options.read(true).write(true).create(true).mode(0o600);
-    let flags = rustix::fs::OFlags::CLOEXEC | rustix::fs::OFlags::NOFOLLOW;
-    let flags = i32::try_from(flags.bits())
-        .map_err(|_| SecureIpcError::Io("lifecycle lock flags are invalid".to_string()))?;
-    options.custom_flags(flags);
-    let lock = options
-        .open(&lock_path)
-        .map_err(|error| SecureIpcError::Io(format!("lifecycle lock open failed: {error}")))?;
-    validate_lock_identity(&lock_path, &lock, trusted_service_uid)?;
-    rustix::fs::flock(&lock, rustix::fs::FlockOperation::NonBlockingLockExclusive)
-        .map_err(|error| SecureIpcError::Custody(format!("lifecycle lock is held: {error}")))?;
-    validate_lock_identity(&lock_path, &lock, trusted_service_uid)?;
-    Ok(lock)
-}
-
-#[cfg(unix)]
-fn validate_lock_identity(path: &Path, lock: &File, trusted_service_uid: u32) -> Result<()> {
-    let path_metadata = std::fs::symlink_metadata(path)
-        .map_err(|error| SecureIpcError::Io(format!("lifecycle lock metadata failed: {error}")))?;
-    let fd_metadata = lock.metadata().map_err(|error| {
-        SecureIpcError::Io(format!("lifecycle lock descriptor failed: {error}"))
-    })?;
-    if !path_metadata.file_type().is_file()
-        || !fd_metadata.file_type().is_file()
-        || path_metadata.dev() != fd_metadata.dev()
-        || path_metadata.ino() != fd_metadata.ino()
-        || fd_metadata.uid() != trusted_service_uid
-        || fd_metadata.nlink() != 1
-        || fd_metadata.permissions().mode() & 0o077 != 0
-    {
-        return Err(SecureIpcError::Custody(
-            "lifecycle lock identity or permissions are invalid".to_string(),
-        ));
-    }
-    Ok(())
 }
 
 pub fn validate_unix_socket_path(path: &Path) -> Result<()> {
