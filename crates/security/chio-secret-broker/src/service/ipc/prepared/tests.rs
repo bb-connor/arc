@@ -173,7 +173,7 @@ fn exchange(
     endpoint: &UnixBrokerEndpoint,
     request: &AuthenticatedIpcRequest,
 ) -> (UnixStream, IpcResponse) {
-    let mut stream = UnixStream::connect(&endpoint.socket_path).test_expect("connect");
+    let mut stream = UnixStream::connect(endpoint.listener.socket_path()).test_expect("connect");
     stream
         .set_read_timeout(Some(Duration::from_secs(1)))
         .test_expect("read bound");
