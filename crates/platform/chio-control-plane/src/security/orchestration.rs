@@ -35,7 +35,8 @@ use super::scheduler_worker::{
     ActiveDefenseServiceRegistry, ActiveDefenseServices, ProductionDeclassificationReceiptOutbox,
     ProductionResponseSchedulerConfig, ProductionResponseWorker, ProductionResponseWorkerHandle,
     ProductionResponseWorkerLoopConfig, ResponseWorkerHealth, ResponseWorkerLifecycle,
-    ResponseWorkerPort, ResponseWorkerTick, ResponseWorkerTickError, SqliteResponseWorkerPort,
+    ResponseWorkerPort, ResponseWorkerTick, ResponseWorkerTickError, SecurityAlertDelivery,
+    SqliteResponseWorkerPort,
 };
 use super::AttestedCorrelationWriter;
 
@@ -264,6 +265,10 @@ pub enum ProductionActiveDefenseHostError {
     },
     #[error("active-defense startup rollback failed after `{cause}`: {rollback}")]
     StartupRollback { cause: String, rollback: String },
+    #[error("security alerts that exhausted SIEM delivery: {exhausted}")]
+    ExhaustedSecurityAlerts { exhausted: u64 },
+    #[error("security alert delivery failed: {0}")]
+    SecurityAlertDelivery(String),
 }
 
 struct ProductionRuntimeLeaseState {
@@ -827,6 +832,7 @@ pub struct ProductionActiveDefenseOrchestrator {
     response_planner: Arc<DurableAttestedFindingBatchPlanner>,
     response_recovery_limits: AttestedFindingResponseRecoveryLimits,
     lifecycle: ProductionDeclassificationReceiptLifecycle,
+    alert_delivery: Arc<SecurityAlertDelivery>,
 }
 
 pub(super) struct ProductionActiveDefenseOrchestratorContext {
@@ -861,14 +867,19 @@ impl ProductionActiveDefenseOrchestrator {
             blast_radius,
             Arc::clone(&context.clock),
         )?;
+        let alert_delivery = Arc::new(SecurityAlertDelivery::new(
+            Arc::clone(&alert_outbox),
+            Arc::clone(&context.clock),
+        ));
         let alerts: Arc<dyn SecurityAlertPort> = alert_outbox;
-        Self::new_with_lifecycle(context, effects, alerts)
+        Self::new_with_lifecycle(context, effects, alerts, alert_delivery)
     }
 
     fn new_with_lifecycle(
         context: ProductionActiveDefenseOrchestratorContext,
         effects: Arc<dyn EffectPort>,
         alerts: Arc<dyn SecurityAlertPort>,
+        alert_delivery: Arc<SecurityAlertDelivery>,
     ) -> Result<Self, ProductionActiveDefenseBuildError> {
         let ProductionActiveDefenseOrchestratorContext {
             security_state_authority,
@@ -990,7 +1001,10 @@ impl ProductionActiveDefenseOrchestrator {
                     runtime_leases: Arc::clone(&lifecycle.runtime_leases),
                 }),
             ));
-        let worker = Arc::new(ProductionResponseWorker::new(Arc::clone(&worker_port))?);
+        let worker = Arc::new(ProductionResponseWorker::new_with_alert_delivery(
+            Arc::clone(&worker_port),
+            Some(Arc::clone(&alert_delivery)),
+        )?);
         lifecycle.bind_worker(&worker)?;
         let services = Self {
             worker,
@@ -1000,6 +1014,7 @@ impl ProductionActiveDefenseOrchestrator {
             response_planner: durable_planner,
             response_recovery_limits,
             lifecycle,
+            alert_delivery,
         };
         services.ensure_bootstrap_ready()?;
         Ok(services)
@@ -1050,9 +1065,10 @@ impl ProductionActiveDefenseOrchestrator {
         ),
         ResponseWorkerTickError,
     > {
-        let worker = Arc::new(ProductionResponseWorker::new(Arc::clone(
-            &self.worker_port,
-        ))?);
+        let worker = Arc::new(ProductionResponseWorker::new_with_alert_delivery(
+            Arc::clone(&self.worker_port),
+            Some(Arc::clone(&self.alert_delivery)),
+        )?);
         let mut handle = worker.start_parked(config).await?;
         if let Err(error) = handle.arm().await {
             let _ = handle.shutdown().await;
@@ -1072,6 +1088,29 @@ impl ProductionActiveDefenseOrchestrator {
     #[must_use]
     pub fn worker(&self) -> &Arc<ProductionResponseWorker> {
         &self.worker
+    }
+
+    /// Parked security alerts and a failed delivery pass close host
+    /// readiness. Neither reaches the worker, so expiry, rollback and
+    /// recovery keep running through a delivery outage. Parked alerts stay
+    /// parked until an operator resolves them.
+    pub(super) fn ensure_security_alerts_delivered(
+        &self,
+    ) -> Result<(), ProductionActiveDefenseHostError> {
+        let backlog = self.alert_delivery.backlog().map_err(|error| {
+            ProductionActiveDefenseHostError::SecurityAlertDelivery(error.to_string())
+        })?;
+        if backlog.parked > 0 {
+            return Err(ProductionActiveDefenseHostError::ExhaustedSecurityAlerts {
+                exhausted: backlog.parked,
+            });
+        }
+        match self.alert_delivery.health().last_error {
+            Some(error) => Err(ProductionActiveDefenseHostError::SecurityAlertDelivery(
+                error,
+            )),
+            None => Ok(()),
+        }
     }
 }
 

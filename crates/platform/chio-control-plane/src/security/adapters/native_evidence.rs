@@ -699,6 +699,16 @@ pub struct AlertDispatchReport {
     pub backend_failures: usize,
 }
 
+/// Undelivered rows of the security paging outbox.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct AlertOutboxBacklog {
+    /// Rows that are due now or will be retried under backoff.
+    pub pending: u64,
+    /// Rows that exhausted their delivery attempts. They are never dispatched
+    /// again and stay parked until an operator resolves them.
+    pub parked: u64,
+}
+
 /// SQLite-backed security paging outbox. `page` means durable admission only;
 /// actual backend delivery advances the row from pending to delivered.
 ///
@@ -970,6 +980,36 @@ impl SqliteSiemOutbox {
             }
         }
         Ok(report)
+    }
+
+    /// Durable count of undelivered rows. A row is parked once it reached
+    /// `max_attempts` or carries the parked retry time, so rows parked under an
+    /// earlier configuration stay counted after a restart.
+    pub fn backlog(&self) -> PortResult<AlertOutboxBacklog> {
+        let max_attempts = i64::from(self.config.max_attempts);
+        let parked_at = sqlite_time(parked_at_unix_ms()?)?;
+        let connection = self.connection()?;
+        let (pending, parked): (i64, i64) = connection
+            .query_row(
+                &format!(
+                    "SELECT
+                        COALESCE(SUM(CASE WHEN attempts < ?1
+                                           AND next_attempt_at_unix_ms <> ?2
+                                          THEN 1 ELSE 0 END), 0),
+                        COALESCE(SUM(CASE WHEN attempts >= ?1
+                                            OR next_attempt_at_unix_ms = ?2
+                                          THEN 1 ELSE 0 END), 0)
+                     FROM {OUTBOX_TABLE}
+                     WHERE status = 'pending'"
+                ),
+                params![max_attempts, parked_at],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .map_err(|_| PortError::unavailable())?;
+        Ok(AlertOutboxBacklog {
+            pending: u64::try_from(pending).map_err(|_| PortError::integrity_failure())?,
+            parked: u64::try_from(parked).map_err(|_| PortError::integrity_failure())?,
+        })
     }
 
     fn load_confirmed_backends(&self, row: &OutboxRow) -> PortResult<BTreeSet<String>> {

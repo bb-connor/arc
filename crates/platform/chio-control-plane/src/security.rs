@@ -47,7 +47,7 @@ pub use active_response_authority::{
     MAX_ACTIVE_RESPONSE_AUTHORITY_SOCKET_PATH_BYTES, MAX_ACTIVE_RESPONSE_AUTHORITY_WIRE_BYTES,
 };
 pub use adapters::{
-    AlertDispatchReport, AlertOutboxConfig, DeclassificationCompactionReport,
+    AlertDispatchReport, AlertOutboxBacklog, AlertOutboxConfig, DeclassificationCompactionReport,
     DeclassificationReceiptDrainReport, DeclassificationReceiptOutboxDrainer,
     DeclassificationReconciliationReport, DeclassificationRevalidationReport, FlowResolverConfig,
     FlowResolverConfigError, NativeActiveResponseFindingAuthority,
@@ -92,7 +92,7 @@ pub use scheduler_worker::{
     ActiveDefenseServiceRegistry, ActiveDefenseServices, ProductionResponseSchedulerConfig,
     ProductionResponseWorker, ProductionResponseWorkerHandle, ProductionResponseWorkerLoopConfig,
     ResponseWorkerHealth, ResponseWorkerLifecycle, ResponseWorkerPort, ResponseWorkerTick,
-    ResponseWorkerTickError, SqliteResponseWorkerPort,
+    ResponseWorkerTickError, SecurityAlertDeliveryHealth, SqliteResponseWorkerPort,
 };
 
 use std::sync::Arc;

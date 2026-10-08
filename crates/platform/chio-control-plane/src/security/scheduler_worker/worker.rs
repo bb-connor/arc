@@ -4,7 +4,7 @@ use super::{
     PortError, ProductionResponseWorker, ProductionResponseWorkerHandle, ResponseWorkerHealth,
     ResponseWorkerJoinOwnership, ResponseWorkerLifecycle, ResponseWorkerPort,
     ResponseWorkerStartupGuard, ResponseWorkerTaskLiveness, ResponseWorkerThreadCompletion,
-    ResponseWorkerTick, ResponseWorkerTickError,
+    ResponseWorkerTick, ResponseWorkerTickError, SecurityAlertDelivery,
 };
 
 pub(super) const WORKER_CLAIM_DOMAIN: &[u8] = b"chio.active-defense-worker-claim.v1\0";
@@ -44,9 +44,18 @@ impl ProductionResponseWorkerLoopConfig {
 
 impl ProductionResponseWorker {
     pub fn new(port: Arc<dyn ResponseWorkerPort>) -> Result<Self, ResponseWorkerTickError> {
+        Self::new_with_alert_delivery(port, None)
+    }
+
+    /// A worker that also delivers paged security alerts between its ticks.
+    pub(in crate::security) fn new_with_alert_delivery(
+        port: Arc<dyn ResponseWorkerPort>,
+        alert_delivery: Option<Arc<SecurityAlertDelivery>>,
+    ) -> Result<Self, ResponseWorkerTickError> {
         port.ensure_recovery_ready()?;
         Ok(Self {
             port,
+            alert_delivery,
             next_tick_sequence: AtomicU64::new(0),
             shutdown_requested: AtomicBool::new(false),
             shutdown_completed: AtomicBool::new(false),
@@ -267,6 +276,7 @@ impl ProductionResponseWorker {
         let (publication_readiness_sender, publication_readiness) = oneshot::channel();
         let (thread_completion_sender, thread_completion) = watch::channel(false);
         let worker = Arc::clone(self);
+        let alert_delivery = self.alert_delivery.clone();
         let join = std::thread::Builder::new()
             .name("chio-response-worker".to_string())
             .spawn(move || {
@@ -348,32 +358,46 @@ impl ProductionResponseWorker {
                         config.tick_interval,
                     );
                     interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
-                    loop {
-                        tokio::select! {
-                            changed = shutdown_receiver.changed() => {
-                                if changed.is_err() || *shutdown_receiver.borrow() {
-                                    break;
+                    let ticks = async {
+                        loop {
+                            tokio::select! {
+                                changed = shutdown_receiver.changed() => {
+                                    if changed.is_err() || *shutdown_receiver.borrow() {
+                                        return Ok(());
+                                    }
                                 }
-                            }
-                            _ = interval.tick() => {
-                                match worker.tick_once_catching_crash() {
-                                    Ok(_) => {}
-                                    Err(ResponseWorkerTickError::WorkerStopped)
-                                        if *shutdown_receiver.borrow() =>
-                                    {
-                                        break;
+                                _ = interval.tick() => {
+                                    match worker.tick_once_catching_crash() {
+                                        Ok(_) => {}
+                                        Err(ResponseWorkerTickError::WorkerStopped)
+                                            if *shutdown_receiver.borrow() =>
+                                        {
+                                            return Ok(());
+                                        }
+                                        Err(error @ ResponseWorkerTickError::WorkerCrash(_)) => {
+                                            return Err(error);
+                                        }
+                                        Err(_) => {}
                                     }
-                                    Err(ResponseWorkerTickError::WorkerCrash(code)) => {
-                                        let error = ResponseWorkerTickError::WorkerCrash(code);
-                                        worker.request_stop();
-                                        worker.complete_shutdown_after_loop()?;
-                                        worker.mark_failed(&error);
-                                        return Err(error);
-                                    }
-                                    Err(_) => {}
                                 }
                             }
                         }
+                    };
+                    // Alert delivery shares this thread and ends with the tick
+                    // loop. Its passes yield while a backend is awaited, so a
+                    // slow or unavailable SIEM never holds back a tick.
+                    let ended = match &alert_delivery {
+                        Some(delivery) => tokio::select! {
+                            ended = ticks => ended,
+                            never = delivery.run(config.tick_interval) => match never {},
+                        },
+                        None => ticks.await,
+                    };
+                    if let Err(error) = ended {
+                        worker.request_stop();
+                        worker.complete_shutdown_after_loop()?;
+                        worker.mark_failed(&error);
+                        return Err(error);
                     }
                     worker.complete_shutdown_after_loop()
                 });
@@ -457,6 +481,10 @@ impl ProductionResponseWorker {
         health.declassification_outbox_configured = configured;
         health.declassification_receipts_pending = pending;
         health.declassification_outbox_error = error;
+        health.security_alert_delivery = self
+            .alert_delivery
+            .as_ref()
+            .map(|delivery| delivery.health());
         health
     }
 
@@ -594,6 +622,7 @@ pub(super) fn failed_health() -> ResponseWorkerHealth {
         last_tick_completed_sequence: None,
         tick_in_flight: false,
         last_error: Some("response worker health lock is unavailable".to_string()),
+        security_alert_delivery: None,
     }
 }
 
