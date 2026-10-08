@@ -27,7 +27,7 @@
 //!    and the proof's `signature` field
 //! 6. Nonce replay -- nonce must not have been seen during the proof's signed validity window
 
-use chio_security_types::clock::{Clock, ClockReading, SystemClock};
+use chio_security_types::clock::{Clock, ClockReading};
 use std::collections::HashMap;
 use std::num::NonZeroUsize;
 use std::sync::{Arc, Mutex};
@@ -230,12 +230,13 @@ impl DpopNonceStore {
     /// `capacity` is the maximum number of (nonce, capability_id) pairs to
     /// remember. `ttl` is fallback retention for calls to
     /// [`Self::check_and_insert`] that do not supply a signed horizon.
+    /// `clock` is the only time source the store samples.
     ///
     /// # Errors
     ///
     /// Returns an error when `capacity` is zero.
-    pub fn new(capacity: usize, ttl: Duration) -> Result<Self, DpopError> {
-        Self::new_with_per_capability_capacity(capacity, capacity, ttl)
+    pub fn new(capacity: usize, ttl: Duration, clock: Arc<dyn Clock>) -> Result<Self, DpopError> {
+        Self::new_with_per_capability_capacity(capacity, capacity, ttl, clock)
     }
 
     /// Create a nonce store with an explicit per-capability live-entry limit.
@@ -252,39 +253,27 @@ impl DpopNonceStore {
         capacity: usize,
         per_capability_capacity: usize,
         ttl: Duration,
-    ) -> Result<Self, DpopError> {
-        Self::new_with_identity_byte_capacity(
-            capacity,
-            per_capability_capacity,
-            DEFAULT_DPOP_IDENTITY_BYTE_CAPACITY,
-            ttl,
-        )
-    }
-
-    /// Configure both marker limits and an aggregate retained identity budget.
-    /// The budget conservatively includes nonce, reservation owner and both
-    /// capability-key copies. Container overhead is bounded separately by the
-    /// marker limit. Exhaustion denies new entries without evicting live ones.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error on zero capacities or a per-capability limit above total capacity.
-    pub fn new_with_identity_byte_capacity(
-        capacity: usize,
-        per_capability_capacity: usize,
-        identity_byte_capacity: usize,
-        ttl: Duration,
+        clock: Arc<dyn Clock>,
     ) -> Result<Self, DpopError> {
         Self::with_clock(
             capacity,
             per_capability_capacity,
-            identity_byte_capacity,
+            DEFAULT_DPOP_IDENTITY_BYTE_CAPACITY,
             ttl,
-            Arc::new(SystemClock),
+            clock,
         )
     }
 
-    /// All sampling, projection and pruning use this clock under the cache lock.
+    /// Configure both marker limits, an aggregate retained identity budget
+    /// and the clock. The budget conservatively includes nonce, reservation
+    /// owner and both capability-key copies. Container overhead is bounded
+    /// separately by the marker limit. Exhaustion denies new entries without
+    /// evicting live ones. All sampling, projection and pruning use `clock`
+    /// under the cache lock.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error on zero capacities or a per-capability limit above total capacity.
     pub fn with_clock(
         capacity: usize,
         per_capability_capacity: usize,
@@ -789,7 +778,11 @@ mod backend_tests {
     #[test]
     fn zero_capacity_is_rejected() {
         assert!(matches!(
-            DpopNonceStore::new(0, Duration::from_secs(1)),
+            DpopNonceStore::new(
+                0,
+                Duration::from_secs(1),
+                std::sync::Arc::new(crate::SystemClock),
+            ),
             Err(DpopError::InvalidCapacity(_))
         ));
     }
@@ -798,11 +791,22 @@ mod backend_tests {
     fn invalid_per_capability_limits_are_rejected() {
         for per_capability in [0, 3] {
             assert!(matches!(
-                DpopNonceStore::new_with_per_capability_capacity(2, per_capability, Duration::ZERO),
+                DpopNonceStore::new_with_per_capability_capacity(
+                    2,
+                    per_capability,
+                    Duration::ZERO,
+                    std::sync::Arc::new(crate::SystemClock),
+                ),
                 Err(DpopError::InvalidCapacity(_))
             ));
         }
-        assert!(DpopNonceStore::new_with_per_capability_capacity(2, 2, Duration::ZERO).is_ok());
+        assert!(DpopNonceStore::new_with_per_capability_capacity(
+            2,
+            2,
+            Duration::ZERO,
+            std::sync::Arc::new(crate::SystemClock),
+        )
+        .is_ok());
     }
 
     #[test]
@@ -832,8 +836,12 @@ mod backend_tests {
 
     #[test]
     fn dispatch_reservation_rolls_back_only_for_its_owner() {
-        let store = DpopNonceStore::new(4, Duration::from_secs(60))
-            .expect("positive replay store test capacities");
+        let store = DpopNonceStore::new(
+            4,
+            Duration::from_secs(60),
+            std::sync::Arc::new(crate::SystemClock),
+        )
+        .expect("positive replay store test capacities");
         assert!(store
             .reserve_for_dispatch_until("nonce", "capability", u64::MAX, "owner-a")
             .unwrap());
@@ -850,8 +858,12 @@ mod backend_tests {
     #[test]
     fn shared_dpop_and_approval_store_capacity_pressure_does_not_evict_live_reservation(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let store = DpopNonceStore::new(2, Duration::from_secs(60))
-            .expect("positive replay store test capacities");
+        let store = DpopNonceStore::new(
+            2,
+            Duration::from_secs(60),
+            std::sync::Arc::new(crate::SystemClock),
+        )
+        .expect("positive replay store test capacities");
         assert!(store.reserve_for_dispatch_until(
             "nonce-a",
             "capability-a",
@@ -882,14 +894,19 @@ mod backend_tests {
     #[test]
     fn shared_dpop_and_approval_store_capacity_pressure_retains_consumed_key_until_expiry(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let store = DpopNonceStore::new(1, Duration::from_secs(60))
-            .expect("positive replay store test capacities");
+        let store = DpopNonceStore::new(
+            1,
+            Duration::from_secs(60),
+            std::sync::Arc::new(crate::SystemClock),
+        )
+        .expect("positive replay store test capacities");
         assert!(store.check_and_insert("nonce-a", "capability")?);
         assert!(store.check_and_insert("nonce-b", "capability").is_err());
         assert!(!store.check_and_insert("nonce-a", "capability")?);
 
         let expired_store =
-            DpopNonceStore::new(1, Duration::ZERO).expect("positive replay store test capacities");
+            DpopNonceStore::new(1, Duration::ZERO, std::sync::Arc::new(crate::SystemClock))
+                .expect("positive replay store test capacities");
         assert!(expired_store.check_and_insert("nonce-a", "capability")?);
         assert!(expired_store.check_and_insert("nonce-b", "capability")?);
         Ok(())
@@ -898,9 +915,13 @@ mod backend_tests {
     #[test]
     fn per_capability_quota_preserves_capacity_for_other_capabilities(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let store =
-            DpopNonceStore::new_with_per_capability_capacity(512, 64, Duration::from_secs(60))
-                .expect("positive replay store test capacities");
+        let store = DpopNonceStore::new_with_per_capability_capacity(
+            512,
+            64,
+            Duration::from_secs(60),
+            std::sync::Arc::new(crate::SystemClock),
+        )
+        .expect("positive replay store test capacities");
         let per_capability_capacity = store.inner.lock().unwrap().per_capability_capacity;
         assert_eq!(per_capability_capacity, 64);
 
@@ -917,8 +938,13 @@ mod backend_tests {
 
     #[test]
     fn small_store_capability_quota_reserves_a_fair_share() -> Result<(), KernelError> {
-        let store = DpopNonceStore::new_with_per_capability_capacity(8, 1, Duration::from_secs(60))
-            .expect("positive replay store test capacities");
+        let store = DpopNonceStore::new_with_per_capability_capacity(
+            8,
+            1,
+            Duration::from_secs(60),
+            std::sync::Arc::new(crate::SystemClock),
+        )
+        .expect("positive replay store test capacities");
         assert_eq!(store.inner.lock().unwrap().per_capability_capacity, 1);
         assert!(store.check_and_insert("capability-a-first", "capability-a")?);
         assert!(store
@@ -930,8 +956,12 @@ mod backend_tests {
 
     #[test]
     fn default_store_allows_one_capability_to_use_configured_capacity() -> Result<(), KernelError> {
-        let store = DpopNonceStore::new(8, Duration::from_secs(60))
-            .expect("positive replay store test capacities");
+        let store = DpopNonceStore::new(
+            8,
+            Duration::from_secs(60),
+            std::sync::Arc::new(crate::SystemClock),
+        )
+        .expect("positive replay store test capacities");
         assert_eq!(store.inner.lock().unwrap().per_capability_capacity, 8);
         for index in 0..8 {
             assert!(store.check_and_insert(&format!("nonce-{index}"), "capability")?);
@@ -946,16 +976,20 @@ mod backend_tests {
     fn signed_expiry_overrides_local_ttl_under_pressure_and_rejects_expired_input(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-        let store =
-            DpopNonceStore::new(1, Duration::ZERO).expect("positive replay store test capacities");
+        let store = DpopNonceStore::new(1, Duration::ZERO, std::sync::Arc::new(crate::SystemClock))
+            .expect("positive replay store test capacities");
         assert!(store.check_and_insert_until("approval-a", "intent", now + 60)?);
         assert!(!store.check_and_insert_until("approval-a", "intent", now + 60)?);
         assert!(store
             .check_and_insert_until("approval-b", "intent", now + 60)
             .is_err());
 
-        let expired_store = DpopNonceStore::new(1, Duration::from_secs(60))
-            .expect("positive replay store test capacities");
+        let expired_store = DpopNonceStore::new(
+            1,
+            Duration::from_secs(60),
+            std::sync::Arc::new(crate::SystemClock),
+        )
+        .expect("positive replay store test capacities");
         assert!(matches!(
             expired_store.check_and_insert_until("approval-a", "intent", 0),
             Err(KernelError::Dpop(DpopError::Expired))

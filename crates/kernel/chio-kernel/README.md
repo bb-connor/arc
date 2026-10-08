@@ -253,7 +253,7 @@ canonicalization or cache-key allocation. Cache admission also enforces a
 charge includes nonce and reservation text plus two capability-key copies per
 marker, conservatively covering the count index. Container overhead remains
 bounded by marker count; this is not a whole-process memory limit.
-`new_with_identity_byte_capacity` permits explicit host tuning, and
+`DpopNonceStore::with_clock` permits explicit host tuning, and
 `identity_byte_utilization` reports the charged bytes and limit. Exhaustion
 denies admission without evicting live markers. Exact rollback and dual-clock
 expiry reclamation return the corresponding charge. No identity is normalized,

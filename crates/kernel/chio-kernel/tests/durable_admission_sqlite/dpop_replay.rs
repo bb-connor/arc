@@ -201,7 +201,11 @@ fn activate_domain(
     operations: &SqliteAdmissionOperationStore,
     fence: &StoreMutationFence,
 ) -> Result<DpopReplayAuthorityV1, Box<dyn Error>> {
-    let source = DpopNonceStore::new(8, std::time::Duration::from_secs(3600))?;
+    let source = DpopNonceStore::new(
+        8,
+        std::time::Duration::from_secs(3600),
+        std::sync::Arc::new(chio_kernel::SystemClock),
+    )?;
     let authority_id = AdmissionIdentifier::try_new("dpop_authority", "sqlite-dpop-authority")?;
     let snapshot = source.preview_unsealed(&DpopReplaySourceBinding {
         dpop_authority_id: authority_id.clone(),

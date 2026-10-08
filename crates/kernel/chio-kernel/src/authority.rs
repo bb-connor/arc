@@ -460,10 +460,7 @@ pub struct LocalCapabilityAuthority {
 }
 
 impl LocalCapabilityAuthority {
-    pub fn new(keypair: Keypair) -> Self {
-        Self::new_with_clock(keypair, Arc::new(SystemClock))
-    }
-
+    /// `clock` is the only time source the authority samples for issuance.
     pub fn new_with_clock(keypair: Keypair, clock: Arc<dyn Clock>) -> Self {
         Self { keypair, clock }
     }
@@ -1087,7 +1084,10 @@ mod tests {
 
     #[test]
     fn local_authority_issues_cumulative_approval_capabilities() {
-        let authority = LocalCapabilityAuthority::new(Keypair::generate());
+        let authority = LocalCapabilityAuthority::new_with_clock(
+            Keypair::generate(),
+            std::sync::Arc::new(crate::SystemClock),
+        );
         let scope = ChioScope {
             grants: vec![ToolGrant {
                 server_id: "server".to_string(),

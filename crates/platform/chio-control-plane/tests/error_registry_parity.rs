@@ -26,7 +26,11 @@ fn assert_registered_kernel_refusal(urn: &str, expected_string_code: &str) {
 
 #[test]
 fn zero_dpop_capacity_emits_registered_diagnostic() {
-    let error = match DpopNonceStore::new(0, Duration::from_secs(60)) {
+    let error = match DpopNonceStore::new(
+        0,
+        Duration::from_secs(60),
+        std::sync::Arc::new(chio_kernel::SystemClock),
+    ) {
         Err(error) => error,
         Ok(_) => panic!("zero-capacity DPoP store constructed"),
     };

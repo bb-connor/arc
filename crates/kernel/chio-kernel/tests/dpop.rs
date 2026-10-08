@@ -67,6 +67,7 @@ fn default_store(config: &DpopConfig) -> DpopNonceStore {
     DpopNonceStore::new(
         config.nonce_store_capacity,
         Duration::from_secs(config.proof_ttl_secs),
+        std::sync::Arc::new(chio_kernel::SystemClock),
     )
     .expect("positive replay store test capacities")
 }
@@ -351,8 +352,12 @@ fn dpop_nonce_replay_within_ttl_rejected() {
 
     let config = default_config();
     // Large TTL so the nonce stays live between calls.
-    let store = DpopNonceStore::new(config.nonce_store_capacity, Duration::from_secs(3600))
-        .expect("positive replay store test capacities");
+    let store = DpopNonceStore::new(
+        config.nonce_store_capacity,
+        Duration::from_secs(3600),
+        std::sync::Arc::new(chio_kernel::SystemClock),
+    )
+    .expect("positive replay store test capacities");
 
     // First invocation -- different nonce each time.
     let now = SystemTime::now()
@@ -430,8 +435,12 @@ fn dpop_nonce_replay_after_local_ttl_is_rejected() {
 
     let config = default_config();
     // A zero local TTL must not shorten the signed proof-validity horizon.
-    let store = DpopNonceStore::new(config.nonce_store_capacity, Duration::from_secs(0))
-        .expect("positive replay store test capacities");
+    let store = DpopNonceStore::new(
+        config.nonce_store_capacity,
+        Duration::from_secs(0),
+        std::sync::Arc::new(chio_kernel::SystemClock),
+    )
+    .expect("positive replay store test capacities");
 
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)

@@ -668,7 +668,10 @@ fn load_capability_authority_with_lineage_mode(
             let keypair = load_or_create_authority_keypair(path).map_err(|error| {
                 plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
             })?;
-            Ok(wrap(Box::new(LocalCapabilityAuthority::new(keypair))))
+            Ok(wrap(Box::new(LocalCapabilityAuthority::new_with_clock(
+                keypair,
+                std::sync::Arc::new(chio_kernel::SystemClock),
+            ))))
         }
         (None, Some(path)) => SqliteCapabilityAuthority::open(path)
             .map(|authority| wrap(Box::new(authority)))

@@ -86,7 +86,10 @@ mod tests {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let key = Keypair::generate();
         let subject = Keypair::generate().public_key();
-        let authority = LocalCapabilityAuthority::new(key.clone());
+        let authority = LocalCapabilityAuthority::new_with_clock(
+            key.clone(),
+            std::sync::Arc::new(crate::SystemClock),
+        );
         let scope = scope();
         let root = authority.issue_aggregate_family_root(&subject, scope.clone(), 300, 2)?;
         let validate = |root: &CapabilityToken, limit| {

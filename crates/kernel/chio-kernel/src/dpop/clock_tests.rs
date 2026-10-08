@@ -156,3 +156,35 @@ fn commit_disables_owner_rollback_without_sampling_an_unavailable_clock() {
     clock.set(101, 1);
     assert!(!store.check_and_insert_through("nonce", "cap", 120).unwrap());
 }
+#[test]
+fn constructors_sample_only_the_supplied_clock() {
+    let clock = Arc::new(TestClock::new(100));
+    let stores = [
+        DpopNonceStore::new(1, Duration::from_secs(10), clock.clone()).unwrap(),
+        DpopNonceStore::new_with_per_capability_capacity(
+            1,
+            1,
+            Duration::from_secs(10),
+            clock.clone(),
+        )
+        .unwrap(),
+    ];
+    for store in &stores {
+        assert!(store.check_and_insert("nonce", "cap").unwrap());
+    }
+    clock.set(105, 5);
+    for store in &stores {
+        assert!(!store.check_and_insert("nonce", "cap").unwrap());
+    }
+    clock.set(111, 11);
+    for store in &stores {
+        assert!(store.check_and_insert("nonce", "cap").unwrap());
+    }
+    clock.fail();
+    for store in &stores {
+        assert!(matches!(
+            store.check_and_insert("other", "cap"),
+            Err(KernelError::Clock(ClockError::Unavailable))
+        ));
+    }
+}

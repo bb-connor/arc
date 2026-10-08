@@ -586,7 +586,10 @@ mod tests {
     #[test]
     fn issuance_response_accepts_trusted_valid_signature() -> Result<(), Box<dyn std::error::Error>>
     {
-        let authority = LocalCapabilityAuthority::new(Keypair::generate());
+        let authority = LocalCapabilityAuthority::new_with_clock(
+            Keypair::generate(),
+            std::sync::Arc::new(chio_kernel::SystemClock),
+        );
         let issued = issue_test_capability(&authority)?;
         let remote = remote_with_trusted_key(authority.authority_public_key())?;
 
@@ -602,8 +605,14 @@ mod tests {
     #[test]
     fn issuance_response_rejects_unknown_issuer_without_changing_trust(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let trusted_authority = LocalCapabilityAuthority::new(Keypair::generate());
-        let untrusted_authority = LocalCapabilityAuthority::new(Keypair::generate());
+        let trusted_authority = LocalCapabilityAuthority::new_with_clock(
+            Keypair::generate(),
+            std::sync::Arc::new(chio_kernel::SystemClock),
+        );
+        let untrusted_authority = LocalCapabilityAuthority::new_with_clock(
+            Keypair::generate(),
+            std::sync::Arc::new(chio_kernel::SystemClock),
+        );
         let issued = issue_test_capability(&untrusted_authority)?;
         let current = trusted_authority.authority_public_key();
 
@@ -626,7 +635,10 @@ mod tests {
     #[test]
     fn issuance_response_rejects_invalid_signature_from_trusted_issuer(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let authority = LocalCapabilityAuthority::new(Keypair::generate());
+        let authority = LocalCapabilityAuthority::new_with_clock(
+            Keypair::generate(),
+            std::sync::Arc::new(chio_kernel::SystemClock),
+        );
         let mut issued = issue_test_capability(&authority)?;
         issued.capability.subject = Keypair::generate().public_key();
 
@@ -649,8 +661,14 @@ mod tests {
     #[test]
     fn historical_rotated_issuance_does_not_install_refreshed_trust(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let previous = LocalCapabilityAuthority::new(Keypair::generate());
-        let rotated = LocalCapabilityAuthority::new(Keypair::generate());
+        let previous = LocalCapabilityAuthority::new_with_clock(
+            Keypair::generate(),
+            std::sync::Arc::new(chio_kernel::SystemClock),
+        );
+        let rotated = LocalCapabilityAuthority::new_with_clock(
+            Keypair::generate(),
+            std::sync::Arc::new(chio_kernel::SystemClock),
+        );
         let previous_key = previous.authority_public_key();
         let rotated_key = rotated.authority_public_key();
         let remote = remote_with_trusted_key(previous_key.clone())?;
@@ -683,8 +701,14 @@ mod tests {
     #[test]
     fn valid_rotated_issuance_installs_status_derived_trust(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let previous = LocalCapabilityAuthority::new(Keypair::generate());
-        let rotated = LocalCapabilityAuthority::new(Keypair::generate());
+        let previous = LocalCapabilityAuthority::new_with_clock(
+            Keypair::generate(),
+            std::sync::Arc::new(chio_kernel::SystemClock),
+        );
+        let rotated = LocalCapabilityAuthority::new_with_clock(
+            Keypair::generate(),
+            std::sync::Arc::new(chio_kernel::SystemClock),
+        );
         let previous_key = previous.authority_public_key();
         let rotated_key = rotated.authority_public_key();
         let remote = remote_with_trusted_key(previous_key.clone())?;
@@ -716,7 +740,10 @@ mod tests {
     #[test]
     fn issuance_response_fails_closed_when_cached_or_refreshed_current_key_is_absent(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let authority = LocalCapabilityAuthority::new(Keypair::generate());
+        let authority = LocalCapabilityAuthority::new_with_clock(
+            Keypair::generate(),
+            std::sync::Arc::new(chio_kernel::SystemClock),
+        );
         let issued = issue_test_capability(&authority)?;
         let remote = RemoteCapabilityAuthority {
             clock: chio_test_support::clock::clock(),
@@ -773,7 +800,10 @@ mod tests {
     #[test]
     fn trusted_signed_substitution_is_rejected_before_return(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let authority = LocalCapabilityAuthority::new(Keypair::generate());
+        let authority = LocalCapabilityAuthority::new_with_clock(
+            Keypair::generate(),
+            std::sync::Arc::new(chio_kernel::SystemClock),
+        );
         let issued = issue_test_capability(&authority)?;
         let substituted = authority.issue_capability(
             &Keypair::generate().public_key(),
@@ -799,7 +829,10 @@ mod tests {
     #[test]
     fn stale_current_key_is_refreshed_before_issuance_acceptance(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let authority = LocalCapabilityAuthority::new(Keypair::generate());
+        let authority = LocalCapabilityAuthority::new_with_clock(
+            Keypair::generate(),
+            std::sync::Arc::new(chio_kernel::SystemClock),
+        );
         let issued = issue_test_capability(&authority)?;
         let remote = RemoteCapabilityAuthority {
             clock: chio_test_support::clock::clock(),

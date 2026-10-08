@@ -99,8 +99,12 @@ fn freshness_saturates_skew_but_rejects_deadline_overflow() {
 
 #[test]
 fn nonce_store_matches_fresh_and_replayed_projections() {
-    let store = DpopNonceStore::new(8, Duration::from_secs(60))
-        .test_expect("positive replay store test capacities");
+    let store = DpopNonceStore::new(
+        8,
+        Duration::from_secs(60),
+        std::sync::Arc::new(chio_kernel::SystemClock),
+    )
+    .test_expect("positive replay store test capacities");
 
     assert_eq!(
         store.check_and_insert("nonce", "cap").test_unwrap(),

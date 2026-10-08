@@ -78,8 +78,12 @@ impl ReceiptProjection {
 
 #[test]
 fn dpop_nonce_projection_rejects_replay() {
-    let store = DpopNonceStore::new(8, Duration::from_secs(60))
-        .test_expect("positive replay store test capacities");
+    let store = DpopNonceStore::new(
+        8,
+        Duration::from_secs(60),
+        std::sync::Arc::new(chio_kernel::SystemClock),
+    )
+    .test_expect("positive replay store test capacities");
 
     assert!(store.check_and_insert("nonce-1", "cap-1").test_unwrap());
     assert!(!store.check_and_insert("nonce-1", "cap-1").test_unwrap());

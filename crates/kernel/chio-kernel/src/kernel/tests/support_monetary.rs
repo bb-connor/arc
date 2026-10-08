@@ -1276,8 +1276,12 @@ pub(super) fn make_dpop_kernel_and_cap(
     let mut kernel = make_kernel(config);
     kernel.register_tool_server(Box::new(EchoServer::new(server, vec![tool])));
 
-    let nonce_store = dpop::DpopNonceStore::new(1024, std::time::Duration::from_secs(300))
-        .expect("positive replay store test capacities");
+    let nonce_store = dpop::DpopNonceStore::new(
+        1024,
+        std::time::Duration::from_secs(300),
+        std::sync::Arc::new(crate::SystemClock),
+    )
+    .expect("positive replay store test capacities");
     kernel
         .set_dpop_store(nonce_store, dpop::DpopConfig::default())
         .unwrap_or_else(|error| panic!("DPoP fixture installation: {error}"));

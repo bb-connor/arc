@@ -2025,6 +2025,7 @@ fn build_reveal_kernel(inputs: &RevealKernelInputs<'_>) -> Result<ChioKernel, An
             DpopNonceStore::new(
                 dpop_config.nonce_store_capacity,
                 std::time::Duration::from_secs(dpop_config.proof_ttl_secs),
+                std::sync::Arc::new(chio_kernel::SystemClock),
             )?,
             dpop_config,
         )

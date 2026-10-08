@@ -701,8 +701,12 @@ fn committed_dispatch_credential_retains_replay_marker_under_capacity_pressure(
     let (mut kernel, capability) = make_dpop_kernel_and_cap(&agent, server, tool);
     kernel
         .set_dpop_store(
-            dpop::DpopNonceStore::new(1, Duration::from_secs(60))
-                .expect("positive replay store test capacities"),
+            dpop::DpopNonceStore::new(
+                1,
+                Duration::from_secs(60),
+                std::sync::Arc::new(crate::SystemClock),
+            )
+            .expect("positive replay store test capacities"),
             dpop::DpopConfig::default(),
         )
         .unwrap_or_else(|error| panic!("DPoP fixture installation: {error}"));

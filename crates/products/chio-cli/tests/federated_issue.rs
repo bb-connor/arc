@@ -231,7 +231,10 @@ fn seed_subject_history(
     budget_db_path: &Path,
     subject_kp: &Keypair,
 ) -> String {
-    let authority = LocalCapabilityAuthority::new(Keypair::generate());
+    let authority = LocalCapabilityAuthority::new_with_clock(
+        Keypair::generate(),
+        std::sync::Arc::new(chio_kernel::SystemClock),
+    );
     let capability = authority
         .issue_capability(
             &subject_kp.public_key(),

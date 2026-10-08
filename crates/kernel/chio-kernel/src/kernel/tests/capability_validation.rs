@@ -17,7 +17,10 @@ fn kg2_receipt_key_cannot_issue_after_distinct_authority_configuration(
         make_scope(vec![make_grant("srv-a", "read_file")]),
         300,
     );
-    kernel.set_capability_authority(Box::new(LocalCapabilityAuthority::new(make_keypair())));
+    kernel.set_capability_authority(Box::new(LocalCapabilityAuthority::new_with_clock(
+        make_keypair(),
+        std::sync::Arc::new(crate::SystemClock),
+    )));
     let response = kernel.evaluate_tool_call_blocking(&make_request(
         "receipt-key-is-not-issuer",
         &capability,

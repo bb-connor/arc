@@ -515,6 +515,7 @@ impl FindingOperatorPurchaseExecutor {
                 DpopNonceStore::new(
                     dpop.nonce_store_capacity,
                     std::time::Duration::from_secs(dpop.proof_ttl_secs),
+                    kernel.authority_clock(),
                 )
                 .map_err(execution_internal)?,
                 dpop,

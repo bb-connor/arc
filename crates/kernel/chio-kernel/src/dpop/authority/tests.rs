@@ -150,8 +150,12 @@ fn exact_authority_signature_yields_only_non_consuming_bounded_evidence() {
 #[test]
 fn legacy_consuming_and_preview_ports_refuse_v2_without_burning_a_nonce() {
     let (_, cap, proof) = fixture();
-    let store = DpopNonceStore::new(8, Duration::from_secs(300))
-        .expect("positive replay store test capacities");
+    let store = DpopNonceStore::new(
+        8,
+        Duration::from_secs(300),
+        std::sync::Arc::new(crate::SystemClock),
+    )
+    .expect("positive replay store test capacities");
     assert!(matches!(
         crate::dpop::verify_dpop_proof_stateless(
             &proof,

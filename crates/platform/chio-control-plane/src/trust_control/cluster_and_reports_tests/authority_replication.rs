@@ -186,9 +186,12 @@ fn assert_kernel_rejects_issuer(
         "server_id": "test-server", "tool_name": "read", "operations": ["invoke"], "constraints": []
     }], "resource_grants": [], "prompt_grants": []}))
     .test_unwrap();
-    let capability = LocalCapabilityAuthority::new(attacker.clone())
-        .issue_capability(&subject, scope, 60)
-        .test_unwrap();
+    let capability = LocalCapabilityAuthority::new_with_clock(
+        attacker.clone(),
+        std::sync::Arc::new(chio_kernel::SystemClock),
+    )
+    .issue_capability(&subject, scope, 60)
+    .test_unwrap();
     let request = ToolCallRequest {
         request_id: "refused-issuer".into(),
         capability,

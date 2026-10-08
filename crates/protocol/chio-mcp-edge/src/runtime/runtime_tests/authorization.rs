@@ -282,7 +282,12 @@ fn inbound_authority_mcp_proof_reaches_session_dispatch() {
     let agent = Keypair::generate();
     kernel
         .set_dpop_store(
-            DpopNonceStore::new(32, std::time::Duration::from_secs(300)).unwrap(),
+            DpopNonceStore::new(
+                32,
+                std::time::Duration::from_secs(300),
+                std::sync::Arc::new(chio_kernel::SystemClock),
+            )
+            .unwrap(),
             DpopConfig::default(),
         )
         .unwrap();
