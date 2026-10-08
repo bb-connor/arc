@@ -84,19 +84,32 @@ while IFS= read -r line; do
   rest="${line#*:}"
   text="${rest#*:}"
 
-  # The trusted qualification auditor consumes internal App metadata v2.
-  # Exempt only this exact quoted identifier in its exact producer path;
-  # an adjacent future core-wire or normative claim must still fail.
-  if [[ "$path" == "scripts/audit-security-merge-qualification.py" ]]; then
-    authority_text="${text//\"chio.security-check-authority.v2\"/}"
-    if [[ "$authority_text" != "$text" ]]; then
-      authority_scan_status=0
-      rg -q "$pattern|$normative_claim_pattern" <<<"$authority_text" || authority_scan_status=$?
-      if ((authority_scan_status > 1)); then
-        echo "ripgrep failed while rechecking the trusted auditor schema line" >&2
-        exit "$authority_scan_status"
+  # The trusted qualification auditor and its definition self-test consume
+  # internal App check metadata. Exempt only the exact quoted identifiers
+  # reviewed for each exact path; an adjacent future core-wire or normative
+  # claim on the same line must still fail.
+  reviewed_literals=()
+  case "$path" in
+    "scripts/audit-security-merge-qualification.py")
+      reviewed_literals=('"chio.security-check-authority.v3"')
+      ;;
+    "scripts/tests/check-security-definitions.test.py")
+      reviewed_literals=('"chio.security-check-authority.v3"' '"chio.security-check-publication.v2"')
+      ;;
+  esac
+  if ((${#reviewed_literals[@]})); then
+    reviewed_text="$text"
+    for literal in "${reviewed_literals[@]}"; do
+      reviewed_text="${reviewed_text//"$literal"/}"
+    done
+    if [[ "$reviewed_text" != "$text" ]]; then
+      reviewed_scan_status=0
+      rg -q "$pattern|$normative_claim_pattern" <<<"$reviewed_text" || reviewed_scan_status=$?
+      if ((reviewed_scan_status > 1)); then
+        echo "ripgrep failed while rechecking a reviewed check metadata line" >&2
+        exit "$reviewed_scan_status"
       fi
-      if ((authority_scan_status == 1)); then
+      if ((reviewed_scan_status == 1)); then
         continue
       fi
     fi
