@@ -1,5 +1,11 @@
 # Security and process landing ledger
 
+## Corrected fixture and owning checkpoint (2026-10-08)
+
+The [current correction checkpoint](audits/fixture-correction-checkpoint-20261008.json) records the whole remote MCP library passing 192 cases and the egress integration target passing five at `e5853308c9`. Broker integrity controls pass four cases, the private selector guards pass three, and the missing-plan router passes three. Historical-query tamper refusal remains covered before the pending authenticated-removal repair.
+
+The earlier nonce-cleanup diagnosis was incorrect: ordinary MCP calls never retain that native request artifact. The corrected test uses coherent metadata through public validation and mint APIs. Earlier setup failures remain retained. Eight-owner strict lint found a test-only future ownership issue; its correction is committed and awaiting recheck. Finality, native/trusted/hosted qualification and protected landing remain open. All 1,793 prior requirement rows are preserved.
+
 ## Latest integration checkpoint (2026-10-08)
 
 The [current local repair checkpoint](audits/repair-batch-local-checkpoint-20261008.json) retains 31 exact-source campaigns. Bounded recovery/FX, correlation, overlay rollback, broker selection and runner lifetime repairs have passing local evidence; the whole runner module passes 34 cases. Remote MCP has 191 passes and one new nonce-fixture failure with a test-only correction awaiting recheck. The 16-call participant-history test passes without losing prior custody, while actual production native performance remains unqualified.
