@@ -21,7 +21,7 @@ fn authenticated_snapshot_over_two_mib_keeps_its_existing_canonical_reader_contr
             .collect(),
     )
     .unwrap_or_else(|error| panic!("bounded affected set: {error}"));
-    assert_eq!(ids.len(), 4096);
+    assert_eq!(ids.as_slice().len(), 4096);
     let spec_bytes = canonical_json_bytes(&CapabilitySetSuspensionSpec {
         affected_ids: ids.clone(),
     })

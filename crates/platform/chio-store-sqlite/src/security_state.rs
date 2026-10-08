@@ -1,10 +1,10 @@
 mod capability_set_suspension;
-mod effect_finality;
 #[cfg(all(test, unix))]
 mod database_file_tests;
 #[cfg(test)]
 mod deadline_tests;
 mod declassification;
+mod effect_finality;
 mod flow_state;
 mod issuance_freeze;
 mod native_declassification;
@@ -847,7 +847,7 @@ use scheduler::{
 };
 
 mod schema;
-use schema::{migrate, SECURITY_STATE_STORE_SUPPORTED_SCHEMA_VERSION};
+use schema::migrate;
 
 mod session_throttle;
 use session_throttle::load_session_throttle_snapshot;
