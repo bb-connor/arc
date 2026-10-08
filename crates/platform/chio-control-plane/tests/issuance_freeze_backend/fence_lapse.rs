@@ -20,6 +20,8 @@ use chio_store_sqlite::SqliteSecurityStateStore;
 
 use super::*;
 
+mod composition;
+
 const PLAN_TTL_MS: u64 = 120_000;
 const INITIAL_FENCE_MS: u64 = 15_000;
 const SCHEDULER_LEASE_MS: u64 = 10_000;
