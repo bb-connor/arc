@@ -213,7 +213,7 @@ fn ceil(value: u64, divisor: u64) -> Result<u64, String> {
     }
     value
         .checked_div(divisor)
-        .and_then(|quotient| quotient.checked_add(u64::from(value % divisor != 0)))
+        .and_then(|quotient| quotient.checked_add(u64::from(!value.is_multiple_of(divisor))))
         .ok_or_else(|| "SQLite physical price ceiling exhausted".to_owned())
 }
 

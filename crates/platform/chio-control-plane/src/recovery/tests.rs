@@ -1,8 +1,8 @@
 use crate::security::adapters::{FlowResolverConfig, NativeFlowResolver};
 use chio_core::{
-    Keypair,
     capability::scope::{ChioScope, Operation, ToolGrant},
     capability::token::CapabilityToken,
+    Keypair,
 };
 use chio_kernel::admission_operation::{
     AdmissionIdentifier, AdmissionOperationState, AdmissionOperationStore,
@@ -20,8 +20,8 @@ use chio_store_sqlite::security_state::SqliteSecurityParticipantSource;
 use chio_store_sqlite::{SqliteAuthorityStore, SqliteSecurityStateStore};
 use std::collections::BTreeMap;
 use std::sync::{
-    Arc,
     atomic::{AtomicUsize, Ordering},
+    Arc,
 };
 mod bootstrap;
 use bootstrap::*;
@@ -74,9 +74,9 @@ mod workflow_lifecycle;
 use crate::recovery::{RecoveryCommandResultV1, RecoveryRuntime};
 use chio_core::crypto::Ed25519Backend;
 use chio_core_types::recovery::SignedAuthorityCoverageAttestationV1;
-use chio_kernel::ToolInvocationContext;
 use chio_kernel::admission_operation::DurableAdmissionMode;
 use chio_kernel::recovery::*;
+use chio_kernel::ToolInvocationContext;
 use chio_process::{ProcessLimits, ProcessRuntime, ProcessSecurityProfile};
 use chio_security_types::recovery::*;
 use serde_json::Value;
@@ -864,13 +864,11 @@ async fn recovery_frozen_denial_gets_a_distinct_successful_native_continuation()
         result.status.effect,
         EffectObservationV1::Complete { .. }
     ));
-    assert!(
-        result
-            .original_response
-            .ok_or("useful disclosure result")?
-            .receipt
-            .verify_signature()?
-    );
+    assert!(result
+        .original_response
+        .ok_or("useful disclosure result")?
+        .receipt
+        .verify_signature()?);
     assert_eq!(f.effects.load(Ordering::SeqCst), 1);
     assert_eq!(f.process.process("root")?.tree_calls, 2);
     assert_eq!(chio_core::canonical_json_bytes(&f.seed)?, original_bytes);
@@ -1107,8 +1105,8 @@ async fn recovery_crash_child() -> TestResult {
         external_count(&f.path)?,
     );
     if let Some(intent) = returned.admission.as_ref() {
-        use chio_kernel::ReceiptStore;
         use chio_kernel::admission_operation::{AdmissionOperationId, AdmissionTerminalReplay};
+        use chio_kernel::ReceiptStore;
         if let Some(operation) = f
             .authority
             .admission_operation_store()
@@ -1512,16 +1510,15 @@ async fn recovery_cancel_negative_lookup_fences_late_original_admission() -> Tes
         .await;
     assert_eq!(external_count(&f.path)?, 0);
     let native = closed.admission.ok_or("intent")?;
-    assert!(
-        f.authority
-            .admission_operation_store()
-            .load_by_operation_id(
-                &chio_kernel::admission_operation::AdmissionOperationId::from_persisted(
-                    native.native_operation_id.as_str()
-                )?
+    assert!(f
+        .authority
+        .admission_operation_store()
+        .load_by_operation_id(
+            &chio_kernel::admission_operation::AdmissionOperationId::from_persisted(
+                native.native_operation_id.as_str()
             )?
-            .is_none()
-    );
+        )?
+        .is_none());
     assert_eq!(f.process.process("root")?.tree_calls, 2);
     assert!(f.record(&id)?.admission_closed);
     Ok(())
@@ -1651,11 +1648,10 @@ async fn recovery_partial_finality_is_positive_scoped_and_spends_the_original() 
         foreign.workflow_id = WorkflowId::new("foreign")?;
         let foreign = SignedRecoveryProviderFinalityV1::sign(foreign, &signer)?;
         assert!(foreign.verify_signature()?);
-        assert!(
-            f.kernel
-                .attach_recovery_provider_finality(&actor, &id, &foreign)
-                .is_err()
-        );
+        assert!(f
+            .kernel
+            .attach_recovery_provider_finality(&actor, &id, &foreign)
+            .is_err());
         let proof = SignedRecoveryProviderFinalityV1::sign(body, &signer)?;
         f.kernel
             .attach_recovery_provider_finality(&actor, &id, &proof)?;
@@ -1889,26 +1885,23 @@ async fn recovery_workflow_flood_retains_settlement_and_tombstones() -> TestResu
         |row| row.get(0),
     )?;
     assert_eq!(workflows, 64);
-    assert!(
-        connection
-            .execute(
-                "DELETE FROM admission_operation_recovery_records WHERE kind='workflow'",
-                []
-            )
-            .is_err()
-    );
+    assert!(connection
+        .execute(
+            "DELETE FROM admission_operation_recovery_records WHERE kind='workflow'",
+            []
+        )
+        .is_err());
     assert!(connection.execute("UPDATE admission_operation_recovery_records SET native_request='foreign' WHERE native_request IS NOT NULL",[]).is_err());
     let native = f.record(&id)?.admission.ok_or("intent")?;
-    assert!(
-        f.authority
-            .admission_operation_store()
-            .load_by_operation_id(
-                &chio_kernel::admission_operation::AdmissionOperationId::from_persisted(
-                    native.native_operation_id.as_str()
-                )?
+    assert!(f
+        .authority
+        .admission_operation_store()
+        .load_by_operation_id(
+            &chio_kernel::admission_operation::AdmissionOperationId::from_persisted(
+                native.native_operation_id.as_str()
             )?
-            .is_some()
-    );
+        )?
+        .is_some());
     Ok(())
 }
 #[tokio::test]
@@ -2022,7 +2015,7 @@ async fn recovery_two_coordinators_select_once_and_review_exact_payload() -> Tes
 #[tokio::test]
 async fn recovery_transport_closed_replay_and_audience_refusals() -> TestResult {
     use axum::{
-        body::{Body, to_bytes},
+        body::{to_bytes, Body},
         http::{Request, StatusCode},
     };
     use tower::ServiceExt;
@@ -2148,12 +2141,11 @@ async fn recovery_rotated_scope_refuses_pending_approval_without_replacing_ident
             expected_revision: before.revision,
         },
     )?;
-    assert!(
-        f.runtime
-            .execute_command(&f.control, &resume)
-            .await
-            .is_err()
-    );
+    assert!(f
+        .runtime
+        .execute_command(&f.control, &resume)
+        .await
+        .is_err());
     let after = f.record(&id)?;
     assert_eq!(
         chio_core::canonical_json_bytes(&before.action)?,
