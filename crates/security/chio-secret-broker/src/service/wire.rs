@@ -1,6 +1,7 @@
 use super::{
     BrokerError, Deserialize, Read, Result, Serialize, Write, Zeroize, Zeroizing, MAX_WIRE_BYTES,
 };
+use chio_secure_ipc::frame::FrameError;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -722,34 +723,40 @@ pub struct IpcResponse {
     pub error_code: Option<String>,
 }
 
-pub(super) fn read_bounded_sensitive_frame(reader: &mut impl Read) -> Result<Zeroizing<Vec<u8>>> {
-    let mut prefix = [0_u8; 4];
-    reader.read_exact(&mut prefix).map_err(|error| {
-        BrokerError::InvalidRequest(format!("IPC frame prefix failed: {error}"))
-    })?;
-    let length = usize::try_from(u32::from_be_bytes(prefix))
-        .map_err(|_| BrokerError::InvalidRequest("IPC frame length overflow".to_string()))?;
-    if length == 0 || length > MAX_WIRE_BYTES {
-        return Err(BrokerError::InvalidRequest(
-            "IPC frame is empty or oversized".to_string(),
-        ));
+/// A frame fault as a broker error. A refused length or a failed read is the
+/// peer's fault; a limit outside the prefix range is the broker's own.
+fn ipc_frame_error(error: FrameError, length_refusal: &'static str) -> BrokerError {
+    match error {
+        FrameError::Prefix(error) => {
+            BrokerError::InvalidRequest(format!("IPC frame prefix failed: {error}"))
+        }
+        FrameError::Body(error) => {
+            BrokerError::InvalidRequest(format!("IPC frame body failed: {error}"))
+        }
+        FrameError::Empty | FrameError::Oversized { .. } => {
+            BrokerError::InvalidRequest(length_refusal.to_string())
+        }
+        FrameError::InvalidLimit { .. } => {
+            BrokerError::Invariant("IPC frame limit is invalid".to_string())
+        }
+        FrameError::Write(error) => {
+            BrokerError::Storage(format!("IPC response write failed: {error}"))
+        }
     }
-    let mut frame = Zeroizing::new(vec![0_u8; length]);
-    read_sensitive_frame_body(reader, &mut frame)?;
-    Ok(frame)
 }
 
+pub(super) fn read_bounded_sensitive_frame(reader: &mut impl Read) -> Result<Zeroizing<Vec<u8>>> {
+    chio_secure_ipc::frame::read_sensitive_frame(reader, MAX_WIRE_BYTES)
+        .map_err(|error| ipc_frame_error(error, "IPC frame is empty or oversized"))
+}
+
+#[cfg(test)]
 pub(super) fn read_sensitive_frame_body(
     reader: &mut impl Read,
     frame: &mut Zeroizing<Vec<u8>>,
 ) -> Result<()> {
-    if let Err(error) = reader.read_exact(frame.as_mut_slice()) {
-        frame.zeroize();
-        return Err(BrokerError::InvalidRequest(format!(
-            "IPC frame body failed: {error}"
-        )));
-    }
-    Ok(())
+    chio_secure_ipc::frame::read_sensitive_frame_body(reader, frame)
+        .map_err(|error| ipc_frame_error(error, "IPC frame is empty or oversized"))
 }
 
 pub fn read_bounded_frame(reader: &mut impl Read) -> Result<Vec<u8>> {
@@ -773,35 +780,11 @@ pub(crate) fn response_payload_limit(operation: IpcOperation) -> usize {
 }
 
 pub(crate) fn read_frame_with_limit(reader: &mut impl Read, maximum: usize) -> Result<Vec<u8>> {
-    let mut prefix = [0_u8; 4];
-    reader.read_exact(&mut prefix).map_err(|error| {
-        BrokerError::InvalidRequest(format!("IPC frame prefix failed: {error}"))
-    })?;
-    let length = usize::try_from(u32::from_be_bytes(prefix))
-        .map_err(|_| BrokerError::InvalidRequest("IPC frame length overflow".to_string()))?;
-    if length == 0 || length > maximum {
-        return Err(BrokerError::InvalidRequest(
-            "IPC frame is empty or oversized".to_string(),
-        ));
-    }
-    let mut frame = vec![0_u8; length];
-    reader
-        .read_exact(&mut frame)
-        .map_err(|error| BrokerError::InvalidRequest(format!("IPC frame body failed: {error}")))?;
-    Ok(frame)
+    chio_secure_ipc::frame::read_frame(reader, maximum)
+        .map_err(|error| ipc_frame_error(error, "IPC frame is empty or oversized"))
 }
 
 pub fn write_bounded_frame(writer: &mut impl Write, frame: &[u8]) -> Result<()> {
-    if frame.is_empty() || frame.len() > MAX_WIRE_BYTES {
-        return Err(BrokerError::InvalidRequest(
-            "IPC response frame is empty or oversized".to_string(),
-        ));
-    }
-    let length = u32::try_from(frame.len())
-        .map_err(|_| BrokerError::InvalidRequest("IPC response length overflow".to_string()))?;
-    writer
-        .write_all(&length.to_be_bytes())
-        .and_then(|()| writer.write_all(frame))
-        .and_then(|()| writer.flush())
-        .map_err(|error| BrokerError::Storage(format!("IPC response write failed: {error}")))
+    chio_secure_ipc::frame::write_frame(writer, frame, MAX_WIRE_BYTES)
+        .map_err(|error| ipc_frame_error(error, "IPC response frame is empty or oversized"))
 }
