@@ -74,8 +74,9 @@ source or open PR alone establishes runtime readiness.
 - [ ] Qualify native peer and intended-server authentication, bounded decoding, scoped store access, competing-owner fencing, credential custody, boot/incarnation and profile lifecycle. Exercise direct installed IPC clients, including clients other than any optional controller. Refusal must precede protected bytes or effects.
 - [ ] Bind authenticated bounded receipt, lineage, usage and revocation reads. Preserve unknown/missing values and provenance. Hook omission/crash remains detect_only; hook success is not a verified native effect.
 - [ ] For streaming, qualify S5 Part A then the required Part B source adapters against independent headless consumers. Test audience, stable subscription identity, gap/restore and bounded non-persisting reads. Work and recovery sources wait for their respective owner gates. Do not spend settlement reserve on observation.
+- [ ] Qualify time-bound authority for every selected profile through Q31, including read/approval/service credentials and release evidence; execution additionally retains Q12/Q19. Record actual clock/freshness ports and independently refuse revival after rollback or unprovable time.
 - [ ] Qualify exact native resource bounds, persistent state/migration, secret/egress and lifecycle ports selected by the profile. Same-user arbitrary consumers require explicit enrollment/custody, not a broadened UID check. Record unsupported resource classes.
-- [ ] Pass applicable Q04/Q09-Q13/Q15-Q21 and Q23/Q29/Q30. Pure reads do not acquire W1/M20 or unexposed mutation gates. Any lifecycle or export mutation already exposed must pass Q02 at its actual owner.
+- [ ] Pass applicable Q04/Q09-Q13/Q15-Q21 and Q23/Q29-Q31. Pure reads do not acquire W1/M20 or unexposed mutation gates. Any lifecycle or export mutation already exposed must pass Q02 at its actual owner.
 
 ### Selected work, authority and control capabilities
 
@@ -90,6 +91,34 @@ source or open PR alone establishes runtime readiness.
 **Acceptance:** Each capability is eligible only after its own native gates. Read,
 resource and stop capabilities can proceed independently where their contracts
 permit. No requirement to build a workbench or run sealed coding first.
+
+## Packet 2a: Implement native profile qualification and activation enforcement
+
+**Owner:** Existing `crates/tooling/chio-release-evidence`, extending its present
+artifact-manifest function through [RELEASE](../specs/2026-10-07-desktop-integration/RELEASE.md).
+Current `--verify` proves no Q-case completeness or profile readiness.
+
+**Files:** Existing `src/main.rs`/`Cargo.toml`; proposed `src/lib.rs`,
+`src/native_host.rs`, `tests/native_host_qualification.rs` in that crate;
+owner-approved versioned catalog/schema; actual native lifecycle/activation
+entrypoints recorded by O0/M0 and their Linux/macOS adapters/tests.
+
+**Depends on:** packet 1's selected-profile inventory and native owner contracts.
+This implementation precedes O7/M10 activation/promotion tests. Candidate assembly
+can precede installed case completion, with unqualified state explicit. Packet
+2a source implementation is not itself final candidate qualification.
+
+- [ ] Preserve the existing self-signed artifact manifest and decoder. Implement a distinct versioned native-profile contract and strict bounded verifier over exact candidate inventory, independently authenticated requirement catalog/release policy and authorized evidence. Reuse existing canonical/signature owners, with trust roots provisioned independently of the submitted manifest.
+- [ ] Encode required owner/Q/C/platform subcases, positive controls and independent observations. Bind exact capability/deployment tuple, policy/catalog, source/runtime/client artifacts and current validity. Refuse empty-ready, omitted/failed/skipped/unknown evidence, unauthorized exclusions, wrong issuer, stale/revoked records and version/floor rollback. Do not let the submitted result set define which tests are required.
+- [ ] Expose the owner-approved typed verifier library and CLI result; document the real command after implementation. It cannot be a caller-provided ready flag or merely a self-signature check. Release eligibility supplies no runtime effect authority.
+- [ ] Implement RELEASE's separately authorized qualification-only candidate mode before installed tests: exact candidate/test principal, bounded fixture resources and finite scope, required native predecessor gates, no production route or self-selected test bypass. Qualify cross-mode refusal so installed evidence can be generated before production promotion without a circular gate.
+- [ ] Wire the verifier into actual native profile enablement, startup and update/backend/principal/policy activation paths before publication of a protected capability. O0/M0 must name concrete source call sites and tests, including signed-byte/active-generation custody and race-safe rejection. A standalone verifier with no installed enforcement is incomplete.
+- [ ] Implement all RELEASE mutation/removal/issuer/decoding/clock/TOCTOU cases at the real owner and native consumers. Use independent route, protected-byte and effect counters; preserve useful passing controls. Existing `cargo test --locked -p chio-release-evidence` remains a regression gate; add the proposed native qualification suite and actual platform activation tests with recorded commands.
+- [ ] Register this predecessor in O6/O7 and M9/M10. Installed tests supply exact candidate-bound outcomes after assembly; the implemented verifier then consumes them for promotion. No mock, unbound CLI, manifest hash list or source-only test closes the installed gate. Commit owner implementation and each native consumer in reviewable slices.
+
+**Acceptance:** One concrete shared owner implements evidence completeness and
+trusted eligibility; actual installed activation refuses every omitted required
+case and substituted tuple while a complete authorized candidate succeeds.
 
 ## Packet 3: Bind real native owner interfaces and qualify candidates
 

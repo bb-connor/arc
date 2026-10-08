@@ -6,6 +6,14 @@ Document checks, mock data and historical host runs cannot satisfy runtime gates
 
 ## Evidence identity and authority
 
+[RELEASE](RELEASE.md) assigns the native-profile schema, trusted verifier and
+activation enforcement to shared packet 2a in `chio-release-evidence` plus the
+actual native lifecycle consumers. The existing tool verifies artifact hashes
+and a self-signed internal manifest; it does not enforce Q-case completeness or
+profile readiness. O7/M10 cannot close until packet 2a supplies that executable
+gate and their installed tests exercise its actual activation call sites.
+
+
 A qualification record binds the owner source commit, public release revision,
 host/plugin versions, controller/client builds, OS version and architecture,
 backend and policy digest, artifact hashes, test commands, raw outputs, expected
@@ -285,7 +293,7 @@ claims additionally require the coordination/resource/cooperation cases below.
 
 ## Systems-layer acceptance added by the product-direction amendment
 
-Q23-Q30 supplement, rather than replace, Q01-Q22. Qualification is per advertised
+Q23-Q31 supplement, rather than replace, Q01-Q22. Qualification is per advertised
 capability and deployment profile. Pure Observe still has no effect, passport,
 recursive-work or cross-organization dependency unless it exposes that feature.
 A selected GUI applies every graphical/browser case; a headless exclusion must
@@ -301,6 +309,7 @@ name the absent UI surface and retain all equivalent native read/effect cases.
 | Q28 | Federation/W2/recovery owners: enrolled separately controlled peers do useful unpaid work; either refuses; substitute peer/treaty/audience/current authority; lose responses/evidence delivery and revoke present release access | Independent local refusal and audience protection; original-ID reconciliation without duplicate rights/effects; historical obligations remain separate from current disclosure. Local multi-process runs do not prove independent organizational administration. C06/C07 require actual counterpart custody and evidence. Funding adds its own gates only if selected. |
 | Q29 | Native profile/credential/lifecycle owners: user-session lock/logout versus separately enrolled service principal; boot, expiry, credential lock/replacement, cross-context request and removal | No session-to-service privilege conversion; no root/linger/launch registration/detach authorization shortcut. Correct principal, credential/store audience and independent expiry survive restart; unknown authority refuses. Native platform oracles verify credentials and effects before any frontend starts. |
 | Q30 | Architecture/release owner: inspect linked/loaded trusted components and stores, remove optional projection; select runtime adapter with mismatched or missing evidence; drop a required consumer/native test | Declared custody/fact-source TCB and owner dependency closure match actual artifact; no hidden application signer or ledger and no new universal daemon requirement. Native feature remains frontend-independent but cannot promote without its exact owner/backend/case evidence. Record useful controls and actual measured resource bounds. |
+| Q31 | Every native owner consuming time-bounded authority or qualification evidence: useful current read/grant/approval/service lease; expire it, roll realtime backward; independently test forward jumps, stale/missing clock/freshness, suspend, restart/boot changes | An expired or unprovably current credential, grant, lease, read authority or release record cannot revive or authorize protected bytes/effects. Observe and approval-only profiles test their actual owners without acquiring task execution dependencies. Bind effective time/expiry and retained state to the qualified owner context; Q12/Q19 add execution deadline and custody cases only when execution is selected. |
 
 For a release claiming the full product ambition, Q23 plus the selected
 coordination (Q25/Q26 and W1 acceptance), shared resources (Q27), and independent
@@ -310,6 +319,33 @@ unrelated prerequisite for every local operation. The completion record names
 actual capability coverage, independent applications, external harness tuples
 and separately administered owners; unavailable dimensions remain open. No
 marketing shorthand merges these dimensions into one green status.
+
+
+## Expiring authority on every native profile
+
+Q31 is mandatory wherever a selected read, approval, resource, service, credential
+or release path consumes time-bounded authority. It is not limited to task
+execution. Packet 1 records each actual owner clock/freshness interface, absolute
+expiry and any boot-bound elapsed/freshness state. The owner must define and
+qualify how it establishes current validity after realtime corrections, suspend
+and restart without trusting a replayed client timestamp or renewing expiry.
+Missing trustworthy time/freshness refuses the affected protected operation.
+This requirement adds no new clock protocol or frontend-owned time authority.
+
+Start with a useful valid operation through the installed native path. Let its
+authority expire, move realtime backward into its former validity window and
+retry both the original read/operation and a new request under the old authority.
+Native protected-byte canaries, approval/credential retention and dispatch/effect
+counters must show no new release or effect. Repeat forward jumps, unavailable
+clock/freshness, boot changes and retained-state restart; compose suspend with
+clock change where that context can suspend. Include long-lived established
+connections/cached decisions as well as new connections. Recover valid current
+authority through the supported owner path and repeat the useful control.
+Historical reconciliation can report only what its independently authorized
+contract permits; it cannot reuse an old expiry to disclose newly protected
+bytes or dispatch work. Execution profiles additionally prove both independent
+deadline/absolute-expiry and descendant-custody cases described above. A read-only
+profile qualifies Q31 through its read owner, without needing a task runner.
 
 ## Superseded-review trace
 

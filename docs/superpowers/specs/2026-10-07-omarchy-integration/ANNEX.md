@@ -130,7 +130,7 @@ Package selected native owner services and Linux adapters with role-specific sys
 | Controller crash/restart | Reconnect through shared transport, reload native projections and unresolved originals; no automatic new work or replay. Native custody is owned by `chio-process`. |
 | User-session lock or unknown lock state | Conceal sensitive UI and disable new operator mutations; admitted work may continue only within its existing expiry/scope and selected qualified policy. |
 | User-session unlock | Fresh identity/session, compatibility and owner snapshot; no extension of approval/capability expiry. |
-| Suspend/resume or clock uncertainty | Host adapter invalidates stale observations; native owners enforce the boot-associated `CLOCK_BOOTTIME` task deadline and authority-issued absolute expiry, then reconcile/revalidate before new effects. Resume, realtime rollback or restart cannot renew authority or replay work. |
+| Suspend/resume or clock uncertainty | Host adapter invalidates stale observations; each selected native owner revalidates its actual read/action/credential/lease authority and freshness under Q31 before further protected access. Execution additionally enforces the boot-associated `CLOCK_BOOTTIME` task deadline and authority-issued absolute expiry. Resume, realtime rollback or restart cannot revive expired authority, renew a grant or replay work. |
 | User-session logout/session loss | Stop new admission and use S4/process custody for bounded local termination, retaining unresolved effects. Must hold with lingering enabled and missed events. |
 | Per-task stop | Invoke S4 closure, render actual result and independently verify descendant termination where claimed. Do not imply an external effect was undone. |
 | Broad emergency action | Use S8 phase 1 for `Kernel`; later `Tenant`/`Recovery` scopes require phases 4/5. Preserve the distinction from one-task closure and the current unqualified process-local implementation. |
@@ -139,7 +139,26 @@ Package selected native owner services and Linux adapters with role-specific sys
 
 Keep controller, trusted relay/launcher and guest/resource units separately scoped where required by their existing owners. Use role-specific tested hardening, bounded restart/stop behavior, restrictive umask, core-dump suppression, measured cgroup resource limits and fixed executable paths. A unit option unsupported in the user manager must not become silent partial protection. Hardening that disables namespaces or required Node threads cannot be fixed by removing all confinement. A systemd analyzer score is supplementary evidence; effective kernel properties and negative probes decide acceptance.
 
-The existing authority/work/runner/process owners must define and qualify the
+Every selected time-bounded capability maps to shared Q31 through its actual
+native owner, including protected reads/subscriptions, snapshot freshness,
+approval/challenge credentials and service leases where exposed. O0 records the
+actual clock/freshness APIs, validity bounds, retained expiry decision, validation
+points and persistence/restart/boot reconciliation; do not substitute a desktop
+timer or infer this contract from a task deadline. Useful unexpired reads,
+approvals and service access are positive controls. Expire each authority before
+rolling realtime back into its former validity window; separately exercise
+forward jumps, suspend across expiry, restart/boot changes and missing or
+uncertain clock/freshness evidence. Native owners must retain the expired state
+or refuse when its basis is unprovable, never revive the old grant. Independently
+probe protected read bytes, downstream effects and credential issuance/storage/
+reuse as applicable. A stale approval cannot yield an accepted credential or
+effect, and a stale service lease cannot authorize reads or actions. These gates
+apply without execution owners; Observe consumes its own Q31 read/freshness
+cases, not Q12/Q19 task-lifetime cases. Already disclosed bytes or completed
+external effects are not claimed to be undone by expiry. Missing enforcement
+keeps the dependent capability unavailable.
+
+Separately, the existing authority/work/runner/process owners must define and qualify the
 actual Linux clock contract before an execution profile is enabled. The inspected
 mini-swe transport uses `time.monotonic()`; this source does not establish the
 suspend-inclusive contract below. The owner must supply the complete native path. Bind local
@@ -156,7 +175,7 @@ a delayed UI or userspace observation is insufficient. An already dispatched
 external effect may still complete and is reconciled separately, never asserted
 undone by expiry. Missing native
 clock enforcement disables the dependent execution profile, not basic Observe;
-observation still qualifies its own read authority and freshness. This carries
+observation still qualifies its own Q31 read authority and freshness. This carries
 the [Linux clock research](research/linux-platform.md#upstream-linux-conclusions)
 into a required implementation and installed-qualification contract.
 
@@ -187,6 +206,7 @@ The support record binds one explicit profile to the following tuple:
 - Finite per-task and aggregate writable-byte/inode quotas and output ingress/buffer/retention limits, actual host storage and engine-log sinks, native enforcement identities, admission reservations and independently measured receipt/controller/stop headroom.
 - Provider/model route and account binding, supported enforceable limits and unavailable dimensions; credential custody profile.
 - Native deployment profile, enrollment/principal and credential context, adapter and effective units/overrides; user-session lock/logout/linger behavior or separately qualified service boot/lease/revocation behavior.
+- For every selected time-bounded capability, its Q31 native owner, actual clock/freshness API and validity semantics, retained expiry and restart/boot reconciliation, plus independent protected-read/effect/credential evidence. Read, approval and service authority do not inherit an execution deadline implementation by implication.
 - For execution profiles, the actual native clock/deadline implementation, boot-identity binding, suspend-inclusive local lifetime, authority absolute-expiry checks and restart/clock-uncertainty reconciliation evidence.
 
 Source presence, historical tests, a valid manifest and package signatures are separate facts from a supported tuple. The read-only diagnostics path may operate on an unknown tuple if its own transport is compatible; affected execution stays unavailable. Report the changed dimension instead of turning a healthy daemon into an execution-ready claim.
@@ -227,7 +247,7 @@ Report component-specific failures through native diagnostics and selected clien
 
 Operational logs contain fixed codes, bounded counters and redacted identifiers. Prompts, source, provider credentials, approval bodies, raw paths, clipboard, window titles and core dumps are excluded by default. Local diagnostic export has an explicit size cap, contents preview and omission marker; sharing is a separate action. Receipts and original-operation fences remain under their owner retention policy and are not pruned with diagnostic logs. Storage pressure stops new effects before authoritative persistence becomes unavailable.
 
-The shared qualification contract owns evidence format and verdicts. Map selected Q23-Q30 and CONSUMERS C01-C11 explicitly: Q23/C01-C02-C05 for independent native consumers, Q24/C09 for advertised or peer-policy-selected passports, Q25/C10 for native delegation, Q26/C11 for swarm/accepted-dependency behavior, Q27/C03-C04 for shared resources, Q28/C06-C07 for independent organizational cooperation, and Q29-Q30 for native profile/owner closure. C08 applies to selected acceptance/release. Unexposed features remain unavailable and do not become baseline prerequisites. Native profile cases apply without a GUI. Shell/browser/accessibility cases apply only to their selected consumer; removing that consumer never removes a native obligation. This annex adds platform cases, not fixture schemas or a second validator. Each case records trigger, independently observed result, exact tuple, owning gate, logs/artifact digests and negative controls. Unknown, refused, skipped and passed remain distinct. Required unexecuted cases leave the profile unqualified.
+The shared qualification contract owns evidence format and verdicts. Map selected Q23-Q31 and CONSUMERS C01-C11 explicitly: Q23/C01-C02-C05 for independent native consumers, Q24/C09 for advertised or peer-policy-selected passports, Q25/C10 for native delegation, Q26/C11 for swarm/accepted-dependency behavior, Q27/C03-C04 for shared resources, Q28/C06-C07 for independent organizational cooperation, Q29-Q30 for native profile/owner closure, and Q31 for every selected time-bounded capability, including read/approval/service authority. C08 applies to selected acceptance/release. Unexposed features remain unavailable and do not become baseline prerequisites. Native profile cases apply without a GUI. Shell/browser/accessibility cases apply only to their selected consumer; removing that consumer never removes a native obligation. This annex adds platform cases, not fixture schemas or a second validator. Each case records trigger, independently observed result, exact tuple, owning gate, logs/artifact digests and negative controls. Unknown, refused, skipped and passed remain distinct. Required unexecuted cases leave the profile unqualified.
 
 | Case group | Required trigger and independent oracle |
 | --- | --- |
@@ -236,6 +256,7 @@ The shared qualification contract owns evidence format and verdicts. Map selecte
 | Peer and session boundaries | Wrong UID/process/session/service principal, stale socket, guest attempt to reach operator socket, logout with linger, suspend/resume and missed events; owner peer-auth tests and external effect counters verify refusal. |
 | Service-profile enrollment | Cold boot without login/key store, wrong/revoked service principal, UID/unit/process substitution, expired lease, duplicate instance, interrupted enrollment/rotation, boot change and loss of persistent custody; native dispatch/disclosure sentinels prove refusal and no takeover of session work. |
 | Observe source independence | Qualify receipt/hook observation with W1/recovery owners and their read/event adapters absent; independent request/subscription traces show no access to them, optional views remain unavailable, and useful receipt/hook reads and resynchronization succeed. |
+| Time-bounded authority in every selected profile (Q31) | Pair useful authorized protected reads, approvals and service access with expiry followed by realtime rollback into the old validity window, separate forward jumps, actual suspend across expiry, restart/boot changes and missing clock/freshness evidence. Exercise the actual native owner admission/revalidation paths on the installed host; retained expiry or an unprovable basis cannot revive the original read authority, approval/challenge credential or service lease. Independent protected-byte probes, downstream effect counters and credential issuance/storage/reuse observations show refusal without a new disclosure, effect or accepted credential as applicable. Map every exposed time-bounded capability to these cases and remove each required result from a passing manifest to verify affected activation/promotion refuses. A useful unexpired control must still succeed; UI state and source clock injection alone cannot qualify installed behavior. Observe requires its own Q31 cases without Q12/Q19 execution prerequisites. |
 | Installed native API/CLI/harness consumers | Invoke the packaged `chio` client and selected supported bindings under the declared native enrollment profile, consuming their source and installed suites. Qualify CONSUMERS coordination, shared-resource and independent-organization cases when those capabilities are advertised, with every Chio GUI absent. Shared packet 4a qualifies the native CLI; optional operator projections add their own selected-surface suites. Useful baseline Observe and cross-client read agreement succeed without execution owners; auth/tuple/reply/terminal-input negatives, interrupted pipes, update/logout and reconnect preserve native authority. For each exposed mutation, independent-client concurrent original-ID and lost-reply tests show one original outcome/uncertainty and no duplicate downstream effects. Bind evidence to the actual CLI/native-owner/protocol tuple and any consumed controller; missing CLI acceptance cannot satisfy program completion or CLI-support claims. |
 | Execution deadline and authority expiry | In actual owner suites and on the installed host, pair useful unexpired execution with suspend past local deadline and absolute expiry in separate cases (the other bound remains valid), realtime forward/backward jumps across expiry, and restart/changed or uncertain boot-clock basis. Independent native dispatch/effect counters and process/cgroup custody observations prove the native fence precedes untrusted continuation on resume, no new protected dispatch/continuation after expiry, no clock-induced renewal, and bounded closure or retained unresolved custody. UI countdown/disabled controls are not an oracle; previously admitted external effects remain separately reconciled. These execution cases do not gate basic Observe. |
 | Backend and custody | Exact Pi/bubblewrap and mini-swe/rootless-engine positive task, filesystem/network/FD/process negatives, engine-socket/group denial, double-fork and detached descendants; S7 owner verification and outside-guest sentinels/census establish effects and absence, including after runner/daemon crash. Any opted-in rootful profile repeats qualification independently. |

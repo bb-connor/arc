@@ -23,8 +23,9 @@ Consumer presentation and the optional operator projection are `advisory_only`.
 6. [Independent consumer acceptance](CONSUMERS.md).
 7. [Optional operator projection](OPERATOR.md).
 8. [Native qualification and release evidence](QUALIFICATION.md).
-9. [Shared delivery plan](../../plans/2026-10-07-desktop-integration.md).
-10. [Omarchy/Linux annex](../2026-10-07-omarchy-integration/ANNEX.md).
+9. [Qualification verifier and native activation](RELEASE.md).
+10. [Shared delivery plan](../../plans/2026-10-07-desktop-integration.md).
+11. [Omarchy/Linux annex](../2026-10-07-omarchy-integration/ANNEX.md).
 
 The [macOS annex](../2026-10-07-macos-integration/ANNEX.md) and its
 [implementation plan](../../plans/2026-10-07-macos-integration/IMPLEMENTATION.md)

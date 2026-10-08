@@ -105,6 +105,12 @@ consent, boot and extension lifecycle remain separate platform gates. The macOS
 annex retains the precise source pins and experiments. Managed endpoint sensing
 is optional to the native kernel profile, unless a selected claim requires it.
 
+Native delivery additionally consumes [RELEASE](RELEASE.md): shared packet 2a
+implements the existing release-evidence owner extension and actual native
+activation gate. Q31 qualifies rollback and uncertain-clock refusal for every
+time-bounded read, approval, service or release path, independently of task
+execution.
+
 ## Decisions and acceptance linkage
 
 | Decision | Grounding | Required evidence |

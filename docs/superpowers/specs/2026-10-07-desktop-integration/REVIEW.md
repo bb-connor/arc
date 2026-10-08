@@ -63,3 +63,11 @@ The review also corrected unconditional streaming/all-six-host gates and a
 premature API freeze in the owner map. Final document checks, current-head hosted
 results and remaining review findings are recorded in the PR review closure
 rather than predicted here.
+
+Current-head Codex review identified two further shared P2 gaps: non-execution
+clock rollback and an unassigned qualification verifier. Q31 now covers all
+time-bounded native authority, and RELEASE/shared packet 2a assign a concrete
+extension of `chio-release-evidence` plus installed native activation consumers.
+Its current self-signed artifact manifest is explicitly insufficient. Separate
+qualification-only candidate admission prevents an installed-evidence/promotion
+cycle without allowing production activation from incomplete evidence.
