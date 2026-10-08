@@ -29,15 +29,7 @@ impl<'a> UntrustedJsonText<'a> {
     }
 
     pub fn from_wire(bytes: &'a [u8], bound: usize) -> Result<Self, UntrustedJsonError> {
-        if bytes.len() > bound {
-            return Err(UntrustedJsonError::TooLarge {
-                bytes: bytes.len(),
-                bound,
-            });
-        }
-        core::str::from_utf8(bytes)
-            .map(Self::new)
-            .map_err(UntrustedJsonError::NotUtf8)
+        bounded_text(bytes, bound).map(Self::new)
     }
 
     /// Strict I-JSON canonicalization. Full-width native integers use `decode_signed`.
@@ -57,6 +49,7 @@ impl<'a> UntrustedJsonText<'a> {
     /// such as `0.10` and is suitable for approximate embedding vectors.
     /// Signed or authoritative records must use their signed/external/canonical
     /// contract instead; this does not enforce lossless numeric spelling.
+    /// New readers name the contract by type with [`DocumentJson`].
     pub fn decode_document<T: DeserializeOwned>(&self) -> Result<T, UntrustedJsonError> {
         let value = super::signed_json::parse_document(self.text)
             .map_err(UntrustedJsonError::SignedInput)?;
@@ -64,6 +57,7 @@ impl<'a> UntrustedJsonText<'a> {
     }
 
     /// Lossless native signed JSON, before the owner's signature and authorization checks.
+    /// New readers name the contract by type with [`SignedRecordJson`].
     pub fn decode_signed<T: DeserializeOwned>(&self) -> Result<T, UntrustedJsonError> {
         let value = super::signed_json::parse_signed_json(self.text)
             .map_err(UntrustedJsonError::SignedInput)?;
@@ -90,6 +84,78 @@ impl<'a> UntrustedJsonText<'a> {
             return Err(UntrustedJsonError::NonCanonical);
         }
         Ok(value)
+    }
+}
+
+fn bounded_text(bytes: &[u8], bound: usize) -> Result<&str, UntrustedJsonError> {
+    if bytes.len() > bound {
+        return Err(UntrustedJsonError::TooLarge {
+            bytes: bytes.len(),
+            bound,
+        });
+    }
+    core::str::from_utf8(bytes).map_err(UntrustedJsonError::NotUtf8)
+}
+
+/// Unsigned JSON documents: peer envelopes, tool arguments and payloads that
+/// carry no signature. The input type fixes the numeric contract, so a decoder
+/// cannot apply signed-record rules to producer output by choosing a method.
+/// Duplicate keys are refused. Numbers follow the target's ordinary Serde
+/// conversions, so producer spellings such as `0.50`, `1e-05` and `1e+16`
+/// decode. Never use this for a record whose signature or digest is checked.
+#[derive(Debug)]
+pub struct DocumentJson<'a>(UntrustedJsonText<'a>);
+
+impl<'a> DocumentJson<'a> {
+    /// Mark already bounded text as an unsigned document without copying it.
+    #[must_use]
+    pub const fn new(text: &'a str) -> Self {
+        Self(UntrustedJsonText { text })
+    }
+
+    /// Bound and UTF-8 check original wire bytes.
+    pub fn from_wire(bytes: &'a [u8], bound: usize) -> Result<Self, UntrustedJsonError> {
+        bounded_text(bytes, bound).map(Self::new)
+    }
+
+    /// Decode with duplicate-key rejection and ordinary numeric conversions.
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "The document contract type is the sanctioned caller of the document reader."
+    )]
+    pub fn decode<T: DeserializeOwned>(&self) -> Result<T, UntrustedJsonError> {
+        self.0.decode_document()
+    }
+}
+
+/// Signed records and native records Chio wrote itself. The input type fixes
+/// the numeric contract. Duplicate keys are refused, and every number token
+/// must be a spelling a typed or canonical writer emits: full-width integers
+/// stay exact and no fractional digit is discarded before the owner rebuilds
+/// the signing body. Peer documents such as `0.50` or `1e-05` are refused, so
+/// unsigned input belongs in [`DocumentJson`]. No signature is verified here.
+#[derive(Debug)]
+pub struct SignedRecordJson<'a>(UntrustedJsonText<'a>);
+
+impl<'a> SignedRecordJson<'a> {
+    /// Mark already bounded text as a signed or native record without copying it.
+    #[must_use]
+    pub const fn new(text: &'a str) -> Self {
+        Self(UntrustedJsonText { text })
+    }
+
+    /// Bound and UTF-8 check original wire bytes.
+    pub fn from_wire(bytes: &'a [u8], bound: usize) -> Result<Self, UntrustedJsonError> {
+        bounded_text(bytes, bound).map(Self::new)
+    }
+
+    /// Decode losslessly, before the owner's signature and authorization checks.
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "The signed-record contract type is the sanctioned caller of the signed reader."
+    )]
+    pub fn decode<T: DeserializeOwned>(&self) -> Result<T, UntrustedJsonError> {
+        self.0.decode_signed()
     }
 }
 
@@ -235,5 +301,85 @@ mod document_tests {
             other => panic!("expected original duplicate rejection, got {other:?}"),
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod contract_type_tests {
+    use super::*;
+    use serde_json::Value;
+
+    #[test]
+    fn producer_spellings_decode_as_documents_and_refuse_as_signed_records(
+    ) -> Result<(), UntrustedJsonError> {
+        for (token, expected) in [
+            ("0.50", 0.5),
+            ("1e-05", 0.00001),
+            ("1e+016", 1e16),
+            ("1E2", 100.0),
+            ("18446744073709551616", 18_446_744_073_709_551_616.0),
+        ] {
+            let text = alloc::format!(r#"{{"n":{token}}}"#);
+            let document: Value = DocumentJson::from_wire(text.as_bytes(), 64)?.decode()?;
+            assert_eq!(document["n"].as_f64(), Some(expected));
+            assert!(matches!(
+                SignedRecordJson::from_wire(text.as_bytes(), 64)?.decode::<Value>(),
+                Err(UntrustedJsonError::SignedInput(_))
+            ));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn writer_spellings_decode_identically_under_both_contracts() -> Result<(), UntrustedJsonError>
+    {
+        for text in [
+            r#"{"n":0.5}"#,
+            r#"{"n":100}"#,
+            r#"{"n":18446744073709551615}"#,
+            r#"{"n":-9223372036854775808}"#,
+        ] {
+            let document: Value = DocumentJson::new(text).decode()?;
+            let signed: Value = SignedRecordJson::new(text).decode()?;
+            assert_eq!(document, signed);
+        }
+        let wide: Value = SignedRecordJson::new(r#"{"n":18446744073709551615}"#).decode()?;
+        assert_eq!(wide["n"].as_u64(), Some(u64::MAX));
+        Ok(())
+    }
+
+    #[test]
+    fn both_contracts_refuse_duplicates_oversize_and_invalid_utf8() {
+        let duplicate = br#"{"n":1,"n":2}"#;
+        assert!(matches!(
+            DocumentJson::from_wire(duplicate, 64).and_then(|input| input.decode::<Value>()),
+            Err(UntrustedJsonError::SignedInput(_))
+        ));
+        assert!(matches!(
+            SignedRecordJson::from_wire(duplicate, 64).and_then(|input| input.decode::<Value>()),
+            Err(UntrustedJsonError::SignedInput(_))
+        ));
+        assert!(matches!(
+            DocumentJson::from_wire(duplicate, 4),
+            Err(UntrustedJsonError::TooLarge {
+                bytes: 13,
+                bound: 4
+            })
+        ));
+        assert!(matches!(
+            SignedRecordJson::from_wire(duplicate, 4),
+            Err(UntrustedJsonError::TooLarge {
+                bytes: 13,
+                bound: 4
+            })
+        ));
+        assert!(matches!(
+            DocumentJson::from_wire(&[0xff], 4),
+            Err(UntrustedJsonError::NotUtf8(_))
+        ));
+        assert!(matches!(
+            SignedRecordJson::from_wire(&[0xff], 4),
+            Err(UntrustedJsonError::NotUtf8(_))
+        ));
     }
 }
