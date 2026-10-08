@@ -1,4 +1,4 @@
-use chio_security_types::clock::{Clock, SystemClock};
+use chio_security_types::clock::Clock;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -17,23 +17,6 @@ use crate::policy::{ReputationIssuancePolicy, RuntimeAssuranceIssuancePolicy};
 use super::attestation::verify_runtime_attestation_for_issuance;
 use super::reputation::{enforce_reputation_policy, ReputationInspectionContext};
 use super::scope::enforce_runtime_assurance_policy;
-
-pub fn wrap_capability_authority(
-    inner: Box<dyn CapabilityAuthority>,
-    issuance_policy: Option<ReputationIssuancePolicy>,
-    runtime_assurance_policy: Option<RuntimeAssuranceIssuancePolicy>,
-    receipt_db_path: Option<&Path>,
-    budget_db_path: Option<&Path>,
-) -> Box<dyn CapabilityAuthority> {
-    wrap_capability_authority_with_clock(
-        inner,
-        issuance_policy,
-        runtime_assurance_policy,
-        receipt_db_path,
-        budget_db_path,
-        Arc::new(SystemClock),
-    )
-}
 
 /// Wrap a service authority without introducing another time owner.
 pub fn wrap_capability_authority_with_clock(
@@ -61,6 +44,7 @@ pub(crate) fn wrap_capability_authority_with_deferred_lineage(
     runtime_assurance_policy: Option<RuntimeAssuranceIssuancePolicy>,
     receipt_db_path: Option<&Path>,
     budget_db_path: Option<&Path>,
+    clock: Arc<dyn Clock>,
 ) -> Box<dyn CapabilityAuthority> {
     wrap_capability_authority_with_lineage_mode(
         inner,
@@ -69,7 +53,7 @@ pub(crate) fn wrap_capability_authority_with_deferred_lineage(
         receipt_db_path,
         budget_db_path,
         false,
-        Arc::new(SystemClock),
+        clock,
     )
 }
 

@@ -68,7 +68,7 @@ Top-level modules:
 | Module | Owns |
 |---|---|
 | `policy` | Policy loading (`load_policy`), guard pipeline construction, default capabilities |
-| `issuance` | `wrap_capability_authority`: reputation- and attestation-gated capability issuance |
+| `issuance` | `wrap_capability_authority_with_clock`: reputation- and attestation-gated capability issuance |
 | `attestation` | Runtime attestation verifier adapters and their appraisal |
 | `trust_control` | The trust-control HTTP service, client, and cluster replication - see [ARCHITECTURE.md](./ARCHITECTURE.md) for its own module map |
 | `certify` | MCP conformance certification, local registry, federated marketplace |

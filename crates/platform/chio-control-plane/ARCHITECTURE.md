@@ -26,7 +26,7 @@ flowchart TD
         policy["load_policy to LoadedPolicy"]
         build["build_kernel"]
         configure["configure_* stores and authority"]
-        wrap["wrap_capability_authority"]
+        wrap["wrap_capability_authority_with_clock"]
     end
 
     subgraph runtime["Hosted runtime"]
@@ -82,7 +82,7 @@ flowchart TD
 |---|---|
 | `src/lib.rs` | `CliError`, `JwtProviderProfile`, and the kernel/store wiring functions (`build_kernel`, `configure_*`) shared by every Chio CLI binary. |
 | `src/policy.rs` + `policy/*` | Parse Chio-YAML or HushSpec policy files into a `LoadedPolicy`: guard pipeline, default capabilities, reputation/runtime-assurance issuance policy (HushSpec only). |
-| `src/issuance.rs` + `issuance/*` | `wrap_capability_authority`: decorates a `CapabilityAuthority` with attestation verification, reputation-tier gating, and runtime-assurance-tier scope narrowing. |
+| `src/issuance.rs` + `issuance/*` | `wrap_capability_authority_with_clock`: decorates a `CapabilityAuthority` with attestation verification, reputation-tier gating, and runtime-assurance-tier scope narrowing. |
 | `src/attestation.rs` + `attestation/*` | `RuntimeAttestationVerifierAdapter` and its Azure MAA, AWS Nitro, Google Confidential VM, and enterprise-verifier implementations; each produces a `VerifiedRuntimeAttestation`. |
 | `src/certify/` (`mod.rs` + siblings) | Build and sign MCP tool-server conformance certifications, a local registry, and a federated public discovery/marketplace network. |
 | `src/evidence_export.rs` + `evidence_export/*` | Export/import signed evidence bundles (receipts, checkpoints, lineage) with tenant disclosure notices and federation-policy scoping. |
@@ -143,7 +143,7 @@ not part of the Rust API) for `authority_handlers`, `budget_handlers`,
    `configure_budget_store` attach either a local `chio-store-sqlite` store or
    a `Remote*Store` built from `--control-url`.
 4. `configure_capability_authority` attaches a `LocalCapabilityAuthority` or
-   `SqliteCapabilityAuthority` - wrapped by `issuance::wrap_capability_authority`
+   `SqliteCapabilityAuthority` - wrapped by `issuance::wrap_capability_authority_with_clock`
    whenever a reputation or runtime-assurance policy is set - or a
    `RemoteCapabilityAuthority` for `--control-url`.
 

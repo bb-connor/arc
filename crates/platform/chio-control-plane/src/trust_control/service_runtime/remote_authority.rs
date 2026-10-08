@@ -8,17 +8,6 @@ mod clock_tests;
 use super::client::build_client;
 use super::*;
 
-pub fn build_remote_capability_authority(
-    control_url: &str,
-    control_token: &str,
-) -> Result<Box<dyn CapabilityAuthority>, CliError> {
-    build_remote_capability_authority_with_clock(
-        control_url,
-        control_token,
-        Arc::new(chio_security_types::clock::SystemClock),
-    )
-}
-
 pub fn build_remote_capability_authority_with_clock(
     control_url: &str,
     control_token: &str,
@@ -35,21 +24,6 @@ pub fn build_remote_capability_authority_with_clock(
         pinned_current: None,
         pinned_trusted: Vec::new(),
     }))
-}
-
-pub fn build_pinned_remote_capability_authority(
-    control_url: &str,
-    workload_token: &str,
-    pinned_current: PublicKey,
-    pinned_trusted: Vec<PublicKey>,
-) -> Result<Box<dyn CapabilityAuthority>, CliError> {
-    build_pinned_remote_capability_authority_with_clock(
-        control_url,
-        workload_token,
-        pinned_current,
-        pinned_trusted,
-        Arc::new(chio_security_types::clock::SystemClock),
-    )
 }
 
 /// Build an operator-pinned authority using its owner's trusted clock.

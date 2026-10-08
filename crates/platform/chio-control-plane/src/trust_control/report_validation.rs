@@ -628,14 +628,18 @@ fn load_capability_authority_with_lineage_mode(
     persist_lineage_immediately: bool,
 ) -> Result<Box<dyn CapabilityAuthority>, Response> {
     let config = &state.config;
+    // The service's authority clock owns issuance time for the inner
+    // authority and its policy wrapper alike.
+    let clock = &state.finding_challenge_clock;
     let wrap = |inner: Box<dyn CapabilityAuthority>| {
         if persist_lineage_immediately {
-            issuance::wrap_capability_authority(
+            issuance::wrap_capability_authority_with_clock(
                 inner,
                 config.issuance_policy.clone(),
                 config.runtime_assurance_policy.clone(),
                 config.receipt_db_path.as_deref(),
                 config.budget_db_path.as_deref(),
+                Arc::clone(clock),
             )
         } else {
             issuance::wrap_capability_authority_with_deferred_lineage(
@@ -644,6 +648,7 @@ fn load_capability_authority_with_lineage_mode(
                 config.runtime_assurance_policy.clone(),
                 config.receipt_db_path.as_deref(),
                 config.budget_db_path.as_deref(),
+                Arc::clone(clock),
             )
         }
     };
@@ -670,10 +675,10 @@ fn load_capability_authority_with_lineage_mode(
             })?;
             Ok(wrap(Box::new(LocalCapabilityAuthority::new_with_clock(
                 keypair,
-                state.finding_challenge_clock.clone(),
+                Arc::clone(clock),
             ))))
         }
-        (None, Some(path)) => SqliteCapabilityAuthority::open(path)
+        (None, Some(path)) => SqliteCapabilityAuthority::open_with_clock(path, Arc::clone(clock))
             .map(|authority| wrap(Box::new(authority)))
             .map_err(|error| {
                 plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())

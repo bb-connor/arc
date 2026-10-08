@@ -25,7 +25,7 @@ fn aggregate_issuance_retains_policy_refusals() -> Result<(), Box<dyn std::error
         (Some(test_policy()), None),
         (None, Some(test_runtime_assurance_policy())),
     ] {
-        let authority = wrap_capability_authority(
+        let authority = wrap_capability_authority_with_clock(
             Box::new(chio_kernel::LocalCapabilityAuthority::new_with_clock(
                 Keypair::generate(),
                 chio_test_support::clock::clock(),
@@ -34,6 +34,7 @@ fn aggregate_issuance_retains_policy_refusals() -> Result<(), Box<dyn std::error
             assurance,
             Some(&receipt_db),
             None,
+            chio_test_support::clock::clock(),
         );
         assert!(matches!(
             authority.issue_aggregate_family_root(&subject, scope(), 300, 2),
@@ -50,7 +51,7 @@ fn aggregate_issuance_persists_the_actual_signed_family_root(
     let receipt_db = directory.path().join("receipts.db");
     let key = Keypair::generate();
     let subject = Keypair::generate().public_key();
-    let authority = wrap_capability_authority(
+    let authority = wrap_capability_authority_with_clock(
         Box::new(chio_kernel::LocalCapabilityAuthority::new_with_clock(
             key.clone(),
             chio_test_support::clock::clock(),
@@ -59,6 +60,7 @@ fn aggregate_issuance_persists_the_actual_signed_family_root(
         None,
         Some(&receipt_db),
         None,
+        chio_test_support::clock::clock(),
     );
     let scope = scope();
     let root = authority.issue_aggregate_family_root(&subject, scope.clone(), 300, 2)?;
@@ -91,7 +93,7 @@ fn legacy_authority_cannot_fall_back_to_an_unbudgeted_token(
         chio_test_support::clock::clock(),
     )
     .issue_capability(&subject, scope(), 300)?;
-    let authority = wrap_capability_authority(
+    let authority = wrap_capability_authority_with_clock(
         Box::new(FixedResponseAuthority {
             response: plain,
             current_issuer: key.public_key(),
@@ -101,6 +103,7 @@ fn legacy_authority_cannot_fall_back_to_an_unbudgeted_token(
         None,
         None,
         None,
+        chio_test_support::clock::clock(),
     );
     assert!(authority
         .issue_aggregate_family_root(&subject, scope(), 300, 2)

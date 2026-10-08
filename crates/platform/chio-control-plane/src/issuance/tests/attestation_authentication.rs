@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn unsigned_matching_attestation_cannot_mint_verified_capabilities() {
-    let authority = wrap_capability_authority(
+    let authority = wrap_capability_authority_with_clock(
         Box::new(chio_kernel::LocalCapabilityAuthority::new_with_clock(
             Keypair::generate(),
             chio_test_support::clock::clock(),
@@ -11,6 +11,7 @@ fn unsigned_matching_attestation_cannot_mint_verified_capabilities() {
         Some(test_trusted_runtime_assurance_policy()),
         None,
         None,
+        chio_test_support::clock::clock(),
     );
     let subject = Keypair::generate();
     for evidence in [

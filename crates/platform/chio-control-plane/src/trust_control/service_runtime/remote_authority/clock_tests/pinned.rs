@@ -71,14 +71,15 @@ fn f048_pinned_builder_clock_fault_removes_trust_and_blocks_network_issuance() -
 }
 
 #[test]
-fn f048_legacy_pinned_builder_keeps_compatible_pin_validation() -> TestResult {
+fn pinned_builder_keeps_compatible_pin_validation() -> TestResult {
     let (status, old, current) = rotated_status()?;
     let server = StatusServer::new(&status, usize::MAX)?;
-    let authority = build_pinned_remote_capability_authority(
+    let authority = build_pinned_remote_capability_authority_with_clock(
         &server.endpoint(),
         "test-only-control",
         current.clone(),
         vec![old.clone(), old, current.clone()],
+        chio_test_support::clock::clock(),
     )?;
     assert_eq!(authority.authority_public_key(), current);
     assert!(server.finish()? >= 1);

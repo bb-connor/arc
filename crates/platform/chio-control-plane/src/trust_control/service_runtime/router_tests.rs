@@ -1,6 +1,9 @@
 #[path = "router_tests/compacted_replay_tests.rs"]
 mod compacted_replay_tests;
 
+#[path = "router_tests/authority_clock_tests.rs"]
+mod authority_clock_tests;
+
 #[cfg(target_os = "linux")]
 #[path = "router_tests/recovery_rpc_tests.rs"]
 mod recovery_rpc_tests;
