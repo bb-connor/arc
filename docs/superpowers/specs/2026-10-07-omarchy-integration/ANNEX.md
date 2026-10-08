@@ -6,6 +6,19 @@ Chio is a Rust kernel for agentic operating systems that coordinate work, share 
 
 The [native host contract](../2026-10-07-desktop-integration/HOST-CONTRACT.md) and [first-class integration contract](../2026-10-07-desktop-integration/FIRST-CLASS-INTEGRATIONS.md) govern the direction. Read [consumer acceptance](../2026-10-07-desktop-integration/CONSUMERS.md), the [program map](../../../architecture/PROGRAM-MAP.md), [qualification contract](../2026-10-07-desktop-integration/QUALIFICATION.md), optional [operator projection](../2026-10-07-desktop-integration/OPERATOR.md), [implementation packets](../../plans/2026-10-07-omarchy-integration/IMPLEMENTATION.md) and dated [native Linux research](research/native-host-services.md). S4, S5, S7, S8, S28, W1 and doc 19 identify existing owners, not new platform APIs. No installer, package, service or supported runtime is delivered by these documents.
 
+Apply FIRST-CLASS-INTEGRATIONS' catalog scope explicitly: individual harness
+promotion uses its own H01-H05/H06a/H08a; a Herdr/harness tuple uses its own
+H07/H08b. H06b and the complete four-selection Herdr matrix gate aggregate
+completion only. O7 tests removal of unrelated records versus removal of the
+selected tuple's own mandatory subcase at the actual release owner.
+
+Selected model routes also consume HOST-CONTRACT's model-provider resource
+boundary: any token/spend dimension required by grant, policy or profile needs
+an enforceable route bound and its actual-owner reservation/uncertainty tests.
+Missing bounds refuse before dispatch; a separately approved narrower profile
+cannot become an automatic fallback. OS confinement and provider accounting
+remain separate qualification dimensions.
+
 ## Product and boundary scope
 
 | Surface/profile | `boundary_class` | `planning_status` | Admission and claim boundary |
@@ -26,7 +39,7 @@ The [native host contract](../2026-10-07-desktop-integration/HOST-CONTRACT.md) a
 
 `planning_status` follows [ADR-0011](../../../adr/ADR-0011-boundary-taxonomy-product-wording.md). `ready_after_adr` permits planning, not execution or a runtime claim. Candidate delivery, source qualification, installed execution and supported release promotion remain distinct.
 
-Claude Code, Codex, Pi and Hermes are required first-class harnesses. Each needs its own native installed acceptance on the declared Linux tuple, including exact doc 19 I01-I08 evidence for protected-mode claims; no harness, mini-swe workload or aggregate smoke test substitutes for another. Herdr is a separate required first-class workspace/plugin consumer with installed client acceptance through actual native owners. Linux first-class target completion requires all four harness records, each with at least one explicitly scoped protected profile, and Herdr's separate H07/H08 matrix for all four selections. H01-H06/H08 apply to each required harness as scoped by FIRST-CLASS-INTEGRATIONS; H06 additionally proves their mixed composition. Global first-class completion also requires the separate macOS cells. Independently qualified profiles may release earlier with the remaining required integrations explicitly open.
+Claude Code, Codex, Pi and Hermes are required first-class harnesses. Each needs its own native installed acceptance on the declared Linux tuple, including exact doc 19 I01-I08 evidence for protected-mode claims; no harness, mini-swe workload or aggregate smoke test substitutes for another. Herdr is a separate required first-class workspace/plugin consumer with installed client acceptance through actual native owners. Linux first-class target completion requires all four harness records, each with at least one explicitly scoped protected profile, and Herdr's separate H07/H08 matrix for all four selections. H01-H05/H06a/H08a apply to each required harness as scoped by FIRST-CLASS-INTEGRATIONS; H06b proves mixed composition for aggregate completion and never gates a single-host release. Global first-class completion also requires the separate macOS cells. Independently qualified profiles may release earlier with the remaining required integrations explicitly open.
 
 The broader doc 19 six-host program additionally retains Cursor and OpenClaw with their own obligations and independent status. No all-six release gate blocks a qualified individual profile, and these additional hosts do not replace the required four. Historical Pi plugin 0.1.0/Pi 0.85.1 results do not qualify the newer tuple, another harness or Omarchy. Source maturity supplies no mandatory Pi-first or mini-swe-first ordering.
 

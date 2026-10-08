@@ -63,6 +63,11 @@ it returns an explicit refusal/unavailable reason. A caller-provided `ready`
 boolean, exit code copied into config, valid self-signature or arbitrary
 candidate-supplied trust root cannot supply acceptance.
 
+FIRST-CLASS-INTEGRATIONS' catalog scope distinguishes individual harness,
+Herdr/harness tuple and aggregate completion claims. Test missing unrelated
+records as an allowed partial promotion and missing own mandatory subcases as
+a refusal; aggregate completion still requires its mixed/full-coverage records.
+
 The mandatory catalog is not learned from the results being verified. Removing
 all profiles/cases, downgrading policy/catalog version, omitting a consumer,
 changing a capability's declared dependency or replacing missing evidence with
