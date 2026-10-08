@@ -40,13 +40,38 @@ NATIVE_DISPATCH_FAULT = re.compile(
     re.MULTILINE,
 )
 NATIVE_CAPTURE_STAGES = (
-    "store_callback", "connection", "transaction_begin", "authority", "preflight_hold",
-    "native_evidence", "native_binding", "native_policy", "native_owner", "budget_selection",
-    "budget_replay", "budget_credentials", "budget_hold", "budget_identity", "budget_revocation",
-    "budget_mutation", "admission_advance", "commit_policy", "commit_clock", "commit_lease_expired",
-    "commit_capability_expired", "commit_runtime_expired", "commit_nonce_expired", "commit_approval",
-    "commit_dpop", "policy_not_yet_valid", "policy_expired", "declassification_not_yet_valid",
-    "declassification_expired", "observation_changed", "commit", "anchor_sync",
+    "store_callback",
+    "connection",
+    "transaction_begin",
+    "authority",
+    "preflight_hold",
+    "native_evidence",
+    "native_binding",
+    "native_policy",
+    "native_owner",
+    "budget_selection",
+    "budget_replay",
+    "budget_credentials",
+    "budget_hold",
+    "budget_identity",
+    "budget_revocation",
+    "budget_mutation",
+    "admission_advance",
+    "commit_policy",
+    "commit_clock",
+    "commit_lease_expired",
+    "commit_capability_expired",
+    "commit_runtime_expired",
+    "commit_nonce_expired",
+    "commit_approval",
+    "commit_dpop",
+    "policy_not_yet_valid",
+    "policy_expired",
+    "declassification_not_yet_valid",
+    "declassification_expired",
+    "observation_changed",
+    "commit",
+    "anchor_sync",
 )
 NATIVE_CAPTURE_FAILURE = re.compile(
     r"^warn chio::native_capture message=native capture refused native_capture_stage=("
@@ -175,7 +200,10 @@ def save_failure_diagnostics(root, output, failure):
                 0o600,
             )
             with os.fdopen(descriptor, "w") as retained:
-                json.dump({"schema": "chio.native-capture-failures.v1", "failures": fixed_capture}, retained)
+                json.dump(
+                    {"schema": "chio.native-capture-failures.v1", "failures": fixed_capture},
+                    retained,
+                )
                 retained.write("\n")
         except OSError:
             diagnostic["host_failure_classes"] = sorted(

@@ -1,6 +1,5 @@
 import importlib.util
 import json
-import os
 import stat
 import subprocess
 import sys
@@ -242,7 +241,9 @@ def test_native_capture_markers_require_complete_fixed_host_lines(qualifier):
         ("budget_mutation", "sqlite"),
         ("admission_advance", "unavailable"),
     ):
-        typed_marker = marker.replace("commit_runtime_expired", stage).replace("invariant", category)
+        typed_marker = marker.replace("commit_runtime_expired", stage).replace(
+            "invariant", category
+        )
         assert qualifier.native_capture_failures(typed_marker) == [
             {"stage": stage, "category": category}
         ]
@@ -339,12 +340,18 @@ def test_native_capture_fixed_marker_survives_captured_host_stderr_privately(qua
         "WARN chio::native_capture message=native capture refused "
         "native_capture_stage=commit_nonce_expired native_capture_category=invariant\n"
     )
-    script = "import os; os.write(2," + repr((secret + "\n" + marker).encode()) + "); raise SystemExit(1)"
+    script = (
+        "import os; os.write(2,"
+        + repr((secret + "\n" + marker).encode())
+        + "); raise SystemExit(1)"
+    )
     child = subprocess.run([sys.executable, "-c", script], capture_output=True, check=False)
     assert child.returncode == 1 and marker.encode() in child.stderr
     output = tmp_path / "output"
     output.mkdir()
-    failure = subprocess.CalledProcessError(1, ["native-host"], output=child.stdout, stderr=child.stderr)
+    failure = subprocess.CalledProcessError(
+        1, ["native-host"], output=child.stdout, stderr=child.stderr
+    )
     qualifier.save_failure_diagnostics(tmp_path, output, failure)
     private = tmp_path / "native-capture-failures.json"
     assert private.is_file(), "fixed physical capture marker was discarded before private export"
@@ -361,7 +368,9 @@ def test_native_capture_fixed_marker_survives_captured_host_stderr_privately(qua
 
 
 @pytest.mark.parametrize("symlink", [False, True])
-def test_native_capture_private_export_refusal_preserves_original_report(qualifier, tmp_path, symlink):
+def test_native_capture_private_export_refusal_preserves_original_report(
+    qualifier, tmp_path, symlink
+):
     retained = tmp_path / "retained-private"
     retained.write_bytes(b"preserved-private-custody")
     private = tmp_path / "native-capture-failures.json"
@@ -383,5 +392,6 @@ def test_native_capture_private_export_refusal_preserves_original_report(qualifi
     diagnostic = json.loads((output / "operator-failure.json").read_text())
     assert diagnostic["returncode"] == 1 and diagnostic["timed_out"] is False
     assert diagnostic["host_failure_classes"] == [
-        "native_capture_artifact_unavailable", "native_capture_commit_runtime_expired"
+        "native_capture_artifact_unavailable",
+        "native_capture_commit_runtime_expired",
     ]
