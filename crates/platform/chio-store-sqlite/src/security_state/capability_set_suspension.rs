@@ -694,10 +694,11 @@ impl CapabilitySetSuspensionStore for SqliteSecurityStateStore {
             transaction.commit().map_err(sqlite_error)?;
             return Ok(stored);
         }
+        // Contributions keyed by action and effect compose as a union, so a
+        // new contribution is bound to the generation it was predicted from,
+        // not to the plan's observed base.
         if binding.is_some()
             || current.generation != request.expected_generation
-            || capability_set_suspension_version_hash(&current)?
-                != request.command.request.expected_version_hash
             || request.contribution.expires_at_unix_ms <= trusted_now
         {
             return Err(PortError::conflict());

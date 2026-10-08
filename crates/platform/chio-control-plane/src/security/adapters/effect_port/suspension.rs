@@ -108,15 +108,15 @@ impl CapabilitySetSuspensionBackend {
             contribution_hash: request.contribution_hash,
             expires_at_unix_ms: request.plan_expires_at_unix_ms,
         };
+        // Contributions are keyed by action and effect and the suspended sets
+        // are their union, so a snapshot without this contribution differs
+        // from the observed base only by other actions' suspensions.
         if let Some(existing) = current.contributions.as_slice().iter().find(|entry| {
             entry.action_id == request.action_id && entry.effect_id == request.effect_id
         }) {
             if existing != &contribution {
                 return Err(PortError::conflict());
             }
-        } else if capability_set_suspension_version_hash(&current)? != request.expected_version_hash
-        {
-            return Err(PortError::conflict());
         }
         let predicted = predict_capability_set_suspension_apply(
             &current,
