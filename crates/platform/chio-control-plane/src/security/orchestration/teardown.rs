@@ -1341,13 +1341,15 @@ impl DetachedActiveDefenseTeardown {
         }
     }
 
-    /// A held overlay is an expected wait rather than a fault only while the
+    /// A held overlay is an expected wait rather than a fault only while no
+    /// contributing response holds durable scheduler retry state and the
     /// running recovery worker keeps completing clean ticks, since those
     /// ticks are what expire it.
     fn awaiting_overlay_expiry(&self, error: &ProductionActiveDefenseHostError) -> bool {
         matches!(
             error,
-            ProductionActiveDefenseHostError::ActiveOverlayContributions { .. }
+            ProductionActiveDefenseHostError::ActiveOverlayContributions { inventory }
+                if inventory.retrying_contributing_responses == 0
         ) && self
             .worker_handle
             .as_ref()

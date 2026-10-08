@@ -178,6 +178,9 @@ pub struct ActiveDefenseOverlayInventory {
     pub capability_suspension_contributions: u64,
     pub issuance_freeze_contributions: u64,
     pub egress_restriction_contributions: u64,
+    /// Contributing responses whose due scheduler work has durably failed and
+    /// has not completed since.
+    pub retrying_contributing_responses: u64,
 }
 
 impl ActiveDefenseOverlayInventory {
@@ -437,7 +440,7 @@ impl SqliteSecurityStateStore {
         }
         drop(foreign_key_check);
 
-        let counts: (i64, i64, i64, i64, i64) = connection
+        let counts: (i64, i64, i64, i64, i64, i64) = connection
             .query_row(
                 r#"
                 SELECT
@@ -445,7 +448,16 @@ impl SqliteSecurityStateStore {
                     (SELECT COUNT(*) FROM security_session_throttle_effects),
                     (SELECT COUNT(*) FROM security_capability_set_suspension_effects),
                     (SELECT COUNT(*) FROM security_issuance_freeze_effects),
-                    (SELECT COUNT(*) FROM security_egress_restriction_effects)
+                    (SELECT COUNT(*) FROM security_egress_restriction_effects),
+                    (SELECT COUNT(*) FROM security_scheduler_retries
+                     WHERE (tenant_id, action_id) IN (
+                         SELECT tenant_id, action_id FROM security_effect_contributions
+                         UNION SELECT tenant_id, action_id FROM security_session_throttle_effects
+                         UNION SELECT tenant_id, action_id
+                             FROM security_capability_set_suspension_effects
+                         UNION SELECT tenant_id, action_id FROM security_issuance_freeze_effects
+                         UNION SELECT tenant_id, action_id
+                             FROM security_egress_restriction_effects))
                 "#,
                 [],
                 |row| {
@@ -455,6 +467,7 @@ impl SqliteSecurityStateStore {
                         row.get(2)?,
                         row.get(3)?,
                         row.get(4)?,
+                        row.get(5)?,
                     ))
                 },
             )
@@ -465,6 +478,7 @@ impl SqliteSecurityStateStore {
             capability_suspension_contributions: from_i64(counts.2)?,
             issuance_freeze_contributions: from_i64(counts.3)?,
             egress_restriction_contributions: from_i64(counts.4)?,
+            retrying_contributing_responses: from_i64(counts.5)?,
         })
     }
 }
