@@ -16,6 +16,10 @@ const CALL_TABLE: &str = "remote_session_credential_calls";
 const LATCH_TABLE: &str = "remote_session_credential_latches";
 const DELIVERY_SCHEMA: &str = "chio.mcp.delivery-ack.v1";
 
+#[path = "session_credentials/reservation.rs"]
+mod reservation;
+pub(super) use reservation::rollback_not_enqueued_call;
+
 #[cfg(test)]
 #[path = "session_credentials_tests/durable_bounds.rs"]
 mod durable_bounds_tests;
@@ -31,7 +35,7 @@ struct DeliveryAcknowledgement {
     acknowledgement: String,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct CredentialCall {
     schema: String,
@@ -48,6 +52,8 @@ pub(super) struct CredentialCall {
     response: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     delivery_ack: Option<DeliveryAcknowledgement>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    reservation_id: Option<String>,
 }
 
 pub(super) enum CallReservation {
@@ -737,6 +743,7 @@ fn reserve_at(
         state: "pending".to_owned(),
         response: None,
         delivery_ack: None,
+        reservation_id: Some(URL_SAFE_NO_PAD.encode(Keypair::generate().seed_bytes())),
     };
     write_call(&tx, keypair, &call)?;
     tx.commit().map_err(storage_error)?;

@@ -445,7 +445,7 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
             }
         }
         if let Err(error) = session.send_accounted(message) {
-            return remote_session_send_error(error);
+            return remote_session_send_error(error.into_error());
         }
         return response_with_mode(
             StatusCode::ACCEPTED.into_response(),
@@ -504,8 +504,15 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
     // a previous owner while this POST waited are never delivered on it.
     let mut event_rx = session.subscribe();
     if let Err(error) = session.send_accounted(message) {
+        if let Some(call) = credential_call.as_ref() {
+            if let Err(response) = remote_mcp_session_credentials::rollback_not_enqueued_call(
+                &state, call, &error,
+            ) {
+                return response;
+            }
+        }
         drop(stream_lock);
-        return remote_session_send_error(error);
+        return remote_session_send_error(error.into_error());
     }
 
     let session_for_stream = session.clone();

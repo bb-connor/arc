@@ -1,5 +1,16 @@
 use super::*;
 
+/// The owning enqueue path returned before a message entered the MCP inbox.
+/// No fallible operation follows a successful inbox send on this path.
+#[derive(Debug)]
+pub(super) struct NotEnqueued(CliError);
+
+impl NotEnqueued {
+    pub(super) fn into_error(self) -> CliError {
+        self.0
+    }
+}
+
 impl RemoteSession {
     pub(super) fn new(init: RemoteSessionInit) -> Result<Self, CliError> {
         let reading = init.clock.read()?;
@@ -64,15 +75,22 @@ impl RemoteSession {
         }
         let message = self.input_tx.account(message)?;
         self.send_accounted(message)
+            .map_err(NotEnqueued::into_error)
     }
 
-    pub(super) fn send_accounted(&self, message: AccountedMessage) -> Result<(), CliError> {
-        remote_mcp_approvals::validate_redemption(self, &message)?;
+    pub(super) fn send_accounted(&self, message: AccountedMessage) -> Result<(), NotEnqueued> {
+        remote_mcp_approvals::validate_redemption(self, &message).map_err(NotEnqueued)?;
         // Redemption can inspect lifecycle itself. Take the lock afterward and
         // retain it through enqueue, serializing with drain/terminal transitions.
-        let mut lifecycle = self.lifecycle.lock().map_err(|_| ClockError::Unavailable)?;
-        self.check_enqueue_lifecycle(&message, &mut lifecycle)?;
-        self.input_tx.send(message).map_err(Into::into)
+        let mut lifecycle = self
+            .lifecycle
+            .lock()
+            .map_err(|_| NotEnqueued(ClockError::Unavailable.into()))?;
+        self.check_enqueue_lifecycle(&message, &mut lifecycle)
+            .map_err(NotEnqueued)?;
+        self.input_tx
+            .send(message)
+            .map_err(|error| NotEnqueued(error.into()))
     }
 
     pub(super) fn record_protocol_refusal(
