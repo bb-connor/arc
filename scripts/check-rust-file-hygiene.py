@@ -489,12 +489,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         max_lines=5_818,
         max_fragments=11,
     ),
-    "crates/platform/chio-store-sqlite/tests/security_state_contract.rs": allow(
-        "2026-12-31",
-        "security-state store contract suite assembled from include! fragments; capped until the fragments become modules",
-        max_lines=1_694,
-        max_fragments=1,
-    ),
     "crates/protocol/chio-mcp-adapter/src/transport/stdio.rs": allow(
         "2026-12-31",
         "MCP stdio transport assembled from include! fragments; capped until the fragments become modules",

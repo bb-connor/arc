@@ -1,8 +1,12 @@
-fn body(value: &'static [u8]) -> CanonicalBody {
+//! Security state contract cases run against the SQLite store and the model.
+
+use super::*;
+
+pub(super) fn body(value: &'static [u8]) -> CanonicalBody {
     CanonicalBody::new(value.to_vec()).unwrap_or_else(|error| panic!("canonical body: {error}"))
 }
 
-fn label(value: &str) -> InformationLabel {
+pub(super) fn label(value: &str) -> InformationLabel {
     InformationLabel::try_known(
         Default::default(),
         BTreeSet::from([
@@ -12,7 +16,7 @@ fn label(value: &str) -> InformationLabel {
     .unwrap_or_else(|error| panic!("information label: {error}"))
 }
 
-fn flow_key(session: &str, epoch: &str) -> FlowStateKey {
+pub(super) fn flow_key(session: &str, epoch: &str) -> FlowStateKey {
     FlowStateKey {
         tenant_id: tenant(),
         principal_id: PrincipalId::new(format!("principal-{session}"))
@@ -25,14 +29,14 @@ fn flow_key(session: &str, epoch: &str) -> FlowStateKey {
     }
 }
 
-fn scoped_action(value: &str) -> TenantScopedId {
+pub(super) fn scoped_action(value: &str) -> TenantScopedId {
     TenantScopedId {
         tenant_id: tenant(),
         id: record(value),
     }
 }
 
-fn overlay_apply_request(
+pub(super) fn overlay_apply_request(
     current: &OverlaySnapshot,
     session_id: &str,
     action_id: ActionId,
@@ -97,7 +101,7 @@ fn overlay_apply_request(
     }
 }
 
-fn overlay_remove_request(
+pub(super) fn overlay_remove_request(
     apply: &OverlayApplyRequest,
     current: &OverlaySnapshot,
     session_id: &str,
@@ -139,7 +143,7 @@ fn overlay_remove_request(
     }
 }
 
-fn overlay_target(session_id: &str) -> TenantScopedId {
+pub(super) fn overlay_target(session_id: &str) -> TenantScopedId {
     containment_session_target(
         &tenant(),
         &SessionId::new(session_id).unwrap_or_else(|error| panic!("session id: {error}")),
@@ -147,7 +151,7 @@ fn overlay_target(session_id: &str) -> TenantScopedId {
     .unwrap_or_else(|error| panic!("containment target: {error}"))
 }
 
-fn empty_overlay(target: TenantScopedId) -> OverlaySnapshot {
+pub(super) fn empty_overlay(target: TenantScopedId) -> OverlaySnapshot {
     OverlaySnapshot {
         target,
         generation: 0,
@@ -158,7 +162,7 @@ fn empty_overlay(target: TenantScopedId) -> OverlaySnapshot {
     }
 }
 
-fn require_unavailable<T>(result: PortResult<T>) {
+pub(super) fn require_unavailable<T>(result: PortResult<T>) {
     let error = result
         .err()
         .unwrap_or_else(|| panic!("fault injection unexpectedly returned success"));
@@ -166,7 +170,7 @@ fn require_unavailable<T>(result: PortResult<T>) {
     assert!(!error.code().as_str().is_empty());
 }
 
-fn require_error_kind<T>(result: PortResult<T>, expected: PortErrorKind) {
+pub(super) fn require_error_kind<T>(result: PortResult<T>, expected: PortErrorKind) {
     let error = result
         .err()
         .unwrap_or_else(|| panic!("invalid mutation unexpectedly returned success"));
@@ -174,7 +178,7 @@ fn require_error_kind<T>(result: PortResult<T>, expected: PortErrorKind) {
     assert!(!error.code().as_str().is_empty());
 }
 
-fn verified_event(value: &str, event_time: u64) -> SecurityEventVerificationRecord {
+pub(super) fn verified_event(value: &str, event_time: u64) -> SecurityEventVerificationRecord {
     let canonical_body = body(b"{}");
     SecurityEventVerificationRecord {
         tenant_id: tenant(),
@@ -190,7 +194,7 @@ fn verified_event(value: &str, event_time: u64) -> SecurityEventVerificationReco
     }
 }
 
-fn advisory_event(value: &str, event_time: u64) -> AdvisorySecurityEvent {
+pub(super) fn advisory_event(value: &str, event_time: u64) -> AdvisorySecurityEvent {
     let canonical_body = body(b"{}");
     AdvisorySecurityEvent {
         tenant_id: tenant(),
@@ -203,7 +207,7 @@ fn advisory_event(value: &str, event_time: u64) -> AdvisorySecurityEvent {
     }
 }
 
-fn response_plan_for_tenant(
+pub(super) fn response_plan_for_tenant(
     tenant_id: TenantId,
     value: &str,
     generation: u64,
@@ -277,11 +281,15 @@ fn response_plan_for_tenant(
     }
 }
 
-fn response_plan(value: &str, generation: u64, due_at: Option<u64>) -> ResponsePlanRecord {
+pub(super) fn response_plan(
+    value: &str,
+    generation: u64,
+    due_at: Option<u64>,
+) -> ResponsePlanRecord {
     response_plan_for_tenant(tenant(), value, generation, due_at)
 }
 
-fn response_transition_id(record: &ResponsePlanRecord) -> RecordId {
+pub(super) fn response_transition_id(record: &ResponsePlanRecord) -> RecordId {
     decode_response_record(record)
         .unwrap_or_else(|error| panic!("response record: {error}"))
         .mutations
@@ -292,7 +300,7 @@ fn response_transition_id(record: &ResponsePlanRecord) -> RecordId {
         .clone()
 }
 
-struct AcceptIsolationEvidence;
+pub(super) struct AcceptIsolationEvidence;
 
 impl IsolationEpochEvidenceVerifierPort for AcceptIsolationEvidence {
     fn verify(
@@ -309,7 +317,7 @@ impl IsolationEpochEvidenceVerifierPort for AcceptIsolationEvidence {
     }
 }
 
-fn exercise_contracts<S>(store: &Faulting<S>)
+pub(super) fn exercise_contracts<S>(store: &Faulting<S>)
 where
     S: FlowStateStore
         + SecurityEventStore
@@ -476,7 +484,7 @@ where
     exercise_lineage_fences(store, expiry);
 }
 
-fn correlation_key(value: u8) -> CorrelationPartitionKey {
+pub(super) fn correlation_key(value: u8) -> CorrelationPartitionKey {
     CorrelationPartitionKey {
         tenant_id: tenant(),
         rule_id: RuleId::new(format!("rule-{value}"))
@@ -485,7 +493,7 @@ fn correlation_key(value: u8) -> CorrelationPartitionKey {
     }
 }
 
-fn scan_for(key: &CorrelationPartitionKey, through: u64) -> EventPartitionScan {
+pub(super) fn scan_for(key: &CorrelationPartitionKey, through: u64) -> EventPartitionScan {
     EventPartitionScan {
         tenant_id: key.tenant_id.clone(),
         rule_id: key.rule_id.clone(),
@@ -497,7 +505,11 @@ fn scan_for(key: &CorrelationPartitionKey, through: u64) -> EventPartitionScan {
     }
 }
 
-fn partial(key: &CorrelationPartitionKey, generation: u64, watermark: u64) -> CorrelationPartial {
+pub(super) fn partial(
+    key: &CorrelationPartitionKey,
+    generation: u64,
+    watermark: u64,
+) -> CorrelationPartial {
     let canonical_body = body(b"{}");
     CorrelationPartial {
         key: key.clone(),
@@ -509,7 +521,7 @@ fn partial(key: &CorrelationPartitionKey, generation: u64, watermark: u64) -> Co
     }
 }
 
-fn correlation_outcome_publication(
+pub(super) fn correlation_outcome_publication(
     key: &CorrelationPartitionKey,
     event: &SecurityEventVerificationRecord,
     rule_version_byte: u8,
@@ -532,7 +544,7 @@ fn correlation_outcome_publication(
     }
 }
 
-fn exercise_events<S: SecurityEventStore>(store: &Faulting<S>, clock: u64) {
+pub(super) fn exercise_events<S: SecurityEventStore>(store: &Faulting<S>, clock: u64) {
     let verified_before = verified_event("verified-before", clock);
     store.arm(FaultMoment::BeforeWrite);
     require_unavailable(store.append_verified(&verified_before));
@@ -891,7 +903,7 @@ fn exercise_events<S: SecurityEventStore>(store: &Faulting<S>, clock: u64) {
         .unwrap_or_else(|error| panic!("recover correlation delete: {error}"));
 }
 
-fn claim_request(owner: &str, clock: u64, expiry: u64) -> SchedulerClaimRequest {
+pub(super) fn claim_request(owner: &str, clock: u64, expiry: u64) -> SchedulerClaimRequest {
     SchedulerClaimRequest {
         tenant_id: tenant(),
         claim_id: record(&format!("claim-{owner}")),
@@ -903,7 +915,7 @@ fn claim_request(owner: &str, clock: u64, expiry: u64) -> SchedulerClaimRequest 
     }
 }
 
-fn response_effect(
+pub(super) fn response_effect(
     action_id: &ActionId,
     effect_id: &str,
     owner: &LeaseOwnerId,
@@ -924,7 +936,7 @@ fn response_effect(
     }
 }
 
-fn exercise_responses<S: ResponseStore>(
+pub(super) fn exercise_responses<S: ResponseStore>(
     store: &Faulting<S>,
     clock: u64,
     expiry: u64,
@@ -1094,7 +1106,7 @@ fn exercise_responses<S: ResponseStore>(
     (claimed_before, recovered_after)
 }
 
-fn exercise_overlays<S: ContainmentOverlayStore>(
+pub(super) fn exercise_overlays<S: ContainmentOverlayStore>(
     store: &Faulting<S>,
     claimed_before: &ScheduledWork,
     claimed_after: &ScheduledWork,
@@ -1196,7 +1208,7 @@ fn exercise_overlays<S: ContainmentOverlayStore>(
         .is_empty());
 }
 
-fn fence_request(value: &str, expiry: u64) -> LineageFenceRequest {
+pub(super) fn fence_request(value: &str, expiry: u64) -> LineageFenceRequest {
     LineageFenceRequest {
         tenant_id: tenant(),
         action_id: action(value),
@@ -1209,7 +1221,7 @@ fn fence_request(value: &str, expiry: u64) -> LineageFenceRequest {
     }
 }
 
-fn exercise_lineage_fences<S: LineageFenceStore>(store: &Faulting<S>, expiry: u64) {
+pub(super) fn exercise_lineage_fences<S: LineageFenceStore>(store: &Faulting<S>, expiry: u64) {
     let acquire_before = fence_request("lineage-acquire-before", expiry);
     store.arm(FaultMoment::BeforeWrite);
     require_unavailable(store.acquire(&acquire_before));
@@ -1274,7 +1286,7 @@ fn exercise_lineage_fences<S: LineageFenceStore>(store: &Faulting<S>, expiry: u6
         .unwrap_or_else(|error| panic!("recover lineage release: {error}"));
 }
 
-fn has_compartment(label: &InformationLabel, value: &str) -> bool {
+pub(super) fn has_compartment(label: &InformationLabel, value: &str) -> bool {
     label.compartments().is_some_and(|compartments| {
         compartments.contains(
             &Compartment::new(value).unwrap_or_else(|error| panic!("compartment: {error}")),
@@ -1282,7 +1294,7 @@ fn has_compartment(label: &InformationLabel, value: &str) -> bool {
     })
 }
 
-fn exercise_cross_key_flow_contract<S: FlowStateStore>(store: &S) {
+pub(super) fn exercise_cross_key_flow_contract<S: FlowStateStore>(store: &S) {
     let first = FlowStateKey {
         tenant_id: tenant(),
         principal_id: PrincipalId::new("scope-principal")
@@ -1398,7 +1410,7 @@ fn exercise_cross_key_flow_contract<S: FlowStateStore>(store: &S) {
     ));
 }
 
-fn exercise_scheduler_takeover_contract<S: ResponseStore>(store: &S) {
+pub(super) fn exercise_scheduler_takeover_contract<S: ResponseStore>(store: &S) {
     let clock = now_unix_ms();
     let plan = response_plan("takeover-contract-action", 0, Some(clock.saturating_sub(1)));
     assert_eq!(
@@ -1463,7 +1475,7 @@ fn exercise_scheduler_takeover_contract<S: ResponseStore>(store: &S) {
     );
 }
 
-fn exercise_response_effect_recovery_contract<S: ResponseStore>(store: &S) {
+pub(super) fn exercise_response_effect_recovery_contract<S: ResponseStore>(store: &S) {
     let clock = now_unix_ms();
     let plan = response_plan(
         "effect-recovery-contract-action",
@@ -1604,7 +1616,11 @@ fn exercise_response_effect_recovery_contract<S: ResponseStore>(store: &S) {
     );
 }
 
-fn exercise_overlay_action_binding_contract<S: ResponseStore + ContainmentOverlayStore>(store: &S) {
+pub(super) fn exercise_overlay_action_binding_contract<
+    S: ResponseStore + ContainmentOverlayStore,
+>(
+    store: &S,
+) {
     let clock = now_unix_ms();
     for value in ["binding-action-a", "binding-action-b"] {
         store
