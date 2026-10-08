@@ -1,6 +1,7 @@
 use super::*;
 
 mod quarantine_controls;
+mod rejection_health;
 
 const BOUNDED_LATENESS_MS: u64 = 200;
 

@@ -32,11 +32,11 @@ use super::event_consumer::{
     TrustedSecurityEventReceiptProducer,
 };
 use super::scheduler_worker::{
-    ActiveDefenseServiceRegistry, ActiveDefenseServices, ProductionDeclassificationReceiptOutbox,
-    ProductionResponseSchedulerConfig, ProductionResponseWorker, ProductionResponseWorkerHandle,
-    ProductionResponseWorkerLoopConfig, ResponseWorkerHealth, ResponseWorkerLifecycle,
-    ResponseWorkerPort, ResponseWorkerTick, ResponseWorkerTickError, SecurityAlertDelivery,
-    SqliteResponseWorkerPort,
+    ActiveDefenseServiceRegistry, ActiveDefenseServices, CorrelationIngressRejectionHealth,
+    ProductionDeclassificationReceiptOutbox, ProductionResponseSchedulerConfig,
+    ProductionResponseWorker, ProductionResponseWorkerHandle, ProductionResponseWorkerLoopConfig,
+    ResponseWorkerHealth, ResponseWorkerLifecycle, ResponseWorkerPort, ResponseWorkerTick,
+    ResponseWorkerTickError, SecurityAlertDelivery, SqliteResponseWorkerPort,
 };
 use super::AttestedCorrelationWriter;
 
@@ -713,6 +713,8 @@ trait ResponseAdmissionPass: Send + Sync {
     fn ensure_ready(&self) -> Result<(), ResponseWorkerTickError>;
 
     fn run_once(&self) -> Result<(), ResponseWorkerTickError>;
+
+    fn ingress_rejections(&self) -> Option<CorrelationIngressRejectionHealth>;
 }
 
 struct DurableResponseAdmissionPass {
@@ -747,6 +749,10 @@ impl ResponseAdmissionPass for DurableResponseAdmissionPass {
         drained?;
         resumed?;
         Ok(())
+    }
+
+    fn ingress_rejections(&self) -> Option<CorrelationIngressRejectionHealth> {
+        Some(self.correlation_ingress.rejection_health())
     }
 }
 
@@ -821,6 +827,10 @@ impl ResponseWorkerPort for PlanningRecoveryResponseWorkerPort {
 
     fn declassification_outbox_status(&self) -> (bool, Option<u64>, Option<String>) {
         self.inner.declassification_outbox_status()
+    }
+
+    fn correlation_ingress_rejections(&self) -> Option<CorrelationIngressRejectionHealth> {
+        self.admission.ingress_rejections()
     }
 }
 

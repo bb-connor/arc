@@ -89,10 +89,11 @@ pub use orchestration::{
     ProductionSecurityStateLifecycleOwner,
 };
 pub use scheduler_worker::{
-    ActiveDefenseServiceRegistry, ActiveDefenseServices, ProductionResponseSchedulerConfig,
-    ProductionResponseWorker, ProductionResponseWorkerHandle, ProductionResponseWorkerLoopConfig,
-    ResponseWorkerHealth, ResponseWorkerLifecycle, ResponseWorkerPort, ResponseWorkerTick,
-    ResponseWorkerTickError, SecurityAlertDeliveryHealth, SqliteResponseWorkerPort,
+    ActiveDefenseServiceRegistry, ActiveDefenseServices, CorrelationIngressRejectionHealth,
+    ProductionResponseSchedulerConfig, ProductionResponseWorker, ProductionResponseWorkerHandle,
+    ProductionResponseWorkerLoopConfig, ResponseWorkerHealth, ResponseWorkerLifecycle,
+    ResponseWorkerPort, ResponseWorkerTick, ResponseWorkerTickError, SecurityAlertDeliveryHealth,
+    SqliteResponseWorkerPort,
 };
 
 use std::sync::Arc;

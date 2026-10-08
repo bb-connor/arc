@@ -4,7 +4,9 @@ use super::{
     SecurityEventIngress, SecurityEventVerificationRecord, SecurityEventVerifierPort,
     SqliteSecurityStateStore, UnverifiedSecurityEvent,
 };
-use chio_security_types::ports::CorrelationIngressRejection;
+use crate::security::CorrelationIngressRejectionHealth;
+use chio_security_types::ports::{CorrelationIngressRejection, CorrelationIngressRejectionReason};
+use std::sync::{Mutex, PoisonError};
 
 /// Production adapter that publishes the complete ordered finding batch and a
 /// durable response outbox. Batch bindings reserve planning identities only.
@@ -59,6 +61,7 @@ pub(crate) struct CorrelationIngressDrain {
 pub(crate) struct DurableCorrelationIngress {
     store: Arc<dyn CorrelationIngressStore>,
     consumer: Arc<ProductionCorrelationConsumer>,
+    rejections: Mutex<CorrelationIngressRejectionHealth>,
 }
 
 impl DurableCorrelationIngress {
@@ -67,7 +70,43 @@ impl DurableCorrelationIngress {
         consumer: Arc<ProductionCorrelationConsumer>,
     ) -> PortResult<Self> {
         store.ensure_correlation_ingress_ready()?;
-        Ok(Self { store, consumer })
+        let rejections = CorrelationIngressRejectionHealth {
+            rejected_total: store.count_rejected_correlation_events()?,
+            ..CorrelationIngressRejectionHealth::default()
+        };
+        Ok(Self {
+            store,
+            consumer,
+            rejections: Mutex::new(rejections),
+        })
+    }
+
+    /// Rejected rows: the durable total and this process's rejections by reason.
+    pub(crate) fn rejection_health(&self) -> CorrelationIngressRejectionHealth {
+        *self
+            .rejections
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+    }
+
+    fn record_rejection(&self, reason: CorrelationIngressRejectionReason) {
+        let mut rejections = self
+            .rejections
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        rejections.rejected_total = rejections.rejected_total.saturating_add(1);
+        let by_reason = match reason {
+            CorrelationIngressRejectionReason::UnconfiguredProducer => {
+                &mut rejections.unconfigured_producer
+            }
+            CorrelationIngressRejectionReason::UnconfiguredProducerKey => {
+                &mut rejections.unconfigured_producer_key
+            }
+            CorrelationIngressRejectionReason::UnconfiguredPolicyVersion => {
+                &mut rejections.unconfigured_policy_version
+            }
+        };
+        *by_reason = by_reason.saturating_add(1);
     }
 
     pub(crate) fn ensure_ready(&self) -> PortResult<()> {
@@ -105,6 +144,7 @@ impl DurableCorrelationIngress {
                 SealedEventDisposition::Rejected(rejection) => {
                     self.store
                         .reject_pending_correlation_event(event, &rejection)?;
+                    self.record_rejection(rejection.reason);
                     tracing::warn!(
                         tenant_id = event.tenant_id.as_str(),
                         event_id = event.event_id.as_str(),

@@ -6,9 +6,10 @@ use chio_quarantine::SchedulerError;
 use chio_security_types::ports::{PortError, PortErrorKind, TenantId};
 
 use super::{
-    PlanningRecoveryResponseWorkerPort, ProductionResponseWorker,
-    ProductionResponseWorkerLoopConfig, ResponseAdmissionPass, ResponseWorkerHealth,
-    ResponseWorkerLifecycle, ResponseWorkerPort, ResponseWorkerTick, ResponseWorkerTickError,
+    CorrelationIngressRejectionHealth, PlanningRecoveryResponseWorkerPort,
+    ProductionResponseWorker, ProductionResponseWorkerLoopConfig, ResponseAdmissionPass,
+    ResponseWorkerHealth, ResponseWorkerLifecycle, ResponseWorkerPort, ResponseWorkerTick,
+    ResponseWorkerTickError,
 };
 
 type TickScript =
@@ -75,7 +76,18 @@ impl ResponseAdmissionPass for CountingAdmission {
             None => Ok(()),
         }
     }
+
+    fn ingress_rejections(&self) -> Option<CorrelationIngressRejectionHealth> {
+        Some(REPORTED_REJECTIONS)
+    }
 }
+
+const REPORTED_REJECTIONS: CorrelationIngressRejectionHealth = CorrelationIngressRejectionHealth {
+    rejected_total: 5,
+    unconfigured_producer: 1,
+    unconfigured_producer_key: 2,
+    unconfigured_policy_version: 1,
+};
 
 fn clean_tick() -> ResponseWorkerTick {
     ResponseWorkerTick {
@@ -355,5 +367,21 @@ async fn a_worker_with_a_fatal_recovery_fault_admits_nothing_after_it() {
         admission.runs(),
         1,
         "only the clean publication tick may admit"
+    );
+}
+
+#[test]
+fn worker_health_reports_the_admission_ingress_rejections() {
+    let admission = Arc::new(CountingAdmission::default());
+    let port: Arc<dyn ResponseWorkerPort> = Arc::new(composed(
+        ScriptedRecoveryPort::new(|_| Ok(clean_tick())),
+        &admission,
+    ));
+    let worker =
+        ProductionResponseWorker::new(port).unwrap_or_else(|error| panic!("worker: {error}"));
+
+    assert_eq!(
+        worker.health().correlation_ingress_rejections,
+        Some(REPORTED_REJECTIONS)
     );
 }

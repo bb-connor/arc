@@ -538,6 +538,7 @@ impl ProductionResponseWorker {
             .alert_delivery
             .as_ref()
             .map(|delivery| delivery.health());
+        health.correlation_ingress_rejections = self.port.correlation_ingress_rejections();
         health
     }
 
@@ -676,6 +677,7 @@ pub(super) fn failed_health() -> ResponseWorkerHealth {
         tick_in_flight: false,
         last_error: Some("response worker health lock is unavailable".to_string()),
         security_alert_delivery: None,
+        correlation_ingress_rejections: None,
     }
 }
 

@@ -60,6 +60,27 @@ pub trait ResponseWorkerPort: Send + Sync {
     fn declassification_outbox_status(&self) -> (bool, Option<u64>, Option<String>) {
         (false, None, None)
     }
+
+    /// Correlation ingress rows this port's admission work refused, when it
+    /// drains correlation ingress.
+    fn correlation_ingress_rejections(&self) -> Option<CorrelationIngressRejectionHealth> {
+        None
+    }
+}
+
+/// Correlation ingress rows refused because the producer configuration no
+/// longer admits them. Each refused row stays durably rejected with its reason.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CorrelationIngressRejectionHealth {
+    /// Rejected rows in the durable ingress ledger, including rows rejected
+    /// before this process started.
+    pub rejected_total: u64,
+    /// Rows this process rejected because no producer binding exists.
+    pub unconfigured_producer: u64,
+    /// Rows this process rejected because the binding names another key.
+    pub unconfigured_producer_key: u64,
+    /// Rows this process rejected because the binding pins another policy.
+    pub unconfigured_policy_version: u64,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -110,6 +131,8 @@ pub struct ResponseWorkerHealth {
     pub last_error: Option<String>,
     /// Security alert delivery driven by this worker, when configured.
     pub security_alert_delivery: Option<SecurityAlertDeliveryHealth>,
+    /// Correlation ingress rows refused by this worker's admission work.
+    pub correlation_ingress_rejections: Option<CorrelationIngressRejectionHealth>,
 }
 
 impl ResponseWorkerHealth {
@@ -127,6 +150,7 @@ impl ResponseWorkerHealth {
             tick_in_flight: false,
             last_error: None,
             security_alert_delivery: None,
+            correlation_ingress_rejections: None,
         }
     }
 }
