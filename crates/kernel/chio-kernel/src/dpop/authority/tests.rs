@@ -168,7 +168,7 @@ fn legacy_consuming_and_preview_ports_refuse_v2_without_burning_a_nonce() {
     let store = DpopNonceStore::new(
         8,
         Duration::from_secs(300),
-        std::sync::Arc::new(crate::SystemClock),
+        chio_test_support::clock::clock(),
     )
     .expect("positive replay store test capacities");
     assert!(matches!(

@@ -102,7 +102,7 @@ fn nonce_store_matches_fresh_and_replayed_projections() {
     let store = DpopNonceStore::new(
         8,
         Duration::from_secs(60),
-        std::sync::Arc::new(chio_kernel::SystemClock),
+        chio_test_support::clock::clock(),
     )
     .test_expect("positive replay store test capacities");
 

@@ -774,11 +774,7 @@ mod backend_tests {
     #[test]
     fn zero_capacity_is_rejected() {
         assert!(matches!(
-            DpopNonceStore::new(
-                0,
-                Duration::from_secs(1),
-                std::sync::Arc::new(crate::SystemClock),
-            ),
+            DpopNonceStore::new(0, Duration::from_secs(1), chio_test_support::clock::clock(),),
             Err(DpopError::InvalidCapacity(_))
         ));
     }
@@ -791,7 +787,7 @@ mod backend_tests {
                     2,
                     per_capability,
                     Duration::ZERO,
-                    std::sync::Arc::new(crate::SystemClock),
+                    chio_test_support::clock::clock(),
                 ),
                 Err(DpopError::InvalidCapacity(_))
             ));
@@ -800,7 +796,7 @@ mod backend_tests {
             2,
             2,
             Duration::ZERO,
-            std::sync::Arc::new(crate::SystemClock),
+            chio_test_support::clock::clock(),
         )
         .is_ok());
     }
@@ -835,7 +831,7 @@ mod backend_tests {
         let store = DpopNonceStore::new(
             4,
             Duration::from_secs(60),
-            std::sync::Arc::new(crate::SystemClock),
+            chio_test_support::clock::clock(),
         )
         .expect("positive replay store test capacities");
         assert!(store
@@ -857,7 +853,7 @@ mod backend_tests {
         let store = DpopNonceStore::new(
             2,
             Duration::from_secs(60),
-            std::sync::Arc::new(crate::SystemClock),
+            chio_test_support::clock::clock(),
         )
         .expect("positive replay store test capacities");
         assert!(store.reserve_for_dispatch_until(
@@ -893,7 +889,7 @@ mod backend_tests {
         let store = DpopNonceStore::new(
             1,
             Duration::from_secs(60),
-            std::sync::Arc::new(crate::SystemClock),
+            chio_test_support::clock::clock(),
         )
         .expect("positive replay store test capacities");
         assert!(store.check_and_insert("nonce-a", "capability")?);
@@ -901,7 +897,7 @@ mod backend_tests {
         assert!(!store.check_and_insert("nonce-a", "capability")?);
 
         let expired_store =
-            DpopNonceStore::new(1, Duration::ZERO, std::sync::Arc::new(crate::SystemClock))
+            DpopNonceStore::new(1, Duration::ZERO, chio_test_support::clock::clock())
                 .expect("positive replay store test capacities");
         assert!(expired_store.check_and_insert("nonce-a", "capability")?);
         assert!(expired_store.check_and_insert("nonce-b", "capability")?);
@@ -915,7 +911,7 @@ mod backend_tests {
             512,
             64,
             Duration::from_secs(60),
-            std::sync::Arc::new(crate::SystemClock),
+            chio_test_support::clock::clock(),
         )
         .expect("positive replay store test capacities");
         let per_capability_capacity = store.inner.lock().unwrap().per_capability_capacity;
@@ -938,7 +934,7 @@ mod backend_tests {
             8,
             1,
             Duration::from_secs(60),
-            std::sync::Arc::new(crate::SystemClock),
+            chio_test_support::clock::clock(),
         )
         .expect("positive replay store test capacities");
         assert_eq!(store.inner.lock().unwrap().per_capability_capacity, 1);
@@ -955,7 +951,7 @@ mod backend_tests {
         let store = DpopNonceStore::new(
             8,
             Duration::from_secs(60),
-            std::sync::Arc::new(crate::SystemClock),
+            chio_test_support::clock::clock(),
         )
         .expect("positive replay store test capacities");
         assert_eq!(store.inner.lock().unwrap().per_capability_capacity, 8);
@@ -972,7 +968,7 @@ mod backend_tests {
     fn signed_expiry_overrides_local_ttl_under_pressure_and_rejects_expired_input(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-        let store = DpopNonceStore::new(1, Duration::ZERO, std::sync::Arc::new(crate::SystemClock))
+        let store = DpopNonceStore::new(1, Duration::ZERO, chio_test_support::clock::clock())
             .expect("positive replay store test capacities");
         assert!(store.check_and_insert_until("approval-a", "intent", now + 60)?);
         assert!(!store.check_and_insert_until("approval-a", "intent", now + 60)?);
@@ -983,7 +979,7 @@ mod backend_tests {
         let expired_store = DpopNonceStore::new(
             1,
             Duration::from_secs(60),
-            std::sync::Arc::new(crate::SystemClock),
+            chio_test_support::clock::clock(),
         )
         .expect("positive replay store test capacities");
         assert!(matches!(

@@ -55,7 +55,7 @@ impl Source {
             DpopNonceStore::new(
                 8,
                 Duration::from_secs(3600),
-                std::sync::Arc::new(chio_kernel::SystemClock),
+                chio_test_support::clock::clock(),
             )
             .expect("positive replay store test capacities"),
         );

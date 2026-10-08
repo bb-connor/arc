@@ -201,7 +201,7 @@ fn permission_preview_accepts_valid_dpop_without_consuming_invocation_nonce() {
             dpop::DpopNonceStore::new(
                 1024,
                 std::time::Duration::from_secs(300),
-                std::sync::Arc::new(chio_kernel::SystemClock),
+                chio_test_support::clock::clock(),
             )
             .test_unwrap(),
             dpop::DpopConfig::default(),
@@ -262,7 +262,7 @@ fn jsonrpc_permission_preview_uses_kernel_dpop_config() {
             dpop::DpopNonceStore::new(
                 1024,
                 std::time::Duration::from_secs(300),
-                std::sync::Arc::new(chio_kernel::SystemClock),
+                chio_test_support::clock::clock(),
             )
             .test_unwrap(),
             dpop::DpopConfig {

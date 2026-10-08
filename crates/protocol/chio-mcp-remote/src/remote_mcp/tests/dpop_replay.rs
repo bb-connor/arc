@@ -41,7 +41,7 @@ fn sender_dpop_rejects_weak_key_forgery_without_consuming_nonce() {
     let store = DpopNonceStore::new(
         8,
         Duration::from_secs(300),
-        std::sync::Arc::new(chio_kernel::SystemClock),
+        chio_test_support::clock::clock(),
     )
     .unwrap();
     let mut forged = proof(&Keypair::generate(), "forged-proof".into(), unix_now());
@@ -97,7 +97,7 @@ fn sender_headers_retain_non_text_causes_before_replay_custody() {
         let store = DpopNonceStore::new(
             8,
             Duration::from_secs(30),
-            std::sync::Arc::new(chio_kernel::SystemClock),
+            chio_test_support::clock::clock(),
         )
         .unwrap();
         let error =
@@ -181,12 +181,8 @@ fn verify(
 fn sender_dpop_signed_retention_overrides_local_ttl_for_future_dated_proofs() {
     let key = Keypair::generate();
     let config = DpopConfig::default();
-    let store = DpopNonceStore::new(
-        8,
-        Duration::ZERO,
-        std::sync::Arc::new(chio_kernel::SystemClock),
-    )
-    .expect("positive replay store test capacities");
+    let store = DpopNonceStore::new(8, Duration::ZERO, chio_test_support::clock::clock())
+        .expect("positive replay store test capacities");
     let proof = proof(
         &key,
         "sender-proof".to_owned(),
@@ -197,12 +193,8 @@ fn sender_dpop_signed_retention_overrides_local_ttl_for_future_dated_proofs() {
     assert_eq!(store.utilization().unwrap().0, 1);
     // Characterize the former local-TTL path: the same cache configuration
     // immediately forgets local-only markers, although this proof is valid.
-    let legacy = DpopNonceStore::new(
-        8,
-        Duration::ZERO,
-        std::sync::Arc::new(chio_kernel::SystemClock),
-    )
-    .expect("positive replay store test capacities");
+    let legacy = DpopNonceStore::new(8, Duration::ZERO, chio_test_support::clock::clock())
+        .expect("positive replay store test capacities");
     assert!(legacy
         .check_and_insert(&proof.body.nonce, "sender-binding")
         .unwrap());
@@ -215,12 +207,8 @@ fn sender_dpop_signed_retention_overrides_local_ttl_for_future_dated_proofs() {
 fn sender_dpop_rejects_oversized_keys_before_signature_verification_or_storage() {
     let key = Keypair::generate();
     let config = DpopConfig::default();
-    let store = DpopNonceStore::new(
-        8,
-        Duration::ZERO,
-        std::sync::Arc::new(chio_kernel::SystemClock),
-    )
-    .expect("positive replay store test capacities");
+    let store = DpopNonceStore::new(8, Duration::ZERO, chio_test_support::clock::clock())
+        .expect("positive replay store test capacities");
     let mut proof = proof(&key, "nonce".to_owned(), unix_now());
     proof.body.nonce = "private-marker".repeat(MAX_DPOP_REPLAY_IDENTITY_PART_BYTES);
     let error = verify(&proof, &store, &config).unwrap_err();
@@ -239,14 +227,9 @@ fn sender_dpop_rejects_oversized_keys_before_signature_verification_or_storage()
 fn sender_dpop_byte_pressure_preserves_the_consumed_proof() {
     let key = Keypair::generate();
     let config = DpopConfig::default();
-    let store = DpopNonceStore::with_clock(
-        8,
-        8,
-        40,
-        Duration::ZERO,
-        std::sync::Arc::new(chio_kernel::SystemClock),
-    )
-    .expect("positive replay store test capacities");
+    let store =
+        DpopNonceStore::with_clock(8, 8, 40, Duration::ZERO, chio_test_support::clock::clock())
+            .expect("positive replay store test capacities");
     let first = proof(&key, "first".to_owned(), unix_now());
     verify(&first, &store, &config).unwrap();
     let second = proof(&key, "second".to_owned(), unix_now());
@@ -274,7 +257,7 @@ fn sender_legacy_profile_rejects_a_durable_domain_even_when_resigned_as_v1() {
     let store = DpopNonceStore::new(
         8,
         Duration::from_secs(300),
-        std::sync::Arc::new(chio_kernel::SystemClock),
+        chio_test_support::clock::clock(),
     )
     .expect("positive replay store test capacities");
     let mut body = proof(&key, "authority-proof".into(), unix_now()).body;

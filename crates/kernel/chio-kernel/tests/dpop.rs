@@ -67,7 +67,7 @@ fn default_store(config: &DpopConfig) -> DpopNonceStore {
     DpopNonceStore::new(
         config.nonce_store_capacity,
         Duration::from_secs(config.proof_ttl_secs),
-        std::sync::Arc::new(chio_kernel::SystemClock),
+        chio_test_support::clock::clock(),
     )
     .expect("positive replay store test capacities")
 }
@@ -355,7 +355,7 @@ fn dpop_nonce_replay_within_ttl_rejected() {
     let store = DpopNonceStore::new(
         config.nonce_store_capacity,
         Duration::from_secs(3600),
-        std::sync::Arc::new(chio_kernel::SystemClock),
+        chio_test_support::clock::clock(),
     )
     .expect("positive replay store test capacities");
 
@@ -438,7 +438,7 @@ fn dpop_nonce_replay_after_local_ttl_is_rejected() {
     let store = DpopNonceStore::new(
         config.nonce_store_capacity,
         Duration::from_secs(0),
-        std::sync::Arc::new(chio_kernel::SystemClock),
+        chio_test_support::clock::clock(),
     )
     .expect("positive replay store test capacities");
 

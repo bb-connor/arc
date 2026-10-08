@@ -231,7 +231,7 @@ fn seed_subject_history(
     budget_db_path: &Path,
     subject_kp: &Keypair,
 ) -> String {
-    let clock = std::sync::Arc::new(chio_kernel::SystemClock);
+    let clock = chio_test_support::clock::clock();
     let authority = LocalCapabilityAuthority::new_with_clock(Keypair::generate(), clock);
     let capability = authority
         .issue_capability(

@@ -347,7 +347,7 @@ fn seed_subject_history(
 ) -> String {
     let authority = LocalCapabilityAuthority::new_with_clock(
         Keypair::generate(),
-        std::sync::Arc::new(chio_kernel::SystemClock),
+        chio_test_support::clock::clock(),
     );
     let capability = authority
         .issue_capability(

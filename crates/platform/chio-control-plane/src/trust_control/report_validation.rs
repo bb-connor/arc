@@ -670,7 +670,7 @@ fn load_capability_authority_with_lineage_mode(
             })?;
             Ok(wrap(Box::new(LocalCapabilityAuthority::new_with_clock(
                 keypair,
-                std::sync::Arc::new(chio_kernel::SystemClock),
+                state.finding_challenge_clock.clone(),
             ))))
         }
         (None, Some(path)) => SqliteCapabilityAuthority::open(path)

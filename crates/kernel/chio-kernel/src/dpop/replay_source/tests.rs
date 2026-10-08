@@ -15,7 +15,7 @@ fn store() -> DpopNonceStore {
         16,
         8,
         Duration::from_secs(60),
-        std::sync::Arc::new(crate::SystemClock),
+        chio_test_support::clock::clock(),
     )
     .expect("positive replay store test capacities")
 }
@@ -219,7 +219,7 @@ fn rollback_and_retirement_cannot_omit_an_outstanding_reservation() {
 
 #[test]
 fn previews_do_not_prune_and_real_pruning_is_retained_in_inventory() {
-    let store = DpopNonceStore::new(4, Duration::ZERO, std::sync::Arc::new(crate::SystemClock))
+    let store = DpopNonceStore::new(4, Duration::ZERO, chio_test_support::clock::clock())
         .expect("positive replay store test capacities");
     store.check_and_insert("elapsed", "cap").unwrap();
     let old = preview(&store);

@@ -1279,7 +1279,7 @@ pub(super) fn make_dpop_kernel_and_cap(
     let nonce_store = dpop::DpopNonceStore::new(
         1024,
         std::time::Duration::from_secs(300),
-        std::sync::Arc::new(crate::SystemClock),
+        chio_test_support::clock::clock(),
     )
     .expect("positive replay store test capacities");
     kernel

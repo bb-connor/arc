@@ -588,7 +588,7 @@ mod tests {
     {
         let authority = LocalCapabilityAuthority::new_with_clock(
             Keypair::generate(),
-            std::sync::Arc::new(chio_kernel::SystemClock),
+            chio_test_support::clock::clock(),
         );
         let issued = issue_test_capability(&authority)?;
         let remote = remote_with_trusted_key(authority.authority_public_key())?;
@@ -607,11 +607,11 @@ mod tests {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let trusted_authority = LocalCapabilityAuthority::new_with_clock(
             Keypair::generate(),
-            std::sync::Arc::new(chio_kernel::SystemClock),
+            chio_test_support::clock::clock(),
         );
         let untrusted_authority = LocalCapabilityAuthority::new_with_clock(
             Keypair::generate(),
-            std::sync::Arc::new(chio_kernel::SystemClock),
+            chio_test_support::clock::clock(),
         );
         let issued = issue_test_capability(&untrusted_authority)?;
         let current = trusted_authority.authority_public_key();
@@ -637,7 +637,7 @@ mod tests {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let authority = LocalCapabilityAuthority::new_with_clock(
             Keypair::generate(),
-            std::sync::Arc::new(chio_kernel::SystemClock),
+            chio_test_support::clock::clock(),
         );
         let mut issued = issue_test_capability(&authority)?;
         issued.capability.subject = Keypair::generate().public_key();
@@ -663,11 +663,11 @@ mod tests {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let previous = LocalCapabilityAuthority::new_with_clock(
             Keypair::generate(),
-            std::sync::Arc::new(chio_kernel::SystemClock),
+            chio_test_support::clock::clock(),
         );
         let rotated = LocalCapabilityAuthority::new_with_clock(
             Keypair::generate(),
-            std::sync::Arc::new(chio_kernel::SystemClock),
+            chio_test_support::clock::clock(),
         );
         let previous_key = previous.authority_public_key();
         let rotated_key = rotated.authority_public_key();
@@ -703,11 +703,11 @@ mod tests {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let previous = LocalCapabilityAuthority::new_with_clock(
             Keypair::generate(),
-            std::sync::Arc::new(chio_kernel::SystemClock),
+            chio_test_support::clock::clock(),
         );
         let rotated = LocalCapabilityAuthority::new_with_clock(
             Keypair::generate(),
-            std::sync::Arc::new(chio_kernel::SystemClock),
+            chio_test_support::clock::clock(),
         );
         let previous_key = previous.authority_public_key();
         let rotated_key = rotated.authority_public_key();
@@ -742,7 +742,7 @@ mod tests {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let authority = LocalCapabilityAuthority::new_with_clock(
             Keypair::generate(),
-            std::sync::Arc::new(chio_kernel::SystemClock),
+            chio_test_support::clock::clock(),
         );
         let issued = issue_test_capability(&authority)?;
         let remote = RemoteCapabilityAuthority {
@@ -802,7 +802,7 @@ mod tests {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let authority = LocalCapabilityAuthority::new_with_clock(
             Keypair::generate(),
-            std::sync::Arc::new(chio_kernel::SystemClock),
+            chio_test_support::clock::clock(),
         );
         let issued = issue_test_capability(&authority)?;
         let substituted = authority.issue_capability(
@@ -831,7 +831,7 @@ mod tests {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let authority = LocalCapabilityAuthority::new_with_clock(
             Keypair::generate(),
-            std::sync::Arc::new(chio_kernel::SystemClock),
+            chio_test_support::clock::clock(),
         );
         let issued = issue_test_capability(&authority)?;
         let remote = RemoteCapabilityAuthority {

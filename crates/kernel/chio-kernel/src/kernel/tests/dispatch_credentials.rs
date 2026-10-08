@@ -704,7 +704,7 @@ fn committed_dispatch_credential_retains_replay_marker_under_capacity_pressure(
             dpop::DpopNonceStore::new(
                 1,
                 Duration::from_secs(60),
-                std::sync::Arc::new(crate::SystemClock),
+                chio_test_support::clock::clock(),
             )
             .expect("positive replay store test capacities"),
             dpop::DpopConfig::default(),

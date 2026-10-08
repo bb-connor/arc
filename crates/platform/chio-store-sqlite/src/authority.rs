@@ -902,7 +902,7 @@ mod tests {
     fn local_capability_authority_signs_capabilities() {
         let authority = LocalCapabilityAuthority::new_with_clock(
             Keypair::generate(),
-            std::sync::Arc::new(chio_kernel::SystemClock),
+            chio_test_support::clock::clock(),
         );
         let subject = Keypair::generate().public_key();
         let capability = authority

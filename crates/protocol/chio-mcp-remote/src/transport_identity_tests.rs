@@ -25,7 +25,7 @@ fn verifier(key: &Keypair) -> Result<JwtBearerVerifier, chio_kernel::dpop::DpopE
         sender_dpop_nonce_store: Arc::new(DpopNonceStore::new(
             32,
             Duration::from_secs(300),
-            std::sync::Arc::new(chio_kernel::SystemClock),
+            chio_test_support::clock::clock(),
         )?),
         sender_dpop_config: DpopConfig::default(),
     })

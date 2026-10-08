@@ -705,7 +705,7 @@ async fn non_strict_dpop_only_payment_requests_reach_the_external_rail(
             dpop::DpopNonceStore::new(
                 1024,
                 std::time::Duration::from_secs(300),
-                std::sync::Arc::new(crate::SystemClock),
+                chio_test_support::clock::clock(),
             )
             .expect("positive replay store test capacities"),
             dpop::DpopConfig::default(),

@@ -19,7 +19,7 @@ fn kg2_receipt_key_cannot_issue_after_distinct_authority_configuration(
     );
     kernel.set_capability_authority(Box::new(LocalCapabilityAuthority::new_with_clock(
         make_keypair(),
-        std::sync::Arc::new(crate::SystemClock),
+        chio_test_support::clock::clock(),
     )));
     let response = kernel.evaluate_tool_call_blocking(&make_request(
         "receipt-key-is-not-issuer",

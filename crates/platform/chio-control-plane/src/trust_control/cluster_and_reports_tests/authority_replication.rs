@@ -188,7 +188,7 @@ fn assert_kernel_rejects_issuer(
     .test_unwrap();
     let capability = LocalCapabilityAuthority::new_with_clock(
         attacker.clone(),
-        std::sync::Arc::new(chio_kernel::SystemClock),
+        chio_test_support::clock::clock(),
     )
     .issue_capability(&subject, scope, 60)
     .test_unwrap();

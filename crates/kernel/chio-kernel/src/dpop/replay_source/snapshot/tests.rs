@@ -8,7 +8,7 @@ fn snapshot() -> DpopReplaySourceSnapshot {
         8,
         4,
         Duration::from_secs(60),
-        std::sync::Arc::new(crate::SystemClock),
+        chio_test_support::clock::clock(),
     )
     .expect("positive replay store test capacities");
     store
@@ -148,7 +148,7 @@ fn even_valid_reencoded_data_is_not_a_live_seal() {
     let fresh = DpopNonceStore::new(
         8,
         Duration::from_secs(60),
-        std::sync::Arc::new(crate::SystemClock),
+        chio_test_support::clock::clock(),
     )
     .expect("positive replay store test capacities");
     assert!(fresh.seal_exact(&substituted).is_err());

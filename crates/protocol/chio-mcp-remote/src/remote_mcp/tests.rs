@@ -162,7 +162,7 @@ fn test_sender_dpop_runtime() -> (Arc<DpopNonceStore>, DpopConfig) {
         DpopNonceStore::new(
             config.nonce_store_capacity,
             Duration::from_secs(config.proof_ttl_secs),
-            std::sync::Arc::new(chio_kernel::SystemClock),
+            chio_test_support::clock::clock(),
         )
         .expect("positive replay store test capacities"),
     );
@@ -789,7 +789,7 @@ fn stored_capability_issuer_revalidation_rejects_untrusted_restart_issuer() {
     trusted_kernel.set_capability_authority(Box::new(
         chio_kernel::LocalCapabilityAuthority::new_with_clock(
             old_authority,
-            std::sync::Arc::new(chio_kernel::SystemClock),
+            chio_test_support::clock::clock(),
         ),
     ));
     assert!(stored_capability_issuers_are_trusted(

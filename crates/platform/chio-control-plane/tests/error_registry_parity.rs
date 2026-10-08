@@ -29,7 +29,7 @@ fn zero_dpop_capacity_emits_registered_diagnostic() {
     let error = match DpopNonceStore::new(
         0,
         Duration::from_secs(60),
-        std::sync::Arc::new(chio_kernel::SystemClock),
+        chio_test_support::clock::clock(),
     ) {
         Err(error) => error,
         Ok(_) => panic!("zero-capacity DPoP store constructed"),

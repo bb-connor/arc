@@ -62,7 +62,7 @@ fn owned_rollback_preserves_marker_on_byte_underflow_and_latches_refusal() -> Te
     let store = DpopNonceStore::new(
         8,
         Duration::from_secs(60),
-        std::sync::Arc::new(crate::SystemClock),
+        chio_test_support::clock::clock(),
     )
     .expect("positive replay store test capacities");
     assert!(store.reserve_for_dispatch_until("nonce", "cap", u64::MAX, "owner")?);
@@ -166,7 +166,7 @@ fn proof_deadline_overflow_is_rejected_before_nonce_reservation() -> TestResult 
     let store = DpopNonceStore::new(
         8,
         Duration::from_secs(60),
-        std::sync::Arc::new(crate::SystemClock),
+        chio_test_support::clock::clock(),
     )
     .expect("positive replay store test capacities");
     for result in [

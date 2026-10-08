@@ -204,7 +204,7 @@ fn activate_domain(
     let source = DpopNonceStore::new(
         8,
         std::time::Duration::from_secs(3600),
-        std::sync::Arc::new(chio_kernel::SystemClock),
+        chio_test_support::clock::clock(),
     )?;
     let authority_id = AdmissionIdentifier::try_new("dpop_authority", "sqlite-dpop-authority")?;
     let snapshot = source.preview_unsealed(&DpopReplaySourceBinding {

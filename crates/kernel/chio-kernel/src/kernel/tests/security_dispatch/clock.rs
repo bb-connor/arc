@@ -156,7 +156,7 @@ fn installed_dpop_and_default_approval_follow_the_kernel_clock() -> TestResult {
         DpopNonceStore::new(
             2,
             Duration::from_secs(60),
-            std::sync::Arc::new(crate::SystemClock),
+            chio_test_support::clock::clock(),
         )
         .expect("positive replay store test capacities"),
         DpopConfig::default(),

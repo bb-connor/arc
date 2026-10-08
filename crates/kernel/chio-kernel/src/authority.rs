@@ -1086,7 +1086,7 @@ mod tests {
     fn local_authority_issues_cumulative_approval_capabilities() {
         let authority = LocalCapabilityAuthority::new_with_clock(
             Keypair::generate(),
-            std::sync::Arc::new(crate::SystemClock),
+            chio_test_support::clock::clock(),
         );
         let scope = ChioScope {
             grants: vec![ToolGrant {
