@@ -1,9 +1,13 @@
+//! Transaction-scoped verdict, outcome and liability writes.
+
+use super::*;
+
 // Shared write-transaction helpers for transitions and verdicts.
 
 /// The caller names the state it believes a head is in, and that state
 /// must be the only legal source of the edge it is asking for, so no
 /// caller can skip a state by naming a later one.
-fn require_transition_source(
+pub(super) fn require_transition_source(
     expected_state: FindingLiabilityState,
     source_state: FindingLiabilityState,
     target_state: FindingLiabilityState,
@@ -23,7 +27,7 @@ fn require_transition_source(
 /// the listing it names without a second load. Identity columns are frozen
 /// at insert, so the listing that record names is the one the edge moved.
 /// Idempotent once the head already sits at the target.
-fn apply_liability_transition_tx(
+pub(super) fn apply_liability_transition_tx(
     transaction: &Transaction<'_>,
     liability_key: &str,
     source_state: FindingLiabilityState,
@@ -70,7 +74,7 @@ fn apply_liability_transition_tx(
 /// listing's sales block. Every head past `open` carries an upheld
 /// challenge, and so holds the listing until it is exonerated; a head that
 /// never left `open` never blocked anything.
-fn listing_holds_another_liability_tx(
+pub(super) fn listing_holds_another_liability_tx(
     transaction: &Transaction<'_>,
     listing_id: &str,
     liability_key: &str,
@@ -168,13 +172,13 @@ pub(crate) fn uphold_liability_tx(
     Ok(FindingChallengeWriteOutcome::Inserted)
 }
 
-const CHALLENGE_COLUMNS: &str = r#"
+pub(super) const CHALLENGE_COLUMNS: &str = r#"
     challenge_id, finding_id, listing_id, challenge_envelope_sha256,
     authorization_branch, evidence_class, challenger_hex, state, retry_count,
     retry_deadline, outcome_envelope_sha256, submitted_at, updated_at
 "#;
 
-fn record_verdict_tx(
+pub(super) fn record_verdict_tx(
     transaction: &Transaction<'_>,
     challenge_id: &str,
     verdict: FindingChallengeVerdict,
@@ -268,7 +272,7 @@ fn record_verdict_tx(
     Ok(target)
 }
 
-fn store_outcome_envelope_tx(
+pub(super) fn store_outcome_envelope_tx(
     transaction: &Transaction<'_>,
     challenge_id: &str,
     outcome_envelope_sha256: &str,
@@ -321,18 +325,18 @@ fn store_outcome_envelope_tx(
     }
 }
 
-struct RawChallenge {
-    challenge_id: String,
-    finding_id: String,
-    listing_id: String,
-    challenge_envelope_sha256: String,
-    authorization_branch: String,
-    evidence_class: String,
-    challenger_hex: Option<String>,
-    state: String,
-    retry_count: i64,
-    retry_deadline: Option<i64>,
-    outcome_envelope_sha256: Option<String>,
-    submitted_at: i64,
-    updated_at: i64,
+pub(super) struct RawChallenge {
+    pub(super) challenge_id: String,
+    pub(super) finding_id: String,
+    pub(super) listing_id: String,
+    pub(super) challenge_envelope_sha256: String,
+    pub(super) authorization_branch: String,
+    pub(super) evidence_class: String,
+    pub(super) challenger_hex: Option<String>,
+    pub(super) state: String,
+    pub(super) retry_count: i64,
+    pub(super) retry_deadline: Option<i64>,
+    pub(super) outcome_envelope_sha256: Option<String>,
+    pub(super) submitted_at: i64,
+    pub(super) updated_at: i64,
 }
