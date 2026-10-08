@@ -1,5 +1,8 @@
 use super::*;
 
+mod durable_admission;
+pub use durable_admission::{AdmissionReason, DurableAdmissionError};
+
 #[derive(Clone, Debug, PartialEq, serde::Serialize)]
 pub struct StructuredErrorReport {
     pub code: String,
@@ -278,8 +281,15 @@ pub enum KernelError {
     #[error("budget store error: {0}")]
     BudgetStore(#[from] BudgetStoreError),
 
+    /// A durable admission failure raised outside the kernel, such as by a
+    /// runtime admission hook or a host store. The kernel raises
+    /// [`Self::Admission`].
     #[error("durable admission failed: {0}")]
     DurableAdmission(String),
+
+    /// A durable admission failure with its typed cause.
+    #[error("durable admission failed: {0}")]
+    Admission(#[source] Box<DurableAdmissionError>),
 
     /// Recovery preserves the deciding typed source. Global authority and
     /// integrity faults cannot be reclassified from diagnostic prose.
@@ -712,6 +722,11 @@ impl KernelError {
             Self::DurableAdmission(reason) => self.report_with_context(
                 "CHIO-KERNEL-DURABLE-ADMISSION",
                 serde_json::json!({ "reason": reason }),
+                "Repair the fenced admission authority and reconcile the retained operation before retrying this request ID.",
+            ),
+            Self::Admission(failure) => self.report_with_context(
+                "CHIO-KERNEL-DURABLE-ADMISSION",
+                serde_json::json!({ "reason": failure.to_string() }),
                 "Repair the fenced admission authority and reconcile the retained operation before retrying this request ID.",
             ),
             Self::AdmissionRecovery(failure) => self.report_with_context(
