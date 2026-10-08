@@ -19,10 +19,18 @@ use axum::middleware::Next;
 use chio_core::canonical::{UntrustedJsonError, UntrustedJsonText};
 use futures_util::StreamExt;
 
+/// A JSON body must arrive within this base deadline plus one second per MiB
+/// of its route bound, so a stalled upload cannot hold its connection and
+/// buffer open indefinitely.
+const BODY_READ_BASE_DEADLINE: std::time::Duration = std::time::Duration::from_secs(10);
+const BODY_READ_MIN_BYTES_PER_SECOND: usize = 1024 * 1024;
+
 #[derive(Debug, thiserror::Error)]
 enum InputError {
     #[error("JSON request body exceeds its limit")]
     TooLarge,
+    #[error("JSON request body was not received before its deadline")]
+    TimedOut,
     #[error("JSON request body transport failed")]
     Transport(#[source] axum::Error),
     #[error(transparent)]
@@ -33,13 +41,33 @@ impl IntoResponse for InputError {
     fn into_response(self) -> Response {
         let status = match &self {
             Self::TooLarge => StatusCode::PAYLOAD_TOO_LARGE,
+            Self::TimedOut => StatusCode::REQUEST_TIMEOUT,
             Self::Transport(_) | Self::Json(_) => StatusCode::BAD_REQUEST,
         };
         plain_http_error(status, &self.to_string())
     }
 }
 
+fn body_read_deadline(bound: usize) -> std::time::Duration {
+    let transfer_secs = u64::try_from(bound / BODY_READ_MIN_BYTES_PER_SECOND).unwrap_or(u64::MAX);
+    BODY_READ_BASE_DEADLINE.saturating_add(std::time::Duration::from_secs(transfer_secs))
+}
+
 async fn read_body(body: Body, bound: usize) -> Result<Vec<u8>, InputError> {
+    read_body_by(body, bound, body_read_deadline(bound)).await
+}
+
+async fn read_body_by(
+    body: Body,
+    bound: usize,
+    deadline: std::time::Duration,
+) -> Result<Vec<u8>, InputError> {
+    tokio::time::timeout(deadline, read_body_within(body, bound))
+        .await
+        .map_err(|_| InputError::TimedOut)?
+}
+
+async fn read_body_within(body: Body, bound: usize) -> Result<Vec<u8>, InputError> {
     let mut stream = body.into_data_stream();
     let mut bytes = Vec::new();
     while let Some(chunk) = stream.next().await {
@@ -346,3 +374,7 @@ pub(super) async fn validate(request: Request, next: Next) -> Response {
     next.run(Request::from_parts(parts, Body::from(bytes)))
         .await
 }
+
+#[cfg(test)]
+#[path = "json_ingress/body_deadline_tests.rs"]
+mod body_deadline_tests;
