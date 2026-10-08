@@ -484,12 +484,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         max_lines=5_488,
         max_fragments=10,
     ),
-    "crates/platform/chio-store-sqlite/src/finding_challenge_store.rs": allow(
-        "2027-01-31",
-        "finding challenge store assembled from include! fragments; capped until the fragments become modules",
-        max_lines=920,
-        max_fragments=1,
-    ),
     "crates/protocol/chio-a2a-edge/src/lib.rs": allow(
         "2027-01-31",
         "A2A edge surface assembled from include! fragments; capped until the fragments become modules",

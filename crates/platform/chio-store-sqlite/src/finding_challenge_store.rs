@@ -734,7 +734,9 @@ use schema_migrations::*;
 mod input_bounds;
 pub(crate) use input_bounds::begin_finalizing_under_sanction_tx;
 use input_bounds::*;
-include!("finding_challenge_store_root_refresh.rs");
+#[path = "finding_challenge_store_root_refresh.rs"]
+mod root_refresh;
+use root_refresh::*;
 
 #[cfg(all(test, unix))]
 mod connection_recovery;
