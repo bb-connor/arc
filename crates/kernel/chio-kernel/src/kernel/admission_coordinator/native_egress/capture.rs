@@ -4,8 +4,11 @@ use crate::kernel::credential_reservation::DispatchCredentialReservation;
 
 #[path = "capture_ack.rs"]
 mod acknowledgement;
+#[path = "fault.rs"]
+mod fault;
 #[path = "lifecycle.rs"]
 mod lifecycle;
+use fault::NativeDispatchFault;
 
 /// Kernel-owned boundary borrowing the live evaluation's actual budget and
 /// credential reservation. No public constructor accepts historical records.
@@ -22,6 +25,8 @@ pub struct NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
     /// Set before the first durable custody write; later failures are unconfirmed.
     store_entered: bool,
     failed: bool,
+    /// First refused kernel step, reported only to the private host log.
+    fault: Option<NativeDispatchFault>,
     return_input: Option<DurableToolReturnContextInput<'a>>,
     captured_lifecycle: Option<lifecycle::CapturedLifecycle>,
 }
@@ -61,14 +66,17 @@ impl<'a, 'kernel: 'a> NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
         ),
         KernelError,
     > {
+        let mut stage = NativeDispatchFault::RetentionBeforeStore;
         let result = self.retain_once(
             prepared,
             egress_expires_at_unix_ms,
             policy_json,
             consumption,
+            &mut stage,
         );
         if result.is_err() {
             self.failed = true;
+            self.fault = self.fault.or(Some(stage));
         }
         result
     }
@@ -79,6 +87,7 @@ impl<'a, 'kernel: 'a> NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
         egress_expires_at_unix_ms: Option<u64>,
         policy_json: &[u8],
         consumption: Option<&chio_security_types::ports::DeclassificationConsumptionEvidenceCommit>,
+        stage: &mut NativeDispatchFault,
     ) -> Result<
         (
             PreparedNativeSecurityEgress<'p>,
@@ -131,12 +140,14 @@ impl<'a, 'kernel: 'a> NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
                 .min(lifecycle::policy_deadline(policy_json)?)
                 .min(egress_expires_at_unix_ms.unwrap_or(u64::MAX));
             if valid_until <= now {
+                *stage = NativeDispatchFault::RetentionDeadline;
                 return Err(invalid("native capture authority expired before retention"));
             }
         }
         // No custody has been retained for this capture before this point.
         self.credentials.retain_if_dropped()?;
         self.store_entered = true;
+        *stage = NativeDispatchFault::RetentionStore;
         prepared.retain_for_capture_inner(
             egress_expires_at_unix_ms,
             grant_index,
@@ -193,9 +204,11 @@ impl<'a, 'kernel: 'a> NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
         ledger: &crate::admission_operation::NativeSecurityDispatchLedgerRecordV1,
         policy_json: &[u8],
     ) -> Result<crate::receipt_store::AdmissionBudgetCapture, KernelError> {
-        let result = self.capture_once(prepared, ledger, policy_json);
+        let mut stage = NativeDispatchFault::CaptureBeforeStore;
+        let result = self.capture_once(prepared, ledger, policy_json, &mut stage);
         if result.is_err() {
             self.failed = true;
+            self.fault = self.fault.or(Some(stage));
         }
         result
     }
@@ -205,6 +218,7 @@ impl<'a, 'kernel: 'a> NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
         prepared: PreparedNativeSecurityEgress<'_>,
         ledger: &crate::admission_operation::NativeSecurityDispatchLedgerRecordV1,
         policy_json: &[u8],
+        stage: &mut NativeDispatchFault,
     ) -> Result<crate::receipt_store::AdmissionBudgetCapture, KernelError> {
         if self.attempted || self.failed {
             return Err(invalid(
@@ -328,8 +342,15 @@ impl<'a, 'kernel: 'a> NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
                     .capture_native_invocation_and_commit_dispatch(capture)
             }
         }))
-        .map_err(|_| invalid("native capture callback panicked; commitment is unconfirmed"))?
-        .map_err(|error| invalid(&error.to_string()))?;
+        .map_err(|_| {
+            *stage = NativeDispatchFault::CaptureStorePanicked;
+            invalid("native capture callback panicked; commitment is unconfirmed")
+        })?
+        .map_err(|error| {
+            *stage = NativeDispatchFault::capture_store(&error);
+            invalid(&error.to_string())
+        })?;
+        *stage = NativeDispatchFault::CaptureReadback;
         let mut attachments = vec![AdmissionAttachment::NativeDispatchLedgerDigest(
             ledger.record_digest.clone(),
         )];
@@ -464,6 +485,7 @@ impl ChioKernel {
             retained: false,
             store_entered: false,
             failed: false,
+            fault: None,
             return_input: None,
             captured_lifecycle: None,
         };

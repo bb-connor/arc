@@ -28,9 +28,20 @@ ATTACHMENT_MARKER = re.compile(
     r"client (exit_zero|exit_error|exit_engine|exit_other|signal|killed_bootstrap"
     r"|killed_interrupt|unobserved|unclassified)\n"
 )
+# One complete line from the host formatter naming a fixed kernel fault class.
+NATIVE_DISPATCH_FAULT = re.compile(
+    r"^warn chio::native_dispatch message=native dispatch failed request_id=[^\n]*"
+    r" native_dispatch_fault=(hook_before_capture|hook_after_authority_entry"
+    r"|hook_suppressed_capture_failure|hook_skipped_capture|retention_before_store"
+    r"|retention_deadline|retention_store|capture_before_store|capture_store_panicked"
+    r"|capture_store_fenced|capture_store_outcome_unknown|capture_store_rejected"
+    r"|capture_readback|handoff_entry|handoff_deadline_at_entry|handoff_readback"
+    r"|handoff_flow|handoff_deadline_after_readback|handoff_custody)\n",
+    re.MULTILINE,
+)
 
 
-def failure_classes(text):
+def failure_classes(text, host=False):
     if isinstance(text, bytes):
         text = text[:65536].decode("utf-8", errors="replace")
     text = (text or "")[:65536].lower()
@@ -56,6 +67,9 @@ def failure_classes(text):
     marker = ATTACHMENT_MARKER.match(text)
     if marker:
         classes.update(("attachment_reason_" + marker[1], "attachment_client_" + marker[2]))
+    if host:
+        # Worker logs can contain arbitrary lines; only the host stream maps here.
+        classes.update("native_dispatch_" + m[1] for m in NATIVE_DISPATCH_FAULT.finditer(text))
     return sorted(classes)
 
 
@@ -124,7 +138,7 @@ def save_failure_diagnostics(root, output, failure):
         "stage": "first_operator_run",
         "timed_out": isinstance(failure, subprocess.TimeoutExpired),
         "run_report": safe_run_report(failure.stdout),
-        "host_failure_classes": failure_classes(failure.stderr),
+        "host_failure_classes": failure_classes(failure.stderr, host=True),
         "worker_logs": [],
     }
     if isinstance(failure, subprocess.CalledProcessError):

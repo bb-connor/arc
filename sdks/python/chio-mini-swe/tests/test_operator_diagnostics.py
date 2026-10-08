@@ -205,7 +205,7 @@ NATIVE_DISPATCH_FAULT = (
 )
 NATIVE_DISPATCH_FAULTS = [
     "hook_before_capture",
-    "hook_after_custody",
+    "hook_after_authority_entry",
     "hook_suppressed_capture_failure",
     "hook_skipped_capture",
     "retention_before_store",

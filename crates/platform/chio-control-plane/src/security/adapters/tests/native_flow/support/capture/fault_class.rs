@@ -176,12 +176,15 @@ impl<S: tracing::Subscriber> Layer<S> for FaultLines {
         }
         let mut fields = Fields(Vec::new());
         event.record(&mut fields);
-        self.0.lock().unwrap_or_else(PoisonError::into_inner).push(format!(
-            "{} {} {}",
-            metadata.level(),
-            metadata.target(),
-            fields.0.join(" ")
-        ));
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(format!(
+                "{} {} {}",
+                metadata.level(),
+                metadata.target(),
+                fields.0.join(" ")
+            ));
     }
 }
 
@@ -221,11 +224,7 @@ fn observe(site: Site, early_ms: u64) -> TestResult<Observed> {
         .lock()
         .map_err(|_| "site hook outcomes poisoned")?
         .clone();
-    let lines = lines
-        .0
-        .lock()
-        .map_err(|_| "fault lines poisoned")?
-        .clone();
+    let lines = lines.0.lock().map_err(|_| "fault lines poisoned")?.clone();
     Ok(Observed {
         fixture,
         response,

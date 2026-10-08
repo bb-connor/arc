@@ -1,5 +1,6 @@
 //! Original capture hands one live owner to the common durable finalizer.
 //! Historical readback can validate that owner, but can never construct it.
+use super::fault::NativeDispatchFault;
 use super::*;
 use crate::kernel::credential_reservation::DispatchCredentialReservation;
 use crate::tool_outcome::DurableSecurityReleaseContext;
@@ -49,11 +50,13 @@ impl SecurityRequestLifecyclePermit for NativeReleaseOwner {
 }
 
 impl CapturedLifecycle {
+    /// `stage` names the refusing check for the private host log only.
     pub(super) fn finish(
         self,
         kernel: &ChioKernel,
         admission: &DurableToolAdmission,
         request: &ToolCallRequest,
+        stage: &mut NativeDispatchFault,
     ) -> Result<
         (
             DurableToolReturnContext,
@@ -84,8 +87,11 @@ impl CapturedLifecycle {
         let runtime = kernel.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
         let now = runtime.refresh_trusted_time(0)?;
-        if now >= self.valid_until_unix_ms
-            || admission.operation() != &self.operation
+        if now >= self.valid_until_unix_ms {
+            *stage = NativeDispatchFault::HandoffDeadlineAtEntry;
+            return Err(invalid("native lifecycle capture expired or changed"));
+        }
+        if admission.operation() != &self.operation
             || self
                 .context
                 .original_security_dispatch_binding
@@ -96,6 +102,7 @@ impl CapturedLifecycle {
         {
             return Err(invalid("native lifecycle capture expired or changed"));
         }
+        *stage = NativeDispatchFault::HandoffReadback;
         let (operation, retained) = store_call(|| {
             runtime.store.load_retained_tool_request(
                 self.operation.binding().operation_id(),
@@ -109,6 +116,7 @@ impl CapturedLifecycle {
         {
             return Err(invalid("native lifecycle capture readback changed"));
         }
+        *stage = NativeDispatchFault::HandoffFlow;
         let observed = observe(
             runtime,
             self.observation.binding(),
@@ -117,12 +125,18 @@ impl CapturedLifecycle {
         )?;
         if observed.snapshot() != self.observation.snapshot()
             || observed.stored_context_generation() != self.observation.stored_context_generation()
-            || runtime.refresh_trusted_time(now)? >= self.valid_until_unix_ms
         {
             return Err(invalid(
                 "native lifecycle lost current flow or capture time",
             ));
         }
+        if runtime.refresh_trusted_time(now)? >= self.valid_until_unix_ms {
+            *stage = NativeDispatchFault::HandoffDeadlineAfterReadback;
+            return Err(invalid(
+                "native lifecycle lost current flow or capture time",
+            ));
+        }
+        *stage = NativeDispatchFault::HandoffCustody;
         let security_context = self
             .context
             .security_invocation_context
@@ -216,26 +230,50 @@ impl ChioKernel {
             retained: false,
             store_entered: false,
             failed: false,
+            fault: None,
             return_input: Some(input),
             captured_lifecycle: None,
         };
+        // Absent only when the capture hook itself returned an error.
+        let mut fault = None;
         let result = crate::kernel::security_dispatch::callback("native dispatch capture", || {
             hook.commit_native_dispatch(&mut authority)
         });
         let result = result.and_then(|()| {
             if authority.failed {
+                fault = Some(NativeDispatchFault::HookSuppressedCaptureFailure);
                 return Err(invalid(
                     "native lifecycle callback suppressed capture failure",
                 ));
             }
             let captured = authority.captured_lifecycle.take().ok_or_else(|| {
+                fault = Some(NativeDispatchFault::HookSkippedCapture);
                 invalid("native lifecycle callback did not capture original custody")
             })?;
-            crate::kernel::security_dispatch::callback("native lifecycle handoff", || {
-                captured.finish(self, authority.admission, request)
-            })
+            let mut stage = NativeDispatchFault::HandoffEntry;
+            let handoff =
+                crate::kernel::security_dispatch::callback("native lifecycle handoff", || {
+                    captured.finish(self, authority.admission, request, &mut stage)
+                });
+            fault = Some(stage);
+            handoff
         });
-        result.map_err(|error| authority.classify_failure(error))
+        result.map_err(|error| {
+            let fault = match fault.or(authority.fault) {
+                Some(fault) => fault,
+                None if authority.retained || authority.attempted => {
+                    NativeDispatchFault::HookAfterAuthorityEntry
+                }
+                None => NativeDispatchFault::HookBeforeCapture,
+            };
+            warn!(
+                target: "chio::native_dispatch",
+                request_id = %request.request_id,
+                native_dispatch_fault = fault.as_str(),
+                "native dispatch failed"
+            );
+            authority.classify_failure(error)
+        })
     }
 }
 
