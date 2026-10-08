@@ -6,21 +6,23 @@ pub(super) fn invalid_row_exists(
     connection: &Connection,
     table: &str,
     predicate: &str,
-) -> Result<bool, String> {
+) -> Result<bool, RecordIntegrityError> {
     connection
         .query_row(
             &format!("SELECT EXISTS(SELECT 1 FROM {table} WHERE {predicate})"),
             [],
             |row| row.get(0),
         )
-        .map_err(|error| error.to_string())
+        .map_err(RecordIntegrityError::from)
 }
 
-pub(super) fn validate_storage_bounds(connection: &Connection) -> Result<bool, String> {
+pub(super) fn validate_storage_bounds(
+    connection: &Connection,
+) -> Result<bool, RecordIntegrityError> {
     let namespace: i64 = connection.query_row(
         "SELECT COUNT(*) FROM sqlite_schema WHERE lower(name) GLOB 'dpop_replay_*' OR lower(tbl_name) GLOB 'dpop_replay_*'",
         [], |row| row.get(0),
-    ).map_err(|error| error.to_string())?;
+    )?;
     if namespace == 0 {
         return Ok(false);
     }
@@ -28,19 +30,19 @@ pub(super) fn validate_storage_bounds(connection: &Connection) -> Result<bool, S
         "SELECT COUNT(*) FROM sqlite_schema WHERE type = 'table' AND name IN
          ('dpop_replay_migration_expectations','dpop_replay_migration_events','dpop_replay_legacy_tombstones')",
         [], |row| row.get(0),
-    ).map_err(|error| error.to_string())?;
+    )?;
     if tables != 3 {
         return Err("partial or substituted DPoP migration schema".into());
     }
     let (expectations, bytes): (i64, i64) = connection.query_row(
         "SELECT COUNT(*), COALESCE(SUM(length(CAST(canonical_source AS BLOB))), 0) FROM dpop_replay_migration_expectations",
         [], |row| Ok((row.get(0)?,row.get(1)?)),
-    ).map_err(|error| error.to_string())?;
+    )?;
     if !(0..=crate::integer::checked::<_, i64>(MAX_MIGRATIONS)
-        .map_err(|error| error.to_string())?)
+        .map_err(RecordIntegrityError::invalid)?)
         .contains(&expectations)
         || !(0..=crate::integer::checked::<_, i64>(MAX_TOTAL_SOURCE_BYTES)
-            .map_err(|error| error.to_string())?)
+            .map_err(RecordIntegrityError::invalid)?)
             .contains(&bytes)
     {
         return Err("DPoP expectation aggregate limit exceeded".into());
@@ -60,22 +62,21 @@ pub(super) fn validate_storage_bounds(connection: &Connection) -> Result<bool, S
           ("nonce",0,4096),("source_instance_id",1,512),("expectation_id",1,512)],
           "typeof(canonical_marker) <> 'blob' OR length(canonical_marker) NOT BETWEEN 1 AND 131072", MAX_TOTAL_MARKERS),
     ] {
-        let rows: i64 = connection.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| row.get(0))
-            .map_err(|error| error.to_string())?;
-        if !(0..=crate::integer::checked::<_, i64>(limit).map_err(|error| error.to_string())?).contains(&rows) { return Err(format!("{table} row limit exceeded")); }
+        let rows: i64 = connection.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| row.get(0))?;
+        if !(0..=crate::integer::checked::<_, i64>(limit).map_err(RecordIntegrityError::invalid)?).contains(&rows) { return Err(format!("{table} row limit exceeded").into()); }
         let predicate = text_columns.into_iter().map(|(column, min, max)| format!(
             "typeof({column}) <> 'text' OR length(CAST({column} AS BLOB)) NOT BETWEEN {min} AND {max}"
         )).chain([extra.to_owned()]).collect::<Vec<_>>().join(" OR ");
         if invalid_row_exists(connection, table, &predicate)? {
-            return Err(format!("{table} has invalid storage types or sizes"));
+            return Err(format!("{table} has invalid storage types or sizes").into());
         }
     }
     let marker_bytes: i64 = connection.query_row(
         "SELECT COALESCE(SUM(length(CAST(canonical_marker AS BLOB))), 0) FROM dpop_replay_legacy_tombstones",
         [], |row| row.get(0),
-    ).map_err(|error| error.to_string())?;
+    )?;
     if !(0..=crate::integer::checked::<_, i64>(MAX_TOTAL_SOURCE_BYTES)
-        .map_err(|error| error.to_string())?)
+        .map_err(RecordIntegrityError::invalid)?)
         .contains(&marker_bytes)
     {
         return Err("DPoP tombstone byte limit exceeded".into());

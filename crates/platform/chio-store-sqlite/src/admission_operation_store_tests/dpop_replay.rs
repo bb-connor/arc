@@ -25,6 +25,8 @@ mod integrity;
 mod lifecycle;
 #[path = "dpop_replay/migration.rs"]
 mod migration;
+#[path = "dpop_replay/record_errors.rs"]
+mod record_errors;
 
 const AUTHORITY_ID: &str = "dpop-authority";
 const TABLES: [&str; 3] = [

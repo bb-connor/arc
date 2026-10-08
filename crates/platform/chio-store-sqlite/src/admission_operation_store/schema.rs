@@ -589,7 +589,7 @@ pub(crate) fn verify_admission_operation_invariants(
         .map_err(AdmissionOperationStoreError::from)?;
     super::dpop_replay::verify_all_records(connection)
         .map(|_| ())
-        .map_err(invariant)?;
+        .map_err(AdmissionOperationStoreError::from)?;
     super::security_participant_migration::verify_all(connection)?;
     super::security_participant_state::egress::verify_catalog(connection)?;
     super::security_participant_state::output::verify_catalog(connection)?;

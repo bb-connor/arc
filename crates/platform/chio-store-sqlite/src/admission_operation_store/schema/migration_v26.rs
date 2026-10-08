@@ -49,7 +49,8 @@ pub(super) fn verify_pre_migration_schema(
             .map_err(AdmissionOperationStoreError::from)?;
         super::super::governed_approval_replay::verify_all_records(connection)
             .map_err(AdmissionOperationStoreError::from)?;
-        super::super::dpop_replay::verify_all_records(connection).map_err(invariant)?;
+        super::super::dpop_replay::verify_all_records(connection)
+            .map_err(AdmissionOperationStoreError::from)?;
     }
     Ok(())
 }

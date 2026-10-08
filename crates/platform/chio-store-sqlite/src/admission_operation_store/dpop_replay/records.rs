@@ -1,7 +1,7 @@
 use super::bounds::{invalid_row_exists, validate_storage_bounds};
 use super::*;
 
-type IntegrityResult<T> = Result<T, String>;
+type IntegrityResult<T> = Result<T, RecordIntegrityError>;
 
 pub(super) const TABLES: [&str; 3] = [
     "dpop_replay_migration_expectations",
@@ -22,7 +22,7 @@ pub(super) struct MigrationEvent {
 }
 
 fn hash(domain: &[u8], value: &impl Serialize) -> IntegrityResult<String> {
-    let encoded = canonical_json_bytes(value).map_err(|error| error.to_string())?;
+    let encoded = canonical_json_bytes(value).map_err(RecordIntegrityError::invalid)?;
     let mut bytes = Vec::with_capacity(domain.len() + encoded.len());
     bytes.extend_from_slice(domain);
     bytes.extend_from_slice(&encoded);
@@ -43,7 +43,7 @@ pub(super) fn new_expectation(
             snapshot.inventory_sha256(),
         ),
     )
-    .map_err(integrity_error)?;
+    .map_err(record_error)?;
     let expectation_digest = hash(
         b"chio.dpop-replay-expectation.v1\0",
         &(
@@ -54,7 +54,7 @@ pub(super) fn new_expectation(
             snapshot.inventory_sha256(),
         ),
     )
-    .map_err(integrity_error)?;
+    .map_err(record_error)?;
     Ok(DpopReplayMigrationRecordV1 {
         snapshot,
         expectation_id: AdmissionIdentifier::try_new("expectation_id", expectation_id)?,
@@ -159,7 +159,7 @@ pub(super) fn insert_event(
         observed_at_unix_ms: observed,
         fence: fence.clone(),
     };
-    event.event_digest = event_digest(record, &event, previous).map_err(integrity_error)?;
+    event.event_digest = event_digest(record, &event, previous).map_err(record_error)?;
     transaction
         .execute(
             "INSERT INTO dpop_replay_migration_events
@@ -219,17 +219,15 @@ pub(in crate::admission_operation_store) fn verify_all_records(
             "NOT EXISTS(SELECT 1 FROM {} AS expectation WHERE expectation.dpop_authority_id = {table}.dpop_authority_id)",
             TABLES[0],
         ))? {
-            return Err(format!("{table} has an orphan record"));
+            return Err(format!("{table} has an orphan record").into());
         }
     }
     let mut statement = connection.prepare(
         "SELECT dpop_authority_id FROM dpop_replay_migration_expectations ORDER BY dpop_authority_id",
-    ).map_err(|error| error.to_string())?;
+    )?;
     let keys = statement
-        .query_map([], |row| row.get::<_, String>(0))
-        .map_err(|error| error.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|error| error.to_string())?;
+        .query_map([], |row| row.get::<_, String>(0))?
+        .collect::<Result<Vec<_>, _>>()?;
     let records: Vec<DpopReplayMigrationRecordV1> = keys
         .into_iter()
         .map(|key| {
@@ -288,8 +286,7 @@ fn load_bounded_record(
                 ))
             },
         )
-        .optional()
-        .map_err(|error| error.to_string())?;
+        .optional()?;
     let Some((
         source_instance_id,
         expectation_id,
@@ -302,7 +299,7 @@ fn load_bounded_record(
         return Ok(None);
     };
     let snapshot = DpopReplaySourceSnapshot::from_canonical_bytes(&canonical)
-        .map_err(|error| error.to_string())?;
+        .map_err(RecordIntegrityError::invalid)?;
     if snapshot.instance_id() != source_instance_id
         || snapshot.dpop_authority_id() != dpop_authority_id
         || snapshot.destination_authority_id() != destination
@@ -310,20 +307,18 @@ fn load_bounded_record(
     {
         return Err("stored expectation source binding mismatch".into());
     }
-    let mut record = new_expectation(snapshot).map_err(|error| error.to_string())?;
+    let mut record = new_expectation(snapshot).map_err(RecordIntegrityError::invalid)?;
     if record.expectation_id.as_str() != expectation_id
         || record.expectation_digest != expectation_digest
     {
         return Err("stored expectation identity or digest mismatch".into());
     }
     record.authority = super::activation::load_authority(connection, &record)?;
-    let mut statement = connection
-        .prepare(
-            "SELECT sequence, mutation_kind, expectation_digest, inventory_sha256, event_digest,
+    let mut statement = connection.prepare(
+        "SELECT sequence, mutation_kind, expectation_digest, inventory_sha256, event_digest,
          observed_at_unix_ms, store_uuid, store_lease_id, store_owner_epoch
          FROM dpop_replay_migration_events WHERE dpop_authority_id = ?1 ORDER BY sequence",
-        )
-        .map_err(|error| error.to_string())?;
+    )?;
     let events = statement
         .query_map([dpop_authority_id], |row| {
             Ok(MigrationEvent {
@@ -339,10 +334,8 @@ fn load_bounded_record(
                     owner_epoch: row_u64(row, 8)?,
                 },
             })
-        })
-        .map_err(|error| error.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|error| error.to_string())?;
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
     if events.is_empty() || events.len() > 3 {
         return Err("migration must retain its expectation event".into());
     }
@@ -356,12 +349,12 @@ fn load_bounded_record(
             record
                 .snapshot
                 .validate_transition_time(event.observed_at_unix_ms)
-                .map_err(|error| error.to_string())?;
+                .map_err(RecordIntegrityError::invalid)?;
         }
         if event.sequence != crate::integer::count(index) + 1
             || event.mutation_kind
                 != migration_mutation(crate::integer::count(index) + 1)
-                    .map_err(|error| error.to_string())?
+                    .map_err(RecordIntegrityError::invalid)?
             || event.expectation_digest != record.expectation_digest
             || event.inventory_sha256 != record.snapshot.inventory_sha256()
             || event.fence.store_uuid != record.snapshot.destination_authority_id()
@@ -370,18 +363,16 @@ fn load_bounded_record(
         {
             return Err("migration event binding, digest, order or time mismatch".into());
         }
-        let lease_matches: bool = connection
-            .query_row(
-                "SELECT EXISTS(SELECT 1 FROM chio_serving_leases
+        let lease_matches: bool = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM chio_serving_leases
              WHERE store_uuid = ?1 AND owner_epoch = ?2 AND lease_id = ?3)",
-                params![
-                    event.fence.store_uuid,
-                    i64::try_from(event.fence.owner_epoch).map_err(|error| error.to_string())?,
-                    event.fence.lease_id
-                ],
-                |row| row.get(0),
-            )
-            .map_err(|error| error.to_string())?;
+            params![
+                event.fence.store_uuid,
+                i64::try_from(event.fence.owner_epoch).map_err(RecordIntegrityError::invalid)?,
+                event.fence.lease_id
+            ],
+            |row| row.get(0),
+        )?;
         if !lease_matches {
             return Err("migration event historical owner lease mismatch".into());
         }
@@ -402,16 +393,12 @@ fn verify_tombstones(
     connection: &Connection,
     record: &DpopReplayMigrationRecordV1,
 ) -> IntegrityResult<()> {
-    let mut statement = connection
-        .prepare(
-            "SELECT capability_id, nonce, source_instance_id, expectation_id, canonical_marker
+    let mut statement = connection.prepare(
+        "SELECT capability_id, nonce, source_instance_id, expectation_id, canonical_marker
          FROM dpop_replay_legacy_tombstones WHERE dpop_authority_id = ?1
          ORDER BY capability_id COLLATE BINARY, nonce COLLATE BINARY",
-        )
-        .map_err(|error| error.to_string())?;
-    let mut rows = statement
-        .query([record.snapshot.dpop_authority_id()])
-        .map_err(|error| error.to_string())?;
+    )?;
+    let mut rows = statement.query([record.snapshot.dpop_authority_id()])?;
     let expected = if record.is_imported() {
         record.snapshot.markers()
     } else {
@@ -419,15 +406,14 @@ fn verify_tombstones(
     };
     for marker in expected {
         let row = rows
-            .next()
-            .map_err(|error| error.to_string())?
+            .next()?
             .ok_or("missing unresolved DPoP replay tombstone")?;
         let actual: (String, String, String, String, Vec<u8>) = (
-            row.get(0).map_err(|error| error.to_string())?,
-            row.get(1).map_err(|error| error.to_string())?,
-            row.get(2).map_err(|error| error.to_string())?,
-            row.get(3).map_err(|error| error.to_string())?,
-            row.get(4).map_err(|error| error.to_string())?,
+            row.get(0)?,
+            row.get(1)?,
+            row.get(2)?,
+            row.get(3)?,
+            row.get(4)?,
         );
         // The complete canonical marker preserves local/signed deadlines and
         // historical owners without interpreting either as releasable custody.
@@ -435,12 +421,12 @@ fn verify_tombstones(
             || actual.1 != marker.nonce
             || actual.2 != record.snapshot.instance_id()
             || actual.3 != record.expectation_id.as_str()
-            || actual.4 != canonical_json_bytes(marker).map_err(|error| error.to_string())?
+            || actual.4 != canonical_json_bytes(marker).map_err(RecordIntegrityError::invalid)?
         {
             return Err("DPoP replay tombstone does not match the exact pinned source".into());
         }
     }
-    if rows.next().map_err(|error| error.to_string())?.is_some() {
+    if rows.next()?.is_some() {
         return Err("extra or premature DPoP replay tombstone".into());
     }
     Ok(())

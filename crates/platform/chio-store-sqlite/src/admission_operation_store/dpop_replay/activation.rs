@@ -48,10 +48,10 @@ impl SqliteAdmissionOperationStore {
                 .snapshot
                 .validate_transition_time(observed)
                 .map_err(integrity_error)?;
-            verify_all_records(&transaction).map_err(integrity_error)?;
+            verify_all_records(&transaction).map_err(record_error)?;
             let mut current =
                 records::load_record(&transaction, authority.dpop_authority_id().as_str())
-                    .map_err(integrity_error)?
+                    .map_err(record_error)?
                     .ok_or_else(|| invariant("DPoP activation expectation disappeared"))?;
             require_same_expectation(&current, &expected)?;
             if !current.imported_inactive() {
@@ -62,7 +62,7 @@ impl SqliteAdmissionOperationStore {
                 params![authority.dpop_authority_id().as_str(), canonical]).map_err(sqlite_error)?;
             current.authority = Some(authority.clone());
             records::insert_event(&transaction, &current, 3, observed, fence)?;
-            verify_all_records(&transaction).map_err(integrity_error)?;
+            verify_all_records(&transaction).map_err(record_error)?;
             append_migration_commit(
                 &self.serving_owner,
                 &transaction,
@@ -175,7 +175,8 @@ pub(super) fn validate_storage_bounds(connection: &Connection) -> Result<(), Str
     if super::bounds::invalid_row_exists(connection, TABLE,
         "typeof(dpop_authority_id) <> 'text' OR length(CAST(dpop_authority_id AS BLOB)) NOT BETWEEN 1 AND 512
          OR typeof(canonical_authority) <> 'blob' OR length(canonical_authority) NOT BETWEEN 1 AND 4096
-         OR NOT EXISTS(SELECT 1 FROM dpop_replay_migration_expectations AS expected WHERE expected.dpop_authority_id = dpop_replay_authority_activations.dpop_authority_id)")? {
+         OR NOT EXISTS(SELECT 1 FROM dpop_replay_migration_expectations AS expected WHERE expected.dpop_authority_id = dpop_replay_authority_activations.dpop_authority_id)")
+        .map_err(|error| error.to_string())? {
         return Err("DPoP activation has invalid storage or no source expectation".into());
     }
     Ok(())
