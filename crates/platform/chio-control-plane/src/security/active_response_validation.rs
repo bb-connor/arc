@@ -61,7 +61,6 @@ pub(super) fn recovery_id(
     lease_expires_at_unix_ms: u64,
 ) -> Result<RecordId, ActiveResponseExecutorError> {
     #[derive(Serialize)]
-    #[serde(deny_unknown_fields)]
     struct RecoveryBody<'a> {
         dispatch_id: &'a RecordId,
         action_id: &'a chio_security_types::ports::ActionId,
@@ -96,4 +95,50 @@ pub(super) fn recovery_id(
             "active-response recovery id is invalid".to_string(),
         )
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chio_security_types::ports::{ActionId, CanonicalBody, TenantId};
+
+    fn record_id(value: &str) -> RecordId {
+        RecordId::new(value).unwrap_or_else(|error| panic!("record id {value}: {error}"))
+    }
+
+    #[test]
+    fn recovery_id_golden_vector_is_exact() {
+        let current = ResponsePlanRecord {
+            tenant_id: TenantId::new("tenant-recovery-golden")
+                .unwrap_or_else(|error| panic!("tenant id: {error}")),
+            action_id: ActionId::new("action-recovery-golden")
+                .unwrap_or_else(|error| panic!("action id: {error}")),
+            generation: 7,
+            state: record_id("active"),
+            canonical_body: CanonicalBody::new(b"{}".to_vec())
+                .unwrap_or_else(|error| panic!("canonical body: {error}")),
+            body_hash: Digest32::new([0x5a; 32]),
+            due_at_unix_ms: None,
+        };
+        let mut preimage = RECOVERY_ID_DOMAIN.to_vec();
+        preimage.extend_from_slice(
+            br#"{"action_id":"action-recovery-golden","dispatch_id":"active_response_dispatch_golden","lease_expires_at_unix_ms":1700000030000,"now_unix_ms":1700000000000,"response_body_hash":[90,90,90,90,90,90,90,90,90,90,90,90,90,90,90,90,90,90,90,90,90,90,90,90,90,90,90,90,90,90,90,90],"response_generation":7}"#,
+        );
+        assert_eq!(
+            sha256(&preimage).to_hex(),
+            "dbb3ce3de3656650bc428544396b97b18e444b653cd986acdc8fe270b61e499c"
+        );
+
+        let id = recovery_id(
+            &record_id("active_response_dispatch_golden"),
+            &current,
+            1_700_000_000_000,
+            1_700_000_030_000,
+        )
+        .unwrap_or_else(|error| panic!("recovery id: {error}"));
+        assert_eq!(
+            id.as_str(),
+            "active_response_recovery_dbb3ce3de3656650bc428544396b97b18e444b653cd986acdc8fe270b61e499c"
+        );
+    }
 }
