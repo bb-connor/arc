@@ -145,6 +145,45 @@ impl<'a, 'kernel: 'a> NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
         )
     }
 
+    /// A failure is a definite pre-commit rejection only while this authority
+    /// entered no custody write and the original operation holds no committed
+    /// egress. Public preparation handles can commit egress, including a
+    /// one-shot declassification consumption, before capture is attempted, so
+    /// that commitment is read back rather than inferred from this handle. An
+    /// unreadable history leaves the commitment unconfirmed.
+    fn classify_failure(&self, error: KernelError) -> DurableDispatchCommitError {
+        if self.store_entered {
+            return DurableDispatchCommitError::CommitUnconfirmed(error);
+        }
+        match self.holds_committed_egress() {
+            Ok(false) => DurableDispatchCommitError::RejectedBeforeCommit(error),
+            Ok(true) => DurableDispatchCommitError::CommitUnconfirmed(error),
+            Err(readback) => {
+                warn!(
+                    request_id = %self.request.request_id,
+                    readback = %redacted!(&readback),
+                    "native egress custody readback failed; dispatch commitment is unconfirmed"
+                );
+                DurableDispatchCommitError::CommitUnconfirmed(error)
+            }
+        }
+    }
+
+    fn holds_committed_egress(&self) -> Result<bool, KernelError> {
+        let runtime = self.kernel.durable_runtime()?;
+        let _guard = runtime.lock_mutations()?;
+        let now = runtime.refresh_trusted_time(0)?;
+        let (_, history) = store_call(|| {
+            runtime.store.load_native_security_egress(
+                self.admission.operation().binding().operation_id(),
+                &runtime.fence,
+                now,
+            )
+        })?
+        .ok_or_else(|| invalid("native egress operation readback is absent"))?;
+        Ok(history.is_some_and(|history| history.commitment.is_some()))
+    }
+
     /// Retain on uncertain commit, then bind the real reservation and policy to
     /// the dedicated physical transaction. A successful result records capture
     /// only. It is never a tool permit or authorization to reacquire resources.
@@ -434,10 +473,6 @@ impl ChioKernel {
         let error = result.err().unwrap_or_else(|| {
             invalid("native capture checkpoint complete; execution remains unsupported")
         });
-        Some(if authority.store_entered {
-            DurableDispatchCommitError::CommitUnconfirmed(error)
-        } else {
-            DurableDispatchCommitError::RejectedBeforeCommit(error)
-        })
+        Some(authority.classify_failure(error))
     }
 }

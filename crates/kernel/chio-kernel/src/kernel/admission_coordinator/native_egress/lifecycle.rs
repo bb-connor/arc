@@ -222,7 +222,6 @@ impl ChioKernel {
         let result = crate::kernel::security_dispatch::callback("native dispatch capture", || {
             hook.commit_native_dispatch(&mut authority)
         });
-        let store_entered = authority.store_entered;
         let result = result.and_then(|()| {
             if authority.failed {
                 return Err(invalid(
@@ -236,13 +235,7 @@ impl ChioKernel {
                 captured.finish(self, authority.admission, request)
             })
         });
-        result.map_err(|error| {
-            if store_entered {
-                DurableDispatchCommitError::CommitUnconfirmed(error)
-            } else {
-                rejected(error)
-            }
-        })
+        result.map_err(|error| authority.classify_failure(error))
     }
 }
 
