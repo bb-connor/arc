@@ -360,7 +360,8 @@ fn another_action_and_effect_can_apply_after_the_original_was_lifted() {
             .execute(&rebound)
             .err()
             .unwrap_or_else(|| panic!("foreign plan accepted the removed effect identity"));
-        assert_eq!(refused.kind(), PortErrorKind::Conflict);
+        assert_eq!(refused.kind(), PortErrorKind::IntegrityFailure);
+        assert_eq!(refused.code().as_str(), "store.integrity_failure");
         assert_eq!(case.snapshot(), before);
         let applied = case
             .effects
