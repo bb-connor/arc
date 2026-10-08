@@ -10,7 +10,10 @@ const WORKER_TICK_INTERVAL: Duration = Duration::from_secs(2);
 /// Longer than the teardown's bounded fault attempts at its retry interval.
 const HEALTHY_WAIT: Duration = Duration::from_secs(8);
 const EXPIRY_CLEANUP_BOUND: Duration = Duration::from_secs(4);
+const ATTEMPTS_BEFORE_PARK: usize = 50;
+const PARK_OBSERVATION_TIMEOUT: Duration = Duration::from_secs(30);
 const PARKED_AUDIT: &str = "active_defense_teardown_cleanup_parked";
+const DRAIN_RETRY_AUDIT: &str = "active_defense_detached_pre_stop_drain_retry";
 
 #[derive(Clone, Default)]
 struct AuditCapture {
@@ -25,10 +28,15 @@ impl AuditCapture {
             .clone()
     }
 
-    fn parked(&self) -> bool {
+    fn count(&self, level: tracing::Level, audit_fault: &str) -> usize {
         self.snapshot()
             .iter()
-            .any(|(level, fault)| *level == tracing::Level::ERROR && fault == PARKED_AUDIT)
+            .filter(|(recorded, fault)| *recorded == level && fault == audit_fault)
+            .count()
+    }
+
+    fn parked(&self) -> bool {
+        self.count(tracing::Level::ERROR, PARKED_AUDIT) > 0
     }
 }
 
@@ -116,6 +124,12 @@ impl LongTtlHost {
     }
 }
 
+async fn released_within(ttl: &LongTtlHost, timeout: Duration) -> bool {
+    tokio::time::timeout(timeout, ttl.fixture.registry.wait_until_vacant())
+        .await
+        .is_ok_and(|vacancy| vacancy.is_ok())
+}
+
 /// Polls a teardown that must keep waiting for the live TTL until `done`
 /// holds or `limit` passes.
 async fn hold_while_ttl_live<F: Future<Output = u32>>(
@@ -185,6 +199,156 @@ async fn healthy_ttl_wait_spends_no_fault_budget_and_cleans_up_once_expired() {
         cleanup_elapsed < EXPIRY_CLEANUP_BOUND,
         "cleanup after TTL expiry took {cleanup_elapsed:?}"
     );
+    assert!(!ttl.fixture.has_active_overlay_contributions());
+    assert!(ttl.fixture.registry.snapshot().is_none());
+}
+
+#[tokio::test]
+async fn two_teardowns_in_healthy_ttl_waits_each_clean_up_on_their_own_expiry() {
+    let waiting = LongTtlHost::new();
+    let expiring = LongTtlHost::new();
+    let waiting_host = waiting.start().await;
+    let expiring_host = expiring.start().await;
+    drop(waiting_host);
+    drop(expiring_host);
+
+    let wait_started = Instant::now();
+    while wait_started.elapsed() < HEALTHY_WAIT {
+        waiting.follow_wall_clock();
+        expiring.follow_wall_clock();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    let both_held = [&waiting, &expiring].iter().all(|ttl| {
+        ttl.fixture.registry.snapshot().is_some() && ttl.fixture.has_active_overlay_contributions()
+    });
+    let remaining_ttl_ms = waiting.remaining_ttl_ms().min(expiring.remaining_ttl_ms());
+
+    expiring.expire();
+    let expiring_started = Instant::now();
+    let expiring_released = released_within(&expiring, HOST_LIFECYCLE_TEST_TIMEOUT).await;
+    let expiring_elapsed = expiring_started.elapsed();
+    let waiting_still_held = waiting.fixture.registry.snapshot().is_some()
+        && waiting.fixture.has_active_overlay_contributions();
+    waiting.expire();
+    let waiting_started = Instant::now();
+    let waiting_released = released_within(&waiting, HOST_LIFECYCLE_TEST_TIMEOUT).await;
+    let waiting_elapsed = waiting_started.elapsed();
+
+    assert!(
+        both_held,
+        "a teardown released its reservation while its TTL overlay was live"
+    );
+    assert!(
+        remaining_ttl_ms > MIN_REMAINING_TTL_MS,
+        "the TTLs were not live for the whole wait: remaining_ttl_ms={remaining_ttl_ms}"
+    );
+    assert!(
+        expiring_released && expiring_elapsed < EXPIRY_CLEANUP_BOUND,
+        "the first expiry was not cleaned up promptly beside a waiting teardown: released={expiring_released} after {expiring_elapsed:?}"
+    );
+    assert!(
+        waiting_still_held,
+        "the waiting teardown released before its own TTL expired"
+    );
+    assert!(
+        waiting_released && waiting_elapsed < EXPIRY_CLEANUP_BOUND,
+        "the second expiry was not cleaned up promptly: released={waiting_released} after {waiting_elapsed:?}"
+    );
+    assert!(!waiting.fixture.has_active_overlay_contributions());
+    assert!(!expiring.fixture.has_active_overlay_contributions());
+}
+
+#[tokio::test]
+async fn store_fault_during_a_ttl_wait_still_spends_the_fault_budget_and_parks() {
+    let ttl = LongTtlHost::new();
+    let host = ttl.start().await;
+    let worker = Arc::clone(host.orchestrator().worker());
+    let connection = rusqlite::Connection::open(&ttl.fixture.security_path)
+        .unwrap_or_else(|error| panic!("open inventory fault connection: {error}"));
+    let capture = AuditCapture::default();
+    let _subscriber = tracing::subscriber::set_default(Registry::default().with(capture.clone()));
+
+    let teardown = host.run_detached_teardown_inline_for_test();
+    tokio::pin!(teardown);
+    hold_while_ttl_live(&mut teardown, &ttl, Duration::from_millis(500), || false).await;
+    let faults_before_outage = capture.snapshot();
+    // An internal test-owned table name. Only the teardown's overlay
+    // inventory reads it while nothing is due.
+    connection
+        .execute_batch(
+            "ALTER TABLE security_egress_restriction_effects RENAME TO unavailable_overlay_inventory",
+        )
+        .unwrap_or_else(|error| panic!("inject overlay inventory outage: {error}"));
+    hold_while_ttl_live(&mut teardown, &ttl, PARK_OBSERVATION_TIMEOUT, || {
+        capture.parked()
+    })
+    .await;
+    let health = worker.health();
+    let drain_faults_at_park = capture.count(tracing::Level::WARN, DRAIN_RETRY_AUDIT);
+    connection
+        .execute_batch(
+            "ALTER TABLE unavailable_overlay_inventory RENAME TO security_egress_restriction_effects",
+        )
+        .unwrap_or_else(|error| panic!("restore overlay inventory: {error}"));
+    ttl.expire();
+    let attempts = tokio::time::timeout(HOST_LIFECYCLE_TEST_TIMEOUT, teardown)
+        .await
+        .unwrap_or_else(|_| panic!("teardown did not clean up after the store recovered"));
+
+    assert_eq!(faults_before_outage, Vec::new());
+    assert_eq!(
+        health.lifecycle,
+        ResponseWorkerLifecycle::Ready,
+        "the store fault was not confined to the teardown inventory: {health:?}"
+    );
+    assert_eq!(capture.count(tracing::Level::ERROR, PARKED_AUDIT), 1);
+    assert_eq!(drain_faults_at_park, ATTEMPTS_BEFORE_PARK);
+    assert!(
+        usize::try_from(attempts).is_ok_and(|attempts| attempts >= ATTEMPTS_BEFORE_PARK),
+        "store faults did not spend the fault budget: attempts={attempts}"
+    );
+    assert!(!ttl.fixture.has_active_overlay_contributions());
+    assert!(ttl.fixture.registry.snapshot().is_none());
+}
+
+#[tokio::test]
+async fn recovery_worker_crash_during_a_ttl_wait_still_spends_the_fault_budget() {
+    let ttl = LongTtlHost::new();
+    let host = ttl.start().await;
+    let primary = Arc::clone(host.orchestrator().worker());
+    let capture = AuditCapture::default();
+    let _subscriber = tracing::subscriber::set_default(Registry::default().with(capture.clone()));
+
+    let teardown = host.run_detached_teardown_inline_for_test();
+    tokio::pin!(teardown);
+    hold_while_ttl_live(&mut teardown, &ttl, Duration::from_millis(500), || false).await;
+    let faults_before_crash = capture.snapshot();
+    ttl.fixture.clock.panic_on_next_worker_read();
+    hold_while_ttl_live(&mut teardown, &ttl, PARK_OBSERVATION_TIMEOUT, || {
+        capture.count(tracing::Level::WARN, DRAIN_RETRY_AUDIT) > 0
+    })
+    .await;
+    let primary_health = primary.health();
+    let recovery_faults = capture.count(tracing::Level::WARN, DRAIN_RETRY_AUDIT);
+    hold_while_ttl_live(&mut teardown, &ttl, Duration::from_secs(3), || false).await;
+    let faults_after_recovered_wait = capture.count(tracing::Level::WARN, DRAIN_RETRY_AUDIT);
+    ttl.expire();
+    let attempts = tokio::time::timeout(HOST_LIFECYCLE_TEST_TIMEOUT, teardown)
+        .await
+        .unwrap_or_else(|_| panic!("teardown did not clean up after recovery"));
+
+    assert_eq!(faults_before_crash, Vec::new());
+    assert_eq!(primary_health.lifecycle, ResponseWorkerLifecycle::Failed);
+    assert!(
+        recovery_faults > 0,
+        "a recovery worker crash spent no fault budget"
+    );
+    assert_eq!(
+        faults_after_recovered_wait, recovery_faults,
+        "the recovered TTL wait kept spending the fault budget"
+    );
+    assert_eq!(usize::try_from(attempts).ok(), Some(recovery_faults));
+    assert!(!capture.parked());
     assert!(!ttl.fixture.has_active_overlay_contributions());
     assert!(ttl.fixture.registry.snapshot().is_none());
 }
