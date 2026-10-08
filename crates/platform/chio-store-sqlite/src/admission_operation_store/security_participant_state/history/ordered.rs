@@ -40,6 +40,83 @@ fn journal_bounds() -> (i64, i64) {
     (MAX_JOURNAL_EVENTS, MAX_JOURNAL_BYTES)
 }
 
+#[cfg(feature = "admission-test-support")]
+impl SqliteAdmissionOperationStore {
+    /// Observe every ordered native journal walk on this authority connection,
+    /// whichever thread runs it. The observer receives zero when a walk starts,
+    /// then the walk's running event count after each anchored event. It cannot
+    /// change a verification result and is absent from production builds.
+    pub fn observe_native_history_visits_for_test(
+        &self,
+        observer: impl Fn(u64) + Send + std::panic::UnwindSafe + 'static,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        use rusqlite::functions::FunctionFlags;
+        let connection = self.connection()?;
+        connection
+            .create_scalar_function(
+                "native_history_visit_probe",
+                1,
+                FunctionFlags::SQLITE_UTF8 | FunctionFlags::SQLITE_DIRECTONLY,
+                move |context| {
+                    let visited = u64::try_from(context.get::<i64>(0)?)
+                        .map_err(|error| rusqlite::Error::UserFunctionError(Box::new(error)))?;
+                    observer(visited);
+                    Ok(0_i32)
+                },
+            )
+            .map_err(sqlite_error)?;
+        connection
+            .execute_batch("CREATE TEMP TABLE IF NOT EXISTS native_history_visit_probe_installed (singleton INTEGER PRIMARY KEY CHECK(singleton = 1))")
+            .map_err(sqlite_error)
+    }
+}
+
+#[cfg(feature = "admission-test-support")]
+struct VisitProbe {
+    installed: bool,
+    visited: u64,
+}
+
+#[cfg(feature = "admission-test-support")]
+impl VisitProbe {
+    fn start(connection: &Connection) -> Result<Self, AdmissionOperationStoreError> {
+        let installed = connection
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM sqlite_temp_schema WHERE type = 'table' AND name = 'native_history_visit_probe_installed')",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(sqlite_error)?;
+        let probe = Self {
+            installed,
+            visited: 0,
+        };
+        probe.report(connection)?;
+        Ok(probe)
+    }
+
+    fn advance(&mut self, connection: &Connection) -> Result<(), AdmissionOperationStoreError> {
+        self.visited = self
+            .visited
+            .checked_add(1)
+            .ok_or_else(|| invalid("native history visit count overflow"))?;
+        self.report(connection)
+    }
+
+    fn report(&self, connection: &Connection) -> Result<(), AdmissionOperationStoreError> {
+        if self.installed {
+            let _: i32 = connection
+                .query_row(
+                    "SELECT native_history_visit_probe(?1)",
+                    [i64::try_from(self.visited).map_err(invalid)?],
+                    |row| row.get(0),
+                )
+                .map_err(sqlite_error)?;
+        }
+        Ok(())
+    }
+}
+
 pub(in crate::admission_operation_store::security_participant_state) enum Event {
     Join(Box<Record>),
     Egress(Box<egress::Record>),
@@ -295,7 +372,11 @@ pub(in crate::admission_operation_store::security_participant_state) fn visit(
             i64::try_from(floors[3]).map_err(invalid)?
         ])
         .map_err(sqlite_error)?;
+    #[cfg(feature = "admission-test-support")]
+    let mut probe = VisitProbe::start(connection)?;
     while let Some(row) = rows.next().map_err(sqlite_error)? {
+        #[cfg(feature = "admission-test-support")]
+        probe.advance(connection)?;
         let kind: String = row.get(0).map_err(sqlite_error)?;
         let sequence =
             u64::try_from(row.get::<_, i64>(1).map_err(sqlite_error)?).map_err(invalid)?;

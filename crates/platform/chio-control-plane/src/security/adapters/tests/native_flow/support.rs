@@ -19,6 +19,8 @@ mod capture;
 
 mod lifecycle;
 
+mod participant_history_cadence;
+
 #[path = "../../native_flow_nonce_tests.rs"]
 mod nonce;
 
