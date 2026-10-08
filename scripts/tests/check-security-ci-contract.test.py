@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import importlib.util
 import os
 import re
@@ -3946,34 +3947,32 @@ assert_rejected(
     "security check revocation weakens event, owner, App, binding, or failure verification",
 )
 assert_rejected(
-    "revocation omits an Actions mirror namespace",
-    "security-contract-revocation.yml",
+    'revocation restores an Actions mirror namespace',
+    'security-contract-revocation.yml',
     replace_in_named_step(
-        "Revoke exact Actions mirrors and dedicated App namespace",
-        'normalize_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / Build, lint, test" "${external_id}:actions:build"',
-        "true",
+        'Revoke exact Actions mirrors and dedicated App namespace',
+        'normalize_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${external_id}"',
+        'normalize_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${external_id}"\n          normalize_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / Build, lint, test" "${external_id}:actions:build"',
     ),
-    "security check revocation weakens event, owner, App, binding, or failure verification",
+    'restores Actions mirror authority',
 )
 assert_rejected(
-    "revocation reconciles Actions mirrors before the Security contract",
-    "security-contract-revocation.yml",
+    'revocation omits the dedicated denial namespace',
+    'security-contract-revocation.yml',
     replace_in_named_step(
-        "Revoke exact Actions mirrors and dedicated App namespace",
-        'normalize_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${external_id}"\n'
-        '          normalize_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / Build, lint, test" "${external_id}:actions:build"\n',
-        'normalize_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / Build, lint, test" "${external_id}:actions:build"\n'
-        '          normalize_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${external_id}"\n',
+        'Revoke exact Actions mirrors and dedicated App namespace',
+        'normalize_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${external_id}"',
+        'true',
     ),
-    "no longer denies the dedicated namespace before the Actions mirrors",
+    'weakens event, owner, App, binding, or failure verification',
 )
 assert_rejected(
-    "revocation drops workflow-token Checks write",
+    "revocation adds workflow-token Checks write",
     "security-contract-revocation.yml",
     replace_in_named_job(
         "revoke-security-contract",
-        "      checks: write\n",
-        "      checks: read\n",
+        "    permissions:\n",
+        "    permissions:\n      checks: write\n",
     ),
     "security check revocation job identity changed",
 )
@@ -4038,8 +4037,8 @@ assert_rejected(
     "security-contract-revocation.yml",
     replace_in_named_job(
         "revoke-security-contract",
-        '          echo "Normalized all five authority namespaces to sticky failure on ${MERGE_COMMIT_SHA}." >> "${GITHUB_STEP_SUMMARY}"\n',
-        '          echo "Normalized all five authority namespaces to sticky failure on ${MERGE_COMMIT_SHA}." >> "${GITHUB_STEP_SUMMARY}"\n'
+        '          echo "Normalized the dedicated Security contract namespace to sticky failure on ${MERGE_COMMIT_SHA}." >> "${GITHUB_STEP_SUMMARY}"\n',
+        '          echo "Normalized the dedicated Security contract namespace to sticky failure on ${MERGE_COMMIT_SHA}." >> "${GITHUB_STEP_SUMMARY}"\n'
         "      - name: Unsealed postrevocation action\n        run: true\n",
     ),
     "security check revocation step inventory changed",
@@ -4118,9 +4117,7 @@ for label, old, new in (
     ),
     (
         "revoker contract reconciles Actions mirrors before the dedicated namespace",
-        "It paginates the dedicated-App `Security contract` namespace on `M` first, then\n"
-        "the four App `15368` mirror namespaces, so a mirror namespace that fails closed\n"
-        "cannot prevent the dedicated tombstone.",
+        "It paginates the dedicated-App `Security contract` namespace on `M`.",
         "It paginates the four App `15368` mirror namespaces and then the dedicated-App namespace.",
     ),
     (
@@ -4155,7 +4152,7 @@ for label, old, new in (
     ),
     (
         "publisher contract reconciles Actions mirrors before the dedicated namespace",
-        "It normalizes the dedicated-App\n`Security contract` namespace before the four Actions mirrors",
+        "It normalizes only the dedicated-App\n`Security contract` namespace.",
         "It normalizes the four Actions mirrors before the dedicated namespace",
     ),
     (
@@ -4232,21 +4229,7 @@ for label, old, new in (
     )
 
 for label, old, new in (
-    (
-        "ruleset reuses the colliding source Build context",
-        '{context: "Security mirror / Build, lint, test", integration_id: 15368}',
-        '{context: "Build, lint, test", integration_id: 15368}',
-    ),
-    (
-        "ruleset leaves MSRV mirror integration unbound",
-        '{context: "Security mirror / MSRV build and test", integration_id: 15368}',
-        '{context: "Security mirror / MSRV build and test"}',
-    ),
-    (
-        "ruleset leaves the dedicated authority integration unbound",
-        '{context: "Security contract", integration_id: $security_app_id}',
-        '{context: "Security contract"}',
-    ),
+    ('ruleset leaves the dedicated authority integration unbound', '{context: "Security contract", integration_id: $security_app_id}', '{context: "Security contract"}'),
 ):
     assert_document_rejected(
         label,
@@ -4266,7 +4249,7 @@ assert_rejected(
     "publisher private key reference escapes",
 )
 assert_rejected(
-    "publisher mirrors use an untrusted token",
+    "publisher reads trusted inputs with an untrusted token",
     "enterprise-evidence-finalizer.yml",
     replace_in_named_step(
         "Reconcile exact five-context merge authority",
@@ -4276,14 +4259,14 @@ assert_rejected(
     "publisher App variables or sealed inputs changed",
 )
 assert_rejected(
-    "publisher reuses an original CI name and collides with the source check",
-    "enterprise-evidence-finalizer.yml",
+    'publisher uses an original CI name instead of the dedicated authority',
+    'enterprise-evidence-finalizer.yml',
     replace_in_named_step(
-        "Reconcile exact five-context merge authority",
-        '["Security mirror / Build, lint, test", "build", "Build, lint, test", .ci.required_check_run_ids.build]',
-        '["Build, lint, test", "build", "Build, lint, test", .ci.required_check_run_ids.build]',
+        'Reconcile exact five-context merge authority',
+        'name: "Security contract"',
+        'name: "Build, lint, test"',
     ),
-    "weakens App, main-ref, binding, or check payload authentication",
+    'weakens App, main-ref, binding, or check payload authentication',
 )
 for label, old, new in (
     (
@@ -4601,46 +4584,42 @@ assert_rejected(
     "weakens App, main-ref, binding, or check payload authentication",
 )
 assert_rejected(
-    "publisher bad-CI branch reconciles Actions mirrors before the Security contract",
-    "enterprise-evidence-finalizer.yml",
+    'publisher bad-CI branch restores an Actions mirror namespace',
+    'enterprise-evidence-finalizer.yml',
     replace_in_named_step(
-        "Reconcile exact five-context merge authority",
-        'normalize_bad_ci_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${EXTERNAL_ID}"\n'
-        '            normalize_bad_ci_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / Build, lint, test" "${EXTERNAL_ID}:actions:build"\n',
-        'normalize_bad_ci_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / Build, lint, test" "${EXTERNAL_ID}:actions:build"\n'
-        '            normalize_bad_ci_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${EXTERNAL_ID}"\n',
+        'Reconcile exact five-context merge authority',
+        'normalize_bad_ci_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${EXTERNAL_ID}"',
+        'normalize_bad_ci_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${EXTERNAL_ID}"\n            normalize_bad_ci_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / Build, lint, test" "${EXTERNAL_ID}:actions:build"',
     ),
-    "denial no longer precedes the Actions mirrors",
+    'restores Actions mirror authority',
 )
 assert_rejected(
-    "publisher authorizing-retry branch fails Actions mirrors before the Security contract",
-    "enterprise-evidence-finalizer.yml",
+    'publisher retry branch restores an Actions mirror namespace',
+    'enterprise-evidence-finalizer.yml',
     replace_in_named_step(
-        "Reconcile exact five-context merge authority",
-        'fail_existing_retry_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${EXTERNAL_ID}"\n'
-        '            fail_existing_retry_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / Build, lint, test" "${EXTERNAL_ID}:actions:build"\n',
-        'fail_existing_retry_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / Build, lint, test" "${EXTERNAL_ID}:actions:build"\n'
-        '            fail_existing_retry_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${EXTERNAL_ID}"\n',
+        'Reconcile exact five-context merge authority',
+        'fail_existing_retry_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${EXTERNAL_ID}"',
+        'fail_existing_retry_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${EXTERNAL_ID}"\n            fail_existing_retry_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / Build, lint, test" "${EXTERNAL_ID}:actions:build"',
     ),
-    "denial no longer precedes the Actions mirrors",
+    'restores Actions mirror authority',
 )
 assert_rejected(
-    "publisher displaced revoker does not reconcile every authority namespace",
-    "enterprise-evidence-finalizer.yml",
+    'publisher omits the dedicated bad-CI denial namespace',
+    'enterprise-evidence-finalizer.yml',
     replace_in_named_step(
-        "Reconcile exact five-context merge authority",
-        'normalize_bad_ci_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / Build, lint, test" "${EXTERNAL_ID}:actions:build"',
-        "true",
+        'Reconcile exact five-context merge authority',
+        'normalize_bad_ci_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${EXTERNAL_ID}"',
+        'true',
     ),
-    "weakens App, main-ref, binding, or check payload authentication",
+    'weakens App, main-ref, binding, or check payload authentication',
 )
 assert_rejected(
     "publisher omits immediate bad-CI revalidation after a success POST",
     "enterprise-evidence-finalizer.yml",
     replace_in_named_step(
         "Reconcile exact five-context merge authority",
-        "            fi\n            require_publishable_ci\n            [[ \"$(jq -r '.id' <<< \"${mirror_check}\")\" =~ ^[1-9][0-9]*$ ]]",
-        "            fi\n            [[ \"$(jq -r '.id' <<< \"${mirror_check}\")\" =~ ^[1-9][0-9]*$ ]]",
+        "          fi\n          require_publishable_ci\n          check_run_id=",
+        "          fi\n          check_run_id=",
     ),
     "weakens App, main-ref, binding, or check payload authentication",
 )
@@ -4833,12 +4812,12 @@ assert_rejected(
     "publication authorization job identity changed",
 )
 assert_rejected(
-    "publisher drops workflow Checks write",
+    "publisher adds workflow Checks write",
     "enterprise-evidence-finalizer.yml",
     replace_in_named_job(
         "publish-security-contract",
-        "      checks: write\n",
-        "      checks: read\n",
+        "    permissions:\n",
+        "    permissions:\n      checks: write\n",
     ),
     "publisher identity changed",
 )
@@ -4857,8 +4836,8 @@ assert_rejected(
     "enterprise-evidence-finalizer.yml",
     replace_in_named_job(
         "publish-security-contract",
-        '          echo "Five exact merge-authority contexts published for ${MERGE_COMMIT_SHA}; Security contract check run ${check_run_id}." >> "${GITHUB_STEP_SUMMARY}"\n',
-        '          echo "Five exact merge-authority contexts published for ${MERGE_COMMIT_SHA}; Security contract check run ${check_run_id}." >> "${GITHUB_STEP_SUMMARY}"\n'
+        '          echo "Dedicated Security contract published for ${MERGE_COMMIT_SHA}; check run ${check_run_id}." >> "${GITHUB_STEP_SUMMARY}"\n',
+        '          echo "Dedicated Security contract published for ${MERGE_COMMIT_SHA}; check run ${check_run_id}." >> "${GITHUB_STEP_SUMMARY}"\n'
         "      - name: Unsealed postpublication action\n        run: true\n",
     ),
     "publisher step inventory changed",
@@ -5685,6 +5664,77 @@ assert_rejected(
         '          python3 scripts/tests/check-security-definitions.test.py || true\n',
     ),
     'changes mandatory step body: Trusted security definition regressions',
+)
+
+# Dedicated-only authority must reject transport restoration and workflow-token writes.
+for authority_workflow, authority_job, authority_step in (
+    ("enterprise-evidence-finalizer.yml", "publish-security-contract", "Reconcile exact five-context merge authority"),
+    ("security-contract-revocation.yml", "revoke-security-contract", "Revoke exact Actions mirrors and dedicated App namespace"),
+):
+    assert_rejected(
+        f"{authority_job} adds workflow-token Statuses write",
+        authority_workflow,
+        replace_in_named_job(authority_job, "    permissions:\n", "    permissions:\n      statuses: write\n"),
+        "identity changed",
+    )
+    assert_rejected(
+        f"{authority_job} writes authority with the workflow token",
+        authority_workflow,
+        replace_in_named_step(
+            authority_step,
+            "          set -euo pipefail\n",
+            '          set -euo pipefail\n'
+            '          curl --request POST -H "Authorization: Bearer ${GH_TOKEN}" '
+            '"https://api.github.com/repos/${GITHUB_REPOSITORY}/check-runs"\n',
+        ),
+        "writes authority with the workflow token",
+    )
+
+assert_document_rejected(
+    "proposed dedicated ruleset restores an Actions mirror context",
+    replace_once(
+        '{context: "Security contract", integration_id: $security_app_id}',
+        '{context: "Security mirror / Build, lint, test", integration_id: 15368},\n'
+        '          {context: "Security contract", integration_id: $security_app_id}',
+    ),
+    "Actions mirrors restored as authority",
+)
+
+
+def assert_auditor_transport_rejected(label: str, old: str, new: str, expected_error: str) -> None:
+    with tempfile.TemporaryDirectory(prefix="chio-security-auditor-transport-") as raw:
+        fixture = Path(raw)
+        populate_fixture(fixture)
+        auditor = fixture / "scripts/audit-security-merge-qualification.py"
+        original = auditor.read_text(encoding="utf-8")
+        changed = original.replace(old, new, 1)
+        if changed == original:
+            raise AssertionError(f"{label}: mutation did not change auditor")
+        auditor.write_text(changed, encoding="utf-8")
+        # Exercise the source witness independently of its exact byte pin.
+        saved = CHECKER.EXPECTED_LANDING_AUDITOR_SHA256
+        CHECKER.EXPECTED_LANDING_AUDITOR_SHA256 = hashlib.sha256(auditor.read_bytes()).hexdigest()
+        try:
+            try:
+                CHECKER.validate(fixture)
+            except CHECKER.ContractError as error:
+                if expected_error not in str(error):
+                    raise AssertionError(f"{label}: unexpected rejection: {error}") from error
+            else:
+                raise AssertionError(f"{label}: checker accepted an unsafe auditor")
+        finally:
+            CHECKER.EXPECTED_LANDING_AUDITOR_SHA256 = saved
+
+
+assert_auditor_transport_rejected(
+    "auditor uses a mutating API method even with a matching code pin",
+    '"--method", "GET"', '"--method", "POST"', "not read-only",
+)
+assert_auditor_transport_rejected(
+    "auditor restores mirror authority even with a matching code pin",
+    '"missing or duplicate dedicated authority namespace"',
+    '"missing or duplicate Security mirror / authority namespace"',
+    "restores Actions mirror authority",
 )
 
 print("security CI contract rejects trust-boundary and evidence mutations")

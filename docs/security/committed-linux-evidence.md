@@ -239,9 +239,8 @@ predicate independently proves `M` has ordered parents `<base>, E` and the
 expected tree. After those checks and all committed evidence, controller,
 capture, runner, artifact, and policy bindings verify, the publisher also
 requires the protected migration-canary signing job to succeed before it
-revalidates the exact current test merge `M`. It creates four
-GitHub Actions App `15368` mirrors on `M`, one for each ordinary check, then
-mints the dedicated App token and posts the fifth authority context on `M`:
+revalidates the exact current test merge `M`. It mints the dedicated App token
+and posts only the dedicated authority context on `M`:
 
 ```text
 name: Security contract
@@ -256,11 +255,18 @@ The publisher rejects App ID `15368`, the wrong App slug, owner, installation,
 repository inventory, permissions, source or evidence variable, workflow ref,
 publication binding, payload head, and response attribution.
 
-Each mirror uses the same identity plus an exact context suffix. Publication is
-idempotent for `(<PR>, <E>, <M>, <S>)`. Any prior failure in any of the five
-exact App-and-name namespaces is sticky; the publisher never creates a later
+Publication is
+idempotent for `(<PR>, <E>, <M>, <S>)`. Any prior failure in the dedicated
+App-and-name namespace is sticky; the publisher never creates a later
 success in that namespace. Labels authorize and describe capture only. Label
 changes after capture cannot grant, renew, or revoke a published authority.
+
+Actions mirrors are not published. Any check run or commit status named
+`Security mirror / ...` is outside authority: the publisher, revoker and auditor
+never read or write it. The four ordinary CI contexts stay governed by
+`main-required-checks` (22033486), and every original CI job and exact check-suite
+verification remains mandatory. The workflow tokens used by the publisher and
+revoker have read permissions only; only the dedicated App token writes authority.
 
 A trusted default-branch `workflow_run` listener handles bad CI completions and
 eligible failed finalizer publishers. Every completed CI conclusion other than
@@ -337,9 +343,7 @@ gh workflow run security-contract-revocation.yml \
 The protected manual revoker requires the all-zero freeze, revalidates the
 requested live `(<PR>, <E>, <M>, <S>)` tuple, and mints the same
 Checks-write-only App token.
-It paginates the dedicated-App `Security contract` namespace on `M` first, then
-the four App `15368` mirror namespaces, so a mirror namespace that fails closed
-cannot prevent the dedicated tombstone. An
+It paginates the dedicated-App `Security contract` namespace on `M`. An
 absent namespace receives an exact completed-failure tombstone. Existing
 members are updated to `conclusion: failure` while preserving each external ID
 and source metadata. If duplicates exist, the oldest member carrying the
@@ -388,9 +392,8 @@ maximum advances. If any completed non-success attempt exists, including an
 earlier failure followed by a successful rerun,
 its separate late-CI branch creates missing failure tombstones or
 updates existing members only toward completed failure while preserving
-external IDs and source metadata. It normalizes the dedicated-App
-`Security contract` namespace before the four Actions mirrors, so a mirror
-namespace that fails closed cannot prevent the dedicated tombstone. After PR or merge-ref drift, the
+external IDs and source metadata. It normalizes only the dedicated-App
+`Security contract` namespace. After PR or merge-ref drift, the
 publisher branch may normalize existing authority on historical `M` but cannot
 create a missing namespace. Every serialized ordering converges to a failed
 authority tombstone that publication cannot
@@ -419,8 +422,13 @@ repository is outside this history only when that identity is complete and
 distinct; any other run without a proven same-repository identity leaves the
 landing unverified. Only then does a run title select the positive source. The
 audit reads the recorded qualification on test merge `M`, authenticates
-all five App-and-name namespaces and their `arc:<PR>:<E>:<M>:<S>` source identity,
-and binds the exact CI and finalizer attempts. It then proves the actual main
+the dedicated App-and-name namespace and its `arc:<PR>:<E>:<M>:<S>` source identity,
+and binds the exact CI and finalizer attempts. It verifies the four original CI
+check runs through the exact source attempt's jobs: job name, run/head, successful
+completion, repository-bound check URL, original check ID/name/head, Actions App
+ID and slug, and the exact source check-suite ID/head must agree. Its authority
+stability re-list includes only the dedicated check; unrelated checks and commit
+statuses cannot supply or revoke authority. It then proves the actual main
 merge has ordered parents `<base>, E` and the same tree as `M`. It does not expect
 mirror checks on the new main merge commit, and an ordinary Actions aggregate
 named `Security contract` cannot substitute for dedicated-App authority. The
@@ -429,8 +437,10 @@ unverified landing diagnosis; administrator bypass attribution requires separate
 external evidence. Manual audit dispatch requires an explicit merged PR number.
 
 GitHub documents required-check evaluation on a test merge when that commit has
-status checks. This supports the `M` placement; it does not establish that this
-repository has activated or accepted the proposed five-App-context ruleset.
+status checks. The retained Actions transport experiments do not qualify the
+dedicated App or the proposed dedicated-App-context ruleset. Current `M` placement
+is a partial implementation state; final head placement and per-PR enforcement
+require their separate reviewed acceptance.
 See [GitHub required-check troubleshooting](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks).
 
 The last observed production ruleset (`main-required-checks`, ID `22033486`,
@@ -445,20 +455,21 @@ currently enforced.
 
 Before adoption, land and review the complete trusted-definition prerequisite on
 main, rotate its immutable definition and caller pins together, and run the real
-five-App-context required-check acceptance experiment. Candidate-only changes do
-not replace a default-branch `workflow_run` listener. Require all five exact
-App-bound contexts on current `M`, verify the ruleset reports their integration
+dedicated-App-context required-check acceptance experiment. Candidate-only changes do
+not replace a default-branch `workflow_run` listener. Require the exact dedicated
+App-bound context on current `M`, verify the ruleset reports their integration
 IDs and strict policy with no bypass actors, and retain the protected merge's
 parents and tree as acceptance evidence. Keep missing, pending, failed and
 unavailable observations explicit. Do not disable a required context to land.
 
 Apply a branch ruleset with no bypass actors. Replace only the numeric
 `CHIO_SECURITY_APP_ID` shell value below with the live App ID; do not use
-`15368` for it. The payload pins the four trusted merge-check mirrors to GitHub
-Actions and pins only the authority check to the dedicated App. These are the
-exact five contexts on `M`; the source CI workflow run is bound to `E`, while
-its original job Check Runs are authenticated on `E` but remain evidence
-inputs rather than merge-authority contexts:
+`15368` for it. The payload pins the authority check to the dedicated App. The dedicated
+context remains on `M` at this partial implementation boundary; the source CI
+workflow run and its four original job Check Runs are authenticated on `E`.
+The original CI requirements remain in `main-required-checks` (22033486).
+Stable content identity, head placement and per-PR enforcement remain separate
+F077 acceptance obligations; this payload is not a live settings change:
 
 ```bash
 test "${CHIO_SECURITY_APP_ID:?set the dedicated App ID}" -gt 0
@@ -495,10 +506,6 @@ jq -n --argjson security_app_id "${CHIO_SECURITY_APP_ID}" '{
         do_not_enforce_on_create: false,
         strict_required_status_checks_policy: true,
         required_status_checks: [
-          {context: "Security mirror / Build, lint, test", integration_id: 15368},
-          {context: "Security mirror / MSRV build and test", integration_id: 15368},
-          {context: "Security mirror / cargo-vet (locked supply-chain audit)", integration_id: 15368},
-          {context: "Security mirror / cargo-deny (supply-chain bans/advisories/licenses)", integration_id: 15368},
           {context: "Security contract", integration_id: $security_app_id}
         ]
       }

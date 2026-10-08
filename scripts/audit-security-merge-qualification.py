@@ -139,11 +139,11 @@ def foreign_head_run(run: dict, path: str, head: str, repository: str, repositor
             and name.lower() != repository.lower())
 
 
-def metadata(check: dict, identity: dict, source_ci: dict, authority: bool) -> dict:
+def metadata(check: dict, identity: dict, source_ci: dict) -> dict:
     text = check.get("output", {}).get("text")
     require(isinstance(text, str) and len(text) <= 65536, "missing authoritative check metadata")
     value = json.loads(text, object_pairs_hook=unique_object)
-    fields = {"schema", "identity", "source_ci", "publication_binding_digest" if authority else "source_check"}
+    fields = {"schema", "identity", "source_ci", "publication_binding_digest"}
     require(isinstance(value, dict) and set(value) == fields
             and value.get("schema") == "chio.security-check-authority.v2"
             and value.get("identity") == identity and value.get("source_ci") == source_ci,
@@ -245,7 +245,7 @@ def audit_qualification(api: GitHub, repository: str, pr_number: int,
 
     qualified: list[dict] = []
     for merge, matching_runs in candidates.items():
-        checks = api.pages(f"commits/{merge}/check-runs?filter=all", "check_runs")
+        checks = api.pages(f"commits/{merge}/check-runs?check_name=Security%20contract&app_id={app_id}&filter=all", "check_runs")
         dedicated = [check for check in checks if check.get("name") == "Security contract"
                      and check.get("app", {}).get("id") == app_id]
         if not dedicated:
@@ -299,30 +299,31 @@ def audit_qualification(api: GitHub, repository: str, pr_number: int,
         require_attempt(ci, ci_run_id, ci_attempt, ci_workflow_id, ci_path, title, evidence, repository, repository_id)
         check_suite_id = positive_id(ci.get("check_suite_id"))
         ci_jobs = api.pages(f"actions/runs/{ci_run_id}/attempts/{ci_attempt}/jobs?filter=all", "jobs")
-        authority_ids: list[int] = []
-        for name, suffix in (*ORDINARY, ("Security contract", "")):
-            dedicated_check = not suffix
-            context, producer = (name, app_id) if dedicated_check else (f"Security mirror / {name}", 15368)
-            namespace = [check for check in checks if check.get("name") == context and check.get("app", {}).get("id") == producer]
-            require(len(namespace) == 1, f"missing or duplicate authority namespace: {context}")
-            check = namespace[0]
-            require(check.get("app", {}).get("slug") == ("chio-security-authority" if dedicated_check else "github-actions")
-                    and check.get("head_sha") == merge and check.get("status") == "completed"
-                    and check.get("conclusion") == "success"
-                    and check.get("external_id") == external_id + (f":actions:{suffix}" if suffix else ""),
-                    f"unauthenticated or non-success authority: {context}")
-            require(timestamp(check.get("completed_at")) <= merged_at, "authority was published after the protected merge")
-            payload = metadata(check, identity, source_ci, dedicated_check)
-            authority_ids.append(positive_id(check.get("id")))
-            if dedicated_check:
-                require(isinstance(payload["publication_binding_digest"], str)
-                        and re.fullmatch(r"[0-9a-f]{64}", payload["publication_binding_digest"]) is not None,
-                        "missing sealed publication source digest")
-                continue
-            source_check = payload["source_check"]
-            require(isinstance(source_check, dict) and set(source_check) == {"name", "check_run_id"}
-                    and source_check.get("name") == name, "mirror source check metadata mismatch")
-            identifier = positive_id(source_check.get("check_run_id"))
+        namespace = [check for check in checks if check.get("name") == "Security contract"
+                     and check.get("app", {}).get("id") == app_id]
+        require(len(namespace) == 1, "missing or duplicate dedicated authority namespace")
+        check = namespace[0]
+        require(check.get("app", {}).get("slug") == "chio-security-authority"
+                and check.get("head_sha") == merge and check.get("status") == "completed"
+                and check.get("conclusion") == "success" and check.get("external_id") == external_id,
+                "unauthenticated or non-success dedicated authority")
+        require(timestamp(check.get("completed_at")) <= merged_at, "authority was published after the protected merge")
+        payload = metadata(check, identity, source_ci)
+        authority_ids = [positive_id(check.get("id"))]
+        require(isinstance(payload["publication_binding_digest"], str)
+                and re.fullmatch(r"[0-9a-f]{64}", payload["publication_binding_digest"]) is not None,
+                "missing sealed publication source digest")
+        for name, _ in ORDINARY:
+            matching_jobs = [job for job in ci_jobs if job.get("name") == name]
+            require(len(matching_jobs) == 1, "source CI job is missing or duplicated")
+            original_job = matching_jobs[0]
+            require(original_job.get("run_id") == ci_run_id and original_job.get("head_sha") == evidence
+                    and original_job.get("status") == "completed" and original_job.get("conclusion") == "success",
+                    "source job does not bind the exact CI attempt")
+            check_url = re.fullmatch(re.escape(f"https://api.github.com/repos/{repository}/check-runs/")
+                                    + r"([1-9][0-9]*)", str(original_job.get("check_run_url", "")))
+            require(check_url is not None, "source job does not bind an exact repository check")
+            identifier = int(check_url.group(1))
             original = api.get(f"check-runs/{identifier}")
             require(original.get("id") == identifier and original.get("name") == name
                     and original.get("head_sha") == evidence and original.get("status") == "completed"
@@ -331,14 +332,7 @@ def audit_qualification(api: GitHub, repository: str, pr_number: int,
                     and original.get("app", {}).get("slug") == "github-actions"
                     and positive_id(original.get("check_suite", {}).get("id")) == check_suite_id
                     and original.get("check_suite", {}).get("head_sha") == evidence,
-                    "mirror original check is not the exact source CI")
-            matching_jobs = [job for job in ci_jobs if job.get("name") == name]
-            require(len(matching_jobs) == 1, "source CI job is missing or duplicated")
-            original_job = matching_jobs[0]
-            require(original_job.get("run_id") == ci_run_id and original_job.get("head_sha") == evidence
-                    and original_job.get("status") == "completed" and original_job.get("conclusion") == "success"
-                    and original_job.get("check_run_url") == f"https://api.github.com/repos/{repository}/check-runs/{identifier}",
-                    "mirror source job does not bind the exact CI attempt")
+                    "original check is not the exact source CI")
 
         details = re.fullmatch(re.escape(f"https://github.com/{repository}/actions/runs/") + r"([1-9][0-9]*)/attempts/([1-9][0-9]*)",
                                str(authority.get("details_url", "")))
@@ -388,7 +382,7 @@ def audit_qualification(api: GitHub, repository: str, pr_number: int,
                     "authorizing finalizer history contains an incomplete or sticky bad attempt")
             finalizer_attempts.append({"run_attempt": attempt, "status": exact["status"],
                                        "conclusion": exact["conclusion"]})
-        require(api.pages(f"commits/{merge}/check-runs?filter=all", "check_runs") == checks,
+        require(api.pages(f"commits/{merge}/check-runs?check_name=Security%20contract&app_id={app_id}&filter=all", "check_runs") == checks,
                 "authority changed during audit")
         for run_id, fingerprint in fingerprints.items():
             current = api.get(f"actions/runs/{run_id}")
@@ -449,7 +443,7 @@ def main() -> int:
         markdown += (f"Verified recorded qualification on `{qualification['merge_commit_sha']}` for PR {qualification['pr_number']}.\n\n"
                      f"Main retained merge `{result['protected_merge_commit_sha']}` with ordered parents "
                      f"`{qualification['base_sha']}`, `{qualification['evidence_sha']}` and the qualified tree.\n\n"
-                     f"Authorized source: `{qualification['authorized_source_sha']}`. Five authentic authority checks passed.\n")
+                     f"Authorized source: `{qualification['authorized_source_sha']}`. The dedicated authority check and four original CI checks passed.\n")
     else:
         markdown += (f"Recorded protected landing remains unverified: {result['error']}.\n\n"
                      "Administrator bypass attribution is unestablished. Investigate the recorded tuple and external ruleset evidence.\n")

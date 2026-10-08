@@ -163,14 +163,6 @@ def snapshot() -> dict[str, dict]:
             "status": "completed", "conclusion": "success",
             "check_run_url": f"https://api.github.com/{prefix}/check-runs/{original['id']}",
         })
-        text = {"schema": "chio.security-check-authority.v2", "identity": identity,
-                "source_ci": source_ci, "source_check": {"check_run_id": str(original["id"]), "name": name}}
-        checks.append({
-            "id": 600 + offset, "name": f"Security mirror / {name}", "head_sha": MERGE,
-            "status": "completed", "conclusion": "success", "external_id": f"{EXTERNAL_ID}:actions:{suffix}",
-            "app": {"id": 15368, "slug": "github-actions"}, "output": {"text": json.dumps(text)},
-            "completed_at": "2026-10-06T00:06:00Z",
-        })
     checks.append({
         "id": 605, "name": "Security contract", "head_sha": MERGE,
         "status": "completed", "conclusion": "success", "external_id": EXTERNAL_ID,
@@ -539,7 +531,7 @@ class RecordedQualificationAuditTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(report.get("status"), "unverified")
 
-    def test_missing_check_suite_ids_cannot_authenticate_mirrors(self) -> None:
+    def test_missing_check_suite_ids_cannot_authenticate_original_ci_checks(self) -> None:
         data = snapshot()
         prefix = f"repos/{REPOSITORY}"
         for path in (f"actions/runs/{CI_RUN}", f"actions/runs/{CI_RUN}/attempts/1"):
@@ -1016,7 +1008,6 @@ class AuthorizingFinalizerRetryTests(unittest.TestCase):
         helper = body[start:body.index('require_publishable_ci() {', start)] if start >= 0 else ''
         guard = body[body.index('require_publishable_ci() {'):body.index('publish_success_authority() {')]
         success = body[body.index('publish_success_authority() {'):body.index('\nreconcile_bad_ci\nif test "${bad_ci_observed}"')]
-        mirrors = body[body.index('list_actions_mirror_checks() {'):body.index('list_namespace_checks() {')]
         with tempfile.TemporaryDirectory(prefix='chio-finalizer-negative-scan-') as raw:
             root = Path(raw)
             fixture = root / 'api.json'
@@ -1027,7 +1018,7 @@ class AuthorizingFinalizerRetryTests(unittest.TestCase):
             result = subprocess.run(['bash', '-c', 'set -euo pipefail\nshopt -s inherit_errexit\n'
                                      + namespace + helper + '\nreconcile_bad_ci() { bad_ci_observed=false; }\n'
                                      + '\nrevalidate_live_publication_head() { return 0; }\n' + guard
-                                     + (mirrors + success + '\npublish_success_authority\n' if full_publication else '\nrequire_publishable_ci\necho success-publication-allowed\n')],
+                                     + (success + '\npublish_success_authority\n' if full_publication else '\nrequire_publishable_ci\necho success-publication-allowed\n')],
                                     capture_output=True, text=True, check=False,
                                     env=os.environ | {'PATH': str(root) + os.pathsep + os.environ['PATH'],
                                                       'API_FIXTURE': str(fixture), 'GITHUB_REPOSITORY': REPOSITORY,
@@ -1054,7 +1045,7 @@ class AuthorizingFinalizerRetryTests(unittest.TestCase):
                 result, observed = self.run_publisher_guard(data)
                 self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
                 checks = observed[f'repos/{REPOSITORY}/commits/{MERGE}/check-runs']['check_runs']
-                self.assertEqual(len(checks), 5)
+                self.assertEqual(len(checks), 1)
                 self.assertTrue(all(c['conclusion'] == 'failure' for c in checks), result.stderr)
                 self.assertEqual([c['external_id'] for c in checks], [c['external_id'] for c in snapshot()[f'repos/{REPOSITORY}/commits/{MERGE}/check-runs']['check_runs']])
                 self.assertEqual([c['output']['text'] for c in checks], [c['output']['text'] for c in snapshot()[f'repos/{REPOSITORY}/commits/{MERGE}/check-runs']['check_runs']])
@@ -1185,11 +1176,11 @@ class AuthorizingFinalizerRetryTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertEqual(observed, data, 'unproven current retry cannot mutate existing authority')
 
-    def test_retry_cannot_create_success_in_either_positive_post_branch(self) -> None:
+    def test_retry_cannot_create_success_in_the_dedicated_post_branch(self) -> None:
         body = next(step['run'] for step in workflow('enterprise-evidence-finalizer.yml')['jobs']['publish-security-contract']['steps']
                     if step.get('name') == 'Reconcile exact five-context merge authority')
         body = body[body.index('publish_success_authority() {'):]
-        for variable in ('mirror_check', 'check_run'):
+        for variable in ('check_run',):
             with self.subTest(branch=variable):
                 start = body.index(variable + '="$({')
                 post = body.index('--request POST', start)
@@ -1459,7 +1450,7 @@ def publisher_body() -> str:
 
 def publication_head_revalidation() -> str:
     body = publisher_body()
-    return body[body.index("revalidate_live_publication_head() {"):body.index("list_actions_mirror_checks() {")]
+    return body[body.index("revalidate_live_publication_head() {"):body.index("list_namespace_checks() {")]
 
 
 def publisher_environment() -> dict[str, str]:
@@ -1579,7 +1570,7 @@ class PublisherEvidenceHeadOriginalRedTests(unittest.TestCase):
         clean = reconcile_bad_ci_then_publish(bad_ci_fixture(prior_failed_ci_run(MERGE)))
         self.assertEqual(len(security_contract_failures(clean.data)), 1, clean.result.stderr)
         polluted = reconcile_bad_ci_then_publish(bad_ci_fixture(prior_failed_ci_run(MERGE), mirrors=(foreign_mirror(MERGE),)))
-        self.assertTrue(any(BUILD_MIRROR_QUERY in call for call in polluted.calls), polluted.calls)
+        self.assertFalse(any("Security%20mirror" in call for call in polluted.calls), polluted.calls)
         self.assertNotIn(PUBLICATION_PROBE, polluted.result.stdout)
         self.assertEqual(len(security_contract_failures(polluted.data)), 1,
                          "a foreign Actions mirror without the required external id stopped bad-CI revocation "
@@ -1746,7 +1737,7 @@ class RevokerEvidenceHeadOriginalRedTests(unittest.TestCase):
                 self.assertEqual(clean.result.returncode, 0, clean.result.stderr)
                 self.assertEqual(len(security_contract_failures(clean.data)), 1)
                 polluted = revoke_five_contexts(revoker_fixture(mirrors=(foreign_mirror(MERGE),)), event_name)
-                self.assertTrue(any(BUILD_MIRROR_QUERY in call for call in polluted.calls), polluted.calls)
+                self.assertFalse(any("Security%20mirror" in call for call in polluted.calls), polluted.calls)
                 self.assertEqual(len(security_contract_failures(polluted.data)), 1,
                                  "a foreign Actions mirror without the required external id stopped revocation "
                                  "before the Security contract tombstone")
@@ -2043,7 +2034,7 @@ class PublisherSharedHeadOriginalRedTests(unittest.TestCase):
         self.assertEqual(control.result.returncode, 0, control.result.stderr)
         self.assertEqual(len(checks_on(control.data, "Security contract", APP_ID, "success")), 1)
         self.assertEqual(sum(len(checks_on(control.data, f"Security mirror / {name}", 15368, "success"))
-                             for name, _ in ORDINARY), 4)
+                             for name, _ in ORDINARY), 0)
         duplicate = second_pull_request_on_evidence()
         self.assertEqual((duplicate["state"], duplicate["head"]["sha"], duplicate["head"]["repo"]["id"]),
                          ("open", EVIDENCE, 1195888645))
@@ -2290,20 +2281,14 @@ class SecurityContractDenialPreservationTests(unittest.TestCase):
         metadata = json.loads(denied["output"]["text"])
         self.assertEqual(metadata["identity"], {"pr_number": str(PR), "authorized_source_sha": SOURCE,
                                                 "evidence_sha": EVIDENCE, "merge_commit_sha": MERGE})
-        for original in existing:
-            if original["id"] == authority["id"]:
-                continue
-            mirror = checks[original["id"]]
-            self.assertEqual((mirror["head_sha"], mirror["app"], mirror["external_id"], mirror["output"]["text"],
-                              mirror["conclusion"]),
-                             (MERGE, {"id": 15368, "slug": "github-actions"}, original["external_id"],
-                              original["output"]["text"], "failure"))
+        self.assertEqual(len(existing), 1)
+        self.assertFalse(any("Security%20mirror" in call for call in run.calls), run.calls)
         writes = check_mutations(run)
         self.assertNotIn(f"POST {prefix}/check-runs", writes)
         self.assertEqual(writes[0], f"PATCH {prefix}/check-runs/{authority['id']}")
         self.assertEqual(len(writes), len(existing))
 
-    def test_revoker_denies_the_exact_dedicated_authority_before_the_mirrors(self) -> None:
+    def test_revoker_denies_only_the_exact_dedicated_authority(self) -> None:
         existing = positive_authority_checks()
         for event_name in ("workflow_run", "workflow_dispatch"):
             with self.subTest(event=event_name):
@@ -2311,7 +2296,7 @@ class SecurityContractDenialPreservationTests(unittest.TestCase):
                 self.assertEqual(run.result.returncode, 0, run.result.stderr)
                 self.assert_exact_denial(run, existing)
 
-    def test_revoker_creates_the_exact_dedicated_tombstone_before_the_mirrors(self) -> None:
+    def test_revoker_creates_only_the_exact_dedicated_tombstone(self) -> None:
         prefix = f"repos/{REPOSITORY}"
         for event_name in ("workflow_run", "workflow_dispatch"):
             with self.subTest(event=event_name):
@@ -2323,12 +2308,11 @@ class SecurityContractDenialPreservationTests(unittest.TestCase):
                 self.assertEqual([(check["name"], check["head_sha"], check["app"], check["external_id"],
                                    check["status"], check["conclusion"]) for check in created],
                                  [("Security contract", MERGE, {"id": APP_ID, "slug": "chio-security-authority"},
-                                   EXTERNAL_ID, "completed", "failure")]
-                                 + [(f"Security mirror / {name}", MERGE, {"id": 15368, "slug": "github-actions"},
-                                     f"{EXTERNAL_ID}:actions:{key}", "completed", "failure") for name, key in ORDINARY])
-                self.assertEqual(check_mutations(run), [f"POST {prefix}/check-runs"] * 5)
+                                   EXTERNAL_ID, "completed", "failure")])
+                self.assertEqual(check_mutations(run), [f"POST {prefix}/check-runs"])
+                self.assertFalse(any("Security%20mirror" in call for call in run.calls), run.calls)
 
-    def test_publisher_bad_ci_denies_the_exact_dedicated_authority_before_the_mirrors(self) -> None:
+    def test_publisher_bad_ci_denies_only_the_exact_dedicated_authority(self) -> None:
         existing = positive_authority_checks()
         bad = prior_failed_ci_run(MERGE)
         assert_authoritative_history(self, bad)
@@ -2336,6 +2320,56 @@ class SecurityContractDenialPreservationTests(unittest.TestCase):
         self.assertNotIn(PUBLICATION_PROBE, run.result.stdout)
         self.assertNotEqual(run.result.returncode, 0)
         self.assert_exact_denial(run, existing)
+
+
+class DedicatedAuthorityOriginalTests(unittest.TestCase):
+    def test_original_ci_job_requires_an_exact_repository_check_url(self):
+        prefix = f"repos/{REPOSITORY}"
+        for url in (
+            "https://api.github.com/repos/other/repository/check-runs/501",
+            f"https://api.github.com/{prefix}/check-runs/501?ignored=true",
+            f"https://api.github.com/{prefix}/check-runs/0",
+            f"https://api.github.com/{prefix}/check-runs/501/",
+            f"https://api.github.com/{prefix}/check-runs/0501",
+        ):
+            with self.subTest(url=url):
+                data = snapshot()
+                jobs = data[f"{prefix}/actions/runs/{CI_RUN}/attempts/1/jobs"]["jobs"]
+                job = next(item for item in jobs if item["name"] == "Build, lint, test")
+                job["check_run_url"] = url
+                result, report, comments = run_audit(data)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(report.get("status"), "unverified", report)
+                self.assertEqual(report.get("error"), "source job does not bind an exact repository check")
+                self.assertEqual(comments, "")
+
+    def test_only_dedicated_authority_and_original_ci_jobs_qualify(self):
+        data = snapshot()
+        key = f'repos/{REPOSITORY}/commits/{MERGE}/check-runs'
+        authority = [c for c in data[key]['check_runs'] if c['name'] == 'Security contract']
+        self.assertEqual(len(authority), 1)
+        data[key] = dict(total_count=1, check_runs=authority)
+        result, report, comments = run_audit(data)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(report.get('status'), 'verified', report)
+        self.assertEqual(comments, '')
+
+    def test_stray_actions_mirrors_cannot_grant_or_deny_qualification(self):
+        for conclusion, count in [('success', 1), ('failure', 1), ('success', 2)]:
+            with self.subTest(conclusion=conclusion, count=count):
+                data = snapshot()
+                key = f'repos/{REPOSITORY}/commits/{MERGE}/check-runs'
+                authority = [c for c in data[key]['check_runs'] if c['name'] == 'Security contract']
+                stray = dict(id=999, name='Security mirror / Build, lint, test',
+                             head_sha=MERGE, status='completed', conclusion=conclusion,
+                             app=dict(id=15368, slug='github-actions'),
+                             external_id='unrelated-actions-check', output=dict(text='untrusted'))
+                mirrors = [copy.deepcopy(stray) | {'id': 999 + offset} for offset in range(count)]
+                data[key] = dict(total_count=1+count, check_runs=authority + mirrors)
+                result, report, comments = run_audit(data)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(report.get('status'), 'verified', report)
+                self.assertEqual(comments, '')
 
 
 if __name__ == "__main__":

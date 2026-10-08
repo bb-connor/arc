@@ -313,7 +313,7 @@ EXPECTED_ADVISORY_ENV = {'CARGO_INCREMENTAL': '0',
  'PROPTEST_CASES': '256',
  'CHIO_CI_RUSTFLAGS': '-D warnings -C link-arg=-Wl,--threads=1'}
 EXPECTED_ADVISORY_JOB_SHA256 = "a518a495aecb5d9eca47d6a5aaa3c3d978f524a5a020f312dbc8a0e24e399ff5"
-EXPECTED_LANDING_AUDITOR_SHA256 = "46b4ccc1af960ee15a2d74e9fadaa393b5b8c09ccc4d182b99454e3ad269a283"
+EXPECTED_LANDING_AUDITOR_SHA256 = "2f43509c7748feb0b630f5bede3748f0e972bfa8e7848f96c0f487dba00fe95d"
 EXPECTED_WORKFLOW_SYNTAX_CHECKER_SHA256 = "1777d2df48bff8f3269a1da5451572576cadfbbf3b0784dfc16e28137bd13ada"
 EXPECTED_CI_PERMISSIONS = {"contents": "read"}
 EXPECTED_CONTROLLER_EVENTS = {
@@ -949,15 +949,15 @@ EXPECTED_TRUST_JOB_DIGESTS = {
     (
         "enterprise evidence finalizer",
         "publish-security-contract",
-    ): "65d89014f7f9024ca1ca94a64648368ba6ea38b9bd7391de987e8dbbc55179c3",
+    ): "a350f2aecabe9a9b1818aad6db5ad7f9941a18380769b041c3ff02b1a08a53ec",
     (
         "security contract revocation",
         "bind-revocation",
-    ): "c011da7bd447b9879d31ab4a03f808edae0b1ddda932a024b812bd1824fd026d",
+    ): "cd80a5675806821beca163cc5c336e039aafda2f429ba02550b4686348f9e8a4",
     (
         "security contract revocation",
         "revoke-security-contract",
-    ): "2b6ea0f5c592d50b1a4ece8f9888558f33905eaf99bc636b7b1a132e29e96f99",
+    ): "64c9810e229489908a6a88e86b10e344a071f2631deac505ebe1b46422e04902",
     (
         "enterprise-hardening",
         "committed-linux-evidence",
@@ -1622,6 +1622,26 @@ def normalized_contract_digest(value: object) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def validate_dedicated_authority_transport(body: str, description: str) -> None:
+    if "Security mirror /" in body or "15368 github-actions" in body:
+        raise ContractError(f"{description} restores Actions mirror authority")
+    commands = re.sub(r"\\\n\s*", " ", body)
+    for line in commands.splitlines():
+        if (
+            re.search(r"\bcurl\b", line)
+            and re.search(r"(?:--request\s+|-X\s*)(?:POST|PATCH|PUT|DELETE)\b", line)
+            and "Authorization: Bearer ${GH_TOKEN}" in line
+        ):
+            raise ContractError(f"{description} writes authority with the workflow token")
+
+
+def validate_read_only_landing_auditor(body: str) -> None:
+    if "Security mirror /" in body or "15368 github-actions" in body:
+        raise ContractError("trusted landing auditor restores Actions mirror authority")
+    if '"--method", "GET"' not in body or re.search(r'''["'](?:POST|PATCH|PUT|DELETE)["']''', body):
+        raise ContractError("trusted landing auditor is not read-only")
+
+
 def validate_job_digest(
     job_body: dict[str, object], expected_digest: str, contract: str
 ) -> None:
@@ -1811,7 +1831,7 @@ def validate_environment_provisioning_document(root: Path) -> None:
         "Do not create a repository or organization copy of the\n"
         "installation ID or private-key secret.",
         "Publication is\nidempotent for `(<PR>, <E>, <M>, <S>)`.",
-        "Any prior failure in any of the five\nexact App-and-name namespaces is sticky",
+        "Any prior failure in the dedicated\nApp-and-name namespace is sticky",
         "Labels authorize and describe capture only. Label\nchanges after capture cannot grant, renew, or revoke a published authority.",
         "A trusted default-branch `workflow_run` listener handles bad CI completions and\n"
         "eligible failed finalizer publishers.",
@@ -1843,9 +1863,7 @@ def validate_environment_provisioning_document(root: Path) -> None:
         "-f merge_commit_sha='<M>'",
         "The protected manual revoker requires the all-zero freeze, revalidates the\n"
         "requested live `(<PR>, <E>, <M>, <S>)` tuple",
-        "It paginates the dedicated-App `Security contract` namespace on `M` first, then\n"
-        "the four App `15368` mirror namespaces, so a mirror namespace that fails closed\n"
-        "cannot prevent the dedicated tombstone.",
+        "It paginates the dedicated-App `Security contract` namespace on `M`.",
         "normalization is mandatory because a ruleset binds check name and App",
         "absent namespace receives an exact completed-failure tombstone.",
         "preserving each external ID\nand source metadata",
@@ -1877,12 +1895,8 @@ def validate_environment_provisioning_document(root: Path) -> None:
         "A head repository name alone never removes a run from this history.",
         "leaves the history incomplete.",
         "It never falls back to an unfiltered listing.",
-        "It normalizes the dedicated-App\n`Security contract` namespace before the four Actions mirrors",
+        "It normalizes only the dedicated-App\n`Security contract` namespace.",
         "Recovery requires a new reviewed evidence head `E`.",
-        '{context: "Security mirror / Build, lint, test", integration_id: 15368}',
-        '{context: "Security mirror / MSRV build and test", integration_id: 15368}',
-        '{context: "Security mirror / cargo-vet (locked supply-chain audit)", integration_id: 15368}',
-        '{context: "Security mirror / cargo-deny (supply-chain bans/advisories/licenses)", integration_id: 15368}',
         '{context: "Security contract", integration_id: $security_app_id}',
     )
     if (
@@ -1890,6 +1904,16 @@ def validate_environment_provisioning_document(root: Path) -> None:
         or re.findall(r'allowed_merge_methods:\s*\[([^\]]*)\]', publisher) != ['"merge"']
     ):
         raise ContractError("documented protected landing cannot retain exact E and both histories")
+    outside_transport = (
+        "Actions mirrors are not published. Any check run or commit status named\n"
+        "`Security mirror / ...` is outside authority: the publisher, revoker and auditor\n"
+        "never read or write it. The four ordinary CI contexts stay governed by\n"
+        "`main-required-checks` (22033486), and every original CI job and exact check-suite\n"
+        "verification remains mandatory. The workflow tokens used by the publisher and\n"
+        "revoker have read permissions only; only the dedicated App token writes authority."
+    )
+    if outside_transport not in publisher or "Security mirror /" in publisher.replace(outside_transport, "", 1):
+        raise ContractError("publisher environment provisioning contract changed: Actions mirrors restored as authority")
     if any(marker not in publisher for marker in publisher_markers):
         raise ContractError("publisher environment provisioning contract changed")
 
@@ -5034,6 +5058,8 @@ def validate(root: Path) -> None:
     ):
         raise ContractError("advisory nextest reporting or read-only boundary changed")
     auditor = root / "scripts/audit-security-merge-qualification.py"
+    if auditor.is_file() and not auditor.is_symlink():
+        validate_read_only_landing_auditor(auditor.read_text(encoding="utf-8"))
     if auditor.is_symlink() or not auditor.is_file() or hashlib.sha256(auditor.read_bytes()).hexdigest() != EXPECTED_LANDING_AUDITOR_SHA256:
         raise ContractError("trusted landing auditor source commitment changed")
 
@@ -6970,7 +6996,6 @@ def validate(root: Path) -> None:
         or publish_security_contract.get("permissions")
         != {
             "actions": "read",
-            "checks": "write",
             "contents": "read",
             "pull-requests": "read",
         }
@@ -7057,7 +7082,6 @@ def validate(root: Path) -> None:
             'test "$(jq -r \'.parents[0].sha\' <<< "${merge_commit}")" = "$(jq -r \'.base.sha\' <<< "${canonical_binding}")"',
             'test "$(jq -r \'.parents[1].sha\' <<< "${merge_commit}")" = "${EVIDENCE_SHA}"',
             'test "$(jq -r \'.tree.sha\' <<< "${merge_commit}")" = "$(jq -r \'.merge_tree_sha\' <<< "${canonical_binding}")"',
-            "list_actions_mirror_checks()",
             "list_namespace_checks()",
             "normalize_bad_ci_namespace()",
             'canonical_check_id="$(jq -r --arg external_id "${required_external_id}"',
@@ -7122,31 +7146,14 @@ def validate(root: Path) -> None:
             'bad_ci_create_missing=false',
             'if test "${bad_ci_create_missing}" = false; then',
             'test "$(jq -r \'.object.sha\' <<< "${live_bad_ci_merge_ref}")" = "${MERGE_COMMIT_SHA}"',
-            'normalize_bad_ci_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / Build, lint, test" "${EXTERNAL_ID}:actions:build"',
-            'normalize_bad_ci_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / MSRV build and test" "${EXTERNAL_ID}:actions:msrv"',
-            'normalize_bad_ci_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / cargo-vet (locked supply-chain audit)" "${EXTERNAL_ID}:actions:vet"',
-            'normalize_bad_ci_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / cargo-deny (supply-chain bans/advisories/licenses)" "${EXTERNAL_ID}:actions:deny"',
             'normalize_bad_ci_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${EXTERNAL_ID}"',
             "publish_success_authority()",
             'reconcile_bad_ci\nif test "${bad_ci_observed}" = false; then',
             "publish_success_authority",
             "else\n  exit 1",
-            "commits/${MERGE_COMMIT_SHA}/check-runs?app_id=15368&check_name=${encoded_name}&filter=all&per_page=100&page=${page}",
-            '["Security mirror / Build, lint, test", "build", "Build, lint, test", .ci.required_check_run_ids.build]',
-            '["Security mirror / MSRV build and test", "msrv", "MSRV build and test", .ci.required_check_run_ids.msrv]',
-            '["Security mirror / cargo-vet (locked supply-chain audit)", "vet", "cargo-vet (locked supply-chain audit)", .ci.required_check_run_ids.vet]',
-            '["Security mirror / cargo-deny (supply-chain bans/advisories/licenses)", "deny", "cargo-deny (supply-chain bans/advisories/licenses)", .ci.required_check_run_ids.deny]',
-            'mirror_external_id="${EXTERNAL_ID}:actions:${mirror_key}"',
             'schema: "chio.security-check-authority.v2"',
-            'test "${mirror_match_count}" -le 1',
-            'test "$(jq -r \'.conclusion\' <<< "${mirror_check}")" = "success"',
             '-H "Authorization: Bearer ${GH_TOKEN}"',
-            'test "$(jq -r \'.head_sha\' <<< "${mirror_check}")" = "${MERGE_COMMIT_SHA}"',
-            'test "$(jq -r \'.app.id\' <<< "${mirror_check}")" = "15368"',
-            'test "$(jq -r \'.app.slug\' <<< "${mirror_check}")" = "github-actions"',
-            'test "${observed_mirror_text}" = "${mirror_text}"',
-            'test "$(jq -r \'.total_count\' <<< "${verified_mirror_namespace}")" = "1"',
-            'revalidate_live_publication_head\nauthority_created=false\nif test "${existing_authority_match_count}" = "1"; then',
+            'authority_created=false\nif test "${existing_authority_match_count}" = "1"; then',
             "commits/${MERGE_COMMIT_SHA}/check-runs?app_id=${SECURITY_APP_ID}&check_name=Security%20contract&filter=all&per_page=100&page=${page}",
             '[[ "${page_total}" =~ ^[0-9]+$ ]]',
             'test "${page_total}" = "${total_count}"',
@@ -7196,7 +7203,6 @@ def validate(root: Path) -> None:
             'observed_authority_text="$(jq -cS \'.output.text | fromjson\' <<< "${check_run}")"',
             'test "${observed_authority_text}" = "${authority_text}"',
             'test "${verified_authority_text}" = "${authority_text}"',
-            '((.output.text | fromjson) == ($expected_text | fromjson))',
         ),
         "dedicated Security contract publisher weakens App, main-ref, binding, or check payload authentication",
     )
@@ -7213,6 +7219,8 @@ def validate(root: Path) -> None:
             "dedicated Security contract reconciler branch ordering changed"
         )
     failure_routine = publisher_run[failure_start:reconciliation_start]
+    validate_dedicated_authority_transport(publisher_run, "dedicated Security contract publisher")
+
     bad_ci_routine = publisher_run[reconciliation_start:retry_start]
     retry_routine = publisher_run[retry_start:guard_start]
     publication_guard = publisher_run[guard_start:success_start]
@@ -7244,7 +7252,7 @@ def validate(root: Path) -> None:
     if (
         "--request POST" in bad_ci_routine
         or "--request PATCH" in bad_ci_routine
-        or bad_ci_routine.count("normalize_bad_ci_namespace ") != 5
+        or bad_ci_routine.count("normalize_bad_ci_namespace ") != 1
         or bad_ci_routine.count("return 0") != 2
         or "return 1" in bad_ci_control_flow
         or "bad_ci_observed=false" not in bad_ci_routine
@@ -7296,9 +7304,9 @@ def validate(root: Path) -> None:
     dedicated_denial = '"${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${EXTERNAL_ID}"'
     for routine, call in ((bad_ci_routine, "normalize_bad_ci_namespace"), (retry_routine, "fail_existing_retry_namespace")):
         calls = denial_calls(routine, call)
-        if len(calls) != 5 or calls[0] != f"{call} {dedicated_denial}":
+        if calls != [f"{call} {dedicated_denial}"]:
             raise ContractError(
-                "dedicated Security contract denial no longer precedes the Actions mirrors"
+                "dedicated Security contract denial is not the sole authority mutation"
             )
     if (
         publication_guard.strip() != (
@@ -7309,7 +7317,7 @@ def validate(root: Path) -> None:
         or retry_routine.count("--request PATCH") != 1
         or retry_routine.count('conclusion: "failure"') != 1
         or 'conclusion: "success"' in retry_routine
-        or retry_routine.count("fail_existing_retry_namespace ") != 5
+        or retry_routine.count("fail_existing_retry_namespace ") != 1
         or "actions/workflows/enterprise-evidence-finalizer.yml/runs" in retry_routine
         or "actions/runs/${authorizing_finalizer_id}/attempts/1" not in retry_routine
         or 'test "${retry_original_blob}" = "${retry_authorized_blob}"' not in retry_routine
@@ -7328,14 +7336,14 @@ def validate(root: Path) -> None:
         raise ContractError("authorizing-finalizer retry reconciliation loses recorded authority or failure-only binding")
     if (
         "--request PATCH" in success_routine
-        or success_routine.count("--request POST") != 2
-        or success_routine.count('conclusion: "success"') != 2
+        or success_routine.count("--request POST") != 1
+        or success_routine.count('conclusion: "success"') != 1
         or 'conclusion: "failure"' in success_routine
-        or success_routine.count("require_publishable_ci\n") != 8
+        or success_routine.count("require_publishable_ci\n") != 5
         or sorted(re.findall(
             r'(?m)^\s*test "\$\{FINALIZER_RUN_ATTEMPT\}" = 1\n\s*(mirror_check|check_run)=',
             success_routine,
-        )) != ["check_run", "mirror_check"]
+        )) != ["check_run"]
     ):
         raise ContractError(
             "dedicated Security contract publisher weakens App, main-ref, binding, or check payload authentication"
@@ -7352,20 +7360,20 @@ def validate(root: Path) -> None:
             "dedicated Security contract reconciler does not fail closed before publication"
         )
     for marker, expected_count in (
-        ('conclusion: "success"', 2),
+        ('conclusion: "success"', 1),
         ('conclusion: "failure"', 3),
-        ("external_id: $external_id", 4),
-        ("head_sha: $head_sha", 3),
-        ('--arg details_url "${publication_details_url}"', 2),
-        ("details_url: $details_url", 2),
-        ('= "${publication_details_url}"', 2),
+        ("external_id: $external_id", 3),
+        ("head_sha: $head_sha", 2),
+        ('--arg details_url "${publication_details_url}"', 1),
+        ("details_url: $details_url", 1),
+        ('= "${publication_details_url}"', 1),
         (
             "actions/runs/${FINALIZER_RUN_ID}/attempts/${FINALIZER_RUN_ATTEMPT}",
             1,
         ),
-        (".details_url", 6),
-        ("revalidate_live_publication_head\n", 12),
-        ('status: "completed"', 5),
+        (".details_url", 4),
+        ("revalidate_live_publication_head\n", 9),
+        ('status: "completed"', 4),
         ("--request PATCH", 2),
     ):
         if publisher_run.count(marker) != expected_count:
@@ -7762,7 +7770,7 @@ def validate(root: Path) -> None:
         or revocation.get("environment") != "security-check-publisher"
         or revocation.get("concurrency") != EXPECTED_REVOCATION_CONCURRENCY
         or revocation.get("permissions")
-        != {"checks": "write", "pull-requests": "read", "contents": "read"}
+        != {"pull-requests": "read", "contents": "read"}
         or revocation.get("runs-on") != "ubuntu-24.04"
         or revocation.get("timeout-minutes") != "10"
         or set(revocation)
@@ -7851,20 +7859,18 @@ def validate(root: Path) -> None:
             '.name == $name and .head_sha == $head_sha and .status == "completed" and .conclusion == "failure" and (.app.id | tostring) == $app_id and .app.slug == $app_slug',
             'test "$(jq -r \'.check_runs[0].external_id\' <<< "${verified}")" = "${required_external_id}"',
             'test "${verified_metadata}" = "${preserved_metadata}"',
-            'normalize_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / Build, lint, test" "${external_id}:actions:build"',
-            'normalize_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / MSRV build and test" "${external_id}:actions:msrv"',
-            'normalize_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / cargo-vet (locked supply-chain audit)" "${external_id}:actions:vet"',
-            'normalize_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / cargo-deny (supply-chain bans/advisories/licenses)" "${external_id}:actions:deny"',
             'normalize_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${external_id}"',
         ),
         "security check revocation weakens event, owner, App, binding, or failure verification",
     )
+    validate_dedicated_authority_transport(revocation_run, "security check revocation")
+
     for marker, expected_count in (
         ("--request POST", 2),
         ("--request PATCH", 1),
         ('conclusion: "failure"', 2),
         ('status: "completed"', 2),
-        ("normalize_namespace ", 5),
+        ("normalize_namespace ", 1),
     ):
         if revocation_run.count(marker) != expected_count:
             raise ContractError(
@@ -7873,11 +7879,11 @@ def validate(root: Path) -> None:
     revocation_calls = [
         line.strip() for line in revocation_run.splitlines() if line.strip().startswith("normalize_namespace ")
     ]
-    if len(revocation_calls) != 5 or revocation_calls[0] != (
+    if revocation_calls != [(
         'normalize_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${external_id}"'
-    ):
+    )]:
         raise ContractError(
-            "security check revocation no longer denies the dedicated namespace before the Actions mirrors"
+            "security check revocation is not the sole dedicated namespace mutation"
         )
     if any(
         contains_text(candidate_free_revocation_job, value)

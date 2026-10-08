@@ -565,7 +565,7 @@ jobs:
                 "repos/${GITHUB_REPOSITORY}/commits/${merge_commit_sha}/check-runs?filter=all&per_page=100" \
                 --jq '.check_runs[]'
             } | jq -s '.')"
-            relevant_count="$(jq -r --arg app_id "${SECURITY_APP_ID}" '[.[] | select((.app.id == 15368 and (.name | startswith("Security mirror / "))) or ((.app.id | tostring) == $app_id and .name == "Security contract"))] | length' <<< "${existing_checks}")"
+            relevant_count="$(jq -r --arg app_id "${SECURITY_APP_ID}" '[.[] | select((.app.id | tostring) == $app_id and .name == "Security contract")] | length' <<< "${existing_checks}")"
             if test "${relevant_count}" = 0; then
               echo "eligible=false" >> "${GITHUB_OUTPUT}"
               exit 0
@@ -931,7 +931,6 @@ jobs:
       cancel-in-progress: false
       queue: max
     permissions:
-      checks: write
       pull-requests: read
       contents: read
     runs-on: ubuntu-24.04
@@ -1209,11 +1208,7 @@ jobs:
           }
 
           normalize_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${external_id}"
-          normalize_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / Build, lint, test" "${external_id}:actions:build"
-          normalize_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / MSRV build and test" "${external_id}:actions:msrv"
-          normalize_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / cargo-vet (locked supply-chain audit)" "${external_id}:actions:vet"
-          normalize_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / cargo-deny (supply-chain bans/advisories/licenses)" "${external_id}:actions:deny"
           revalidate_target
           unset installation_token
           trap - EXIT
-          echo "Normalized all five authority namespaces to sticky failure on ${MERGE_COMMIT_SHA}." >> "${GITHUB_STEP_SUMMARY}"
+          echo "Normalized the dedicated Security contract namespace to sticky failure on ${MERGE_COMMIT_SHA}." >> "${GITHUB_STEP_SUMMARY}"

@@ -2304,7 +2304,6 @@ jobs:
       queue: max
     permissions:
       actions: read
-      checks: write
       contents: read
       pull-requests: read
     runs-on: ubuntu-24.04
@@ -2562,55 +2561,6 @@ jobs:
             test "$(jq -r '.parents[0].sha' <<< "${merge_commit}")" = "$(jq -r '.base.sha' <<< "${canonical_binding}")"
             test "$(jq -r '.parents[1].sha' <<< "${merge_commit}")" = "${EVIDENCE_SHA}"
             test "$(jq -r '.tree.sha' <<< "${merge_commit}")" = "$(jq -r '.merge_tree_sha' <<< "${canonical_binding}")"
-          }
-
-          list_actions_mirror_checks() {
-            mirror_name="$1"
-            encoded_name="$(jq -rn --arg value "${mirror_name}" '$value | @uri')"
-            page=1
-            total_count=''
-            collected_checks='[]'
-            while true; do
-              page_response="$({
-                curl \
-                  --proto '=https' \
-                  --tlsv1.2 \
-                  --fail \
-                  --silent \
-                  --show-error \
-                  -H "Accept: application/vnd.github+json" \
-                  -H "Authorization: Bearer ${GH_TOKEN}" \
-                  -H "X-GitHub-Api-Version: 2026-03-10" \
-                  "https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/${MERGE_COMMIT_SHA}/check-runs?app_id=15368&check_name=${encoded_name}&filter=all&per_page=100&page=${page}"
-              })"
-              page_total="$(jq -r '.total_count' <<< "${page_response}")"
-              [[ "${page_total}" =~ ^[0-9]+$ ]]
-              if test -z "${total_count}"; then
-                total_count="${page_total}"
-              else
-                test "${page_total}" = "${total_count}"
-              fi
-              page_checks="$(jq -cS '.check_runs' <<< "${page_response}")"
-              test "$(jq -r 'type' <<< "${page_checks}")" = "array"
-              collected_checks="$({
-                jq -cS -n \
-                  --argjson collected "${collected_checks}" \
-                  --argjson page "${page_checks}" \
-                  '$collected + $page'
-              })"
-              collected_count="$(jq -r 'length' <<< "${collected_checks}")"
-              test "${collected_count}" -le "${total_count}"
-              if test "${collected_count}" = "${total_count}"; then
-                break
-              fi
-              test "$(jq -r 'length' <<< "${page_checks}")" = "100"
-              page="$((page + 1))"
-            done
-            test "$(jq -r '[.[].id] | unique | length' <<< "${collected_checks}")" = "${total_count}"
-            jq -cS -n \
-              --argjson check_runs "${collected_checks}" \
-              --argjson total_count "${total_count}" \
-              '{check_runs: $check_runs, total_count: $total_count}'
           }
 
           list_namespace_checks() {
@@ -3020,10 +2970,6 @@ jobs:
               fi
             fi
             normalize_bad_ci_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${EXTERNAL_ID}"
-            normalize_bad_ci_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / Build, lint, test" "${EXTERNAL_ID}:actions:build"
-            normalize_bad_ci_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / MSRV build and test" "${EXTERNAL_ID}:actions:msrv"
-            normalize_bad_ci_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / cargo-vet (locked supply-chain audit)" "${EXTERNAL_ID}:actions:vet"
-            normalize_bad_ci_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / cargo-deny (supply-chain bans/advisories/licenses)" "${EXTERNAL_ID}:actions:deny"
             echo "Bad current CI completion permanently tombstoned ${EXTERNAL_ID}." >> "${GITHUB_STEP_SUMMARY}"
             bad_ci_observed=true
             return 0
@@ -3139,10 +3085,6 @@ jobs:
               test "$(jq -r --arg id "${retry_id}" --arg app "${retry_app}" --arg slug "${retry_slug}" --arg name "${retry_name}" --arg external "${retry_external}" --arg head "${MERGE_COMMIT_SHA}" --arg text "${retry_text}" '(.id | tostring) == $id and .name == $name and .external_id == $external and .head_sha == $head and (.app.id | tostring) == $app and .app.slug == $slug and .status == "completed" and .conclusion == "failure" and .output.text == $text' <<< "${retry_failed}")" = true
             }
             fail_existing_retry_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${EXTERNAL_ID}"
-            fail_existing_retry_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / Build, lint, test" "${EXTERNAL_ID}:actions:build"
-            fail_existing_retry_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / MSRV build and test" "${EXTERNAL_ID}:actions:msrv"
-            fail_existing_retry_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / cargo-vet (locked supply-chain audit)" "${EXTERNAL_ID}:actions:vet"
-            fail_existing_retry_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / cargo-deny (supply-chain bans/advisories/licenses)" "${EXTERNAL_ID}:actions:deny"
           }
 
           require_publishable_ci() {
@@ -3155,142 +3097,6 @@ jobs:
           publish_success_authority() {
           require_publishable_ci
           revalidate_live_publication_head
-          mirror_rows="$({
-            jq -r '
-              [
-                ["Security mirror / Build, lint, test", "build", "Build, lint, test", .ci.required_check_run_ids.build],
-                ["Security mirror / MSRV build and test", "msrv", "MSRV build and test", .ci.required_check_run_ids.msrv],
-                ["Security mirror / cargo-vet (locked supply-chain audit)", "vet", "cargo-vet (locked supply-chain audit)", .ci.required_check_run_ids.vet],
-                ["Security mirror / cargo-deny (supply-chain bans/advisories/licenses)", "deny", "cargo-deny (supply-chain bans/advisories/licenses)", .ci.required_check_run_ids.deny]
-              ][] | @tsv
-            ' <<< "${canonical_binding}"
-          })"
-          while IFS=$'\t' read -r mirror_name mirror_key source_check_name source_check_run_id; do
-            test -n "${mirror_name}"
-            test -n "${source_check_name}"
-            [[ "${mirror_key}" =~ ^(build|msrv|vet|deny)$ ]]
-            [[ "${source_check_run_id}" =~ ^[1-9][0-9]*$ ]]
-            mirror_external_id="${EXTERNAL_ID}:actions:${mirror_key}"
-            mirror_summary="Trusted mirror of authenticated ${source_check_name} for ${EXTERNAL_ID}."
-            mirror_text="$({
-              jq -cS -n \
-                --arg authorized_source_sha "${AUTHORIZED_SOURCE_SHA}" \
-                --arg evidence_sha "${EVIDENCE_SHA}" \
-                --arg merge_commit_sha "${MERGE_COMMIT_SHA}" \
-                --arg pr_number "${PR_NUMBER}" \
-                --arg source_check_name "${source_check_name}" \
-                --arg source_check_run_id "${source_check_run_id}" \
-                --arg source_ci_run_attempt "${CI_RUN_ATTEMPT}" \
-                --arg source_ci_run_id "${CI_RUN_ID}" \
-                --arg source_ci_workflow_id "${CI_WORKFLOW_ID}" \
-                '{
-                  identity: {
-                    authorized_source_sha: $authorized_source_sha,
-                    evidence_sha: $evidence_sha,
-                    merge_commit_sha: $merge_commit_sha,
-                    pr_number: $pr_number
-                  },
-                  schema: "chio.security-check-authority.v2",
-                  source_check: {
-                    check_run_id: $source_check_run_id,
-                    name: $source_check_name
-                  },
-                  source_ci: {
-                    run_attempt: $source_ci_run_attempt,
-                    run_id: $source_ci_run_id,
-                    workflow_id: $source_ci_workflow_id
-                  }
-                }'
-            })"
-            mirror_namespace="$(list_actions_mirror_checks "${mirror_name}")"
-            test "$(jq -r '.check_runs | length' <<< "${mirror_namespace}")" = "$(jq -r '.total_count' <<< "${mirror_namespace}")"
-            test "$({
-              jq -r \
-                --arg head_sha "${MERGE_COMMIT_SHA}" \
-                --arg name "${mirror_name}" \
-                'all(.check_runs[];
-                  .name == $name and
-                  .head_sha == $head_sha and
-                  .app.id == 15368 and
-                  .app.slug == "github-actions"
-                )' <<< "${mirror_namespace}"
-            })" = "true"
-            mirror_matches="$(jq -cS '.check_runs | sort_by(.id)' <<< "${mirror_namespace}")"
-            mirror_match_count="$(jq -r 'length' <<< "${mirror_matches}")"
-            test "${mirror_match_count}" -le 1
-            mirror_created=false
-            if test "${mirror_match_count}" = "1"; then
-              mirror_check="$(jq -cS '.[0]' <<< "${mirror_matches}")"
-              test "$(jq -r '.external_id' <<< "${mirror_check}")" = "${mirror_external_id}"
-              test "$(jq -r '.status' <<< "${mirror_check}")" = "completed"
-              test "$(jq -r '.conclusion' <<< "${mirror_check}")" = "success"
-              test "$(jq -r '.output.title' <<< "${mirror_check}")" = "Chio trusted Actions mirror"
-              test "$(jq -r '.output.summary' <<< "${mirror_check}")" = "${mirror_summary}"
-              existing_mirror_text="$(jq -cS '.output.text | fromjson' <<< "${mirror_check}")"
-              test "${existing_mirror_text}" = "${mirror_text}"
-            else
-              mirror_payload="$({
-                jq -cS -n \
-                  --arg details_url "${publication_details_url}" \
-                  --arg external_id "${mirror_external_id}" \
-                  --arg head_sha "${MERGE_COMMIT_SHA}" \
-                  --arg name "${mirror_name}" \
-                  --arg summary "${mirror_summary}" \
-                  --arg text "${mirror_text}" \
-                  '{
-                    conclusion: "success",
-                    details_url: $details_url,
-                    external_id: $external_id,
-                    head_sha: $head_sha,
-                    name: $name,
-                    output: {
-                      summary: $summary,
-                      text: $text,
-                      title: "Chio trusted Actions mirror"
-                    },
-                    status: "completed"
-                }'
-              })"
-              require_publishable_ci
-              revalidate_live_publication_head
-              test "${FINALIZER_RUN_ATTEMPT}" = 1
-              mirror_check="$({
-                curl \
-                  --proto '=https' \
-                  --tlsv1.2 \
-                  --fail \
-                  --silent \
-                  --show-error \
-                  --request POST \
-                  -H "Accept: application/vnd.github+json" \
-                  -H "Authorization: Bearer ${GH_TOKEN}" \
-                  -H "Content-Type: application/json" \
-                  -H "X-GitHub-Api-Version: 2026-03-10" \
-                  --data-binary "${mirror_payload}" \
-                "https://api.github.com/repos/${GITHUB_REPOSITORY}/check-runs"
-              })"
-              revalidate_live_publication_head
-              mirror_created=true
-            fi
-            require_publishable_ci
-            [[ "$(jq -r '.id' <<< "${mirror_check}")" =~ ^[1-9][0-9]*$ ]]
-            test "$(jq -r '.name' <<< "${mirror_check}")" = "${mirror_name}"
-            test "$(jq -r '.head_sha' <<< "${mirror_check}")" = "${MERGE_COMMIT_SHA}"
-            test "$(jq -r '.status' <<< "${mirror_check}")" = "completed"
-            test "$(jq -r '.conclusion' <<< "${mirror_check}")" = "success"
-            test "$(jq -r '.external_id' <<< "${mirror_check}")" = "${mirror_external_id}"
-            [[ "$(jq -r '.details_url' <<< "${mirror_check}")" =~ ^https://github\.com/${GITHUB_REPOSITORY}/actions/runs/[1-9][0-9]*/attempts/[1-9][0-9]*$ ]]
-            if test "${mirror_created}" = true; then
-              test "$(jq -r '.details_url' <<< "${mirror_check}")" = "${publication_details_url}"
-            fi
-            test "$(jq -r '.app.id' <<< "${mirror_check}")" = "15368"
-            test "$(jq -r '.app.slug' <<< "${mirror_check}")" = "github-actions"
-            observed_mirror_text="$(jq -cS '.output.text | fromjson' <<< "${mirror_check}")"
-            test "${observed_mirror_text}" = "${mirror_text}"
-            require_publishable_ci
-          done <<< "${mirror_rows}"
-          revalidate_live_publication_head
-
           list_authority_checks() {
             page=1
             total_count=''
@@ -3474,45 +3280,11 @@ jobs:
           verified_authority_text="$(jq -cS '.output.text | fromjson' <<< "${verified_check}")"
           test "${verified_authority_text}" = "${authority_text}"
           require_publishable_ci
-          while IFS=$'\t' read -r mirror_name mirror_key source_check_name source_check_run_id; do
-            verified_mirror_namespace="$(list_actions_mirror_checks "${mirror_name}")"
-            test "$(jq -r '.total_count' <<< "${verified_mirror_namespace}")" = "1"
-            expected_mirror_text="$(
-              jq -cS -n \
-                --arg authorized_source_sha "${AUTHORIZED_SOURCE_SHA}" \
-                --arg evidence_sha "${EVIDENCE_SHA}" \
-                --arg merge_commit_sha "${MERGE_COMMIT_SHA}" \
-                --arg pr_number "${PR_NUMBER}" \
-                --arg source_check_name "${source_check_name}" \
-                --arg source_check_run_id "${source_check_run_id}" \
-                --arg source_ci_run_attempt "${CI_RUN_ATTEMPT}" \
-                --arg source_ci_run_id "${CI_RUN_ID}" \
-                --arg source_ci_workflow_id "${CI_WORKFLOW_ID}" \
-                '{identity: {authorized_source_sha: $authorized_source_sha, evidence_sha: $evidence_sha, merge_commit_sha: $merge_commit_sha, pr_number: $pr_number}, schema: "chio.security-check-authority.v2", source_check: {check_run_id: $source_check_run_id, name: $source_check_name}, source_ci: {run_attempt: $source_ci_run_attempt, run_id: $source_ci_run_id, workflow_id: $source_ci_workflow_id}}'
-            )"
-            test "$({
-              jq -r \
-                --arg external_id "${EXTERNAL_ID}:actions:${mirror_key}" \
-                --arg head_sha "${MERGE_COMMIT_SHA}" \
-                --arg name "${mirror_name}" \
-                --arg expected_text "${expected_mirror_text}" \
-                'all(.check_runs[];
-                  .name == $name and
-                  .head_sha == $head_sha and
-                  .external_id == $external_id and
-                  .status == "completed" and
-                  .conclusion == "success" and
-                  .app.id == 15368 and
-                  .app.slug == "github-actions" and
-                  ((.output.text | fromjson) == ($expected_text | fromjson))
-                )' <<< "${verified_mirror_namespace}"
-            })" = "true"
-          done <<< "${mirror_rows}"
           require_publishable_ci
           revalidate_live_publication_head
           unset installation_token
           trap - EXIT
-          echo "Five exact merge-authority contexts published for ${MERGE_COMMIT_SHA}; Security contract check run ${check_run_id}." >> "${GITHUB_STEP_SUMMARY}"
+          echo "Dedicated Security contract published for ${MERGE_COMMIT_SHA}; check run ${check_run_id}." >> "${GITHUB_STEP_SUMMARY}"
           }
 
           reconcile_bad_ci
