@@ -3,6 +3,37 @@ use super::*;
 mod invocations;
 use chio_kernel_core::budget_increment_admits;
 
+/// Every usage row, most recently updated first.
+pub(super) const LIST_ALL_USAGES_SQL: &str = r#"
+    SELECT
+        capability_id,
+        grant_index,
+        invocation_count,
+        updated_at,
+        seq,
+        total_cost_exposed,
+        total_cost_realized_spend
+    FROM capability_grant_budgets
+    ORDER BY updated_at DESC, capability_id ASC, grant_index ASC
+"#;
+
+/// One capability's usage rows, in the same order as the full listing. The
+/// equality on the primary key's leading column lets SQLite read only that
+/// capability's rows.
+pub(super) const LIST_CAPABILITY_USAGES_SQL: &str = r#"
+    SELECT
+        capability_id,
+        grant_index,
+        invocation_count,
+        updated_at,
+        seq,
+        total_cost_exposed,
+        total_cost_realized_spend
+    FROM capability_grant_budgets
+    WHERE capability_id = ?1
+    ORDER BY updated_at DESC, grant_index ASC
+"#;
+
 /// Budget-store schema revision. Bump on every schema-affecting change.
 pub(crate) const BUDGET_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 12;
 /// The revision from which a stamped database is expected to already
@@ -1103,24 +1134,22 @@ impl SqliteBudgetStore {
     ) -> Result<Vec<BudgetUsageRecord>, BudgetStoreError> {
         let mut connection = self.connection()?;
         let transaction = self.begin_read(&mut connection)?;
-        let mut statement = transaction.prepare(
-            r#"
-            SELECT
-                capability_id,
-                grant_index,
-                invocation_count,
-                updated_at,
-                seq,
-                total_cost_exposed,
-                total_cost_realized_spend
-            FROM capability_grant_budgets
-            WHERE (?1 IS NULL OR capability_id = ?1)
-            ORDER BY updated_at DESC, capability_id ASC, grant_index ASC
-            "#,
-        )?;
-        let rows = statement.query_map(params![capability_id], record_from_row)?;
-        let rows = rows.collect::<Result<Vec<_>, _>>()?;
-        drop(statement);
+        let rows = match capability_id {
+            None => {
+                let mut statement = transaction.prepare(LIST_ALL_USAGES_SQL)?;
+                let rows = statement
+                    .query_map([], record_from_row)?
+                    .collect::<Result<Vec<_>, _>>()?;
+                rows
+            }
+            Some(capability_id) => {
+                let mut statement = transaction.prepare(LIST_CAPABILITY_USAGES_SQL)?;
+                let rows = statement
+                    .query_map(params![capability_id], record_from_row)?
+                    .collect::<Result<Vec<_>, _>>()?;
+                rows
+            }
+        };
         transaction.rollback()?;
         Ok(rows)
     }

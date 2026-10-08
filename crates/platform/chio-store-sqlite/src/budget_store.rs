@@ -92,6 +92,10 @@ mod import_boundaries;
 #[path = "budget_store/tests/checked_accounting.rs"]
 mod checked_accounting;
 
+#[cfg(test)]
+#[path = "budget_store/tests/usage_listing.rs"]
+mod usage_listing;
+
 use composite_schema::*;
 use model::{HoldDisposition, SqliteBudgetHold};
 use replication::*;
