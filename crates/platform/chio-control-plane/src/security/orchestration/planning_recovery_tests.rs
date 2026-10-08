@@ -100,9 +100,12 @@ fn composed(
     PlanningRecoveryResponseWorkerPort::new(Arc::new(recovery), admission)
 }
 
+/// A labelled constructor for one recovery error that must stop admission.
+type FatalRecoveryCase = (&'static str, fn() -> ResponseWorkerTickError);
+
 /// Every recovery error other than a terminal cleanup backlog: global store,
 /// integrity and clock faults, and declassification outbox failures.
-fn fatal_recovery_errors() -> Vec<(&'static str, fn() -> ResponseWorkerTickError)> {
+fn fatal_recovery_errors() -> Vec<FatalRecoveryCase> {
     vec![
         ("store unavailable", || {
             ResponseWorkerTickError::Port(PortError::unavailable())
