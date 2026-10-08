@@ -89,6 +89,25 @@ fn os_error_code<T>(result: io::Result<T>) -> Result<i32, Box<dyn Error>> {
     }
 }
 
+/// The message of a failed directory walk that is not a custody refusal.
+fn walk_failure<T>(result: io::Result<T>) -> Result<String, Box<dyn Error>> {
+    match result {
+        Ok(_) => Err("operation was not refused".into()),
+        Err(error) if refusal(&error).is_some() => {
+            Err(format!("expected an operating-system error, got: {error}").into())
+        }
+        Err(error) => Ok(error.to_string()),
+    }
+}
+
+/// Whether a walk failure names the error a no-follow directory open
+/// returns for a symlink: `ENOTDIR` on Linux, `ELOOP` elsewhere.
+fn names_symlink_refusal(message: &str) -> bool {
+    [not_a_directory(), symlink_loop()]
+        .into_iter()
+        .any(|code| message.ends_with(&io::Error::from_raw_os_error(code).to_string()))
+}
+
 /// `ELOOP`: a no-follow open met a symlink.
 fn symlink_loop() -> i32 {
     rustix::io::Errno::LOOP.raw_os_error()

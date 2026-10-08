@@ -83,12 +83,9 @@ fn prepare_refuses_a_final_symlink_without_changing_its_target() -> TestResult {
     fs::set_permissions(&target, fs::Permissions::from_mode(0o755))?;
     symlink(&target, &alias)?;
 
-    let code = os_error_code(PrivateDirectory::prepare(&alias, &DIRECTORY))?;
+    let failure = walk_failure(PrivateDirectory::prepare(&alias, &DIRECTORY))?;
 
-    assert!(
-        code == not_a_directory() || code == symlink_loop(),
-        "{code}"
-    );
+    assert!(names_symlink_refusal(&failure), "{failure}");
     assert_eq!(mode_of(&target)?, 0o755);
     Ok(())
 }
@@ -102,15 +99,12 @@ fn prepare_refuses_an_intermediate_symlink() -> TestResult {
     fs::create_dir(target_parent.join("project"))?;
     symlink(&target_parent, &alias_parent)?;
 
-    let code = os_error_code(PrivateDirectory::prepare(
+    let failure = walk_failure(PrivateDirectory::prepare(
         &alias_parent.join("project"),
         &DIRECTORY,
     ))?;
 
-    assert!(
-        code == not_a_directory() || code == symlink_loop(),
-        "{code}"
-    );
+    assert!(names_symlink_refusal(&failure), "{failure}");
     Ok(())
 }
 
