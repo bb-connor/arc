@@ -447,4 +447,38 @@ assert_rc "$(run_checker "$allowlisted_fragment" "$work/allowlisted-fragment.out
 grep -F "crates/products/chio-cli/tests/mcp_serve_http.rs: allowlist entry names an include! fragment; the cap belongs to crates/products/chio-cli/tests/wrapper.rs" \
   "$work/allowlisted-fragment.err" >/dev/null
 
+orphan_inc="$work/orphan-inc"
+init_case "$orphan_inc"
+write_lines "$orphan_inc/crates/chio-small/src/main.rs" 25
+write_lines "$orphan_inc/crates/chio-small/src/parts/orphan.inc" 4
+write_lines "$orphan_inc/crates/chio-small/src/parts/included.inc" 4
+write_lines "$orphan_inc/crates/chio-small/src/parts/pathed.inc" 4
+write_module_with_includes "$orphan_inc/crates/chio-small/src/lib.rs" 4 "parts/included.inc"
+printf '#[path = "parts/pathed.inc"]\nmod pathed;\n' >> "$orphan_inc/crates/chio-small/src/lib.rs"
+track_case "$orphan_inc"
+assert_rc "$(run_checker "$orphan_inc" "$work/orphan-inc.out" "$work/orphan-inc.err")" 1 \
+  "an .inc file nothing references fails"
+grep -Fx -- "- crates/chio-small/src/parts/orphan.inc: .inc file is not referenced by any include! or #[path] attribute" \
+  "$work/orphan-inc.err" >/dev/null
+if grep -F "included.inc" "$work/orphan-inc.err" >/dev/null || grep -F "pathed.inc" "$work/orphan-inc.err" >/dev/null; then
+  echo "FAIL: a referenced .inc file was reported as unreferenced" >&2
+  exit 1
+fi
+
+dead_cfg="$work/dead-cfg"
+init_case "$dead_cfg"
+write_lines "$dead_cfg/crates/chio-small/src/main.rs" 25
+{
+  printf '// #[cfg(any())] in a comment is ignored\n'
+  printf 'pub fn live() {}\n'
+  printf '#[cfg(any())]\n'
+  printf 'pub fn never_compiled() {}\n'
+} > "$dead_cfg/crates/chio-small/src/lib.rs"
+track_case "$dead_cfg"
+assert_rc "$(run_checker "$dead_cfg" "$work/dead-cfg.out" "$work/dead-cfg.err")" 1 \
+  "a cfg(any()) block fails"
+grep -Fx -- "- crates/chio-small/src/lib.rs:3: #[cfg(any())] gates code that is never compiled; delete it" \
+  "$work/dead-cfg.err" >/dev/null
+test "$(grep -c 'cfg(any())' "$work/dead-cfg.err")" = 1
+
 echo "check-rust-file-hygiene.test.sh: all assertions passed"

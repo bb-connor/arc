@@ -833,6 +833,49 @@ def resolve_include(
     return relative, None
 
 
+PATH_ATTRIBUTE = re.compile(r'#\s*\[\s*path\s*=\s*"([^"]+)"\s*\]')
+CFG_ANY_EMPTY = re.compile(r"#\s*\[\s*cfg\s*\(\s*any\s*\(\s*\)\s*\)\s*\]")
+
+
+def validate_dead_source(
+    root: Path,
+    paths: list[str],
+    graph: dict[str, tuple[str, ...]],
+    failures: list[str],
+) -> None:
+    """Reject source that no build ever compiles.
+
+    An `.inc` file under `crates/` must be spliced by `include!` or named by a
+    `#[path]` attribute, and `#[cfg(any())]` is never true, so whatever it
+    gates is never type-checked.
+    """
+    referenced = fragment_paths(graph)
+    root_resolved = root.resolve()
+    for path in sorted(paths):
+        if not path.startswith("crates/"):
+            continue
+        text = (root / path).read_text(encoding="utf-8", errors="replace")
+        blanked = blank_rust_noise(text)
+        for match in PATH_ATTRIBUTE.finditer(text):
+            if blanked[match.start()] != "#":
+                continue
+            try:
+                target = ((root / path).parent / match.group(1)).resolve()
+                referenced.add(str(target.relative_to(root_resolved)))
+            except ValueError:
+                continue
+        for match in CFG_ANY_EMPTY.finditer(blanked):
+            line = blanked.count("\n", 0, match.start()) + 1
+            failures.append(
+                f"{path}:{line}: #[cfg(any())] gates code that is never compiled; delete it"
+            )
+    for path in sorted(paths):
+        if path.startswith("crates/") and path.endswith(".inc") and path not in referenced:
+            failures.append(
+                f"{path}: .inc file is not referenced by any include! or #[path] attribute"
+            )
+
+
 def build_include_graph(
     root: Path, paths: list[str], failures: list[str]
 ) -> dict[str, tuple[str, ...]]:
@@ -1430,6 +1473,7 @@ def main() -> int:
         for violation in file.violations:
             failures.append(f"{file.path}: {violation}")
 
+    validate_dead_source(root, paths, graph, failures)
     validate_generated_headers(root, paths, failures)
     validate_rust_example_packages(root, paths, failures)
     validate_text_hygiene(root, failures)
