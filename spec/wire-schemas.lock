@@ -5061,7 +5061,7 @@ first_seen = "95f04d5d74"
 
 [[schema]]
 value = "chio.security-admission-operation.v1"
-files = ["crates/kernel/chio-kernel/src/admission_operation.part1.inc"]
+files = ["crates/kernel/chio-kernel/src/security_admission_operation.rs"]
 first_seen = "b39b131271"
 
 [[schema]]

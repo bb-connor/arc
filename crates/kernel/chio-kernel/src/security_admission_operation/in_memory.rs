@@ -1,4 +1,7 @@
 //! Process-local in-memory admission operation store.
+use std::collections::HashMap;
+use std::sync::Mutex;
+
 use super::*;
 
 #[derive(Default)]
