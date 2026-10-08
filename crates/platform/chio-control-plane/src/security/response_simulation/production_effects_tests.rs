@@ -37,6 +37,8 @@ use crate::security::adapters::effect_port::{
 };
 use crate::security::adapters::{AlertOutboxConfig, SqliteSiemOutbox};
 
+mod finality;
+
 /// Trusted time ten minutes ahead of the host wall clock.
 const TRUSTED_SKEW_MS: u64 = 600_000;
 
