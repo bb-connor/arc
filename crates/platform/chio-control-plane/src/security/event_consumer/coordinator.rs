@@ -1010,6 +1010,7 @@ pub(in crate::security) fn map_active_response_kernel_error(error: KernelError) 
     let retryable = matches!(
         &error,
         KernelError::Internal(_)
+            | KernelError::ActiveResponse(_)
             | KernelError::ReceiptPersistence(_)
             | KernelError::RevocationStore(_)
             | KernelError::Overloaded { .. }
