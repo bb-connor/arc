@@ -730,7 +730,9 @@ use record_validation::*;
 mod schema_migrations;
 pub(crate) use schema_migrations::initialize_finding_challenge_schema;
 use schema_migrations::*;
-include!("finding_challenge_store/input_bounds.rs");
+mod input_bounds;
+pub(crate) use input_bounds::begin_finalizing_under_sanction_tx;
+use input_bounds::*;
 include!("finding_challenge_store_root_refresh.rs");
 
 #[cfg(all(test, unix))]

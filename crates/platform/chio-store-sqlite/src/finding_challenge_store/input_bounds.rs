@@ -1,3 +1,7 @@
+//! The bounded finalizing-under-sanction transition shared with finding status.
+
+use super::*;
+
 // Input bounds, required-field checks, and error mapping.
 
 /// Apply the appeal-final transition and retain its exact authorization in a
