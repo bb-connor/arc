@@ -1,9 +1,14 @@
-use std::fs;
-use std::path::Path;
-use std::sync::MutexGuard;
+//! Standalone security admission operation store, compiled only for tests
+//! and benches.
 
-use crate::store_connection::StoreConnection;
-use chio_kernel::{
+use super::*;
+
+pub(super) use std::fs;
+pub(super) use std::path::Path;
+pub(super) use std::sync::MutexGuard;
+
+pub(super) use crate::store_connection::StoreConnection;
+pub(super) use chio_kernel::{
     AdmissionCleanupAction, AdmissionCleanupActionCasOutcome, AdmissionCleanupActionClaimOutcome,
     AdmissionCleanupActionCreateOutcome, AdmissionCleanupActionKind, AdmissionCleanupActionState,
     AdmissionDispatchState, AdmissionOperation, AdmissionOperationCasOutcome,
@@ -11,16 +16,18 @@ use chio_kernel::{
     AdmissionOperationKind, AdmissionOperationState, AdmissionOperationStore,
     AdmissionOperationStoreProfile, PersistedAdmissionCleanupAction, PersistedAdmissionOperation,
 };
-use chio_security_types::clock::{Clock, SystemClock};
-use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
+pub(super) use chio_security_types::clock::{Clock, SystemClock};
+pub(super) use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 
 pub struct SqliteAdmissionOperationStore {
-    connection: StoreConnection,
-    authority_profile: AdmissionOperationStoreProfile,
+    pub(super) connection: StoreConnection,
+    pub(super) authority_profile: AdmissionOperationStoreProfile,
 }
 
 #[cfg(unix)]
-fn create_private_plain_database_if_missing(path: &Path) -> Result<(), AdmissionOperationError> {
+pub(super) fn create_private_plain_database_if_missing(
+    path: &Path,
+) -> Result<(), AdmissionOperationError> {
     use std::fs::OpenOptions;
     use std::os::unix::fs::OpenOptionsExt;
 
@@ -66,7 +73,7 @@ impl SqliteAdmissionOperationStore {
         Self::from_connection(connection, AdmissionOperationStoreProfile::EphemeralLocal)
     }
 
-    fn from_connection(
+    pub(super) fn from_connection(
         connection: Connection,
         authority_profile: AdmissionOperationStoreProfile,
     ) -> Result<Self, AdmissionOperationError> {
@@ -156,13 +163,13 @@ impl SqliteAdmissionOperationStore {
         })
     }
 
-    fn connection(&self) -> Result<MutexGuard<'_, Connection>, AdmissionOperationError> {
+    pub(super) fn connection(&self) -> Result<MutexGuard<'_, Connection>, AdmissionOperationError> {
         self.connection
             .lock()
             .map_err(|fenced| AdmissionOperationError::Unavailable(fenced.to_string()))
     }
 
-    fn mutate_claimed_cleanup_action<F>(
+    pub(super) fn mutate_claimed_cleanup_action<F>(
         &self,
         action_id: &str,
         expected_version: u64,
@@ -1086,7 +1093,7 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
     }
 }
 
-fn insert_operation(
+pub(super) fn insert_operation(
     connection: &Connection,
     operation: &AdmissionOperation,
 ) -> Result<(), AdmissionOperationError> {
@@ -1133,8 +1140,11 @@ fn insert_operation(
     Ok(())
 }
 
-#[allow(clippy::type_complexity, reason = "The tuple preserves the complete typed database row at this existing storage boundary.")]
-fn load_operation(
+#[allow(
+    clippy::type_complexity,
+    reason = "The tuple preserves the complete typed database row at this existing storage boundary."
+)]
+pub(super) fn load_operation(
     connection: &Connection,
     operation_id: &str,
 ) -> Result<Option<AdmissionOperation>, AdmissionOperationError> {
@@ -1231,7 +1241,7 @@ fn load_operation(
     )?))
 }
 
-fn load_operation_by_budget_hold_id(
+pub(super) fn load_operation_by_budget_hold_id(
     connection: &Connection,
     budget_hold_id: &str,
 ) -> Result<Option<AdmissionOperation>, AdmissionOperationError> {
@@ -1263,7 +1273,7 @@ fn load_operation_by_budget_hold_id(
     Ok(Some(operation))
 }
 
-type StoredCleanupAction = (
+pub(super) type StoredCleanupAction = (
     String,
     String,
     String,
@@ -1277,7 +1287,7 @@ type StoredCleanupAction = (
     Option<String>,
 );
 
-fn cleanup_action_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoredCleanupAction> {
+pub(super) fn cleanup_action_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoredCleanupAction> {
     Ok((
         row.get(0)?,
         row.get(1)?,
@@ -1293,7 +1303,7 @@ fn cleanup_action_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoredCleanup
     ))
 }
 
-fn parse_cleanup_action(
+pub(super) fn parse_cleanup_action(
     row: StoredCleanupAction,
 ) -> Result<AdmissionCleanupAction, AdmissionOperationError> {
     let kind = AdmissionCleanupActionKind::parse(&row.3).ok_or_else(|| {
@@ -1328,7 +1338,7 @@ fn parse_cleanup_action(
     })
 }
 
-fn load_cleanup_action(
+pub(super) fn load_cleanup_action(
     connection: &Connection,
     action_id: &str,
 ) -> Result<Option<AdmissionCleanupAction>, AdmissionOperationError> {
@@ -1349,7 +1359,7 @@ fn load_cleanup_action(
     row.map(parse_cleanup_action).transpose()
 }
 
-fn load_cleanup_action_by_participant(
+pub(super) fn load_cleanup_action_by_participant(
     connection: &Connection,
     operation_id: &str,
     kind: AdmissionCleanupActionKind,
@@ -1371,7 +1381,7 @@ fn load_cleanup_action_by_participant(
     row.map(parse_cleanup_action).transpose()
 }
 
-fn insert_cleanup_action(
+pub(super) fn insert_cleanup_action(
     connection: &Connection,
     action: &AdmissionCleanupAction,
 ) -> Result<(), AdmissionOperationError> {
@@ -1409,7 +1419,7 @@ fn insert_cleanup_action(
     Ok(())
 }
 
-fn persist_cleanup_transition(
+pub(super) fn persist_cleanup_transition(
     connection: &Connection,
     current: &AdmissionCleanupAction,
     next: &AdmissionCleanupAction,
@@ -1452,21 +1462,21 @@ fn persist_cleanup_transition(
     Ok(())
 }
 
-fn sqlite_integer(value: u64, label: &str) -> Result<i64, AdmissionOperationError> {
+pub(super) fn sqlite_integer(value: u64, label: &str) -> Result<i64, AdmissionOperationError> {
     i64::try_from(value)
         .map_err(|_| AdmissionOperationError::Overflow(format!("{label} exceeds SQLite INTEGER")))
 }
 
-fn nonnegative_u64(value: i64, label: &str) -> Result<u64, AdmissionOperationError> {
+pub(super) fn nonnegative_u64(value: i64, label: &str) -> Result<u64, AdmissionOperationError> {
     u64::try_from(value)
         .map_err(|_| AdmissionOperationError::Invalid(format!("persisted {label} is negative")))
 }
 
-fn sqlite_error(error: rusqlite::Error) -> AdmissionOperationError {
+pub(super) fn sqlite_error(error: rusqlite::Error) -> AdmissionOperationError {
     AdmissionOperationError::Unavailable(format!("sqlite admission operation error: {error}"))
 }
 
-fn reject_volatile_database_path(path: &Path) -> Result<(), AdmissionOperationError> {
+pub(super) fn reject_volatile_database_path(path: &Path) -> Result<(), AdmissionOperationError> {
     let path = path.to_string_lossy();
     let lower = path.to_ascii_lowercase();
     let memory_uri = lower.starts_with("file:")
@@ -1480,7 +1490,7 @@ fn reject_volatile_database_path(path: &Path) -> Result<(), AdmissionOperationEr
     Ok(())
 }
 
-fn unix_now() -> Result<i64, AdmissionOperationError> {
+pub(super) fn unix_now() -> Result<i64, AdmissionOperationError> {
     let seconds = SystemClock.unix_millis()?.as_secs();
     sqlite_integer(seconds, "authority clock seconds")
 }
