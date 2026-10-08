@@ -262,8 +262,13 @@ def session_iteration(ctx: Context, *, wait_timeout: float = 1200) -> str:
     digest = {"digest_every": store.config()["digest_seconds"]} if meta["role"] == "conductor" else {}
     events = ctx.waiter(store, timeout=wait_timeout, **digest)
     sid_path = state_dir() / f"{meta['id']}.session"
+    turns_path = state_dir() / f"{meta['id']}.turns"
     sid = sid_path.read_text().strip() if sid_path.exists() else ""
-    if sid:
+    turns = int(turns_path.read_text() or "0") if turns_path.exists() and sid else 0
+    rotating = bool(sid) and turns >= int(store.config()["session_max_turns"])
+    if rotating:
+        prompt = render(ctx.prompts / "handoff.md", agent=meta["id"], stamp=clock.stamp())
+    elif sid:
         prompt = render(ctx.prompts / "event.md", events="\n".join(f"- {e}" for e in events) or "- periodic check, no new events")
     else:
         prompt = render(ctx.prompts / f"{meta['role']}.md", agent=meta["id"], base=store.config()["base_branch"])
@@ -274,13 +279,19 @@ def session_iteration(ctx: Context, *, wait_timeout: float = 1200) -> str:
     )
     if rate_limited(result):
         return throttle(store)
+    msgs.inbox(store, mark=True)  # the turn saw these events; do not replay them
+    claims.heartbeat(store)
+    if rotating:
+        sid_path.unlink(missing_ok=True)  # the successor starts from the charter and reads the handoff
+        turns_path.unlink(missing_ok=True)
+        return "rotated"
     new_sid = session_id_from(meta["vendor"], result.output)
     if new_sid:
         sid_path.write_text(new_sid)
+        turns_path.write_text(str(turns + 1))
     elif sid and result.returncode != 0:
         sid_path.unlink(missing_ok=True)  # resume failed: start fresh from the charter next turn
-    msgs.inbox(store, mark=True)  # the turn saw these events; do not replay them
-    claims.heartbeat(store)
+        turns_path.unlink(missing_ok=True)
     return "turn" if result.returncode == 0 else "failed"
 
 

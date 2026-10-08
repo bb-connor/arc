@@ -45,7 +45,8 @@ class CommandTest(unittest.TestCase):
 
     def test_templates_render_with_their_fields(self):
         fields = dict(agent="a", role="worker", item_id="F1", worktree="/w", branch="lane/F1-x", base="b",
-                      paths="p", brief="BRIEF", sender="s", subject="s", request="r", events="- e")
+                      paths="p", brief="BRIEF", sender="s", subject="s", request="r", events="- e",
+                      stamp="20261008T000000Z")
         for template in sorted(PROMPTS.glob("*.md")):
             text = agent.render(template, **fields)
             self.assertNotIn("{", text.replace("{{", ""), template.name)
@@ -170,6 +171,27 @@ class LoopTest(SwarmCase):
         agent.session_iteration(ctx)
         self.assertEqual(commands[1][-2:], ["--resume", "sess-1"])
         self.assertIn("item F1: open -> review", commands[1][2])
+
+    def test_long_sessions_hand_off_and_restart_from_the_charter(self):
+        conductor = self.clone("claude-ws2-conductor-3", role="conductor", vendor="claude")
+        agents.register(conductor, agent_id=conductor.agent, machine="ws2", vendor="claude", role="conductor",
+                        model="opus", effort="", tiers=["premium"])
+        from swarmlib.store import set_config
+        set_config(conductor, "session_max_turns", "2")
+        meta = agents.load(conductor, conductor.agent)
+        commands = []
+
+        def fake(command, cwd, log):
+            commands.append(command)
+            return Execution(0, json.dumps({"type": "result", "session_id": "sess-1"}))
+
+        ctx = self.ctx(conductor, meta, fake, waiter=lambda store, timeout, **kw: [])
+        outcomes = [agent.session_iteration(ctx) for _ in range(4)]
+        self.assertEqual(outcomes, ["turn", "turn", "rotated", "turn"])
+        self.assertIn("handoff", commands[2][2])
+        self.assertEqual(commands[2][-2:], ["--resume", "sess-1"])
+        self.assertNotIn("--resume", commands[3])
+        self.assertIn("conductor of the Chio swarm", commands[3][2])
 
     def test_janitor_answers_requests_addressed_to_it(self):
         janitor = self.clone("hermes-ws2-janitor1", role="janitor", vendor="hermes")
