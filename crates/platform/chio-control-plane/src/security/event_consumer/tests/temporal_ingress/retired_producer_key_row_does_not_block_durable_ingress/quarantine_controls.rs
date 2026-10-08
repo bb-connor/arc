@@ -892,6 +892,7 @@ fn receipt_signer_replacement_quarantines_the_sealed_receipt_row() {
         tenant_id: tenant(),
         producer_id: receipt_producer(),
         signer_key_id: record("receipt-key-v1"),
+        policy_version: record("policy-v1"),
         signer_key: signer.public_key(),
     };
     let event = receipt_event(&original_signer, ToolOrigin::ChioInternal, 9_900, 10_000);

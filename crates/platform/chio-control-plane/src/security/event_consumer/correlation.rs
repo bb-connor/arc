@@ -221,6 +221,10 @@ impl ProductionCorrelationConsumer {
                 .trusted
                 .values()
                 .any(|producer| !rule_policy_versions.contains(&producer.policy_version))
+            || verifier
+                .trusted_receipts
+                .values()
+                .any(|producer| !rule_policy_versions.contains(&producer.policy_version))
         {
             return Err(PortError::invalid_data());
         }

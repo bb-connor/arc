@@ -28,6 +28,7 @@ pub struct TrustedSecurityEventReceiptProducer {
     pub tenant_id: TenantId,
     pub producer_id: ProducerId,
     pub signer_key_id: RecordId,
+    pub policy_version: RecordId,
     pub signer_key: PublicKey,
 }
 
@@ -258,8 +259,8 @@ impl NativeSecurityEventVerifier {
     }
 
     /// Verifies the receipt under the kernel key it carries, and every
-    /// projection field, before comparing that key and key id with the
-    /// configured receipt producer.
+    /// projection field, before comparing that key, its id and the policy pin
+    /// with the configured receipt producer.
     fn verify_receipt_event(
         &self,
         event: &UnverifiedSecurityEvent,
@@ -337,6 +338,9 @@ impl NativeSecurityEventVerifier {
                     || body.producer_key_id != trusted.signer_key_id =>
             {
                 Some(CorrelationIngressRejectionReason::UnconfiguredProducerKey)
+            }
+            Some(trusted) if trusted.policy_version != body.policy_version => {
+                Some(CorrelationIngressRejectionReason::UnconfiguredPolicyVersion)
             }
             Some(_) => None,
         };

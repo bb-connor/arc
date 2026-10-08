@@ -189,6 +189,7 @@ fn start_runtime(detector_key: &Keypair, receipt_key: &Keypair) -> PolicyPinRunt
                 tenant_id: tenant(),
                 producer_id: receipt_producer(),
                 signer_key_id: record("receipt-key-v1"),
+                policy_version: record(RECEIPT_POLICY),
                 signer_key: receipt_key.public_key(),
             }],
             60_000,

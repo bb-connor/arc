@@ -857,6 +857,10 @@ impl ProductionActiveDefenseOrchestrator {
                 .trusted_event_producers
                 .iter()
                 .any(|producer| !rule_policy_versions.contains(&producer.policy_version))
+            || config
+                .trusted_event_receipt_producers
+                .iter()
+                .any(|producer| !rule_policy_versions.contains(&producer.policy_version))
         {
             return Err(PortError::invalid_data().into());
         }

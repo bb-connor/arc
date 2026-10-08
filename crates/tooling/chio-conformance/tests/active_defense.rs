@@ -1108,6 +1108,7 @@ fn event_producer_trust() {
                 producer_id: ProducerId::new("detector-active-defense")
                     .test_expect("receipt producer id"),
                 signer_key_id: record("detector-active-defense-key"),
+                policy_version: record("active-defense-correlation-policy"),
                 signer_key: receipt_key.public_key(),
             }],
             1_000,

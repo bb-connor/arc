@@ -372,6 +372,7 @@ pub(super) fn verifier_with_receipts(
             tenant_id: tenant(),
             producer_id: receipt_producer(),
             signer_key_id: record("receipt-key-v1"),
+            policy_version: record("policy-v1"),
             signer_key: receipt_keypair.public_key(),
         }],
         60_000,
