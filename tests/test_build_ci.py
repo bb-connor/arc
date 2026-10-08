@@ -4,7 +4,7 @@ import subprocess
 import unittest
 from unittest import mock
 
-from support import SwarmCase
+from support import SwarmCase, git
 
 from swarmlib import build, ci, items, reviews
 
@@ -92,6 +92,19 @@ class CITest(unittest.TestCase):
         gh = FakeGh([(["gh"], "", 1)])
         with self.assertRaises(ci.CIError):
             ci.in_flight(gh)
+
+
+class ResolveShaTest(SwarmCase):
+    def test_resolves_branch_and_passes_full_sha_through(self):
+        arc, _ = self.make_arc()
+        head = git(arc, "rev-parse", "integration/beta-next")
+        self.assertEqual(ci.resolve_sha("integration/beta-next", str(arc)), head)
+        self.assertEqual(ci.resolve_sha(head, str(arc)), head)
+
+    def test_unknown_branch_raises(self):
+        arc, _ = self.make_arc()
+        with self.assertRaises(ci.CIError):
+            ci.resolve_sha("lane/missing", str(arc))
 
 
 class ReviewsTest(SwarmCase):

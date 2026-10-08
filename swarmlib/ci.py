@@ -4,14 +4,18 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import time
 import uuid
 from typing import Callable
 
+from . import gitio
+
 Runner = Callable[[list[str]], subprocess.CompletedProcess]
 WORKFLOW = "lane-test.yml"
 ACTIVE = {"queued", "in_progress", "waiting", "pending", "requested"}
+SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
 class CIError(RuntimeError):
@@ -20,6 +24,17 @@ class CIError(RuntimeError):
 
 def repo_slug() -> str:
     return os.environ.get("SWARM_REPO_SLUG", "bb-connor/arc")
+
+
+def resolve_sha(ref: str, url: str) -> str:
+    """Pin a branch to the commit it points at now; lane-test only accepts full SHAs."""
+    if SHA_RE.match(ref):
+        return ref
+    proc = gitio.run(None, *gitio.auth_args(), "ls-remote", url, f"refs/heads/{ref}", check=False)
+    heads = [line.split()[0] for line in proc.stdout.splitlines() if line.strip()]
+    if proc.returncode != 0 or len(heads) != 1:
+        raise CIError(f"cannot resolve {ref!r} to a single commit on {url}")
+    return heads[0]
 
 
 def default_runner(args: list[str]) -> subprocess.CompletedProcess:

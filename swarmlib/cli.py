@@ -148,16 +148,17 @@ def cmd_ci(store: Store, a: argparse.Namespace) -> int:
     ref = a.ref or item.meta["branch"]
     if not ref:
         raise SwarmError(f"{a.item} has no branch yet; pass --ref")
+    sha = ci.resolve_sha(ref, worktree.repo_url())
     runner = ci.default_runner
     ci.wait_for_capacity(runner, store.config()["ci_max_in_flight"])
-    nonce = ci.dispatch(runner, item=a.item, target_ref=ref, packages=_split(a.packages),
+    nonce = ci.dispatch(runner, item=a.item, target_ref=sha, packages=_split(a.packages),
                         test_filter=a.filter or "", features=a.features or "")
     run_id, url = ci.find_run(runner, nonce)
     print(url, flush=True)
     passed = ci.watch(runner, run_id)
     lifecycle.record_evidence(
         store, a.item,
-        {"kind": "lane-test", "url": url, "conclusion": "success" if passed else "failure", "ref": ref,
+        {"kind": "lane-test", "url": url, "conclusion": "success" if passed else "failure", "ref": ref, "sha": sha,
          "packages": _split(a.packages), "at": clock.fmt(clock.now())},
         ci_failed=not passed,
     )
