@@ -201,12 +201,59 @@ pub struct ProductionResponseWorker {
     progress: Mutex<ResponseWorkerProgress>,
 }
 
+/// Where a parked worker is in its start, publication and stop handshake.
+/// The host drives `Armed` and `PublicationReleased`, the worker thread drives
+/// `Ready`, `Stopped` and `Failed`, and either side may request `Stopping`.
+/// Phases only advance, and `Stopped` and `Failed` are final: a recorded
+/// failure is never replaced by a later phase or a later error.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(super) enum WorkerPhase {
+    Created,
+    Armed,
+    PublicationReleased,
+    Ready,
+    Stopping,
+    Stopped,
+    Failed(String),
+}
+
+impl WorkerPhase {
+    pub(super) const fn rank(&self) -> u8 {
+        match self {
+            Self::Created => 0,
+            Self::Armed => 1,
+            Self::PublicationReleased => 2,
+            Self::Ready => 3,
+            Self::Stopping => 4,
+            Self::Stopped | Self::Failed(_) => 5,
+        }
+    }
+
+    const fn is_final(&self) -> bool {
+        matches!(self, Self::Stopped | Self::Failed(_))
+    }
+
+    /// A stop was requested or the worker already ended.
+    pub(super) const fn stop_requested(&self) -> bool {
+        self.rank() >= Self::Stopping.rank()
+    }
+}
+
+pub(super) type WorkerPhaseSender = Arc<watch::Sender<WorkerPhase>>;
+
+/// Moves the phase forward. Returns whether `next` was applied.
+pub(super) fn advance_phase(phase: &watch::Sender<WorkerPhase>, next: WorkerPhase) -> bool {
+    phase.send_if_modified(|current| {
+        if current.is_final() || next.rank() <= current.rank() {
+            return false;
+        }
+        *current = next;
+        true
+    })
+}
+
 pub struct ProductionResponseWorkerHandle {
-    shutdown: watch::Sender<bool>,
-    arm: Option<oneshot::Sender<()>>,
-    armed: Option<oneshot::Receiver<()>>,
-    publication_gate: Option<oneshot::Sender<()>>,
-    publication_readiness: Option<oneshot::Receiver<Result<(), String>>>,
+    phase: WorkerPhaseSender,
     thread_completion: watch::Receiver<bool>,
     join: Option<ResponseWorkerJoinOwnership>,
     worker: Arc<ProductionResponseWorker>,
@@ -216,7 +263,7 @@ pub struct ProductionResponseWorkerHandle {
 }
 
 pub(super) struct ResponseWorkerStartupGuard {
-    shutdown: watch::Sender<bool>,
+    phase: WorkerPhaseSender,
     join: Option<ResponseWorkerJoinOwnership>,
     worker: Arc<ProductionResponseWorker>,
     active: bool,
@@ -229,4 +276,5 @@ pub(super) struct ResponseWorkerJoinOwnership {
 
 pub(super) struct ResponseWorkerThreadCompletion {
     completion: watch::Sender<bool>,
+    phase: WorkerPhaseSender,
 }

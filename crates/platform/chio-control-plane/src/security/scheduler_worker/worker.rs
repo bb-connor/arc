@@ -1,10 +1,11 @@
 use super::{
-    acquire_response_worker_join_permit, catch_unwind, oneshot, watch, Arc, AssertUnwindSafe,
-    AtomicBool, AtomicU64, Duration, ErrorCode, Instant, MissedTickBehavior, Mutex, Ordering,
-    PortError, ProductionResponseWorker, ProductionResponseWorkerHandle, ResponseWorkerHealth,
-    ResponseWorkerJoinOwnership, ResponseWorkerLifecycle, ResponseWorkerPort,
+    acquire_response_worker_join_permit, advance_phase, catch_unwind, oneshot, watch, Arc,
+    AssertUnwindSafe, AtomicBool, AtomicU64, Duration, ErrorCode, Instant, MissedTickBehavior,
+    Mutex, Ordering, PortError, ProductionResponseWorker, ProductionResponseWorkerHandle,
+    ResponseWorkerHealth, ResponseWorkerJoinOwnership, ResponseWorkerLifecycle, ResponseWorkerPort,
     ResponseWorkerStartupGuard, ResponseWorkerTaskLiveness, ResponseWorkerThreadCompletion,
-    ResponseWorkerTick, ResponseWorkerTickError, SecurityAlertDelivery,
+    ResponseWorkerTick, ResponseWorkerTickError, SecurityAlertDelivery, WorkerPhase,
+    WorkerPhaseSender,
 };
 
 pub(super) const WORKER_CLAIM_DOMAIN: &[u8] = b"chio.active-defense-worker-claim.v1\0";
@@ -250,7 +251,7 @@ impl ProductionResponseWorker {
     async fn tick_until_initial_ready(
         &self,
         config: ProductionResponseWorkerLoopConfig,
-        shutdown_receiver: &mut watch::Receiver<bool>,
+        phase_receiver: &mut watch::Receiver<WorkerPhase>,
     ) -> Result<ResponseWorkerTick, ResponseWorkerTickError> {
         let started_at = Instant::now();
         let deadline = config.progress_deadline();
@@ -272,13 +273,15 @@ impl ProductionResponseWorker {
                 Err(error @ ResponseWorkerTickError::TerminalSchedulerCleanupPending)
                     if elapsed < deadline =>
                 {
-                    if shutdown_receiver.has_changed().is_err() || *shutdown_receiver.borrow() {
+                    if phase_receiver.has_changed().is_err()
+                        || phase_receiver.borrow().stop_requested()
+                    {
                         return Err(ResponseWorkerTickError::WorkerStopped);
                     }
                     let remaining = deadline.saturating_sub(elapsed);
                     tokio::select! {
-                        changed = shutdown_receiver.changed() => {
-                            if changed.is_err() || *shutdown_receiver.borrow() {
+                        changed = phase_receiver.changed() => {
+                            if changed.is_err() || phase_receiver.borrow().stop_requested() {
                                 return Err(ResponseWorkerTickError::WorkerStopped);
                             }
                         }
@@ -293,8 +296,8 @@ impl ProductionResponseWorker {
                         return Err(error);
                     }
                     tokio::select! {
-                        changed = shutdown_receiver.changed() => {
-                            if changed.is_err() || *shutdown_receiver.borrow() {
+                        changed = phase_receiver.changed() => {
+                            if changed.is_err() || phase_receiver.borrow().stop_requested() {
                                 return Err(ResponseWorkerTickError::WorkerStopped);
                             }
                         }
@@ -321,12 +324,10 @@ impl ProductionResponseWorker {
             health.lifecycle = ResponseWorkerLifecycle::Created;
             health.last_error = None;
         });
-        let (shutdown, mut shutdown_receiver) = watch::channel(false);
+        let phase: WorkerPhaseSender = Arc::new(watch::channel(WorkerPhase::Created).0);
+        let mut phase_receiver = phase.subscribe();
+        let thread_phase = Arc::clone(&phase);
         let (task_ready_sender, task_ready) = oneshot::channel();
-        let (arm, mut arm_receiver) = oneshot::channel();
-        let (armed_sender, armed) = oneshot::channel();
-        let (publication_gate, mut publication_receiver) = oneshot::channel();
-        let (publication_readiness_sender, publication_readiness) = oneshot::channel();
         let (thread_completion_sender, thread_completion) = watch::channel(false);
         let worker = Arc::clone(self);
         let alert_delivery = self.alert_delivery.clone();
@@ -335,6 +336,7 @@ impl ProductionResponseWorker {
             .spawn(move || {
                 let thread_completion_guard = ResponseWorkerThreadCompletion {
                     completion: thread_completion_sender,
+                    phase: Arc::clone(&thread_phase),
                 };
                 let task_liveness = ResponseWorkerTaskLiveness::begin(Arc::clone(&worker));
                 let runtime = match tokio::runtime::Builder::new_current_thread()
@@ -351,55 +353,52 @@ impl ProductionResponseWorker {
                 if task_ready_sender.send(Ok(())).is_err() {
                     return Err(ResponseWorkerTickError::WorkerTaskReadyHandshake);
                 }
+                let loop_phase = Arc::clone(&thread_phase);
                 let result = runtime.block_on(async move {
-                    let arm_received = tokio::select! {
-                        result = &mut arm_receiver => result.is_ok(),
-                        _ = shutdown_receiver.changed() => {
+                    match wait_for_phase(&mut phase_receiver, WorkerPhase::Armed).await {
+                        PhaseWait::Reached => {}
+                        PhaseWait::StopRequested => {
                             worker.request_stop();
                             return worker.complete_shutdown_after_loop();
                         }
-                    };
-                    if !arm_received {
-                        worker.request_stop();
-                        worker.complete_shutdown_after_loop()?;
-                        return Err(ResponseWorkerTickError::WorkerArmHandshake);
+                        PhaseWait::Closed => {
+                            worker.request_stop();
+                            worker.complete_shutdown_after_loop()?;
+                            return Err(ResponseWorkerTickError::WorkerArmHandshake);
+                        }
                     }
-                    worker.mark_armed();
-                    if armed_sender.send(()).is_err() {
-                        worker.request_stop();
-                        worker.complete_shutdown_after_loop()?;
-                        return Err(ResponseWorkerTickError::WorkerArmHandshake);
-                    }
-                    let publication_released = tokio::select! {
-                        result = &mut publication_receiver => result.is_ok(),
-                        _ = shutdown_receiver.changed() => {
+                    match wait_for_phase(&mut phase_receiver, WorkerPhase::PublicationReleased)
+                        .await
+                    {
+                        PhaseWait::Reached => {}
+                        PhaseWait::StopRequested => {
                             worker.request_stop();
                             return worker.complete_shutdown_after_loop();
                         }
-                    };
-                    if !publication_released {
-                        worker.request_stop();
-                        worker.complete_shutdown_after_loop()?;
-                        return Err(ResponseWorkerTickError::WorkerPublicationGate);
+                        PhaseWait::Closed => {
+                            worker.request_stop();
+                            worker.complete_shutdown_after_loop()?;
+                            return Err(ResponseWorkerTickError::WorkerPublicationGate);
+                        }
                     }
                     let initial_tick = worker
-                        .tick_until_initial_ready(config, &mut shutdown_receiver)
+                        .tick_until_initial_ready(config, &mut phase_receiver)
                         .await;
                     if let Err(error) = initial_tick {
-                        let _ = publication_readiness_sender.send(Err(error.to_string()));
+                        advance_phase(&loop_phase, WorkerPhase::Failed(error.to_string()));
                         worker.request_stop();
                         worker.complete_shutdown_after_loop()?;
                         worker.mark_failed(&error);
                         return Err(error);
                     }
                     if let Err(error) = worker.mark_publication_ready() {
-                        let _ = publication_readiness_sender.send(Err(error.to_string()));
+                        advance_phase(&loop_phase, WorkerPhase::Failed(error.to_string()));
                         worker.request_stop();
                         worker.complete_shutdown_after_loop()?;
                         worker.mark_failed(&error);
                         return Err(error);
                     }
-                    if publication_readiness_sender.send(Ok(())).is_err() {
+                    if !advance_phase(&loop_phase, WorkerPhase::Ready) {
                         let error = ResponseWorkerTickError::WorkerPublicationGate;
                         worker.request_stop();
                         worker.complete_shutdown_after_loop()?;
@@ -414,8 +413,8 @@ impl ProductionResponseWorker {
                     let ticks = async {
                         loop {
                             tokio::select! {
-                                changed = shutdown_receiver.changed() => {
-                                    if changed.is_err() || *shutdown_receiver.borrow() {
+                                changed = phase_receiver.changed() => {
+                                    if changed.is_err() || phase_receiver.borrow().stop_requested() {
                                         return Ok(());
                                     }
                                 }
@@ -423,7 +422,7 @@ impl ProductionResponseWorker {
                                     match worker.tick_once_catching_crash() {
                                         Ok(_) => {}
                                         Err(ResponseWorkerTickError::WorkerStopped)
-                                            if *shutdown_receiver.borrow() =>
+                                            if phase_receiver.borrow().stop_requested() =>
                                         {
                                             return Ok(());
                                         }
@@ -454,6 +453,12 @@ impl ProductionResponseWorker {
                     }
                     worker.complete_shutdown_after_loop()
                 });
+                match &result {
+                    Ok(()) => advance_phase(&thread_phase, WorkerPhase::Stopped),
+                    Err(error) => {
+                        advance_phase(&thread_phase, WorkerPhase::Failed(error.to_string()))
+                    }
+                };
                 drop(runtime);
                 drop(task_liveness);
                 drop(thread_completion_guard);
@@ -465,7 +470,7 @@ impl ProductionResponseWorker {
                 error
             })?;
         let mut startup_guard = ResponseWorkerStartupGuard {
-            shutdown: shutdown.clone(),
+            phase: Arc::clone(&phase),
             join: Some(ResponseWorkerJoinOwnership {
                 join,
                 permit: join_permit,
@@ -483,11 +488,7 @@ impl ProductionResponseWorker {
         }
         let join = startup_guard.take_join()?;
         Ok(ProductionResponseWorkerHandle {
-            shutdown,
-            arm: Some(arm),
-            armed: Some(armed),
-            publication_gate: Some(publication_gate),
-            publication_readiness: Some(publication_readiness),
+            phase,
             thread_completion,
             join: Some(join),
             worker: Arc::clone(self),
@@ -567,7 +568,7 @@ impl ProductionResponseWorker {
         self.configure_progress(deadline);
     }
 
-    fn mark_armed(&self) {
+    pub(super) fn mark_armed(&self) {
         self.with_health(|health| {
             health.lifecycle = ResponseWorkerLifecycle::Created;
             health.last_error = None;
@@ -686,4 +687,31 @@ pub(super) fn worker_task_crash_error() -> ResponseWorkerTickError {
         ResponseWorkerTickError::InvalidConfig,
         ResponseWorkerTickError::WorkerCrash,
     )
+}
+
+enum PhaseWait {
+    Reached,
+    StopRequested,
+    Closed,
+}
+
+/// Waits until the phase has reached `target` or a stop was requested.
+async fn wait_for_phase(
+    receiver: &mut watch::Receiver<WorkerPhase>,
+    target: WorkerPhase,
+) -> PhaseWait {
+    loop {
+        {
+            let phase = receiver.borrow_and_update();
+            if phase.stop_requested() {
+                return PhaseWait::StopRequested;
+            }
+            if phase.rank() >= target.rank() {
+                return PhaseWait::Reached;
+            }
+        }
+        if receiver.changed().await.is_err() {
+            return PhaseWait::Closed;
+        }
+    }
 }

@@ -17,6 +17,7 @@ pub(super) use super::ResponseWorkerPort;
 pub(super) use super::ResponseWorkerTick;
 pub(super) use super::ResponseWorkerTickError;
 pub(super) use super::SqliteResponseWorkerPort;
+pub(super) use super::WorkerPhase;
 pub(super) use super::MAX_WORKER_PROGRESS_DEADLINE;
 pub(super) use super::MIN_WORKER_PROGRESS_DEADLINE;
 pub(super) use chio_quarantine::build_response_plan;
@@ -749,6 +750,10 @@ mod cancelled_shutdown_retains_join_until_the_blocked_tick_exits;
 mod dropping_handle_signals_stop_without_concurrent_drain_or_zombie_tick;
 
 mod worker_crash_marks_health_failed_and_restart_can_take_over;
+
+mod worker_phases_advance_in_order_and_a_stop_is_observable;
+
+mod failed_start_reports_failed_with_the_exact_error;
 
 mod terminated_primary_reuses_its_durable_port_without_concurrent_ticks;
 

@@ -1,8 +1,8 @@
 use super::{
-    catch_unwind, worker_task_crash_error, Arc, AssertUnwindSafe, Condvar, Duration, Mutex,
-    OnceLock, Ordering, ProductionResponseWorker, ProductionResponseWorkerHandle,
+    advance_phase, catch_unwind, worker_task_crash_error, Arc, AssertUnwindSafe, Condvar, Duration,
+    Mutex, OnceLock, Ordering, ProductionResponseWorker, ProductionResponseWorkerHandle,
     ResponseWorkerJoinOwnership, ResponseWorkerStartupGuard, ResponseWorkerThreadCompletion,
-    ResponseWorkerTickError, VecDeque,
+    ResponseWorkerTickError, VecDeque, WorkerPhase,
 };
 #[cfg(test)]
 use std::sync::atomic::AtomicBool;
@@ -265,7 +265,7 @@ impl Drop for ResponseWorkerStartupGuard {
         if !self.active {
             return;
         }
-        let _ = self.shutdown.send(true);
+        advance_phase(&self.phase, WorkerPhase::Stopping);
         if let Some(ResponseWorkerJoinOwnership { join, permit }) = self.join.take() {
             let _ = join_response_worker_thread(join, &self.worker);
             drop(permit);
@@ -279,6 +279,10 @@ pub(super) struct ResponseWorkerTaskLiveness {
 
 impl Drop for ResponseWorkerThreadCompletion {
     fn drop(&mut self) {
+        advance_phase(
+            &self.phase,
+            WorkerPhase::Failed("response worker thread exited without a final phase".to_string()),
+        );
         let _ = self.completion.send_replace(true);
     }
 }
@@ -314,32 +318,40 @@ impl ProductionResponseWorkerHandle {
     }
 
     pub(in crate::security) async fn arm(&mut self) -> Result<(), ResponseWorkerTickError> {
-        let arm = self
-            .arm
-            .take()
-            .ok_or(ResponseWorkerTickError::WorkerArmHandshake)?;
-        arm.send(())
-            .map_err(|_| ResponseWorkerTickError::WorkerArmHandshake)?;
-        self.armed
-            .take()
-            .ok_or(ResponseWorkerTickError::WorkerArmHandshake)?
-            .await
-            .map_err(|_| ResponseWorkerTickError::WorkerArmHandshake)
+        if self.phase.receiver_count() == 0
+            || !self.phase.send_if_modified(|phase| match phase {
+                WorkerPhase::Created => {
+                    *phase = WorkerPhase::Armed;
+                    true
+                }
+                _ => false,
+            })
+        {
+            return Err(ResponseWorkerTickError::WorkerArmHandshake);
+        }
+        self.worker.mark_armed();
+        Ok(())
     }
 
     pub(in crate::security) fn release_publication(
         &mut self,
     ) -> Result<(), ResponseWorkerTickError> {
-        let publication_gate = self
-            .publication_gate
-            .take()
-            .ok_or(ResponseWorkerTickError::WorkerPublicationGate)?;
+        if self.publication_released {
+            return Err(ResponseWorkerTickError::WorkerPublicationGate);
+        }
         self.worker.mark_publication_released()?;
-        publication_gate.send(()).map_err(|_| {
+        let released = self.phase.send_if_modified(|phase| match phase {
+            WorkerPhase::Armed => {
+                *phase = WorkerPhase::PublicationReleased;
+                true
+            }
+            _ => false,
+        });
+        if !released {
             self.worker
                 .mark_failed(&ResponseWorkerTickError::WorkerPublicationGate);
-            ResponseWorkerTickError::WorkerPublicationGate
-        })?;
+            return Err(ResponseWorkerTickError::WorkerPublicationGate);
+        }
         self.publication_released = true;
         Ok(())
     }
@@ -350,12 +362,23 @@ impl ProductionResponseWorkerHandle {
         if !self.publication_released {
             return Err(ResponseWorkerTickError::WorkerPublicationGate);
         }
-        self.publication_readiness
-            .take()
-            .ok_or(ResponseWorkerTickError::WorkerPublicationGate)?
-            .await
-            .map_err(|_| ResponseWorkerTickError::WorkerPublicationGate)?
-            .map_err(ResponseWorkerTickError::WorkerInitialTick)?;
+        let mut phase = self.phase.subscribe();
+        loop {
+            match &*phase.borrow_and_update() {
+                WorkerPhase::Ready => break,
+                WorkerPhase::Failed(message) => {
+                    return Err(ResponseWorkerTickError::WorkerInitialTick(message.clone()));
+                }
+                WorkerPhase::Stopping | WorkerPhase::Stopped => {
+                    return Err(ResponseWorkerTickError::WorkerPublicationGate);
+                }
+                WorkerPhase::Created | WorkerPhase::Armed | WorkerPhase::PublicationReleased => {}
+            }
+            phase
+                .changed()
+                .await
+                .map_err(|_| ResponseWorkerTickError::WorkerPublicationGate)?;
+        }
         self.publication_ready = true;
         Ok(())
     }
@@ -365,7 +388,7 @@ impl ProductionResponseWorkerHandle {
             return Ok(());
         }
         self.worker.request_stop();
-        let _ = self.shutdown.send(true);
+        advance_phase(&self.phase, WorkerPhase::Stopping);
         let result = if self.join.is_some() {
             if !*self.thread_completion.borrow() {
                 while self.thread_completion.changed().await.is_ok() {
@@ -402,7 +425,7 @@ impl ProductionResponseWorkerHandle {
 impl Drop for ProductionResponseWorkerHandle {
     fn drop(&mut self) {
         self.worker.request_stop();
-        let _ = self.shutdown.send(true);
+        advance_phase(&self.phase, WorkerPhase::Stopping);
         let Some(ResponseWorkerJoinOwnership { join, permit }) = self.join.take() else {
             return;
         };
