@@ -1624,6 +1624,7 @@ dependencies = [
  "chio-reputation",
  "chio-revocation-oracle",
  "chio-risk-comptroller",
+ "chio-secure-fs",
  "chio-secure-ipc",
  "chio-security-kernel",
  "chio-security-types",
@@ -1641,7 +1642,6 @@ dependencies = [
  "futures-util",
  "hex",
  "libc",
- "nix",
  "p384",
  "percent-encoding",
  "rand_core 0.6.4",
@@ -2582,6 +2582,15 @@ dependencies = [
  "chrono",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "chio-secure-fs"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "rustix",
+ "zeroize",
 ]
 
 [[package]]
