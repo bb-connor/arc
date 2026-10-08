@@ -3,14 +3,14 @@
 //! Durable host paths are unrestricted by Unix socket address length. The fixed
 //! Linux /tmp parent is independent of TMPDIR and never exposes host state.
 
-use std::ffi::CString;
-use std::fs::{File, Metadata, OpenOptions};
+use std::ffi::OsStr;
+use std::fs::{File, Metadata};
 use std::io;
-use std::os::fd::{AsRawFd, FromRawFd};
-use std::os::unix::fs::{FileTypeExt, MetadataExt, OpenOptionsExt};
+use std::os::unix::fs::{FileTypeExt, MetadataExt};
 use std::path::{Path, PathBuf};
 
 use rusqlite::{params, Connection, OptionalExtension};
+use rustix::fs::{mkdirat, openat, unlinkat, AtFlags, Mode, OFlags};
 
 use super::super::state::error;
 use crate::CliError;
@@ -36,56 +36,36 @@ fn identity(metadata: &Metadata) -> (u64, u64) {
 }
 
 fn owned_private(metadata: &Metadata) -> bool {
-    // SAFETY: geteuid is a read-only process query.
-    metadata.uid() == unsafe { libc::geteuid() } && metadata.mode() & 0o077 == 0
+    metadata.uid() == chio_secure_fs::effective_uid() && metadata.mode() & 0o077 == 0
 }
 
-fn open_at(parent: &File, name: &str, flags: i32) -> io::Result<File> {
-    let name = CString::new(name)?;
-    // SAFETY: name is NUL-terminated and parent remains open for this call.
-    let descriptor = unsafe {
-        libc::openat(
-            parent.as_raw_fd(),
-            name.as_ptr(),
-            flags | libc::O_CLOEXEC | libc::O_NOFOLLOW,
-        )
-    };
-    if descriptor < 0 {
-        return Err(io::Error::last_os_error());
-    }
-    // SAFETY: openat returned a newly owned descriptor.
-    Ok(unsafe { File::from_raw_fd(descriptor) })
+fn open_directory_at(parent: &File, name: &str) -> io::Result<File> {
+    Ok(File::from(openat(
+        parent,
+        name,
+        OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC | OFlags::NOFOLLOW,
+        Mode::empty(),
+    )?))
 }
 
+/// The entry's own metadata through a path-only descriptor, never following
+/// a symlink; `None` when it is absent.
 fn entry(parent: &File, name: &str) -> io::Result<Option<Metadata>> {
-    match open_at(parent, name, libc::O_PATH) {
-        Ok(file) => file.metadata().map(Some),
-        Err(failure) if failure.kind() == io::ErrorKind::NotFound => Ok(None),
-        Err(failure) => Err(failure),
-    }
+    chio_secure_fs::entry_metadata(parent, OsStr::new(name))
 }
 
 fn remove_at(parent: &File, name: &str, directory: bool) -> io::Result<()> {
-    let name = CString::new(name)?;
-    // SAFETY: name is NUL-terminated and parent remains open for this call.
-    if unsafe {
-        libc::unlinkat(
-            parent.as_raw_fd(),
-            name.as_ptr(),
-            if directory { libc::AT_REMOVEDIR } else { 0 },
-        )
-    } != 0
-    {
-        return Err(io::Error::last_os_error());
-    }
+    let flags = if directory {
+        AtFlags::REMOVEDIR
+    } else {
+        AtFlags::empty()
+    };
+    unlinkat(parent, name, flags)?;
     parent.sync_all()
 }
 
 fn parent() -> Result<File, CliError> {
-    let parent = OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
-        .open("/tmp")?;
+    let parent = chio_secure_fs::open_directory_nofollow(Path::new("/tmp"))?;
     let metadata = parent.metadata()?;
     if metadata.uid() != 0 || metadata.mode() & 0o1000 == 0 {
         return Err(error(
@@ -196,7 +176,7 @@ fn reconcile(db: &Connection, parent: &File) -> Result<(), CliError> {
         {
             return Err(error(format!("worker socket directory ownership is unresolved: /tmp/{}; preserve the directory and runner journal", record.name)));
         }
-        let directory = open_at(parent, &record.name, libc::O_RDONLY | libc::O_DIRECTORY)?;
+        let directory = open_directory_at(parent, &record.name)?;
         if Some(identity(&directory.metadata()?)) != record.directory {
             return Err(error("worker socket directory changed during cleanup"));
         }
@@ -258,13 +238,9 @@ impl Endpoint {
             [&name],
         )
         .map_err(error)?;
-        let c_name = CString::new(name.as_bytes()).map_err(error)?;
-        // SAFETY: the name is NUL-terminated and parent remains open.
-        if unsafe { libc::mkdirat(parent.as_raw_fd(), c_name.as_ptr(), 0o700) } != 0 {
-            return Err(io::Error::last_os_error().into());
-        }
+        mkdirat(&parent, name.as_str(), Mode::RWXU).map_err(io::Error::from)?;
         parent.sync_all()?;
-        let directory = open_at(&parent, &name, libc::O_RDONLY | libc::O_DIRECTORY)?;
+        let directory = open_directory_at(&parent, &name)?;
         let metadata = directory.metadata()?;
         if !owned_private(&metadata) {
             return Err(error("new worker socket directory must be private"));
