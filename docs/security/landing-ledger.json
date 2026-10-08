@@ -1928,7 +1928,8 @@
         "incoming-pr1160-review-20261007:resume:AR-TERM-EVIDENCE"
       ]
     },
-    {"path":"docs/security/audits/native-attachment-diagnostic-20261008.json","commit":"24e97760481275a824a3572bab1b8eed24da5b63","sha256":"90bffa7e29b954c759691c53652128dfa5a254ee6d99fc94bc8afc89b1a2078f","requirement_ids":["incoming-pr1160-review-20261008:native:MINISW-PDEATH","incoming-pr1160-review-20261008:native:MINISW-NATIVE-DENY","incoming-pr1160-review-20261008:native:BROKER-SELECT"]}
+    {"path":"docs/security/audits/native-attachment-diagnostic-20261008.json","commit":"24e97760481275a824a3572bab1b8eed24da5b63","sha256":"90bffa7e29b954c759691c53652128dfa5a254ee6d99fc94bc8afc89b1a2078f","requirement_ids":["incoming-pr1160-review-20261008:native:MINISW-PDEATH","incoming-pr1160-review-20261008:native:MINISW-NATIVE-DENY","incoming-pr1160-review-20261008:native:BROKER-SELECT"]},
+    {"path":"docs/security/audits/review-reconciliation-obligations-20261008.json","commit":"b6d38fceca3951c2f6900c0c3e83372b426a5e3a","sha256":"6a445336bfa8184168a334ba9ac549e054b8a2c01f40bc42bfbc702971e08fcf","requirement_ids":["incoming-pr1160-review-20261008:reconciliation:MCP-RESERVE","incoming-pr1160-review-20261008:reconciliation:MCP-PROJECTION","incoming-pr1160-review-20261008:reconciliation:MCP-GENERATION","incoming-pr1160-review-20261008:reconciliation:FX-CLOCK","incoming-pr1160-review-20261008:reconciliation:EF-FINALITY","incoming-pr1160-review-20261008:reconciliation:EF-FREEZE"]}
   ],
   "pull_requests": [
     {
@@ -7953,7 +7954,13 @@
     },
     {"id":"incoming-pr1160-review-20261008:native:MINISW-PDEATH","label":"MINISW-PDEATH","priority":"P1","requirement":"Keep the child spawning thread alive for the exact supervised process while preserving parent-death termination, cancellation, at-most-once reaping and concurrency bounds.","source":{"path":"docs/security/audits/native-attachment-diagnostic-20261008.json","line":45,"line_sha256":"20c38d57eff8b168693caa03d91941287bdf5d476b4772b77ac25daadf6ea6bf","checkpoint":"24e97760481275a824a3572bab1b8eed24da5b63","reviewed_source":"f41e8928d9baf5e722801146fef7e20b2921ed10"},"disposition":"confirmed-native-counterexample-original-first-repair-assigned","source_repair":null,"verification_evidence":[{"path":"docs/security/audits/native-attachment-diagnostic-20261008.json","sha256":"90bffa7e29b954c759691c53652128dfa5a254ee6d99fc94bc8afc89b1a2078f","scope":"Verified diagnostic failure or explicitly suspected source defect; not repair evidence."}],"remaining_acceptance":["Actual Original-first repair and focused controls for the process lifetime defect.","Bounded non-secret diagnostics and causal Original for the separate native capture denial.","Broker collision runtime reproduction before accepting a producer change.","Exact final source native/cold/trusted/hosted qualification and protected landing."],"landing_unit":"foundation","landing_pr":1160,"main_ancestry_verified":false,"review_scope":"now","work_status":"in-progress","owner":"claude","review_thread_urls":[]},
     {"id":"incoming-pr1160-review-20261008:native:MINISW-NATIVE-DENY","label":"MINISW-NATIVE-DENY","priority":"P1","requirement":"Identify and repair the native dispatch capture or lifecycle-handoff denial reached on the third sandbox execution without weakening custody, trusted-time or recovery-required behavior.","source":{"path":"docs/security/audits/native-attachment-diagnostic-20261008.json","line":52,"line_sha256":"00673813f045cca9232dc3223925646200e36376ee2c3b59c46def035a1797ed","checkpoint":"24e97760481275a824a3572bab1b8eed24da5b63","reviewed_source":"f41e8928d9baf5e722801146fef7e20b2921ed10"},"disposition":"native-failure-confirmed-cause-unidentified-diagnostic-proposal-pending","source_repair":null,"verification_evidence":[{"path":"docs/security/audits/native-attachment-diagnostic-20261008.json","sha256":"90bffa7e29b954c759691c53652128dfa5a254ee6d99fc94bc8afc89b1a2078f","scope":"Verified diagnostic failure or explicitly suspected source defect; not repair evidence."}],"remaining_acceptance":["Actual Original-first repair and focused controls for the process lifetime defect.","Bounded non-secret diagnostics and causal Original for the separate native capture denial.","Broker collision runtime reproduction before accepting a producer change.","Exact final source native/cold/trusted/hosted qualification and protected landing."],"landing_unit":"foundation","landing_pr":1160,"main_ancestry_verified":false,"review_scope":"now","work_status":"in-progress","owner":"claude","review_thread_urls":[]},
-    {"id":"incoming-pr1160-review-20261008:native:BROKER-SELECT","label":"BROKER-SELECT","priority":"P2","requirement":"Select the broker execution original through authenticated operation custody despite another operation sharing the request identifier.","source":{"path":"docs/security/audits/native-attachment-diagnostic-20261008.json","line":59,"line_sha256":"d5647558d8444f2d29a62afa33974bee35f410c9062334006900ce46252a462c","checkpoint":"24e97760481275a824a3572bab1b8eed24da5b63","reviewed_source":"f41e8928d9baf5e722801146fef7e20b2921ed10"},"disposition":"source-suspected-liveness-defect-original-and-selector-proposal-pending","source_repair":null,"verification_evidence":[{"path":"docs/security/audits/native-attachment-diagnostic-20261008.json","sha256":"90bffa7e29b954c759691c53652128dfa5a254ee6d99fc94bc8afc89b1a2078f","scope":"Verified diagnostic failure or explicitly suspected source defect; not repair evidence."}],"remaining_acceptance":["Actual Original-first repair and focused controls for the process lifetime defect.","Bounded non-secret diagnostics and causal Original for the separate native capture denial.","Broker collision runtime reproduction before accepting a producer change.","Exact final source native/cold/trusted/hosted qualification and protected landing."],"landing_unit":"foundation","landing_pr":1160,"main_ancestry_verified":false,"review_scope":"now","work_status":"in-progress","owner":"claude","review_thread_urls":[]}
+    {"id":"incoming-pr1160-review-20261008:native:BROKER-SELECT","label":"BROKER-SELECT","priority":"P2","requirement":"Select the broker execution original through authenticated operation custody despite another operation sharing the request identifier.","source":{"path":"docs/security/audits/native-attachment-diagnostic-20261008.json","line":59,"line_sha256":"d5647558d8444f2d29a62afa33974bee35f410c9062334006900ce46252a462c","checkpoint":"24e97760481275a824a3572bab1b8eed24da5b63","reviewed_source":"f41e8928d9baf5e722801146fef7e20b2921ed10"},"disposition":"source-suspected-liveness-defect-original-and-selector-proposal-pending","source_repair":null,"verification_evidence":[{"path":"docs/security/audits/native-attachment-diagnostic-20261008.json","sha256":"90bffa7e29b954c759691c53652128dfa5a254ee6d99fc94bc8afc89b1a2078f","scope":"Verified diagnostic failure or explicitly suspected source defect; not repair evidence."}],"remaining_acceptance":["Actual Original-first repair and focused controls for the process lifetime defect.","Bounded non-secret diagnostics and causal Original for the separate native capture denial.","Broker collision runtime reproduction before accepting a producer change.","Exact final source native/cold/trusted/hosted qualification and protected landing."],"landing_unit":"foundation","landing_pr":1160,"main_ancestry_verified":false,"review_scope":"now","work_status":"in-progress","owner":"claude","review_thread_urls":[]},
+    {"id":"incoming-pr1160-review-20261008:reconciliation:MCP-RESERVE","label":"MCP-RESERVE","priority":"P2","requirement":"Release only the exact credential call reservation after a request is definitely not enqueued.","source":{"path":"docs/security/audits/review-reconciliation-obligations-20261008.json","line":8,"line_sha256":"cace328287c8d93fb6881c0093dd5a52a01b3f6c45410f2b21b3016ec7a0b6be","checkpoint":"b6d38fceca3951c2f6900c0c3e83372b426a5e3a","reviewed_source":"b82c92262879b0929c729ff7e6a635eda74244ed"},"disposition":"source-confirmed-original-and-repair-pending","source_repair":null,"verification_evidence":[{"path":"docs/security/audits/review-reconciliation-obligations-20261008.json","sha256":"6a445336bfa8184168a334ba9ac549e054b8a2c01f40bc42bfbc702971e08fcf","scope":"Source review or explicitly limited hypothesis; Original and composed repair acceptance pending."}],"remaining_acceptance":["Real restricted HTTP request with conflicting approval aliases refuses before enqueue and does not strand a credential.","Disconnected inbox rollback is exact; ambiguous delivery or a newer/rebound latch cannot be released.","Genuine Original failure, reviewed repair and current focused controls for each new obligation.","Combined-source owning/strict/native/cold/trusted/hosted qualification and protected landing; no quota or baseline waiver."],"landing_unit":"foundation","landing_pr":1160,"main_ancestry_verified":false,"review_scope":"now","work_status":"in-progress","owner":"codex","review_thread_urls":["https://github.com/bb-connor/arc/pull/1160#issuecomment-6031035480"]},
+    {"id":"incoming-pr1160-review-20261008:reconciliation:MCP-PROJECTION","label":"MCP-PROJECTION","priority":"P1","requirement":"Authenticate the complete caller-visible MCP result against its signed output before delivery or acknowledgement.","source":{"path":"docs/security/audits/review-reconciliation-obligations-20261008.json","line":24,"line_sha256":"c0742ded9e1e438ff383f87045caf343e3d56b609a17aae1a312a91220e65a3e","checkpoint":"b6d38fceca3951c2f6900c0c3e83372b426a5e3a","reviewed_source":"b82c92262879b0929c729ff7e6a635eda74244ed"},"disposition":"source-confirmed-original-and-repair-pending","source_repair":null,"verification_evidence":[{"path":"docs/security/audits/review-reconciliation-obligations-20261008.json","sha256":"6a445336bfa8184168a334ba9ac549e054b8a2c01f40bc42bfbc702971e08fcf","scope":"Source review or explicitly limited hypothesis; Original and composed repair acceptance pending."}],"remaining_acceptance":["Genuine signed evidence with substituted content, structuredContent or isError cannot expose the substituted result.","Invalid evidence cannot return forged output even if the reservation is fenced and no acknowledgement is minted.","Legitimate signed error results, once-only completion and replay remain valid.","Genuine Original failure, reviewed repair and current focused controls for each new obligation.","Combined-source owning/strict/native/cold/trusted/hosted qualification and protected landing; no quota or baseline waiver."],"landing_unit":"foundation","landing_pr":1160,"main_ancestry_verified":false,"review_scope":"now","work_status":"in-progress","owner":"codex","review_thread_urls":["https://github.com/bb-connor/arc/pull/1160#issuecomment-6031035480"]},
+    {"id":"incoming-pr1160-review-20261008:reconciliation:MCP-GENERATION","label":"MCP-GENERATION","priority":"P2","requirement":"Bind each request-stream event to the actual actor enqueue generation while preserving session notification ownership.","source":{"path":"docs/security/audits/review-reconciliation-obligations-20261008.json","line":42,"line_sha256":"0212c83755c0a9ed3f0644c953f313b5460b65fad9797686ff0754c1c2a88995","checkpoint":"b6d38fceca3951c2f6900c0c3e83372b426a5e3a","reviewed_source":"b82c92262879b0929c729ff7e6a635eda74244ed"},"disposition":"source-confirmed-original-and-producer-proposal-pending","source_repair":null,"verification_evidence":[{"path":"docs/security/audits/review-reconciliation-obligations-20261008.json","sha256":"6a445336bfa8184168a334ba9ac549e054b8a2c01f40bc42bfbc702971e08fcf","scope":"Source review or explicitly limited hypothesis; Original and composed repair acceptance pending."}],"remaining_acceptance":["After an old POST body is dropped, its late method event cannot be forwarded on a new POST stream.","Pre-enqueue events and a reused JSON-RPC identifier cannot terminate or lend authority to a different generation.","Roots, nested requests, GET notifications, absolute deadlines and cancellation remain correct.","Genuine Original failure, reviewed repair and current focused controls for each new obligation.","Combined-source owning/strict/native/cold/trusted/hosted qualification and protected landing; no quota or baseline waiver."],"landing_unit":"foundation","landing_pr":1160,"main_ancestry_verified":false,"review_scope":"now","work_status":"in-progress","owner":"codex","review_thread_urls":["https://github.com/bb-connor/arc/pull/1160#issuecomment-6031035480"]},
+    {"id":"incoming-pr1160-review-20261008:reconciliation:FX-CLOCK","label":"FX-CLOCK","priority":"P2","requirement":"Check fetched FX evidence against fresh trusted time without changing stored settlement replay or accepting future quotes.","source":{"path":"docs/security/audits/review-reconciliation-obligations-20261008.json","line":59,"line_sha256":"bd922e45b27a785c651866a69024fa0059fe3c11c84005e5b084c203c6360fc6","checkpoint":"b6d38fceca3951c2f6900c0c3e83372b426a5e3a","reviewed_source":"b82c92262879b0929c729ff7e6a635eda74244ed"},"disposition":"source-hypothesis-deterministic-original-and-proposal-pending","source_repair":null,"verification_evidence":[{"path":"docs/security/audits/review-reconciliation-obligations-20261008.json","sha256":"6a445336bfa8184168a334ba9ac549e054b8a2c01f40bc42bfbc702971e08fcf","scope":"Source review or explicitly limited hypothesis; Original and composed repair acceptance pending."}],"remaining_acceptance":["An injected trusted clock advancing during oracle I/O distinguishes a valid newly fetched quote from a truly future quote.","Both ordinary and durable callers preserve future/stale refusal, global clock/fence failure and original stored-disposition replay.","Genuine Original failure, reviewed repair and current focused controls for each new obligation.","Combined-source owning/strict/native/cold/trusted/hosted qualification and protected landing; no quota or baseline waiver."],"landing_unit":"foundation","landing_pr":1160,"main_ancestry_verified":false,"review_scope":"now","work_status":"in-progress","owner":"codex","review_thread_urls":[]},
+    {"id":"incoming-pr1160-review-20261008:reconciliation:EF-FINALITY","label":"EF-FINALITY","priority":"P2","requirement":"A fresh Apply command cannot reinstall the same effect after its committed removal; exact historical command replay remains read-only.","source":{"path":"docs/security/audits/review-reconciliation-obligations-20261008.json","line":76,"line_sha256":"734158957d91dcd896fdcb1f5fd6e9a1a799f118efb58a8c062e58d96479006e","checkpoint":"b6d38fceca3951c2f6900c0c3e83372b426a5e3a","reviewed_source":"c472f5c79e"},"disposition":"proposed-effect-repair-regression-confirmed-original-and-producer-pending","source_repair":null,"verification_evidence":[{"path":"docs/security/audits/review-reconciliation-obligations-20261008.json","sha256":"6a445336bfa8184168a334ba9ac549e054b8a2c01f40bc42bfbc702971e08fcf","scope":"Source review or explicitly limited hypothesis; Original and composed repair acceptance pending."}],"remaining_acceptance":["Real egress, throttle, capability-set and session suspension Apply/Remove/fresh-Apply controls, preserving exact old command replay.","Atomic same tenant/action/effect journal barrier with bounded verified reads and fatal malformed or unavailable custody.","Genuine Original failure, reviewed repair and current focused controls for each new obligation.","Combined-source owning/strict/native/cold/trusted/hosted qualification and protected landing; no quota or baseline waiver."],"landing_unit":"foundation","landing_pr":1160,"main_ancestry_verified":false,"review_scope":"now","work_status":"in-progress","owner":"codex","review_thread_urls":[]},
+    {"id":"incoming-pr1160-review-20261008:reconciliation:EF-FREEZE","label":"EF-FREEZE","priority":"P2","requirement":"Concurrent plans freezing the same lineage retain each plan contribution through renewal, restart and independent lift.","source":{"path":"docs/security/audits/review-reconciliation-obligations-20261008.json","line":91,"line_sha256":"5bc4e6c8659f25a47490d05caa6def19e314e734b36b38c25670086779c6849f","checkpoint":"b6d38fceca3951c2f6900c0c3e83372b426a5e3a","reviewed_source":"c472f5c79e"},"disposition":"effect-composition-gap-confirmed-original-and-producer-proposal-pending","source_repair":null,"verification_evidence":[{"path":"docs/security/audits/review-reconciliation-obligations-20261008.json","sha256":"6a445336bfa8184168a334ba9ac549e054b8a2c01f40bc42bfbc702971e08fcf","scope":"Source review or explicitly limited hypothesis; Original and composed repair acceptance pending."}],"remaining_acceptance":["Use the normal executor: the second plan must reach its intended suspension with its authenticated observed base.","Lifting the first plan preserves the second restriction and external issuance fence; renew/restart retain both obligations.","Genuine Original failure, reviewed repair and current focused controls for each new obligation.","Combined-source owning/strict/native/cold/trusted/hosted qualification and protected landing; no quota or baseline waiver."],"landing_unit":"foundation","landing_pr":1160,"main_ancestry_verified":false,"review_scope":"now","work_status":"in-progress","owner":"codex","review_thread_urls":[]}
   ],
   "incoming_review_execution": {
     "snapshot_date": "2026-10-06",
@@ -116098,6 +116105,11 @@
           "path": "/home/connor/lanes/integration/docs/security/audits/production-repair-checkpoint-20261007.json",
           "sha256": "60bb17f6a66e89a38603b6cbe7c1e87c7769496494805682fea19fc00e335617",
           "scope": "Current scoped repair checkpoint, passing/failing/setup outcomes preserved; foundation remains unqualified/unmerged."
+        },
+        {
+          "path": "docs/security/audits/native-capture-integration-checkpoint-20261008.json",
+          "sha256": "7c7bd07658c8bb7f07fd8aaf8227c7c1dd9f927039d15bf361e4585307914b56",
+          "scope": "Composed single-use controls preserved; focused11/0 and kernel owning12/0; broad control-plane selection cancelled and remains pending."
         }
       ],
       "remaining_acceptance": [
@@ -130241,10 +130253,25 @@
       "automatic_preparation_reader_inventory": "cd5531924a+fe8ebbc59e, currentMCP sourcegate497/86/171 Green, allraw45preserved"
     },
     "incoming-pr1160-review-20261007:resume:NF-CAP": {
-      "state": "claude-complete-partial-gates-public-direct-path-amendment-pending",
-      "source_checkpoint": "61b4272bf929f205db2bc3a38130e89c8f8a8ea1",
+      "state": "source-integrated-focused-green-broad-control-plane-cancelled-acceptance-pending",
+      "source_checkpoint": "b82c92262879b0929c729ff7e6a635eda74244ed",
       "qualified": false,
-      "merged": false
+      "merged": false,
+      "previous_checkpoint": {
+        "state": "claude-complete-partial-gates-public-direct-path-amendment-pending",
+        "source_checkpoint": "61b4272bf929f205db2bc3a38130e89c8f8a8ea1",
+        "qualified": false,
+        "merged": false
+      },
+      "audit_checkpoint": "b6d38fceca3951c2f6900c0c3e83372b426a5e3a",
+      "audit_path": "docs/security/audits/native-capture-integration-checkpoint-20261008.json",
+      "focused_green": true,
+      "remaining_acceptance": [
+        "Full combined-source control-plane/native owning and default/PQ matrix, conformance and required platform acceptance.",
+        "The native call-five performance defect and process lifetime repair are separate open obligations.",
+        "Credential expiry between retention preflight and later custody I/O is not newly qualified by these controls; final atomic capture still rechecks live authority.",
+        "Exact final independent review, complete cold/trusted/hosted evidence and protected landing."
+      ]
     },
     "incoming-pr1160-review-20261007:resume:SIEM-BE": {
       "state": "source-integrated-scoped-green-final-acceptance-pending",
@@ -130507,7 +130534,18 @@
       "merged": false
     },
     "incoming-pr1160-review-20261008:native:MINISW-NATIVE-DENY": {
-      "state": "native-failure-confirmed-cause-unidentified-diagnostic-proposal-pending",
+      "state": "deadline-exhaustion-strong-causal-inference-exact-fixed-diagnostic-and-performance-repair-pending",
+      "source_checkpoint": "f41e8928d9baf5e722801146fef7e20b2921ed10",
+      "audit_checkpoint": "24e97760481275a824a3572bab1b8eed24da5b63",
+      "audit_path": "docs/security/audits/native-attachment-diagnostic-20261008.json",
+      "source_repair": null,
+      "focused_green": false,
+      "qualified": false,
+      "merged": false,
+      "previous_state": "native-failure-confirmed-cause-unidentified-diagnostic-proposal-pending"
+    },
+    "incoming-pr1160-review-20261008:native:BROKER-SELECT": {
+      "state": "source-suspected-liveness-defect-original-and-selector-proposal-pending",
       "source_checkpoint": "f41e8928d9baf5e722801146fef7e20b2921ed10",
       "audit_checkpoint": "24e97760481275a824a3572bab1b8eed24da5b63",
       "audit_path": "docs/security/audits/native-attachment-diagnostic-20261008.json",
@@ -130516,11 +130554,61 @@
       "qualified": false,
       "merged": false
     },
-    "incoming-pr1160-review-20261008:native:BROKER-SELECT": {
-      "state": "source-suspected-liveness-defect-original-and-selector-proposal-pending",
-      "source_checkpoint": "f41e8928d9baf5e722801146fef7e20b2921ed10",
-      "audit_checkpoint": "24e97760481275a824a3572bab1b8eed24da5b63",
-      "audit_path": "docs/security/audits/native-attachment-diagnostic-20261008.json",
+    "incoming-pr1160-review-20261008:reconciliation:MCP-RESERVE": {
+      "state": "source-confirmed-original-and-repair-pending",
+      "source_checkpoint": "b82c92262879b0929c729ff7e6a635eda74244ed",
+      "audit_checkpoint": "b6d38fceca3951c2f6900c0c3e83372b426a5e3a",
+      "audit_path": "docs/security/audits/review-reconciliation-obligations-20261008.json",
+      "source_repair": null,
+      "focused_green": false,
+      "qualified": false,
+      "merged": false
+    },
+    "incoming-pr1160-review-20261008:reconciliation:MCP-PROJECTION": {
+      "state": "source-confirmed-original-and-repair-pending",
+      "source_checkpoint": "b82c92262879b0929c729ff7e6a635eda74244ed",
+      "audit_checkpoint": "b6d38fceca3951c2f6900c0c3e83372b426a5e3a",
+      "audit_path": "docs/security/audits/review-reconciliation-obligations-20261008.json",
+      "source_repair": null,
+      "focused_green": false,
+      "qualified": false,
+      "merged": false
+    },
+    "incoming-pr1160-review-20261008:reconciliation:MCP-GENERATION": {
+      "state": "source-confirmed-original-and-producer-proposal-pending",
+      "source_checkpoint": "b82c92262879b0929c729ff7e6a635eda74244ed",
+      "audit_checkpoint": "b6d38fceca3951c2f6900c0c3e83372b426a5e3a",
+      "audit_path": "docs/security/audits/review-reconciliation-obligations-20261008.json",
+      "source_repair": null,
+      "focused_green": false,
+      "qualified": false,
+      "merged": false
+    },
+    "incoming-pr1160-review-20261008:reconciliation:FX-CLOCK": {
+      "state": "source-hypothesis-deterministic-original-and-proposal-pending",
+      "source_checkpoint": "b82c92262879b0929c729ff7e6a635eda74244ed",
+      "audit_checkpoint": "b6d38fceca3951c2f6900c0c3e83372b426a5e3a",
+      "audit_path": "docs/security/audits/review-reconciliation-obligations-20261008.json",
+      "source_repair": null,
+      "focused_green": false,
+      "qualified": false,
+      "merged": false
+    },
+    "incoming-pr1160-review-20261008:reconciliation:EF-FINALITY": {
+      "state": "proposed-effect-repair-regression-confirmed-original-and-producer-pending",
+      "source_checkpoint": "b82c92262879b0929c729ff7e6a635eda74244ed",
+      "audit_checkpoint": "b6d38fceca3951c2f6900c0c3e83372b426a5e3a",
+      "audit_path": "docs/security/audits/review-reconciliation-obligations-20261008.json",
+      "source_repair": null,
+      "focused_green": false,
+      "qualified": false,
+      "merged": false
+    },
+    "incoming-pr1160-review-20261008:reconciliation:EF-FREEZE": {
+      "state": "effect-composition-gap-confirmed-original-and-producer-proposal-pending",
+      "source_checkpoint": "b82c92262879b0929c729ff7e6a635eda74244ed",
+      "audit_checkpoint": "b6d38fceca3951c2f6900c0c3e83372b426a5e3a",
+      "audit_path": "docs/security/audits/review-reconciliation-obligations-20261008.json",
       "source_repair": null,
       "focused_green": false,
       "qualified": false,
@@ -131862,5 +131950,14 @@
     "qualified": false,
     "merged": false,
     "requirements": 1786
+  },
+  "review_reconciliation_20261008": {
+    "audit_checkpoint": "b6d38fceca3951c2f6900c0c3e83372b426a5e3a",
+    "audit_path": "docs/security/audits/review-reconciliation-obligations-20261008.json",
+    "requirement_count": 1792,
+    "native_capture_checkpoint": "docs/security/audits/native-capture-integration-checkpoint-20261008.json",
+    "ci_dispositions": "docs/security/audits/failed-check-dispositions-20261008.json",
+    "qualified": false,
+    "merged": false
   }
 }
