@@ -1,6 +1,6 @@
 //! Original-byte ACP messages and bounded newline framing.
 use crate::AcpProxyError;
-use chio_core::canonical::{UntrustedJsonError, UntrustedJsonText};
+use chio_core::canonical::{DocumentJson, SignedRecordJson, UntrustedJsonError};
 use std::io::BufRead;
 
 pub const MAX_ACP_MESSAGE_BYTES: usize = 8 * 1024 * 1024;
@@ -37,8 +37,8 @@ fn validate_original_authority_fields(
         // strict reader. Object forms must pass it before envelope projection.
         if !raw.get().starts_with('"') {
             let _: serde_json::Value =
-                UntrustedJsonText::from_wire(raw.get().as_bytes(), MAX_ACP_MESSAGE_BYTES)?
-                    .decode_signed()?;
+                SignedRecordJson::from_wire(raw.get().as_bytes(), MAX_ACP_MESSAGE_BYTES)?
+                    .decode()?;
         }
     }
     for raw in [fields.execution_nonce, fields.snake_execution_nonce]
@@ -46,8 +46,7 @@ fn validate_original_authority_fields(
         .flatten()
     {
         let _: serde_json::Value =
-            UntrustedJsonText::from_wire(raw.get().as_bytes(), MAX_ACP_MESSAGE_BYTES)?
-                .decode_signed()?;
+            SignedRecordJson::from_wire(raw.get().as_bytes(), MAX_ACP_MESSAGE_BYTES)?.decode()?;
     }
     Ok(())
 }
@@ -83,9 +82,9 @@ fn validate_original_authority(bytes: &[u8]) -> Result<(), AcpProxyError> {
 pub struct AcpMessage(serde_json::Value);
 impl AcpMessage {
     pub fn decode(bytes: &[u8]) -> Result<Self, AcpProxyError> {
-        let original = UntrustedJsonText::from_wire(bytes, MAX_ACP_MESSAGE_BYTES)?;
+        let original = DocumentJson::from_wire(bytes, MAX_ACP_MESSAGE_BYTES)?;
         validate_original_authority(bytes)?;
-        Ok(Self(original.decode_document()?))
+        Ok(Self(original.decode()?))
     }
     pub fn as_value(&self) -> &serde_json::Value {
         &self.0

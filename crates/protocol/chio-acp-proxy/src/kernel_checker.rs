@@ -175,11 +175,11 @@ impl KernelCapabilityChecker {
     }
 
     fn parse_token(&self, token_json: &str) -> Result<CapabilityToken, CapabilityCheckError> {
-        Ok(chio_core::canonical::UntrustedJsonText::from_wire(
+        Ok(chio_core::canonical::SignedRecordJson::from_wire(
             token_json.as_bytes(),
             input::MAX_CAPABILITY_BYTES,
         )?
-        .decode_signed()?)
+        .decode()?)
     }
 
     fn map_request(

@@ -201,11 +201,11 @@ where
     let payload = data_lines.join("\n");
     data_lines.clear();
     *event_bytes = 0;
-    let event = chio_core::canonical::UntrustedJsonText::from_wire(
+    let event = chio_core::canonical::DocumentJson::from_wire(
         payload.as_bytes(),
         MAX_SSE_EVENT_BYTES,
     )?
-    .decode_document::<Value>()?;
+    .decode::<Value>()?;
     let stream_response = decode_event(event)?;
     let (stream_response, terminal_or_interrupted) = validate_stream_response(stream_response)?;
     if chunks.len() >= MAX_SSE_CHUNKS {

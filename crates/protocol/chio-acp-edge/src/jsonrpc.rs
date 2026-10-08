@@ -138,8 +138,8 @@ impl ChioAcpEdge {
         execution: &AcpKernelExecutionContext,
     ) -> Result<AcpJsonRpcResponse, AcpEdgeError> {
         let message =
-            chio_core::canonical::UntrustedJsonText::from_wire(bytes, MAX_ACP_REQUEST_BYTES)?
-                .decode_document()?;
+            chio_core::canonical::DocumentJson::from_wire(bytes, MAX_ACP_REQUEST_BYTES)?
+                .decode()?;
         Ok(self.handle_jsonrpc_value(message, kernel, execution))
     }
 }

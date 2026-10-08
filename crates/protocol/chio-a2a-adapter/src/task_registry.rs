@@ -103,8 +103,8 @@ impl A2aTaskRegistry {
                     .read_to_end(&mut bytes)
                     .map_err(AdapterError::Io)?;
                 let registry: A2aPersistedTaskRegistry =
-                    chio_core::canonical::UntrustedJsonText::from_wire(&bytes, MAX_A2A_JSON_BYTES)?
-                        .decode_signed()?;
+                    chio_core::canonical::SignedRecordJson::from_wire(&bytes, MAX_A2A_JSON_BYTES)?
+                        .decode()?;
                 if registry.version != TASK_REGISTRY_VERSION {
                     return Err(AdapterError::Lifecycle(format!(
                         "unsupported A2A task registry version `{}` in {}",

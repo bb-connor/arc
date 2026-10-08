@@ -98,8 +98,7 @@ fn original_capability_objects_keep_full_width_signed_integers() -> TestResult {
             let text = crate::extract_capability_token(&message.as_value()["params"])
                 .ok_or("missing object-form token")?;
             let decoded: CapabilityToken =
-                UntrustedJsonText::from_wire(text.as_bytes(), MAX_CAPABILITY_BYTES)?
-                    .decode_signed()?;
+                SignedRecordJson::from_wire(text.as_bytes(), MAX_CAPABILITY_BYTES)?.decode()?;
             assert_eq!(decoded.issued_at, 9_007_199_254_740_993);
             assert_eq!(decoded.expires_at, u64::MAX);
             assert!(decoded.verify_signature()?);
@@ -174,8 +173,8 @@ fn encoded_capability_text_still_uses_its_strict_signed_reader() -> TestResult {
         .ok_or("missing token text")?;
     assert_eq!(text, raw);
     assert!(matches!(
-        UntrustedJsonText::from_wire(text.as_bytes(), MAX_CAPABILITY_BYTES)?
-            .decode_signed::<CapabilityToken>(),
+        SignedRecordJson::from_wire(text.as_bytes(), MAX_CAPABILITY_BYTES)?
+            .decode::<CapabilityToken>(),
         Err(UntrustedJsonError::SignedInput(_))
     ));
     Ok(())

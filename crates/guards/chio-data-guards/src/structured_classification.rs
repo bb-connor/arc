@@ -179,11 +179,11 @@ impl StructuredClassificationResult {
             .iter()
             .any(|finding| matches!(finding.location, FindingLocation::FieldPath(_)))
             .then(|| {
-                chio_core::canonical::UntrustedJsonText::from_wire(
+                chio_core::canonical::DocumentJson::from_wire(
                     payload,
                     MAX_CLASSIFICATION_PAYLOAD_BYTES,
                 )
-                .and_then(|input| input.decode_document::<serde_json::Value>())
+                .and_then(|input| input.decode::<serde_json::Value>())
             })
             .transpose()
             .map_err(|error| StructuredClassificationError::Input(error.into()))?;

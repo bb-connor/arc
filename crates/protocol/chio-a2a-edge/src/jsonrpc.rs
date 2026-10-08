@@ -184,8 +184,8 @@ impl ChioA2aEdge {
         execution: &A2aKernelExecutionContext,
     ) -> Result<A2aJsonRpcResponse, A2aEdgeError> {
         let message =
-            chio_core::canonical::UntrustedJsonText::from_wire(bytes, MAX_A2A_REQUEST_BYTES)?
-                .decode_document()?;
+            chio_core::canonical::DocumentJson::from_wire(bytes, MAX_A2A_REQUEST_BYTES)?
+                .decode()?;
         Ok(self.handle_jsonrpc_value(message, kernel, execution))
     }
 }
