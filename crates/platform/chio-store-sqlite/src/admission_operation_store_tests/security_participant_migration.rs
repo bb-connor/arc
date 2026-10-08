@@ -14,6 +14,9 @@ mod cutpoints;
 #[path = "security_participant_migration/integrity.rs"]
 mod integrity;
 #[cfg(unix)]
+#[path = "security_participant_migration/legacy_owner_pair.rs"]
+mod legacy_owner_pair;
+#[cfg(unix)]
 #[path = "security_participant_migration/lifecycle.rs"]
 mod lifecycle;
 #[path = "security_participant_migration/migration.rs"]
