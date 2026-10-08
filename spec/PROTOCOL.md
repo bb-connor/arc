@@ -258,6 +258,14 @@ Hybrid public keys are encoded with the same self-describing prefix discipline
 as signatures: `hybrid:<classical-public-key>:<mldsa65-public-key>:<alg_set>`.
 Classical encodings remain byte-identical.
 
+Every Ed25519 verification is strict. A verifier MUST reject a weak
+(small-order) public key, a signature whose `R` is a small-order point, and a
+signature whose scalar `s` is not reduced modulo the group order. A hybrid
+signature applies the same rules to its classical Ed25519 half. Honest signers
+never produce such keys or signatures, so strictness changes no encoding and
+no signed bytes. A key accepted as a trust root, pinned signer or artifact
+issuer MUST be refused at acceptance when it is weak.
+
 `did:chio` remains the shipped self-certifying DID method for those keys in
 this release:
 
