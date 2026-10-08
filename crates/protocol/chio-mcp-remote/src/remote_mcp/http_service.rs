@@ -502,6 +502,7 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
     // The stream subscribes only once it owns the request stream and has passed
     // final authentication, immediately before enqueue, so events published for
     // a previous owner while this POST waited are never delivered on it.
+    let request_generation = message.request_generation();
     let mut event_rx = session.subscribe();
     if let Err(error) = session.send_accounted(message) {
         if let Some(call) = credential_call.as_ref() {
@@ -528,6 +529,12 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
         loop {
             match session_worker::receive(&session_for_stream, &mut event_rx).await {
                 Ok(event) => {
+                    // HTTP ownership can change while an older actor request is
+                    // still running. Its origin survives disconnect and id reuse.
+                    if event.kind == RemoteSessionEventKind::RequestCorrelated
+                        && event.request_generation != Some(request_generation) {
+                        continue;
+                    }
                     let mut outgoing = event.message.clone();
                     if is_terminal_response_for_request(&event.message, &request_id) {
                         if let Some(call) = credential_call.as_ref() {

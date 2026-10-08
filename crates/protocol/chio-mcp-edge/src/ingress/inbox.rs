@@ -1,6 +1,9 @@
 //! One ingress reservation follows each message through inbox and deferred storage.
 //! The reserved control share is part of the original aggregate ceiling.
-use super::budget::{AccountedMessage, Footprint, IngressBudget, IngressUsage};
+use super::budget::{
+    AccountedMessage, Footprint, FrameReservation, IngressBudget, IngressUsage,
+    McpResponseContext, McpResponseScope,
+};
 use crate::AdapterError;
 use serde::Deserialize;
 use serde_json::{value::RawValue, Value};
@@ -149,6 +152,13 @@ impl InboxAdmission {
     pub(crate) fn usage(&self) -> Result<IngressUsage, AdapterError> {
         self.ordinary.usage()
     }
+
+    pub(crate) fn enter_response_scope(
+        &self,
+        reservation: &FrameReservation,
+    ) -> Result<McpResponseScope, AdapterError> {
+        self.ordinary.enter_response_scope(reservation)
+    }
 }
 
 pub(crate) struct ControlGuard {
@@ -273,6 +283,9 @@ impl std::fmt::Debug for McpInboxSender {
     }
 }
 impl McpInboxSender {
+    pub fn response_context(&self) -> McpResponseContext {
+        self.admission.ordinary.response_context()
+    }
     /// Decode original ingress bytes only after reserving their aggregate footprint.
     pub fn decode(&self, bytes: &[u8], bound: usize) -> Result<AccountedMessage, AdapterError> {
         self.admission.decode(bytes, bound)
@@ -332,6 +345,14 @@ pub struct McpInboxReceiver {
     _lifetime: ReceiverLifetime,
 }
 impl McpInboxReceiver {
+    /// A trusted actor enters a scope using a reservation owned by this inbox.
+    /// Client replies consumed by an active request retain that request's scope.
+    pub fn enter_response_scope(
+        &self,
+        message: &AccountedMessage,
+    ) -> Result<McpResponseScope, AdapterError> {
+        self.admission.enter_response_scope(&message.reservation)
+    }
     /// Receive without blocking, retaining the message's accounting ownership.
     pub fn try_recv(&self) -> Result<Option<AccountedMessage>, AdapterError> {
         match self.receiver.try_recv() {

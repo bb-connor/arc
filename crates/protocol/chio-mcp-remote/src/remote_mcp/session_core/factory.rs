@@ -499,7 +499,7 @@ impl RemoteSessionFactory {
             session.retained_notification_events.clone(),
             session.next_event_id.clone(),
             session.session_id.clone(),
-            session.active_request_stream.clone(),
+            session.input_tx.response_context(),
         );
         let worker_exit = session_worker::WorkerExit::new(&session);
         std::thread::spawn(move || {
@@ -717,7 +717,7 @@ impl RemoteSessionFactory {
             session.retained_notification_events.clone(),
             session.next_event_id.clone(),
             session.session_id.clone(),
-            session.active_request_stream.clone(),
+            session.input_tx.response_context(),
         );
         let worker_exit = session_worker::WorkerExit::new(&session);
         std::thread::spawn(move || {

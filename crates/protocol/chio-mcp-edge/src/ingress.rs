@@ -6,7 +6,10 @@ use serde_json::{value::RawValue, Value};
 mod budget;
 pub(crate) mod framing;
 mod inbox;
-pub use budget::{AccountedMessage, FrameReservation, IngressBudget, IngressUsage};
+pub use budget::{
+    AccountedMessage, FrameReservation, IngressBudget, IngressUsage, McpRequestGeneration,
+    McpResponseContext, McpResponseScope,
+};
 pub use inbox::{mcp_inbox, McpInboxReceiver, McpInboxSender, ProtocolRefusalAcknowledgement};
 pub(crate) use inbox::{ClientInbound, HostProtocolRefusal, InboxAdmission};
 

@@ -3,13 +3,14 @@ use super::*;
 #[test]
 fn standalone_server_request_is_retained_for_get_without_post_ownership() {
     let (sender, _) = broadcast::channel(8);
+    let (inbox, _receiver) = mcp_inbox();
     let retained = Arc::new(StdMutex::new(VecDeque::new()));
     let writer = BroadcastJsonRpcWriter::new(
         sender,
         retained.clone(),
         Arc::new(AtomicU64::new(0)),
         "standalone-session".into(),
-        Arc::new(Mutex::new(())),
+        inbox.response_context(),
     );
     let event = writer
         .next_event(json!({"jsonrpc":"2.0","id":"roots-1","method":"roots/list","params":{}}))
@@ -27,15 +28,16 @@ fn standalone_server_request_is_retained_for_get_without_post_ownership() {
 fn sampling_and_terminal_reply_keep_the_actual_post_owner_and_skip_get_replay() {
     let (sender, _) = broadcast::channel(8);
     let retained = Arc::new(StdMutex::new(VecDeque::new()));
-    let owner = Arc::new(Mutex::new(()));
+    let (inbox, receiver) = mcp_inbox();
+    let request = inbox.account(json!({"jsonrpc":"2.0","id":7,"method":"ping"})).unwrap();
     let writer = BroadcastJsonRpcWriter::new(
         sender,
         retained.clone(),
         Arc::new(AtomicU64::new(0)),
         "correlated-session".into(),
-        owner.clone(),
+        inbox.response_context(),
     );
-    let _post_owner = owner.try_lock().unwrap();
+    let _actor_scope = receiver.enter_response_scope(&request).unwrap();
     for message in [
         json!({"jsonrpc":"2.0","id":"sampling-1","method":"sampling/createMessage","params":{}}),
         json!({"jsonrpc":"2.0","id":7,"result":{"content":[]}}),

@@ -77,13 +77,14 @@ async fn mcp_generation_original_late_old_nested_request_does_not_enter_a_new_po
         session.retained_notification_events.clone(),
         session.next_event_id.clone(),
         session.session_id.clone(),
-        session.active_request_stream.clone(),
+        session.input_tx.response_context(),
     );
     let old = post(&fixture, Some(&session.session_id), &read_call(81)).await;
     assert_eq!(old.status(), StatusCode::OK);
     // The actor has taken OLD and still retains its bounded accounted message.
     let old_request = inbox.try_recv().unwrap().expect("OLD was not enqueued");
     assert_eq!(old_request.value()["id"], 81);
+    let old_scope = inbox.enter_response_scope(&old_request).unwrap();
     drop(old);
     assert!(!session.has_active_request_stream());
 
@@ -99,12 +100,15 @@ async fn mcp_generation_original_late_old_nested_request_does_not_enter_a_new_po
         "content":[{"type":"text","text":"old-owner-late-result"}],"isError":false}});
     publish(&mut output, &old_sample);
     publish(&mut output, &old_terminal);
+    drop(old_scope);
     drop(old_request);
     let new_request = inbox.try_recv().unwrap().expect("NEW was not enqueued");
     assert_eq!(new_request.value()["id"], 82);
     let new_terminal = json!({"jsonrpc":"2.0","id":82,"result":{
         "content":[{"type":"text","text":"new-owner-result"}],"isError":false}});
+    let new_scope = inbox.enter_response_scope(&new_request).unwrap();
     publish(&mut output, &new_terminal);
+    drop(new_scope);
     drop(new_request);
     let wire = tokio::time::timeout(WAIT, axum::body::to_bytes(new.into_body(), 64 * 1024))
         .await

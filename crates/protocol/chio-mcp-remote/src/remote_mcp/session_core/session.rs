@@ -194,6 +194,7 @@ impl RemoteSession {
                         seq: event.seq,
                         event_id: event.event_id.clone(),
                         kind: classify_remote_session_event(&event.message, false),
+                        request_generation: None,
                         message: event.message.clone(),
                     })
                     .collect(),
@@ -234,6 +235,7 @@ impl RemoteSession {
                 // The retained schema is unchanged. Only session-owned messages
                 // enter this window; restore their kind from preserved shape.
                 kind: classify_remote_session_event(&event.message, false),
+                request_generation: None,
                 message: event.message.clone(),
             })
             .collect();

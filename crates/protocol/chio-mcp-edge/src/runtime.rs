@@ -539,6 +539,7 @@ impl ChioMcpEdge {
 
             if let Some(message) = self.take_deferred_client_message() {
                 let (message, reservation) = message.into_parts();
+                let response_scope = self.inbox_admission.enter_response_scope(&reservation)?;
                 let response = self.handle_inbound_with_channel(
                     message,
                     reservation.request_digest().cloned(),
@@ -551,6 +552,7 @@ impl ChioMcpEdge {
                 if let Some(response) = response {
                     write_jsonrpc_line(writer, &response)?;
                 }
+                drop(response_scope);
                 self.service_background_runtime_with_channel(client_rx, cancel_rx, writer)?;
                 continue;
             }
@@ -558,6 +560,7 @@ impl ChioMcpEdge {
             match client_rx.recv_timeout(CLIENT_IDLE_POLL_INTERVAL) {
                 Ok(ClientInbound::Accounted(message)) => {
                     let (message, reservation) = message.into_parts();
+                    let response_scope = self.inbox_admission.enter_response_scope(&reservation)?;
                     let response = self.handle_inbound_with_channel(
                         message,
                         reservation.request_digest().cloned(),
@@ -570,6 +573,7 @@ impl ChioMcpEdge {
                     if let Some(response) = response {
                         write_jsonrpc_line(writer, &response)?;
                     }
+                    drop(response_scope);
                     self.service_background_runtime_with_channel(client_rx, cancel_rx, writer)?;
                 }
                 Ok(ClientInbound::HostProtocolRefusal(command)) => {

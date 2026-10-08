@@ -566,6 +566,7 @@ async fn lagged_post_response_fails_closed_without_reinvocation() {
             seq: 1,
             event_id: "lost-response-session:1".into(),
             kind: RemoteSessionEventKind::RequestCorrelated,
+            request_generation: None,
             message: json!({"jsonrpc":"2.0","id":77,"result":{}}),
         })
         .unwrap();
@@ -573,6 +574,7 @@ async fn lagged_post_response_fails_closed_without_reinvocation() {
         session.event_tx.send(RemoteSessionEvent {
             seq: sequence, event_id: format!("lost-response-session:{sequence}"),
             kind: RemoteSessionEventKind::Notification,
+            request_generation: None,
             message: json!({"jsonrpc":"2.0","method":"notifications/message","params":{"sequence":sequence}}),
         }).unwrap();
     }
@@ -625,7 +627,7 @@ async fn initialize_wait_closes_when_actual_worker_panics_before_reply() {
 }
 
 /// Writes one worker output line through the production session writer, which
-/// classifies it against the current request-stream owner.
+/// classifies it against the current actor response scope.
 fn publish(output: &mut BroadcastJsonRpcWriter, message: &Value) {
     let mut line = serde_json::to_vec(message).unwrap();
     line.push(b'\n');
@@ -660,7 +662,7 @@ async fn owner_hand_off(old_id: u64, new_id: u64) -> OwnerHandOff {
         session.retained_notification_events.clone(),
         session.next_event_id.clone(),
         session.session_id.clone(),
-        session.active_request_stream.clone(),
+        session.input_tx.response_context(),
     );
 
     let old = post(&fixture, Some(&session.session_id), &read_call(old_id)).await;
@@ -676,6 +678,7 @@ async fn owner_hand_off(old_id: u64, new_id: u64) -> OwnerHandOff {
         .unwrap()
         .expect("OLD request was not enqueued");
     assert_eq!(old_request.value()["id"], old_id);
+    let old_scope = inbox.enter_response_scope(&old_request).unwrap();
     let old_sample = json!({"jsonrpc":"2.0","id":"old-owner-sampling",
         "method":"sampling/createMessage","params":{"maxTokens":1,
         "messages":[{"role":"user","content":{"type":"text","text":"old-owner-sample"}}]}});
@@ -705,6 +708,7 @@ async fn owner_hand_off(old_id: u64, new_id: u64) -> OwnerHandOff {
     // The OLD outcome is delivered while the NEW POST waits for the owner.
     publish(&mut output, &old_sample);
     publish(&mut output, &old_terminal);
+    drop(old_scope);
     drop(old_request);
     let old_wire = tokio::time::timeout(WAIT, axum::body::to_bytes(old.into_body(), 64 * 1024))
         .await
@@ -731,7 +735,9 @@ async fn owner_hand_off(old_id: u64, new_id: u64) -> OwnerHandOff {
     );
     let new_terminal = json!({"jsonrpc":"2.0","id":new_id,"result":{
         "content":[{"type":"text","text":"new-owner-result"}],"isError":false}});
+    let new_scope = inbox.enter_response_scope(&new_request).unwrap();
     publish(&mut output, &new_terminal);
+    drop(new_scope);
     drop(new_request);
     let new_wire = tokio::time::timeout(WAIT, axum::body::to_bytes(new.into_body(), 64 * 1024))
         .await

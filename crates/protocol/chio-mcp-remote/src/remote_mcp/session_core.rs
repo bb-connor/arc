@@ -43,7 +43,9 @@ use chio_kernel::{
     CHIO_OAUTH_SENDER_BINDING_CAPABILITY_SUBJECT, CHIO_OAUTH_SENDER_PROOF_CHIO_DPOP,
 };
 use chio_mcp_adapter::adapter::{McpAdapter, McpAdapterConfig, SerializedMcpTransport};
-use chio_mcp_adapter::edge::ingress::{mcp_inbox, AccountedMessage, McpInboxSender};
+use chio_mcp_adapter::edge::ingress::{
+    mcp_inbox, AccountedMessage, McpInboxSender, McpRequestGeneration, McpResponseContext,
+};
 use chio_mcp_adapter::edge::{AdapterError, ChioMcpEdge, McpEdgeConfig, McpTransport};
 use chio_mcp_adapter::server::AdaptedMcpServer;
 use chio_mcp_adapter::transport::StdioMcpTransport;
@@ -436,6 +438,7 @@ struct RemoteSessionEvent {
     seq: u64,
     event_id: String,
     kind: RemoteSessionEventKind,
+    request_generation: Option<McpRequestGeneration>,
     message: Value,
 }
 
@@ -1037,7 +1040,7 @@ struct BroadcastJsonRpcWriter {
     retained_notification_events: Arc<StdMutex<VecDeque<RetainedRemoteSessionEvent>>>,
     next_event_id: Arc<AtomicU64>,
     session_id: String,
-    active_request_stream: Arc<Mutex<()>>,
+    response_context: McpResponseContext,
     buffer: Vec<u8>,
 }
 
@@ -1047,14 +1050,14 @@ impl BroadcastJsonRpcWriter {
         retained_notification_events: Arc<StdMutex<VecDeque<RetainedRemoteSessionEvent>>>,
         next_event_id: Arc<AtomicU64>,
         session_id: String,
-        active_request_stream: Arc<Mutex<()>>,
+        response_context: McpResponseContext,
     ) -> Self {
         Self {
             event_tx,
             retained_notification_events,
             next_event_id,
             session_id,
-            active_request_stream,
+            response_context,
             buffer: Vec::new(),
         }
     }
@@ -1063,8 +1066,15 @@ impl BroadcastJsonRpcWriter {
         let next =
             crate::clock::next_counter(&self.next_event_id).map_err(std::io::Error::other)?;
         let event_id = format!("{}-{next}", self.session_id);
-        let kind =
-            classify_remote_session_event(&message, self.active_request_stream.try_lock().is_err());
+        let generation = self
+            .response_context
+            .request_generation()
+            .map_err(std::io::Error::other)?;
+        let kind = classify_remote_session_event(&message, generation.is_some());
+        let request_generation = match kind {
+            RemoteSessionEventKind::RequestCorrelated => generation,
+            _ => None,
+        };
         if kind.is_session_owned() {
             if let Ok(mut retained) = self.retained_notification_events.lock() {
                 retained.push_back(RetainedRemoteSessionEvent {
@@ -1082,6 +1092,7 @@ impl BroadcastJsonRpcWriter {
             seq: next,
             event_id,
             kind,
+            request_generation,
             message,
         })
     }

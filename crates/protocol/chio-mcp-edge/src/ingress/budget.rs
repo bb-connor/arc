@@ -17,6 +17,8 @@ use super::framing::read_document_frame_with_admission;
 use crate::AdapterError;
 
 mod admission;
+mod response_scope;
+pub use response_scope::{McpRequestGeneration, McpResponseContext, McpResponseScope};
 #[cfg(test)]
 mod tests;
 
@@ -117,6 +119,8 @@ struct BudgetState {
     retained: Footprint,
     messages: usize,
     failure: Option<TerminalFailure>,
+    next_generation: u64,
+    response_generation: Option<McpRequestGeneration>,
 }
 
 #[derive(Clone)]
@@ -192,7 +196,22 @@ impl IngressBudget {
     }
 
     pub(super) fn owns(&self, message: &AccountedMessage) -> bool {
-        Arc::ptr_eq(&self.state, &message.reservation.budget.state)
+        self.owns_reservation(&message.reservation)
+    }
+
+    pub(super) fn owns_reservation(&self, reservation: &FrameReservation) -> bool {
+        Arc::ptr_eq(&self.state, &reservation.budget.state)
+    }
+
+    pub(super) fn response_context(&self) -> McpResponseContext {
+        McpResponseContext::new(self.clone())
+    }
+
+    pub(super) fn enter_response_scope(
+        &self,
+        reservation: &FrameReservation,
+    ) -> Result<McpResponseScope, AdapterError> {
+        response_scope::enter(self, reservation)
     }
 
     /// Current retained ownership, including messages moved into deferred storage.
@@ -261,12 +280,18 @@ impl IngressBudget {
             drop(state);
             return Err(self.exhausted("MCP ingress message capacity exceeded"));
         }
+        let generation = state
+            .next_generation
+            .checked_add(1)
+            .ok_or(AdapterError::IngressCapacity)?;
+        state.next_generation = generation;
         state.retained = combined;
         state.messages = messages;
         Ok(FrameReservation {
             budget: self.clone(),
             footprint,
             request_digest: None,
+            generation: McpRequestGeneration::new(generation),
         })
     }
 
@@ -316,9 +341,14 @@ pub struct FrameReservation {
     budget: IngressBudget,
     footprint: Footprint,
     request_digest: Option<chio_kernel::ProtocolRequestDigest>,
+    generation: McpRequestGeneration,
 }
 
 impl FrameReservation {
+    /// Trusted local origin, assigned once by this reservation's accounting owner.
+    pub fn request_generation(&self) -> McpRequestGeneration {
+        self.generation
+    }
     /// Original ingress identity travels with its sealed accounting ownership.
     pub fn request_digest(&self) -> Option<&chio_kernel::ProtocolRequestDigest> {
         self.request_digest.as_ref()
@@ -356,6 +386,9 @@ pub struct AccountedMessage {
 }
 
 impl AccountedMessage {
+    pub fn request_generation(&self) -> McpRequestGeneration {
+        self.reservation.request_generation()
+    }
     pub fn value(&self) -> &Value {
         &self.value
     }
