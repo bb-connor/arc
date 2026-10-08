@@ -20,6 +20,7 @@ import re
 import sys
 import unittest
 from pathlib import Path
+from typing import NamedTuple
 from unittest import mock
 
 
@@ -45,9 +46,19 @@ CI_HISTORY_GET = f"GET {PREFIX}/{LANDING.CI_HISTORY_QUERY}"
 FINALIZER = "enterprise-evidence-finalizer.yml"
 PUBLISHER_SETUP = [f"GET {PREFIX}/contents/.github/workflows/{FINALIZER}?ref={DEFINITION}"] * 2
 
-# The finalizer's Security contract namespace for the fixture tuple: the head
-# its App checks are written to and the external ID a denial for E carries.
+# The Security contract namespace the finalizer and the revoker bind for the
+# fixture tuple: the head their App checks are written to and the external ID
+# a denial for E carries. Every Original asserts its denial here, beside a
+# control that the current producers already deny in exactly this namespace.
 Y_HEAD, Y_EXTERNAL_ID = MERGE, LANDING.EXTERNAL_ID
+
+
+def revocation_text(reason: str) -> dict:
+    """The tombstone text the revoker writes for the fixture tuple."""
+    return {"identity": {"authorized_source_sha": SOURCE, "evidence_sha": EVIDENCE, "merge_commit_sha": MERGE,
+                         "pr_number": str(PR)},
+            "reason": reason, "schema": "chio.security-check-revocation.v1", "security_definition_sha": DEFINITION}
+
 
 ORIGINAL_FAKE_GH, ORIGINAL_CHECK_STORE_CURL = LANDING.FAKE_GH, LANDING.CHECK_STORE_CURL
 
@@ -127,6 +138,10 @@ def run_step(script: str, data: dict, environment: dict[str, str]):
             "gh-store": ORIGINAL_FAKE_GH.encode(), "curl-store": ORIGINAL_CHECK_STORE_CURL.encode()})
 
 
+def outputs(run) -> dict[str, str]:
+    return dict(line.split("=", 1) for line in run.output.splitlines())
+
+
 def server_error(data: dict, path: str) -> None:
     data.setdefault("__http_errors", {})[f"{PREFIX}/{path}"] = {
         "status": 502, "body": {"message": "Server Error", "status": "502"}}
@@ -146,7 +161,7 @@ def check_identity(check: dict) -> tuple:
     return (check["name"], check["app"], check["head_sha"], check["external_id"], check["status"], check["conclusion"])
 
 
-def publisher_context(committed_evidence: str = EVIDENCE) -> dict[str, str]:
+def publisher_context() -> dict[str, str]:
     binding = LANDING.publication_binding()
     authorization = {
         "authorized_source_sha": SOURCE, "ci_aggregate_check_run_id": "505", "ci_run_attempt": "1",
@@ -156,7 +171,7 @@ def publisher_context(committed_evidence: str = EVIDENCE) -> dict[str, str]:
         "publication_binding_json": binding, "security_definition_sha": DEFINITION,
     }
     return {f"needs.authorize-security-check-publication.outputs.{key}": value for key, value in authorization.items()} | {
-        "vars.CHIO_COMMITTED_LINUX_EVIDENCE_SHA": committed_evidence, "github.run_attempt": "1",
+        "vars.CHIO_COMMITTED_LINUX_EVIDENCE_SHA": EVIDENCE, "github.run_attempt": "1",
         "github.run_id": str(FINALIZER_RUN), "github.token": LANDING.ACTIONS_TOKEN, "github.ref": "refs/heads/main",
         "github.sha": DEFINITION, "github.repository_id": REPOSITORY_ID, "vars.CHIO_SECURITY_APP_ID": str(APP_ID),
         "vars.CHIO_SECURITY_APP_INSTALLATION_ID": "1", "secrets.CHIO_SECURITY_APP_PRIVATE_KEY_PEM": "",
@@ -265,6 +280,443 @@ class PublisherReadErrorBeforeBadRunOriginalTests(unittest.TestCase):
                          f"the read of CI run 200 answered HTTP 502 and the step exited {run.result.returncode} before "
                          f"reading failed run 202 (reads: {run.calls[2:]}); refused at: {refusals(run)}")
         assert_bad_ci_denial(self, run, [(202, 1, "failure")])
+
+
+
+def with_attempts(data: dict, run_id: int, attempts: int, failed_attempt: int = 0) -> dict:
+    """Give run `run_id` completed attempts 1..`attempts`, each successful except `failed_attempt`."""
+    for attempt in range(1, attempts + 1):
+        record = ci_run(run_id, conclusion="failure" if attempt == failed_attempt else "success", attempt=attempt)
+        data[f"{PREFIX}/actions/runs/{run_id}/attempts/{attempt}"] = record
+    return data
+
+
+def first_scan(run) -> list[str]:
+    """The reads of the first history scan: from the first listing up to the next one."""
+    start = run.calls.index(CI_HISTORY_GET)
+    end = run.calls.index(CI_HISTORY_GET, start + 1) if CI_HISTORY_GET in run.calls[start + 1:] else len(run.calls)
+    return run.calls[start:end]
+
+
+CEILING_RUN = 202
+
+
+class PublisherAttemptCeilingOriginalTests(unittest.TestCase):
+    """Original (RED at b94eb3788e+D): a CI run past the 100-attempt ceiling (O-G3).
+
+    The attempt loop of `reconcile_bad_ci` (FIN:2876) has no bound, unlike the
+    auditor (AUD:216-217) and the finalizer retry scan (FIN:3038). A run whose
+    current attempt is 101 is read through attempt 101 and, with every attempt
+    successful, the step publishes. A history the producer cannot bound is
+    unavailable: refuse without a tombstone and read no attempt past 100.
+    Fails today at the mutation assertion: the step POSTs a success publication.
+    """
+
+    def test_run_past_the_attempt_ceiling_refuses_without_a_tombstone(self) -> None:
+        bounded = run_publisher(with_attempts(publisher_fixture(ci_run(CEILING_RUN, attempt=100)), CEILING_RUN, 100))
+        self.assertEqual(bounded.result.returncode, 0, bounded.result.stderr)
+        self.assertEqual(first_scan(bounded)[:6], [CI_HISTORY_GET, *run_reads(CI_RUN), f"GET {PREFIX}/actions/runs/{CEILING_RUN}",
+                                                   f"GET {PREFIX}/actions/runs/{CEILING_RUN}/attempts/1"])
+        self.assertEqual(mutations(bounded), [CHECK_RUN_POST])
+        self.assertEqual([check_identity(check) for check in app_checks(bounded.data)],
+                         [("Security contract", APP, Y_HEAD, Y_EXTERNAL_ID, "completed", "success")])
+
+        data = with_attempts(publisher_fixture(ci_run(CEILING_RUN, attempt=101)), CEILING_RUN, 101)
+        self.assertEqual(data[f"{PREFIX}/actions/runs/{CEILING_RUN}"]["run_attempt"], 101)
+        run = run_publisher(data)
+        self.assertNotIn("unprovided API", run.result.stderr)
+        self.assertEqual(run.calls[:7], PUBLISHER_SETUP + [CI_HISTORY_GET, *run_reads(CI_RUN),
+                                                                f"GET {PREFIX}/actions/runs/{CEILING_RUN}"])
+        past_ceiling = f"GET {PREFIX}/actions/runs/{CEILING_RUN}/attempts/101"
+        scanned = [call for call in first_scan(run) if call.startswith(f"GET {PREFIX}/actions/runs/{CEILING_RUN}/attempts/")]
+        self.assertEqual(mutations(run), [],
+                         f"CI run {CEILING_RUN} at attempt 101 was scanned through attempt 101 ({len(scanned)} attempt "
+                         f"reads in the first scan, {run.calls.count(past_ceiling)} reads of attempt 101 in all) and the "
+                         f"step published {[check_identity(check) for check in app_checks(run.data)]}")
+        self.assertEqual(run.calls.count(past_ceiling), 0)
+        self.assertEqual(app_checks(run.data), [])
+        self.assertNotEqual(run.result.returncode, 0)
+
+
+RETIRED_CI_WORKFLOW, RETIRED_RUN = 98, 199
+
+
+def retired_registration_run(conclusion: str = "failure") -> dict:
+    """A `ci.yml` run on E recorded under the workflow ID of a replaced registration."""
+    run = ci_run(RETIRED_RUN, conclusion=conclusion)
+    run["workflow_id"] = RETIRED_CI_WORKFLOW
+    return run
+
+
+def registry_replacement_fixture() -> dict:
+    """The current registration lists only the source run; the repository listing also holds the retired run."""
+    data = publisher_fixture()
+    retired = retired_registration_run()
+    data[f"{PREFIX}/actions/runs/{RETIRED_RUN}"] = retired
+    data[f"{PREFIX}/actions/runs/{RETIRED_RUN}/attempts/1"] = dict(retired)
+    data[f"{PREFIX}/actions/runs"] = {"total_count": 2, "workflow_runs": [ci_run(CI_RUN), dict(retired)]}
+    data[f"{PREFIX}/actions/workflows/ci.yml"] = {"id": CI_WORKFLOW, "path": ".github/workflows/ci.yml", "state": "active"}
+    return data
+
+
+class PublisherDualCensusOriginalTests(unittest.TestCase):
+    """Original (RED at b94eb3788e+D): a failed run of a replaced `ci.yml` registration (O-G2).
+
+    History discovery reads only `actions/workflows/ci.yml/runs` (FIN:2722),
+    which lists the runs of the current registration. After the registration
+    is replaced, a failed `ci.yml` run on E keeps the old workflow ID and is
+    listed only by the repository-wide `actions/runs?event=pull_request&head_sha=E`.
+    The step publishes. That failure must deny E. The case asserts the denial
+    outcome only, not the class the repair gives such a run.
+    Fails today at the conclusion assertion: the one App check is a success.
+    """
+
+    def test_failed_run_of_a_replaced_registration_denies_the_evidence_head(self) -> None:
+        listed = ci_run(RETIRED_RUN, conclusion="failure")
+        control = run_publisher(publisher_fixture(listed))
+        self.assertEqual(control.calls[:9], PUBLISHER_SETUP + [CI_HISTORY_GET, *run_reads(RETIRED_RUN), *run_reads(CI_RUN)])
+        assert_bad_ci_denial(self, control, [(RETIRED_RUN, 1, "failure")])
+
+        data = registry_replacement_fixture()
+        retired = data[f"{PREFIX}/actions/runs/{RETIRED_RUN}"]
+        self.assertEqual((retired["path"], retired["event"], retired["head_sha"], retired["repository"]["id"],
+                          retired["head_repository"]["id"], retired["status"], retired["conclusion"], retired["workflow_id"]),
+                         (".github/workflows/ci.yml", "pull_request", EVIDENCE, 1195888645, 1195888645, "completed",
+                          "failure", RETIRED_CI_WORKFLOW))
+        self.assertEqual([run["id"] for run in data[f"{PREFIX}/actions/workflows/ci.yml/runs"]["workflow_runs"]], [CI_RUN])
+        self.assertEqual([run["id"] for run in data[f"{PREFIX}/actions/runs"]["workflow_runs"]], [CI_RUN, RETIRED_RUN])
+        run = run_publisher(data)
+        self.assertNotIn("unprovided API", run.result.stderr)
+        self.assertEqual(run.calls[:6], PUBLISHER_SETUP + [CI_HISTORY_GET, *run_reads(CI_RUN)])
+        listings = [call for call in run.calls if "/runs?" in call]
+        self.assertEqual([check["conclusion"] for check in app_checks(run.data)], ["failure"],
+                         f"the publisher read only {sorted(set(listings))} ({len(listings)} listing reads), never the "
+                         f"repository-wide history holding failed run {RETIRED_RUN}, and its mutations were "
+                         f"{mutations(run)} with {[check_identity(check) for check in app_checks(run.data)]}")
+        self.assertEqual(mutations(run), [CHECK_RUN_POST])
+        self.assertEqual([check_identity(check) for check in app_checks(run.data)],
+                         [("Security contract", APP, Y_HEAD, Y_EXTERNAL_ID, "completed", "failure")])
+        self.assertEqual(run.result.returncode, 1)
+
+
+# The revoker: `bind-revocation`, then `revoke-security-contract` with its outputs.
+
+REVOCATION = "security-contract-revocation.yml"
+BINDER_OUTPUTS = tuple(LANDING.workflow(REVOCATION)["jobs"]["bind-revocation"]["outputs"])
+FREEZE = "0" * 40
+EVENT_RUN = LANDING.LATER_CI_RUN
+CLOSED_AT = "2026-10-06T00:20:00Z"
+LANDED = LANDING.PROTECTED
+NOT_FOUND_DOCUMENTATION = {
+    "git/commits": "https://docs.github.com/rest/git/commits#get-a-commit-object",
+    "git/ref": "https://docs.github.com/rest/git/refs#get-a-reference",
+    "contents": "https://docs.github.com/rest/repos/contents#get-repository-content",
+}
+
+
+class Revocation(NamedTuple):
+    steps: tuple
+    outputs: dict
+
+    @property
+    def data(self) -> dict:
+        return self.steps[-1].data
+
+    @property
+    def calls(self) -> list[str]:
+        return [call for step in self.steps for call in step.calls]
+
+
+def not_found(data: dict, path: str) -> None:
+    """Make `path` answer 404 as GitHub does, and drop any fixture record for it."""
+    data.pop(f"{PREFIX}/{path}", None)
+    kind = next(prefix for prefix in NOT_FOUND_DOCUMENTATION if path.startswith(prefix))
+    data.setdefault("__http_errors", {})[f"{PREFIX}/{path}"] = {
+        "status": 404, "body": {"message": "Not Found", "documentation_url": NOT_FOUND_DOCUMENTATION[kind], "status": "404"}}
+
+
+def revoke_with(steps: tuple, event_name: str, committed_evidence: str) -> Revocation:
+    """Run `revoke-security-contract` when the binder succeeded with `eligible=true`, as its job condition does."""
+    bound = outputs(steps[-1])
+    if steps[-1].result.returncode != 0 or bound.get("eligible") != "true":
+        return Revocation(steps, bound)
+    context = {f"needs.bind-revocation.outputs.{key}": bound.get(key, "") for key in BINDER_OUTPUTS} | {
+        "github.event.repository.default_branch": "main", "github.event_name": event_name,
+        "github.token": LANDING.ACTIONS_TOKEN, "vars.CHIO_AUTHORIZED_SECURITY_SOURCE_SHA": SOURCE,
+        "vars.CHIO_COMMITTED_LINUX_EVIDENCE_SHA": committed_evidence,
+        "vars.CHIO_ENTERPRISE_SECURITY_DEFINITION_SHA": DEFINITION, "github.ref": "refs/heads/main",
+        "github.sha": DEFINITION, "vars.CHIO_SECURITY_APP_ID": str(APP_ID), "vars.CHIO_SECURITY_APP_INSTALLATION_ID": "1",
+        "secrets.CHIO_SECURITY_APP_PRIVATE_KEY_PEM": "",
+    }
+    script, environment = render_step(REVOCATION, "revoke-security-contract",
+                                      "Revoke exact Actions mirrors and dedicated App namespace", context)
+    revoke = run_step(without_credential_exchange(script, "list_checks() {"), steps[-1].data,
+                      environment | {"installation_token": LANDING.INSTALLATION_TOKEN})
+    return Revocation((*steps, revoke), bound)
+
+
+def revoke_failed_ci(data: dict, event_run: dict, committed_evidence: str = EVIDENCE) -> Revocation:
+    """The `workflow_run` path: resolve the completed run, bind it, then revoke."""
+    context = {
+        "github.event.workflow_run.conclusion": event_run["conclusion"] or "",
+        "github.event.workflow_run.run_attempt": str(event_run["run_attempt"]),
+        "github.event.workflow_run.id": str(event_run["id"]),
+        "github.event.workflow_run.workflow_id": str(event_run["workflow_id"]),
+        "github.event.action": "completed", "github.event.repository.default_branch": "main",
+        "github.token": LANDING.ACTIONS_TOKEN, "github.ref": "refs/heads/main", "github.run_attempt": "1",
+        "github.run_id": "901", "github.sha": DEFINITION, "github.repository_id": REPOSITORY_ID,
+        "github.repository_owner_id": "1", "vars.CHIO_AUTHORIZED_SECURITY_SOURCE_SHA": SOURCE,
+        "vars.CHIO_COMMITTED_LINUX_EVIDENCE_SHA": committed_evidence, "vars.CHIO_SECURITY_APP_ID": str(APP_ID),
+        "vars.CHIO_ENTERPRISE_SECURITY_DEFINITION_SHA": DEFINITION,
+    }
+    script, environment = render_step(REVOCATION, "bind-revocation", "Resolve exact completed workflow identity", context)
+    route = run_step(script, data, environment)
+    if route.result.returncode != 0 or outputs(route).get("workflow_path") != ".github/workflows/ci.yml":
+        return Revocation((route,), {})
+    script, environment = render_step(REVOCATION, "bind-revocation", "Bind later failed CI rerun to existing authority",
+                                      context)
+    return revoke_with((route, run_step(script, route.data, environment)), "workflow_run", committed_evidence)
+
+
+def revoke_manually(data: dict) -> Revocation:
+    """The `workflow_dispatch` path under the all-zero freeze."""
+    context = {
+        "inputs.authorized_source_sha": SOURCE, "github.event.repository.default_branch": "main",
+        "inputs.evidence_sha": EVIDENCE, "github.token": LANDING.ACTIONS_TOKEN, "inputs.merge_commit_sha": MERGE,
+        "inputs.pr_number": str(PR), "inputs.reason": "operator-security-revocation", "github.actor": "bb-connor",
+        "github.ref": "refs/heads/main", "github.run_id": "902", "github.sha": DEFINITION,
+        "github.triggering_actor": "bb-connor", "github.run_attempt": "1",
+        "vars.CHIO_ENTERPRISE_SECURITY_DEFINITION_SHA": DEFINITION,
+    }
+    script, environment = render_step(REVOCATION, "bind-revocation", "Bind frozen manual revocation", context)
+    return revoke_with((run_step(script, data, environment),), "workflow_dispatch", FREEZE)
+
+
+def add_revocation_records(data: dict, checks: tuple[dict, ...]) -> dict:
+    """Add the commit E, the manual revoker's own run, and `checks` in the check store."""
+    data[f"{PREFIX}/git/commits/{EVIDENCE}"] = {"sha": EVIDENCE, "parents": [{"sha": SOURCE}], "tree": {"sha": "e0" * 20}}
+    data.setdefault(f"{PREFIX}/commits/{EVIDENCE}/check-runs", {"total_count": 0, "check_runs": []})
+    data[f"{PREFIX}/actions/runs/902/attempts/1"] = LANDING.revoker_run(902, "workflow_dispatch")
+    for check in checks:
+        store = data.setdefault(f"{PREFIX}/commits/{check['head_sha']}/check-runs", {"total_count": 0, "check_runs": []})
+        store["check_runs"].append(check)
+        store["total_count"] = len(store["check_runs"])
+        data[f"{PREFIX}/check-runs/{check['id']}"] = check
+    return data
+
+
+def revocation_fixture(live_merge: str = MERGE, checks: tuple[dict, ...] = ()) -> dict:
+    """An open pull request on E at `live_merge` with the revoker's records."""
+    return add_revocation_records(LANDING.revoker_fixture(live_merge=live_merge), checks)
+
+
+def failed_event(display_title: str | None = None) -> dict:
+    return LANDING.pull_request_ci_run(EVENT_RUN, MERGE, conclusion="failure", check_suite_id=404,
+                                       display_title=display_title)
+
+
+def listener_fixture(event_run: dict, live_merge: str = MERGE, checks: tuple[dict, ...] = ()) -> dict:
+    """The revocation fixture plus the completed failed CI run, its jobs, and the listener's own run."""
+    data = LANDING.failed_ci_listener_fixture(event_run, LANDING.failed_builder_jobs(event_run["id"]), live_merge=live_merge)
+    return add_revocation_records(data, checks)
+
+
+def close_pull_request(data: dict, merged: bool) -> None:
+    """Close pull request N with head E, as the pulls API reports it; its test-merge ref is gone."""
+    for key in (f"{PREFIX}/pulls/{PR}", f"{PREFIX}/pulls", f"{PREFIX}/commits/{EVIDENCE}/pulls"):
+        records = data[key] if isinstance(data[key], list) else [data[key]]
+        for record in records:
+            if record["number"] == PR:
+                record.update(state="closed", merged=merged, merged_at=CLOSED_AT if merged else None, closed_at=CLOSED_AT,
+                              mergeable=None, mergeable_state="unknown")
+                if merged:
+                    record["merge_commit_sha"] = LANDED
+    if merged:
+        data[f"{PREFIX}/git/commits/{LANDED}"] = {"sha": LANDED, "parents": [{"sha": BASE}, {"sha": EVIDENCE}],
+                                                  "tree": {"sha": LANDING.TREE}}
+    not_found(data, f"git/ref/pull/{PR}/merge")
+
+
+def move_pull_request_head(data: dict, head: str, merge: str) -> None:
+    """Pull request N stays open after its head moved from E to `head`, with test merge `merge`."""
+    for key in (f"{PREFIX}/pulls/{PR}", f"{PREFIX}/pulls"):
+        for record in data[key] if isinstance(data[key], list) else [data[key]]:
+            record["head"]["sha"], record["merge_commit_sha"] = head, merge
+    data[f"{PREFIX}/git/ref/pull/{PR}/merge"]["object"]["sha"] = merge
+    data[f"{PREFIX}/git/commits/{merge}"] = {"sha": merge, "parents": [{"sha": BASE}, {"sha": head}],
+                                             "tree": {"sha": "1" * 40}}
+
+
+def assert_revocation_denial(test: unittest.TestCase, revocation: Revocation, reason: str) -> None:
+    """Exactly one POSTed Security contract failure for E in the revoker's namespace, with its exact text."""
+    test.assertEqual(mutations(revocation), [CHECK_RUN_POST], revocation.steps[-1].result.stderr)
+    checks = app_checks(revocation.data)
+    test.assertEqual([check_identity(check) for check in checks],
+                     [("Security contract", APP, Y_HEAD, Y_EXTERNAL_ID, "completed", "failure")])
+    test.assertEqual(json.loads(checks[0]["output"]["text"]), revocation_text(reason))
+    test.assertEqual(revocation.steps[-1].result.returncode, 0, revocation.steps[-1].result.stderr)
+
+
+def binder_refusal(revocation: Revocation) -> str:
+    binder = revocation.steps[-1]
+    return f"binder exit {binder.result.returncode}, outputs {revocation.outputs}, refused at {refusals(binder)[-1:]}"
+
+
+LISTENER_SETUP = [
+    f"GET {PREFIX}/actions/runs/{EVENT_RUN}/attempts/1",
+    f"GET {PREFIX}/contents/.github/workflows/{REVOCATION}?ref={DEFINITION}",
+    f"GET {PREFIX}/contents/.github/workflows/{REVOCATION}?ref={DEFINITION}",
+    f"GET {PREFIX}/actions/runs/901/attempts/1",
+    f"GET {PREFIX}/actions/runs/{EVENT_RUN}/attempts/1",
+]
+MANUAL_SETUP = [
+    f"GET {PREFIX}/contents/.github/workflows/{REVOCATION}?ref={DEFINITION}",
+    f"GET {PREFIX}/contents/.github/workflows/{REVOCATION}?ref={DEFINITION}",
+    f"GET {PREFIX}/actions/runs/902/attempts/1",
+    f"GET {PREFIX}/pulls/{PR}",
+]
+
+
+class ListenerClosedPullRequestOriginalTests(unittest.TestCase):
+    """Original (RED at b94eb3788e+D): C-P5-1, a closed unmerged pull request on the committed E.
+
+    The listener's create rule (REV:542-558) creates a tombstone only for an
+    open pull request whose live test merge is the titled M; otherwise it binds
+    existing members only and, finding none, outputs `eligible=false`
+    (REV:570). An authenticated failed CI run for the committed E must deny E
+    whatever the pull request's state, unless it merged with head E.
+    Fails today at the binder-output assertion: `eligible=false`.
+    """
+
+    def test_failed_ci_on_the_committed_head_of_a_closed_pull_request_denies_the_head(self) -> None:
+        event = failed_event()
+        LANDING.assert_authoritative_history(self, event)
+        control = revoke_failed_ci(listener_fixture(event), event)
+        self.assertEqual((control.outputs["eligible"], control.outputs["create_missing"]), ("true", "true"))
+        assert_revocation_denial(self, control, "ci-regression")
+
+        data = listener_fixture(event)
+        close_pull_request(data, merged=False)
+        self.assertEqual((data[f"{PREFIX}/pulls/{PR}"]["state"], data[f"{PREFIX}/pulls/{PR}"]["merged"],
+                          data[f"{PREFIX}/pulls/{PR}"]["head"]["sha"]), ("closed", False, EVIDENCE))
+        run = revoke_failed_ci(data, event)
+        self.assertNotIn("unprovided API", run.steps[-1].result.stderr)
+        self.assertEqual(run.calls[:len(LISTENER_SETUP)], LISTENER_SETUP)
+        self.assertIn(f"GET {PREFIX}/pulls/{PR}", run.steps[1].calls)
+        self.assertEqual((run.outputs.get("eligible"), run.outputs.get("create_missing")), ("true", "true"),
+                         f"failed CI run {EVENT_RUN} on committed head {EVIDENCE} of closed pull request {PR} was not "
+                         f"bound for denial: {binder_refusal(run)}; mutations {mutations(run)}")
+        assert_revocation_denial(self, run, "ci-regression")
+
+
+MOVED_HEAD, MOVED_MERGE = "c4" * 20, "c5" * 20
+
+
+class ManualRevocationOffHeadOriginalTests(unittest.TestCase):
+    """Original (RED at b94eb3788e+D): C-P5-8, manual revocation under the freeze.
+
+    The manual binder requires pull request N to be open (REV:136) with head E
+    (REV:138) and its live test merge to be the requested M. An owner-authored
+    revocation under the all-zero freeze must deny E for a closed pull request
+    and for one whose head moved off E.
+    Fails today at the binder-output assertion: the binder exits 1 at REV:136
+    or REV:138 with no outputs.
+    """
+
+    def test_manual_revocation_denies_e_for_a_closed_or_moved_pull_request(self) -> None:
+        control = revoke_manually(revocation_fixture())
+        self.assertEqual((control.outputs["eligible"], control.outputs["create_missing"]), ("true", "true"))
+        assert_revocation_denial(self, control, "operator-security-revocation")
+
+        for label in ("closed", "head moved off E"):
+            with self.subTest(pull_request=label):
+                data = revocation_fixture()
+                if label == "closed":
+                    close_pull_request(data, merged=False)
+                else:
+                    move_pull_request_head(data, MOVED_HEAD, MOVED_MERGE)
+                self.assertEqual(data[f"{PREFIX}/git/commits/{MERGE}"]["parents"], [{"sha": BASE}, {"sha": EVIDENCE}])
+                run = revoke_manually(data)
+                self.assertNotIn("unprovided API", run.steps[-1].result.stderr)
+                self.assertEqual(run.calls[:len(MANUAL_SETUP)], MANUAL_SETUP)
+                self.assertEqual((run.outputs.get("eligible"), run.outputs.get("create_missing")), ("true", "true"),
+                                 f"manual revocation of {EVIDENCE} under the freeze was refused for a {label} pull "
+                                 f"request: {binder_refusal(run)}")
+                assert_revocation_denial(self, run, "operator-security-revocation")
+
+
+def unavailable_test_merges(data: dict) -> None:
+    """The CI-titled M and the capture M are absent: GitHub answers 404 for each commit and its `ci.yml`."""
+    for merge in (MERGE, LANDING.PRIOR_MERGE):
+        not_found(data, f"git/commits/{merge}")
+        not_found(data, f"contents/.github/workflows/ci.yml?ref={merge}")
+
+
+class ListenerUnavailableTestMergeOriginalTests(unittest.TestCase):
+    """Original (RED at b94eb3788e+D): C-P5-3a and C-P5-3b at the binder boundary.
+
+    The titled test merge M_ci and the capture merge M_cap are no longer
+    readable, and the live test merge was regenerated. The listener reads M's
+    `ci.yml` blob (REV:322) and M's commit (REV:334-339) before it binds any
+    denial, so it exits without outputs. An authenticated failed CI run for
+    the committed E must make E eligible for denial without M.
+    Fails today at the binder-output assertion: the binder exits 1 at the
+    REV:322 read. The denial itself is prospective (see
+    `ListenerUnavailableTestMergeProspectiveTests`): with M absent there is no
+    test-merge namespace to deny in.
+    """
+
+    def test_failed_ci_on_the_committed_head_binds_without_the_historical_test_merge(self) -> None:
+        event = failed_event()
+        control = revoke_failed_ci(listener_fixture(event), event)
+        self.assertEqual((control.outputs["eligible"], control.outputs["create_missing"], control.outputs["evidence_sha"]),
+                         ("true", "true", EVIDENCE))
+
+        data = listener_fixture(event, live_merge=LANDING.REGENERATED_MERGE)
+        unavailable_test_merges(data)
+        run = revoke_failed_ci(data, event)
+        self.assertNotIn("unprovided API", run.steps[-1].result.stderr)
+        self.assertEqual(run.calls[:len(LISTENER_SETUP) + 2], LISTENER_SETUP + [
+            f"GET {PREFIX}/contents/.github/workflows/ci.yml?ref={SOURCE}",
+            f"GET {PREFIX}/contents/.github/workflows/ci.yml?ref={EVIDENCE}"])
+        self.assertEqual(
+            (run.outputs.get("eligible"), run.outputs.get("create_missing"), run.outputs.get("evidence_sha")),
+            ("true", "true", EVIDENCE),
+            f"failed CI run {EVENT_RUN} on committed head {EVIDENCE} was not bound once its test merges "
+            f"{MERGE} and {LANDING.PRIOR_MERGE} were unreadable: {binder_refusal(run)}")
+
+
+MISMATCHED_HEAD = "c3" * 20
+
+
+class ListenerMismatchedTitleOriginalTests(unittest.TestCase):
+    """Original (RED at b94eb3788e+D): C-P5-9 at the binder boundary.
+
+    The run title is `CI N=<N> E=<other> B=<B> M=<M>` while the API head is E.
+    The listener requires the title's E to equal the API head (REV:306) and
+    exits. A title is never authentication: the API identity alone binds E.
+    Fails today at the binder-output assertion: the binder exits 1 at REV:306.
+    The denial itself is prospective (see `ListenerMismatchedTitleProspectiveTests`):
+    a mismatched title supplies no authenticated test merge to deny in.
+    """
+
+    def test_failed_ci_with_a_mismatched_title_binds_the_api_head(self) -> None:
+        valid = failed_event()
+        control = revoke_failed_ci(listener_fixture(valid), valid)
+        self.assertEqual((control.outputs["eligible"], control.outputs["create_missing"], control.outputs["evidence_sha"]),
+                         ("true", "true", EVIDENCE))
+
+        event = failed_event(f"CI N={PR} E={MISMATCHED_HEAD} B={BASE} M={MERGE}")
+        LANDING.assert_authoritative_history(self, event)
+        run = revoke_failed_ci(listener_fixture(event), event)
+        self.assertNotIn("unprovided API", run.steps[-1].result.stderr)
+        self.assertEqual(run.calls[:len(LISTENER_SETUP)], LISTENER_SETUP)
+        self.assertEqual(
+            (run.outputs.get("eligible"), run.outputs.get("create_missing"), run.outputs.get("evidence_sha")),
+            ("true", "true", EVIDENCE),
+            f"failed CI run {EVENT_RUN} with API head {EVIDENCE} and title E={MISMATCHED_HEAD} was not bound: "
+            f"{binder_refusal(run)}")
+
 
 
 if __name__ == "__main__":
