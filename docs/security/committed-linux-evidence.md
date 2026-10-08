@@ -336,8 +336,10 @@ gh workflow run security-contract-revocation.yml \
 
 The protected manual revoker requires the all-zero freeze, revalidates the
 requested live `(<PR>, <E>, <M>, <S>)` tuple, and mints the same
-Checks-write-only App token. It paginates the four App `15368` mirror
-namespaces and the dedicated-App `Security contract` namespace on `M`. An
+Checks-write-only App token.
+It paginates the dedicated-App `Security contract` namespace on `M` first, then
+the four App `15368` mirror namespaces, so a mirror namespace that fails closed
+cannot prevent the dedicated tombstone. An
 absent namespace receives an exact completed-failure tombstone. Existing
 members are updated to `conclusion: failure` while preserving each external ID
 and source metadata. If duplicates exist, the oldest member carrying the

@@ -957,7 +957,7 @@ EXPECTED_TRUST_JOB_DIGESTS = {
     (
         "security contract revocation",
         "revoke-security-contract",
-    ): "3dc04fec4dd1260b2e4706201ab0686bf8332273f188d55f65315733a038aec7",
+    ): "2b6ea0f5c592d50b1a4ece8f9888558f33905eaf99bc636b7b1a132e29e96f99",
     (
         "enterprise-hardening",
         "committed-linux-evidence",
@@ -1843,7 +1843,9 @@ def validate_environment_provisioning_document(root: Path) -> None:
         "-f merge_commit_sha='<M>'",
         "The protected manual revoker requires the all-zero freeze, revalidates the\n"
         "requested live `(<PR>, <E>, <M>, <S>)` tuple",
-        "It paginates the four App `15368` mirror\nnamespaces and the dedicated-App `Security contract` namespace on `M`",
+        "It paginates the dedicated-App `Security contract` namespace on `M` first, then\n"
+        "the four App `15368` mirror namespaces, so a mirror namespace that fails closed\n"
+        "cannot prevent the dedicated tombstone.",
         "normalization is mandatory because a ruleset binds check name and App",
         "absent namespace receives an exact completed-failure tombstone.",
         "preserving each external ID\nand source metadata",
@@ -7864,6 +7866,15 @@ def validate(root: Path) -> None:
             raise ContractError(
                 "security check revocation weakens event, owner, App, binding, or failure verification"
             )
+    revocation_calls = [
+        line.strip() for line in revocation_run.splitlines() if line.strip().startswith("normalize_namespace ")
+    ]
+    if len(revocation_calls) != 5 or revocation_calls[0] != (
+        'normalize_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${external_id}"'
+    ):
+        raise ContractError(
+            "security check revocation no longer denies the dedicated namespace before the Actions mirrors"
+        )
     if any(
         contains_text(candidate_free_revocation_job, value)
         for candidate_free_revocation_job in (bind_revocation, revocation)

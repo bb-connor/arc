@@ -3956,6 +3956,18 @@ assert_rejected(
     "security check revocation weakens event, owner, App, binding, or failure verification",
 )
 assert_rejected(
+    "revocation reconciles Actions mirrors before the Security contract",
+    "security-contract-revocation.yml",
+    replace_in_named_step(
+        "Revoke exact Actions mirrors and dedicated App namespace",
+        'normalize_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${external_id}"\n'
+        '          normalize_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / Build, lint, test" "${external_id}:actions:build"\n',
+        'normalize_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / Build, lint, test" "${external_id}:actions:build"\n'
+        '          normalize_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${external_id}"\n',
+    ),
+    "no longer denies the dedicated namespace before the Actions mirrors",
+)
+assert_rejected(
     "revocation drops workflow-token Checks write",
     "security-contract-revocation.yml",
     replace_in_named_job(
@@ -4103,6 +4115,13 @@ for label, old, new in (
         "completion for the current `E`, under any pull request, base, test merge, or run\n"
         "title, can permanently tombstone that tuple",
         "a later successful rerun restores the tuple",
+    ),
+    (
+        "revoker contract reconciles Actions mirrors before the dedicated namespace",
+        "It paginates the dedicated-App `Security contract` namespace on `M` first, then\n"
+        "the four App `15368` mirror namespaces, so a mirror namespace that fails closed\n"
+        "cannot prevent the dedicated tombstone.",
+        "It paginates the four App `15368` mirror namespaces and then the dedicated-App namespace.",
     ),
     (
         "publisher contract scopes CI history to one test merge tuple",

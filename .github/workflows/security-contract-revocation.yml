@@ -1208,11 +1208,11 @@ jobs:
             fi
           }
 
+          normalize_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${external_id}"
           normalize_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / Build, lint, test" "${external_id}:actions:build"
           normalize_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / MSRV build and test" "${external_id}:actions:msrv"
           normalize_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / cargo-vet (locked supply-chain audit)" "${external_id}:actions:vet"
           normalize_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / cargo-deny (supply-chain bans/advisories/licenses)" "${external_id}:actions:deny"
-          normalize_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${external_id}"
           revalidate_target
           unset installation_token
           trap - EXIT
