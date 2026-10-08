@@ -308,7 +308,7 @@ fn snapshot(
     let snapshot = SecurityParticipantSourceSnapshot::new(
         binding.clone(),
         identity,
-        schema::digest()?,
+        schema::digest(connection)?,
         inventory,
     )?;
     if file_identity(connection, path)? != identity {

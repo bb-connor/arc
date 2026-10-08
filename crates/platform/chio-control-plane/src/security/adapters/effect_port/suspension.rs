@@ -234,6 +234,65 @@ impl CapabilitySetSuspensionBackend {
         self.verify_committed(request, &key, &predicted, &result)?;
         Ok(result)
     }
+
+    fn verify_completed_removal(
+        &self,
+        query: &EffectResultQuery,
+        key: &CapabilitySetSuspensionKey,
+        original_result: &EffectResult,
+    ) -> PortResult<()> {
+        let command = self
+            .suspensions
+            .load_completed_capability_set_suspension_remove(query)?
+            .ok_or_else(PortError::integrity_failure)?;
+        let removed = &command.request;
+        if removed.operation != EffectOperation::Remove
+            || removed.tenant_id != query.tenant_id
+            || removed.action_id != query.action_id
+            || removed.effect_id != query.effect_id
+            || removed.effect_kind != query.effect_kind
+            || removed.target != query.target
+            || removed.plan_hash != query.plan_hash
+            || removed.plan_expires_at_unix_ms != query.plan_expires_at_unix_ms
+            || removed.contribution_hash != query.contribution_hash
+            || removed.expected_version_hash != original_result.resulting_version_hash
+            || command.result.effect_id != query.effect_id
+            || command.result.applied
+        {
+            return Err(PortError::integrity_failure());
+        }
+        verify_contribution_hash(&removed.canonical_contribution, removed.contribution_hash)?;
+        let spec = decode_capability_set_suspension_spec(&removed.canonical_contribution)?;
+        if response_affected_set_hash(&query.tenant_id, &spec.affected_ids)?
+            != key.affected_set_hash
+        {
+            return Err(PortError::integrity_failure());
+        }
+        let original = CapabilitySetSuspensionContribution {
+            action_id: query.action_id.clone(),
+            effect_id: query.effect_id.clone(),
+            affected_ids: spec.affected_ids,
+            contribution_hash: query.contribution_hash,
+            expires_at_unix_ms: query.plan_expires_at_unix_ms,
+        };
+        validate_capability_set_suspension_snapshot(&command.resulting_snapshot, key)?;
+        if capability_set_suspension_installed_version_hash(key, &original)?
+            != original_result.resulting_version_hash
+            || capability_set_suspension_version_hash(&command.resulting_snapshot)?
+                != command.result.resulting_version_hash
+            || command
+                .resulting_snapshot
+                .contributions
+                .as_slice()
+                .iter()
+                .any(|entry| {
+                    entry.action_id == query.action_id && entry.effect_id == query.effect_id
+                })
+        {
+            return Err(PortError::integrity_failure());
+        }
+        Ok(())
+    }
 }
 
 impl ResponseEffectBackend for CapabilitySetSuspensionBackend {
@@ -305,20 +364,19 @@ impl ResponseEffectBackend for CapabilitySetSuspensionBackend {
                         .load_capability_set_suspensions(&key)?
                         .ok_or_else(PortError::integrity_failure)?;
                     validate_capability_set_suspension_snapshot(&snapshot, &key)?;
-                    let contribution = snapshot
-                        .contributions
-                        .as_slice()
-                        .iter()
-                        .find(|entry| {
-                            entry.action_id == query.action_id && entry.effect_id == query.effect_id
-                        })
-                        .ok_or_else(PortError::integrity_failure)?;
-                    if contribution.contribution_hash != query.contribution_hash
-                        || contribution.expires_at_unix_ms != query.plan_expires_at_unix_ms
-                        || capability_set_suspension_installed_version_hash(&key, contribution)?
-                            != result.resulting_version_hash
-                    {
-                        return Err(PortError::integrity_failure());
+                    let contribution = snapshot.contributions.as_slice().iter().find(|entry| {
+                        entry.action_id == query.action_id && entry.effect_id == query.effect_id
+                    });
+                    if let Some(contribution) = contribution {
+                        if contribution.contribution_hash != query.contribution_hash
+                            || contribution.expires_at_unix_ms != query.plan_expires_at_unix_ms
+                            || capability_set_suspension_installed_version_hash(&key, contribution)?
+                                != result.resulting_version_hash
+                        {
+                            return Err(PortError::integrity_failure());
+                        }
+                    } else {
+                        self.verify_completed_removal(query, &key, result)?;
                     }
                 }
             }

@@ -150,11 +150,11 @@ fn validate_remove_request(request: &CapabilitySetSuspensionRemoveRequest) -> Po
     Ok(())
 }
 
-fn validate_stored_command(command: &CapabilitySetSuspensionCommand) -> PortResult<()> {
+pub(super) fn validate_stored_command(command: &CapabilitySetSuspensionCommand) -> PortResult<()> {
     validate_command_common(command).map_err(|_| PortError::integrity_failure())
 }
 
-fn load_command(
+pub(super) fn load_command(
     connection: &Connection,
     tenant_id: &str,
     idempotency_key: &str,
@@ -533,6 +533,10 @@ fn persist_effect(
 impl CapabilitySetSuspensionStore for SqliteSecurityStateStore {
     fn ensure_capability_set_suspensions_ready(&self) -> PortResult<()> {
         let mut connection = self.connection()?;
+        super::effect_finality::validate_ready(
+            &connection,
+            ResponseEffectKind::SuspendCapabilitySet,
+        )?;
         let orphan_effect: bool = connection
             .query_row(
                 r#"
@@ -657,6 +661,7 @@ impl CapabilitySetSuspensionStore for SqliteSecurityStateStore {
             transaction.commit().map_err(sqlite_error)?;
             return Ok(existing.resulting_snapshot);
         }
+        super::effect_finality::check_apply(&transaction, &request.command.request)?;
         let binding = load_binding(
             &transaction,
             request.key.tenant_id.as_str(),
@@ -777,6 +782,7 @@ impl CapabilitySetSuspensionStore for SqliteSecurityStateStore {
                 return Err(PortError::integrity_failure());
             }
             persist_command(&transaction, &request.command)?;
+            super::effect_finality::record_remove(&transaction, &request.command.request)?;
             transaction.commit().map_err(sqlite_error)?;
             return Ok(current);
         };
@@ -809,6 +815,7 @@ impl CapabilitySetSuspensionStore for SqliteSecurityStateStore {
             return Err(PortError::integrity_failure());
         }
         persist_command(&transaction, &request.command)?;
+        super::effect_finality::record_remove(&transaction, &request.command.request)?;
         transaction.commit().map_err(sqlite_error)?;
         Ok(stored)
     }
@@ -866,5 +873,31 @@ impl CapabilitySetSuspensionStore for SqliteSecurityStateStore {
         Ok(EffectExecutionStatus::Completed {
             result: command.result,
         })
+    }
+
+    fn load_completed_capability_set_suspension_remove(
+        &self,
+        query: &EffectResultQuery,
+    ) -> PortResult<Option<CapabilitySetSuspensionCommand>> {
+        let mut connection = self.connection()?;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Deferred)
+            .map_err(sqlite_error)?;
+        let Some(original) = load_command(
+            &transaction,
+            query.tenant_id.as_str(),
+            query.idempotency_key.as_str(),
+        )?
+        else {
+            transaction.commit().map_err(sqlite_error)?;
+            return Ok(None);
+        };
+        validate_stored_command(&original)?;
+        if !effect_request_matches_query(&original.request, query) {
+            return Err(PortError::conflict());
+        }
+        let command = super::effect_finality::completed_capability_remove(&transaction, query)?;
+        transaction.commit().map_err(sqlite_error)?;
+        Ok(command)
     }
 }

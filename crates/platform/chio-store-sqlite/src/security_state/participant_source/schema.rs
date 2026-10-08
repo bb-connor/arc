@@ -1,5 +1,5 @@
 use chio_core::{canonical_json_bytes, sha256_hex};
-use rusqlite::{params, Connection};
+use rusqlite::Connection;
 
 use super::{Error, Result};
 
@@ -155,9 +155,9 @@ pub(super) fn verify(connection: &Connection, sealed: bool) -> Result<()> {
     }
     let valid: bool = connection.query_row(
         "SELECT COUNT(*) = 1 AND COALESCE(MIN(store_key = 'security_state'
-        AND typeof(version) = 'integer' AND version = ?1), 0)
+        AND typeof(version) = 'integer' AND version IN (0, 1)), 0)
         FROM chio_store_schema_versions WHERE lower(store_key) = 'security_state'",
-        params![super::super::SECURITY_STATE_STORE_SUPPORTED_SCHEMA_VERSION],
+        [],
         |row| row.get(0),
     )?;
     if !valid {
@@ -165,14 +165,57 @@ pub(super) fn verify(connection: &Connection, sealed: bool) -> Result<()> {
             "source security schema version is not canonical",
         ));
     }
+    match authenticated_revision(connection)? {
+        0 if super::super::effect_finality::objects_absent(connection)
+            .map_err(|_| Error::Invalid("legacy source finality namespace is invalid"))? => {}
+        1 => super::super::effect_finality::validate_schema(connection)
+            .map_err(|_| Error::Invalid("source finality schema is not qualified"))?,
+        _ => {
+            return Err(Error::Invalid(
+                "source version and finality schema disagree",
+            ))
+        }
+    }
     Ok(())
 }
 
-pub(super) fn digest() -> Result<String> {
-    let mut bytes = b"chio.security-participant-source.catalog.v1\0".to_vec();
-    bytes.extend(
-        canonical_json_bytes(&expected_catalog(true)?)
-            .map_err(|_| Error::Invalid("source catalog cannot be encoded"))?,
-    );
+fn authenticated_revision(connection: &Connection) -> Result<i32> {
+    super::super::effect_finality::schema_revision(connection)
+        .map_err(|_| Error::Invalid("source security schema version is not canonical"))
+}
+
+pub(super) fn digest(connection: &Connection) -> Result<String> {
+    let catalog = expected_catalog(true)?;
+    let bytes = match authenticated_revision(connection)? {
+        0 => {
+            let mut bytes = b"chio.security-participant-source.catalog.v1\0".to_vec();
+            bytes.extend(
+                canonical_json_bytes(&catalog)
+                    .map_err(|_| Error::Invalid("source catalog cannot be encoded"))?,
+            );
+            bytes
+        }
+        1 => {
+            #[derive(serde::Serialize)]
+            struct VersionedCatalog<'a> {
+                schema_revision: u8,
+                catalog: &'a [CatalogEntry],
+            }
+            let mut bytes = b"chio.security-participant-source.catalog.v2\0".to_vec();
+            bytes.extend(
+                canonical_json_bytes(&VersionedCatalog {
+                    schema_revision: 1,
+                    catalog: &catalog,
+                })
+                .map_err(|_| Error::Invalid("source catalog cannot be encoded"))?,
+            );
+            bytes
+        }
+        _ => {
+            return Err(Error::Invalid(
+                "source security schema version is unsupported",
+            ))
+        }
+    };
     Ok(sha256_hex(&bytes))
 }

@@ -457,11 +457,6 @@ impl IssuanceFreezeBackend {
                 entry.action_id == request.action_id && entry.effect_id == request.effect_id
             })
             .cloned();
-        if existing.is_none()
-            && issuance_freeze_version_hash(&current)? != request.expected_version_hash
-        {
-            return Err(PortError::conflict());
-        }
         let fence = self.acquire_or_recover_fence(request, &spec)?;
         let derived_contribution = match Self::contribution(request, &spec, fence.clone()) {
             Ok(contribution) => contribution,

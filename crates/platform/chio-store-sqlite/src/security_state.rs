@@ -1,4 +1,5 @@
 mod capability_set_suspension;
+mod effect_finality;
 #[cfg(all(test, unix))]
 mod database_file_tests;
 #[cfg(test)]

@@ -16,6 +16,7 @@ use super::{
 impl EgressRestrictionStore for SqliteSecurityStateStore {
     fn ensure_egress_restrictions_ready(&self) -> PortResult<()> {
         let connection = self.connection()?;
+        super::effect_finality::validate_ready(&connection, ResponseEffectKind::RestrictEgress)?;
         let orphan_effect: bool = connection
             .query_row(
                 r#"
@@ -156,6 +157,7 @@ impl EgressRestrictionStore for SqliteSecurityStateStore {
             transaction.commit().map_err(sqlite_error)?;
             return Ok(current);
         }
+        super::effect_finality::check_apply(&transaction, &request.command.request)?;
         let current = load_egress_restriction_snapshot(&transaction, &request.key)?
             .unwrap_or(empty_egress_restriction_snapshot(&request.key)?);
         if let Some(existing) = current
@@ -311,6 +313,7 @@ impl EgressRestrictionStore for SqliteSecurityStateStore {
                 return Err(PortError::integrity_failure());
             }
             persist_egress_restriction_command(&transaction, &request.command)?;
+            super::effect_finality::record_remove(&transaction, &request.command.request)?;
             transaction.commit().map_err(sqlite_error)?;
             return Ok(current);
         };
@@ -361,6 +364,7 @@ impl EgressRestrictionStore for SqliteSecurityStateStore {
         let snapshot = load_egress_restriction_snapshot(&transaction, &request.key)?
             .ok_or_else(PortError::integrity_failure)?;
         persist_egress_restriction_command(&transaction, &request.command)?;
+        super::effect_finality::record_remove(&transaction, &request.command.request)?;
         transaction.commit().map_err(sqlite_error)?;
         Ok(snapshot)
     }
@@ -442,7 +446,7 @@ pub(super) struct EgressCommandContributionBody {
     destinations: EgressDestinationSet,
 }
 
-fn validate_stored_egress_restriction_command(
+pub(super) fn validate_stored_egress_restriction_command(
     command: &EgressRestrictionCommand,
 ) -> PortResult<()> {
     validate_egress_command_common(command).map_err(|_| PortError::integrity_failure())?;
@@ -548,7 +552,7 @@ pub(super) fn effect_request_matches_query(
 
 pub(super) type StoredEgressRestrictionCommand = (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>);
 
-fn load_egress_restriction_command(
+pub(super) fn load_egress_restriction_command(
     connection: &Connection,
     tenant_id: &str,
     idempotency_key: &str,

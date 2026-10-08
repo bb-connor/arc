@@ -17,6 +17,7 @@ use super::{
 impl ContainmentOverlayStore for SqliteSecurityStateStore {
     fn ensure_containment_overlays_ready(&self) -> PortResult<()> {
         let mut connection = self.connection()?;
+        super::effect_finality::validate_ready(&connection, ResponseEffectKind::SuspendSession)?;
         let orphan_contribution: bool = connection
             .query_row(
                 r#"
@@ -126,6 +127,7 @@ impl ContainmentOverlayStore for SqliteSecurityStateStore {
             transaction.commit().map_err(sqlite_error)?;
             return Ok(result);
         }
+        super::effect_finality::check_apply(&transaction, &request.command.request)?;
         if let Some((target_id, action_id)) = load_contribution_binding(
             &transaction,
             request.target.tenant_id.as_str(),
@@ -303,6 +305,7 @@ impl ContainmentOverlayStore for SqliteSecurityStateStore {
                 return Err(PortError::integrity_failure());
             }
             persist_containment_overlay_command(&transaction, &request.command)?;
+            super::effect_finality::record_remove(&transaction, &request.command.request)?;
             transaction.commit().map_err(sqlite_error)?;
             return Ok(current);
         }
@@ -355,6 +358,7 @@ impl ContainmentOverlayStore for SqliteSecurityStateStore {
             return Err(PortError::integrity_failure());
         }
         persist_containment_overlay_command(&transaction, &request.command)?;
+        super::effect_finality::record_remove(&transaction, &request.command.request)?;
         transaction.commit().map_err(sqlite_error)?;
         Ok(snapshot)
     }
@@ -409,7 +413,7 @@ pub(super) struct ContainmentCommandContributionBody {
     posture_rank: u32,
 }
 
-fn validate_stored_containment_overlay_command(
+pub(super) fn validate_stored_containment_overlay_command(
     command: &ContainmentOverlayCommand,
 ) -> PortResult<()> {
     validate_containment_command_common(command).map_err(|_| PortError::integrity_failure())
@@ -539,7 +543,7 @@ fn decode_containment_command_contribution(
 pub(super) type StoredEffectCommandProjection =
     (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>);
 
-fn load_containment_overlay_command(
+pub(super) fn load_containment_overlay_command(
     connection: &Connection,
     tenant_id: &str,
     idempotency_key: &str,

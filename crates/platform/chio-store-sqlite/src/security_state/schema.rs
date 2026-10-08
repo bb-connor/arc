@@ -10,7 +10,7 @@ use super::{
 };
 
 const SECURITY_STATE_STORE_SCHEMA_KEY: &str = "security_state";
-pub(super) const SECURITY_STATE_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
+pub(super) const SECURITY_STATE_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 1;
 const SECURITY_STATE_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &[
     "security_transitions",
     "security_flow_contexts",
@@ -75,6 +75,7 @@ const SECURITY_STATE_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &[
 // tenant-read-contract: security_verified_events; class=tenant-predicate; principal=security-runtime
 // Contracts: docs/security/trust-boundary-inventory.json
 pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
+    super::effect_finality::preflight(connection)?;
     super::dispatch::preflight_automatic_preparation_schema(connection)?;
     connection
         .execute_batch(
@@ -1113,6 +1114,10 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
             .map_err(sqlite_error)?;
         ensure_attested_finding_batch_tenant_keys(connection)?;
         super::dispatch::ensure_automatic_preparation_schema(connection)?;
+        super::effect_finality::ensure_schema(connection)?;
+        if super::effect_finality::schema_revision(connection)? == 0 {
+            super::effect_finality::migrate_legacy(connection)?;
+        }
         ensure_attested_finding_response_outbox_schema(connection)?;
         upgrade_correlation_ingress_pending_index(connection)?;
         validate_correlation_durable_schema(connection)?;

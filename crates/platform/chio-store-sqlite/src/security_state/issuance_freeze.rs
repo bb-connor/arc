@@ -889,6 +889,7 @@ fn effect_exists(
 impl IssuanceFreezeStore for SqliteSecurityStateStore {
     fn ensure_issuance_freezes_ready(&self) -> PortResult<()> {
         let mut connection = self.connection()?;
+        super::effect_finality::validate_ready(&connection, ResponseEffectKind::FreezeIssuance)?;
         let orphan_effect: bool = connection
             .query_row(
                 r#"
@@ -989,6 +990,7 @@ impl IssuanceFreezeStore for SqliteSecurityStateStore {
             transaction.commit().map_err(sqlite_error)?;
             return Ok(existing.command.resulting_snapshot);
         }
+        super::effect_finality::check_apply(&transaction, &request.command.request)?;
         if pending_command_exists(&transaction, &request.key, None)? {
             return Err(PortError::conflict());
         }
@@ -1038,8 +1040,6 @@ impl IssuanceFreezeStore for SqliteSecurityStateStore {
         }
         if binding.is_some()
             || current.generation != request.expected_generation
-            || issuance_freeze_version_hash(&current)?
-                != request.command.request.expected_version_hash
             || request.contribution.expires_at_unix_ms <= trusted_now
         {
             return Err(PortError::conflict());
@@ -1238,6 +1238,7 @@ impl IssuanceFreezeStore for SqliteSecurityStateStore {
                 pending_contribution: None,
             },
         )?;
+        super::effect_finality::record_remove(&transaction, &request.command.request)?;
         transaction.commit().map_err(sqlite_error)?;
         Ok(stored_snapshot)
     }
@@ -1514,4 +1515,15 @@ impl IssuanceFreezeStore for SqliteSecurityStateStore {
         transaction.commit().map_err(sqlite_error)?;
         Ok(stored)
     }
+}
+
+/// Authenticated completed journal projection; pending release never proves finality.
+pub(super) fn load_finality_command(
+    connection: &Connection,
+    tenant_id: &str,
+    idempotency_key: &str,
+) -> PortResult<Option<IssuanceFreezeCommand>> {
+    let stored = load_command(connection, tenant_id, idempotency_key)?
+        .ok_or_else(PortError::integrity_failure)?;
+    Ok((stored.state == StoredCommandState::Completed).then_some(stored.command))
 }

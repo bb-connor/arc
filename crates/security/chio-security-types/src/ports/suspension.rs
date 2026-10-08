@@ -386,4 +386,15 @@ pub trait CapabilitySetSuspensionStore: Send + Sync {
         &self,
         query: &EffectResultQuery,
     ) -> PortResult<EffectExecutionStatus>;
+
+    /// Authenticate the completed removal of this exact original effect.
+    /// Absence alone is not historical completion evidence. Implementations
+    /// bind the first durable removal to its canonical source journal in one
+    /// guarded read; unsupported authorities refuse without granting a replay.
+    fn load_completed_capability_set_suspension_remove(
+        &self,
+        _query: &EffectResultQuery,
+    ) -> PortResult<Option<CapabilitySetSuspensionCommand>> {
+        Err(PortError::unavailable())
+    }
 }

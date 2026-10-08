@@ -16,7 +16,9 @@ use super::{
     StoredEffectCommandProjection, Transaction, TransactionBehavior, MAX_CLOCK_SKEW_MS,
 };
 
-fn validate_stored_session_throttle_command(command: &SessionThrottleCommand) -> PortResult<()> {
+pub(super) fn validate_stored_session_throttle_command(
+    command: &SessionThrottleCommand,
+) -> PortResult<()> {
     validate_session_throttle_command_common(command).map_err(|_| PortError::integrity_failure())
 }
 
@@ -143,7 +145,7 @@ fn decode_session_throttle_limits(request: &EffectRequest) -> PortResult<Session
     Ok(limits)
 }
 
-fn load_session_throttle_command(
+pub(super) fn load_session_throttle_command(
     connection: &Connection,
     tenant_id: &str,
     idempotency_key: &str,
@@ -420,6 +422,7 @@ fn persist_session_throttle_state(
 impl SessionThrottleStore for SqliteSecurityStateStore {
     fn ensure_session_throttles_ready(&self) -> PortResult<()> {
         let connection = self.connection()?;
+        super::effect_finality::validate_ready(&connection, ResponseEffectKind::ThrottleSession)?;
         let orphaned: bool = connection
             .query_row(
                 r#"
@@ -627,6 +630,7 @@ impl SessionThrottleStore for SqliteSecurityStateStore {
             transaction.commit().map_err(sqlite_error)?;
             return Ok(existing.resulting_snapshot);
         }
+        super::effect_finality::check_apply(&transaction, &request.command.request)?;
         let binding = load_session_throttle_binding(
             &transaction,
             request.key.tenant_id.as_str(),
@@ -790,6 +794,7 @@ impl SessionThrottleStore for SqliteSecurityStateStore {
                 return Err(PortError::integrity_failure());
             }
             persist_session_throttle_command(&transaction, &request.command)?;
+            super::effect_finality::record_remove(&transaction, &request.command.request)?;
             transaction.commit().map_err(sqlite_error)?;
             drop(connection);
             super::lifecycle_observation::throttle_committed(&request.command);
@@ -833,6 +838,7 @@ impl SessionThrottleStore for SqliteSecurityStateStore {
             return Err(PortError::integrity_failure());
         }
         persist_session_throttle_command(&transaction, &request.command)?;
+        super::effect_finality::record_remove(&transaction, &request.command.request)?;
         transaction.commit().map_err(sqlite_error)?;
         drop(connection);
         super::lifecycle_observation::throttle_committed(&request.command);
