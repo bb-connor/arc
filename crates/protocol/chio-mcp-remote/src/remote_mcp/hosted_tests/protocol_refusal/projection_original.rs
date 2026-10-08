@@ -1,0 +1,230 @@
+//! Worker-output substitution controls at the owning credential completion seam.
+//! These controls do not claim an unprivileged peer can publish worker events.
+
+use super::*;
+
+const DEADLINE: Duration = Duration::from_secs(4);
+const FORGED: &str = "unsigned-worker-projection-sentinel";
+
+struct CapturedCall {
+    fixture: HttpFixture,
+    session: String,
+    token: String,
+    request: Value,
+    pending: remote_mcp_session_credentials::CredentialCall,
+    terminal: Value,
+}
+
+async fn status_call(
+    fixture: &HttpFixture,
+    session: &str,
+) -> TestResult<remote_mcp_session_credentials::CredentialCall> {
+    let request = axum::http::Request::builder()
+        .method("GET")
+        .uri(format!("/admin/sessions/{session}/credential/status"))
+        .header(AUTHORIZATION, "Bearer admin-fixture")
+        .body(axum::body::Body::empty())?;
+    let response =
+        tokio::time::timeout(DEADLINE, fixture.router.clone().oneshot(request)).await??;
+    assert_eq!(response.status(), StatusCode::OK);
+    let bytes = axum::body::to_bytes(response.into_body(), 128 * 1024).await?;
+    let body: Value = serde_json::from_slice(&bytes)?;
+    Ok(serde_json::from_value(body["call"].clone())?)
+}
+
+async fn capture(logical_id: &str) -> TestResult<CapturedCall> {
+    let fixture = fixture()?;
+    let session = initialize(&fixture).await?;
+    let token = credential(&fixture, &session).await?;
+    let bound = match fixture.state.sessions.lookup(&session).await {
+        Some(RemoteSessionEntry::Active(bound)) => bound,
+        _ => return Err("restricted worker session is not active".into()),
+    };
+    let mut events = bound.subscribe();
+    let call = json!({"jsonrpc":"2.0","id":41,"method":"tools/call","params":{
+        "name":"echo_json","arguments":{"message":"signed-original-output"},
+        "_meta":{"chioRequestId":logical_id}}});
+    let response = tokio::time::timeout(
+        DEADLINE,
+        request(
+            &fixture,
+            MCP_ENDPOINT_PATH,
+            &token,
+            Some(&session),
+            &serde_json::to_vec(&call)?,
+        ),
+    )
+    .await??;
+    assert_eq!(response.status(), StatusCode::OK);
+    let terminal = tokio::time::timeout(DEADLINE, async {
+        loop {
+            let event = events.recv().await?;
+            if event.message["id"] == 41 && event.message.get("method").is_none() {
+                return Ok::<_, broadcast::error::RecvError>(event.message);
+            }
+        }
+    })
+    .await??;
+    // The real adapter and kernel have produced a terminal result. This body
+    // has never been polled, so the credential outcome remains pending. Dropping
+    // it allows a substitution control at finish_call, without dispatching twice.
+    drop(response);
+    let pending = status_call(&fixture, &session).await?;
+    let receipt: ChioReceipt =
+        serde_json::from_value(terminal["result"]["_meta"]["chioEvidence"]["receipt"].clone())?;
+    assert_eq!(receipt.kernel_key, fixture.trusted_key);
+    assert!(receipt.verify_signature()?);
+    assert_eq!(
+        receipt.content_hash,
+        sha256_hex(&canonical_json_bytes(
+            &terminal["result"]["_meta"]["chioEvidence"]["output"]
+        )?)
+    );
+    assert_eq!(fixture.calls.load(Ordering::SeqCst), 1);
+    Ok(CapturedCall {
+        fixture,
+        session,
+        token,
+        request: call,
+        pending,
+        terminal,
+    })
+}
+
+async fn replay(captured: &CapturedCall) -> TestResult<(StatusCode, Vec<u8>)> {
+    let bytes = serde_json::to_vec(&captured.request)?;
+    let response = tokio::time::timeout(
+        DEADLINE,
+        request(
+            &captured.fixture,
+            MCP_ENDPOINT_PATH,
+            &captured.token,
+            Some(&captured.session),
+            &bytes,
+        ),
+    )
+    .await??;
+    let status = response.status();
+    let bytes = tokio::time::timeout(
+        DEADLINE,
+        axum::body::to_bytes(response.into_body(), 128 * 1024),
+    )
+    .await??;
+    Ok((status, bytes.to_vec()))
+}
+
+fn visible_result(message: &Value) -> Value {
+    json!({"content":message["result"]["content"],
+        "structuredContent":message["result"]["structuredContent"],
+        "isError":message["result"]["isError"]})
+}
+
+async fn cleanup(captured: &CapturedCall) -> TestResult {
+    captured
+        .fixture
+        .state
+        .sessions
+        .shutdown_all_active()
+        .await?;
+    captured
+        .fixture
+        .state
+        .factory
+        .shutdown_shared_upstream_owner()?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn mcp_projection_original_real_adapter_projection_is_acknowledged_and_replayed() -> TestResult
+{
+    let captured = capture("projection-real-adapter-positive").await?;
+    let finished = remote_mcp_session_credentials::finish_call(
+        &captured.fixture.state,
+        &captured.pending,
+        &captured.terminal,
+    );
+    let replayed = replay(&captured).await?;
+    cleanup(&captured).await?;
+    let finished = finished.map_err(|response| format!("finish returned {}", response.status()))?;
+    assert_eq!(
+        visible_result(&finished),
+        visible_result(&captured.terminal)
+    );
+    assert!(finished["result"]["_meta"]["chioDelivery"]["acknowledgement"].is_string());
+    assert_eq!(replayed.0, StatusCode::OK);
+    let replayed: Value = serde_json::from_slice(&replayed.1)?;
+    assert_eq!(
+        replayed, finished,
+        "replay changed the verified delivered outcome"
+    );
+    assert_eq!(captured.fixture.calls.load(Ordering::SeqCst), 1);
+    Ok(())
+}
+
+async fn rejects_forged_projection(invalid_signed_evidence: bool) -> TestResult {
+    let captured = capture(if invalid_signed_evidence {
+        "projection-invalid-signed-evidence"
+    } else {
+        "projection-unchanged-signed-evidence"
+    })
+    .await?;
+    let mut forged = captured.terminal.clone();
+    forged["result"]["content"] = json!([{"type":"text","text":FORGED}]);
+    forged["result"]["structuredContent"] = json!({"echo":FORGED});
+    forged["result"]["isError"] = json!(true);
+    if invalid_signed_evidence {
+        let mut receipt: ChioReceipt =
+            serde_json::from_value(forged["result"]["_meta"]["chioEvidence"]["receipt"].clone())?;
+        receipt.tool_name = "unsigned-replacement-tool".into();
+        assert!(!receipt.verify_signature()?);
+        forged["result"]["_meta"]["chioEvidence"]["receipt"] = serde_json::to_value(receipt)?;
+    } else {
+        assert_eq!(
+            forged["result"]["_meta"]["chioEvidence"],
+            captured.terminal["result"]["_meta"]["chioEvidence"],
+            "projection-only control changed signed evidence"
+        );
+    }
+    let finished = remote_mcp_session_credentials::finish_call(
+        &captured.fixture.state,
+        &captured.pending,
+        &forged,
+    );
+    let replayed = replay(&captured).await?;
+    cleanup(&captured).await?;
+
+    if let Ok(response) = finished {
+        assert!(
+            !visible_result(&response).to_string().contains(FORGED),
+            "credential completion returned an unsigned visible tool result: {response}"
+        );
+        if response.get("result").is_some() {
+            assert_eq!(
+                visible_result(&response),
+                visible_result(&captured.terminal)
+            );
+            assert!(
+                !invalid_signed_evidence,
+                "invalid receipt still authorized tool output"
+            );
+        }
+    }
+    assert!(
+        !String::from_utf8_lossy(&replayed.1).contains(FORGED),
+        "the signed credential-call row replayed forged worker output"
+    );
+    assert_eq!(captured.fixture.calls.load(Ordering::SeqCst), 1);
+    Ok(())
+}
+
+#[tokio::test]
+async fn mcp_projection_original_unchanged_receipt_cannot_authorize_tampered_visible_output(
+) -> TestResult {
+    rejects_forged_projection(false).await
+}
+
+#[tokio::test]
+async fn mcp_projection_original_invalid_signed_evidence_cannot_deliver_or_replay_tool_output(
+) -> TestResult {
+    rejects_forged_projection(true).await
+}
