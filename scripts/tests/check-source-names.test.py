@@ -90,6 +90,58 @@ class SourceNamesTest(unittest.TestCase):
         self.write("scripts/check-release-inputs.sh", f'key="{legacy}_suffix"\n')
         self.assertEqual(len(list(MODULE.violations(self.root))), 2)
 
+    def test_retained_corpus_aliases_are_data_in_their_existing_mapping(self):
+        policy = MODULE.legacy_label(3, "_counterexample", padded=True)
+        sdk = MODULE.legacy_label(2, "_verdict_divergence", padded=True)
+        self.write("scripts/check-corpus-metadata.sh", '\n'.join([
+            "LEGACY_SOURCE_ALIASES = {",
+            f'    "{policy}": "policy_counterexample",',
+            f'    "{sdk}": "sdk_verdict_divergence",',
+            "}",
+        ]) + '\n')
+        self.assertEqual(list(MODULE.violations(self.root)), [])
+
+    def test_retained_reference_report_key_is_data_with_false_acceptance(self):
+        key = MODULE.legacy_label(5, "_acceptance_complete")
+        self.write("examples/reference-swarm/process-run.py",
+                   'report = {\n    "' + key + '": False,\n}\n')
+        self.assertEqual(list(MODULE.violations(self.root)), [])
+
+    def test_retained_interface_controls_can_assert_the_exact_data_keys(self):
+        policy = MODULE.legacy_label(3, "_counterexample", padded=True)
+        sdk = MODULE.legacy_label(2, "_verdict_divergence", padded=True)
+        key = MODULE.legacy_label(5, "_acceptance_complete")
+        self.write("scripts/tests/legacy-machine-interfaces.test.py", '\n'.join([
+            "class Controls:",
+            "    def check(self, report):",
+            f'        result = self.check_corpus_source("{policy}")',
+            f'        result = self.check_corpus_source("{sdk}")',
+            f'        self.assertIn("{key}", report)',
+            f'        self.assertIs(report["{key}"], False)',
+        ]) + '\n')
+        self.assertEqual(list(MODULE.violations(self.root)), [])
+
+    def test_retained_data_aliases_do_not_hide_changed_values_or_fake_phase_symbols(self):
+        policy = MODULE.legacy_label(3, "_counterexample", padded=True)
+        key = MODULE.legacy_label(5, "_acceptance_complete")
+        label = "phase_" + str(9) + "_invoke"
+        cases = [
+            ("scripts/check-corpus-metadata.sh", f'    "{policy}": "grant_authority",\n'),
+            ("examples/reference-swarm/process-run.py", 'report = {\n    "' + key + '": True,\n}\n'),
+            ("examples/reference-swarm/process-run.py", f'def {label}():\n    pass\n'),
+            ("scripts/tests/legacy-machine-interfaces.test.py", f'def test_{label}_approval():\n    pass\n'),
+            ("examples/reference-swarm/process-run.py", '# "' + key + '": False,\n'),
+            ("examples/reference-swarm/process-run.py", '"""\n    "' + key + '": False,\n"""\n'),
+            ("scripts/unrelated-corpus.sh", f'    "{policy}": "policy_counterexample",\n'),
+            ("scripts/tests/legacy-machine-interfaces.test.py", f'result = self.check_corpus_source("{policy}") # {label}\n'),
+        ]
+        for name, content in cases:
+            with self.subTest(name=name, content=content):
+                self.write(name, content)
+                self.assertTrue(any(finding.startswith(name + ":")
+                                    for finding in MODULE.violations(self.root)))
+                (self.root / name).unlink()
+
     def test_root_build_targets_and_symbol_suffixes_are_rejected(self):
         label = "m" + str(11)
         self.write("Makefile", f"qualify-market-{label}:\n\ttrue\n")
@@ -318,6 +370,41 @@ class SourceNamesTest(unittest.TestCase):
                 self.write(name, source + ordinary_variable)
                 self.assertEqual(list(MODULE.violations(self.root)), [])
                 self.write(name, source + ordinary_variable + ' /* Added for:\nP' + str(6) + ' product acceptance.\n*/')
+                self.assertEqual(len(list(MODULE.violations(self.root))), 1)
+
+    def test_javascript_update_expressions_preserve_division_and_comment_context(self):
+        name = "sdks/example/src/probe.js"
+        label = "P" + str(6)
+        for source in [
+            "value++ / divisor;",
+            "value-- / divisor;",
+            "const result = (value++ / divisor);",
+            "const result = (value-- / divisor);",
+            "++value / divisor;",
+            "--value / divisor;",
+        ]:
+            with self.subTest(source=source):
+                self.write(name, source + " // Ordinary arithmetic.\n")
+                self.assertEqual(list(MODULE.violations(self.root)), [])
+                self.write(name, source + " // " + label + "\n")
+                findings = list(MODULE.violations(self.root))
+                self.assertEqual(len(findings), 1)
+                self.assertIn(":1:", findings[0])
+
+    def test_javascript_prefix_updates_keep_regex_operands_after_line_breaks(self):
+        name = "sdks/example/src/probe.js"
+        for source in [
+            '++/["/]/.lastIndex; ',
+            '--/["/]/.lastIndex; ',
+            'value\n++/["/]/.lastIndex; ',
+            'value\n--/["/]/.lastIndex; ',
+            'value /*\n ordinary prose\n */ ++/["/]/.lastIndex; ',
+        ]:
+            with self.subTest(source=source):
+                ordinary = "let p" + str(1) + " = 1;"
+                self.write(name, source + ordinary)
+                self.assertEqual(list(MODULE.violations(self.root)), [])
+                self.write(name, source + ordinary + " // P" + str(6) + "\n")
                 self.assertEqual(len(list(MODULE.violations(self.root))), 1)
 
     def test_rust_fragments_and_jsx_literals_keep_their_language_context(self):

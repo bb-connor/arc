@@ -4,10 +4,13 @@ use crate::recovery::RecoveryMaintenanceRuntime;
 use chio_core_types::recovery::{SignedPolicyDeploymentChangeV1, SignedSemanticDeploymentV1};
 use chio_security_types::semantic::{SemanticOutputDispositionV1, SemanticSelectorV1};
 use chio_semantic_contracts::{compile_semantic_registry, VerificationBudget};
+mod bounded_projection_intake;
 mod evidence_owners;
 mod historical_audience;
 mod lifecycle;
+mod proposal_terminal_custody;
 mod read_privacy;
+mod reclamation_audience;
 mod transport_admission;
 
 fn maintenance(f: &KnowledgeFixture) -> TestResult<RecoveryMaintenanceRuntime> {
@@ -676,3 +679,5 @@ async fn policy_http_projection_rechecks_revoked_audience_without_canaries() -> 
 }
 
 mod source_integrity;
+
+mod reclamation_integrity;

@@ -140,7 +140,117 @@ impl core::fmt::Debug for ConfinedProcessAttachment<'_> {
     }
 }
 
+/// Borrowed private candidate data. Neither this description nor verification
+/// of it is a permit to write the process journal's reserved return slot.
+pub struct ConfinedReturnCandidateInput<'a> {
+    pub actor: &'a crate::recovery::AuthenticatedRecoveryActor,
+    pub boundary: &'a chio_security_types::confinement::IsolationBoundaryV1,
+    pub bytes: &'a [u8],
+}
+impl core::fmt::Debug for ConfinedReturnCandidateInput<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("ConfinedReturnCandidateInput([redacted])")
+    }
+}
+
+/// Exact current RETURN data selected by the trusted host before byte dispatch.
+/// Describing this input grants no Process marker authority.
+pub struct ConfinedReturnDeliveryInput<'a> {
+    pub actor: &'a crate::recovery::AuthenticatedRecoveryActor,
+    pub request: &'a chio_security_types::recovery::RequestId,
+    pub seal: &'a crate::knowledge::ArtifactBlobSealV1,
+    pub admission: &'a chio_security_types::confinement::ReturnAdmissionV1,
+}
+impl core::fmt::Debug for ConfinedReturnDeliveryInput<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("ConfinedReturnDeliveryInput([redacted])")
+    }
+}
+
 pub trait AdmissionOperationStore: Send + Sync {
+    // Target-only additive methods for the existing AdmissionOperationStore trait.
+    // They use the actual Kernel-configured qualified store and default refuse.
+    fn verify_original_process_return_enrollment(
+        &self,
+        _source: &crate::process_return_custody::ProcessReturnSourceDataV1,
+        _fence: &StoreMutationFence,
+        _now: u64,
+    ) -> Result<
+        crate::process_return_custody::ProcessReturnFundingDataV1,
+        AdmissionOperationStoreError,
+    > {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "original funded Process enrollment unavailable".into(),
+        ))
+    }
+    fn verify_original_process_nonce_custody(
+        &self,
+        _source: &crate::process_return_custody::ProcessReturnSourceDataV1,
+        _fence: &StoreMutationFence,
+        _now: u64,
+    ) -> Result<
+        crate::process_return_custody::ProcessOriginalNonceCustodyDataV1,
+        AdmissionOperationStoreError,
+    > {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "original funded Process nonce custody unavailable".into(),
+        ))
+    }
+    fn verify_original_process_return_capture(
+        &self,
+        _source: &crate::process_return_custody::ProcessReturnSourceDataV1,
+        _fence: &StoreMutationFence,
+        _now: u64,
+    ) -> Result<
+        crate::process_return_custody::ProcessNativeReturnCaptureDataV1,
+        AdmissionOperationStoreError,
+    > {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "original funded Process return capture unavailable".into(),
+        ))
+    }
+    fn verify_original_process_return_reconciliation(
+        &self,
+        _source: &crate::process_return_custody::ProcessReturnSourceDataV1,
+        _final_receipt_digest: &str,
+        _final_sequence: u64,
+        _final_event_digest: &str,
+        _fence: &StoreMutationFence,
+        _now: u64,
+    ) -> Result<
+        crate::process_return_custody::ProcessReturnReconciliationDataV1,
+        AdmissionOperationStoreError,
+    > {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "original funded Process return reconciliation unavailable".into(),
+        ))
+    }
+
+    /// Return only the authenticated complete native boundary after a fresh
+    /// current RETURN gate. The Kernel separately mints an affine marker proof.
+    fn verify_confined_return_delivery(
+        &self,
+        _input: ConfinedReturnDeliveryInput<'_>,
+        _fence: &StoreMutationFence,
+        _now: u64,
+    ) -> Result<chio_security_types::confinement::IsolationBoundaryV1, AdmissionOperationStoreError>
+    {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "confined delivery verification unavailable".into(),
+        ))
+    }
+    /// Current native actor, complete boundary, source audience and successful
+    /// canonical projection must be verified before a reserved slot is filled.
+    fn verify_confined_return_candidate(
+        &self,
+        _input: ConfinedReturnCandidateInput<'_>,
+        _fence: &StoreMutationFence,
+        _now: u64,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "confined candidate verification unavailable".into(),
+        ))
+    }
     /// Enforced knowledge runtimes check every attachment against the native
     /// confined-capability index before consuming a process or sibling share.
     fn verify_confined_process_attachment(
@@ -173,6 +283,20 @@ pub trait AdmissionOperationStore: Send + Sync {
         _now: u64,
     ) -> Result<bool, AdmissionOperationStoreError> {
         Ok(false)
+    }
+
+    /// Authenticate original native finishing funding before a fresh external
+    /// payment authorization. Borrowed context and a retained profile are DATA,
+    /// not a financing grant. Implementations must verify the exact physical
+    /// original, operation, lease, owner and whole prepaid phase plan. Ordinary
+    /// calls and retained captured fate use their existing purposes.
+    fn require_native_pre_authorization_finishing_funding(
+        &self,
+        _context: &NativeSecurityEgressContext<'_>,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "native pre-authorization finishing funding is unsupported".into(),
+        ))
     }
 
     /// Read the original capture-bound disposition. A semantic invocation may

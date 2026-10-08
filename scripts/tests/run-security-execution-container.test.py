@@ -139,29 +139,29 @@ def candidate_helper_environment_tests() -> None:
 def static_contract_tests() -> None:
     dockerfile = DOCKERFILE_PATH.read_text(encoding="utf-8")
     expected_base = (
-        "FROM --platform=linux/amd64 rust:1.94.1-alpine3.22@sha256:"
-        "667605141d2be37e8a27b3e5368fa388fcd3065ed2dbc2fe64665bce7254fc67"
+        "FROM --platform=linux/amd64 rust:1.95.0-alpine3.22@sha256:"
+        "064dfc925d68d1a63f4fd2871bd7dc6e6ea56692989a487185855d62885d90aa"
     )
     if expected_base not in dockerfile:
         raise AssertionError(
-            "security image base is not pinned to the reviewed Rust 1.94.1 digest"
+            "security image base is not pinned to the reviewed Rust 1.95.0 digest"
         )
     for marker in (
         "bash=5.2.37-r0",
         "security-evidence-apk.lock",
-        "354d439672c5c992ca20d54a276e30aea1dc431ae719357899885c7282169acd",
-        "637f50a513c887136bfd8c5b8ad946ee8c185f75041a1d9a091db998455efeda",
-        "a1492d1c91d82b8d2101220accedffb1c2af7c97ea0793915c4a97d5c3d7424b",
+        "2094807ad2bfeb1dc61c5c8d2ea7fec92735fa908f64ede7bb93f1ceeb5e20f2",
+        "c55a7b5604fe2e0400911c488b320922066fe23646235793cec7c8e5c03e7a61",
+        "688a9ba3b40e9fd360dc083ff28b7ae43c110f2919ee939bb788a46a1e579a84",
         "47040c9cded7996c38b9976af0a9c46c4902ec5eb59369fffec758410dba8028",
         "cargo install \\",
         "--path /tmp/cargo-mutants-25.3.1",
         "chmod 0755 /usr/local/cargo /usr/local/cargo/bin",
         "chmod 0555 /usr/local/cargo/bin/cargo-mutants",
-        'test "$(rustc --version)" = "rustc 1.94.1 (e408947bf 2026-03-25)"',
-        'test "$(cargo clippy --version)" = "clippy 0.1.94 '
-        '(e408947bfd 2026-03-25)"',
-        'test "$(cargo fmt --version)" = "rustfmt 1.8.0-stable '
-        '(e408947bfd 2026-03-25)"',
+        'test "$(rustc --version)" = "rustc 1.95.0 (59807616e 2026-04-14)"',
+        'test "$(cargo clippy --version)" = "clippy 0.1.95 '
+        '(59807616e1 2026-04-14)"',
+        'test "$(cargo fmt --version)" = "rustfmt 1.9.0-stable '
+        '(59807616e1 2026-04-14)"',
         'ENTRYPOINT ["/usr/bin/python3", "-I", "/opt/chio-security/entrypoint.py"]',
         "/opt/chio-security/command-client.py",
         "/opt/chio-security/verifier-bin/cargo",
@@ -1463,6 +1463,7 @@ class FakeDocker:
         self.fail_start = False
         self.fail_remove = False
         self.removed: list[str] = []
+        self.started: list[str] = []
         self.inspect_mutator = None
 
     def inspection(self, identifier: str) -> dict[str, object]:
@@ -1642,6 +1643,7 @@ class FakeDocker:
         if arguments[0] == "start":
             if self.fail_start:
                 raise BOUNDARY.BoundaryError("synthetic Docker start failure")
+            self.started.append(identifier)
             state["state"] = "running"
             output = state["output"]
             assert isinstance(output, Path)
@@ -1744,6 +1746,20 @@ def fake_docker_main_tests() -> None:
                 "real runner main path did not import fake Docker output"
             )
 
+        def reverse_mounts(document: dict[str, object]) -> None:
+            document["Mounts"].reverse()
+
+        reordered = FakeDocker(image)
+        reordered.inspect_mutator = reverse_mounts
+        reordered_output = temporary / "reordered-mounts-output"
+        invoke(reordered, reordered_output, authorized_sha="a" * 40)
+        if (
+            (reordered_output / "probe.log").read_bytes() != b"fake isolated output\n"
+            or len(reordered.started) != 1
+            or any(item["exists"] for item in reordered.containers.values())
+        ):
+            raise AssertionError("permuted exact mount inventory changed execution")
+
         def mutate_network(document: dict[str, object]) -> None:
             document["HostConfig"]["NetworkMode"] = "host"
 
@@ -1758,6 +1774,36 @@ def fake_docker_main_tests() -> None:
                     "Propagation": "rprivate",
                 }
             )
+
+        def duplicate_mount(document: dict[str, object]) -> None:
+            document["Mounts"][1] = dict(document["Mounts"][0])
+
+        def remove_mount(document: dict[str, object]) -> None:
+            document["Mounts"].pop()
+
+        def change_mount_source(document: dict[str, object]) -> None:
+            document["Mounts"][0]["Source"] = "/"
+
+        def change_mount_access(document: dict[str, object]) -> None:
+            document["Mounts"][0]["RW"] = True
+
+        def change_mount_propagation(document: dict[str, object]) -> None:
+            document["Mounts"][0]["Propagation"] = "rshared"
+
+        def add_mount_field(document: dict[str, object]) -> None:
+            document["Mounts"][0]["Unreviewed"] = True
+
+        def remove_mount_field(document: dict[str, object]) -> None:
+            del document["Mounts"][0]["Source"]
+
+        def replace_mount_access_type(document: dict[str, object]) -> None:
+            document["Mounts"][0]["RW"] = 0
+
+        def replace_mount_destination_type(document: dict[str, object]) -> None:
+            document["Mounts"][0]["Destination"] = 0
+
+        def replace_mount_record_type(document: dict[str, object]) -> None:
+            document["Mounts"][0] = None
 
         def relax_pids(document: dict[str, object]) -> None:
             document["HostConfig"]["PidsLimit"] = 0
@@ -1774,6 +1820,16 @@ def fake_docker_main_tests() -> None:
         for label, mutator in (
             ("post-create network override", mutate_network),
             ("post-create extra mount", add_mount),
+            ("post-create duplicate mount", duplicate_mount),
+            ("post-create missing mount", remove_mount),
+            ("post-create changed mount source", change_mount_source),
+            ("post-create changed mount access", change_mount_access),
+            ("post-create changed mount propagation", change_mount_propagation),
+            ("post-create unknown mount field", add_mount_field),
+            ("post-create missing mount field", remove_mount_field),
+            ("post-create nonboolean mount access", replace_mount_access_type),
+            ("post-create nonstring mount destination", replace_mount_destination_type),
+            ("post-create invalid mount record", replace_mount_record_type),
             ("post-create relaxed pids", relax_pids),
             ("post-create relaxed memory", relax_memory),
             ("post-create relaxed CPU", relax_cpu),
@@ -1790,7 +1846,7 @@ def fake_docker_main_tests() -> None:
                     authorized_sha="a" * 40,
                 ),
             )
-            if mutant_output.exists() or any(
+            if mutant.started or mutant_output.exists() or any(
                 item["exists"] for item in mutant.containers.values()
             ):
                 raise AssertionError(
@@ -2304,7 +2360,7 @@ exec "$real" "$@"
             raise AssertionError(
                 "candidate Cargo, target, temp, Python, or detached poison ran"
             )
-        if "cargo 1.94.1" not in cargo_log:
+        if "cargo 1.95.0" not in cargo_log:
             raise AssertionError("fresh disposable Cargo verification did not run")
         if "detached candidate quiescence verified" not in cargo_log:
             raise AssertionError("detached Cargo process quiescence was not verified")

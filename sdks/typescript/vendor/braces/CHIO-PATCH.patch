@@ -1,0 +1,160 @@
+--- a/lib/compile.js
++++ b/lib/compile.js
+@@ -2,9 +2,13 @@
+ 
+ const fill = require('fill-range');
+ const utils = require('./utils');
++const { MAX_DEPTH } = require('./constants');
+ 
+ const compile = (ast, options = {}) => {
+-  const walk = (node, parent = {}) => {
++  const walk = (node, parent = {}, depth = 0) => {
++    if (depth > MAX_DEPTH + 1) {
++      throw new RangeError('Maximum nesting depth exceeded');
++    }
+     const invalidBlock = utils.isInvalidBrace(parent);
+     const invalidNode = node.invalid === true && options.escapeInvalid === true;
+     const invalid = invalidBlock === true || invalidNode === true;
+@@ -47,7 +51,7 @@
+ 
+     if (node.nodes) {
+       for (const child of node.nodes) {
+-        output += walk(child, node);
++        output += walk(child, node, depth + 1);
+       }
+     }
+ 
+--- a/lib/constants.js
++++ b/lib/constants.js
+@@ -1,6 +1,7 @@
+ 'use strict';
+ 
+ module.exports = {
++  MAX_DEPTH: 100,
+   MAX_LENGTH: 10000,
+ 
+   // Digits
+--- a/lib/expand.js
++++ b/lib/expand.js
+@@ -3,6 +3,7 @@
+ const fill = require('fill-range');
+ const stringify = require('./stringify');
+ const utils = require('./utils');
++const { MAX_DEPTH } = require('./constants');
+ 
+ const append = (queue = '', stash = '', enclose = false) => {
+   const result = [];
+@@ -33,7 +34,10 @@
+ const expand = (ast, options = {}) => {
+   const rangeLimit = options.rangeLimit === undefined ? 1000 : options.rangeLimit;
+ 
+-  const walk = (node, parent = {}) => {
++  const walk = (node, parent = {}, depth = 0) => {
++    if (depth > MAX_DEPTH + 1) {
++      throw new RangeError('Maximum nesting depth exceeded');
++    }
+     node.queue = [];
+ 
+     let p = parent;
+@@ -100,7 +104,7 @@
+       }
+ 
+       if (child.nodes) {
+-        walk(child, node);
++        walk(child, node, depth + 1);
+       }
+     }
+ 
+--- a/lib/parse.js
++++ b/lib/parse.js
+@@ -8,6 +8,7 @@
+ 
+ const {
+   MAX_LENGTH,
++  MAX_DEPTH,
+   CHAR_BACKSLASH, /* \ */
+   CHAR_BACKTICK, /* ` */
+   CHAR_COMMA, /* , */
+@@ -143,6 +144,9 @@
+      */
+ 
+     if (value === CHAR_LEFT_PARENTHESES) {
++      if (stack.length > MAX_DEPTH) {
++        throw new RangeError('Maximum nesting depth exceeded');
++      }
+       block = push({ type: 'paren', nodes: [] });
+       stack.push(block);
+       push({ type: 'text', value });
+@@ -195,6 +199,9 @@
+      */
+ 
+     if (value === CHAR_LEFT_CURLY_BRACE) {
++      if (stack.length > MAX_DEPTH) {
++        throw new RangeError('Maximum nesting depth exceeded');
++      }
+       depth++;
+ 
+       const dollar = prev.value && prev.value.slice(-1) === '$' || block.dollar === true;
+--- a/lib/stringify.js
++++ b/lib/stringify.js
+@@ -1,9 +1,13 @@
+ 'use strict';
+ 
+ const utils = require('./utils');
++const { MAX_DEPTH } = require('./constants');
+ 
+ module.exports = (ast, options = {}) => {
+-  const stringify = (node, parent = {}) => {
++  const stringify = (node, parent = {}, depth = 0) => {
++    if (depth > MAX_DEPTH + 1) {
++      throw new RangeError('Maximum nesting depth exceeded');
++    }
+     const invalidBlock = options.escapeInvalid && utils.isInvalidBrace(parent);
+     const invalidNode = node.invalid === true && options.escapeInvalid === true;
+     let output = '';
+@@ -21,7 +25,7 @@
+ 
+     if (node.nodes) {
+       for (const child of node.nodes) {
+-        output += stringify(child);
++        output += stringify(child, undefined, depth + 1);
+       }
+     }
+     return output;
+@@ -29,4 +33,3 @@
+ 
+   return stringify(ast);
+ };
+-
+--- a/package.json
++++ b/package.json
+@@ -24,18 +24,8 @@
+   "engines": {
+     "node": ">=8"
+   },
+-  "scripts": {
+-    "test": "mocha",
+-    "benchmark": "node benchmark"
+-  },
+   "dependencies": {
+     "fill-range": "^7.1.1"
+-  },
+-  "devDependencies": {
+-    "ansi-colors": "^3.2.4",
+-    "bash-path": "^2.0.1",
+-    "gulp-format-md": "^2.0.0",
+-    "mocha": "^6.1.1"
+   },
+   "keywords": [
+     "alpha",
+@@ -73,5 +63,10 @@
+     "plugins": [
+       "gulp-format-md"
+     ]
++  },
++  "private": true,
++  "chioPatch": {
++    "upstreamVersion": "3.0.3",
++    "scope": "bounded malformed input validation"
+   }
+ }

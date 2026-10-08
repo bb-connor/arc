@@ -221,10 +221,7 @@ if ! command -v cargo >/dev/null 2>&1; then
   exit 1
 fi
 if [[ "$DRY_RUN" -eq 0 ]]; then
-  if ! cargo kani --version >/dev/null 2>&1; then
-    echo "run-kani-manifest.sh: cargo-kani not installed (\`cargo install --locked kani-verifier && cargo kani setup\`)" >&2
-    exit 1
-  fi
+  bash scripts/check-kani-toolchain.sh
 fi
 
 HAS_TIMEOUT=0

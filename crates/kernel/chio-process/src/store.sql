@@ -52,7 +52,7 @@ BEGIN SELECT RAISE(ABORT,'recovery reservation is immutable'); END;
 CREATE TRIGGER IF NOT EXISTS process_recovery_no_delete BEFORE DELETE ON process_recovery_calls
 BEGIN SELECT RAISE(ABORT,'recovery reservation is immutable'); END;
 CREATE TRIGGER IF NOT EXISTS process_recovery_version_monotone BEFORE UPDATE OF version ON process_runtime
-WHEN NEW.version < OLD.version OR NEW.version NOT BETWEEN 1 AND 5
+WHEN NEW.version < OLD.version OR NEW.version NOT BETWEEN 1 AND 7
 BEGIN SELECT RAISE(ABORT,'recovery journal cannot downgrade'); END;
 CREATE TABLE IF NOT EXISTS worker_credentials (
     credential_hash TEXT PRIMARY KEY,

@@ -82,7 +82,7 @@ impl<'tx, 'conn> KnowledgeReferenceColdActivation<'tx, 'conn> {
             super::references::verify_committed_cold_baseline(tx, &cohort)
         })?;
         let record = ReferenceReadyRecord {
-            schema: ReferenceReadySchema::V1,
+            schema: ReferenceReadySchema::V3,
             account: ReferenceAccount::from_scope(self.baseline.scope()),
             cutoff: self.baseline.global_cutoff().clone(),
             cohort_digest: self.baseline.cohort_digest(),

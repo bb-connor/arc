@@ -150,6 +150,7 @@ impl ChioKernel {
             &current_plan,
             retained.security_binding(),
             retained.authority_profile(),
+            retained.native_output_retention(),
         )
         .map_err(denied)?
             != *binding.immutable_request_hash()

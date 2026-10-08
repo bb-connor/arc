@@ -183,7 +183,11 @@ async fn saturated_submission_closes_native_admission_before_dispatch() -> TestR
         "send",
         serde_json::json!({"title":"support", "body":"private-connector-canary"}),
     )?;
-    let response = kernel.evaluate_tool_call(&request).await?;
+    // The actual Process route retains the caller namespace and original-only
+    // binding. A direct kernel call omits those owning admission prerequisites.
+    let response = process
+        .invoke_known_only("root", "saturated-connector", &request)
+        .await?;
     let (original, _) = authority
         .admission_operation_store()
         .load_unambiguous_retained_tool_request(
@@ -209,6 +213,10 @@ async fn saturated_submission_closes_native_admission_before_dispatch() -> TestR
         AdmissionOperationState::CompensatedBeforeDispatch
     );
     assert!(original.dispatch_commit().is_none());
+    assert!(request.execution_nonce.is_none());
+    assert!(response.execution_nonce.is_none());
+    assert!(original.execution_nonce_id().is_none());
+    assert_eq!(process.process("root")?.tree_calls, 1);
     let usage = authority
         .budget_store()
         .get_invocation_quota_usage(&BudgetQuotaKey::grant(&capability.id, 0))?

@@ -16,6 +16,7 @@ from pathlib import Path
 import platform
 import re
 import selectors
+import signal
 import struct
 import stat
 import subprocess
@@ -33,6 +34,9 @@ MAX_JSON = 16 * 1024 * 1024
 MAX_RECORDS = 100000
 MAX_ARTIFACTS = 100000
 MAX_RETENTION_BATCHES = 100000
+MAX_NATIVE_COMPILER_OUTPUT = 16 * 1024 * 1024
+NATIVE_COMPILER_DISPATCH_SECONDS = 180
+NATIVE_COMPILER_CLEANUP_RESERVE_SECONDS = 1
 SECRET_NAMES = frozenset({"credentials", "credentials.json", "credentials.toml", ".git-credentials", ".netrc",
     ".npmrc", ".pypirc", "id_rsa", "id_ed25519", "id_ecdsa", "id_dsa", ".aws", ".ssh",
     ".gnupg", ".secrets", ".auth", ".password-store"})
@@ -54,6 +58,13 @@ class UnitPublicationDurabilityUnconfirmed(Refusal):
     def __init__(self, outcome):
         super().__init__("unit_publication_durability_unconfirmed")
         self.outcome = outcome
+
+
+class CompilerOutputRefusal(Refusal):
+    """A bounded output observation preserves its actual child exit."""
+    def __init__(self, reason, compiler_exit):
+        super().__init__(reason)
+        self.compiler_exit = compiler_exit
 
 
 def require(condition, code):
@@ -725,11 +736,13 @@ def snapshot(paths):
 
 
 def verify_unchanged(path, original, mutable_directory=None):
-    with HeldPath(path) as handle:
-        require(handle.binding()[0] == original[0], "input_changed_during_compilation")
+    directory_input = stat.S_ISDIR(original[0][2])
+    with HeldPath(path, directory=directory_input, metadata_only=directory_input) as handle:
+        require((handle.binding()[0][:3] == original[0][:3] if directory_input
+                 else handle.binding()[0] == original[0]), "input_changed_during_compilation")
         for index, (before, after) in enumerate(zip(original[1], handle.binding()[1])):
             directory = Path("/").joinpath(*handle.path.parts[1:index + 1])
-            if (mutable_directory is not None and directory == mutable_directory) or index != len(original[1]) - 1:
+            if directory_input or (mutable_directory is not None and directory == mutable_directory) or index != len(original[1]) - 1:
                 require(before[:3] == after[:3], "input_parent_changed")
             else:
                 require(before == after, "input_parent_changed")
@@ -1011,7 +1024,8 @@ def compiler_probe(compiler, args, name, campaign, original):
     result = dispatch_compiler(campaign, [str(compiler), *args], True)
     row["compiler_exit"] = result.returncode
     row["status"] = "success" if result.returncode == 0 else "compiler_failed"
-    # Do not persist arbitrary probe stdout; decoded allowlisted fields follow below.
+    # Standalone probe rows keep only decoded allowlisted fields. Native
+    # dispatch output is bounded inside the outside-owned private namespace.
     campaign.publish(row)
     require(result.returncode == 0 and len(result.stdout) <= MAX_JSON, "compiler_probe_failed")
     return result.stdout.decode("utf-8", errors="strict").strip()
@@ -1654,8 +1668,24 @@ def _collect_linux_scope_members(config, campaign):
         else:
             for name in sorted(scope["members"]):
                 member(root/name)
-        inventory = {"schema": "chio.compilation-read-scope.v1", "role": scope["role"], "root": str(root),
+        directory_metadata = []
+        if scope["selection"] == "explicit-members":
+            # Import discovery needs READ_DIR on containing directories. Derive
+            # this finite metadata set only from approved regular byte leaves.
+            # READ_DIR supplies no regular-file read or execute authority.
+            directories = sorted({str(Path(entry["path"]).parent) for entry in members if entry["kind"] == "regular"})
+            require(len(directories) + len(members) <= MAX_RECORDS, "linux_scope_count")
+            for name in directories:
+                path = root/name
+                with HeldPath(path, directory=True, metadata_only=True) as held:
+                    directory_metadata.append({"path": name, "identity": list(held.initial[:3])})
+                    originals[str(path)] = held.binding()
+                    held.verify(content=False)
+        inventory = {"schema": "chio.compilation-read-scope.v2" if directory_metadata else "chio.compilation-read-scope.v1",
+                     "role": scope["role"], "root": str(root),
                      "selection": scope["selection"], "directories": sorted(directories), "members": sorted(members, key=lambda value: value["path"])}
+        if directory_metadata:
+            inventory["directory_metadata"] = directory_metadata
         payload = canonical(inventory) + b"\n"
         require(len(payload) <= MAX_JSON, "linux_inventory_limit")
         retained = campaign.retain(payload)
@@ -1802,8 +1832,12 @@ def enforce_linux_scope(config, declaration, originals, campaign, machine, unit_
                 require(hashlib.sha256(payload).hexdigest() == reference["sha256"] and len(payload) == reference["size"], "linux_inventory_changed")
             inventory = json.loads(payload)
             root = Path(inventory["root"])
+            directory_metadata = {entry["path"]: entry["identity"] for entry in inventory.get("directory_metadata", [])}
             for name in inventory["directories"]:
-                with HeldPath(root/name, directory=True) as directory:
+                with HeldPath(root/name, directory=True, metadata_only=True) as directory:
+                    if inventory["schema"] == "chio.compilation-read-scope.v2":
+                        require(list(directory.initial[:3]) == directory_metadata.get(name)
+                                and directory.initial[:3] == originals[str(root/name)][0][:3], "linux_scope_changed")
                     rule(directory.fd, 1 << 3)
             for member in inventory["members"]:
                 if member["kind"] != "regular":
@@ -2172,15 +2206,167 @@ def compilation_client(argv):
             pipe_write(table["lease"][1], slot)
 
 
+def native_process_identity(pid):
+    """Read a bounded kernel parent/start identity, without caller text."""
+    require(platform.system() == "Linux" and type(pid) is int and pid > 0,
+            "compiler_cleanup_unsupported")
+    try:
+        with open(Path("/proc") / str(pid) / "stat", "rb") as stream:
+            raw = stream.read(65537)
+    except FileNotFoundError:
+        return None
+    require(0 < len(raw) <= 65536, "compiler_cleanup_process_identity")
+    fields = raw.rsplit(b")", 1)[-1].split()
+    require(len(fields) >= 20 and all(fields[index].isdigit() for index in [1, 2, 3, 19]),
+            "compiler_cleanup_process_identity")
+    return tuple(int(fields[index]) for index in [1, 2, 3, 19])
+
+
+def native_scope_owner_identity():
+    """Require this existing Linux task subreaper and pidfd support."""
+    require(platform.system() == "Linux" and hasattr(os, "pidfd_open")
+            and hasattr(signal, "pidfd_send_signal"), "compiler_cleanup_unsupported")
+    subreaper = ctypes.c_int()
+    library = ctypes.CDLL(None, use_errno=True)
+    require(library.prctl(37, ctypes.byref(subreaper), 0, 0, 0) == 0 and subreaper.value == 1,
+            "compiler_cleanup_subreaper")
+    identity = native_process_identity(os.getpid())
+    require(identity is not None, "compiler_cleanup_scope_identity")
+    return identity
+
+
+def _stop_owned_scope_children(scope_identity, processes, deadline):
+    """Drain only this dedicated kernel subreaper's children via held pidfds.
+
+    Killing a direct child reparents its remaining descendants to this same
+    subreaper. Repeated kernel parent checks therefore cover orphan pipe holders
+    without creating a process group or trusting a reported descendant PID.
+    """
+    parent = os.getpid()
+    require(scope_identity is not None and native_scope_owner_identity() == scope_identity,
+            "compiler_cleanup_scope_identity")
+    reaped = []
+    while True:
+        children = []
+        for entry in Path("/proc").iterdir():
+            if not entry.name.isdecimal():
+                continue
+            identity = native_process_identity(int(entry.name))
+            if identity is not None and identity[0] == parent:
+                children.append((int(entry.name), identity))
+        require(native_process_identity(parent) == scope_identity, "compiler_cleanup_scope_identity")
+        if not children:
+            return {"status": "REAPED", "scope_pid": parent, "scope_start_identity": scope_identity[3],
+                    "process_groups_changed": False, "children": reaped}
+        require(time.monotonic() < deadline, "compiler_cleanup_deadline")
+        for pid, identity in children:
+            descriptor = os.pidfd_open(pid, 0)
+            try:
+                require(native_process_identity(pid) == identity and identity[0] == parent,
+                        "compiler_cleanup_process_identity")
+                signal.pidfd_send_signal(descriptor, signal.SIGSTOP)
+                signal.pidfd_send_signal(descriptor, signal.SIGKILL)
+                with selectors.DefaultSelector() as ready:
+                    ready.register(descriptor, selectors.EVENT_READ)
+                    require(bool(ready.select(max(0, deadline - time.monotonic()))),
+                            "compiler_cleanup_deadline")
+                actual_pid, status = os.waitpid(pid, 0)
+                require(actual_pid == pid, "compiler_cleanup_wait")
+                code = os.waitstatus_to_exitcode(status)
+                for process in processes:
+                    if process is not None and process.pid == pid:
+                        process.returncode = code
+                reaped.append({"pid": pid, "process_start_identity": identity[3], "wait_status": status})
+            finally:
+                os.close(descriptor)
+
+
+def stop_owned_scope_children(scope_identity, processes, deadline):
+    """An unconfirmed kill, wait or kernel identity is a typed refusal."""
+    try:
+        return _stop_owned_scope_children(scope_identity, processes, deadline)
+    except OSError as error:
+        raise Refusal("compiler_cleanup_io") from error
+
+
+def bounded_compiler_output(argv, environment, cwd, preexec_fn, cleanup):
+    """Drain both anonymous streams within one finite execution/cleanup budget."""
+    require(type(MAX_NATIVE_COMPILER_OUTPUT) is int and 0 < MAX_NATIVE_COMPILER_OUTPUT <= 16 * 1024**2
+            and type(NATIVE_COMPILER_DISPATCH_SECONDS) in {int, float}
+            and 0 < NATIVE_COMPILER_CLEANUP_RESERVE_SECONDS < NATIVE_COMPILER_DISPATCH_SECONDS <= 180,
+            "compiler_output_policy")
+    started = time.monotonic()
+    deadline = started + NATIVE_COMPILER_DISPATCH_SECONDS
+    process = subprocess.Popen(argv, env=environment, cwd=cwd, close_fds=True,
+        stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=preexec_fn)
+    buffers = {"stdout": bytearray(), "stderr": bytearray()}
+    observed = {"stdout": 0, "stderr": 0}
+    eof = {"stdout": False, "stderr": False}
+    refusal = None
+    cleanup_record = None
+    try:
+        with selectors.DefaultSelector() as ready:
+            for name in buffers:
+                stream = getattr(process, name)
+                os.set_blocking(stream.fileno(), False)
+                ready.register(stream, selectors.EVENT_READ, name)
+            while ready.get_map() or process.poll() is None:
+                remaining = deadline - time.monotonic()
+                if remaining <= NATIVE_COMPILER_CLEANUP_RESERVE_SECONDS:
+                    refusal = "compiler_output_timeout"
+                    break
+                for key, _ in ready.select(min(0.1, remaining - NATIVE_COMPILER_CLEANUP_RESERVE_SECONDS)):
+                    block = os.read(key.fileobj.fileno(), 65536)
+                    if not block:
+                        eof[key.data] = True
+                        ready.unregister(key.fileobj)
+                        continue
+                    observed[key.data] += len(block)
+                    available = MAX_NATIVE_COMPILER_OUTPUT - len(buffers[key.data])
+                    buffers[key.data].extend(block[:available])
+                    if observed[key.data] > MAX_NATIVE_COMPILER_OUTPUT:
+                        refusal = "compiler_output_limit"
+                        break
+                if refusal is not None:
+                    break
+        if refusal is not None:
+            cleanup_record = cleanup(process, deadline)
+            require(type(cleanup_record) is dict and cleanup_record.get("status") == "REAPED"
+                    and process.poll() is not None, "compiler_cleanup_unconfirmed")
+        else:
+            process.wait(timeout=max(0, deadline - time.monotonic()))
+        result = subprocess.CompletedProcess(argv, process.returncode, bytes(buffers["stdout"]), bytes(buffers["stderr"]))
+        result.output_observation = {"status": "refused" if refusal else "complete", "refusal": refusal,
+            "observed_bytes": observed, "eof": eof, "elapsed_seconds": time.monotonic() - started,
+            "cleanup": cleanup_record,
+            "policy": {"maximum_bytes_per_stream": MAX_NATIVE_COMPILER_OUTPUT,
+                       "execution_and_cleanup_seconds": NATIVE_COMPILER_DISPATCH_SECONDS,
+                       "cleanup_reserve_seconds": NATIVE_COMPILER_CLEANUP_RESERVE_SECONDS,
+                       "raw_diagnostics_forwarded": False}}
+        result.output_deadline = deadline
+        return result
+    except BaseException:
+        # A failed cleanup or custody observation cannot leave a success record.
+        cleanup(process, deadline)
+        raise
+    finally:
+        process.stdout.close()
+        process.stderr.close()
+
+
 class CompilationSupervisor:
     """Finite anonymous channels; the outside parent owns execution and evidence."""
     def __init__(self, config, declaration, originals, campaign, fixed_environment):
         self.config, self.declaration, self.originals, self.campaign = config, declaration, originals, campaign
         self.aliases = linux_alias_bindings(config)
-        self.fixed = fixed_environment
+        # Transport endpoints are added to the launch environment after this
+        # snapshot. They are intentionally absent from compiler requests.
+        self.fixed = dict(fixed_environment)
         self.selector = selectors.DefaultSelector()
         self.descriptors, self.channels, self.events = [], [], []
         self.dispatches = []
+        self.scope_process = None
+        self.scope_identity = None
         self.lease = list(os.pipe())
         self.descriptors.extend(self.lease)
         for index in range(4):
@@ -2195,6 +2381,11 @@ class CompilationSupervisor:
         self.pass_fds = tuple(self.lease + [fd for pair in self.channels for fd in pair])
 
     def execute(self, argv, environment, cwd, probe):
+        require(self.scope_identity is not None and native_scope_owner_identity() == self.scope_identity,
+                "compiler_cleanup_scope_identity")
+        namespace = os.fstat(self.campaign.directory.fd)
+        require(stat.S_ISDIR(namespace.st_mode) and stat.S_IMODE(namespace.st_mode) == 0o700
+                and namespace.st_uid == os.getuid(), "compiler_output_private_namespace")
         native, _ = native_target_context(self.config, argv[1:], Path(cwd))
         verify_linux_aliases(native, self.aliases)
         writes = []
@@ -2204,14 +2395,27 @@ class CompilationSupervisor:
             writes.append(str(depfile.parent))
         if environment.get("TMPDIR"):
             writes.append(str(absolute(environment["TMPDIR"])))
-        result = subprocess.run(argv, env=environment, cwd=cwd, close_fds=True,
-            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE if probe else subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL, check=False,
-            preexec_fn=lambda: enforce_linux_scope(native, self.declaration, self.originals, self.campaign,
-                                                   platform.machine(), writes))
-        self.dispatches.append({"kind": "compiler-probe" if probe else "compiler-unit",
+        result = bounded_compiler_output(argv, environment, cwd,
+            lambda: enforce_linux_scope(native, self.declaration, self.originals, self.campaign,
+                                        platform.machine(), writes),
+            lambda child, deadline: stop_owned_scope_children(self.scope_identity,
+                [self.scope_process, child], deadline))
+        output = {"schema": "chio.native-compiler-output.v1", **result.output_observation,
+                  "stdout": None, "stderr": None}
+        self.dispatches.append({"schema": "chio.native-compiler-dispatch.v2",
+            "kind": "compiler-probe" if probe else "compiler-unit",
             "invocation_sha256": digest(argv), "environment_sha256": digest(environment),
-            "cwd": cwd, "compiler_exit": result.returncode})
+            "cwd": cwd, "compiler_exit": result.returncode, "output": output})
+        try:
+            output["stdout"] = self.campaign.retain(result.stdout)
+            output["stderr"] = self.campaign.retain(result.stderr)
+        except (Refusal, OSError, ValueError, TypeError, KeyError) as error:
+            output.update(status="publication-failed", refusal="compiler_output_publication")
+            output["cleanup"] = stop_owned_scope_children(self.scope_identity,
+                [self.scope_process], result.output_deadline)
+            raise CompilerOutputRefusal("compiler_output_publication", result.returncode) from error
+        if result.output_observation["refusal"] is not None:
+            raise CompilerOutputRefusal(result.output_observation["refusal"], result.returncode)
         return result
 
     def respond(self, payload):
@@ -2367,6 +2571,7 @@ def launch_scope(arguments):
             native, _, _ = load_native_scope(environment, campaign)
             supervisor = CompilationSupervisor(native, declaration, originals, campaign, environment)
             supervisor.aliases = alias_originals
+            supervisor.scope_identity = native_scope_owner_identity()
             environment["CHIO_COMPILATION_IPC"] = canonical(supervisor.table).decode("ascii")
             started = time.time()
             with HeldPath(evidence_path/"stdout.log", create=True) as stdout, HeldPath(evidence_path/"stderr.log", create=True) as stderr:
@@ -2374,6 +2579,7 @@ def launch_scope(arguments):
                     stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True,
                     pass_fds=supervisor.pass_fds,
                     preexec_fn=lambda: enforce_linux_scope(config, declaration, originals, campaign, platform.machine()))
+                supervisor.scope_process = process
                 command_exit = supervisor.wait(process, (stdout, stderr))
                 reaped = []
                 while True:
@@ -2402,7 +2608,7 @@ def launch_scope(arguments):
                     "reaped_descendants": reaped,
                     "generated_before": before_image, "generated_after": after_image, "logs": logs,
                     "retention_outcomes": list(campaign.retention_outcomes),
-                    "supervisor_events": campaign.retain(canonical({"schema": "chio.compilation-supervisor-events.v1", "events": supervisor.events}) + b"\n")}}
+                    "supervisor_events": campaign.retain(canonical({"schema": "chio.compilation-supervisor-events.v2", "events": supervisor.events}) + b"\n")}}
             publish_file(launch, "scope.json", canonical(completed) + b"\n")
         return command_exit if command_exit >= 0 else 128-command_exit
     except (Refusal, OSError, ValueError, UnicodeError, TypeError, KeyError, subprocess.SubprocessError) as error:
@@ -2411,10 +2617,16 @@ def launch_scope(arguments):
             observed_exit = command_exit if command_exit is not None else (process.poll() if process is not None else None)
             try:
                 with HeldPath(evidence_path, directory=True) as failure_directory:
-                    publish_file(failure_directory, "failure.json", canonical({"schema": "chio.linux-compilation-scope-failure.v1",
+                    failure = {"schema": "chio.linux-compilation-scope-failure.v1",
                         "source_binding": config["source_binding"], "scope_id": declaration["scope_id"],
                         "command_exit": observed_exit, "runner_exit": 86, "refusal": reason,
-                        "compiled_closure_status": "not-established"}) + b"\n")
+                        "compiled_closure_status": "not-established"}
+                    if supervisor is not None:
+                        failure.update(schema="chio.linux-compilation-scope-failure.v2",
+                            supervisor_events=campaign.retain(canonical({
+                                "schema": "chio.compilation-supervisor-events.v2",
+                                "events": supervisor.events}) + b"\n"))
+                    publish_file(failure_directory, "failure.json", canonical(failure) + b"\n")
             except (Refusal, OSError, ValueError, TypeError, KeyError):
                 # Failed observation persistence cannot create usable closure.
                 pass
@@ -2678,6 +2890,8 @@ def main(argv, supplied_environment=None, supplied_cwd=None, executor=None, prob
         return 0
     except (Refusal, OSError, ValueError, UnicodeError, TypeError, KeyError, subprocess.SubprocessError) as error:
         reason = str(error) if isinstance(error, Refusal) else "recorder_io_or_format"
+        if isinstance(error, CompilerOutputRefusal):
+            actual_exit = error.compiler_exit
         if row is not None and campaign is not None:
             row["status"] = "instrumentation_failed" if dispatched and actual_exit == 0 else ("compiler_failed" if actual_exit else "refused")
             row["compiler_exit"] = actual_exit

@@ -11,6 +11,44 @@ pub(super) fn label(
     proposal: &PolicyMaintenanceProposalV1,
     now: u64,
 ) -> Result<InformationLabel, AdmissionOperationStoreError> {
+    label_with_attachments(tx, actor, reader, profile, proposal, now, join_attachment)
+}
+
+pub(super) fn retained_label(
+    tx: &Transaction<'_>,
+    actor: &AuthenticatedRecoveryActor,
+    reader: &AuthenticatedRecoveryActor,
+    profile: &RecoveryDeploymentV1,
+    proposal: &PolicyMaintenanceProposalV1,
+    now: u64,
+) -> Result<InformationLabel, AdmissionOperationStoreError> {
+    label_with_attachments(
+        tx,
+        actor,
+        reader,
+        profile,
+        proposal,
+        now,
+        join_retained_attachment,
+    )
+}
+
+type AttachmentLabel = fn(
+    &Transaction<'_>,
+    &RecoveryScopeV1,
+    InformationLabel,
+    &ArtifactVersionRefV1,
+) -> Result<InformationLabel, AdmissionOperationStoreError>;
+
+fn label_with_attachments(
+    tx: &Transaction<'_>,
+    actor: &AuthenticatedRecoveryActor,
+    reader: &AuthenticatedRecoveryActor,
+    profile: &RecoveryDeploymentV1,
+    proposal: &PolicyMaintenanceProposalV1,
+    now: u64,
+    join: AttachmentLabel,
+) -> Result<InformationLabel, AdmissionOperationStoreError> {
     if proposal.scope != *actor.scope() {
         return Err(AdmissionOperationStoreError::RecoveryAuthorityDenied);
     }
@@ -20,7 +58,7 @@ pub(super) fn label(
         .join_restrictions(&report.label)
         .map_err(refused)?;
     for reference in report.report.attachments.as_slice() {
-        label = join_attachment(tx, actor.scope(), label, reference)?;
+        label = join(tx, actor.scope(), label, reference)?;
     }
     for case in proposal
         .benign_trajectories
@@ -28,7 +66,7 @@ pub(super) fn label(
         .iter()
         .chain(proposal.adversarial_trajectories.as_slice())
     {
-        label = join_attachment(tx, actor.scope(), label, &case.artifact)?;
+        label = join(tx, actor.scope(), label, &case.artifact)?;
     }
     require_clearance(actor, profile, &label)?;
     Ok(label)
@@ -50,20 +88,20 @@ impl SqliteAdmissionOperationStore {
             {
                 return Err(AdmissionOperationStoreError::RecoveryAuthorityDenied.into());
             }
-            let report = selected_report(tx, actor.scope(), &proposal.report_id)?;
-            let label = label(tx, actor, reader, profile, proposal, now)?;
             let digest = CanonicalPayloadDigest::from_bytes(hash(
                 RecoveryDigestDomain::PolicyMaintenanceProposal,
                 proposal,
             )?);
             let key = proposal_key(actor.scope(), &proposal.proposal_id)?;
-            if let Some(old) = load::<StoredPolicyMaintenanceProposalV1>(tx, &key)? {
+            if load::<StoredPolicyMaintenanceProposalV1>(tx, &key)?.is_some() {
+                let old = stored_proposal(tx, actor.scope(), &proposal.proposal_id)?;
+                let label = retained_label(tx, actor, reader, profile, &old.proposal, now)?;
                 require_clearance(
                     actor,
                     profile,
                     &label.join_restrictions(&old.label).map_err(refused)?,
                 )?;
-                if old.digest != digest {
+                if old.digest != digest || old.proposal != *proposal {
                     return Err(RecoveryCommandPortError::Conflict);
                 }
                 require_product_evidence_owners(
@@ -76,6 +114,8 @@ impl SqliteAdmissionOperationStore {
                 )?;
                 return Ok(old);
             }
+            let report = selected_report(tx, actor.scope(), &proposal.report_id)?;
+            let label = label(tx, actor, reader, profile, proposal, now)?;
             require_finite_intake_audience(actor, profile)?;
             let current =
                 super::super::semantic::installation(tx, actor.scope())?.policy_basis()?;

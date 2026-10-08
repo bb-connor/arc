@@ -29,8 +29,8 @@ from typing import Any, Iterable
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SCHEMA = "chio.proof-mutants-report.v1"
 EXPECTED_CARGO_MUTANTS = "cargo-mutants 25.3.1"
-EXPECTED_KANI = "0.67.0"
-EXPECTED_RUSTC = "1.93.0"
+EXPECTED_KANI = "0.68.0"
+EXPECTED_RUSTC = "1.95.0"
 CONFIG = Path("formal/rust-verification/formal-mutants.toml")
 FILES = (
     Path("crates/kernel/chio-kernel-core/src/formal_core.rs"),
@@ -58,6 +58,7 @@ FIXED_PROOF_INPUTS = (
     Path("scripts/proof-mutants.sh"),
     Path("scripts/kani-mutant-killer.sh"),
     Path("scripts/check-kani-core.sh"),
+    Path("scripts/check-kani-toolchain.sh"),
 )
 PROOF_SOURCE_ROOTS = (
     Path("crates/kernel/chio-kernel-core/src"),
@@ -288,7 +289,7 @@ def kani_version() -> str:
         raise ProofMutationError(f"CHIO_KANI_VERSION must remain {EXPECTED_KANI}")
     try:
         completed = subprocess.run(
-            ["cargo", "kani", "--version"],
+            ["bash", "scripts/check-kani-toolchain.sh"],
             check=False,
             text=True,
             stdout=subprocess.PIPE,

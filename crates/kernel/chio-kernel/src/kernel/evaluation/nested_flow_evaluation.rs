@@ -950,12 +950,13 @@ impl ChioKernel {
             }
         }
 
-        let payment_authorization = match self.authorize_payment_if_needed(
+        let payment_authorization = match self.authorize_payment_with_context(
             request,
             budget_mutation.charge_result(),
             durable_admission.as_ref(),
             now_unix_ms,
             verified_governed_payee_binding.as_ref(),
+            security_context,
         ) {
             Ok(authorization) => {
                 if authorization.is_some() {
@@ -995,6 +996,7 @@ impl ChioKernel {
                 authorization
             }
             Err(error) => {
+                let error = error.into_payment_error();
                 let internal_reason = error.to_string();
                 warn!(request_id = %request.request_id, reason = %redacted!(&internal_reason), "payment denied");
                 let error_code = match &error {

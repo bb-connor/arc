@@ -9,6 +9,10 @@ impl super::Store {
         &mut self,
         reservation: &RecoveryCallReservation,
     ) -> Result<(), ProcessError> {
+        self.require_open_recovery_reservation(
+            &reservation.process_id,
+            &reservation.operation_key,
+        )?;
         let process = read_process(&self.connection, &reservation.process_id)?
             .ok_or_else(|| ProcessError::NotFound(reservation.process_id.clone()))?;
         if reservation.capability_digest != digest(&process.capability)? {
@@ -33,6 +37,11 @@ impl super::Store {
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        super::unused_recovery_reservation::require_open_recovery_reservation(
+            &tx,
+            &reservation.process_id,
+            &reservation.operation_key,
+        )?;
         let process = read_process(&tx, &reservation.process_id)?
             .ok_or_else(|| ProcessError::NotFound(reservation.process_id.clone()))?;
         require_running(&process)?;
@@ -83,6 +92,11 @@ impl super::Store {
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        super::unused_recovery_reservation::require_open_recovery_reservation(
+            &tx,
+            &reservation.process_id,
+            &reservation.operation_key,
+        )?;
         let process = read_process(&tx, &reservation.process_id)?
             .ok_or_else(|| ProcessError::NotFound(reservation.process_id.clone()))?;
         require_running(&process)?;

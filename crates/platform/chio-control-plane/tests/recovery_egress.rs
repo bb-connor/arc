@@ -5,7 +5,7 @@ use chio_control_plane::{
 };
 use chio_core_types::Keypair;
 use chio_egress_contract::HttpEgressContract;
-use chio_kernel::recovery::{RecordName, RecoveryEffectContractSchema, RecoveryEffectContractV1};
+use chio_kernel::recovery::{RecoveryEffectContractSchema, RecoveryEffectContractV1};
 use chio_security_types::{recovery::*, semantic::*};
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -48,8 +48,8 @@ fn network_policy(endpoint: &str) -> TestResult<HttpEgressContract> {
 fn effect_contract(endpoint: &str) -> TestResult<RecoveryEffectContractV1> {
     Ok(RecoveryEffectContractV1 {
         schema: RecoveryEffectContractSchema::V1,
-        provider: RecordName::new("provider")?,
-        account: RecordName::new("account")?,
+        provider: RecoveryEffectProviderId::new("provider")?,
+        account: RecoveryEffectAccountId::new("account")?,
         resource: ProtectedText::new(endpoint)?,
         observation_key: Keypair::from_seed(&[17; 32]).public_key(),
         max_response_bytes: SafeInteger::new(65536)?,

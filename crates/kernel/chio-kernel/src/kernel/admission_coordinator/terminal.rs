@@ -11,6 +11,8 @@ use payment::DurablePaymentSettlementInput;
 
 #[path = "terminal/evaluation_contract.rs"]
 mod evaluation_contract;
+#[path = "terminal/historical_signing.rs"]
+mod historical_signing;
 #[path = "terminal/public_delivery.rs"]
 mod public_delivery;
 #[path = "terminal/semantic.rs"]
@@ -630,6 +632,7 @@ impl ChioKernel {
             .ok_or_else(|| {
                 KernelError::DurableAdmission("projected receipt disappeared".to_owned())
             })?;
+        self.require_no_historical_settlement_delivery(&receipt)?;
         let mut delivery_evaluation = delivery_contract::evaluate_delivery(
             expected_output_digest.as_deref(),
             &receipt_content.content_hash,
@@ -1172,11 +1175,15 @@ impl ChioKernel {
             .outcome
             .validate_canonical_blob(&admission.operation, &raw_blob)
             .map_err(tool_outcome_error)?;
-        // Select no replacement authority for unfinished historical output.
-        // Check before output/settlement callbacks and pin the eventual body
-        // again in the core identity-bound signing primitive.
-        let signing_identity = self.durable_return_signing_identity(&tool_return.raw)?;
-        self.require_original_receipt_signer(&signing_identity)?;
+        // Ordinary returns keep their frozen signer. Authenticated captured
+        // recovery may instead sign a distinct, permanently withheld private
+        // settlement attestation without restoring old private key material.
+        let (signing_identity, private_settlement) = self.select_captured_settlement_signer(
+            admission,
+            request,
+            tool_return,
+            security_release.is_some(),
+        )?;
         let _guard_evidence_scope = scope_pre_invocation_guard_evidence(
             tool_return.raw.pre_invocation_guard_evidence().to_vec(),
         );
@@ -1776,6 +1783,8 @@ impl ChioKernel {
         } else {
             metadata
         };
+        let metadata =
+            self.attach_private_settlement_metadata(metadata, private_settlement.as_ref())?;
         let action =
             ToolCallAction::from_parameters(request.arguments.clone()).map_err(|error| {
                 KernelError::ReceiptSigningFailed(format!("failed to hash parameters: {error}"))

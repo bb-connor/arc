@@ -13,6 +13,7 @@ import stat
 import subprocess
 import threading
 import time
+import types
 
 from qualification_runtime import installed_module, native_environment, require, wait_endpoint
 
@@ -25,6 +26,68 @@ from campaign_report import summarize
 from chio_sdk.recovery_host import RecoveryHostSession
 from chio_sdk.recovery_host import RecoveryHostOutcome
 from manifest_builder import PROVIDER_ENDPOINT, SOURCE_INVENTORY_VERSION, source_binding, source_inventory
+
+
+def optional_compiler_capture(repository, output, configuration, expected_sha, dimension="formal"):
+    """Execute only the explicitly pinned helper's original no-follow bytes."""
+    if configuration is None:
+        if expected_sha is not None:raise ValueError("compiler.capture_configuration_required")
+        return None,None
+    repository,configuration = Path(repository),Path(configuration)
+    def public_path(path):
+        secrets = {"credentials","credentials.json","credentials.toml",".netrc",".git-credentials",
+            ".npmrc",".pypirc",".aws",".ssh",".gnupg",".secrets",".auth",".password-store",
+            "id_rsa","id_ed25519","id_ecdsa","id_dsa"}
+        if (not path.is_absolute() or ".." in path.parts or str(path).startswith("//")
+                or path.suffix.casefold() in {".pem",".key",".p12",".pfx",".keystore"}
+                or any(part.casefold() in secrets for part in path.parts)):
+            raise ValueError("compiler.capture_input_policy")
+    public_path(configuration)
+    if (type(expected_sha) is not str or len(expected_sha) != 64
+            or any(c not in "0123456789abcdef" for c in expected_sha)
+            or not configuration.is_relative_to(repository/"target")):
+        raise ValueError("compiler.capture_configuration_pin_required")
+    def read(path,readonly=False):
+        public_path(path)
+        descriptors,locations = [],[]
+        identity = lambda item:(item.st_dev,item.st_ino,item.st_mode,item.st_size,item.st_mtime_ns,item.st_ctime_ns,item.st_nlink)
+        try:
+            parent = os.open("/",os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW);descriptors.append(parent)
+            for part in path.parts[1:-1]:
+                child = os.open(part,os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,dir_fd=parent);descriptors.append(child)
+                value = identity(os.fstat(child))[:3]
+                if value != identity(os.stat(part,dir_fd=parent,follow_symlinks=False))[:3]:raise ValueError("compiler.capture_parent_changed")
+                locations.append((parent,part,child,value));parent = child
+            descriptor = os.open(path.name,os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,dir_fd=parent);descriptors.append(descriptor)
+            before = os.fstat(descriptor)
+            if not stat.S_ISREG(before.st_mode) or not 0 < before.st_size <= 1024*1024 or before.st_nlink != 1 or readonly and before.st_mode & 0o222:
+                raise ValueError("compiler.capture_input")
+            body = bytearray()
+            for chunk in iter(lambda:os.read(descriptor,1024*1024),b""):body.extend(chunk)
+            if identity(before) != identity(os.fstat(descriptor)) or identity(before) != identity(os.stat(path.name,dir_fd=parent,follow_symlinks=False)):
+                raise ValueError("compiler.capture_input_changed")
+            for ancestor,name,child,value in locations:
+                if identity(os.fstat(child))[:3] != value or identity(os.stat(name,dir_fd=ancestor,follow_symlinks=False))[:3] != value:
+                    raise ValueError("compiler.capture_parent_changed")
+            return bytes(body)
+        finally:
+            for descriptor in reversed(descriptors):os.close(descriptor)
+    raw = read(configuration,readonly=True)
+    if hashlib.sha256(raw).hexdigest() != expected_sha:raise ValueError("compiler.capture_configuration_pin")
+    def pairs(rows):
+        result = {}
+        for name,value in rows:
+            if name in result:raise ValueError("compiler.capture_duplicate_field")
+            result[name] = value
+        return result
+    options = json.loads(raw,object_pairs_hook=pairs)
+    image = repository/"scripts/compiled-dimension-profiles.py"
+    body = read(image)
+    if options["tools"]["helper"] != {"path":str(image),"sha256":hashlib.sha256(body).hexdigest(),"size":len(body)}:
+        raise ValueError("compiler.capture_helper_pin")
+    module = types.ModuleType("owned_dimension_compiler_capture");module.__file__ = str(image)
+    exec(compile(body,str(image),"exec"),module.__dict__)
+    return module,module.open_capture(repository,output/"compiled-capture",configuration,expected_sha,dimension)
 
 
 def sha(path): return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -70,7 +133,7 @@ def observed_native_executable(root, log_text):
     finally:
         for descriptor in reversed(descriptors):
             os.close(descriptor)
-    return {"path":str(relative),"sha256":digest.hexdigest()}
+    return {"path":str(relative),"sha256":digest.hexdigest(),"size":before.st_size}
 
 
 class DeadlineSession:
@@ -85,11 +148,12 @@ class DeadlineSession:
         return await self._owner.execute(choice)
 
 
-def trial_run(root, evidence, manifest, trial):
+def trial_run(root, evidence, manifest, trial, compiler_capture=None):
     exchange = evidence / trial["id"]
     exchange.mkdir(mode=0o700, parents=True, exist_ok=False)
     (exchange/"configuration.json").write_text(json.dumps({key:trial[key] for key in ["workflow", "case"]}))
     environment = native_environment("CHIO_RECOVERY_CAMPAIGN_EXCHANGE", exchange)
+    if compiler_capture is not None:environment = compiler_capture.runtime_environment("native-host-library",environment)
     started = time.monotonic()
     preparation_finished = None
     host_started = None
@@ -200,6 +264,8 @@ def main():
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--checkout", type=Path, required=True)
     parser.add_argument("--evidence", type=Path, required=True)
+    parser.add_argument("--compiled-capture-config",type=Path)
+    parser.add_argument("--compiled-capture-sha256")
     args = parser.parse_args()
     raw = args.manifest.read_bytes()
     require(hashlib.sha256(raw).hexdigest() == args.manifest.with_suffix(".sha256").read_text().strip(),
@@ -217,33 +283,51 @@ def main():
     require(sources == manifest["sources"], "campaign_source_inventory")
     require(source_binding(sources, current_commit) == manifest["source_binding"], "campaign_source_binding")
     args.evidence.mkdir(mode=0o700, parents=True, exist_ok=False)
-    lock = threading.Lock()
-    rows = []
-    def execute(trial):
-        row = trial_run(args.checkout, args.evidence, manifest, trial)
-        with lock:
-            rows.append(row)
-            with (args.evidence/"results.jsonl").open("a") as output:
-                output.write(json.dumps(row, separators=(",", ":"), allow_nan=False)+"\n")
-            print(f"Retained {len(rows)}/96 {row['id']} {row['outcome']}", flush=True)
-    with ThreadPoolExecutor(max_workers=manifest["budgets"]["concurrent_trials"]) as executor:
-        list(executor.map(execute, manifest["trials"]))
-    report = summarize(manifest, rows)
-    (args.evidence/"summary.json").write_text(json.dumps(report, indent=2, allow_nan=False)+"\n")
-    require(report["unauthorized_effects"] == report["duplicate_effects"] == 0, "campaign_safety")
-    require(report["native_evidence_unknown_trials"] == 0, "campaign_native_evidence")
-    require(all(row["native"]["source_label_retained"] is True for row in rows), "campaign_labels")
-    require(all(not row.get("native_execution_error") and not row.get("native_shutdown_error")
-                and not row.get("native_executable_error")
-                and row["elapsed_seconds"] <= manifest["budgets"]["trial_seconds"] for row in rows),
-            "campaign_native_execution")
-    after_commit = subprocess.check_output(["git", "rev-parse", "--verify", "HEAD"], cwd=args.checkout).decode().strip()
-    require(after_commit == current_commit and source_inventory(args.checkout) == sources, "campaign_source_changed")
-    # All declared positive strata must demonstrate useful execution. Failures
-    # remain in their exact three-trial denominator; no replacement is allowed.
-    require(all(stratum["completion"]["numerator"] >= 1 for stratum in report["strata"] if stratum["case"] in ["authorized", "lost_ack_restart"]),
-            "campaign_utility")
-    print("Completed source-bound 96-trial live campaign", flush=True)
+    support,capture = optional_compiler_capture(args.checkout,args.evidence,args.compiled_capture_config,args.compiled_capture_sha256,"live_provider")
+    try:
+        compiled = None
+        if capture is not None:
+            require(set(capture.options["actions"]) == {"native-host-library"},"capture_action_inventory")
+            capture.produce("native-host-library",3600)
+            compiled = capture.compiled_library("native-host-library")
+        lock = threading.Lock()
+        rows = []
+        def execute(trial):
+            row = trial_run(args.checkout, args.evidence, manifest, trial, capture)
+            with lock:
+                rows.append(row)
+                with (args.evidence/"results.jsonl").open("a") as output:
+                    output.write(json.dumps(row, separators=(",", ":"), allow_nan=False)+"\n")
+                print(f"Retained {len(rows)}/96 {row['id']} {row['outcome']}", flush=True)
+        with ThreadPoolExecutor(max_workers=manifest["budgets"]["concurrent_trials"]) as executor:
+            list(executor.map(execute, manifest["trials"]))
+        report = summarize(manifest, rows)
+        (args.evidence/"summary.json").write_text(json.dumps(report, indent=2, allow_nan=False)+"\n")
+        require(report["unauthorized_effects"] == report["duplicate_effects"] == 0, "campaign_safety")
+        require(report["native_evidence_unknown_trials"] == 0, "campaign_native_evidence")
+        require(all(row["native"]["source_label_retained"] is True for row in rows), "campaign_labels")
+        require(all(not row.get("native_execution_error") and not row.get("native_shutdown_error")
+                    and not row.get("native_executable_error")
+                    and row["elapsed_seconds"] <= manifest["budgets"]["trial_seconds"] for row in rows),
+                "campaign_native_execution")
+        after_commit = subprocess.check_output(["git", "rev-parse", "--verify", "HEAD"], cwd=args.checkout).decode().strip()
+        require(after_commit == current_commit and source_inventory(args.checkout) == sources, "campaign_source_changed")
+        # All declared positive strata must demonstrate useful execution. Failures
+        # remain in their exact three-trial denominator; no replacement is allowed.
+        require(all(stratum["completion"]["numerator"] >= 1 for stratum in report["strata"] if stratum["case"] in ["authorized", "lost_ack_restart"]),
+                "campaign_utility")
+        if capture is not None:
+            image,unit,copy = compiled
+            expected = {"path":str(Path(image["path"]).relative_to(args.checkout)),"sha256":image["sha256"],"size":image["size"]}
+            require(all(row.get("native_executable") == expected for row in rows),"capture_executed_subject")
+            name = "dimension/live_provider/native-host-library"
+            capture.observe("native-host-library",{name:[unit]},{name:[image]},[copy] if copy is not None else [])
+            index = capture.finish()
+            (args.evidence/"compiled-capture-index.json").write_text(json.dumps({"capture_index":index,
+                "qualified":False,"compiled_closure_status":"not-established"},indent=2)+"\n")
+        print("Completed source-bound 96-trial live campaign", flush=True)
+    finally:
+        if capture is not None:capture.close()
 
 
 if __name__ == "__main__": main()

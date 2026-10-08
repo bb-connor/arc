@@ -835,6 +835,83 @@ observed={'types':parsed['crate_types'],'externs':parsed['externs'],'linker':par
         self.assertEqual(observed['externs'][0]['kind'],'dynamic-image')
         self.assertTrue(observed['linker'].endswith('/native-runtime/linker'))
 
+    def test_explicit_file_scope_records_only_approved_leaf_parent_directories(self):
+        observed=self.child(r'''
+runtime=base/'native-runtime'
+(runtime/'lib/python3.12/encodings').mkdir(parents=True)
+for name in ['lib/python3.12/codecs.py','lib/python3.12/encodings/__init__.py']:
+ (runtime/name).write_bytes(b'public import input')
+(runtime/'credentials.toml').write_bytes(b'SYNTHETIC-UNLISTED-CONTENT')
+selected=['cargo','rustc','linker','python','recorder','lib/python3.12/codecs.py','lib/python3.12/encodings/__init__.py']
+config['scopes'][-1].update(selection='explicit-members',members=selected)
+m.validate_linux_configuration(config,{})
+campaign_root=candidate/'target/records';campaign_root.mkdir()
+campaign=m.Campaign(campaign_root,config['source_binding']);campaign.root=campaign_root
+try:
+ declaration,originals=m.collect_linux_scope(config,campaign)
+ reference=declaration['scopes'][-1]['inventory']
+ inventory=json.loads((campaign_root/reference['artifact']).read_bytes())
+ observed={'schema':inventory['schema'],'directories':inventory['directories'],
+  'directory_metadata':inventory.get('directory_metadata'),
+  'members':[row['path'] for row in inventory['members']],
+  'original_directory_count':sum(path in originals for path in [str(runtime),str(runtime/'lib/python3.12'),str(runtime/'lib/python3.12/encodings')])}
+finally:campaign.close()
+''')
+        self.assertEqual(observed['schema'],'chio.compilation-read-scope.v2')
+        self.assertEqual(observed['directories'],['.','lib/python3.12','lib/python3.12/encodings'])
+        self.assertEqual([row['path'] for row in observed['directory_metadata']],observed['directories'])
+        self.assertEqual(observed['original_directory_count'],3)
+        self.assertNotIn('credentials.toml',observed['members'])
+        for row in observed['directory_metadata']:
+            self.assertEqual(set(row),{'path','identity'})
+            self.assertEqual(len(row['identity']),3)
+            self.assertTrue(all(type(value) is int for value in row['identity']))
+
+    def test_explicit_scope_emits_read_dir_only_rules_and_refuses_replaced_directory(self):
+        observed=self.child(r'''
+runtime=base/'native-runtime'
+(runtime/'lib/python3.12/encodings').mkdir(parents=True)
+for name in ['lib/python3.12/codecs.py','lib/python3.12/encodings/__init__.py']:
+ (runtime/name).write_bytes(b'public import input')
+unlisted=runtime/'credentials.toml';unlisted.write_bytes(b'SYNTHETIC-UNLISTED-CONTENT')
+selected=['cargo','rustc','linker','python','recorder','lib/python3.12/codecs.py','lib/python3.12/encodings/__init__.py']
+config['scopes'][-1].update(selection='explicit-members',members=selected)
+campaign_root=candidate/'target/records';campaign_root.mkdir()
+campaign=m.Campaign(campaign_root,config['source_binding']);campaign.root=campaign_root
+try:
+ declaration,originals=m.collect_linux_scope(config,campaign)
+ campaign.aliases=m.linux_alias_bindings(config)
+ inventory=json.loads((campaign_root/declaration['scopes'][-1]['inventory']['artifact']).read_bytes())
+ class Library:
+  def __init__(self):self.rules=[]
+  def syscall(self,number,*args):
+   if number==444:return os.open(os.devnull,os.O_RDONLY)
+   if number==445:
+    entry=m.ctypes.cast(args[2],m.ctypes.POINTER(m.LinuxPathRule)).contents
+    info=os.fstat(entry.parent_fd)
+    self.rules.append({'identity':[info.st_dev,info.st_ino,info.st_mode],'allowed':entry.allowed_access})
+   return 0
+  def prctl(self,*args):return 0
+ library=Library();m.linux_abi=lambda:(library,5)
+ m.enforce_linux_scope(config,declaration,originals,campaign,'x86_64')
+ expected={tuple(row['identity']) for row in inventory['directory_metadata']}
+ runtime_rules=[row for row in library.rules if tuple(row['identity']) in expected]
+ unlisted_info=unlisted.stat();unlisted_identity=[unlisted_info.st_dev,unlisted_info.st_ino,unlisted_info.st_mode]
+ replacement=runtime/'lib/python3.12/encodings'
+ replacement.rename(runtime/'lib/python3.12/displaced-encodings');replacement.mkdir()
+ try:m.enforce_linux_scope(config,declaration,originals,campaign,'x86_64');refusal=None
+ except m.Refusal as error:refusal=str(error)
+ observed={'runtime_rules':runtime_rules,'directory_count':len(expected),
+  'unlisted_file_rule':any(row['identity']==unlisted_identity for row in library.rules),
+  'replacement_refusal':refusal,'native_kernel_executed':False}
+finally:campaign.close()
+''')
+        self.assertEqual(len(observed['runtime_rules']),observed['directory_count'])
+        self.assertTrue(all(row['allowed']==1<<3 for row in observed['runtime_rules']))
+        self.assertFalse(observed['unlisted_file_rule'])
+        self.assertEqual(observed['replacement_refusal'],'linux_scope_changed')
+        self.assertFalse(observed['native_kernel_executed'])
+
     def test_inherited_selectors_and_proxy_inputs_refuse(self):
         observed=self.child(r'''
 for name in ['RUSTC','RUSTC_WRAPPER','CARGO_BUILD_RUSTC','RUSTC_BOOTSTRAP','CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER',
@@ -1185,6 +1262,210 @@ with m.HeldPath(base/'stdout',create=True) as out,m.HeldPath(base/'stderr',creat
 ''')
         self.assertEqual(observed,{'exit':0,'stdout':'PUBLIC-PIPE\n','stderr':'PUBLIC-ERROR\n'})
 
+    def native_compiler_output_observation(self, probe=False, exit_code=1):
+        """Actual Python child I/O through execute; no Rust or Linux proof."""
+        return self.child(r'''
+from unittest.mock import patch
+records=pathlib.Path(config['records']);records.mkdir(mode=0o700)
+campaign=m.Campaign(records,'a'*64);declaration={'images':images,'scope_id':'e'*64}
+supervisor=m.CompilationSupervisor(config,declaration,{},campaign,{})
+supervisor.scope_identity=(1,2,3,4)
+argv=[sys.executable,'-c','import sys;print("PUBLIC-COMPILER-OUT");print("PUBLIC-COMPILER-ERROR",file=sys.stderr);sys.exit(EXIT)'.replace('EXIT','EXIT_CODE')]
+try:
+ with patch.object(m,'native_target_context',return_value=(config,None)),patch.object(m,'verify_linux_aliases'), \
+      patch.object(m,'parse',return_value={}),patch.object(m,'output_paths',return_value=(candidate/'target/unit.d',{})), \
+      patch.object(m,'enforce_linux_scope'),patch.object(m,'native_scope_owner_identity',return_value=(1,2,3,4),create=True):
+  result=supervisor.execute(argv,{'PATH':'/usr/bin:/bin'},str(candidate),PROBE)
+ output=supervisor.dispatches[-1].get('output')
+ observed={'exit':result.returncode,'stdout':None,'stderr':None,'output':output,
+           'raw_diagnostics_forwarded':False,'compiler_executed':False,'linux_enforcement_established':False}
+ if output is not None:
+  observed['stdout']=(records/output['stdout']['artifact']).read_bytes().decode()
+  observed['stderr']=(records/output['stderr']['artifact']).read_bytes().decode()
+finally:supervisor.close();campaign.close()
+'''.replace('EXIT_CODE',str(exit_code)).replace('PROBE',repr(probe)))
+
+    def test_native_compiler_unit_outputs_remain_in_owned_evidence(self):
+        observed=self.native_compiler_output_observation()
+        self.assertEqual((observed['exit'],observed['stdout'],observed['stderr']),
+            (1,'PUBLIC-COMPILER-OUT\n','PUBLIC-COMPILER-ERROR\n'))
+        self.assertEqual(observed['output']['status'],'complete')
+        self.assertFalse(observed['raw_diagnostics_forwarded'])
+
+    def test_native_compiler_probe_diagnostics_remain_in_owned_evidence(self):
+        observed=self.native_compiler_output_observation(probe=True,exit_code=0)
+        self.assertEqual((observed['exit'],observed['stdout'],observed['stderr']),
+            (0,'PUBLIC-COMPILER-OUT\n','PUBLIC-COMPILER-ERROR\n'))
+        self.assertEqual(observed['output']['status'],'complete')
+
+    def test_native_compiler_output_drains_both_full_pipes_before_retention(self):
+        observed=self.child(r'''
+from unittest.mock import patch
+payload=128*1024
+code='import os,sys;os.write(2,b"E"*'+str(payload)+');os.write(1,b"O"*'+str(payload)+');sys.exit(1)'
+def cleanup(process,deadline):
+ process.kill();process.wait(timeout=max(0,deadline-m.time.monotonic()));return {'status':'REAPED'}
+result=m.bounded_compiler_output([sys.executable,'-c',code],{'PATH':'/usr/bin:/bin'},str(candidate),None,cleanup)
+observed={'exit':result.returncode,'stdout_size':len(result.stdout),'stderr_size':len(result.stderr),
+ 'stdout_exact':result.stdout==b'O'*payload,'stderr_exact':result.stderr==b'E'*payload,
+ 'observation':result.output_observation,'rust_compiler_dispatch':False}
+''')
+        self.assertEqual((observed['exit'],observed['stdout_size'],observed['stderr_size']),(1,128*1024,128*1024))
+        self.assertTrue(observed['stdout_exact'] and observed['stderr_exact'])
+        self.assertEqual(observed['observation']['status'],'complete')
+        self.assertEqual(observed['observation']['eof'],{'stdout':True,'stderr':True})
+
+    def test_native_compiler_output_limit_refuses_and_reaps_the_owned_child(self):
+        observed=self.child(r'''
+m.MAX_NATIVE_COMPILER_OUTPUT=1024
+calls=[]
+def cleanup(process,deadline):
+ process.kill();process.wait(timeout=max(0,deadline-m.time.monotonic()));calls.append(process.returncode)
+ return {'status':'REAPED','scope':'direct-child-byte-limit-control'}
+result=m.bounded_compiler_output([sys.executable,'-c','import os,time;os.write(2,b"E"*2048);time.sleep(30)'],
+ {'PATH':'/usr/bin:/bin'},str(candidate),None,cleanup)
+observed={'exit':result.returncode,'stderr_size':len(result.stderr),'calls':calls,'observation':result.output_observation}
+''')
+        self.assertLess(observed['exit'],0)
+        self.assertEqual(observed['stderr_size'],1024)
+        self.assertEqual(len(observed['calls']),1)
+        self.assertEqual(observed['observation']['status'],'refused')
+        self.assertEqual(observed['observation']['refusal'],'compiler_output_limit')
+        self.assertGreater(observed['observation']['observed_bytes']['stderr'],1024)
+
+    def test_native_compiler_output_timeout_is_inside_the_whole_dispatch_budget(self):
+        observed=self.child(r'''
+m.NATIVE_COMPILER_DISPATCH_SECONDS=2
+def cleanup(process,deadline):
+ process.kill();process.wait(timeout=max(0,deadline-m.time.monotonic()))
+ return {'status':'REAPED','scope':'direct-child-timeout-control'}
+result=m.bounded_compiler_output([sys.executable,'-c','import time;time.sleep(30)'],
+ {'PATH':'/usr/bin:/bin'},str(candidate),None,cleanup)
+observed={'exit':result.returncode,'observation':result.output_observation}
+''')
+        self.assertLess(observed['exit'],0)
+        self.assertEqual(observed['observation']['refusal'],'compiler_output_timeout')
+        self.assertLess(observed['observation']['elapsed_seconds'],2)
+
+    def test_native_compiler_output_publication_failure_cannot_be_a_complete_observation(self):
+        observed=self.child(r'''
+from unittest.mock import patch
+records=pathlib.Path(config['records']);records.mkdir(mode=0o700)
+campaign=m.Campaign(records,'a'*64);declaration={'images':images,'scope_id':'e'*64}
+supervisor=m.CompilationSupervisor(config,declaration,{},campaign,{})
+supervisor.scope_identity=(1,2,3,4);calls=[]
+def unavailable(payload):raise OSError(5,'controlled public output I/O failure')
+def cleanup(*args):calls.append(True);return {'status':'REAPED','scope':'publication-control-only'}
+try:
+ with patch.object(m,'native_scope_owner_identity',return_value=(1,2,3,4)), \
+      patch.object(m,'native_target_context',return_value=(config,None)),patch.object(m,'verify_linux_aliases'), \
+      patch.object(m,'parse',return_value={}),patch.object(m,'output_paths',return_value=(candidate/'target/unit.d',{})), \
+      patch.object(m,'enforce_linux_scope'),patch.object(m,'stop_owned_scope_children',side_effect=cleanup), \
+      patch.object(campaign,'retain',side_effect=unavailable):
+  try:supervisor.execute([sys.executable,'-c','print("PUBLIC-OUTPUT")'],{'PATH':'/usr/bin:/bin'},str(candidate),False)
+  except m.CompilerOutputRefusal as error:
+   observed={'refusal':str(error),'actual_exit':error.compiler_exit,'cleanup_calls':len(calls),
+    'output':supervisor.dispatches[-1]['output'],'rust_compiler_dispatch':False}
+finally:supervisor.close();campaign.close()
+''')
+        self.assertEqual(observed['refusal'],'compiler_output_publication')
+        self.assertEqual(observed['actual_exit'],0)
+        self.assertEqual(observed['cleanup_calls'],1)
+        self.assertEqual(observed['output']['status'],'publication-failed')
+        self.assertIsNone(observed['output']['stdout'])
+        self.assertIsNone(observed['output']['stderr'])
+
+    def test_native_compiler_output_requires_an_existing_owned_subreaper_before_dispatch(self):
+        observed=self.child(r'''
+from unittest.mock import patch
+supervisor=m.CompilationSupervisor(config,{'images':images,'scope_id':'e'*64},{},None,{})
+try:
+ with patch.object(m.subprocess,'Popen',side_effect=AssertionError('unowned compiler was dispatched')):
+  try:supervisor.execute([images['rustc']['path'],'-vV'],{},str(candidate),True)
+  except m.Refusal as error:observed={'refusal':str(error),'dispatches':supervisor.dispatches}
+finally:supervisor.close()
+''')
+        self.assertEqual(observed,{'refusal':'compiler_cleanup_scope_identity','dispatches':[]})
+
+    def test_native_compiler_output_requires_owner_private_evidence_before_dispatch(self):
+        observed=self.child(r'''
+from unittest.mock import patch
+records=pathlib.Path(config['records']);records.mkdir(mode=0o700)
+campaign=m.Campaign(records,'a'*64);records.chmod(0o755)
+supervisor=m.CompilationSupervisor(config,{'images':images,'scope_id':'e'*64},{},campaign,{})
+supervisor.scope_identity=(1,2,3,4)
+try:
+ with patch.object(m,'native_scope_owner_identity',return_value=(1,2,3,4)), \
+      patch.object(m.subprocess,'Popen',side_effect=AssertionError('nonprivate compiler was dispatched')):
+  try:supervisor.execute([images['rustc']['path'],'-vV'],{},str(candidate),True)
+  except m.Refusal as error:observed={'refusal':str(error),'dispatches':supervisor.dispatches}
+finally:supervisor.close();campaign.close()
+''')
+        self.assertEqual(observed,{'refusal':'compiler_output_private_namespace','dispatches':[]})
+
+    @unittest.skipUnless(sys.platform.startswith('linux'),'Requires actual Linux subreaper and pidfds')
+    def test_native_compiler_timeout_reaps_orphan_pipe_holders_without_signalling_other_processes(self):
+        unrelated=subprocess.Popen([sys.executable,'-c','import time;time.sleep(30)'])
+        try:
+            observed=self.child(r'''
+import ctypes
+library=ctypes.CDLL(None,use_errno=True)
+if library.prctl(36,1,0,0,0)!=0:raise RuntimeError('actual subreaper unavailable')
+scope=m.native_process_identity(os.getpid());m.NATIVE_COMPILER_DISPATCH_SECONDS=2
+pid_file=base/'public-orphan-pid'
+code='import pathlib,subprocess,sys;child=subprocess.Popen([sys.executable,"-c","import time;time.sleep(30)"]);pathlib.Path(sys.argv[1]).write_text(str(child.pid))'
+def cleanup(process,deadline):return m.stop_owned_scope_children(scope,[process],deadline)
+result=m.bounded_compiler_output([sys.executable,'-c',code,str(pid_file)],
+ {'PATH':'/usr/bin:/bin'},str(candidate),None,cleanup)
+orphan=int(pid_file.read_text());record=result.output_observation
+observed={'parent_exit':result.returncode,'refusal':record['refusal'],'cleanup':record['cleanup'],
+ 'orphan_reaped':m.native_process_identity(orphan) is None,'orphan':orphan,
+ 'elapsed':record['elapsed_seconds'],'rust_compiler_dispatch':False}
+''')
+            self.assertEqual(observed['parent_exit'],0)
+            self.assertEqual(observed['refusal'],'compiler_output_timeout')
+            self.assertEqual(observed['cleanup']['status'],'REAPED')
+            self.assertTrue(observed['orphan_reaped'])
+            self.assertIn(observed['orphan'],[row['pid']for row in observed['cleanup']['children']])
+            self.assertLess(observed['elapsed'],2)
+            self.assertIsNone(unrelated.poll())
+        finally:
+            unrelated.terminate();unrelated.wait(timeout=5)
+
+    @unittest.skipUnless(sys.platform.startswith('linux'),'Requires actual Linux subreaper and pidfds')
+    def test_native_compiler_cleanup_identity_or_permission_failure_refuses(self):
+        observed=self.child(r'''
+import ctypes
+from unittest.mock import patch
+library=ctypes.CDLL(None,use_errno=True)
+if library.prctl(36,1,0,0,0)!=0:raise RuntimeError('actual subreaper unavailable')
+scope=m.native_scope_owner_identity();results={}
+for mode in ['identity','permission']:
+ child=subprocess.Popen([sys.executable,'-c','import time;time.sleep(30)'])
+ original=m.native_process_identity;reads=[]
+ def replaced(pid):
+  value=original(pid)
+  if pid==child.pid:
+   reads.append(pid)
+   if len(reads)>1:return (*value[:3],value[3]+1)
+  return value
+ try:
+  target=patch.object(m,'native_process_identity',side_effect=replaced) if mode=='identity' else \
+   patch.object(m.signal,'pidfd_send_signal',side_effect=PermissionError(1,'controlled signal refusal'))
+  with target:
+   try:m.stop_owned_scope_children(scope,[child],m.time.monotonic()+2);results[mode]='accepted'
+   except m.Refusal as error:results[mode]=str(error)
+ finally:m.stop_owned_scope_children(scope,[child],m.time.monotonic()+2)
+remaining=[]
+for entry in pathlib.Path('/proc').iterdir():
+ if entry.name.isdecimal():
+  identity=m.native_process_identity(int(entry.name))
+  if identity is not None and identity[0]==os.getpid():remaining.append(int(entry.name))
+observed={'results':results,'remaining_owned_children':remaining,'rust_compiler_dispatch':False}
+''')
+        self.assertEqual(observed['results'],{'identity':'compiler_cleanup_process_identity','permission':'compiler_cleanup_io'})
+        self.assertEqual(observed['remaining_owned_children'],[])
+
     def test_anonymous_pipe_client_round_trip_is_transport_only(self):
         observed=self.child(r'''
 declaration={'images':images,'scope_id':'e'*64}
@@ -1203,6 +1484,65 @@ try:
 finally:supervisor.close()
 ''')
         self.assertEqual(observed,{'transport_exit':7,'stdout':'','stderr':''})
+
+    def pipe_authority_observation(self, modification=''):
+        """Exercise the real client/parent pipes with an explicit noncompiler sink."""
+        return self.child(r'''
+records=pathlib.Path(config['records']);records.mkdir();campaign=m.Campaign(records,'a'*64)
+declaration={'images':images,'scope_id':'e'*64}
+environment={**config['environment'],'RUSTC':images['rustc']['path'],'RUSTC_WRAPPER':images['recorder']['path'],
+ 'CHIO_COMPILATION_SOURCE_BINDING':'a'*64,'CHIO_COMPILATION_SCOPE_ID':'e'*64}
+supervisor=m.CompilationSupervisor(config,declaration,{},campaign,environment)
+called=[]
+def public_protocol_sink(argv,env,cwd,executor,sink,selection):
+ called.append({'ipc_in_request':'CHIO_COMPILATION_IPC' in env})
+ sink(b'PUBLIC-PIPE-RESPONSE');return 0
+m.main=public_protocol_sink
+environment['CHIO_COMPILATION_IPC']=m.canonical(supervisor.table).decode('ascii')
+ENVIRONMENT_MODIFICATION
+try:
+ child=subprocess.Popen([sys.executable,'-B',*(['-O']*sys.flags.optimize),str(sys.argv[1]),images['rustc']['path'],'-vV'],
+  env=environment,cwd=candidate,pass_fds=supervisor.pass_fds,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+ observed={'transport_exit':supervisor.wait(child),'stdout':child.stdout.read().decode(),
+  'stderr':child.stderr.read().decode(),'calls':called,
+  'event_exit':supervisor.events[-1]['exit'],'refusal':supervisor.events[-1]['refusal'],
+  'dispatches':supervisor.events[-1]['dispatches'],'records':supervisor.events[-1]['records']}
+finally:supervisor.close();campaign.close()
+'''.replace('ENVIRONMENT_MODIFICATION', modification))
+
+    def test_parent_authority_pipe_survives_transport_environment_addition(self):
+        observed=self.pipe_authority_observation()
+        self.assertEqual(observed,{'transport_exit':0,'stdout':'PUBLIC-PIPE-RESPONSE','stderr':'',
+            'calls':[{'ipc_in_request':False}],'event_exit':0,'refusal':None,'dispatches':[],'records':[]})
+
+    def test_parent_authority_pipe_refuses_changed_source_selector(self):
+        observed=self.pipe_authority_observation("environment['CHIO_COMPILATION_SOURCE_BINDING']='b'*64")
+        self.assertEqual(observed,{'transport_exit':86,'stdout':'','stderr':'','calls':[],
+            'event_exit':86,'refusal':'compilation_request_authority','dispatches':[],'records':[]})
+
+    def test_parent_authority_pipe_refuses_undeclared_compilation_key(self):
+        observed=self.pipe_authority_observation("environment['CHIO_COMPILATION_UNDECLARED']='public-control'")
+        self.assertEqual(observed,{'transport_exit':86,'stdout':'','stderr':'','calls':[],
+            'event_exit':86,'refusal':'compilation_request_authority','dispatches':[],'records':[]})
+
+    def test_parent_authority_is_not_replaced_by_launch_dictionary_mutation(self):
+        observed=self.child(r'''
+records=pathlib.Path(config['records']);records.mkdir();campaign=m.Campaign(records,'a'*64)
+declaration={'images':images,'scope_id':'e'*64}
+environment={**config['environment'],'RUSTC':images['rustc']['path'],'RUSTC_WRAPPER':images['recorder']['path'],
+ 'CHIO_COMPILATION_SOURCE_BINDING':'a'*64}
+supervisor=m.CompilationSupervisor(config,declaration,{},campaign,environment)
+called=[]
+m.main=lambda *args:called.append(True) or 0
+environment['CHIO_COMPILATION_SOURCE_BINDING']='b'*64
+try:
+ request={'schema':'chio.rust-compilation-request.v1','id':'f'*32,'argv':[images['rustc']['path'],'-vV'],
+  'environment':environment,'cwd':str(candidate)}
+ response=json.loads(supervisor.respond(m.canonical(request)))
+ observed={'exit':response['exit'],'called':len(called),'refusal':supervisor.events[-1]['refusal']}
+finally:supervisor.close();campaign.close()
+''')
+        self.assertEqual(observed,{'exit':86,'called':0,'refusal':'compilation_request_authority'})
 
 
     def selector_child(self, operation):

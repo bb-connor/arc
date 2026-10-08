@@ -1,6 +1,6 @@
 # Recovery runtime execution status
 
-As of 2026-10-06, remediation of the current implementation is in progress. The
+Remediation of the current implementation is in progress. The
 working tree is **not qualified**. Focused local passes and scoped independent
 reviews apply to their exact recorded subjects. Later source changes need their
 owning validation and review. Complete current resource-reserve, historical
@@ -16,18 +16,28 @@ The second review's three P1 findings and its P2/P3 findings remain historical
 review results. The first review's four P1 repair results do not establish
 completion of later reviews or findings introduced during remediation.
 
-The latest completed evidence-index snapshot is
-`target/recovery-safety-remediation/all-findings/report/current-progress/20261006T211334.492952Z/REPORT.md`,
-with exact input hashes in its `FINAL-CAPTURE.json`. It is a progress capture;
-current candidate qualification and release remain pending. Later proof
-associations and explicit causal corrections are staged under
-`target/recovery-safety-remediation/all-findings/report/proof-catalog/20261006T232459.739266Z/`.
-That catalogue is not a final source freeze or complete disposition refresh.
+Current per-ID dispositions are maintained in
+`target/recovery-pr/current-review-followup/current-reviewed-dispositions.json`.
+Each row retains its exact immutable catalog path and JSON pointer, current
+source/evidence references, accepted local dimensions and remaining obligations.
+The original canonical catalog and earlier progress captures remain immutable.
+Source-only finding closure and scoped native passes do not establish whole-tree
+qualification or release readiness.
+
+The original canonical remaining matrix is
+`target/recovery-safety-remediation/all-findings/report/proof-catalog/20261006T232459.739266Z/canonical-all-findings-remaining-matrix.json`.
+Its historical null dispositions are superseded only by explicit current per-ID
+review dispositions. It is not a current source freeze. Later introduced findings
+and their independent reports remain separate until the owning catalog joins
+those exact IDs.
 
 The retained P5/P6 completion flags describe their archived source bytes and
 supported profiles. They do not establish qualification for naming changes,
 runtime repairs, tooling changes or documentation edits. Historical records,
-failed attempts, missing outcomes, archives and seals remain unchanged.
+failed attempts, missing outcomes, archives and seals remain as retained. The
+published P6 package has two explicitly documented metadata redactions; their
+original and published hashes remain in [the redaction note](p6/evidence/REDACTIONS.md).
+The original seal is not rewritten to accept those published bytes.
 
 At the cumulative review snapshot, 113 of the 735 P6-qualified source paths
 differed: 79 changed in place and 34 were renamed, including eight renames with
@@ -37,7 +47,119 @@ current inventory. The retained P5 and P6 read-only package auditors refuse the
 working tree. P6 refuses at `qualification.live_runtime_sources`. Updating
 metadata to reuse old runs would not qualify the changed implementation.
 
+Current guided setup uses the [source-bound operator procedure](protected-setup-operations.md), including its original-denial prerequisite, quiet source window, retained legacy disposition and logical call accounting. Historical phase contracts and acceptance records keep their original source scope.
+
 ## Current remediation evidence
+
+The [current source correspondence and reproduction guidance](current-reproduction.md)
+links the additive coverage overlay and current command declarations. The overlay
+resolves historical locators and checks source hashes; it does not rerun their
+historical tests or convert archived completion flags into current acceptance.
+Changed containing-source bytes require their own behavior review.
+
+Captured Source39 Linux behavior is independently indexed at
+`target/recovery-safety-remediation/linux-acceptance/behavior-source-capture.ddff5266e101/source39-owning-baseline-completion.json`
+and its separate completion readback. That subject completed the 16-row
+preparation, Store's 1,908 passes with five declared ignored cases, and the strict
+72-case challenge including 27 probes and ten helper mutations. Its native
+18-case recovery run retained five passes and thirteen failures. The earlier
+900-second transfer failure, prerequisite failures and image-permission failure
+remain preserved. These Source39 observations do not qualify later source bytes
+or replace later source/profile-bound Linux acceptance.
+
+### Current Linux compilation and targeted controls
+
+The October 8 native GNU/Linux build compiled the five library test targets for
+the kernel, Process, control plane, SQLite store and SQLite file identity on
+Rust 1.95. The kernel, control plane and store included PQ support. Its frozen
+source manifest is
+`d03e9412fe671ddc53fdebb5db7aaf8d5aef218ebf35dfad5714cd935c40321f`.
+This is compilation evidence for that subject, not a passing execution of its
+registered test inventories or a Clippy result. The five executables were
+hashed and copied before another cache writer was authorized. The older PQ
+producer was separately protected before the current compiler ran.
+
+Its full kernel library subsequently executed all 1,502 registered cases:
+1,499 passed, three failed and none were ignored. Two failed because a modeled
+input fixture had not implemented the new mandatory classified acknowledgment
+port. That fixture repair preserves the owning assertions, passed both exact
+owning cases on Linux and received an independent Source-only review. Its
+acceptance is limited to the modeled Kernel unit fixture. The third failed the bounded
+raw canonical-output contract because early byte-budget exhaustion returned the
+wrong error category. The repaired mapping passed that original assertion and
+all four retained-envelope controls on Linux, with independent Source review.
+The original full-suite failure remains retained. A subsequent isolated
+composition ran the full Kernel library with 1,502 passes, zero failures and no
+ignored cases. That composition includes the fixture and encoding repairs plus
+test-only numeric SQLite-read diagnostics. Its exact subject and original logs
+are retained under
+`target/recovery-pr/current-review-followup/linux-current/connection-authorizer-denial-diagnostic-20261008T1610/`.
+The corrected Native producer composition still requires execution.
+
+The independent Source review approved an isolated, feature-gated reconciliation
+observer. Its source manifest is
+`a9f141e0e70877b7791716303d37b7d8dab274eebfb2f34a89bd6b13d0ad95d9`.
+That subject compiled and passed four observer unit tests and five pressure
+controls. Three exercise actual SQLite files and WAL; two check observation or
+headroom predicates. The file controls include an unreleased reader, recovery
+after reader release, checkpointed WAL high-water allocation and writes against
+a valid sparse database larger than 2 GiB. The first control driver misparsed the
+expected-panic test's split libtest output. Its failure is retained; the original
+test exited zero with exactly one pass, and the successor executed the remaining
+seven cases. These controls do not establish funded native capture, settlement
+or release at capacity.
+
+Two independently created old-build captures retain failed current-signer
+regressions at the unchanged 90-second deadline. The first used the frozen
+baseline. The second used the observer subject. Both producers reached the
+genuine return-recorded crash point, both original roots remain retained, and
+both timed-out consumers were reaped. Each test reached its initial terminal
+custody assertion and a genuine current denied call before the later custody
+reconciliation timed out. Neither case is a passing key-rotation gate. The
+observer recorded repeated imported-source and native-history verification;
+Source reuse repairs still require their own review and runtime acceptance.
+
+A separate 29-path reader and fixture composition compiled and passed the two
+Kernel fixture cases and 21 authored reader tests. Independent review blocked
+the reader: authorizer ownership allowed nested cleanup to invalidate an outer
+snapshot, absence helpers skipped Source binding and rehashed middle-event
+tests could mask their named validator. Those are one P1 and two P2s in an
+uninstalled candidate. Passing its current tests does not satisfy the missing
+regressions. The original review, compiler and tests remain retained under
+`target/recovery-pr/current-review-followup/linux-current/snapshot-history-reader-20261008T1512/`.
+The reader remains isolated while actual connection-owned hook leases and the
+other findings are repaired and reviewed.
+
+The expanded connection-owned composition compiled all five owning library
+targets. Nine lease controls and two attached-state controls passed. Its genuine
+history fixture failed during store initialization, before its intended
+corruption assertions. Independent review also identified a copy-fixture
+incompatibility with the production ATTACH refusal and a generic FFI destructor
+panic crossing the C ABI. A two-leaf successor preserves that refusal, copies
+through a separate read-only fixture handle and contains unwinding at the FFI
+boundary. Independent Source review approved those corrections. Their actual
+affected execution and the store-initialization failure remain under diagnosis;
+the reader has not been installed in the working tree.
+
+The original build and first capture export is retained under
+`target/recovery-pr/current-review-followup/linux-current/current-baseline-source-package-20261008T1253/`.
+The observer build, all nine control records, original parser failure and second
+capture trace are retained under
+`target/recovery-pr/current-review-followup/linux-current/reconciliation-observer-20261008T1422/`.
+Their separately verified exports contain 33 and 77 original members,
+respectively. The protected executables and databases remain on the task host.
+Neither export qualifies the whole working tree.
+
+`NATIVE-FUNDING-AVAILABILITY-01` is a current open P1 integration blocker:
+`finishing_funding.rs` refuses fresh authenticated native external authorization
+because the complete initial finishing bank has not been installed. The refusal
+preserves the authority boundary, but it disables useful fresh native delivery.
+Partial Source constructors, conservative price calculations and negative
+controls do not satisfy this obligation. Its additive record is
+`target/recovery-pr/current-review-followup/current-native-funding-integration-blocker-20261008T1433.json`.
+The original per-ID dispositions remain unchanged by these targeted controls.
+
+### Earlier selected local subject
 
 The protected local executable with SHA-256
 `31f5d1da430571df1e4cbb0ba2def01ab3cb2ca32b08ae407e66e386d62649bf`
@@ -145,9 +267,9 @@ fulfill that missing evidence requirement.
 |---|---|
 | Code review | Independent reviews bind exact source, control or executable scopes. Every original and later finding needs its complete source-bound disposition. Historical or focused reviews do not establish a clean review of the current tree. |
 | Local verification | Selected native, Store, pure, SDK and tooling cases have recorded passes and mixed failures. Current successors still need their owning tests and complete affected suites. Failed compilers, prerequisite fixtures, ignored cases and commands selecting zero tests remain explicit. Complete compiled-source authority is pending. |
-| Linux acceptance | Historical P5/P6 results apply only to archived bindings and profiles. Current runner and transfer controls have scoped local evidence. The original source transfer failed at 900 seconds; a later old-pinned strict-cage diagnostic timed out at 3,600 seconds before enforcement, with the registered 18 recovery cases and Store suite unexecuted. Current native Linux acceptance is pending. |
+| Linux acceptance | Historical P5/P6 results apply to their archived bindings and profiles. Captured Source39 preparation, Store and strict challenge completed; its native 18-case run retained five passes and thirteen failures. Earlier failed and unexecuted attempts remain separately recorded. Later Linux results require their own source/image joins; complete qualification of the final current profile is pending. |
 | Live providers and host comparisons | The finite P6 campaign is historical. Current model-free and mocked-delivery framework controls have explicit limits. Current live-provider cohort and host comparison qualification remain pending. |
-| Formal assurance | The primary Lean command passed on 265 held formal/script/claim inputs. Its broader runner exited 86 for concurrent source drift. Rust refinement, complete SQL/two-store/provider proofs and final whole-source formal qualification remain pending. |
+| Formal assurance | The captured primary Lean command passed on 265 held formal/script/claim inputs; its broader runner exited 86 for concurrent source drift. That bounded subject is historical. Rust refinement, complete SQL/two-store/provider proofs and final whole-source formal qualification remain pending. |
 | Performance and adoption | Retained measurements bind their source/profile inventories. Current performance, raw samples and adoption applicability remain pending. |
 | Hosted CI | No current-candidate hosted CI qualification is recorded. Required hosted checks remain separate from local verification. |
 | Production | No deployment, production migration or operational acceptance is recorded. The current tree has no production qualification. |

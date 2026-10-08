@@ -1,5 +1,6 @@
 """Qualification mutations must fail at their actual semantic boundary."""
 from copy import deepcopy
+from contextlib import ExitStack, redirect_stderr
 import hashlib
 import importlib.util
 import io
@@ -1224,6 +1225,18 @@ class QualificationAuditTest(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError,"^qualification.compiled_profile_producer_subject$"):
                         self.audit.audit_compiled_profiles(root,record,runtime["source_binding"],runtime["sources"],None)
 
+    def test_compiled_dimension_subject_cannot_borrow_an_unrelated_cargo_producer(self):
+        for name in ["dimension/linux/native","dimension/formal/solver","dimension/live_provider/host"]:
+            with self.subTest(subject=name),tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary).resolve()
+                bundle = self.compiled_profile_archive_bundle(root)
+                runtime,profile = bundle["fixture"]["runtime"],bundle["profile"]
+                profile["subjects"] = {name:profile["roots"]}
+                with patch.object(self.audit,"audit_gate"),patch.object(self.audit,"audit_execution_provenance"), \
+                        patch.object(self.audit,"audit_current_compiled_publication"):
+                    with self.assertRaisesRegex(ValueError,"^qualification.compiled_profile_producer_subject$"):
+                        self.audit.audit_compiled_profile(root,profile,runtime["source_binding"],runtime["sources"],None)
+
     def test_host_cached_extern_refuses_self_declared_native_scope(self):
         rows,_sources,_roots = self.compiler_unit_graph_bundle()
         image = {key:rows[1]["inputs"][1][key] for key in ["path","sha256","size"]}
@@ -1255,6 +1268,188 @@ class QualificationAuditTest(unittest.TestCase):
                     patch.object(self.audit,"audit_gate"),patch.object(self.audit,"audit_execution_provenance"):
                 with self.assertRaisesRegex(ValueError,"^qualification.compiled_profile_image$"):
                     self.audit.audit_compiled_profiles(root,record,runtime["source_binding"],runtime["sources"],None)
+
+    def test_compiled_image_custody_bounds_the_complete_retained_pool(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            images = []
+            for name,payload in [("first",b"12345678"),("second",b"abcdefgh")]:
+                (root/name).write_bytes(payload)
+                images.append({"path":name,"sha256":hashlib.sha256(payload).hexdigest(),"size":len(payload)})
+            with patch.object(self.audit,"COMPILED_IMAGE_POOL_MAX_BYTES",15):
+                with self.assertRaisesRegex(ValueError,"^qualification.compiled_profile_image_budget$"):
+                    with self.audit.compiled_image_custody(root) as hold:
+                        hold(images[0])
+                        hold(images[0])
+                        hold(images[1])
+            with patch.object(self.audit,"COMPILED_IMAGE_POOL_MAX_BYTES",16):
+                with self.audit.compiled_image_custody(root) as hold:
+                    for image in [images[0],images[0],images[1]]:
+                        hold(image)
+
+    def test_actual_large_retention_pool_requires_declared_descriptor_capacity(self):
+        """Actual publisher/physical-reader resource composition, no Rust run."""
+        code = r'''
+import contextlib,hashlib,importlib.util,json,os,pathlib,resource,sys,tempfile
+def load(name,path):
+ spec=importlib.util.spec_from_file_location(name,path);module=importlib.util.module_from_spec(spec);sys.modules[name]=module;spec.loader.exec_module(module);return module
+audit=load('large_pool_auditor',sys.argv[1]);recorder=load('large_pool_recorder',sys.argv[2])
+with tempfile.TemporaryDirectory() as temporary:
+ root=pathlib.Path(temporary).resolve();namespace=root/'target/records';namespace.mkdir(parents=True)
+ with contextlib.redirect_stderr(open(os.devnull,'w')):
+  campaign=recorder.Campaign(namespace,'a'*64)
+  try:
+   with campaign.retention_batch():
+    for index in range(1637):campaign.retain(('PUBLIC-DESCRIPTOR-CUSTODY-'+str(index)).encode())
+  finally:campaign.close()
+ observed={'artifacts':len(list((namespace/'artifacts').iterdir())),'controls':{},'compiler_executed':False}
+ hard=resource.getrlimit(resource.RLIMIT_NOFILE)[1]
+ original=audit.regular_input;reads=0;pool_entries=0
+ @contextlib.contextmanager
+ def counted(path):
+  global reads
+  reads+=1
+  with original(path) as stream:yield stream
+ audit.regular_input=counted
+ original_pool=audit.compiler_input_custody
+ @contextlib.contextmanager
+ def counted_pool():
+  global pool_entries
+  pool_entries+=1
+  with original_pool() as regular:yield regular
+ audit.compiler_input_custody=counted_pool
+ resource.setrlimit(resource.RLIMIT_NOFILE,(1024,hard))
+ try:audit.audit_compiler_publications(namespace,'a'*64);observed['low']='accepted'
+ except Exception as error:observed['low']={'type':type(error).__name__,'reason':str(error),'regular_reads':reads,'pool_entries':pool_entries}
+ resource.setrlimit(resource.RLIMIT_NOFILE,(32768,hard))
+ before_limit=resource.getrlimit(resource.RLIMIT_NOFILE)
+ capacity=audit.original_compiler_descriptor_capacity(namespace)
+ report=audit.audit_compiler_publications(namespace,'a'*64)
+ observed['capacity']={'required':capacity['required_descriptors'],'leaves':capacity['regular_namespace_leaves'],
+  'budget':capacity['descriptor_budget'],'limit_changed':capacity['limit_changed'],
+  'process_limits_unchanged':before_limit==resource.getrlimit(resource.RLIMIT_NOFILE)}
+ observed['positive']={'records':report['verified_records'],'artifacts':report['verified_artifacts'],'closure':report['compiled_closure_status']}
+ victim=next((namespace/'artifacts').iterdir());saved=victim.read_bytes();victim.write_bytes(b'PUBLIC-MUTATED-CUSTODY')
+ try:audit.audit_compiler_publications(namespace,'a'*64);observed['controls']['changed']='accepted'
+ except (ValueError,OSError):observed['controls']['changed']='refused'
+ victim.write_bytes(saved);victim.unlink()
+ try:audit.audit_compiler_publications(namespace,'a'*64);observed['controls']['missing']='accepted'
+ except (ValueError,OSError):observed['controls']['missing']='refused'
+ print(json.dumps(observed))
+'''
+        command = [sys.executable,"-I","-B",*(["-O"] if sys.flags.optimize else []),"-c",code,
+                   str(TOOL),str(ROOT/"scripts/record-rust-compilation.py")]
+        result = subprocess.run(command,cwd=ROOT,capture_output=True,timeout=90)
+        self.assertEqual(result.returncode,0,result.stderr.decode())
+        observed = json.loads(result.stdout)
+        self.assertEqual(observed["artifacts"],1637)
+        self.assertEqual(observed["low"],{"type":"ValueError",
+            "reason":"qualification.compiler_descriptor_capacity","regular_reads":0,"pool_entries":0})
+        self.assertEqual(observed["positive"],{"records":0,"artifacts":1637,"closure":"not-established"})
+        self.assertGreater(observed["capacity"]["required"],1637)
+        self.assertLessEqual(observed["capacity"]["required"],32768)
+        self.assertEqual(observed["capacity"]["leaves"],1639)
+        self.assertEqual(observed["capacity"]["budget"],32768)
+        self.assertFalse(observed["capacity"]["limit_changed"])
+        self.assertTrue(observed["capacity"]["process_limits_unchanged"])
+        self.assertEqual(observed["controls"],{"changed":"refused","missing":"refused"})
+        self.assertFalse(observed["compiler_executed"])
+
+    def test_compiler_input_custody_holds_shared_ancestry_and_each_original_leaf(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            directory = root/"public"
+            directory.mkdir()
+            first, second = directory/"first", directory/"second"
+            first.write_bytes(b"PUBLIC-FIRST")
+            second.write_bytes(b"PUBLIC-SECOND")
+            from contextlib import ExitStack
+            with self.audit.compiler_input_custody() as regular:
+                with ExitStack() as held:
+                    left = held.enter_context(regular(first))
+                    right = held.enter_context(regular(second))
+                    self.assertEqual(left.read(),b"PUBLIC-FIRST")
+                    self.assertEqual(right.read(),b"PUBLIC-SECOND")
+                    self.assertEqual(os.fstat(left.fileno()).st_ino,first.stat().st_ino)
+                    self.assertNotEqual(left.fileno(),right.fileno())
+            with self.assertRaisesRegex(ValueError,"^qualification.compiler_namespace_changed$"):
+                with self.audit.compiler_input_custody() as regular:
+                    with ExitStack() as held:
+                        left = held.enter_context(regular(first))
+                        right = held.enter_context(regular(second))
+                        directory.rename(root/"displaced-public")
+                        directory.mkdir()
+                        (directory/"first").write_bytes(b"PUBLIC-FIRST")
+                        (directory/"second").write_bytes(b"PUBLIC-SECOND")
+                        self.assertEqual(left.read(),b"PUBLIC-FIRST")
+                        self.assertEqual(right.read(),b"PUBLIC-SECOND")
+
+    def test_descriptor_capacity_without_resource_api_has_a_typed_refusal(self):
+        import builtins
+        original = builtins.__import__
+        def unsupported(name,*args,**kwargs):
+            if name == "resource":
+                raise ModuleNotFoundError("resource API unavailable in this control")
+            return original(name,*args,**kwargs)
+        with patch.object(builtins,"__import__",side_effect=unsupported):
+            self.assertIn("workspace-msrv",self.audit.gate_catalog())
+            with self.assertRaisesRegex(ValueError,"^qualification.compiler_descriptor_capacity$"):
+                self.audit.original_compiler_descriptor_capacity(Path("/unused-original-namespace"))
+
+    def test_workspace_msrv_gate_uses_the_supported_workspace_toolchain(self):
+        catalog = self.audit.gate_catalog()
+        expected = ["cargo","+1.95.0","check","--offline","--locked","--workspace","--all-targets"]
+        self.assertEqual(catalog.get("workspace-msrv",{}).get("command"),expected)
+        # The portable crates retain their separately declared minimum version.
+        for name in ["allocator-msrv","standard-msrv"]:
+            self.assertEqual(catalog[name]["command"][1],"+1.93.0")
+
+    def test_explicit_read_directory_metadata_cannot_expand_the_approved_file_scope(self):
+        selected = ["bin/python","lib/python3.12/codecs.py","lib/python3.12/encodings/__init__.py"]
+        configured = {"role":"native-runtime","root":"/usr","selection":"explicit-members","members":selected}
+        names = ["bin","lib/python3.12","lib/python3.12/encodings"]
+        inventory = {"schema":"chio.compilation-read-scope.v2",**{key:configured[key] for key in ["role","root","selection"]},
+            "members":[{"path":name,"kind":"regular"} for name in selected],"directories":names,
+            "directory_metadata":[{"path":name,"identity":[1,index+1,0o40755]} for index,name in enumerate(names)]}
+        self.audit.audit_compilation_directory_inventory(configured,inventory)
+        mutations = ["parent","missing","metadata","mode","boolean","version","selected","payload"]
+        for change in mutations:
+            value = deepcopy(inventory)
+            if change == "parent":
+                value["directories"].insert(0,".")
+                value["directory_metadata"].insert(0,{"path":".","identity":[1,10,0o40755]})
+            elif change == "missing":value["directories"].pop();value["directory_metadata"].pop()
+            elif change == "metadata":value["directory_metadata"][0]["path"] = "lib"
+            elif change == "mode":value["directory_metadata"][0]["identity"][2] = 0o100644
+            elif change == "boolean":value["directory_metadata"][0]["identity"][0] = True
+            elif change == "version":value["schema"] = []
+            elif change == "selected":value["members"].pop()
+            else:value["directory_metadata"][0]["contents"] = "SYNTHETIC-UNLISTED-CONTENT"
+            with self.subTest(change=change):
+                with self.assertRaisesRegex(ValueError,"^qualification.compilation_scope_directories$"):
+                    self.audit.audit_compilation_directory_inventory(configured,value)
+
+    def test_explicit_read_directory_metadata_rejoins_original_no_follow_objects(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            child = root/"encodings"
+            child.mkdir()
+            (child/"credentials.toml").write_bytes(b"SYNTHETIC-UNLISTED-CONTENT")
+            info = child.stat()
+            metadata = {"path":"encodings","identity":[info.st_dev,info.st_ino,info.st_mode]}
+            inventory = {"schema":"chio.compilation-read-scope.v2","root":str(root),"directory_metadata":[metadata]}
+            with patch.object(self.audit,"regular_input",side_effect=AssertionError("directory metadata opened file contents")):
+                with ExitStack() as held:
+                    self.audit.hold_compilation_directory_metadata([inventory],held,{})
+                changed = deepcopy(inventory)
+                changed["directory_metadata"][0]["identity"][1] += 1
+                with self.assertRaisesRegex(ValueError,"^qualification.compilation_scope_directories_physical$"):
+                    with ExitStack() as held:
+                        self.audit.hold_compilation_directory_metadata([changed],held,{})
+                with self.assertRaisesRegex(ValueError,"^qualification.compiler_namespace_changed$"):
+                    with ExitStack() as held:
+                        self.audit.hold_compilation_directory_metadata([inventory],held,{})
+                        child.chmod(0o700)
 
     def test_required_executable_belongs_to_its_particular_subject(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -1399,6 +1594,78 @@ class QualificationAuditTest(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError,"^qualification.compiled_profile_primary_tool$"):
                     self.audit.audit_primary_compiler_tools(changed)
 
+    def test_directory_probe_roster_requires_its_complete_matching_successor(self):
+        candidate = "/var/tmp/public-primary-directory-contract"
+        tools = self.audit.DIRECTORY_PRIMARY_COMPILER_TOOLS
+        plan = {"schema":"chio.public-linux-primary-plan.v2","candidate":candidate,
+                "tools":[{"path":candidate+"/target/metadata/"+path,"sha256":digest}
+                         for path,digest in tools.items()]}
+        self.assertEqual(self.audit.audit_primary_compiler_tools(plan),
+                         {row["path"]:row["sha256"] for row in plan["tools"]})
+        for mutation in ["changed","mixed","missing","duplicate"]:
+            changed = deepcopy(plan)
+            if mutation == "changed":changed["tools"][0]["sha256"] = "0"*64
+            elif mutation == "mixed":changed["tools"][0]["sha256"] = self.audit.CURRENT_PRIMARY_COMPILER_TOOLS["consumer/verify_public_compilation_probes.py"]
+            elif mutation == "missing":changed["tools"].pop()
+            else:changed["tools"].append(deepcopy(changed["tools"][0]))
+            with self.subTest(mutation=mutation):
+                with self.assertRaisesRegex(ValueError,"^qualification.compiled_profile_primary_tool$"):
+                    self.audit.audit_primary_compiler_tools(changed)
+
+    def test_descriptor_custody_probe_requires_the_complete_source_pinned_roster(self):
+        candidate = "/var/tmp/public-primary-descriptor-custody-contract"
+        tools = {
+            "consumer/verify_public_compilation_probes.py":"1733d055922b83c4228646b1e7bc4426d89e425f663c3ea5e0fb3279b88696da",
+            "consumer/scope-record-functions.py":"39f6e1477b63751a5730305d75035aa97ba3a8cf8c7f8fcb7c2cfa888afeb94b",
+            "consumer/physical_publication_functions.py":"35274dde491ca572e22d5d44d787f52aaa8f1f13a9d9d40a714fa5cfe6799564",
+            "consumer/probe-observation-functions.py":"8ac9b9822c09e629c81d458207cf8f1b0af8a3161bf81dd045dc9b098172403e",
+            "inventory-collector.py":"e5cfc57485dcc268d45fba83e588e66c40b6f1386020204106b2a0df9bb9610c",
+            "run-public-compiler-campaign-current.py":"35735f7d03fa1030155b076cad5fe5e0d66ac653a2458708750aaf09a3a4d26a",
+        }
+        plan = {"schema":"chio.public-linux-primary-plan.v2","candidate":candidate,
+            "tools":[{"path":candidate+"/target/metadata/"+path,"sha256":digest} for path,digest in tools.items()]}
+        self.assertEqual(self.audit.audit_primary_compiler_tools(plan),
+                         {row["path"]:row["sha256"] for row in plan["tools"]})
+        for mutation in ["mixed","missing","extra","unhashable_path","invalid_hash"]:
+            changed = deepcopy(plan)
+            if mutation == "mixed":changed["tools"][0]["sha256"] = self.audit.DIRECTORY_PRIMARY_COMPILER_TOOLS["consumer/verify_public_compilation_probes.py"]
+            elif mutation == "missing":changed["tools"].pop()
+            elif mutation == "extra":changed["tools"].append(deepcopy(changed["tools"][0]))
+            elif mutation == "unhashable_path":changed["tools"][0]["path"] = {}
+            else:changed["tools"][0]["sha256"] = []
+            with self.subTest(mutation=mutation):
+                with self.assertRaisesRegex(ValueError,"^qualification.compiled_profile_primary_tool$"):
+                    self.audit.audit_primary_compiler_tools(changed)
+
+    def test_primary_tool_roster_refuses_untyped_paths_before_a_hash_join(self):
+        candidate = "/var/tmp/public-primary-typed-tool-contract"
+        plan = {"schema":"chio.public-linux-primary-plan.v2","candidate":candidate,
+                "tools":[{"path":candidate+"/target/metadata/"+path,"sha256":digest}
+                         for path,digest in self.audit.DIRECTORY_PRIMARY_COMPILER_TOOLS.items()]}
+        plan["tools"][0]["path"] = {}
+        with self.assertRaisesRegex(ValueError,"^qualification.compiled_profile_primary_tool$"):
+            self.audit.audit_primary_compiler_tools(plan)
+
+    def test_scope_dependency_probe_roster_accepts_only_its_complete_reviewed_six_images(self):
+        candidate = "/var/tmp/public-primary-scope-dependency-contract"
+        tools = dict(self.audit.DESCRIPTOR_CUSTODY_PRIMARY_COMPILER_TOOLS)
+        tools["consumer/verify_public_compilation_probes.py"] = "4cfecc814d8077069efac6e052005ba506d43c9ce2f47fce4f930dcbd1bf5122"
+        tools["consumer/scope-record-functions.py"] = "cd1da76e46982c7f8846cb5e3f5526e4dbc2a54afb486a7361a485676f25b1e6"
+        plan = {"schema":"chio.public-linux-primary-plan.v2","candidate":candidate,
+            "tools":[{"path":candidate+"/target/metadata/"+name,"sha256":digest} for name,digest in tools.items()]}
+        self.assertEqual(self.audit.audit_primary_compiler_tools(plan),
+                         {row["path"]:row["sha256"] for row in plan["tools"]})
+        for mutation in ["mixed","missing","extra","path_type","hash_type","unknown"]:
+            changed = deepcopy(plan)
+            if mutation == "mixed":changed["tools"][0]["sha256"] = self.audit.DESCRIPTOR_CUSTODY_PRIMARY_COMPILER_TOOLS["consumer/verify_public_compilation_probes.py"]
+            elif mutation == "missing":changed["tools"].pop()
+            elif mutation == "extra":changed["tools"].append(deepcopy(changed["tools"][0]))
+            elif mutation == "path_type":changed["tools"][0]["path"] = []
+            elif mutation == "hash_type":changed["tools"][0]["sha256"] = {}
+            else:changed["tools"][0]["sha256"] = "e"*64
+            with self.subTest(mutation=mutation),self.assertRaisesRegex(ValueError,"^qualification.compiled_profile_primary_tool$"):
+                self.audit.audit_primary_compiler_tools(changed)
+
     def test_completed_unit_sync_projection_requires_legal_typed_outcomes(self):
         identifier,source_binding = "1"*32,"2"*64
         reference = {"path":"records/"+identifier+".json","sha256":"3"*64,"size":100,
@@ -1423,6 +1690,116 @@ class QualificationAuditTest(unittest.TestCase):
             with self.subTest(negative_status=status,exit_code=exit_code):
                 with self.assertRaisesRegex(ValueError,"^qualification.compiled_profile_primary_sync$"):
                     observe({**value,"record_status":status,"compiler_exit":exit_code})
+
+    def test_native_compiler_output_joins_actual_published_pipe_bytes(self):
+        """Actual Python output/publisher/reader composition, not Rust proof."""
+        recorder_path=ROOT/"scripts/record-rust-compilation.py"
+        spec=importlib.util.spec_from_file_location("diagnostic_output_recorder",recorder_path)
+        recorder=importlib.util.module_from_spec(spec);spec.loader.exec_module(recorder)
+        with tempfile.TemporaryDirectory() as temporary:
+            namespace=Path(temporary).resolve();campaign=recorder.Campaign(namespace,"a"*64)
+            def cleanup(process,deadline):
+                process.kill();process.wait(timeout=max(0,deadline-recorder.time.monotonic()))
+                return {"status":"REAPED","scope":"direct-child-output-control"}
+            try:
+                result=recorder.bounded_compiler_output([sys.executable,"-c",
+                    'import sys;print("PUBLIC-PIPE-OUT");print("PUBLIC-PIPE-ERROR",file=sys.stderr);sys.exit(1)'],
+                    {"PATH":"/usr/bin:/bin"},str(namespace),None,cleanup)
+                output={"schema":"chio.native-compiler-output.v1",**result.output_observation,
+                    "stdout":campaign.retain(result.stdout),"stderr":campaign.retain(result.stderr)}
+                def raw(reference):
+                    with self.audit.regular_input(namespace/reference["artifact"]) as stream:
+                        return stream.read(16*1024**2+1)
+                self.audit.audit_native_compiler_output(output,raw)
+                self.assertEqual(result.returncode,1)
+                self.assertEqual(result.stderr,b"PUBLIC-PIPE-ERROR\n")
+                for field in ["status","refusal","cleanup","eof","count","count_type","elapsed","elapsed_type",
+                              "policy_cap","policy_timeout","forwarded","reference_path","reference_type","size"]:
+                    changed=deepcopy(output)
+                    if field=="status":changed["status"]="refused"
+                    elif field=="refusal":changed["refusal"]="compiler_output_limit"
+                    elif field=="cleanup":changed["cleanup"]={"status":"REAPED"}
+                    elif field=="eof":changed["eof"]["stderr"]=False
+                    elif field=="count":changed["observed_bytes"]["stderr"]+=1
+                    elif field=="count_type":changed["observed_bytes"]["stderr"]=True
+                    elif field=="elapsed":changed["elapsed_seconds"]=float("nan")
+                    elif field=="elapsed_type":changed["elapsed_seconds"]=False
+                    elif field=="policy_cap":changed["policy"]["maximum_bytes_per_stream"]*=2
+                    elif field=="policy_timeout":changed["policy"]["execution_and_cleanup_seconds"]=True
+                    elif field=="forwarded":changed["policy"]["raw_diagnostics_forwarded"]=True
+                    elif field=="reference_path":changed["stderr"]["artifact"]="credentials.toml"
+                    elif field=="reference_type":changed["stderr"]["size"]=True
+                    else:
+                        changed["stderr"]["size"]+=1;changed["observed_bytes"]["stderr"]+=1
+                    with self.subTest(field=field),self.assertRaisesRegex(ValueError,"^qualification.micro_compiler_output"):
+                        self.audit.audit_native_compiler_output(changed,raw)
+                (namespace/output["stderr"]["artifact"]).write_bytes(b"X"*len(result.stderr))
+                with self.assertRaisesRegex(ValueError,"^qualification.micro_compiler_output_bytes$"):
+                    self.audit.audit_native_compiler_output(output,raw)
+            finally:campaign.close()
+
+    def test_native_compiler_dispatch_output_version_is_closed(self):
+        base={"schema":"chio.compilation-supervisor-events.v1","events":[]}
+        configuration={"candidate":"/candidate","aliases":[],"records":"/candidate/target/records",
+                       "evidence":"/candidate/target/evidence"}
+        for version in ["chio.compilation-supervisor-events.v1","chio.compilation-supervisor-events.v2"]:
+            self.assertEqual(self.audit.audit_compilation_dispatches(Path(configuration["records"]),configuration,{},
+                {**base,"schema":version},{"records":[]},None,None),0)
+        for version in [None,[],"chio.compilation-supervisor-events.v3"]:
+            with self.subTest(version=version),self.assertRaisesRegex(ValueError,"^qualification.micro_supervisor_events$"):
+                self.audit.audit_compilation_dispatches(Path(configuration["records"]),configuration,{},
+                    {**base,"schema":version},{"records":[]},None,None)
+        dispatch={"kind":"compiler-unit","invocation_sha256":"1"*64,"environment_sha256":"2"*64,
+                  "cwd":"/candidate","compiler_exit":1}
+        event={"request_sha256":"3"*64,"id":"4"*32,"exit":1,"recorder_exit":1,"response":"encoded",
+               "refusal":None,"dispatches":[dispatch],"records":[]}
+        for version,changed in [("chio.compilation-supervisor-events.v1",{
+                **dispatch,"schema":"chio.native-compiler-dispatch.v2","output":{}}),
+                ("chio.compilation-supervisor-events.v2",dispatch)]:
+            with self.subTest(mixed_version=version),self.assertRaisesRegex(ValueError,"^qualification.micro_dispatch$"):
+                self.audit.audit_compilation_dispatches(Path(configuration["records"]),configuration,{},
+                    {"schema":version,"events":[{**event,"dispatches":[changed]}]},
+                    {"records":[]},None,None)
+
+    def test_actual_recorder_publications_join_the_current_archive_decoder(self):
+        """Real public publisher/parser composition; no compiler was executed."""
+        recorder_path = ROOT/"scripts/record-rust-compilation.py"
+        spec = importlib.util.spec_from_file_location("qualification_recorder_composition",recorder_path)
+        recorder = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(recorder)
+        with tempfile.TemporaryDirectory() as temporary:
+            namespace = Path(temporary).resolve()
+            binding = "a"*64
+            outside = io.StringIO()
+            campaign = recorder.Campaign(namespace,binding)
+            try:
+                with redirect_stderr(outside):
+                    for kind,status,exit_code in [("compilation","success",0),("compilation","success",0),
+                            ("probe","success",0),("compilation","compiler_failed",1),("compilation","refused",None)]:
+                        row = recorder.row_for([],{},binding)
+                        row.update(kind=kind,status=status,compiler_exit=exit_code)
+                        campaign.publish(row)
+            finally:
+                campaign.close()
+            publication = self.audit.audit_compiler_publications(namespace,binding)
+            physical = self.audit.current_required_sync_observations(publication,outside.getvalue().encode())
+            decoded = self.audit.current_primary_sync(outside.getvalue().encode(),binding,publication["verified_records"])
+            self.assertEqual(decoded,physical)
+            self.assertEqual(self.audit.checked_public_compilation_count(publication,"gnu-native"),2)
+            self.assertEqual(self.audit.checked_public_compilation_count(publication,"musl-static-pie"),2)
+            self.assertEqual(publication["compiled_closure_status"],"not-established")
+            for replacement in ["probe","compiler_failed"]:
+                changed = deepcopy(publication)
+                for row in changed["records"]:
+                    if row["kind"] == "compilation" and row["status"] == "success":
+                        unit = changed["unit_publications"][row["invocation_id"]]
+                        if replacement == "probe":row["kind"] = unit["kind"] = "probe"
+                        else:
+                            row["status"] = unit["record_status"] = "compiler_failed"
+                            unit["compiler_exit"] = 1
+                with self.subTest(replacement=replacement):
+                    with self.assertRaisesRegex(ValueError,"^qualification.micro_primary_compilations$"):
+                        self.audit.checked_public_compilation_count(changed,"gnu-native")
 
     def test_current_source_hash_and_cycles_are_independently_checked(self):
         rows,sources,roots = self.compiler_unit_graph_bundle()
@@ -1744,6 +2121,7 @@ timeout_secs = 60
             candidate = self.audit.binding(sources, base)
             manifest = {"schema":"chio.recovery-live-corpus.v2", "source_inventory_version":self.audit.INVENTORY_VERSION,
                 "provider_endpoint":self.audit.PROVIDER_ENDPOINT, "sources":sources, "base_commit":base,
+                "source_binding":candidate,
                 "model":"gpt-5.4-2026-03-05", "hosts":{"crewai":"0.203.2", "langgraph":"1.2.12", "openai":"3.3.0", "httpx":"0.28.1"},
                 "authority_policy":"2"*64,
                 "trials":[{"id":f"{host}-{workflow}-{arm}-{case}-r{repeat}", "host":host, "workflow":workflow,
@@ -1840,6 +2218,393 @@ timeout_secs = 60
             reference = {"path":"linux.json", "sha256":hashlib.sha256(raw).hexdigest()}
             with self.assertRaisesRegex(ValueError, "^qualification.linux_record$"):
                 self.audit.audit_dimensions(root,{"linux":reference},"candidate")
+
+
+    def public_primary_contract_fixture(self):
+        # Exact B2 published payload bytes and plan/summary header fields. This
+        # is a source guard fixture, not a native campaign or qualification.
+        raw = b'{\n  "allowed_substitutions": [\n    "candidate",\n    "configuration"\n  ],\n  "campaign_budget_seconds": 900,\n  "cases": [\n    {\n      "command_template": [\n        "/usr/bin/python3.12",\n        "-B",\n        "{candidate}/scripts/record-rust-compilation.py",\n        "--launch-scope",\n        "{configuration}",\n        "--probe",\n        "--",\n        "/usr/bin/python3.12",\n        "-B",\n        "{candidate}/public-probes/native-scope-probe.py",\n        "allowed-read",\n        "--path",\n        "{candidate}/public-probes/allowed-input.txt"\n      ],\n      "configuration_relative_path": "target/metadata/public-allowed-read.launch.json",\n      "expected_command_exit": 0,\n      "name": "allowed-read",\n      "timeout_seconds": 120\n    },\n    {\n      "command_template": [\n        "/usr/bin/python3.12",\n        "-B",\n        "{candidate}/scripts/record-rust-compilation.py",\n        "--launch-scope",\n        "{configuration}",\n        "--probe",\n        "--",\n        "/usr/bin/python3.12",\n        "-B",\n        "{candidate}/public-probes/native-scope-probe.py",\n        "outside-read",\n        "--path",\n        "{candidate}/target/outside-public/allowed-input.txt"\n      ],\n      "configuration_relative_path": "target/metadata/public-outside-read.launch.json",\n      "expected_command_exit": 0,\n      "name": "outside-read",\n      "timeout_seconds": 120\n    },\n    {\n      "command_template": [\n        "/usr/bin/python3.12",\n        "-B",\n        "{candidate}/scripts/record-rust-compilation.py",\n        "--launch-scope",\n        "{configuration}",\n        "--probe",\n        "--",\n        "/usr/bin/python3.12",\n        "-B",\n        "{candidate}/public-probes/native-scope-probe.py",\n        "outside-write",\n        "--path",\n        "{candidate}/target/outside-public/fresh-output"\n      ],\n      "configuration_relative_path": "target/metadata/public-outside-write.launch.json",\n      "expected_command_exit": 0,\n      "name": "outside-write",\n      "timeout_seconds": 120\n    },\n    {\n      "command_template": [\n        "/usr/bin/python3.12",\n        "-B",\n        "{candidate}/scripts/record-rust-compilation.py",\n        "--launch-scope",\n        "{configuration}",\n        "--probe",\n        "--",\n        "/usr/bin/python3.12",\n        "-B",\n        "{candidate}/public-probes/native-scope-probe.py",\n        "evidence-read"\n      ],\n      "configuration_relative_path": "target/metadata/public-evidence-read.launch.json",\n      "expected_command_exit": 0,\n      "name": "evidence-read",\n      "timeout_seconds": 120\n    },\n    {\n      "command_template": [\n        "/usr/bin/python3.12",\n        "-B",\n        "{candidate}/scripts/record-rust-compilation.py",\n        "--launch-scope",\n        "{configuration}",\n        "--probe",\n        "--",\n        "/usr/bin/python3.12",\n        "-B",\n        "{candidate}/public-probes/native-scope-probe.py",\n        "evidence-write"\n      ],\n      "configuration_relative_path": "target/metadata/public-evidence-write.launch.json",\n      "expected_command_exit": 0,\n      "name": "evidence-write",\n      "timeout_seconds": 120\n    },\n    {\n      "command_template": [\n        "/usr/bin/python3.12",\n        "-B",\n        "{candidate}/scripts/record-rust-compilation.py",\n        "--launch-scope",\n        "{configuration}",\n        "--probe",\n        "--",\n        "/usr/bin/python3.12",\n        "-B",\n        "{candidate}/public-probes/native-scope-probe.py",\n        "network"\n      ],\n      "configuration_relative_path": "target/metadata/public-network.launch.json",\n      "expected_command_exit": 0,\n      "name": "network",\n      "timeout_seconds": 120\n    },\n    {\n      "command_template": [\n        "/usr/bin/python3.12",\n        "-B",\n        "{candidate}/scripts/record-rust-compilation.py",\n        "--launch-scope",\n        "{configuration}",\n        "--probe",\n        "--",\n        "/usr/bin/python3.12",\n        "-B",\n        "{candidate}/public-probes/native-scope-probe.py",\n        "forged-ipc"\n      ],\n      "configuration_relative_path": "target/metadata/public-forged-ipc.launch.json",\n      "expected_command_exit": 0,\n      "name": "forged-ipc",\n      "timeout_seconds": 120\n    },\n    {\n      "command_template": [\n        "/usr/bin/python3.12",\n        "-B",\n        "{candidate}/scripts/record-rust-compilation.py",\n        "--launch-scope",\n        "{configuration}",\n        "--probe",\n        "--",\n        "/usr/bin/python3.12",\n        "-B",\n        "{candidate}/public-probes/native-scope-probe.py",\n        "gnu-native",\n        "--fixture-root",\n        "{candidate}/public-probes",\n        "--output-root",\n        "{candidate}/target/write/gnu-native/outputs/gnu-probe",\n        "--linker",\n        "/usr/bin/x86_64-linux-gnu-gcc-13",\n        "--implicit-linker"\n      ],\n      "configuration_relative_path": "target/metadata/public-gnu-native.launch.json",\n      "expected_command_exit": 0,\n      "name": "gnu-native",\n      "timeout_seconds": 180\n    },\n    {\n      "command_template": [\n        "/usr/bin/python3.12",\n        "-B",\n        "{candidate}/scripts/record-rust-compilation.py",\n        "--launch-scope",\n        "{configuration}",\n        "--probe",\n        "--",\n        "/usr/bin/python3.12",\n        "-B",\n        "{candidate}/public-probes/native-scope-probe.py",\n        "musl-static-pie",\n        "--fixture-root",\n        "{candidate}/public-probes",\n        "--output-root",\n        "{candidate}/target/write/musl-static-pie/outputs/musl-probe",\n        "--linker",\n        "/usr/bin/x86_64-linux-musl-gcc",\n        "--implicit-linker"\n      ],\n      "configuration_relative_path": "target/metadata/public-musl-static-pie.launch.json",\n      "expected_command_exit": 0,\n      "name": "musl-static-pie",\n      "timeout_seconds": 180\n    }\n  ],\n  "native_case_seconds": 180,\n  "ordinary_case_seconds": 120,\n  "payloads": [\n    {\n      "path": "public-probes/allowed-input.txt",\n      "sha256": "a6951fcb41290f05a4cb68504f187fb0fff9d9041a1ec4c210ffd13f4a43f265",\n      "size": 20\n    },\n    {\n      "path": "public-probes/native-scope-probe.py",\n      "sha256": "2772799b09e5948a57afac5d2be66973b723dcde19aaf24a6dd290c4d0db2cb4",\n      "size": 9251\n    },\n    {\n      "path": "public-probes/public-input.txt",\n      "sha256": "9282c9b1536f651a561231c358efe0f9bceae45a90e011854701220ec12a50ae",\n      "size": 15\n    },\n    {\n      "path": "public-probes/src/gnu-main.rs",\n      "sha256": "182be7b42ac5c46a230f97cc46d97411ec666377675444e5fd3a6062c82694ec",\n      "size": 354\n    },\n    {\n      "path": "public-probes/src/musl-main.rs",\n      "sha256": "236f93e8055681f0443d8d85a1538f30ac101c23185ad98b884440079ea2f844",\n      "size": 43\n    },\n    {\n      "path": "public-probes/src/public-macro.rs",\n      "sha256": "a28a24503e66ae419fae27545039d4ff867dc27c140a8894c42a09a3331b7ef5",\n      "size": 1173\n    }\n  ],\n  "profile": "public-linux-x86_64-gnu-musl-explicit-instrumented-compiler",\n  "schema": "chio.public-linux-primary-authorization.v1",\n  "scope": "Six fixed public fixture images and nine fixed command templates. Approval of this exact table is separately required; no native results or current main qualification."\n}\n'
+        plan = {'schema': 'chio.public-linux-primary-plan.v2', 'candidate': '/var/tmp/chio-public-directory.b2b7534cfd08', 'authorization_sha256': '0658e3dfa7e8a5ecd58a11ccc4842e76275fd055bd57052e063bf238f6908f21', 'tools': [{'path': '/var/tmp/chio-public-directory.b2b7534cfd08/target/metadata/consumer/physical_publication_functions.py', 'sha256': '35274dde491ca572e22d5d44d787f52aaa8f1f13a9d9d40a714fa5cfe6799564'}, {'path': '/var/tmp/chio-public-directory.b2b7534cfd08/target/metadata/consumer/probe-observation-functions.py', 'sha256': '6137af233bdbbedc245eb5105a8fe381a6981576a81b582c5c5ae8ce73aaa027'}, {'path': '/var/tmp/chio-public-directory.b2b7534cfd08/target/metadata/consumer/scope-record-functions.py', 'sha256': 'cd1da76e46982c7f8846cb5e3f5526e4dbc2a54afb486a7361a485676f25b1e6'}, {'path': '/var/tmp/chio-public-directory.b2b7534cfd08/target/metadata/consumer/verify_public_compilation_probes.py', 'sha256': '47deea10c5be41a12dd2b4528677623c01999f4a81ae8a50c80d1f25099c0f31'}, {'path': '/var/tmp/chio-public-directory.b2b7534cfd08/target/metadata/inventory-collector.py', 'sha256': '0ec77f139132a449270a96baf188a49efad057d3d8be3214e118efcb7d34f410'}, {'path': '/var/tmp/chio-public-directory.b2b7534cfd08/target/metadata/run-public-compiler-campaign-current.py', 'sha256': 'e3b2cca44d42b0487ca604061a30486fdf35402d4bf6bf8f47802c90079fb5cf'}]}
+        summary = {'schema': 'chio.public-linux-primary-result.v2', 'authorization_sha256': '0658e3dfa7e8a5ecd58a11ccc4842e76275fd055bd57052e063bf238f6908f21'}
+        self.assertEqual(hashlib.sha256(raw).hexdigest(),
+            "0658e3dfa7e8a5ecd58a11ccc4842e76275fd055bd57052e063bf238f6908f21")
+        return raw,plan,summary
+
+    def test_public_primary_payload_is_bound_to_its_reviewed_tool_roster(self):
+        raw,plan,summary = self.public_primary_contract_fixture()
+        authorization,tools,digest = self.audit.checked_primary_compiler_contract(plan,summary,raw)
+        self.assertEqual(authorization,json.loads(raw))
+        self.assertEqual(tools,{row["path"]:row["sha256"] for row in plan["tools"]})
+        self.assertEqual(digest,plan["authorization_sha256"])
+
+    def test_public_primary_contract_refuses_crossed_payload_rosters_and_summaries(self):
+        raw,plan,summary = self.public_primary_contract_fixture()
+        old_authority = deepcopy(plan)
+        old_authority["authorization_sha256"] = self.audit.PRIMARY_AUTHORIZATION_SHA
+        old_tools = deepcopy(plan)
+        old_tools["tools"] = [{"path":str(Path(plan["candidate"])/"target/metadata"/name),"sha256":digest}
+            for name,digest in self.audit.SCOPE_DEPENDENCY_PRIMARY_COMPILER_TOOLS.items()]
+        old_summary = deepcopy(summary)
+        old_summary["authorization_sha256"] = self.audit.PRIMARY_AUTHORIZATION_SHA
+        for changed,observed in [(old_authority,summary),(old_tools,summary),(plan,old_summary)]:
+            with self.subTest(authorization=changed["authorization_sha256"]):
+                with self.assertRaises(ValueError):
+                    self.audit.checked_primary_compiler_contract(changed,observed,raw)
+        for changed in [old_authority,old_tools]:
+            with self.assertRaises(ValueError):self.audit.audit_primary_compiler_tools(changed)
+
+    def test_public_primary_contract_checks_every_tool_and_untyped_authority(self):
+        raw,plan,summary = self.public_primary_contract_fixture()
+        for index in range(6):
+            for field,value in [("path","/usr/forged-tool"),("sha256","0"*64),("path",None),("sha256",True)]:
+                with self.subTest(index=index,field=field):
+                    changed = deepcopy(plan)
+                    changed["tools"][index][field] = value
+                    with self.assertRaises(ValueError):
+                        self.audit.checked_primary_compiler_contract(changed,summary,raw)
+        for value in [None,True,1,"0"*64]:
+            with self.subTest(value=value):
+                changed = deepcopy(plan)
+                changed["authorization_sha256"] = value
+                with self.assertRaises(ValueError):self.audit.audit_primary_compiler_tools(changed)
+        for changed in [raw+b"\n",bytearray(raw),b"{}",None]:
+            with self.assertRaises(ValueError):self.audit.checked_public_authorization(changed)
+
+
+    def primary_authorization_join_clauses(self):
+        import ast
+        tree = ast.parse(TOOL.read_bytes())
+        function = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
+                        and node.name == "audit_current_primary_compiler_probes")
+        nodes = list(ast.walk(function))
+        def assigned(name):
+            return next(node for node in nodes if isinstance(node, ast.Assign)
+                        and any(isinstance(target, ast.Name) and target.id == name for target in node.targets))
+        def requires(reason):
+            return [node for node in nodes if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call)
+                    and isinstance(node.value.func, ast.Name) and node.value.func.id == "require"
+                    and len(node.value.args) == 2 and isinstance(node.value.args[1], ast.Constant)
+                    and node.value.args[1].value == reason]
+        pin_checks = requires("compiled_profile_primary_tool")
+        report_checks = [node for node in requires("compiled_profile_primary_custody")
+                         if any(isinstance(value, ast.Call) and isinstance(value.func, ast.Attribute)
+                                and isinstance(value.func.value, ast.Name) and value.func.value.id == "original"
+                                and value.func.attr == "get" and value.args
+                                and isinstance(value.args[0], ast.Constant)
+                                and value.args[0].value == "authorization_sha256" for value in ast.walk(node))]
+        self.assertEqual(len(pin_checks), 1)
+        self.assertEqual(len(report_checks), 1)
+        return assigned("expected_pins"), pin_checks[0], assigned("report_fields"), report_checks[0]
+
+
+    def invoke_original_primary_join_clause(self, node, context):
+        import ast
+        scope = dict(self.audit.__dict__)
+        scope.update(context)
+        exec(compile(ast.fix_missing_locations(ast.Module(body=[node],type_ignores=[])),
+                     str(TOOL),"exec"),scope)
+        return scope
+
+
+    def test_public_primary_payload_threads_through_execution_file_pins(self):
+        raw,plan,summary = self.public_primary_contract_fixture()
+        _,tools,digest = self.audit.checked_primary_compiler_contract(plan,summary,raw)
+        assignment,check,_,_ = self.primary_authorization_join_clauses()
+        candidate = Path(plan["candidate"])
+        controller = candidate/"target/metadata/run-public-compiler-campaign-current.py"
+        original_plan = candidate/"target/metadata/primary-campaign-plan.json"
+        authorization = candidate/"target/metadata/public-probe-authorization.json"
+        plan_digest = "9ef129a977e7066e86e12cacfc525bc0a2287fd197d2dd382e5171f1c2acd13b"
+        context = {"candidate":candidate,"tools":tools,"authorization_sha":digest,
+            "original_controller":controller,"original_plan":original_plan,
+            "original_authorization":authorization,"controller":{"sha256":tools[str(controller)]},
+            "evidence":{"plan":{"sha256":plan_digest}}}
+        expected = self.invoke_original_primary_join_clause(assignment,context)
+        actual_images = {**tools,str(original_plan):plan_digest,str(authorization):digest}
+        # A guard fixture from actual B2 Source41 digests; no new provenance.
+        pins = [{"purpose":purpose,"path":path,"observed":{"sha256":actual_images[path]}}
+                for purpose,path,_ in expected["expected_pins"]]
+        self.invoke_original_primary_join_clause(check,{**expected,"pins":pins})
+        changed = deepcopy(pins)
+        next(row for row in changed if row["purpose"]=="compiler-primary-authorization")["observed"]["sha256"] = self.audit.PRIMARY_AUTHORIZATION_SHA
+        with self.assertRaisesRegex(ValueError,"^qualification.compiled_profile_primary_tool$"):
+            self.invoke_original_primary_join_clause(check,{**expected,"pins":changed})
+
+    def test_public_primary_payload_threads_through_original_audit_report(self):
+        raw,plan,summary = self.public_primary_contract_fixture()
+        _,_,digest = self.audit.checked_primary_compiler_contract(plan,summary,raw)
+        _,_,assignment,check = self.primary_authorization_join_clauses()
+        report_fields = self.invoke_original_primary_join_clause(assignment,{})["report_fields"]
+        # Exact original allowed-read report, independently joined in B2.
+        original = {'authorization_sha256': '0658e3dfa7e8a5ecd58a11ccc4842e76275fd055bd57052e063bf238f6908f21', 'compiled_closure_status': 'not-established', 'coverage': 'original-namespace-public-microprobe-record-joins-only', 'launcher_capture': {'stderr': {'path': '/var/tmp/chio-public-directory.b2b7534cfd08/target/metadata/primary-observations/allowed-read/launcher.stderr.log', 'sha256': 'c94acb7595e5946c51efabd4ab08721b040ef0cf5aee413633b3ab69fbf41149', 'size': 781}, 'stdout': {'path': '/var/tmp/chio-public-directory.b2b7534cfd08/target/metadata/primary-observations/allowed-read/launcher.stdout.log', 'sha256': 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', 'size': 0}}, 'launcher_observation': {'path': '/var/tmp/chio-public-directory.b2b7534cfd08/target/metadata/primary-observations/allowed-read/launcher-observation.json', 'sha256': 'd3532dd0ce072351e0ca2182f2454b48ad345ee867256d91a9735a5aad7c938d', 'size': 1438}, 'original_namespace': '/var/tmp/chio-public-directory.b2b7534cfd08/target/records/allowed-read', 'primary_probe_result_coverage': 'separate actual whole controller execution required', 'probe_observation': {'mode': 'allowed-read', 'result': {'public_bytes': 20}, 'schema': 'chio.public-linux-compilation-probe.v1'}, 'qualified': False, 'required_sync_observation_sha256': '7e9bb7f41ca5c4a4672b6f3e96023c02e537a20836ff69453ec4301e5a56226d', 'schema': 'chio.original-public-compilation-probe-verification.v2', 'scope_id': 'b610e8602a2d1a51f7560aa4d53efca2879aa82b5edce05786952e3f5fc8b498', 'scope_path': '/var/tmp/chio-public-directory.b2b7534cfd08/target/evidence/allowed-read/d209cb8da63546cab3dd7bb4ad396df5/scope.json', 'scope_stderr_capture': {'path': '/var/tmp/chio-public-directory.b2b7534cfd08/target/evidence/allowed-read/d209cb8da63546cab3dd7bb4ad396df5/stderr.log', 'sha256': 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', 'size': 0}, 'scope_stdout_capture': {'path': '/var/tmp/chio-public-directory.b2b7534cfd08/target/evidence/allowed-read/d209cb8da63546cab3dd7bb4ad396df5/stdout.log', 'sha256': 'b37667547968f46a90a4e58ed80984392d2a85619b08ea0ef9bc7ee47db0313d', 'size': 109}, 'source_binding': '078f14932b59d6d1cd487a9e36da6811e238a6c85b82ddc5a4b56184250b0eb9', 'verified_compilations': 0, 'verified_dispatches': 0, 'verified_inventory_images': 1624, 'verified_publications': 0}
+        context = {"original":original,"report_fields":report_fields,
+            "micro_binding":"078f14932b59d6d1cd487a9e36da6811e238a6c85b82ddc5a4b56184250b0eb9",
+            "scope_path":Path(original["scope_path"]),"candidate":Path(plan["candidate"]),
+            "case":{"name":"allowed-read"},"observed":{"launcher_capture":original["launcher_capture"]},
+            "ref":original["launcher_observation"],"authorization_sha":digest}
+        self.invoke_original_primary_join_clause(check,context)
+        changed = deepcopy(context)
+        changed["original"]["authorization_sha256"] = self.audit.PRIMARY_AUTHORIZATION_SHA
+        with self.assertRaisesRegex(ValueError,"^qualification.compiled_profile_primary_custody$"):
+            self.invoke_original_primary_join_clause(check,changed)
+
+    def test_formal_kani_version_requires_the_current_released_toolchain(self):
+        supported = "Kani Rust Verifier 0.68.0 (cargo plugin)\nCBMC 6.11.0\n"
+        self.audit.audit_kani_tool_version(supported)
+        for mutant in [supported.replace("0.68.0","0.67.0"), supported.replace("6.11.0","6.10.0"),
+                       supported.replace(" (cargo plugin)"," (standalone)"),
+                       "cargo-kani 0.68.0\n", supported + "unexpected trailer\n",
+                       supported.replace("CBMC 6.11.0\n","")]:
+            with self.subTest(version=mutant), self.assertRaisesRegex(ValueError,"^qualification.formal_tool_version$"):
+                self.audit.audit_kani_tool_version(mutant)
+
+
+
+class RetainedCohortOutcomeTest(unittest.TestCase):
+    """Retained model/native facts must support the outcome counted by the auditor."""
+
+    def setUp(self):
+        QualificationAuditTest.setUp(self)
+
+    def cohort_package(self, root, mutation=None, *, qualified=True, selected=96, manifest_mutation=None):
+        def retain(name, value, *, raw=False):
+            body = value if raw else json.dumps(value, allow_nan=False).encode()
+            path = root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(body)
+            return {"path":name, "sha256":hashlib.sha256(body).hexdigest()}
+        sources = [{"path":"fixtures/source.py", "sha256":"0" * 64}]
+        base = "1" * 40
+        candidate = self.audit.binding(sources, base)
+        planned = [{"id":f"{host}-{workflow}-{arm}-{case}-r{repeat}",
+                    "host":host, "workflow":workflow, "arm":arm, "case":case, "repetition":repeat}
+                   for host in ("langgraph", "crewai") for workflow in ("support", "artifact")
+                   for arm in ("baseline", "product")
+                   for case in ("authorized", "lost_ack_restart", "wrong_authority", "conflicting_basis")
+                   for repeat in range(1, 4)]
+        manifest = {"schema":"chio.recovery-live-corpus.v2",
+            "source_inventory_version":self.audit.INVENTORY_VERSION,
+            "provider_endpoint":self.audit.PROVIDER_ENDPOINT, "sources":sources, "base_commit":base,
+            "source_binding":candidate, "model":self.audit.COHORT_MODEL,
+            "hosts":dict(self.audit.COHORT_HOSTS), "authority_policy":"2" * 64,
+            "trials":planned,
+            "budgets":{"model_calls":4, "tool_actions":8, "prompt_bytes":16384,
+                       "output_tokens":512, "output_bytes":8192, "provider_seconds":45,
+                       "native_http_seconds":120, "native_preparation_seconds":240,
+                       "native_shutdown_seconds":120, "host_start_deadline_seconds":240,
+                       "trial_seconds":720, "concurrent_trials":2, "transport_retries":0}}
+        if manifest_mutation is not None:
+            manifest_mutation(manifest)
+        # These retained bytes exercise the parser's executable-format check.
+        # They are a synthetic fixture and are never executed or called native proof.
+        image = retain("executable.fixture", b"\x7fELF" + b"\0" * 60, raw=True)
+        image["size"] = 64
+        log = retain("native.log", b"test live_comparative_native_host ... ok\n"
+            b"test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n", raw=True)
+        rows = []
+        trials = {}
+        positives = {(h, w, a, c):0 for h in ("langgraph", "crewai")
+                     for w in ("support", "artifact") for a in ("baseline", "product")
+                     for c in ("authorized", "lost_ack_restart")}
+        unknown_native = 0
+        unknown_tokens = 0
+        for index, plan in enumerate(planned[:selected]):
+            positive = plan["case"] in ("authorized", "lost_ack_restart")
+            messages = [{"role":"user", "content":"public synthetic request"}]
+            prompt = json.dumps(messages, ensure_ascii=False, separators=(",", ":")).encode()
+            attempt = {"provider_endpoint":self.audit.PROVIDER_ENDPOINT, "model":self.audit.COHORT_MODEL,
+                       "request_id":"synthetic-provider-response", "error":None,
+                       "messages":messages, "prompt_bytes":len(prompt),
+                       "prompt_sha256":hashlib.sha256(prompt).hexdigest(),
+                       "input_tokens":7, "output_tokens":3, "seconds":0.01,
+                       "completion":"public synthetic completion"}
+            native = {"effects":int(positive), "charges":int(positive),
+                      "unauthorized_effects":0, "duplicate_effects":0, "unresolved":0,
+                      "unresolved_age_ms":0, "extra_approvals":0,
+                      "source_label_retained":True, "useful_completion":positive}
+            row = {**plan, "source_binding":candidate, "base_commit":base,
+                   "provider_endpoint":manifest["provider_endpoint"],
+                   "source_inventory_version":manifest["source_inventory_version"],
+                   "authority_policy":manifest["authority_policy"], "requested_model":manifest["model"],
+                   "hidden_retries":0, "tool_actions":int(positive), "model_attempts":[attempt],
+                   "native":native, "native_observation":"observed", "native_exit_code":0,
+                   "native_executable":dict(image), "elapsed_seconds":10,
+                   "outcome":"complete" if positive else "refused"}
+            if mutation is not None:
+                mutation(row, index)
+            rows.append(row)
+            unknown_tokens += sum(a.get("input_tokens") is None or a.get("output_tokens") is None
+                                  for a in row["model_attempts"])
+            current_native = row["native"]
+            unknown_native += current_native is None
+            key = tuple(row[k] for k in ("host", "workflow", "arm", "case"))
+            if key in positives and row["outcome"] == "complete" and current_native is not None and current_native["useful_completion"]:
+                positives[key] += 1
+            refs = {"result":retain("trials/" + row["id"] + ".json", row),
+                    "native_log":log, "native_executable":image}
+            if current_native is not None:
+                refs["native"] = retain("native/" + row["id"] + ".json", current_native)
+            trials[row["id"]] = refs
+        raw_rows = b"\n".join(json.dumps(r, allow_nan=False).encode() for r in rows) + b"\n"
+        evidence = {"schema":"chio.recovery-live-cohort-evidence.v1", "source_binding":candidate,
+                    "manifest":retain("manifest.json", manifest), "rows":retain("rows.jsonl", raw_rows, raw=True),
+                    "trials":trials,
+                    "recomputed":{"planned_trials":96, "measured_trials":selected,
+                        "unknown_trials":96 - selected, "native_unknown_trials":unknown_native,
+                        "unknown_token_usage_attempts":unknown_tokens, "positive_strata":16,
+                        "positive_strata_passed":sum(v >= 1 for v in positives.values()), "qualified":qualified}}
+        return retain("evidence.json", evidence), candidate
+
+    def observe(self, mutation=None, *, qualified=True, selected=96, manifest_mutation=None):
+        retained = getattr(self, "retained_case_directory", None)
+        if retained is not None:
+            retained.mkdir(parents=True, exist_ok=False)
+            reference, candidate = self.cohort_package(retained, mutation, qualified=qualified, selected=selected,
+                                                      manifest_mutation=manifest_mutation)
+            try:
+                result = self.audit.audit_live_cohort(retained, reference, candidate)
+            except ValueError as error:
+                (retained / "reader-observation.json").write_text(json.dumps({
+                    "scope":"synthetic retained-file parser control, no native or provider execution",
+                    "exception_category":str(error), "whole_qualification":False}) + "\n")
+                raise
+            (retained / "reader-observation.json").write_text(json.dumps({
+                "scope":"synthetic retained-file parser control, no native or provider execution",
+                "reader_return":result, "whole_qualification":False}) + "\n")
+            return result
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            reference, candidate = self.cohort_package(root, mutation, qualified=qualified, selected=selected,
+                                                      manifest_mutation=manifest_mutation)
+            return self.audit.audit_live_cohort(root, reference, candidate)
+
+    def test_supported_cohort_parser_retains_all_ninety_six_rows_and_sixteen_strata(self):
+        observed = self.observe()
+        self.assertTrue(observed["qualified"])
+        self.assertEqual((observed["measured_trials"], observed["positive_strata_passed"]), (96, 16))
+
+    def test_complete_cohort_cannot_be_supported_only_by_failed_provider_attempts(self):
+        def replace(row, _):
+            for attempt in row["model_attempts"]:
+                attempt.update(model=None, error="provider_unavailable", input_tokens=None, output_tokens=None)
+                attempt.pop("completion")
+                attempt.pop("request_id")
+        with self.assertRaisesRegex(ValueError, "^qualification.cohort_trial_completion$"):
+            self.observe(replace)
+
+    def test_success_log_cannot_hide_a_failed_native_process_exit(self):
+        def replace(row, index):
+            if index == 0:
+                row["native_exit_code"] = 101
+        with self.assertRaisesRegex(ValueError, "^qualification.cohort_native_execution$"):
+            self.observe(replace)
+
+    def test_native_process_exit_requires_an_integer_not_boolean_success(self):
+        def replace(row, index):
+            if index == 0:
+                row["native_exit_code"] = False
+        with self.assertRaisesRegex(ValueError, "^qualification.cohort_native_execution$"):
+            self.observe(replace)
+
+    def test_successful_provider_attempt_requires_its_retained_completion(self):
+        def replace(row, index):
+            if index == 0:
+                row["model_attempts"][0].pop("completion")
+        with self.assertRaisesRegex(ValueError, "^qualification.cohort_provider_completion$"):
+            self.observe(replace)
+
+    def test_successful_provider_tokens_cannot_exceed_the_declared_output_bound(self):
+        def replace(row, index):
+            if index == 0:
+                row["model_attempts"][0]["output_tokens"] = 513
+        with self.assertRaisesRegex(ValueError, "^qualification.cohort_provider_completion$"):
+            self.observe(replace)
+
+    def test_successful_provider_utf8_completion_cannot_exceed_the_declared_byte_bound(self):
+        def replace(row, index):
+            if index == 0:
+                row["model_attempts"][0]["completion"] = "\u00e9" * 4097
+        with self.assertRaisesRegex(ValueError, "^qualification.cohort_provider_completion$"):
+            self.observe(replace)
+
+    def test_serial_provider_elapsed_cannot_exceed_the_entire_recorded_trial(self):
+        def replace(row, index):
+            if index == 0:
+                row["model_attempts"][0]["seconds"] = 1000
+        with self.assertRaisesRegex(ValueError, "^qualification.cohort_latency$"):
+            self.observe(replace)
+
+    def test_failed_native_process_is_retained_as_a_failed_cohort_observation(self):
+        def replace(row, index):
+            if index == 0:
+                row["native_exit_code"] = 101
+                row["native_execution_error"] = True
+        self.assertFalse(self.observe(replace, qualified=False)["qualified"])
+
+    def test_partial_trial_inventory_retains_unknown_slots_without_qualification(self):
+        observed = self.observe(qualified=False, selected=48)
+        self.assertEqual(observed["unknown_trials"], 48)
+        self.assertFalse(observed["qualified"])
+
+    def test_failed_provider_rows_remain_retained_without_useful_completion(self):
+        def replace(row, _):
+            row["outcome"] = "provider_error"
+            row["native"]["useful_completion"] = False
+            for attempt in row["model_attempts"]:
+                attempt.update(model=None, error="provider_unavailable", input_tokens=None, output_tokens=None)
+                attempt.pop("completion")
+                attempt.pop("request_id")
+        observed = self.observe(replace, qualified=False)
+        self.assertFalse(observed["qualified"])
+        self.assertEqual(observed["unknown_token_usage_attempts"], 96)
+
+    def test_empty_provider_response_remains_retained_without_a_completion_claim(self):
+        def replace(row, _):
+            row["outcome"] = "skipped_tool"
+            row["native"]["useful_completion"] = False
+            row["model_attempts"][0]["completion"] = ""
+        observed = self.observe(replace, qualified=False)
+        self.assertFalse(observed["qualified"])
+        self.assertEqual(observed["unknown_token_usage_attempts"], 0)
+
+    def test_useful_native_completion_requires_a_recorded_tool_action(self):
+        def replace(row, _):
+            row["tool_actions"] = 0
+        with self.assertRaisesRegex(ValueError, "^qualification.cohort_completion_without_action$"):
+            self.observe(replace)
+
+    def test_live_version_outcomes_cannot_borrow_a_legacy_pending_value(self):
+        def replace(row, _):
+            if row["case"] in ("wrong_authority", "conflicting_basis"):
+                row["outcome"] = "pending"
+        with self.assertRaisesRegex(ValueError, "^qualification.cohort_outcome$"):
+            self.observe(replace)
+
+    def test_manifest_and_trial_literals_cannot_substitute_the_computed_source_binding(self):
+        def replace(row, _):
+            row["source_binding"] = "f" * 64
+        def replace_manifest(manifest):
+            manifest["source_binding"] = "f" * 64
+        with self.assertRaisesRegex(ValueError, "^qualification.cohort_manifest$"):
+            self.observe(replace, manifest_mutation=replace_manifest)
+
+    def test_present_native_facts_require_the_observed_presence_label(self):
+        def replace(row, _):
+            row["native_observation"] = "unknown"
+        with self.assertRaisesRegex(ValueError, "^qualification.cohort_native_observation$"):
+            self.observe(replace)
+
+    def test_absent_native_facts_are_retained_as_unknown_without_qualification(self):
+        def replace(row, _):
+            row["native"] = None
+            row["native_observation"] = "unknown"
+            row["outcome"] = "native_error"
+            row["native_exit_code"] = None
+            row["model_attempts"] = []
+        observed = self.observe(replace, qualified=False)
+        self.assertEqual(observed["native_unknown_trials"], 96)
+        self.assertEqual(observed["positive_strata_passed"], 0)
+        self.assertFalse(observed["qualified"])
 
 
 if __name__ == "__main__":

@@ -72,7 +72,7 @@ class MsrvCacheTarget(unittest.TestCase):
     def test_the_job_has_one_cache_bound_to_the_actual_compile_directory(self):
         targets = [line.strip() for line in JOB.splitlines() if 'CARGO_TARGET_DIR:' in line]
         self.assertEqual(targets, ['CARGO_TARGET_DIR: ${{ runner.temp }}/chio-msrv-target'] * 2)
-        self.assertIn('toolchain: "1.94.1"\n          cache: "false"', JOB)
+        self.assertIn('toolchain: "1.95.0"\n          cache: "false"', JOB)
         self.assertEqual(JOB.count('uses: Swatinem/rust-cache@' + PIN), 1)
         self.assertIn('workspaces: ${{ steps.msrv-cache.outputs.workspace }}', JOB)
         self.assertLess(JOB.index('python3 scripts/tests/msrv-cache-target.test.py'),

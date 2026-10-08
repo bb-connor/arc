@@ -108,6 +108,8 @@ impl<'a, 'kernel: 'a> NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
                 "native capture preparation belongs to another live evaluation",
             ));
         }
+        self.kernel
+            .require_native_output_retention_for_capture(&prepared.original)?;
         let mut frozen = self
             .return_input
             .take()

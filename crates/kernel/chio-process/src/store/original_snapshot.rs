@@ -28,7 +28,7 @@ impl Store {
     }
 }
 impl OriginalProcessSnapshot {
-    fn verify_path(&self) -> Result<(), ProcessError> {
+    pub(super) fn verify_path(&self) -> Result<(), ProcessError> {
         let file = std::fs::symlink_metadata(&self.path)?;
         let parent = self.path.parent().ok_or(ProcessError::Conflict)?;
         let directory = std::fs::symlink_metadata(parent)?;
@@ -67,7 +67,9 @@ impl OriginalProcessSnapshot {
         let metadata:(i64,Option<String>,Option<String>,Option<String>)=tx.query_row(
             "SELECT version,CASE WHEN typeof(namespace)='text' AND length(CAST(namespace AS BLOB)) BETWEEN 1 AND 256 THEN namespace END, CASE WHEN typeof(authority)='text' AND length(CAST(authority AS BLOB)) BETWEEN 1 AND 256 THEN authority END, CASE WHEN typeof(kernel_key)='text' AND length(CAST(kernel_key AS BLOB)) BETWEEN 1 AND 32768 THEN kernel_key END FROM process_runtime WHERE singleton=1",[],|row|Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?)),
         )?;
-        if !matches!(metadata.0, 1..=5) {
+        super::unused_recovery_reservation::verify_before_open(&tx)?;
+        super::confined_delivery::verify_before_open(&tx)?;
+        if !matches!(metadata.0, 1..=7) {
             return Err(ProcessError::Invalid(
                 "unsupported original process journal version",
             ));

@@ -272,11 +272,13 @@ impl ChioKernel {
             durable_admission.as_ref(),
             revalidation_now_unix_ms,
             verified_governed_payee_binding.as_ref(),
+            security_context,
         ) {
             Ok(prepayment) => prepayment,
             Err(error) => {
+                let before_authorization = error.is_before_authorization();
                 let mut reason = error.to_string();
-                let credential_disposition = if governed_mustprepay {
+                let credential_disposition = if governed_mustprepay && !before_authorization {
                     match credential_reservation.commit() {
                         Ok(disposition) => disposition,
                         Err(retention_error) => {

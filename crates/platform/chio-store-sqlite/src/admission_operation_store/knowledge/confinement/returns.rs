@@ -1,6 +1,11 @@
 //! Return admission is an independent native release, never a schema-only permit.
 use super::*;
 
+mod candidate;
+mod delivery;
+mod original_admission;
+pub(super) use original_admission::OriginalReturnOrigin;
+
 fn metadata(record: &BoundaryRecord) -> Result<&ArtifactVersionV1, AdmissionOperationStoreError> {
     record
         .return_metadata
@@ -204,36 +209,12 @@ impl SqliteAdmissionOperationStore {
                 &record.reservation.boundary,
             )?;
             require_child_source_audience(&tx, actor, profile, &record, input)?;
-            validate_current(&tx, &record, profile, now)?;
-            if bytes.len() > 8 {
-                return Err(refused("return staging bound"));
-            }
-            let boolean: bool = serde_json::from_slice(bytes).map_err(refused)?;
-            if chio_core::canonical_json_bytes(&boolean)
-                .map_err(refused)?
-                .as_slice()
-                != bytes
-            {
-                return Err(refused("return canonical schema"));
-            }
+            let basis = candidate::basis(&tx, actor, &record, profile, bytes, now)?;
             let b = &record.reservation.boundary;
-            if now >= b.deadline_unix_ms.get()
-                || record.observation_release.is_none()
-                || record
-                    .terminal
-                    .as_ref()
-                    .and_then(|v| v.exit.as_ref())
-                    .and_then(|v| v.exit_code)
-                    != Some(0)
-                || record.expected_return != Some(knowledge_content_digest(bytes))
-                || seal.content != knowledge_content_digest(bytes)
+            if seal.content != knowledge_content_digest(bytes)
                 || seal.bytes.get() != bytes.len() as u64
                 || seal.process != b.child
                 || seal.runtime != b.parent.runtime
-                || !matches!(
-                    record.reservation.state,
-                    IsolationStateV1::EnforcedRunning | IsolationStateV1::ReturnStaged
-                )
             {
                 return Err(refused("return producer"));
             }
@@ -244,24 +225,6 @@ impl SqliteAdmissionOperationStore {
             } else {
                 let mut roots = b.seed_artifacts.as_slice().to_vec();
                 roots.push(b.observation.clone());
-                let rows = traversal::dependencies(&tx, actor.scope(), &roots)?;
-                let label = source(
-                    &tx,
-                    &profile.native_authority,
-                    &record.reservation.child_context,
-                )?;
-                let influence = traversal::influence(
-                    &tx,
-                    &profile.native_authority,
-                    &record.reservation.child_context,
-                    &rows,
-                    false,
-                )?;
-                if influence.unknown
-                    || !label.flows_to(&record.installation.contract.source_ceiling)
-                {
-                    return Err(refused("unknown return provenance"));
-                }
                 let m = ArtifactVersionV1 {
                     domain_version: VersionV1,
                     scope: actor.scope().clone(),
@@ -277,8 +240,8 @@ impl SqliteAdmissionOperationStore {
                         operation: OperationId::new(b.boundary.as_str()).map_err(refused)?,
                     },
                     dependencies: BoundedList::new(roots).map_err(refused)?,
-                    label,
-                    influence,
+                    label: basis.label,
+                    influence: basis.influence,
                     lineage: b.lineage.clone(),
                     isolation_epoch: b.isolation_epoch.clone(),
                     evidence: BoundedList::new(vec![b.boundary.clone()]).map_err(refused)?,
@@ -356,6 +319,10 @@ impl SqliteAdmissionOperationStore {
         }
         super::super::require_finite_recipient(parent)?;
         mutate(self, actor, fence, now, |tx, profile, now| {
+            let native_source_origin = self
+                .serving_owner
+                .prepare_native_source_transaction(&tx)
+                .map_err(map_owner_error)?;
             let parent_source = require_parent_source_audience(&tx, actor, profile)?;
             let mut record = record(&tx, actor.scope(), request)?;
             let input = require_input_source_audience(
@@ -404,13 +371,11 @@ impl SqliteAdmissionOperationStore {
                 &rows,
                 false,
             )?;
-            if source != m.label
-                || influence != m.influence
-                || m.influence.unknown
-                || now >= record.reservation.boundary.deadline_unix_ms.get()
-            {
+            if source != m.label || influence != m.influence || m.influence.unknown {
                 return Err(refused("stale child basis"));
             }
+            // Execution is already staged. Its launch deadline cannot retire
+            // the retained result or replace current RETURN approval checks.
             let target = &record.installation.contract.target;
             traversal::ensure_audience(&tx, actor, target)?;
             let mut disclosure_id = None;
@@ -482,18 +447,20 @@ impl SqliteAdmissionOperationStore {
                 .ok_or_else(|| refused("recipient context"))?
                 .context
                 .clone();
-            let (tx, release) = super::super::super::security_participant_state::knowledge::join(
-                tx,
-                &self.serving_owner,
-                super::super::super::security_participant_state::knowledge::KnowledgeJoin {
-                    binding: &profile.native_authority,
-                    key: &recovery_flow_key(&context),
-                    source: target,
-                    scope: actor.scope(),
-                    release,
-                    now,
-                },
-            )?;
+            let (tx, release) =
+                super::super::super::security_participant_state::knowledge::join_with_origin(
+                    tx,
+                    &self.serving_owner,
+                    &native_source_origin,
+                    super::super::super::security_participant_state::knowledge::KnowledgeJoin {
+                        binding: &profile.native_authority,
+                        key: &recovery_flow_key(&context),
+                        source: target,
+                        scope: actor.scope(),
+                        release,
+                        now,
+                    },
+                )?;
             let admission = ReturnAdmissionV1 {
                 domain_version: VersionV1,
                 boundary: record.reservation.boundary.boundary.clone(),
@@ -517,13 +484,12 @@ impl SqliteAdmissionOperationStore {
             {
                 check_evidence(&record, signed, later)?;
             }
-            if later >= record.reservation.boundary.deadline_unix_ms.get() {
-                return Err(refused("return deadline"));
-            }
             record.return_admission = Some(admission.clone());
             record.return_authority = Some(authority);
             record.reservation.state = IsolationStateV1::ReturnAdmitted;
+            record.return_origin = Some(original_admission::capture(&tx, actor, &record)?);
             retain(&tx, &self.serving_owner, &record)?;
+            original_admission::verify_source(&tx, &record)?;
             Ok((tx, admission))
         })
     }
@@ -535,42 +501,48 @@ impl SqliteAdmissionOperationStore {
         delivered: bool,
         fence: &StoreMutationFence,
         now: u64,
-    ) -> Result<(), AdmissionOperationStoreError> {
+    ) -> Result<ArtifactDeliveryStateV1, AdmissionOperationStoreError> {
         if actor.permission() != RecoveryPermission::ConfinedReturn {
             return Err(refused("return acknowledgement"));
         }
-        mutate(self, actor, fence, now, |tx, profile, now| {
-            let mut record = record(&tx, actor.scope(), request)?;
-            validate_current(&tx, &record, profile, now)?;
-            if !matches!(
-                record.reservation.state,
-                IsolationStateV1::ReturnAdmitted | IsolationStateV1::Closed
-            ) {
-                return Err(refused("cancelled return acknowledgement"));
+        let mut connection = self.connection()?;
+        let tx = self.begin_write(&mut connection, Some(fence))?;
+        schema::authority_validation_time(&tx, now)?;
+        if actor.scope().authority_domain.as_str() != fence.store_uuid {
+            return Err(refused("return acknowledgement authority"));
+        }
+        let mut record = record(&tx, actor.scope(), request)?;
+        original_admission::verify_actor_and_admission(&tx, &record, actor, admission)?;
+        let prior = record
+            .return_admission
+            .as_mut()
+            .ok_or_else(|| refused("return admission"))?;
+        let next = if delivered {
+            ArtifactDeliveryStateV1::Delivered
+        } else {
+            ArtifactDeliveryStateV1::Uncertain
+        };
+        // The two fate transitions are monotone and exact retries add no event.
+        // This logical packet keeps ordinary storage checks. Dedicated full
+        // family financing is installed separately before its acceptance.
+        if prior.admitted.state != ArtifactDeliveryStateV1::Delivered
+            && prior.admitted.state != next
+        {
+            prior.admitted.state = next;
+            if delivered && !record.stop_requested {
+                record.reservation.state = IsolationStateV1::Closed;
             }
-            let prior = record
-                .return_admission
-                .as_mut()
-                .ok_or_else(|| refused("return admission"))?;
-            let mut compared = admission.clone();
-            compared.admitted.state = prior.admitted.state;
-            if *prior != compared
-                || record.return_authority != Some(capability_digest(actor.capability())?)
-            {
-                return Err(refused("return acknowledgement binding"));
-            }
-            if prior.admitted.state != ArtifactDeliveryStateV1::Delivered {
-                prior.admitted.state = if delivered {
-                    ArtifactDeliveryStateV1::Delivered
-                } else {
-                    ArtifactDeliveryStateV1::Uncertain
-                };
-                if delivered {
-                    record.reservation.state = IsolationStateV1::Closed;
-                }
-                retain(&tx, &self.serving_owner, &record)?;
-            }
-            Ok((tx, ()))
-        })
+            retain(&tx, &self.serving_owner, &record)?;
+        }
+        let acknowledged = record
+            .return_admission
+            .as_ref()
+            .ok_or_else(|| refused("return admission"))?
+            .admitted
+            .state
+            .clone();
+        self.commit_write(tx)?;
+        self.sync_after_write(&connection)?;
+        Ok(acknowledged)
     }
 }

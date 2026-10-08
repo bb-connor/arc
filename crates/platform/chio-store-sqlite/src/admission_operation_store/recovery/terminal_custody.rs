@@ -98,7 +98,10 @@ pub(in crate::admission_operation_store) fn publish_completed(
     owner: &SqliteServingOwner,
     operation: &AdmissionOperationV1,
 ) -> Result<bool, AdmissionOperationStoreError> {
-    if operation.state() != AdmissionOperationState::Completed {
+    if !matches!(
+        operation.state(),
+        AdmissionOperationState::Completed | AdmissionOperationState::DeniedAfterDelivery
+    ) {
         return Ok(false);
     }
     let Some(record) = native::located(tx, operation.binding())? else {
@@ -122,8 +125,21 @@ pub(in crate::admission_operation_store) fn publish_completed(
     let Some((record, custody)) = native::captured_custody(tx, id, &owner.fence)? else {
         return Err(invariant("captured terminal original custody absent"));
     };
-    if historical_holds::effective(tx, &record)?.is_some() {
+    let hold = historical_holds::effective(tx, &record)?;
+    let private_settlement =
+        native::verified_private_settlement(tx, &record, operation, &owner.fence)?;
+    if operation.state() == AdmissionOperationState::DeniedAfterDelivery && !private_settlement {
         return Ok(false);
+    }
+    if let Some(hold) = hold {
+        if hold.reason != RecoveryHistoricalHoldReasonV1::FrozenSigningCustodyUnavailable {
+            return Ok(false);
+        }
+        if !private_settlement {
+            return Err(invariant(
+                "signer hold requires a signed private settlement terminal",
+            ));
+        }
     }
     match custody {
         RecoveryCapturedDeploymentV1::Verified(_) => {}
@@ -282,8 +298,10 @@ pub(in crate::admission_operation_store) fn verify_terminal(
         AdmissionOperationId::from_persisted(terminal.operation.operation_id().as_str())?;
     let stored = load_by_operation_id_tx(tx, &operation)?
         .ok_or_else(|| invariant("captured terminal original operation absent"))?;
-    if stored.operation.state() != AdmissionOperationState::Completed
-        || native::operation_ref(&stored.operation)? != terminal.operation
+    if !matches!(
+        stored.operation.state(),
+        AdmissionOperationState::Completed | AdmissionOperationState::DeniedAfterDelivery
+    ) || native::operation_ref(&stored.operation)? != terminal.operation
         || terminal_digest(&stored.operation)? != terminal.projection_digest
     {
         return Err(invariant("captured terminal original native fact changed"));
@@ -298,7 +316,46 @@ pub(in crate::admission_operation_store) fn verify_terminal(
             return Err(invariant("captured terminal original verifier unavailable"))
         }
     };
-    native::verify_captured_roots(tx, &record, &stored.operation, &original, &profile)
+    native::verify_captured_roots(tx, &record, &stored.operation, &original, &profile)?;
+    let private_settlement =
+        native::verified_private_settlement(tx, &record, &stored.operation, &fence)?;
+    if stored.operation.state() == AdmissionOperationState::DeniedAfterDelivery
+        && !private_settlement
+    {
+        return Err(invariant(
+            "denied output private terminal lost its qualified original return",
+        ));
+    }
+    if historical_holds::retained_hold_data(tx, &record)?.is_some_and(|hold| {
+        hold.reason == RecoveryHistoricalHoldReasonV1::FrozenSigningCustodyUnavailable
+    }) && !private_settlement
+    {
+        return Err(invariant(
+            "captured signer hold terminal lost its private attestation",
+        ));
+    }
+    Ok(())
+}
+
+/// Independently verify permanent withholding without reading quota pointers.
+pub(super) fn private_settlement_committed(
+    tx: &Connection,
+    record: &RecoveryWorkflowRecordV1,
+) -> Result<bool, AdmissionOperationStoreError> {
+    let intent = record
+        .admission
+        .as_ref()
+        .ok_or_else(|| invariant("private settlement original intent absent"))?;
+    let id = AdmissionOperationId::from_persisted(intent.native_operation_id.as_str())?;
+    let stored = load_by_operation_id_tx(tx, &id)?
+        .ok_or_else(|| invariant("private settlement original operation absent"))?;
+    if !matches!(
+        stored.operation.state(),
+        AdmissionOperationState::Completed | AdmissionOperationState::DeniedAfterDelivery
+    ) {
+        return Ok(false);
+    }
+    native::verified_private_settlement(tx, record, &stored.operation, &retained_store_fence(tx)?)
 }
 
 /// A retained release is historical data. Public delivery still revalidates
@@ -450,8 +507,10 @@ pub(crate) fn repair_completed_at_startup(
                 .ok_or_else(|| {
                     startup_error(invariant("captured workflow original operation absent"))
                 })?;
-            if stored.operation.state() == AdmissionOperationState::Completed
-                && publish_completed(&tx, owner, &stored.operation).map_err(startup_error)?
+            if matches!(
+                stored.operation.state(),
+                AdmissionOperationState::Completed | AdmissionOperationState::DeniedAfterDelivery
+            ) && publish_completed(&tx, owner, &stored.operation).map_err(startup_error)?
             {
                 changed = true;
                 repaired = repaired.checked_add(1).ok_or_else(|| {

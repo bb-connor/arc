@@ -44,7 +44,7 @@ pub(crate) fn export(
     )?;
     println!(
         "{}",
-        json!({"artifact": output, "receipt_id": signed.id, "request_id": signed.action.parameters["response"]["request_id"], "qualification_complete": false})
+        json!({"artifact": output, "receipt_id": signed.id, "request_id": signed.action.parameters["response"]["request_id"], "qualification_complete": false, "m5_acceptance_complete": false})
     );
     Ok(())
 }

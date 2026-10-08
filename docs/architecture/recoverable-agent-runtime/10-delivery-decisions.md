@@ -120,3 +120,10 @@ These questions do not reopen the core invariants. The package is ready for arch
 No mandatory OpenAPPA runtime dependency, new general-purpose policy language, unbounded planner, independent replay coordinator, model-issued authority, or automatic policy weakening is part of this design. UI polish, broad provider catalogs and cross-platform expansion follow a working native vertical slice.
 
 Architecture acceptance requires every numbered obligation to have an owner/test/phase; source findings to be reproducible; every effect/authority transition to have a durable owner; every claimed data channel to have mediation; and unresolved assumptions to be explicit. Implementation acceptance requires the owning evidence, not a document checklist. Public availability and release qualification are separately demonstrated.
+
+Current source names and evidence replay are described in the
+[current reproduction overlay](implementation/current-reproduction.md). Original
+coverage, commands and seals remain historical inputs; published P6 metadata
+redactions preserve their documented original/published hash distinction. A
+local source correspondence or completed finding disposition does not qualify
+the changed implementation.

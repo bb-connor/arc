@@ -103,7 +103,11 @@ fn retained_outcome(
         actor.permission(),
         RecoveryPermission::Create | RecoveryPermission::Resume
     ) {
-        RecoveryCommandContinuationMode::SameCurrentGeneration
+        if original_owner_is_current(tx, &physical)? {
+            RecoveryCommandContinuationMode::SameCurrentGeneration
+        } else {
+            RecoveryCommandContinuationMode::HistoricalGenerationReadOnly
+        }
     } else {
         RecoveryCommandContinuationMode::ControlOnly
     };
@@ -275,6 +279,11 @@ pub(in crate::admission_operation_store) fn load_selected_workflow(
         (
             RecoveryCommandContinuationMode::SameCurrentGeneration,
             RecoveryCommandContinuationMode::HistoricalGenerationReadOnly,
+        ) => RecoveryCommandContinuationMode::HistoricalGenerationReadOnly,
+        (
+            RecoveryCommandContinuationMode::HistoricalGenerationReadOnly,
+            RecoveryCommandContinuationMode::SameCurrentGeneration
+            | RecoveryCommandContinuationMode::HistoricalGenerationReadOnly,
         ) => RecoveryCommandContinuationMode::HistoricalGenerationReadOnly,
         _ => return Err(invariant("selected command upgraded its retained mode")),
     };

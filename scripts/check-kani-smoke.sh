@@ -3,10 +3,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-if ! cargo kani --version >/dev/null 2>&1; then
-  echo "Kani smoke check requires cargo-kani" >&2
-  exit 1
-fi
+bash scripts/check-kani-toolchain.sh
 
 tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/chio-kani-smoke.XXXXXX")"
 trap 'rm -rf "${tmp_dir}"' EXIT

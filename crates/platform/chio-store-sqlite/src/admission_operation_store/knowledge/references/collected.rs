@@ -47,7 +47,7 @@ impl<'tx, 'conn> CollectedPublicationReferenceClosure<'tx, 'conn> {
     }
 }
 
-fn collection_sources(
+pub(in crate::admission_operation_store::knowledge) fn collection_sources(
     tx: &Connection,
     record: &NativeArtifactRecordV1,
 ) -> Result<Vec<protected::ProtectedSourceReference>, AdmissionOperationStoreError> {
@@ -61,22 +61,58 @@ fn collection_sources(
     let publication =
         reader::indexed::<NativeArtifactRecordV1>(tx, &publication_key, &record.metadata.scope)?
             .ok_or_else(|| refused("publication closure lost its owning source"))?;
-    let pointer = reader::indexed::<String>(tx, &version_key(&reference)?, &record.metadata.scope)?
-        .ok_or_else(|| refused("publication closure lost its exact version pointer"))?;
+    let pointer = reader::indexed::<String>(tx, &version_key(&reference)?, &record.metadata.scope)?;
     let encoded = protected::encode(record)?;
-    if protected::encode(&publication.value)? != encoded || pointer.value != publication_key {
+    if protected::encode(&publication.value)? != encoded
+        || pointer
+            .as_ref()
+            .is_some_and(|pointer| pointer.value != publication_key)
+    {
         return Err(refused(
             "publication closure changed its metadata or pointer",
         ));
     }
-    let root = load_reference_state(tx, &reference)?;
-    if root.aggregate.value.collection_count()? != 0 {
-        return Err(refused(
-            "publication closure retains active reference owners",
-        ));
+    let terminal_sequence = publication.head.global_commit_sequence();
+    let mut sources = Vec::new();
+    if let Some(pointer) = pointer {
+        let root = load_reference_state(tx, &reference)?;
+        if root.aggregate.value.collection_count()? != 0
+            || super::super::lifecycle::pinned(tx, &reference)?
+        {
+            return Err(refused(
+                "publication closure retains active reference owners",
+            ));
+        }
+        sources.push(pointer.head);
+        sources.push(root.aggregate.head);
+        sources.extend(root.buckets.into_iter().map(|bucket| bucket.head));
+    } else {
+        // An aborted staging object never became a governed version. Preserve
+        // absence provenance rather than manufacturing a pointer or root.
+        let mut initial = record.clone();
+        initial.state = ArtifactPublicationStateV1::Reserved;
+        initial.seal = None;
+        initial.certificate = None;
+        initial.location = ProtectedText::new("private-process-blob").map_err(refused)?;
+        if record.certificate.is_some()
+            || matches!(
+                record.metadata.producer,
+                ArtifactProducerV1::NativeOperation { .. }
+            )
+            || !protected::matches_historical_source_command_payload(
+                tx,
+                &publication.head,
+                1,
+                &protected::encode(&initial)?,
+            )?
+        {
+            return Err(refused(
+                "uncommitted collection lacks original reservation custody",
+            ));
+        }
+        require_uncommitted_reference_absence(tx, &reference)?;
     }
-    let mut sources = vec![publication.head, pointer.head, root.aggregate.head];
-    sources.extend(root.buckets.into_iter().map(|bucket| bucket.head));
+    sources.push(publication.head);
     let owner = ReferenceOwner::Publication {
         scope: record.metadata.scope.clone(),
         artifact: record.metadata.artifact.clone(),
@@ -84,8 +120,31 @@ fn collection_sources(
     };
     for dependency in record.input.dependencies.as_slice() {
         let state = load_reference_state(tx, dependency)?;
-        let leaf = load_owner_leaf(tx, dependency, &owner, &state)?
-            .ok_or_else(|| refused("publication closure lacks its dependency owner"))?;
+        let Some(leaf) = load_owner_leaf(tx, dependency, &owner, &state)? else {
+            let ReferenceBaselineSource::Cold { cutoff, .. } =
+                &state.aggregate.value.baseline.source
+            else {
+                return Err(refused("publication closure lacks its dependency owner"));
+            };
+            if terminal_sequence > cutoff.sequence()
+                && super::super::publication_capacity::collection::retired_source_before(
+                    tx,
+                    record,
+                    cutoff
+                        .sequence()
+                        .checked_add(1)
+                        .ok_or_else(|| refused("publication cold cutoff exhausted"))?,
+                )?
+                .is_none()
+            {
+                return Err(refused(
+                    "publication dependency lacks an authentic cold retirement",
+                ));
+            }
+            sources.push(state.aggregate.head);
+            sources.extend(state.buckets.into_iter().map(|bucket| bucket.head));
+            continue;
+        };
         if leaf.value.state != ReferenceOwnerState::Retired {
             return Err(refused(
                 "publication closure retains a direct dependency owner",
@@ -96,6 +155,37 @@ fn collection_sources(
         sources.extend(state.buckets.into_iter().map(|bucket| bucket.head));
     }
     Ok(sources)
+}
+
+fn require_uncommitted_reference_absence(
+    tx: &Connection,
+    reference: &ArtifactVersionRefV1,
+) -> Result<(), AdmissionOperationStoreError> {
+    let identity = reference_identity(reference)?;
+    for pattern in [
+        aggregate_key(identity),
+        format!(
+            "knowledge-reference-owner:{}:*",
+            hex::encode(identity.as_bytes())
+        ),
+        format!(
+            "knowledge-reference-bucket:{}:*",
+            hex::encode(identity.as_bytes())
+        ),
+    ] {
+        let retained: bool = tx.query_row(
+            "SELECT EXISTS(SELECT 1 FROM admission_operation_recovery_records WHERE record_key GLOB ?1)
+             OR EXISTS(SELECT 1 FROM admission_operation_recovery_events WHERE record_key GLOB ?1)
+             OR EXISTS(SELECT 1 FROM authority_global_commits WHERE projection_kind='recovery' AND projection_key GLOB ?1)",
+            [pattern], |row| row.get(0),
+        ).map_err(sqlite_error)?;
+        if retained {
+            return Err(refused(
+                "uncommitted collection retained a governed reference index",
+            ));
+        }
+    }
+    Ok(())
 }
 
 impl std::fmt::Debug for CollectedPublicationReferenceClosure<'_, '_> {

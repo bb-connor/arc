@@ -10,6 +10,7 @@ use chio_security_types::recovery::*;
 
 mod commands;
 pub(super) use commands::apply as apply_command;
+pub(super) use commands::apply_with_origin as apply_command_with_origin;
 #[cfg(feature = "admission-test-support")]
 pub(super) mod command_quota_test_support;
 pub(super) mod deployment_history;
@@ -27,7 +28,7 @@ pub(in crate::admission_operation_store) mod origins;
 mod preview;
 pub(in crate::admission_operation_store) use preview::workflow_preview_tx;
 mod provider_lookup_clock;
-mod resources;
+pub(in crate::admission_operation_store) mod resources;
 mod retained_host_reply;
 pub(super) mod storage;
 pub(in crate::admission_operation_store) mod terminal_custody;
@@ -618,13 +619,13 @@ impl RecoveryAuthorityPort for SqliteAdmissionOperationStore {
         verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
         schema::authority_validation_time(&tx, now)?;
         let result = match native::captured_custody(&tx, operation, fence)? {
-            Some((record, custody)) => {
-                Some(if historical_holds::effective(&tx, &record)?.is_some() {
+            Some((record, custody)) => Some(
+                if historical_holds::blocks_original_private_settlement(&tx, &record)? {
                     RecoveryCapturedDeploymentV1::Quarantined
                 } else {
                     custody
-                })
-            }
+                },
+            ),
             None => None,
         };
         tx.commit().map_err(sqlite_error)?;

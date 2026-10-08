@@ -17,6 +17,18 @@ mod workflow_quota_heads;
 #[path = "authority_terminal.rs"]
 mod authority_terminal;
 
+#[cfg(all(unix, feature = "pq"))]
+#[path = "authority_history/near_capacity_historical_signing.rs"]
+mod near_capacity_historical_signing;
+
+#[cfg(all(unix, feature = "pq"))]
+#[path = "authority_history/near_capacity_private_kernel_continuation.rs"]
+mod near_capacity_private_kernel_continuation;
+
+#[cfg(all(unix, feature = "pq"))]
+#[path = "authority_history/retained_digest_denial.rs"]
+mod retained_digest_denial;
+
 #[path = "authority_history/host_port_replay.rs"]
 pub(super) mod host_port_replay;
 
@@ -28,12 +40,18 @@ pub(super) fn configure_fixture_history_hooks(
     control: &CapabilityToken,
 ) -> TestResult {
     #[cfg(feature = "pq")]
-    if path.join("current-recovery-receipt-signer").exists() {
+    if path.join("current-recovery-receipt-signer").exists()
+        || path.join("original-recovery-receipt-signer").exists()
+    {
         let verifier = FixtureSigningQuote(kernel.public_key());
         kernel.with_hybrid_signing_backend(
             &chio_kernel::HybridSigningConfig {
                 crypto_floor: chio_kernel::KernelCryptoFloor::AllowHybrid,
-                pq_signing_seed: Some([206; 32]),
+                pq_signing_seed: Some(if path.join("current-recovery-receipt-signer").exists() {
+                    [206; 32]
+                } else {
+                    [205; 32]
+                }),
             },
             b"recovery-current-receipt-signer-quote",
             &verifier,
@@ -389,13 +407,53 @@ async fn crash_after_capture_with_output_floor(
     point: &str,
     output_floor: Option<InformationLabel>,
 ) -> TestResult<tempfile::TempDir> {
+    Box::pin(crash_after_capture_with_profile(
+        point,
+        output_floor,
+        false,
+        false,
+    ))
+    .await
+}
+
+#[cfg(all(unix, feature = "pq"))]
+async fn crash_after_capture_with_original_receipt_signer(
+    point: &str,
+) -> TestResult<tempfile::TempDir> {
+    Box::pin(crash_after_capture_with_profile(point, None, true, false)).await
+}
+
+#[cfg(all(unix, feature = "pq"))]
+async fn crash_after_digest_rejection_with_original_receipt_signer(
+    point: &str,
+) -> TestResult<tempfile::TempDir> {
+    Box::pin(crash_after_capture_with_profile(point, None, true, true)).await
+}
+
+#[cfg(unix)]
+async fn crash_after_capture_with_profile(
+    point: &str,
+    output_floor: Option<InformationLabel>,
+    original_receipt_signer: bool,
+    mismatched_output_digest: bool,
+) -> TestResult<tempfile::TempDir> {
     use std::os::unix::process::ExitStatusExt;
     use std::time::{Duration, Instant};
 
     let directory = tempfile::tempdir()?;
+    if original_receipt_signer {
+        std::fs::write(
+            directory.path().join("original-recovery-receipt-signer"),
+            b"1",
+        )?;
+    }
+    if mismatched_output_digest {
+        std::fs::write(directory.path().join("mismatched-output-digest"), b"1")?;
+    }
     if let Some(floor) = output_floor {
         set_output_floor(directory.path(), &floor)?;
     }
+    eprintln!("historical capture phase: {point} original seed open");
     let original = RecoveryFixture::open(directory.path().to_path_buf(), None, false)?;
     Box::pin(original.denied_seed_named("ticket-1")).await?;
     assert_eq!(original.process.process("root")?.tree_calls, 1);
@@ -428,6 +486,7 @@ async fn crash_after_capture_with_output_floor(
         std::thread::sleep(Duration::from_millis(25));
     };
     let log = std::fs::read_to_string(directory.path().join("authority-history-child.log"))?;
+    eprintln!("historical capture child: {point} status={status}\n{log}");
     assert_eq!(status.signal(), Some(6), "{point}: {log}");
     assert!(
         log.contains(&format!("recovery crash cutpoint: {point}")),
@@ -1472,82 +1531,347 @@ async fn recovery_nested_classifier_panic_is_fatal_before_output_join() -> TestR
 
 #[cfg(all(unix, feature = "pq"))]
 #[tokio::test]
-async fn recovery_captured_signer_rotation_is_durably_quarantined() -> TestResult {
-    let directory = Box::pin(crash_after_capture("return-recorded")).await?;
+async fn recovery_captured_signer_rotation_reaches_current_signed_withheld_terminal() -> TestResult
+{
+    use chio_kernel::admission_operation::{AdmissionOperationId, AdmissionTerminalReplay};
+    use chio_kernel::ReceiptStore;
+    for point in ["return-recorded", "evaluation", "resolved", "release-ack"] {
+        let directory = Box::pin(crash_after_capture_with_original_receipt_signer(point)).await?;
+        let before = retained_workflow(directory.path())?;
+        let physical_before = chio_core::canonical_json_bytes(&before)?;
+        let raw_before = captured_return_bytes(directory.path(), &before)?.1;
+        let original_signer = captured_receipt_signer(directory.path(), &before)?;
+        assert_eq!(
+            original_signer.algorithm(),
+            chio_core::SigningAlgorithm::Hybrid
+        );
+        let intent = before
+            .admission
+            .as_ref()
+            .ok_or("rotated signer original intent")?;
+        let operation_id =
+            AdmissionOperationId::from_persisted(intent.native_operation_id.as_str())?;
+        std::fs::write(
+            directory.path().join("current-recovery-receipt-signer"),
+            b"1",
+        )?;
+        std::fs::remove_file(directory.path().join("original-recovery-receipt-signer"))?;
+        eprintln!("historical signer phase: {point} current signer open");
+        let fixture = Box::new(RecoveryFixture::open(
+            directory.path().to_path_buf(),
+            None,
+            false,
+        )?);
+        let current_signer = fixture.kernel.receipt_signing_public_key();
+        assert_ne!(current_signer, original_signer);
+        let store = fixture.authority.admission_operation_store();
+        let terminal = store
+            .load_by_operation_id(&operation_id)?
+            .ok_or("captured terminal")?;
+        assert_eq!(
+            terminal.state(),
+            AdmissionOperationState::Completed,
+            "{point}: current authority left the authenticated external effect unfinished"
+        );
+        assert_eq!(terminal.binding().to_persisted(), intent.native_binding);
+        let private = store.inspect_captured_workflow_terminal_for_test(
+            fixture.runtime.scope(),
+            &before.workflow_id,
+        )?;
+        assert!(private.captured && private.admission_closed, "{point}");
+        assert!(
+            private.historical_hold.is_none(),
+            "{point}: permanent signing debt"
+        );
+        assert!(matches!(
+            private.effect,
+            EffectObservationV1::Complete { .. }
+        ));
+        assert!(matches!(
+            private.release,
+            ReleaseDispositionV1::Withheld { .. }
+        ));
+        assert_eq!(
+            chio_core::canonical_json_bytes(&retained_workflow(&fixture.path)?)?,
+            physical_before,
+            "{point}: rotated settlement changed the captured workflow"
+        );
+        assert_eq!(captured_return_bytes(&fixture.path, &before)?.1, raw_before);
+        let receipt_id = match terminal.terminal_replay() {
+            Some(AdmissionTerminalReplay::Receipt { receipt_id, .. }) => receipt_id,
+            _ => return Err("rotated settlement terminal receipt absent".into()),
+        };
+        let receipt = store
+            .load_chio_receipt(receipt_id.as_str())?
+            .ok_or("rotated terminal receipt")?;
+        assert_eq!(receipt.kernel_key, current_signer);
+        assert_eq!(
+            receipt.policy_hash,
+            intent.native_binding.policy_hash.as_str()
+        );
+        assert!(receipt.verify_signature_with_floor(
+            chio_core::receipt::crypto_floor::ReceiptCryptoFloor::PqRequired,
+        )?);
+        let settlement = receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| {
+                metadata.get(chio_kernel::tool_outcome::PRIVATE_RECOVERY_SETTLEMENT_METADATA_KEY)
+            })
+            .ok_or("distinct signed private settlement attestation")?;
+        assert_eq!(settlement["disposition"], "permanently_withheld");
+        assert_eq!(
+            settlement["original_signing_identity"]["public_key"],
+            serde_json::to_value(&original_signer)?
+        );
+        assert_eq!(
+            settlement["settlement_signing_identity"]["public_key"],
+            serde_json::to_value(&current_signer)?
+        );
+        assert_eq!(
+            settlement["raw_output_digest"],
+            chio_core::sha256_hex(&raw_before)
+        );
+        assert_eq!(
+            settlement["captured_deployment_digest"],
+            serde_json::to_value(before.deployment_digest)?
+        );
+        let actor = fixture.kernel.authenticate_recovery_actor(
+            fixture.runtime.scope(),
+            &fixture.control,
+            RecoveryPermission::Inspect,
+        )?;
+        assert!(fixture
+            .kernel
+            .replay_recovery_result(&actor, &before.workflow_id)
+            .is_err());
+        assert_eq!(
+            external_count(&fixture.path)?,
+            1,
+            "{point}: duplicate original effect"
+        );
+        assert_eq!(
+            fixture.process.process("root")?.tree_calls,
+            2,
+            "{point}: duplicate charge"
+        );
+        let terminal_bytes = native_original_bytes(&fixture.path, &before)?;
+        let events = recovery_event_count(&fixture.path)?;
+        for _ in 0..2 {
+            fixture.kernel.reconcile_durable_admission_startup()?;
+            fixture
+                .runtime
+                .settle(&fixture.control, &before.workflow_id)?;
+        }
+        assert_eq!(
+            native_original_bytes(&fixture.path, &before)?,
+            terminal_bytes
+        );
+        assert_eq!(recovery_event_count(&fixture.path)?, events);
+        drop(store);
+        drop(fixture);
+        eprintln!("historical signer phase: {point} terminal reopen");
+        let reopened = Box::new(RecoveryFixture::open(
+            directory.path().to_path_buf(),
+            None,
+            false,
+        )?);
+        assert_eq!(
+            native_original_bytes(&reopened.path, &before)?,
+            terminal_bytes
+        );
+        assert_eq!(
+            captured_return_bytes(&reopened.path, &before)?.1,
+            raw_before
+        );
+        assert_eq!(external_count(&reopened.path)?, 1);
+        // New guarded work uses the installed signing authority, while the old
+        // operation remains terminal and its original effect remains singular.
+        let fresh_id =
+            Box::pin(reopened.ready_named("after-signer-rotation", "current-signer")).await?;
+        let fresh = reopened.record(&fresh_id)?;
+        let delivered = Box::pin(reopened.execute(
+            "current-signer-resume",
+            RecoveryCommandBodyV1::ResumeWorkflow {
+                workflow_id: fresh_id,
+                expected_revision: fresh.revision,
+            },
+        ))
+        .await?;
+        let fresh_response = delivered
+            .original_response
+            .ok_or("fresh current-authority response")?;
+        assert_eq!(
+            fresh_response.receipt.decision,
+            Some(chio_core::receipt::decision::Decision::Allow)
+        );
+        assert!(
+            fresh_response.result.is_some(),
+            "{point}: fresh guarded output withheld"
+        );
+        assert_eq!(fresh_response.receipt.kernel_key, current_signer);
+        assert_eq!(external_count(&reopened.path)?, 2);
+        assert_eq!(reopened.process.process("root")?.tree_calls, 4);
+        assert_eq!(
+            native_original_bytes(&reopened.path, &before)?,
+            terminal_bytes
+        );
+        let effects = rusqlite::Connection::open(&reopened.path.join("effects.db"))?;
+        let old_effects: i64 = effects.query_row(
+            "SELECT count(*) FROM effects WHERE operation=?1",
+            [operation_id.as_str()],
+            |row| row.get(0),
+        )?;
+        assert_eq!(
+            old_effects, 1,
+            "{point}: original repeated during future guarded work"
+        );
+    }
+    Ok(())
+}
+
+#[cfg(all(unix, feature = "pq"))]
+#[tokio::test]
+async fn recovery_previously_held_signer_rotation_reaches_authenticated_withheld_terminal(
+) -> TestResult {
+    use chio_kernel::admission_operation::{AdmissionOperationId, AdmissionTerminalReplay};
+    use chio_kernel::ReceiptStore;
+    let directory = Box::pin(crash_after_capture_with_original_receipt_signer(
+        "return-recorded",
+    ))
+    .await?;
     let before = retained_workflow(directory.path())?;
-    let native_before = native_original_bytes(directory.path(), &before)?;
-    let raw_before = captured_return_bytes(directory.path(), &before)?;
+    let raw_before = captured_return_bytes(directory.path(), &before)?.1;
     let original_signer = captured_receipt_signer(directory.path(), &before)?;
-    assert_eq!(
-        original_signer.algorithm(),
-        chio_core::SigningAlgorithm::Ed25519
-    );
+    let intent = before
+        .admission
+        .as_ref()
+        .ok_or("historical signer original")?;
+    let operation_id = AdmissionOperationId::from_persisted(intent.native_operation_id.as_str())?;
+    let quota_before;
+    {
+        // Reproduce the earlier qualified runtime's signer-only hold through
+        // its owning fenced API, over this genuine immutable native capture.
+        let authority = SqliteAuthorityStore::open_serving(
+            directory.path().join("admission.db"),
+            directory.path().join("locks"),
+        )?;
+        authority
+            .admission_operation_store()
+            .recovery_authority()
+            .ok_or("historical signer authority")?
+            .quarantine_historical(
+                &operation_id,
+                RecoveryHistoricalHoldReasonV1::FrozenSigningCustodyUnavailable,
+                &authority.mutation_fence(),
+                now_ms()?,
+            )?;
+        quota_before = retained_workflow_quota_bytes(directory.path(), &before)?;
+    }
+    let old_quota: serde_json::Value = serde_json::from_slice(&quota_before.1)?;
+    let old_hold = old_quota
+        .get("native_hold")
+        .cloned()
+        .ok_or("authentic retained signer hold")?;
+    let database = rusqlite::Connection::open(directory.path().join("admission.db"))?;
+    let old_hold_audit_digest: String = database.query_row(
+        "SELECT e.record_digest FROM admission_operation_recovery_events e
+         JOIN admission_operation_recovery_records r
+         ON e.record_key=r.record_key AND e.record_version=r.version
+         WHERE r.record_key GLOB 'workflow-quota:*' AND r.payload=?1",
+        [&quota_before.1],
+        |row| row.get(0),
+    )?;
+    let old_hold_events = database.query_row(
+        "SELECT count(*) FROM admission_operation_recovery_events WHERE record_digest=?1",
+        [&old_hold_audit_digest],
+        |row| row.get::<_, i64>(0),
+    )?;
+    drop(database);
+    assert_eq!(old_hold_events, 1);
     std::fs::write(
         directory.path().join("current-recovery-receipt-signer"),
         b"1",
     )?;
-    let fixture = Box::new(
-        RecoveryFixture::open(directory.path().to_path_buf(), None, false).map_err(|error| {
-            format!("captured receipt signer rotation blocked authority startup: {error}")
-        })?,
-    );
-    let current_signer = fixture.kernel.receipt_signing_public_key();
-    assert_ne!(current_signer, original_signer);
+    std::fs::remove_file(directory.path().join("original-recovery-receipt-signer"))?;
+    let fixture = Box::new(RecoveryFixture::open(
+        directory.path().to_path_buf(),
+        None,
+        false,
+    )?);
+    assert_ne!(fixture.kernel.receipt_signing_public_key(), original_signer);
+    let store = fixture.authority.admission_operation_store();
+    let native = store
+        .load_by_operation_id(&operation_id)?
+        .ok_or("settled previously held original")?;
+    assert_eq!(native.state(), AdmissionOperationState::Completed);
+    assert_eq!(native.binding().to_persisted(), intent.native_binding);
+    let settled = fixture.record(&before.workflow_id)?;
+    assert!(settled.captured && settled.admission_closed);
+    assert_eq!(settled.control, WorkflowControlV1::Active);
+    assert!(settled.historical_hold.is_none());
+    assert!(matches!(
+        settled.effect,
+        EffectObservationV1::Complete { .. }
+    ));
+    assert!(matches!(
+        settled.release,
+        ReleaseDispositionV1::Withheld { .. }
+    ));
+    assert_eq!(captured_return_bytes(&fixture.path, &before)?.1, raw_before);
     assert_eq!(
-        current_signer.algorithm(),
-        chio_core::SigningAlgorithm::Hybrid
+        chio_core::canonical_json_bytes(&retained_workflow(&fixture.path)?)?,
+        chio_core::canonical_json_bytes(&before)?
     );
+    let quota_after: serde_json::Value =
+        serde_json::from_slice(&retained_workflow_quota_bytes(&fixture.path, &before)?.1)?;
+    assert_eq!(quota_after.get("native_hold"), Some(&old_hold));
     assert_eq!(
-        fixture.kernel.public_key(),
-        original_signer,
-        "ordinary signer changed capability/process root"
+        rusqlite::Connection::open(fixture.path.join("admission.db"))?.query_row(
+            "SELECT count(*) FROM admission_operation_recovery_events WHERE record_digest=?1",
+            [&old_hold_audit_digest],
+            |row| row.get::<_, i64>(0),
+        )?,
+        1,
+        "old signer hold audit event changed"
     );
-    let held = fixture.record(&before.workflow_id)?;
-    assert_eq!(held.control, WorkflowControlV1::Quarantined);
-    let hold = held
-        .historical_hold
+    let receipt_id = match native.terminal_replay() {
+        Some(AdmissionTerminalReplay::Receipt { receipt_id, .. }) => receipt_id,
+        _ => return Err("held original private terminal receipt absent".into()),
+    };
+    let receipt = store
+        .load_chio_receipt(receipt_id.as_str())?
+        .ok_or("held original settlement receipt")?;
+    assert_eq!(
+        receipt.kernel_key,
+        fixture.kernel.receipt_signing_public_key()
+    );
+    assert!(receipt.verify_signature_with_floor(
+        chio_core::receipt::crypto_floor::ReceiptCryptoFloor::PqRequired
+    )?);
+    let marker = receipt
+        .metadata
         .as_ref()
-        .ok_or("frozen signing custody hold")?;
+        .and_then(|metadata| {
+            metadata.get(chio_kernel::tool_outcome::PRIVATE_RECOVERY_SETTLEMENT_METADATA_KEY)
+        })
+        .ok_or("held settlement attestation")?;
+    assert_eq!(marker["historical_signing_hold"], old_hold["hold"]);
     assert_eq!(
-        serde_json::to_value(hold.reason)?,
-        serde_json::json!("frozen_signing_custody_unavailable")
+        marker["original_signing_identity"]["public_key"],
+        serde_json::to_value(original_signer)?
     );
-    assert!(held.captured && !held.admission_closed);
-    assert_eq!(held.captured_deployment, before.captured_deployment);
-    assert_eq!(native_original_bytes(&fixture.path, &held)?, native_before);
-    assert_eq!(captured_return_bytes(&fixture.path, &held)?, raw_before);
-    for (retained, original) in [
-        (
-            chio_core::canonical_json_bytes(&held.action)?,
-            chio_core::canonical_json_bytes(&before.action)?,
-        ),
-        (
-            chio_core::canonical_json_bytes(&held.signed_grant)?,
-            chio_core::canonical_json_bytes(&before.signed_grant)?,
-        ),
-        (
-            chio_core::canonical_json_bytes(&held.envelope)?,
-            chio_core::canonical_json_bytes(&before.envelope)?,
-        ),
-        (
-            chio_core::canonical_json_bytes(&held.admission)?,
-            chio_core::canonical_json_bytes(&before.admission)?,
-        ),
-    ] {
-        assert_eq!(retained, original);
-    }
-    assert_eq!(external_count(&fixture.path)?, 1);
-    assert_eq!(fixture.process.process("root")?.tree_calls, 2);
-    fixture
-        .runtime
-        .settle(&fixture.control, &held.workflow_id)?;
     let events = recovery_event_count(&fixture.path)?;
-    for _ in 0..3 {
+    let terminal_bytes = native_original_bytes(&fixture.path, &before)?;
+    for _ in 0..2 {
         fixture
             .runtime
-            .settle(&fixture.control, &held.workflow_id)?;
+            .settle(&fixture.control, &before.workflow_id)?;
+        fixture.kernel.reconcile_recoverable_admissions()?;
     }
     assert_eq!(recovery_event_count(&fixture.path)?, events);
+    assert_eq!(external_count(&fixture.path)?, 1);
+    assert_eq!(fixture.process.process("root")?.tree_calls, 2);
     let actor = fixture.kernel.authenticate_recovery_actor(
         fixture.runtime.scope(),
         &fixture.control,
@@ -1555,185 +1879,294 @@ async fn recovery_captured_signer_rotation_is_durably_quarantined() -> TestResul
     )?;
     assert!(fixture
         .kernel
-        .replay_recovery_result(&actor, &held.workflow_id)
+        .replay_recovery_result(&actor, &before.workflow_id)
         .is_err());
-    assert!(fixture
-        .execute(
-            "held-signer-resume",
-            RecoveryCommandBodyV1::ResumeWorkflow {
-                workflow_id: held.workflow_id.clone(),
-                expected_revision: fixture.record(&held.workflow_id)?.revision,
-            }
-        )
-        .await
-        .is_err());
-    let request: ToolCallRequest = serde_json::from_str(
-        held.envelope
-            .as_ref()
-            .ok_or("signer held envelope")?
-            .request
-            .as_str(),
-    )?;
-    let reservation: RecoveryProcessReservationV1 = serde_json::from_str(
-        held.process_reservation
-            .as_ref()
-            .ok_or("signer held reservation")?
-            .as_str(),
-    )?;
-    let physical_before_replay =
-        chio_core::canonical_json_bytes(&retained_workflow(&fixture.path)?)?;
-    let effective_before_replay =
-        chio_core::canonical_json_bytes(&fixture.record(&held.workflow_id)?)?;
-    let replay_events = recovery_event_count(&fixture.path)?;
-    let replay = Box::pin(fixture.process.invoke_known_only(
-        "root",
-        &reservation.operation_key,
-        &request,
-    ))
-    .await;
-    match &replay {
-        Ok(response) => {
-            let reason = response.reason.as_deref().unwrap_or("");
-            let admission_metadata = response.receipt.metadata.as_ref().and_then(|metadata| {
-                metadata.get(chio_kernel::admission_operation::ADMISSION_RECEIPT_METADATA_KEY)
-            });
-            eprintln!(
-                "held known-only response: {}",
-                serde_json::json!({
-                    "verdict": format!("{:?}", response.verdict),
-                    "request_id_matches": response.request_id == request.request_id,
-                    "output_present": response.output.is_some(),
-                    "nonce_present": response.execution_nonce.is_some(),
-                    "terminal_state": format!("{:?}", response.terminal_state),
-                    "reason_prefix": reason.chars().take(256).collect::<String>(),
-                    "reason_bytes": reason.len(),
-                    "reason_hash": chio_core::sha256_hex(reason.as_bytes()),
-                    "current_receipt_signer": response.receipt.kernel_key == current_signer,
-                    "original_receipt_signer": response.receipt.kernel_key == original_signer,
-                    "receipt_decision_deny": matches!(
-                        &response.receipt.decision,
-                        Some(chio_core::receipt::decision::Decision::Deny { .. }),
-                    ),
-                    "receipt_content_is_null": response.receipt.content_hash
-                        == chio_core::sha256_hex(b"null"),
-                    "receipt_reason_matches_response": match &response.receipt.decision {
-                        Some(chio_core::receipt::decision::Decision::Deny { reason, .. }) => {
-                            response.reason.as_deref() == Some(reason.as_str())
-                        }
-                        _ => false,
-                    },
-                    "admission_metadata_present": admission_metadata.is_some(),
-                    "admission_metadata_projected_state": admission_metadata
-                        .and_then(|metadata| metadata.get("projected_state"))
-                        .and_then(Value::as_str),
-                    "admission_metadata_compensation": admission_metadata
-                        .and_then(|metadata| metadata.get("compensation_status"))
-                        .and_then(Value::as_str),
-                    "admission_metadata_outcome_present": admission_metadata
-                        .and_then(|metadata| metadata.get("tool_outcome_id"))
-                        .is_some_and(|value| !value.is_null()),
-                    "signature_with_current_floor": response.receipt.verify_signature_with_floor(
-                        chio_core::receipt::crypto_floor::ReceiptCryptoFloor::PqRequired,
-                    ).map_err(|error| error.to_string()),
-                    "receipt_hash": chio_core::sha256_hex(
-                        &chio_core::canonical_json_bytes(&response.receipt)?,
-                    ),
-                })
-            );
-        }
-        Err(error) => eprintln!("held known-only error: {error}"),
-    }
-    assert_eq!(
-        chio_core::canonical_json_bytes(&retained_workflow(&fixture.path)?)?,
-        physical_before_replay,
-        "held replay changed physical workflow custody"
-    );
-    assert_eq!(
-        chio_core::canonical_json_bytes(&fixture.record(&held.workflow_id)?)?,
-        effective_before_replay,
-        "held replay changed authenticated hold custody"
-    );
-    assert_eq!(native_original_bytes(&fixture.path, &held)?, native_before);
-    assert_eq!(captured_return_bytes(&fixture.path, &held)?, raw_before);
-    assert_eq!(recovery_event_count(&fixture.path)?, replay_events);
-    assert_eq!(external_count(&fixture.path)?, 1);
-    assert_eq!(fixture.process.process("root")?.tree_calls, 2);
-    // This is new refusal evidence signed by the current backend. It cannot
-    // complete or release the held original native operation.
-    let response = replay?;
-    assert_eq!(response.request_id, request.request_id);
-    assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response.output.is_none());
-    assert!(response.execution_nonce.is_none());
-    assert_eq!(response.receipt.kernel_key, current_signer);
-    assert_ne!(response.receipt.kernel_key, original_signer);
-    assert!(response.receipt.verify_signature_with_floor(
-        chio_core::receipt::crypto_floor::ReceiptCryptoFloor::PqRequired,
-    )?);
-    assert_eq!(
-        response.receipt.content_hash,
-        chio_core::sha256_hex(b"null")
-    );
-    let refusal = "durable admission failed: admission operation invariant failed: recovery workflow is historically quarantined";
-    assert_eq!(response.reason.as_deref(), Some(refusal));
-    match &response.receipt.decision {
-        Some(chio_core::receipt::decision::Decision::Deny { reason, .. }) => {
-            assert_eq!(reason, refusal);
-            assert_eq!(response.reason.as_deref(), Some(reason.as_str()));
-        }
-        _ => return Err("held generic replay lacks signed denial".into()),
-    }
-    assert!(response.receipt.metadata.as_ref().is_none_or(|metadata| {
-        metadata
-            .get(chio_kernel::admission_operation::ADMISSION_RECEIPT_METADATA_KEY)
-            .is_none()
-    }));
-    let healthy_key = "denied:healthy-current-signer-operation";
-    let healthy_request = fixture.process.tool_request(
-        fixture.runtime.scope().process_id.as_str(),
-        healthy_key,
-        &fixture.seed.server_id,
-        &fixture.seed.tool_name,
-        fixture.seed.arguments.clone(),
-    )?;
-    let response = Box::pin(fixture.process.invoke_known_only(
-        fixture.runtime.scope().process_id.as_str(),
-        healthy_key,
-        &healthy_request,
-    ))
-    .await?;
-    assert_eq!(response.verdict, Verdict::Deny);
-    assert_eq!(response.receipt.kernel_key, current_signer);
-    assert_eq!(
-        response.receipt.algorithm,
-        Some(chio_core::SigningAlgorithm::Hybrid)
-    );
-    assert!(response.receipt.verify_signature_with_floor(
-        chio_core::receipt::crypto_floor::ReceiptCryptoFloor::PqRequired,
-    )?);
-    assert_eq!(fixture.process.process("root")?.tree_calls, 3);
-    assert_eq!(external_count(&fixture.path)?, 1);
-    assert_eq!(native_original_bytes(&fixture.path, &held)?, native_before);
-    assert_eq!(captured_return_bytes(&fixture.path, &held)?, raw_before);
+    drop(store);
     drop(fixture);
-    let fixture = Box::new(RecoveryFixture::open(
+    let reopened = Box::new(RecoveryFixture::open(
         directory.path().to_path_buf(),
         None,
         false,
     )?);
-    let reopened = fixture.record(&held.workflow_id)?;
-    assert_eq!(reopened.control, WorkflowControlV1::Quarantined);
-    let events = recovery_event_count(&fixture.path)?;
-    fixture
-        .runtime
-        .settle(&fixture.control, &held.workflow_id)?;
-    assert_eq!(recovery_event_count(&fixture.path)?, events);
     assert_eq!(
-        native_original_bytes(&fixture.path, &reopened)?,
-        native_before
+        native_original_bytes(&reopened.path, &before)?,
+        terminal_bytes
     );
-    assert_eq!(captured_return_bytes(&fixture.path, &reopened)?, raw_before);
-    assert_eq!(external_count(&fixture.path)?, 1);
+    assert!(reopened.record(&before.workflow_id)?.admission_closed);
+    assert_eq!(recovery_event_count(&reopened.path)?, events);
+    assert_eq!(external_count(&reopened.path)?, 1);
+    Ok(())
+}
+
+#[cfg(all(unix, feature = "pq"))]
+#[tokio::test]
+async fn recovery_rotated_signer_preserves_digest_denial_and_settles_known_private_return(
+) -> TestResult {
+    use chio_kernel::admission_operation::{
+        AdmissionOperationId, AdmissionReceiptMetadataV1, AdmissionTerminalReplay,
+    };
+    use chio_kernel::ReceiptStore;
+    for previously_held in [false, true] {
+        let directory = Box::pin(crash_after_digest_rejection_with_original_receipt_signer(
+            "return-recorded",
+        ))
+        .await?;
+        let before = retained_workflow(directory.path())?;
+        let raw_before = captured_return_bytes(directory.path(), &before)?.1;
+        let original_signer = captured_receipt_signer(directory.path(), &before)?;
+        let intent = before.admission.as_ref().ok_or("digest denial original")?;
+        let operation_id =
+            AdmissionOperationId::from_persisted(intent.native_operation_id.as_str())?;
+        let retained_hold = if previously_held {
+            // The previous release wrote this hold through its owning fenced
+            // authority. Preserve its immutable audit record during settlement.
+            let authority = SqliteAuthorityStore::open_serving(
+                directory.path().join("admission.db"),
+                directory.path().join("locks"),
+            )?;
+            authority
+                .admission_operation_store()
+                .recovery_authority()
+                .ok_or("digest denial historical authority")?
+                .quarantine_historical(
+                    &operation_id,
+                    RecoveryHistoricalHoldReasonV1::FrozenSigningCustodyUnavailable,
+                    &authority.mutation_fence(),
+                    now_ms()?,
+                )?;
+            let quota = retained_workflow_quota_bytes(directory.path(), &before)?.1;
+            let value: serde_json::Value = serde_json::from_slice(&quota)?;
+            let audit_digest: String =
+                rusqlite::Connection::open(directory.path().join("admission.db"))?.query_row(
+                    "SELECT e.record_digest FROM admission_operation_recovery_events e
+                     JOIN admission_operation_recovery_records r
+                     ON e.record_key=r.record_key AND e.record_version=r.version
+                     WHERE r.record_key GLOB 'workflow-quota:*' AND r.payload=?1",
+                    [&quota],
+                    |row| row.get(0),
+                )?;
+            Some((
+                value
+                    .get("native_hold")
+                    .cloned()
+                    .ok_or("retained signer hold")?,
+                audit_digest,
+            ))
+        } else {
+            None
+        };
+        std::fs::write(
+            directory.path().join("current-recovery-receipt-signer"),
+            b"1",
+        )?;
+        std::fs::remove_file(directory.path().join("original-recovery-receipt-signer"))?;
+        let fixture = Box::new(RecoveryFixture::open(
+            directory.path().to_path_buf(),
+            None,
+            false,
+        )?);
+        let current_signer = fixture.kernel.receipt_signing_public_key();
+        assert_ne!(current_signer, original_signer);
+        let store = fixture.authority.admission_operation_store();
+        let terminal = store
+            .load_by_operation_id(&operation_id)?
+            .ok_or("rotated digest denial terminal")?;
+        assert_eq!(
+            terminal.state(),
+            AdmissionOperationState::DeniedAfterDelivery
+        );
+        assert_eq!(terminal.binding().to_persisted(), intent.native_binding);
+        let settled = fixture.record(&before.workflow_id)?;
+        assert!(settled.captured && settled.admission_closed);
+        assert!(settled.historical_hold.is_none());
+        assert!(matches!(
+            settled.effect,
+            EffectObservationV1::Complete { .. }
+        ));
+        assert!(matches!(
+            settled.release,
+            ReleaseDispositionV1::Withheld { .. }
+        ));
+        assert_eq!(
+            chio_core::canonical_json_bytes(&retained_workflow(&fixture.path)?)?,
+            chio_core::canonical_json_bytes(&before)?
+        );
+        assert_eq!(captured_return_bytes(&fixture.path, &before)?.1, raw_before);
+        let receipt_id = match terminal.terminal_replay() {
+            Some(AdmissionTerminalReplay::Receipt { receipt_id, .. }) => receipt_id,
+            _ => return Err("digest denial terminal receipt absent".into()),
+        };
+        let receipt = store
+            .load_chio_receipt(receipt_id.as_str())?
+            .ok_or("digest denial private receipt")?;
+        assert_eq!(receipt.kernel_key, current_signer);
+        assert!(matches!(
+            receipt.decision,
+            Some(chio_core::receipt::decision::Decision::Deny { .. })
+        ));
+        let expected_digest = chio_core::sha256_hex(b"an output the provider will never return");
+        let mut redacted_preimage = b"chio.delivery-mismatch.redacted.v1\0".to_vec();
+        redacted_preimage.extend_from_slice(expected_digest.as_bytes());
+        assert_eq!(
+            receipt.content_hash,
+            chio_core::sha256_hex(&redacted_preimage)
+        );
+        assert_ne!(receipt.content_hash, chio_core::sha256_hex(&raw_before));
+        assert!(receipt.verify_signature_with_floor(
+            chio_core::receipt::crypto_floor::ReceiptCryptoFloor::PqRequired
+        )?);
+        let metadata = receipt.metadata.as_ref().ok_or("digest denial metadata")?;
+        let native_metadata: AdmissionReceiptMetadataV1 = serde_json::from_value(
+            metadata[chio_kernel::admission_operation::ADMISSION_RECEIPT_METADATA_KEY].clone(),
+        )?;
+        assert_eq!(
+            native_metadata.projected_state,
+            AdmissionOperationState::DeniedAfterDelivery
+        );
+        assert!(native_metadata.tool_outcome_id.is_none());
+        assert!(native_metadata.tool_outcome_version.is_none());
+        let marker = metadata
+            .get(chio_kernel::tool_outcome::PRIVATE_RECOVERY_SETTLEMENT_METADATA_KEY)
+            .ok_or("digest denial private attestation")?;
+        assert_eq!(marker["disposition"], "permanently_withheld");
+        assert_eq!(
+            marker["raw_output_digest"],
+            chio_core::sha256_hex(&raw_before)
+        );
+        assert_eq!(
+            marker["original_signing_identity"]["public_key"],
+            serde_json::to_value(&original_signer)?
+        );
+        assert_eq!(
+            marker["settlement_signing_identity"]["public_key"],
+            serde_json::to_value(&current_signer)?
+        );
+        assert_eq!(
+            marker["captured_deployment_digest"],
+            serde_json::to_value(before.deployment_digest)?
+        );
+        let database = rusqlite::Connection::open(fixture.path.join("admission.db"))?;
+        let projection: Vec<u8> = database.query_row(
+            "SELECT projection_json FROM admission_operation_terminal_projections WHERE operation_id=?1",
+            [operation_id.as_str()], |row| row.get(0),
+        )?;
+        let projection: serde_json::Value = serde_json::from_slice(&projection)?;
+        assert_eq!(projection["terminal"], "denied_after_delivery");
+        assert_eq!(projection["reason"], "digest_mismatch");
+        if let Some((old_hold, audit_digest)) = &retained_hold {
+            assert_eq!(marker["historical_signing_hold"], old_hold["hold"]);
+            let quota: serde_json::Value =
+                serde_json::from_slice(&retained_workflow_quota_bytes(&fixture.path, &before)?.1)?;
+            assert_eq!(quota.get("native_hold"), Some(old_hold));
+            let events: i64 = database.query_row(
+                "SELECT count(*) FROM admission_operation_recovery_events WHERE record_digest=?1",
+                [audit_digest],
+                |row| row.get(0),
+            )?;
+            assert_eq!(events, 1);
+        } else {
+            assert!(marker["historical_signing_hold"].is_null());
+        }
+        let actor = fixture.kernel.authenticate_recovery_actor(
+            fixture.runtime.scope(),
+            &fixture.control,
+            RecoveryPermission::Inspect,
+        )?;
+        assert!(fixture
+            .kernel
+            .replay_recovery_result(&actor, &before.workflow_id)
+            .is_err());
+        let terminal_bytes = native_original_bytes(&fixture.path, &before)?;
+        let events = recovery_event_count(&fixture.path)?;
+        for _ in 0..2 {
+            fixture.kernel.reconcile_durable_admission_startup()?;
+            fixture
+                .runtime
+                .settle(&fixture.control, &before.workflow_id)?;
+        }
+        assert_eq!(
+            native_original_bytes(&fixture.path, &before)?,
+            terminal_bytes
+        );
+        assert_eq!(recovery_event_count(&fixture.path)?, events);
+        assert_eq!(external_count(&fixture.path)?, 1);
+        assert_eq!(fixture.process.process("root")?.tree_calls, 2);
+        drop(database);
+        drop(store);
+        drop(fixture);
+        let reopened = Box::new(RecoveryFixture::open(
+            directory.path().to_path_buf(),
+            None,
+            false,
+        )?);
+        assert_eq!(
+            native_original_bytes(&reopened.path, &before)?,
+            terminal_bytes
+        );
+        assert!(reopened.record(&before.workflow_id)?.admission_closed);
+        let fresh_id =
+            Box::pin(reopened.ready_named("after-digest-denial", "current-denial")).await?;
+        let fresh = reopened.record(&fresh_id)?;
+        let delivered = Box::pin(reopened.execute(
+            "current-denial-resume",
+            RecoveryCommandBodyV1::ResumeWorkflow {
+                workflow_id: fresh_id,
+                expected_revision: fresh.revision,
+            },
+        ))
+        .await?;
+        assert!(delivered.original_response.is_none());
+        assert!(matches!(
+            delivered.status.effect,
+            EffectObservationV1::Unknown { .. }
+        ));
+        let fresh = reopened.record(&delivered.status.workflow_id)?;
+        let fresh_intent = fresh.admission.as_ref().ok_or("fresh denial intent")?;
+        let fresh_operation = reopened
+            .authority
+            .admission_operation_store()
+            .load_by_operation_id(&AdmissionOperationId::from_persisted(
+                fresh_intent.native_operation_id.as_str(),
+            )?)?
+            .ok_or("fresh denial operation")?;
+        assert_eq!(
+            fresh_operation.state(),
+            AdmissionOperationState::DeniedAfterDelivery
+        );
+        let fresh_receipt_id = match fresh_operation.terminal_replay() {
+            Some(AdmissionTerminalReplay::Receipt { receipt_id, .. }) => receipt_id,
+            _ => return Err("fresh denial receipt absent".into()),
+        };
+        let fresh_receipt = reopened
+            .authority
+            .admission_operation_store()
+            .load_chio_receipt(fresh_receipt_id.as_str())?
+            .ok_or("fresh current denial receipt")?;
+        assert!(matches!(
+            fresh_receipt.decision,
+            Some(chio_core::receipt::decision::Decision::Deny { .. })
+        ));
+        assert_eq!(fresh_receipt.kernel_key, current_signer);
+        assert!(fresh_receipt
+            .metadata
+            .as_ref()
+            .is_none_or(|metadata| metadata
+                .get(chio_kernel::tool_outcome::PRIVATE_RECOVERY_SETTLEMENT_METADATA_KEY)
+                .is_none()));
+        assert_eq!(external_count(&reopened.path)?, 2);
+        assert_eq!(reopened.process.process("root")?.tree_calls, 4);
+        assert_eq!(
+            native_original_bytes(&reopened.path, &before)?,
+            terminal_bytes
+        );
+        let effects = rusqlite::Connection::open(reopened.path.join("effects.db"))?;
+        let old_effects: i64 = effects.query_row(
+            "SELECT count(*) FROM effects WHERE operation=?1",
+            [operation_id.as_str()],
+            |row| row.get(0),
+        )?;
+        assert_eq!(old_effects, 1);
+    }
     Ok(())
 }
 
@@ -1747,28 +2180,31 @@ async fn recovery_signer_rotation_rejects_corrupt_original_return_without_hold()
         "held-hash-changed",
     ] {
         let directory = Box::pin(crash_after_capture("return-recorded")).await?;
-        let before = if fault == "held-hash-changed" {
-            std::fs::write(
-                directory.path().join("current-recovery-receipt-signer"),
-                b"1",
+        let before = retained_workflow(directory.path())?;
+        if fault == "held-hash-changed" {
+            let authority = SqliteAuthorityStore::open_serving(
+                directory.path().join("admission.db"),
+                directory.path().join("locks"),
             )?;
-            let fixture = Box::new(RecoveryFixture::open(
-                directory.path().to_path_buf(),
-                None,
-                false,
-            )?);
-            let original = retained_workflow(directory.path())?;
-            let held = fixture.record(&original.workflow_id)?;
-            assert_eq!(held.control, WorkflowControlV1::Quarantined);
-            assert_eq!(
-                held.historical_hold.as_ref().map(|hold| hold.reason),
-                Some(RecoveryHistoricalHoldReasonV1::FrozenSigningCustodyUnavailable)
-            );
-            drop(fixture);
-            held
-        } else {
-            retained_workflow(directory.path())?
-        };
+            let id = chio_kernel::admission_operation::AdmissionOperationId::from_persisted(
+                before
+                    .admission
+                    .as_ref()
+                    .ok_or("corrupted held original")?
+                    .native_operation_id
+                    .as_str(),
+            )?;
+            authority
+                .admission_operation_store()
+                .recovery_authority()
+                .ok_or("corrupted held original authority")?
+                .quarantine_historical(
+                    &id,
+                    RecoveryHistoricalHoldReasonV1::FrozenSigningCustodyUnavailable,
+                    &authority.mutation_fence(),
+                    now_ms()?,
+                )?;
+        }
         let physical_before = retained_workflow(directory.path())?;
         let quota_before = retained_workflow_quota_bytes(directory.path(), &before)?;
         let native_before = native_original_bytes(directory.path(), &before)?;
@@ -2095,6 +2531,60 @@ async fn recovery_unavailable_frozen_output_verifier_is_durably_quarantined() ->
         assert_eq!(events, recovery_event_count(&reopened.path)?);
         assert_eq!(native_before, native_original_bytes(&reopened.path, &held)?);
         assert_eq!(external_count(&reopened.path)?, 1);
+        if marker == "current-recovery-post-return-hook" {
+            let fresh_id =
+                Box::pin(reopened.ready_named("after-frozen-verifier-hold", "current-verifier"))
+                    .await?;
+            let fresh = reopened.record(&fresh_id)?;
+            let delivered = Box::pin(reopened.execute(
+                "current-verifier-resume",
+                RecoveryCommandBodyV1::ResumeWorkflow {
+                    workflow_id: fresh_id,
+                    expected_revision: fresh.revision,
+                },
+            ))
+            .await?;
+            let response = delivered
+                .original_response
+                .ok_or("unrelated current-verifier response")?;
+            assert_eq!(
+                response.receipt.decision,
+                Some(chio_core::receipt::decision::Decision::Allow)
+            );
+            assert!(response.result.is_some());
+            assert_eq!(external_count(&reopened.path)?, 2);
+            assert_eq!(reopened.process.process("root")?.tree_calls, 4);
+        } else {
+            // Current unavailable output verification cannot authorize a fresh
+            // effect. A genuine unrelated durable input denial still completes.
+            Box::pin(reopened.denied_seed_named("after-unavailable-verifier-hold")).await?;
+            assert_eq!(external_count(&reopened.path)?, 1);
+            assert_eq!(reopened.process.process("root")?.tree_calls, 3);
+        }
+        let current_hold = reopened.record(&held.workflow_id)?;
+        assert_eq!(current_hold.control, WorkflowControlV1::Quarantined);
+        assert_eq!(current_hold.historical_hold, held.historical_hold);
+        assert!(!current_hold.admission_closed);
+        assert_eq!(native_before, native_original_bytes(&reopened.path, &held)?);
+        let events = recovery_event_count(&reopened.path)?;
+        reopened.kernel.reconcile_durable_admission_startup()?;
+        reopened
+            .runtime
+            .settle(&reopened.control, &held.workflow_id)?;
+        assert_eq!(events, recovery_event_count(&reopened.path)?);
+        let operation_id = held
+            .admission
+            .as_ref()
+            .ok_or("held original intent")?
+            .native_operation_id
+            .as_str();
+        let old_effects: i64 = rusqlite::Connection::open(reopened.path.join("effects.db"))?
+            .query_row(
+                "SELECT count(*) FROM effects WHERE operation=?1",
+                [operation_id],
+                |row| row.get(0),
+            )?;
+        assert_eq!(old_effects, 1);
     }
     Ok(())
 }

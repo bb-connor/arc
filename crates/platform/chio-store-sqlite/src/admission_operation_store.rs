@@ -46,6 +46,12 @@ use crate::store_connection::StoreConnection;
 mod authentication_test_support;
 mod budget_custody;
 mod caller_budget;
+#[cfg(feature = "admission-test-support")]
+mod outcome_read_test_support;
+mod raw_custody_liability;
+#[cfg(test)]
+pub(crate) mod raw_liability_test_support;
+mod tool_outcome_liability;
 pub use budget_custody::{AdmissionBudgetCustodySnapshot, RetainedToolAdmissionCustodySnapshot};
 mod caller_dispatch_context;
 mod caller_wait;
@@ -88,6 +94,7 @@ mod obligation;
 mod participant;
 mod projection;
 mod retained_request;
+pub(crate) use retained_request::original_output_read_bounds;
 mod runtime_participant;
 mod runtime_replay;
 mod schema;
@@ -101,6 +108,8 @@ pub(crate) use security_participant_state::dispatch_ledger::{
     NativeCaptureBinding, VerifiedNativeCapture,
 };
 pub(crate) use security_participant_state::egress::projection_reference as security_participant_egress_projection_reference;
+#[cfg(feature = "admission-test-support")]
+pub use security_participant_state::knowledge::read_work_test_support::NativeInfluenceReadWorkFixture;
 pub(crate) use security_participant_state::nonce_preflight::projection_reference as security_participant_nonce_preflight_projection_reference;
 pub(crate) use security_participant_state::output::projection_reference as security_participant_output_projection_reference;
 pub(crate) use security_participant_state::projection_reference as security_participant_state_projection_reference;

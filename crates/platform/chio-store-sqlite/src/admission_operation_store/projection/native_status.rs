@@ -10,7 +10,7 @@ use chio_security_types::ports::FlowStateKey;
 /// tool bytes, certain finality, retry permission or current disclosure.
 pub(in crate::admission_operation_store) struct AuthenticatedNativeStatusSource<'tx, 'conn> {
     tx: &'tx Transaction<'conn>,
-    store: &'tx SqliteAdmissionOperationStore,
+    owner: &'tx SqliteServingOwner,
     trusted_now_unix_ms: u64,
     origin: crate::serving_owner::NativeSourceTransactionOrigin<'tx>,
     identity: StatusIdentity,
@@ -39,14 +39,15 @@ impl<'tx, 'conn> AuthenticatedNativeStatusSource<'tx, 'conn> {
             return Err(invariant("native status source changed its transaction"));
         }
         self.origin.verify(tx).map_err(map_owner_error)?;
-        if !self.origin.matches_owner(&self.store.serving_owner) {
+        if !self.origin.matches_owner(self.owner) {
             return Err(invariant(
                 "native status changed its transaction source owner",
             ));
         }
         let current = load_status_identity(
             tx,
-            self.store,
+            self.owner,
+            &self.origin,
             self.operation().binding().operation_id(),
             self.trusted_now_unix_ms,
         )?;
@@ -122,16 +123,37 @@ pub(in crate::admission_operation_store) fn authenticate_historical_native_statu
     operation_id: &AdmissionOperationId,
     trusted_now_unix_ms: u64,
 ) -> Result<AuthenticatedNativeStatusSource<'tx, 'conn>, AdmissionOperationStoreError> {
+    authenticate_native_status_source_for_owner(
+        tx,
+        &store.serving_owner,
+        origin,
+        operation_id,
+        trusted_now_unix_ms,
+    )
+}
+
+/// Cold migration borrows the actual unpublished owner after its private SQL
+/// lease is installed. No synthetic Store or fresh append permission is made.
+pub(in crate::admission_operation_store) fn authenticate_native_status_source_for_owner<
+    'tx,
+    'conn,
+>(
+    tx: &'tx Transaction<'conn>,
+    owner: &'tx SqliteServingOwner,
+    origin: &crate::serving_owner::NativeSourceTransactionOrigin<'tx>,
+    operation_id: &AdmissionOperationId,
+    trusted_now_unix_ms: u64,
+) -> Result<AuthenticatedNativeStatusSource<'tx, 'conn>, AdmissionOperationStoreError> {
     origin.verify(tx).map_err(map_owner_error)?;
-    if !origin.matches_owner(&store.serving_owner) {
+    if !origin.matches_owner(owner) {
         return Err(invariant(
             "native status source owner differs from anchored transaction",
         ));
     }
-    let identity = load_status_identity(tx, store, operation_id, trusted_now_unix_ms)?;
+    let identity = load_status_identity(tx, owner, origin, operation_id, trusted_now_unix_ms)?;
     Ok(AuthenticatedNativeStatusSource {
         tx,
-        store,
+        owner,
         trusted_now_unix_ms,
         origin: origin.fork_for_source(),
         identity,
@@ -140,11 +162,12 @@ pub(in crate::admission_operation_store) fn authenticate_historical_native_statu
 
 fn load_status_identity(
     tx: &Transaction<'_>,
-    store: &SqliteAdmissionOperationStore,
+    owner: &SqliteServingOwner,
+    origin: &crate::serving_owner::NativeSourceTransactionOrigin<'_>,
     operation_id: &AdmissionOperationId,
     now: u64,
 ) -> Result<StatusIdentity, AdmissionOperationStoreError> {
-    verify_active_owner(tx, &store.serving_owner, Some(&store.serving_owner.fence))?;
+    verify_active_owner(tx, owner, Some(&owner.fence))?;
     super::super::schema::authority_validation_time(tx, now)?;
     let stored = load_by_operation_id_tx(tx, operation_id)?
         .ok_or_else(|| invariant("native status operation absent"))?;
@@ -173,23 +196,22 @@ fn load_status_identity(
         .native_security_authority_binding()
         .ok_or_else(|| invariant("native status original authority absent"))?
         .clone();
-    if binding.store_uuid().as_str() != store.serving_owner.fence.store_uuid {
+    if binding.store_uuid().as_str() != owner.fence.store_uuid {
         return Err(invariant("native status changed its serving domain"));
     }
     let key = super::super::security_participant_state::dispatch_ledger::authenticated_status_key(
         tx, &operation, &original, &binding,
     )?;
-    let physical = store
-        .native_capture_tx(tx, operation_id, now)?
+    let physical = crate::budget_store::authenticate_native_budget_capture(
+        tx, owner, origin, &operation, &original,
+    )
+    .map_err(|error| invariant(error.to_string()))?;
+    physical
+        .verify(tx)
+        .map_err(|error| invariant(error.to_string()))?;
+    let current = load_by_operation_id_tx(tx, operation_id)?
         .ok_or_else(|| invariant("native status physical capture absent"))?;
-    let chio_kernel::budget_store::BudgetInvocationCaptureDecision::Captured(decision) =
-        &physical.decision
-    else {
-        return Err(invariant(
-            "native status lost its captured budget participant",
-        ));
-    };
-    if physical.operation.to_persisted() != operation.to_persisted() {
+    if current.operation.to_persisted() != operation.to_persisted() {
         return Err(invariant(
             "native status capture changed its exact operation",
         ));
@@ -230,7 +252,8 @@ fn load_status_identity(
         &apply_fence,
         terminal_committed_at_unix_ms,
     )?;
-    let capture_global_commit_sequence = exact_capture_global_reference(tx, &operation, decision)?;
+    let capture_global_commit_sequence =
+        exact_capture_global_reference(tx, &operation, physical.event())?;
     if capture_global_commit_sequence >= global_commit_sequence {
         return Err(invariant(
             "native status precedes its original physical capture",
@@ -282,7 +305,7 @@ fn exact_admission_global_reference(
 fn exact_capture_global_reference(
     tx: &Connection,
     operation: &AdmissionOperationV1,
-    decision: &chio_kernel::budget_store::BudgetHoldMutationDecision,
+    event: &chio_kernel::budget_store::BudgetMutationRecord,
 ) -> Result<u64, AdmissionOperationStoreError> {
     let dispatch = operation
         .dispatch_commit()
@@ -305,12 +328,8 @@ fn exact_capture_global_reference(
         .query(params![
             operation.binding().operation_id().as_str(),
             sqlite_i64(dispatch.committed_version, "status_capture_version")?,
-            decision.metadata.event_id.as_deref(),
-            decision
-                .metadata
-                .budget_commit_index
-                .map(|v| sqlite_i64(v, "status_capture_sequence"))
-                .transpose()?,
+            &event.event_id,
+            sqlite_i64(event.event_seq, "status_capture_sequence")?,
             &dispatch.store_fence.store_uuid,
             &dispatch.store_fence.lease_id,
             sqlite_i64(dispatch.store_fence.owner_epoch, "status_capture_epoch")?
@@ -346,6 +365,13 @@ pub(in crate::admission_operation_store) struct AuthenticatedNativeStatusAppend<
     append: super::super::commit_chain::AdmissionCommitAppendReceipt,
 }
 impl<'tx, 'conn> AuthenticatedNativeStatusAppend<'tx, 'conn> {
+    pub(in crate::admission_operation_store) fn matches_owner(
+        &self,
+        owner: &SqliteServingOwner,
+    ) -> bool {
+        std::ptr::eq(self.source.owner, owner) && self.source.origin.matches_owner(owner)
+    }
+
     pub(in crate::admission_operation_store) fn source(
         &self,
     ) -> &AuthenticatedNativeStatusSource<'tx, 'conn> {
@@ -356,7 +382,7 @@ impl<'tx, 'conn> AuthenticatedNativeStatusAppend<'tx, 'conn> {
         tx: &Transaction<'conn>,
     ) -> Result<(), AdmissionOperationStoreError> {
         self.source.verify(tx)?;
-        self.append.verify(tx, &self.source.store.serving_owner)?;
+        self.append.verify(tx, self.source.owner)?;
         if self.append.operation().to_persisted() != self.source.operation().to_persisted()
             || self.append.global_sequence() != self.source.global_commit_sequence()
             || self.append.recorded_at_unix_ms() != self.source.terminal_committed_at_unix_ms()

@@ -441,6 +441,59 @@ pub(in crate::admission_operation_store) fn apply(
     now: u64,
     original_process: Option<&dyn RecoveryProcessOriginPort>,
 ) -> Result<RecoveryCommandResponseV1, RecoveryCommandPortError> {
+    apply_in_origin(
+        tx,
+        (owner, None),
+        actor,
+        command,
+        deployment,
+        now,
+        original_process,
+    )
+}
+
+/// Setup supplies its actual pre-mutation cut across Selection and creation.
+pub(in crate::admission_operation_store) fn apply_with_origin(
+    tx: &Transaction<'_>,
+    writer: (
+        &SqliteServingOwner,
+        &crate::serving_owner::NativeSourceTransactionOrigin<'_>,
+    ),
+    actor: &AuthenticatedRecoveryActor,
+    command: &RecoveryCommandV1,
+    deployment: &RecoveryDeploymentV1,
+    now: u64,
+    original_process: Option<&dyn RecoveryProcessOriginPort>,
+) -> Result<RecoveryCommandResponseV1, RecoveryCommandPortError> {
+    let (owner, cut) = writer;
+    cut.verify(tx).map_err(map_owner_error)?;
+    if !cut.matches_owner(owner) {
+        return Err(invariant("setup creation changed its actual source owner").into());
+    }
+    apply_in_origin(
+        tx,
+        (owner, Some(cut)),
+        actor,
+        command,
+        deployment,
+        now,
+        original_process,
+    )
+}
+
+fn apply_in_origin(
+    tx: &Transaction<'_>,
+    writer: (
+        &SqliteServingOwner,
+        Option<&crate::serving_owner::NativeSourceTransactionOrigin<'_>>,
+    ),
+    actor: &AuthenticatedRecoveryActor,
+    command: &RecoveryCommandV1,
+    deployment: &RecoveryDeploymentV1,
+    now: u64,
+    original_process: Option<&dyn RecoveryProcessOriginPort>,
+) -> Result<RecoveryCommandResponseV1, RecoveryCommandPortError> {
+    let (owner, initial_cut) = writer;
     if let Some(response) = inspect_or_replay(tx, owner, actor, command, deployment)? {
         return Ok(response);
     }
@@ -544,14 +597,47 @@ pub(in crate::admission_operation_store) fn apply(
                     provider_finality: None,
                     provider_lookups: SafeInteger::ZERO,
                 };
-                origins::claim(tx, owner, &new)?;
-                save_workflow(tx, owner, &mut new, WorkflowWriteClass::Planning)?;
+                if using_original_owner_successor_format(tx)? {
+                    let prepared_cut;
+                    let cut = match initial_cut {
+                        Some(cut) => cut,
+                        None => {
+                            prepared_cut = owner
+                                .prepare_native_source_transaction(tx)
+                                .map_err(map_owner_error)?;
+                            &prepared_cut
+                        }
+                    };
+                    let mut original = prepare_original_owner_creation(
+                        tx,
+                        (owner, cut),
+                        actor,
+                        deployment,
+                        &new,
+                        now,
+                    )?;
+                    seal_original_owner_predecessor(tx, owner, &mut original)?;
+                    save_workflow(tx, owner, &mut new, WorkflowWriteClass::Planning)?;
+                    publish_original_owner_creation(tx, owner, original, &new)?;
+                } else {
+                    origins::claim(tx, owner, &new)?;
+                    save_workflow(tx, owner, &mut new, WorkflowWriteClass::Planning)?;
+                }
                 new
             }
         }
         body => {
             let (id, revision) = selector(body)?;
             let mut record = workflow_preview_tx(tx, actor, deployment, id)?;
+            if record.origin.is_none()
+                && matches!(body, RecoveryCommandBodyV1::CancelWorkflow { .. })
+            {
+                // Historical control keeps its exact retained source without
+                // acquiring a fresh original or effect authority.
+                using_original_owner_successor_format(tx)?;
+            } else {
+                require_current_original_owner(tx, &record)?;
+            }
             let held = historical_holds::effective(tx, &record)?.is_some();
             if revision.is_some_and(|revision| revision != record.revision) {
                 return Err(RecoveryCommandPortError::Conflict);

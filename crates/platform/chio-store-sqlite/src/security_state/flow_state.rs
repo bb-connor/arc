@@ -14,6 +14,7 @@ mod generations;
 mod input_join;
 mod labels;
 mod mutations;
+mod native_join_preview;
 #[cfg(test)]
 mod tests;
 mod transitions;
@@ -25,6 +26,7 @@ use epochs::{ensure_epoch_for_join, load_isolation_transition, validate_isolatio
 use generations::*;
 pub(crate) use input_join::{resolve_native_input_join, resolve_native_label_join};
 use labels::*;
+pub(crate) use native_join_preview::{preview_native_flow_join, NativeFlowJoinPreview};
 use transitions::{scoped_record_transition, scoped_transition_status};
 
 pub(crate) fn planned_native_egress_fence(request: &EgressFenceRequest) -> PortResult<EgressFence> {

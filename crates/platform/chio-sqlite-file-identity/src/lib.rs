@@ -7,6 +7,21 @@
 
 #![deny(unsafe_op_in_unsafe_fn)]
 
+mod write_capacity;
+pub use write_capacity::{
+    require_physical_write_capacity, write_capacity_policy_descriptor,
+    SqlitePhysicalDebtAmountData, SqliteWriteCapacityStageData,
+};
+
+mod write_liability;
+pub use write_liability::{
+    price_transaction_write_shape, write_price_algorithm_descriptor, SqliteFramePriceProfileData,
+    SqliteTransactionWritePriceData, SqliteTransactionWriteShapeData, SqliteTreeWriteShapeData,
+};
+
+mod write_geometry;
+pub use write_geometry::{main_database_write_geometry, SqliteWriteGeometryData};
+
 #[cfg(unix)]
 use std::ffi::{c_int, c_void, CStr};
 

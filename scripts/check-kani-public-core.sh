@@ -204,10 +204,7 @@ if [[ "$LIST_ONLY" -eq 1 ]]; then
   exit 0
 fi
 
-if ! cargo kani --version >/dev/null 2>&1; then
-  echo "Kani public core check requires cargo-kani" >&2
-  exit 1
-fi
+bash scripts/check-kani-toolchain.sh
 
 COUNT=0
 while IFS=$'\t' read -r harness unwinding_checks; do

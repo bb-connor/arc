@@ -170,12 +170,35 @@ fn shared_vectors() -> TestResult<serde_json::Value> {
     )
 }
 
+fn compare_shared_vectors(committed_json: &str) -> TestResult {
+    let committed: serde_json::Value = serde_json::from_str(committed_json)?;
+    let generated = shared_vectors()?;
+    assert_eq!(generated, committed);
+    assert_eq!(
+        canonical_json_bytes(&generated)?,
+        chio_core_types::canonical_json_bytes_from_str(committed_json)?,
+        "generated knowledge corpus changed its canonical bytes"
+    );
+    Ok(())
+}
+
 #[test]
 fn shared_vectors_match_the_committed_native_corpus() -> TestResult {
-    let committed: serde_json::Value = serde_json::from_slice(include_bytes!(
+    compare_shared_vectors(include_str!(
         "../../../../spec/vectors/recovery/v1/knowledge-contracts.json"
-    ))?;
-    assert_eq!(shared_vectors()?, committed);
+    ))
+}
+
+#[test]
+fn shared_corpus_rejects_ambiguous_raw_json() -> TestResult {
+    let committed = include_str!("../../../../spec/vectors/recovery/v1/knowledge-contracts.json");
+    let corpus: serde_json::Value = serde_json::from_str(committed)?;
+    let duplicated_schema = format!(
+        "{{\"schema\":{},{}",
+        corpus["schema"],
+        committed.strip_prefix('{').ok_or("corpus object")?
+    );
+    assert!(compare_shared_vectors(&duplicated_schema).is_err());
     Ok(())
 }
 

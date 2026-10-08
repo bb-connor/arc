@@ -23,6 +23,7 @@ mod native_nonce_preflight;
 mod native_output_join;
 mod native_security_binding;
 mod nonce_preflight;
+mod output_retention;
 mod projection;
 mod remote_projection;
 mod retained_request;
@@ -66,10 +67,16 @@ pub use nonce_preflight::{
     AdmissionNoncePreflightHoldDisposition, AdmissionNoncePreflightIdentityV1,
     AdmissionNoncePreflightRecoveryV1, NONCE_PREFLIGHT_BUDGET_PREFIX,
 };
+pub use output_retention::{
+    NativeOutputEnvelopeBoundsV1, NativeOutputOverflowDisposition, NativeOutputRetentionError,
+    NativeOutputRetentionProfileV1, NativeOutputRetentionSchema,
+};
 pub use projection::*;
 pub use remote_projection::*;
 #[cfg(test)]
 pub(crate) use retained_request::immutable_tool_request_hash;
+pub(crate) use retained_request::immutable_tool_request_hash_with_output_retention;
+#[cfg(test)]
 pub(crate) use retained_request::immutable_tool_request_hash_with_profile;
 pub(crate) use retained_request::AdmissionSecurityBindingV1;
 pub use retained_request::RetainedToolAdmissionRequestV1;

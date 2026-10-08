@@ -1041,8 +1041,8 @@ assert_boundary_file_rejected(
     "security image loses digest-pinned Rust base",
     Path("deploy/docker/Dockerfile.security-evidence-runner"),
     replace_once(
-        "rust:1.94.1-alpine3.22@sha256:667605141d2be37e8a27b3e5368fa388fcd3065ed2dbc2fe64665bce7254fc67",
-        "rust:1.94.1-alpine3.22",
+        "rust:1.95.0-alpine3.22@sha256:064dfc925d68d1a63f4fd2871bd7dc6e6ea56692989a487185855d62885d90aa",
+        "rust:1.95.0-alpine3.22",
     ),
     "image has an unpinned build stage",
 )
@@ -1050,9 +1050,9 @@ assert_boundary_file_rejected(
     "security image ignores a commented pinned-base decoy",
     Path("deploy/docker/Dockerfile.security-evidence-runner"),
     replace_once(
-        "FROM --platform=linux/amd64 rust:1.94.1-alpine3.22@sha256:667605141d2be37e8a27b3e5368fa388fcd3065ed2dbc2fe64665bce7254fc67",
-        "# FROM --platform=linux/amd64 rust:1.94.1-alpine3.22@sha256:667605141d2be37e8a27b3e5368fa388fcd3065ed2dbc2fe64665bce7254fc67\n"
-        "FROM --platform=linux/amd64 rust:1.94.1-alpine3.22",
+        "FROM --platform=linux/amd64 rust:1.95.0-alpine3.22@sha256:064dfc925d68d1a63f4fd2871bd7dc6e6ea56692989a487185855d62885d90aa",
+        "# FROM --platform=linux/amd64 rust:1.95.0-alpine3.22@sha256:064dfc925d68d1a63f4fd2871bd7dc6e6ea56692989a487185855d62885d90aa\n"
+        "FROM --platform=linux/amd64 rust:1.95.0-alpine3.22",
     ),
     "image has an unpinned build stage",
 )
@@ -1070,9 +1070,9 @@ assert_boundary_file_rejected(
     Path("deploy/docker/Dockerfile.security-evidence-runner"),
     replace_once(
         " && cmp \\\n"
-        "      /usr/local/rustup/toolchains/1.94.1-x86_64-unknown-linux-musl/"
+        "      /usr/local/rustup/toolchains/1.95.0-x86_64-unknown-linux-musl/"
         "bin/cargo-clippy \\\n"
-        "      /tmp/clippy-1.94.1-x86_64-unknown-linux-musl/clippy-preview/"
+        "      /tmp/clippy-1.95.0-x86_64-unknown-linux-musl/clippy-preview/"
         "bin/cargo-clippy \\\n",
         " && true \\\n",
     ),
@@ -1083,7 +1083,7 @@ assert_boundary_file_rejected(
     Path("deploy/docker/Dockerfile.security-evidence-runner"),
     replace_once(
         'test "$(cargo clippy --version)" = '
-        '"clippy 0.1.94 (e408947bfd 2026-03-25)"',
+        '"clippy 0.1.95 (59807616e1 2026-04-14)"',
         'test "$(cargo clippy --version | cut -d\' \' -f1)" = "clippy"',
     ),
     "image Rust component closure changed",
@@ -1181,6 +1181,44 @@ assert_boundary_file_rejected(
     replace_once('"--network",\n        "none"', '"--network",\n        "bridge"'),
     "trusted security container runner contract changed",
 )
+for label, original, replacement in (
+    (
+        "security runner accepts changed mount cardinality",
+        "or len(mounts) != len(expected_mounts)",
+        "or False",
+    ),
+    (
+        "security runner accepts unknown mount fields",
+        "or set(mount) != set(mount_field_types)",
+        "or False",
+    ),
+    (
+        "security runner accepts changed mount field types",
+        "type(mount[field]) is not field_type",
+        "False",
+    ),
+    (
+        "security runner accepts duplicate mount destinations",
+        "len(set(destinations)) != len(destinations)",
+        "False",
+    ),
+    (
+        "security runner accepts altered mount records",
+        'or sorted(mounts, key=lambda mount: mount["Destination"])',
+        'or sorted(expected_mounts, key=lambda mount: mount["Destination"])',
+    ),
+    (
+        "security runner accepts a writable source bind",
+        '"Destination": "/source",\n            "Mode": "",\n            "RW": False',
+        '"Destination": "/source",\n            "Mode": "",\n            "RW": True',
+    ),
+):
+    assert_boundary_file_rejected(
+        label,
+        Path("scripts/run-security-execution-container.py"),
+        replace_once(original, replacement),
+        "trusted security container mount inventory contract changed",
+    )
 assert_boundary_file_rejected(
     "security runner appends a later host-network override",
     Path("scripts/run-security-execution-container.py"),

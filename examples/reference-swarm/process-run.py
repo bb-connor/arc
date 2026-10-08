@@ -176,6 +176,7 @@ def main():
         "runner": run_report,
         "completed_run": run_verification,
         "qualification_complete": False,
+        "m5_acceptance_complete": False,
     }
     write(output / "run.json", result)
     print(json.dumps(result))

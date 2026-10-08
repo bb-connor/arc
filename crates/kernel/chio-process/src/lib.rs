@@ -11,9 +11,12 @@ mod binding;
 mod integrity_tests;
 #[cfg(feature = "mailboxes")]
 pub mod mailboxes;
+pub mod native_return_custody;
 mod recovery;
 mod registry;
-pub use recovery::RecoveryCallReservation;
+pub use recovery::{
+    ClosedUnusedRecoveryReservation, RecoveryCallReservation, UnusedRecoveryReservationClosureData,
+};
 mod routes;
 mod security;
 mod state_reader;

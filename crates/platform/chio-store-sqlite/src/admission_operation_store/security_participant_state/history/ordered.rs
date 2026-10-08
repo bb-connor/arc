@@ -43,6 +43,15 @@ pub(in crate::admission_operation_store::security_participant_state) fn validate
     connection: &Connection,
     authority: &str,
 ) -> Result<(), AdmissionOperationStoreError> {
+    journal_totals(connection, authority).map(|_| ())
+}
+
+/// Actual retained native bytes and journal slots. These totals are data and
+/// cannot discharge a pending source purpose or create an allocation.
+pub(in crate::admission_operation_store::security_participant_state) fn journal_totals(
+    connection: &Connection,
+    authority: &str,
+) -> Result<(u64, u64), AdmissionOperationStoreError> {
     let (mut count, mut bytes): (i64,i64) = connection.query_row("SELECT COUNT(*), COALESCE(SUM(length(canonical_record)),0) FROM security_participant_state_mutations WHERE security_authority_id = ?1", [authority], |row| Ok((row.get(0)?,row.get(1)?))).map_err(sqlite_error)?;
     if egress::exists(connection)? {
         let (extra_count,extra_bytes): (i64,i64) = connection.query_row("SELECT COUNT(*), COALESCE(SUM(length(canonical_record)),0) FROM security_participant_egress_events WHERE security_authority_id = ?1", [authority], |row| Ok((row.get(0)?,row.get(1)?))).map_err(sqlite_error)?;
@@ -101,7 +110,10 @@ pub(in crate::admission_operation_store::security_participant_state) fn validate
     if !(0..=65_536).contains(&count) || !(0..=67_108_864).contains(&bytes) {
         return Err(invalid("combined native journal exceeds bounds"));
     }
-    Ok(())
+    Ok((
+        u64::try_from(count).map_err(invalid)?,
+        u64::try_from(bytes).map_err(invalid)?,
+    ))
 }
 
 pub(in crate::admission_operation_store::security_participant_state) fn latest_totals(

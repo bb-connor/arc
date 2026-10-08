@@ -51,8 +51,8 @@ scored_files = [
 scored_viability_target = 80
 scored_tools = [
   "cargo_mutants=25.3.1",
-  "kani=0.67.0",
-  "rustc=1.93.0",
+  "kani=0.68.0",
+  "rustc=1.95.0",
 ]
 
 [gates.strict]
@@ -453,8 +453,8 @@ def proof_report(commit, run_id, run_attempt, run_number):
         "sample_size_requested": 10,
         "tools": {
             "cargo_mutants": "25.3.1",
-            "kani": "0.67.0",
-            "rustc": "1.93.0",
+            "kani": "0.68.0",
+            "rustc": "1.95.0",
         },
         "inputs": report_inputs(PROOF_INPUT_PATHS),
         "mutants": mutants,
@@ -690,7 +690,7 @@ proof_low_viability["aggregate"]["source_activation_met"] = True
 archive("proof-low-viability.zip", {"report.json": proof_low_viability})
 
 proof_tool_drift = deepcopy(valid_proof)
-proof_tool_drift["tools"]["kani"] = "0.68.0"
+proof_tool_drift["tools"]["kani"] = "0.67.0"
 archive("proof-tool-drift.zip", {"report.json": proof_tool_drift})
 
 proof_inventory_digest = deepcopy(valid_proof)
@@ -1571,15 +1571,15 @@ release_workflow = Path(".github/workflows/release-qualification.yml").read_text
 if "actions: read" not in release_workflow or "GH_TOKEN: ${{ github.token }}" not in release_workflow:
     raise SystemExit("release qualification lacks GitHub Actions read credentials")
 for msrv_contract in (
-    "rustup toolchain install 1.94.1 --profile minimal",
-    "cargo +1.94.1 build --workspace",
-    "cargo +1.94.1 test --workspace",
+    "rustup toolchain install 1.95.0 --profile minimal",
+    "cargo +1.95.0 build --workspace",
+    "cargo +1.95.0 test --workspace",
 ):
     if msrv_contract not in release_workflow:
         raise SystemExit(f"release qualification MSRV contract lacks {msrv_contract}")
 ci_workflow = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
-if 'toolchain: "1.94.1"' not in ci_workflow:
-    raise SystemExit("CI workspace MSRV toolchain is not Rust 1.94.1")
+if 'toolchain: "1.95.0"' not in ci_workflow:
+    raise SystemExit("CI workspace MSRV toolchain is not Rust 1.95.0")
 enterprise_workflow = Path(
     ".github/workflows/enterprise-hardening.yml"
 ).read_text(encoding="utf-8")

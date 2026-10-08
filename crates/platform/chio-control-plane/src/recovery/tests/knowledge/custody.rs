@@ -1,6 +1,9 @@
 //! Replays and release outcomes exercise the public native knowledge boundary.
 use super::*;
 
+#[path = "custody/quarantined_blob_capacity.rs"]
+mod quarantined_blob_capacity;
+
 fn retained_count(f: &KnowledgeFixture, prefix: &str) -> TestResult<i64> {
     Ok(
         rusqlite::Connection::open(f.f.path.join("admission.db"))?.query_row(
@@ -560,3 +563,6 @@ fn artifacts_publication_request_id_is_partitioned_by_authenticated_actor() -> T
     );
     Ok(())
 }
+
+#[path = "custody/release_basis.rs"]
+mod release_basis;

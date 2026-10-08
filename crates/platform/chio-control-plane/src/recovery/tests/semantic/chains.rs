@@ -8,20 +8,69 @@ pub(super) fn bundle(
     let mode = if mode == "held-expired" { "held" } else { mode };
     let kind = match mode {
         "read"
+        | "read-reviewed-constraints"
         | "read-weak-manifest"
         | "read-missing-status"
         | "annotated-read"
         | "annotated-read-weak-manifest"
+        | "trusted-annotated-read"
         | "annotated-disclosure"
         | "acl-subjects" => SemanticOperationKindV1::SupportRead,
         "project" => SemanticOperationKindV1::FieldProjection,
         _ => SemanticOperationKindV1::IssueWrite,
     };
     let mut primary = native_profile(scope.clone(), now, kind)?;
-    if mode == "read-missing-status" {
+    if mode == "read-reviewed-constraints" {
         let mut package = primary.package.body().clone();
         let mut contract = package.operations.as_slice()[0].clone();
-        contract.withheld_status = None;
+        contract.selectors = BoundedList::new(vec![
+            SemanticSelectorV1::Equals {
+                field: SemanticFieldId::new("title")?,
+                value: SemanticValueV1::Text {
+                    value: ProtectedText::new("package-only-title")?,
+                },
+            },
+            SemanticSelectorV1::TextBytesAtMost {
+                field: SemanticFieldId::new("body")?,
+                bytes: SafeInteger::new(32)?,
+            },
+        ])?;
+        package.operations = NonEmptyBoundedList::new(vec![contract])?;
+        primary.package = SignedSemanticPackageV1::sign(package, &primary.publisher)?;
+        let package = semantic_package_digest(primary.package.body())?;
+        let mut deployment = primary.deployment.body().clone();
+        let mut route = deployment.routes.as_slice()[0].clone();
+        route.package = package;
+        route.reviewed_overrides = BoundedList::new(vec![SemanticReviewedOverrideV1 {
+            selector_index: SafeInteger::new(0)?,
+            reason: ProtectedText::new("reviewed customer-support title exception")?,
+            fixture_digests: NonEmptyBoundedList::new(vec![semantic_content_digest(
+                &primary.payload,
+            )?])?,
+        }])?;
+        route.operator_selectors = BoundedList::new(vec![SemanticSelectorV1::Equals {
+            field: SemanticFieldId::new("title")?,
+            value: SemanticValueV1::Text {
+                value: ProtectedText::new("support ticket")?,
+            },
+        }])?;
+        deployment.packages = NonEmptyBoundedList::new(vec![package])?;
+        deployment.routes = NonEmptyBoundedList::new(vec![route])?;
+        primary.deployment = SignedSemanticDeploymentV1::sign(deployment, &primary.operator)?;
+        primary.plan.registry = semantic_registry_digest(primary.deployment.body())?;
+        primary.invocation.action.registry = primary.plan.registry;
+    }
+    if matches!(mode, "read-missing-status" | "trusted-annotated-read") {
+        let mut package = primary.package.body().clone();
+        let mut contract = package.operations.as_slice()[0].clone();
+        if mode == "read-missing-status" {
+            contract.withheld_status = None;
+        } else {
+            contract.external_influence = false;
+            primary.invocation.action.externally_influenced = false;
+            primary.invocation.action.influence =
+                semantic_content_digest(&(&primary.invocation.action.inputs, false))?;
+        }
         package.operations = NonEmptyBoundedList::new(vec![contract])?;
         primary.package = SignedSemanticPackageV1::sign(package, &primary.publisher)?;
         let package = semantic_package_digest(primary.package.body())?;
@@ -50,7 +99,10 @@ pub(super) fn bundle(
     }
     if matches!(
         mode,
-        "annotated-read" | "annotated-read-weak-manifest" | "annotated-disclosure"
+        "annotated-read"
+            | "annotated-read-weak-manifest"
+            | "trusted-annotated-read"
+            | "annotated-disclosure"
     ) {
         let mut deployment = primary.deployment.body().clone();
         let mut route = deployment.routes.as_slice()[0].clone();

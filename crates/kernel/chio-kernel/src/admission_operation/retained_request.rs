@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     AdmissionAuthorityProfileV1, AdmissionDigest, AdmissionOperationBindingV1,
-    AdmissionOperationStoreError, NativeSecurityAuthorityBindingV1,
+    AdmissionOperationStoreError, NativeOutputRetentionProfileV1, NativeSecurityAuthorityBindingV1,
 };
 use crate::kernel::MatchingGrant;
 use crate::tool_outcome::FrozenEvaluationStepV1;
@@ -17,6 +17,7 @@ const SCHEMA: &str = "chio.retained-tool-admission-request.v1";
 const SECURITY_SCHEMA: &str = "chio.retained-tool-admission-request.v2";
 const NATIVE_SECURITY_SCHEMA: &str = "chio.retained-tool-admission-request.v3";
 const AUTHORITY_PROFILE_SCHEMA: &str = "chio.retained-tool-admission-request.v4";
+const OUTPUT_RETENTION_SCHEMA: &str = "chio.retained-tool-admission-request.v5";
 const MAX_BYTES: usize = 262_144;
 
 mod security_binding;
@@ -30,7 +31,8 @@ pub(crate) use security_binding::AdmissionSecurityBindingV1;
 /// One-shot credentials and approval artifacts are deliberately not retained.
 /// This record must not be exposed on a public receipt or collector response.
 /// The API accepts unbound v1, identity-bound v2 and native-authority-bound v3
-/// artifacts, plus explicit original authority profiles in v4. No stored
+/// artifacts, explicit original authority profiles in v4 and original output
+/// retention data in v5. No stored
 /// version establishes a current trusted host context or claim authority.
 #[derive(Clone)]
 pub struct RetainedToolAdmissionRequestV1 {
@@ -60,6 +62,8 @@ struct RetainedRequestWire {
     security_binding: Option<AdmissionSecurityBindingV1>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     authority_profile: Option<AdmissionAuthorityProfileV1>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    native_output_retention: Option<NativeOutputRetentionProfileV1>,
 }
 
 #[derive(Serialize)]
@@ -160,6 +164,53 @@ pub(crate) fn immutable_tool_request_hash_with_profile(
     AdmissionDigest::try_new("immutable_request_hash", sha256_hex(&bytes)).map_err(Into::into)
 }
 
+/// Extends the original V4 request commitment without changing its preimage.
+/// This is configuration binding DATA, not capture or financing authority.
+pub(crate) fn immutable_tool_request_hash_with_output_retention(
+    request: &ToolCallRequest,
+    matching_grants: &[MatchingGrant<'_>],
+    post_return_steps: &[FrozenEvaluationStepV1],
+    security_binding: Option<&AdmissionSecurityBindingV1>,
+    authority_profile: Option<&AdmissionAuthorityProfileV1>,
+    native_output_retention: Option<&NativeOutputRetentionProfileV1>,
+) -> Result<AdmissionDigest, AdmissionOperationStoreError> {
+    let prior_request_hash = immutable_tool_request_hash_with_profile(
+        request,
+        matching_grants,
+        post_return_steps,
+        security_binding,
+        authority_profile,
+    )?;
+    let Some(retention) = native_output_retention else {
+        return Ok(prior_request_hash);
+    };
+    retention
+        .validate_original_plan(post_return_steps.len())
+        .map_err(invalid)?;
+    if authority_profile.is_none()
+        || security_binding
+            .and_then(AdmissionSecurityBindingV1::native_authority)
+            .is_none()
+    {
+        return Err(invalid(
+            "native output retention requires original native authority",
+        ));
+    }
+    #[derive(Serialize)]
+    struct RetentionBoundRequest<'a> {
+        schema: &'static str,
+        prior_request_hash: &'a AdmissionDigest,
+        native_output_retention: &'a NativeOutputRetentionProfileV1,
+    }
+    let bytes = canonical_json_bytes(&RetentionBoundRequest {
+        schema: "chio.tool-admission-request.v5",
+        prior_request_hash: &prior_request_hash,
+        native_output_retention: retention,
+    })
+    .map_err(invalid)?;
+    AdmissionDigest::try_new("immutable_request_hash", sha256_hex(&bytes)).map_err(Into::into)
+}
+
 impl RetainedToolAdmissionRequestV1 {
     fn request_without_transient_credentials(request: &ToolCallRequest) -> ToolCallRequest {
         // Explicit construction makes additions to ToolCallRequest require a
@@ -226,14 +277,43 @@ impl RetainedToolAdmissionRequestV1 {
         security_binding: Option<&AdmissionSecurityBindingV1>,
         authority_profile: Option<&AdmissionAuthorityProfileV1>,
     ) -> Result<Self, AdmissionOperationStoreError> {
+        Self::from_admission_with_output_retention(
+            request,
+            matching_grants,
+            post_return_steps,
+            security_binding,
+            authority_profile,
+            None,
+        )
+    }
+
+    pub(crate) fn from_admission_with_output_retention(
+        request: &ToolCallRequest,
+        matching_grants: &[MatchingGrant<'_>],
+        post_return_steps: &[FrozenEvaluationStepV1],
+        security_binding: Option<&AdmissionSecurityBindingV1>,
+        authority_profile: Option<&AdmissionAuthorityProfileV1>,
+        native_output_retention: Option<&NativeOutputRetentionProfileV1>,
+    ) -> Result<Self, AdmissionOperationStoreError> {
+        if let Some(retention) = native_output_retention {
+            retention
+                .validate_original_plan(post_return_steps.len())
+                .map_err(invalid)?;
+        }
         let request = Self::request_without_transient_credentials(request);
         let wire = RetainedRequestWire {
-            schema: Self::schema(security_binding, authority_profile).to_owned(),
+            schema: if native_output_retention.is_some() {
+                OUTPUT_RETENTION_SCHEMA
+            } else {
+                Self::schema(security_binding, authority_profile)
+            }
+            .to_owned(),
             request: Box::new(request),
             matching_grant_indices: matching_grants.iter().map(|grant| grant.index).collect(),
             post_return_steps: post_return_steps.to_vec(),
             security_binding: security_binding.cloned(),
             authority_profile: authority_profile.cloned(),
+            native_output_retention: native_output_retention.cloned(),
         };
         let canonical = canonical_json_bytes(&wire).map_err(invalid)?;
         Self::from_canonical_bytes(&canonical)
@@ -247,10 +327,28 @@ impl RetainedToolAdmissionRequestV1 {
         }
         let wire: Box<RetainedRequestWire> = serde_json::from_slice(bytes).map_err(invalid)?;
         let request = &wire.request;
-        let expected_schema = Self::schema(
-            wire.security_binding.as_ref(),
-            wire.authority_profile.as_ref(),
-        );
+        let expected_schema = if let Some(retention) = wire.native_output_retention.as_ref() {
+            retention
+                .validate_original_plan(wire.post_return_steps.len())
+                .map_err(invalid)?;
+            if wire.authority_profile.is_none()
+                || wire
+                    .security_binding
+                    .as_ref()
+                    .and_then(AdmissionSecurityBindingV1::native_authority)
+                    .is_none()
+            {
+                return Err(invalid(
+                    "native output retention lost original native authority",
+                ));
+            }
+            OUTPUT_RETENTION_SCHEMA
+        } else {
+            Self::schema(
+                wire.security_binding.as_ref(),
+                wire.authority_profile.as_ref(),
+            )
+        };
         if wire.schema != expected_schema
             || request.dpop_proof.is_some()
             || request.execution_nonce.is_some()
@@ -308,9 +406,42 @@ impl RetainedToolAdmissionRequestV1 {
         self.wire.authority_profile.as_ref()
     }
 
-    /// Frozen historical verifier identities, never authority for new work.
-    pub(crate) fn post_return_steps(&self) -> &[FrozenEvaluationStepV1] {
+    /// Complete original producer bounds from retained DATA. Actual store
+    /// provenance, original operation/lease and funded liabilities are separate.
+    #[must_use]
+    pub fn native_output_retention(&self) -> Option<&NativeOutputRetentionProfileV1> {
+        self.wire.native_output_retention.as_ref()
+    }
+
+    /// Original frozen verifier identities as read-only DATA. The native store
+    /// independently authenticates retained source, operation and funded phase
+    /// purposes before using them. This view grants no execution or loan.
+    #[must_use]
+    pub fn post_return_steps(&self) -> &[FrozenEvaluationStepV1] {
         &self.wire.post_return_steps
+    }
+
+    /// Validate only the closed original bounded materialization DATA shape.
+    /// A decoded request can satisfy this check, so it grants no admission,
+    /// finishing allocation, dispatch or replacement of a historical profile.
+    pub fn validate_bounded_native_materializer(&self) -> Result<(), AdmissionOperationStoreError> {
+        if self.native_security_authority_binding().is_none() {
+            return Err(AdmissionOperationStoreError::Invariant(
+                "bounded materializer requires original native selection".into(),
+            ));
+        }
+        let profile = self.native_output_retention().ok_or_else(|| {
+            AdmissionOperationStoreError::Invariant(
+                "bounded materializer original profile is absent".into(),
+            )
+        })?;
+        let expected = profile.materialization_identity()?;
+        if self.post_return_steps() != [expected] {
+            return Err(AdmissionOperationStoreError::Invariant(
+                "bounded materializer differs from the original frozen step".into(),
+            ));
+        }
+        Ok(())
     }
 
     /// Historical authority selection only. It cannot authorize a new write.
@@ -385,12 +516,13 @@ impl RetainedToolAdmissionRequestV1 {
         &self,
         request: &ToolCallRequest,
     ) -> Result<(), AdmissionOperationStoreError> {
-        let candidate = Self::from_admission_with_profile(
+        let candidate = Self::from_admission_with_output_retention(
             request,
             &self.matching_grants()?,
             &self.wire.post_return_steps,
             self.wire.security_binding.as_ref(),
             self.wire.authority_profile.as_ref(),
+            self.wire.native_output_retention.as_ref(),
         )?;
         if candidate.canonical != self.canonical {
             return Err(invalid(
@@ -418,13 +550,14 @@ impl RetainedToolAdmissionRequestV1 {
         &self,
         binding: &AdmissionOperationBindingV1,
     ) -> Result<(), AdmissionOperationStoreError> {
-        Self::validate_request_binding(
+        Self::validate_request_binding_with_output_retention(
             binding,
             &self.wire.request,
             &self.matching_grants()?,
             &self.wire.post_return_steps,
             self.wire.security_binding.as_ref(),
             self.wire.authority_profile.as_ref(),
+            self.wire.native_output_retention.as_ref(),
         )
     }
 
@@ -436,15 +569,36 @@ impl RetainedToolAdmissionRequestV1 {
         security_binding: Option<&AdmissionSecurityBindingV1>,
         authority_profile: Option<&AdmissionAuthorityProfileV1>,
     ) -> Result<(), AdmissionOperationStoreError> {
-        let capability_hash =
-            sha256_hex(&canonical_json_bytes(&request.capability).map_err(invalid)?);
-        let action_hash = sha256_hex(&canonical_json_bytes(&request.arguments).map_err(invalid)?);
-        let request_hash = immutable_tool_request_hash_with_profile(
+        Self::validate_request_binding_with_output_retention(
+            binding,
             request,
             matching_grants,
             post_return_steps,
             security_binding,
             authority_profile,
+            None,
+        )
+    }
+
+    fn validate_request_binding_with_output_retention(
+        binding: &AdmissionOperationBindingV1,
+        request: &ToolCallRequest,
+        matching_grants: &[MatchingGrant<'_>],
+        post_return_steps: &[FrozenEvaluationStepV1],
+        security_binding: Option<&AdmissionSecurityBindingV1>,
+        authority_profile: Option<&AdmissionAuthorityProfileV1>,
+        native_output_retention: Option<&NativeOutputRetentionProfileV1>,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        let capability_hash =
+            sha256_hex(&canonical_json_bytes(&request.capability).map_err(invalid)?);
+        let action_hash = sha256_hex(&canonical_json_bytes(&request.arguments).map_err(invalid)?);
+        let request_hash = immutable_tool_request_hash_with_output_retention(
+            request,
+            matching_grants,
+            post_return_steps,
+            security_binding,
+            authority_profile,
+            native_output_retention,
         )?;
         if binding.kind() != super::AdmissionOperationKind::ToolDispatch
             || binding.request_id().as_str() != request.request_id

@@ -77,6 +77,24 @@ pub(super) fn proposal_disposition(
     Ok(value)
 }
 
+pub(super) fn proposal_archive_source(
+    tx: &Connection,
+    proposal: &StoredPolicyMaintenanceProposalV1,
+) -> Result<Option<(protected::ProtectedSourceReference, u64)>, AdmissionOperationStoreError> {
+    let Some(archive) = proposal_disposition(tx, proposal)? else {
+        return Ok(None);
+    };
+    let key = terminal_key(
+        &proposal.proposal.scope,
+        "archived-proposal",
+        proposal.proposal.proposal_id.as_str(),
+    )?;
+    Ok(Some((
+        protected::source_reference(tx, &key)?,
+        archive.archived_at_unix_ms.get(),
+    )))
+}
+
 impl SqliteAdmissionOperationStore {
     /// Current Maintain and the current evidence audience retire one active
     /// review slot. Every report, proposal and artifact pin remains retained.
@@ -182,14 +200,50 @@ impl SqliteAdmissionOperationStore {
     /// ownership contract. Queue archival cannot release any artifact bytes.
     pub fn reclaim_archived_policy_evidence(
         &self,
-        _actor: &AuthenticatedRecoveryActor,
-        _reader: &AuthenticatedRecoveryActor,
-        _id: &ReviewId,
-        _fence: &StoreMutationFence,
-        _now: u64,
+        actor: &AuthenticatedRecoveryActor,
+        reader: &AuthenticatedRecoveryActor,
+        id: &ReviewId,
+        fence: &StoreMutationFence,
+        now: u64,
     ) -> Result<(), AdmissionOperationStoreError> {
-        Err(refused(
-            "terminal proposal evidence reclamation unavailable",
-        ))
+        use super::super::super::knowledge::references::ProductEvidenceOwner;
+        use super::super::evidence_reclamation::{
+            append_reclamation, product_reclamation_source, ProductReclamationWriter,
+        };
+        self.recovery_mutation(actor, fence, now, |tx, profile, now| {
+            if actor.permission() != RecoveryPermission::Maintain {
+                return Err(AdmissionOperationStoreError::RecoveryAuthorityDenied);
+            }
+            require_finite_intake_audience(actor, profile)?;
+            let proposal = stored_proposal(tx, actor.scope(), id)?;
+            let current =
+                proposals::retained_label(tx, actor, reader, profile, &proposal.proposal, now)?;
+            require_clearance(
+                actor,
+                profile,
+                &current
+                    .join_restrictions(&proposal.label)
+                    .map_err(refused)?,
+            )?;
+            let owner = ProductEvidenceOwner::Proposal {
+                scope: actor.scope().clone(),
+                id: id.clone(),
+                digest: proposal.digest,
+            };
+            if product_reclamation_source(tx, &owner)?.is_some() {
+                // Authentic retained terminal readback appends no writer or owner.
+                require_product_evidence_owners(tx, &owner)?;
+                return Ok(());
+            }
+            let writer =
+                ProductReclamationWriter::new(tx, &self.serving_owner, actor, reader, profile, now);
+            let proof = append_reclamation(writer, &proposal)?;
+            super::super::super::knowledge::retire_product_evidence(
+                tx,
+                &self.serving_owner,
+                proof,
+            )?;
+            require_product_evidence_owners(tx, &owner)
+        })
     }
 }

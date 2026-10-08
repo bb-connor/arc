@@ -29,6 +29,7 @@ pub(in crate::admission_operation_store) use baseline::{
     PreparedNewArtifactReferenceBaseline,
 };
 pub(in crate::admission_operation_store) use bucket::ReferenceBaselineSource;
+pub(in crate::admission_operation_store::knowledge) use collected::collection_sources as verify_collected_publication_sources;
 pub(in crate::admission_operation_store) use collected::{
     collected_publication_closure, CollectedPublicationReferenceClosure,
 };
@@ -39,8 +40,10 @@ pub(in crate::admission_operation_store) use prepare::{
 pub(in crate::admission_operation_store) use prepared::{
     PreparedReferenceUpdates, ReferenceWriteFootprint, StagedReferenceUpdate,
 };
+pub(in crate::admission_operation_store::knowledge) use readback::require_product_retirement_custody;
 pub(in crate::admission_operation_store) use readback::{
     require_active_reference_owner, require_new_artifact_reference_baseline,
+    require_retired_reference_owner,
 };
 #[cfg(feature = "admission-test-support")]
 pub(in crate::admission_operation_store) use reader::active_product_evidence_owner_count;

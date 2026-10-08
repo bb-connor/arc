@@ -53,7 +53,7 @@ notify = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 wasmparser = { version = "0.221", optional = true }
-wasmtime = { version = "46.0.2", optional = true }
+wasmtime = { version = "48.0.5", optional = true }
 pollster = { version = "0.4", optional = true }
 # `arbitrary` is gated behind the `fuzz` feature so production builds stay
 # free of fuzz instrumentation. Pulled in by

@@ -134,6 +134,23 @@ COMPATIBILITY_LABELS = {
         "crates/products/chio-cli/tests/fixtures/process-worker-outcomes/v2-policy-bound-budget.json",
     },
 }
+# These complete data lines preserve existing versioned report and corpus
+# interfaces. They do not permit comments, changed values or other symbols.
+RETAINED_INTERFACE_DATA_LINES = {
+    "scripts/check-corpus-metadata.sh": frozenset({
+        json.dumps(legacy_label(3, "_counterexample", padded=True)) + ': "policy_counterexample",',
+        json.dumps(legacy_label(2, "_verdict_divergence", padded=True)) + ': "sdk_verdict_divergence",',
+    }),
+    "examples/reference-swarm/process-run.py": frozenset({
+        json.dumps(LEGACY_ACCEPTANCE_KEY) + ": False,",
+    }),
+    "scripts/tests/legacy-machine-interfaces.test.py": frozenset({
+        "result = self.check_corpus_source(" + json.dumps(legacy_label(3, "_counterexample", padded=True)) + ")",
+        "result = self.check_corpus_source(" + json.dumps(legacy_label(2, "_verdict_divergence", padded=True)) + ")",
+        "self.assertIn(" + json.dumps(LEGACY_ACCEPTANCE_KEY) + ", report)",
+        "self.assertIs(report[" + json.dumps(LEGACY_ACCEPTANCE_KEY) + "], False)",
+    }),
+}
 SEVERITY_VALUE = re.compile(
     r"((?:\bseverity|\bpriority)[\"']?(?:\s*:\s*&?[a-z_][a-z0-9_:<> ]{0,24})?\s*[:=]\s*[\"']?)"
     r"P[0-5](?:(?:[-/, ]+)P[0-5])*(?=[\"';,\s]|$)", re.I,
@@ -717,6 +734,19 @@ def c_comment_lines(text, relative):
                 previous_token = word
                 line_break = False
             else:
+                if javascript and text[position:position + 2] in {"++", "--"}:
+                    # Postfix updates finish a value. A preceding line break
+                    # starts a prefix update and permits a regex operand.
+                    expression_position = expression_position or line_break
+                    statement_position = False
+                    pending_body = None
+                    pending_control = False
+                    module_declaration = False
+                    pending_label = None
+                    line_break = False
+                    previous_token = text[position:position + 2]
+                    position += 2
+                    continue
                 if javascript and text.startswith("=>", position):
                     pending_body = False
                     expression_position = True
@@ -941,6 +971,9 @@ def mask_semantic_values(relative, text):
 
 def has_planning_label(relative, line, *, prose=None):
     if not POTENTIAL_LABEL.search(line):
+        return False
+    if (line.strip() in RETAINED_INTERFACE_DATA_LINES.get(relative.as_posix(), ())
+            and not (prose if prose is not None else comment_text(relative, line)).strip()):
         return False
     text = mask_semantic_values(relative, line)
     if any(pattern.search(text) for pattern in CONTENT_LABELS):

@@ -35,6 +35,11 @@ pub(in crate::admission_operation_store) enum ReferenceOwner {
         scope: RecoveryScopeV1,
         release: ReleaseId,
     },
+    ConfinedInputs {
+        scope: RecoveryScopeV1,
+        request: RequestId,
+        boundary: EvidenceRef,
+    },
     ProductReport {
         scope: RecoveryScopeV1,
         id: EvidenceRef,
@@ -70,6 +75,7 @@ impl ReferenceOwner {
             | Self::PendingApproval { scope, .. }
             | Self::ArtifactRelease { scope, .. }
             | Self::CheckpointRestore { scope, .. }
+            | Self::ConfinedInputs { scope, .. }
             | Self::ProductReport { scope, .. }
             | Self::ProductProposal { scope, .. }
             | Self::ArchivePreparation { scope, .. }

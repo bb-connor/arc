@@ -26,7 +26,7 @@ pub use restore_test_support::{
 mod tests;
 
 pub(super) fn pins(
-    tx: &Transaction<'_>,
+    tx: &Connection,
     key: &str,
     reference: &ArtifactVersionRefV1,
 ) -> Result<bool, AdmissionOperationStoreError> {
@@ -48,7 +48,7 @@ pub(super) fn pins(
 }
 
 pub(super) fn restore_pins(
-    tx: &Transaction<'_>,
+    tx: &Connection,
     key: &str,
     reference: &ArtifactVersionRefV1,
 ) -> Result<bool, AdmissionOperationStoreError> {
@@ -152,8 +152,24 @@ impl SqliteAdmissionOperationStore {
             // upgrade, preserve the previous valid legacy current envelope.
             if let Some(old) = &old {
                 retain_checkpoint_revision(&tx, &self.serving_owner, old)?;
+                if !retirement::revision_is_retired(&tx, old)? {
+                    super::reference_custody::retain_checkpoint_references(
+                        &tx,
+                        &self.serving_owner,
+                        &head::checkpoint_revision_key(
+                            &old.scope,
+                            &old.checkpoint,
+                            old.revision.get(),
+                        )?,
+                    )?;
+                }
             }
             retain_checkpoint_revision(&tx, &self.serving_owner, &checkpoint)?;
+            super::reference_custody::retain_checkpoint_references(
+                &tx,
+                &self.serving_owner,
+                &head::checkpoint_revision_key(actor.scope(), id, checkpoint.revision.get())?,
+            )?;
             save(&tx, &self.serving_owner, actor.scope(), &key, &checkpoint)?;
             let head = VerifiedCheckpointHeadWrite::new(
                 &tx,

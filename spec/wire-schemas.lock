@@ -5340,6 +5340,11 @@ files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
 first_seen = "de84fc306e"
 
 [[schema]]
+value = "chio.semantic.native-input-origin.v1"
+files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
+first_seen = "59138e12ed"
+
+[[schema]]
 value = "chio.semantic.native-output-origin.v1"
 files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
 first_seen = "de84fc306e"

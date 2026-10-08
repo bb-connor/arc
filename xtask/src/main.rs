@@ -51,10 +51,10 @@
 //! `[go]`). The xtask shells out to
 //! `bash sdks/go/chio-go-http/scripts/regen-types.sh`, which bundles the
 //! schemas into a single OpenAPI 3.0 document and feeds them to
-//! `oapi-codegen v2.4.1`, writing to `sdks/go/chio-go-http/types.go`. With
-//! `--check` the xtask additionally runs `git diff --exit-code` against the
-//! generated file so the spec-drift CI lane catches drift between the
-//! committed bytes and a fresh regeneration.
+//! `oapi-codegen v2.4.1`. Normal generation writes
+//! `sdks/go/chio-go-http/types.go`. With `--check`, the xtask generates a
+//! private temporary file and compares its bytes with the maintained output.
+//! The maintained file remains unchanged on success, drift or failure.
 //!
 //! `codegen --lang ts [--check]` regenerates the schema-derived TypeScript
 //! types under `sdks/typescript/packages/conformance/src/_generated/index.ts`

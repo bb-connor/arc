@@ -252,3 +252,62 @@ async fn large_owned_future_completes_on_default_worker_stack() -> TestResult {
     assert_eq!(executor.capacity.available_permits(), WORKERS);
     Ok(())
 }
+
+#[tokio::test(flavor = "current_thread")]
+async fn published_native_reply_releases_the_exact_principal_capacity() -> TestResult {
+    let executor = CommandExecutor::new();
+    tokio::time::timeout(Duration::from_secs(2), executor.ready()).await??;
+    let principal = "checked-authority:published-reply".to_owned();
+    let (release, pending) = oneshot::channel();
+    let (entered, started) = oneshot::channel();
+    let held = executor.try_submit(principal.clone(), None, async move {
+        let _ = entered.send(());
+        pending
+            .await
+            .map_err(|_| RecoveryRuntimeError::Unavailable)?;
+        Ok(())
+    })?;
+    tokio::time::timeout(Duration::from_secs(2), started).await??;
+
+    let gate = Arc::new(RefusalGate::default());
+    let observer_gate = gate.clone();
+    let (published, observed_publication) = mpsc::channel();
+    *executor
+        .reply_publication_observer
+        .lock()
+        .map_err(|_| "publication observer poisoned")? = Some(Arc::new(move |_| {
+        let _ = published.send(());
+        observer_gate.pause();
+    }));
+    let completed = executor.try_submit(principal.clone(), None, async { Ok(47) })?;
+    // The owning future has completed, and its result was actually published.
+    // Pause only after publication, so this premise has no scheduling race.
+    observed_publication.recv_timeout(Duration::from_secs(2))?;
+    assert_eq!(
+        tokio::time::timeout(Duration::from_secs(2), completed).await???,
+        47
+    );
+    *executor
+        .reply_publication_observer
+        .lock()
+        .map_err(|_| "publication observer poisoned")? = None;
+    let next = executor.try_submit(principal, None, async { Ok(59) });
+    let admitted = next.is_ok();
+    gate.release();
+    let _ = release.send(());
+    tokio::time::timeout(Duration::from_secs(2), held).await???;
+    eprintln!("PUBLISHED_NATIVE_REPLY next_same_principal_admitted={admitted}");
+    assert!(
+        !gate.timed_out.load(Ordering::SeqCst),
+        "publication observer timed out"
+    );
+    assert!(
+        admitted,
+        "a published completed job still retained its principal capacity"
+    );
+    assert_eq!(
+        tokio::time::timeout(Duration::from_secs(2), next?).await???,
+        59
+    );
+    Ok(())
+}

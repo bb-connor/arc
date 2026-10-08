@@ -491,12 +491,76 @@ pub(super) fn retire_cancelled(
     persist_retirement(tx, owner, record, None).map(|_| ())
 }
 
+/// Only the native absence/compensation owner can retire a materialized lease.
+/// This preserves the physical workflow, acknowledged reservation and charges.
+pub(super) fn retire_no_future_native_admission(
+    tx: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    proof: &super::original_owner::AuthenticatedNoFutureNativeAdmission<'_, '_, '_>,
+) -> Result<bool, AdmissionOperationStoreError> {
+    proof.verify(tx)?;
+    if !proof.matches_owner(owner)
+        || load_allocation(tx, &proof.record().scope, &proof.record().workflow_id)?.is_none()
+    {
+        return Err(invariant(
+            "original retirement lacks its actual allocated serving owner",
+        ));
+    }
+    persist_retirement(tx, owner, proof.record(), None)
+}
+
+pub(super) fn require_live_allocation(
+    tx: &Connection,
+    record: &RecoveryWorkflowRecordV1,
+) -> Result<(), AdmissionOperationStoreError> {
+    let allocation = load_allocation(tx, &record.scope, &record.workflow_id)?
+        .ok_or_else(|| invariant("unused setup lacks an authentic live workflow allocation"))?;
+    if allocation.retirement.is_some() {
+        return Err(invariant("unused setup allocation was already retired"));
+    }
+    Ok(())
+}
+
+pub(super) fn require_no_future_retired_allocation(
+    tx: &Connection,
+    record: &RecoveryWorkflowRecordV1,
+) -> Result<(), AdmissionOperationStoreError> {
+    let allocation = load_allocation(tx, &record.scope, &record.workflow_id)?
+        .ok_or_else(|| invariant("original closure lost its retained workflow allocation"))?;
+    let retirement = allocation
+        .retirement
+        .ok_or_else(|| invariant("original closure retains an active workflow allocation"))?;
+    if retirement.workflow_version != record.revision
+        || retirement.captured_terminal.is_some()
+        || retirement.workflow_digest
+            != event(
+                tx,
+                &workflow_key(&record.scope, &record.workflow_id)?,
+                record.revision.get(),
+            )?
+            .1
+    {
+        return Err(invariant(
+            "original no-future retirement changed its physical closure source",
+        ));
+    }
+    Ok(())
+}
+
 fn require_terminal_retirement(
     tx: &Connection,
     physical: &RecoveryWorkflowRecordV1,
     expected: &ProjectionDigest,
 ) -> Result<(), AdmissionOperationStoreError> {
-    super::super::historical_holds::require_unheld(tx, physical)?;
+    if super::super::historical_holds::effective(tx, physical)?.is_some() {
+        if super::super::historical_holds::blocks_original_private_settlement(tx, physical)?
+            || !super::super::terminal_custody::private_settlement_committed(tx, physical)?
+        {
+            return Err(invariant(
+                "captured terminal retirement retains its historical hold",
+            ));
+        }
+    }
     auxiliary_captured_terminal(tx, physical)?
         .ok_or_else(|| invariant("retired captured workflow lost terminal custody"))?;
     let key = super::super::terminal_custody::terminal_key(&physical.scope, &physical.workflow_id)?;

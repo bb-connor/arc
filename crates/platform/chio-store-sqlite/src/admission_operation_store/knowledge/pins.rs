@@ -1,6 +1,9 @@
 //! Distinct pin owners retain custody without interpreting caller text as authority.
 use super::*;
 
+#[cfg(feature = "admission-test-support")]
+mod legacy_custody_test_support;
+
 #[derive(Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "owner", rename_all = "snake_case", deny_unknown_fields)]
 pub(super) enum PinOwner {
@@ -169,7 +172,7 @@ pub(super) fn retain(
         {
             return Err(refused("pin owner was rebound"));
         }
-        return Ok(());
+        return super::reference_custody::retain_pin_references(tx, serving_owner, &key);
     }
     save(
         tx,
@@ -184,7 +187,8 @@ pub(super) fn retain(
             state: PinState::Active,
             retirement: None,
         },
-    )
+    )?;
+    super::reference_custody::retain_pin_references(tx, serving_owner, &key)
 }
 
 /// Historical flat pins remain conservative collection barriers. Their text
@@ -194,7 +198,7 @@ pub(super) fn reference(
     key: &str,
 ) -> Result<Option<ArtifactVersionRefV1>, AdmissionOperationStoreError> {
     let row = protected::raw_checked(tx, key)?.ok_or_else(|| refused("pin disappeared"))?;
-    protected::source_reference(tx, key)?;
+    let source = protected::source_reference(tx, key)?;
     if row.kind != "command" || row.version == 0 {
         return Err(refused("pin protected identity changed"));
     }
@@ -217,10 +221,26 @@ pub(super) fn reference(
         return Ok((pin.state == PinState::Active).then_some(pin.reference));
     }
     let reference: Option<ArtifactVersionRefV1> = protected::decode(&row.payload)?;
+    if !key.starts_with(&format!("knowledge-pin:{}:", row.scope)) {
+        return Err(refused("historical pin source changed its scope"));
+    }
     if let Some(reference) = &reference {
         let scope = scope_key(&reference.scope)?;
         if row.scope != scope || !key.starts_with(&format!("knowledge-pin:{scope}:")) {
             return Err(refused("historical pin scope changed"));
+        }
+    }
+    // The closed predecessor writer never cleared or rebound a flat pin.
+    // Matching only the first and current values would conceal A -> B -> A.
+    // Authenticate every retained version without a lifetime scan ceiling.
+    for version in 1..=source.version() {
+        if !protected::matches_historical_source_command_payload(
+            tx,
+            &source,
+            version,
+            &row.payload,
+        )? {
+            return Err(refused("historical pin changed its original custody"));
         }
     }
     Ok(reference)
@@ -280,5 +300,6 @@ pub(super) fn retire_operator(
         retired_at: SafeInteger::new(now).map_err(refused)?,
     });
     protected::verify_source_reference(tx, &previous)?;
-    save(tx, serving_owner, actor.scope(), &key, &pin)
+    save(tx, serving_owner, actor.scope(), &key, &pin)?;
+    super::reference_retirement::retire_pin_references(tx, serving_owner, &key)
 }

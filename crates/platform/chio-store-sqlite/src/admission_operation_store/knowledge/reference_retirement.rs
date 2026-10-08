@@ -1,5 +1,6 @@
 //! Retirement is minted from a closed native terminal source, never from absence.
-use super::references::{ReferenceOwner, SourceAnchor};
+use super::super::product::evidence_reclamation::VerifiedProductEvidenceReclamation;
+use super::references::{ProductEvidenceOwner, ReferenceOwner, SourceAnchor};
 use super::*;
 use std::ops::Deref;
 
@@ -9,18 +10,64 @@ pub(in crate::admission_operation_store) struct VerifiedKnowledgeReferenceRetire
     references: Vec<ArtifactVersionRefV1>,
     original: protected::ProtectedSourceReference,
     terminal: protected::ProtectedSourceReference,
-    evidence: TerminalEvidence,
+    evidence: TerminalEvidence<'tx, 'conn>,
 }
 
-enum TerminalEvidence {
+enum TerminalEvidence<'tx, 'conn> {
     Publication,
     OperatorPin,
-    Checkpoint { envelope: CanonicalPayloadDigest },
-    Restore { envelope: CanonicalPayloadDigest },
-    ArtifactRelease { envelope: CanonicalPayloadDigest },
+    Checkpoint {
+        envelope: CanonicalPayloadDigest,
+    },
+    Restore {
+        envelope: CanonicalPayloadDigest,
+    },
+    ArtifactRelease {
+        envelope: CanonicalPayloadDigest,
+    },
+    ProductProposal {
+        proof: VerifiedProductEvidenceReclamation<'tx, 'conn>,
+    },
 }
 
 impl<'tx, 'conn> VerifiedKnowledgeReferenceRetirement<'tx, 'conn> {
+    pub(super) fn product_proposal(
+        tx: &'tx Transaction<'conn>,
+        proof: VerifiedProductEvidenceReclamation<'tx, 'conn>,
+    ) -> Result<Self, AdmissionOperationStoreError> {
+        proof.verify_current(tx)?;
+        if !matches!(proof.owner(), ProductEvidenceOwner::Proposal { .. }) {
+            return Err(refused("Product retirement cannot select Report custody"));
+        }
+        let original = protected::source_reference(tx, proof.original().record_key())?;
+        let terminal = protected::source_reference(tx, proof.terminal().record_key())?;
+        let witness = Self {
+            transaction: tx,
+            owner: ReferenceOwner::from(proof.owner().clone()),
+            references: proof.references().to_vec(),
+            original,
+            terminal,
+            evidence: TerminalEvidence::ProductProposal { proof },
+        };
+        witness.verify(tx)?;
+        Ok(witness)
+    }
+
+    /// The separate Product persistence entry accepts only the consumed affine
+    /// proof family. A decoded owner or source cannot select this purpose.
+    pub(in crate::admission_operation_store) fn verify_product_proposal_retirement(
+        &self,
+        tx: &Transaction<'conn>,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        self.verify(tx)?;
+        if !matches!(self.evidence, TerminalEvidence::ProductProposal { .. }) {
+            return Err(refused(
+                "Product retirement requires its own terminal proof",
+            ));
+        }
+        Ok(())
+    }
+
     pub(super) fn artifact_release(
         tx: &'tx Transaction<'conn>,
         key: &str,
@@ -178,6 +225,31 @@ impl<'tx, 'conn> VerifiedKnowledgeReferenceRetirement<'tx, 'conn> {
             return Err(refused("reference retirement changed its account"));
         }
         match &self.evidence {
+            TerminalEvidence::ProductProposal { proof } => {
+                proof.verify_current(tx)?;
+                if !matches!(proof.owner(), ProductEvidenceOwner::Proposal { .. })
+                    || self.owner != ReferenceOwner::from(proof.owner().clone())
+                    || self.references.as_slice() != proof.references()
+                    || !same_source(&self.original, proof.original())
+                    || !same_source(&self.terminal, proof.terminal())
+                {
+                    return Err(refused(
+                        "Product retirement changed its complete original source",
+                    ));
+                }
+                let original = SourceAnchor::capture(&self.original);
+                let terminal = SourceAnchor::capture(&self.terminal);
+                for reference in &self.references {
+                    retained_product_artifact(tx, reference)?;
+                    references::require_product_retirement_custody(
+                        tx,
+                        reference,
+                        &self.owner,
+                        &original,
+                        &terminal,
+                    )?;
+                }
+            }
             TerminalEvidence::ArtifactRelease { envelope } => {
                 let release = release::artifact_reference_source(tx, self.original.record_key())?
                     .ok_or_else(|| refused("release retirement source disappeared"))?;
@@ -356,4 +428,58 @@ impl std::fmt::Debug for VerifiedKnowledgeReferenceRetirement<'_, '_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("VerifiedKnowledgeReferenceRetirement([redacted])")
     }
+}
+
+pub(super) fn retire_publication_references(
+    tx: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    record: &NativeArtifactRecordV1,
+) -> Result<(), AdmissionOperationStoreError> {
+    let proof = VerifiedKnowledgeReferenceRetirement::publication_dependencies(tx, record)?;
+    protected::persist_knowledge_reference_retirement(tx, owner, proof)?;
+    Ok(())
+}
+
+pub(super) fn retire_pin_references(
+    tx: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    key: &str,
+) -> Result<(), AdmissionOperationStoreError> {
+    let proof = VerifiedKnowledgeReferenceRetirement::operator_pin(tx, key)?
+        .ok_or_else(|| refused("retired operator pin has no genuine terminal source"))?;
+    protected::persist_knowledge_reference_retirement(tx, owner, proof)?;
+    Ok(())
+}
+
+pub(super) fn retire_checkpoint_references(
+    tx: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    key: &str,
+) -> Result<(), AdmissionOperationStoreError> {
+    let proof = VerifiedKnowledgeReferenceRetirement::checkpoint(tx, key)?
+        .ok_or_else(|| refused("retired checkpoint has no genuine terminal source"))?;
+    protected::persist_knowledge_reference_retirement(tx, owner, proof)?;
+    Ok(())
+}
+
+pub(super) fn retire_release_references(
+    tx: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    key: &str,
+) -> Result<(), AdmissionOperationStoreError> {
+    let proof = VerifiedKnowledgeReferenceRetirement::artifact_release(tx, key)?
+        .ok_or_else(|| refused("delivered release has no genuine terminal source"))?;
+    protected::persist_knowledge_reference_retirement(tx, owner, proof)?;
+    Ok(())
+}
+
+pub(super) fn retire_restore_references(
+    tx: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    key: &str,
+) -> Result<(), AdmissionOperationStoreError> {
+    let proof = VerifiedKnowledgeReferenceRetirement::restore(tx, key)?
+        .ok_or_else(|| refused("delivered restore has no genuine terminal source"))?;
+    protected::persist_knowledge_reference_retirement(tx, owner, proof)?;
+    Ok(())
 }

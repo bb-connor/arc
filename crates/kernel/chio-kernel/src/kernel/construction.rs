@@ -256,6 +256,7 @@ impl ChioKernel {
             config,
             durable_admission_mode: crate::admission_operation::DurableAdmissionMode::default(),
             durable_admission_runtime: None,
+            native_output_retention: None,
             #[cfg(feature = "admission-test-support")]
             durable_finalization_cutpoint_hook: None,
             #[cfg(feature = "admission-test-support")]

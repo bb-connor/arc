@@ -17,10 +17,19 @@ HERE = Path(__file__).resolve().parent
 
 
 def write(path, value):
-    with path.open("w") as output:
-        json.dump(value, output)
-        output.flush()
-        os.fsync(output.fileno())
+    pending = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", dir=path.parent, prefix="." + path.name + "-", delete=False
+        ) as output:
+            pending = Path(output.name)
+            json.dump(value, output)
+            output.flush()
+            os.fsync(output.fileno())
+        pending.replace(path)
+    finally:
+        if pending is not None:
+            pending.unlink(missing_ok=True)
 
 
 def worker():
@@ -607,7 +616,7 @@ def relocated(binary, directory):
     )
     manifest_path = other_abi / "relocation.json"
     manifest = json.loads(manifest_path.read_text())
-    assert manifest["abi"] == "chio.process.abi.v2"
+    assert manifest["abi"] == "chio.process.abi.v3"
     unsupported_abi = manifest["abi"] + ".unsupported"
     manifest_path.write_text(json.dumps({**manifest, "abi": unsupported_abi}))
     authority_before = (other_abi / "authority.db").read_bytes()

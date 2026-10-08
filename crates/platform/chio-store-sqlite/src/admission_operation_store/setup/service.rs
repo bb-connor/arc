@@ -1,5 +1,6 @@
 //! Selected operator self-test custody and report acceptance.
 use super::*;
+use crate::serving_owner::NativeSourceTransactionOrigin;
 
 impl SqliteAdmissionOperationStore {
     /// Trusted selected operator pins and creates a new exact self-test in the
@@ -47,7 +48,6 @@ impl SqliteAdmissionOperationStore {
             if &root != operator {
                 return Err(AdmissionOperationStoreError::RecoveryAuthorityDenied);
             }
-            register_native_setup_context(tx, &self.serving_owner, recovery)?;
             let workflow = WorkflowId::new(&format!(
                 "workflow:{}",
                 sha256_hex(&protected::encode(&(actor.scope(), creation_key))?)
@@ -72,22 +72,30 @@ impl SqliteAdmissionOperationStore {
                 RecoveryDigestDomain::SetupCreation,
                 &(request_seed, &origin),
             )?);
+            let original_cut = self
+                .serving_owner
+                .prepare_native_source_transaction(tx)
+                .map_err(map_owner_error)?;
             if let Some(existing) = load(tx, actor.scope())? {
-                if current(tx, &existing).is_ok() && now < existing.probe.expires_at_unix_ms.get() {
-                    if existing.probe.scope != *actor.scope()
-                        || existing.probe.benign_workflow != workflow
-                        || existing.creation != creation
-                        || existing.receipt_key != *receipt_key
-                        || existing.operator != *operator
-                    {
-                        return Err(refused("active self-test cannot change"));
-                    }
+                if existing.probe.scope == *actor.scope()
+                    && existing.probe.benign_workflow == workflow
+                    && existing.creation == creation
+                    && existing.receipt_key == *receipt_key
+                    && existing.operator == *operator
+                {
+                    current(tx, &existing)?;
+                    register_native_setup_context(tx, &self.serving_owner, recovery)?;
                 } else {
-                    if protected::raw(tx, &protected::workflow_key(actor.scope(), &workflow)?)?
-                        .is_some()
-                    {
-                        return Err(refused("new profile needs a new unfinished self-test"));
-                    }
+                    retire_for_replacement(
+                        tx,
+                        (&self.serving_owner, &original_cut),
+                        &existing,
+                        recovery,
+                        &workflow,
+                        fence,
+                        now,
+                    )?;
+                    register_native_setup_context(tx, &self.serving_owner, recovery)?;
                     let selection = make_selection(
                         tx,
                         SelectionInput {
@@ -104,6 +112,7 @@ impl SqliteAdmissionOperationStore {
                     save(tx, &self.serving_owner, &selection)?;
                 }
             } else {
+                register_native_setup_context(tx, &self.serving_owner, recovery)?;
                 let selection = make_selection(
                     tx,
                     SelectionInput {
@@ -119,9 +128,9 @@ impl SqliteAdmissionOperationStore {
                 )?;
                 save(tx, &self.serving_owner, &selection)?;
             }
-            let response = super::super::recovery::apply_command(
+            let response = super::super::recovery::apply_command_with_origin(
                 tx,
-                &self.serving_owner,
+                (&self.serving_owner, &original_cut),
                 actor,
                 command,
                 recovery,
@@ -447,6 +456,54 @@ impl SqliteAdmissionOperationStore {
     }
 }
 
+// The native closure consumer independently checks original-operation and
+// process custody. Selection replacement and closure share this transaction.
+fn retire_for_replacement(
+    tx: &Transaction<'_>,
+    writer: (&SqliteServingOwner, &NativeSourceTransactionOrigin<'_>),
+    selected: &Selection,
+    deployment: &RecoveryDeploymentV1,
+    replacement: &WorkflowId,
+    fence: &StoreMutationFence,
+    now: u64,
+) -> Result<(), AdmissionOperationStoreError> {
+    let (owner, origin) = writer;
+    let reason = unused_replacement_reason(tx, selected, deployment, fence, now)?
+        .ok_or_else(|| refused("active self-test cannot change"))?;
+    if protected::raw_checked(
+        tx,
+        &protected::workflow_key(&selected.probe.scope, replacement)?,
+    )?
+    .is_some()
+    {
+        return Err(refused("replacement needs a fresh self-test identity"));
+    }
+    let record =
+        protected::workflow_tx(tx, &selected.probe.scope, &selected.probe.benign_workflow)?;
+    if selected.evidence.is_none()
+        && selected.report.is_none()
+        && record.control == WorkflowControlV1::Active
+        && record.action.is_none()
+        && record.process_reservation.is_none()
+        && !record.captured
+        && record.native_link.is_none()
+    {
+        let proof = super::unused_generation::verify_unused_generation(
+            tx, selected, deployment, fence, now,
+        )?;
+        protected::retire_unused_setup_generation_with_origin(tx, owner, proof, now, origin)?;
+    } else if !matches!(
+        reason,
+        UnusedSetupReplacementReason::ProfileChanged
+            | UnusedSetupReplacementReason::InitialWindowExpired
+    ) {
+        return Err(refused("unprobed setup custody is not replaceable"));
+    }
+    // Other retained workflows keep their allocation, original claim and every
+    // charge. Profile or expiry selection rotation releases no capacity.
+    Ok(())
+}
+
 /// This is a refusal before exposing a dispatch command. Native issuance and
 /// capture still own the complete fresh authority checks after preparation.
 fn require_fresh_uncaptured_source(
@@ -486,6 +543,49 @@ fn require_fresh_uncaptured_source(
         return Err(NativeSetupPreparationError::StaleSource);
     }
     Ok(())
+}
+
+// Only authenticated profile differences and the native pending window can
+// classify replacement. Operational failures never become an unused proof.
+pub(super) fn unused_replacement_reason(
+    tx: &Transaction<'_>,
+    selected: &Selection,
+    deployment: &RecoveryDeploymentV1,
+    fence: &StoreMutationFence,
+    now: u64,
+) -> Result<Option<UnusedSetupReplacementReason>, AdmissionOperationStoreError> {
+    let current_deployment = protected::deployment_tx(tx, &selected.probe.scope)?;
+    if current_deployment.scope != deployment.scope
+        || protected::encode(&current_deployment)? != protected::encode(deployment)?
+    {
+        return Err(refused("setup replacement deployment changed"));
+    }
+    let (authority, basis, source, operator) =
+        profile(tx, &selected.probe.scope, &selected.receipt_key)?;
+    if authority != selected.probe.native_authority
+        || basis != selected.probe.deployment
+        || source != selected.probe.source_profile
+        || operator != selected.operator
+        || required_coverage(tx, &selected.probe.scope)? != selected.probe.required_coverage
+    {
+        return Ok(Some(UnusedSetupReplacementReason::ProfileChanged));
+    }
+    if now >= selected.probe.expires_at_unix_ms.get() {
+        return Ok(Some(UnusedSetupReplacementReason::InitialWindowExpired));
+    }
+    if selected.evidence.is_none() && fence_digest(fence)? != selected.previous_fence {
+        return Ok(Some(UnusedSetupReplacementReason::WriterChanged));
+    }
+    match require_fresh_uncaptured_source(tx, deployment, selected, now) {
+        Ok(()) => Ok(None),
+        Err(NativeSetupPreparationError::StaleSource) => {
+            Ok(Some(UnusedSetupReplacementReason::StaleSource))
+        }
+        Err(NativeSetupPreparationError::Store(error)) => Err(error),
+        Err(NativeSetupPreparationError::Expired | NativeSetupPreparationError::WriterChanged) => {
+            Err(refused("setup replacement classification changed"))
+        }
+    }
 }
 
 struct SelectionInput<'a> {

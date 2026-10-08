@@ -10,6 +10,9 @@ use chio_store_sqlite::admission_operation_store::{
 use std::sync::Arc;
 use zeroize::Zeroizing;
 
+mod acknowledgement;
+pub use acknowledgement::ConfinedDeliveryError;
+
 #[cfg(unix)]
 mod channels;
 #[cfg(unix)]
@@ -195,7 +198,7 @@ impl NativeConfinedRuntime {
         sink: &dyn ArtifactReleaseSink,
         disclosure: Option<&SignedConfinedDisclosureV1>,
         endorsement: Option<&SignedConfinedEndorsementV1>,
-    ) -> Result<ReturnAdmissionV1, KernelError> {
+    ) -> Result<ReturnAdmissionV1, ConfinedDeliveryError> {
         let actor = self.actor(capability, RecoveryPermission::ConfinedReturn)?;
         let profile = self
             .store
@@ -228,32 +231,46 @@ impl NativeConfinedRuntime {
             )
             .map_err(refused)?;
         if admission.artifact != prepared.artifact {
-            return Err(refused("return substitution"));
+            return Err(refused("return substitution").into());
         }
         self.cutpoint(ConfinedCutpoint::ReturnCommitted)?;
         self.cutpoint(ConfinedCutpoint::BeforeDelivery)?;
-        // The final journal activity read is the cancellation ordering point
-        // for this release. A completed earlier cancellation withholds bytes,
-        // retaining the native join and consumption. No store lock spans I/O.
         self.broker
             .validate_process(&self.installation.scope.process_id, &recipient.context)?;
-        self.cutpoint(ConfinedCutpoint::DeliveryOrdered)?;
-        let delivered = sink.deliver(&admission.admitted, &prepared.bytes).is_ok();
-        self.cutpoint(ConfinedCutpoint::DeliveryCompleted)?;
         self.store
             .acknowledge_confined_return(
                 &actor,
                 &prepared.request,
                 &admission,
-                delivered,
+                false,
                 &self.fence,
                 now()?,
             )
             .map_err(refused)?;
-        if !delivered {
-            return Err(refused("delivery uncertain"));
+        self.broker.begin_confined_delivery(
+            &actor,
+            &prepared.request,
+            &prepared.seal,
+            &admission,
+        )?;
+        self.cutpoint(ConfinedCutpoint::DeliveryOrdered)?;
+        let delivered = sink.deliver(&admission.admitted, &prepared.bytes).is_ok();
+        // Own the actual result before any fallible post-I/O cutpoint or write.
+        let pending = ConfinedDeliveryError::pending(
+            refused("return acknowledgement pending"),
+            actor,
+            prepared.request,
+            admission,
+            delivered,
+        );
+        if self.cutpoint(ConfinedCutpoint::DeliveryCompleted).is_err() {
+            return Err(pending);
         }
-        Ok(admission)
+        let acknowledged = pending.reconcile(&self.store, &self.fence)?;
+        if !delivered {
+            return Err(refused("delivery uncertain").into());
+        }
+        Ok(acknowledged)
     }
     /// Accept a stop request without disclosing input or execution progress.
     /// Stopping revokes future admissions and retains original custody. This
@@ -270,7 +287,9 @@ impl NativeConfinedRuntime {
             .cancel_confined_child(&actor, request, &self.fence, now()?)
             .map_err(refused)?;
         match process.cancel(accepted.child().as_str()) {
-            Ok(_) | Err(chio_process::ProcessError::NotFound(_)) => (),
+            Ok(_)
+            | Err(chio_process::ProcessError::NotFound(_))
+            | Err(chio_process::ProcessError::ConfinedReturnAlreadyOrdered) => (),
             Err(error) => return Err(refused(error)),
         }
         Ok(())

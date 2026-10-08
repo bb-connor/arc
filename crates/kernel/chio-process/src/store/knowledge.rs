@@ -5,6 +5,8 @@ impl Store {
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        super::unused_recovery_reservation::verify_before_open(&tx)?;
+        super::confined_delivery::verify_before_open(&tx)?;
         tx.execute(
             "UPDATE process_runtime SET version=5 WHERE singleton=1 AND version IN (1,2,3,4)",
             [],
@@ -18,7 +20,9 @@ impl Store {
             [],
             |row| row.get(0),
         )?;
-        if version >= 3 {
+        super::unused_recovery_reservation::verify_before_open(&self.connection)?;
+        super::confined_delivery::verify_before_open(&self.connection)?;
+        if !matches!(version, 1 | 2) {
             return Err(ProcessError::Configuration(
                 "durable knowledge requires mediated release",
             ));
@@ -53,7 +57,9 @@ impl Store {
             [],
             |row| row.get(0),
         )?;
-        if version != 5 {
+        super::unused_recovery_reservation::verify_before_open(&self.connection)?;
+        super::confined_delivery::verify_before_open(&self.connection)?;
+        if !matches!(version, 5..=7) {
             return Err(ProcessError::Configuration(
                 "durable knowledge is not enforced",
             ));

@@ -154,7 +154,7 @@ async fn native_changed_selected_annotation_refusal_keeps_the_authored_status_au
 
 #[tokio::test]
 async fn native_failed_external_read_status_taints_later_exact_inputs() -> TestResult {
-    let f = native_fixture("external-history")?;
+    let f = empty_import::native_fixture_from_empty_import("external-history").await?;
     std::fs::write(f.path.join("provider-error"), "enabled")?;
     let (runtime, read, source) = chains::prepare_origin_read(&f, "external-read-failure")?;
     assert!(source.package.body().operations.as_slice()[0].external_influence);
@@ -207,5 +207,161 @@ async fn native_failed_external_read_status_taints_later_exact_inputs() -> TestR
         "an observed external provider status must survive without Output journal, FutureOutput, artifact or model claim"
     );
     assert_eq!(f.effects.load(Ordering::SeqCst), 1);
+    Ok(())
+}
+
+#[tokio::test]
+async fn native_changed_annotation_refusal_taints_later_independent_exact_inputs() -> TestResult {
+    let f = empty_import::native_fixture_from_empty_import("trusted-annotated-read").await?;
+    let store = f.authority.admission_operation_store();
+    let (runtime, mut request, mut profile) = prepare(
+        &f,
+        "changed-external-annotation",
+        SemanticOutputDispositionV1::Withhold,
+    )?;
+    let neutral = attach_neutral_annotation(&f, &mut request, &mut profile)?;
+    assert!(!profile.invocation.action.externally_influenced);
+    assert!(request.model_metadata.is_none());
+    assert!(store
+        .observe_knowledge_influence(
+            &profile.plan.scope,
+            &f.authority.mutation_fence(),
+            now_ms()?
+        )?
+        .is_none());
+    let mut current = neutral.body().clone();
+    current.externally_influenced = true;
+    let issued = now_ms()?.max(
+        neutral
+            .body()
+            .issued_at_unix_ms
+            .get()
+            .checked_add(1)
+            .ok_or("annotation clock overflow")?,
+    );
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(1);
+    while now_ms()? < issued {
+        if std::time::Instant::now() >= deadline {
+            return Err("annotation authority clock did not advance".into());
+        }
+        tokio::task::yield_now().await;
+    }
+    current.issued_at_unix_ms = SafeInteger::new(issued)?;
+    current.valid_until_unix_ms = SafeInteger::new(
+        issued
+            .checked_add(50_000)
+            .ok_or("annotation deadline overflow")?,
+    )?;
+    let current = SignedSemanticAnnotationV1::sign(current, &profile.annotator)?;
+    store.install_semantic_annotation(&current)?;
+    assert!(now_ms()? < profile.invocation.action.valid_until_unix_ms.get());
+    let denied = runtime
+        .execute_step(&f.process, "root", "changed-external-annotation", &request)
+        .await?;
+    assert_eq!(denied.verdict, Verdict::Deny);
+    assert!(denied.receipt.verify_signature()?);
+    let (operation, original) = store
+        .load_unambiguous_retained_tool_request(
+            &AdmissionIdentifier::try_new("request_id", &request.request_id)?,
+            &f.authority.mutation_fence(),
+            now_ms()?,
+        )?
+        .ok_or("changed annotation refusal original absent")?;
+    let deployment = f.kernel.recovery_deployment(f.runtime.scope())?;
+    original.validate_request_material(&request)?;
+    original.validate_native_security_authority(&deployment.native_authority)?;
+    original.validate_native_security_context(&deployment.security_context)?;
+    assert_eq!(
+        operation.state(),
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    assert!(operation.dispatch_commit().is_none());
+    assert!(operation.native_dispatch_ledger_digest().is_none());
+    assert_eq!(denied.receipt.capability_id, request.capability.id);
+    assert_eq!(denied.receipt.tool_server, request.server_id);
+    assert_eq!(denied.receipt.tool_name, request.tool_name);
+    assert_eq!(denied.receipt.action.parameters, request.arguments);
+    assert_eq!(
+        denied.receipt.action.parameter_hash,
+        operation.binding().action_parameter_hash().as_str()
+    );
+    let signed_invocation: SemanticInvocationV1 = decode_contract(
+        &chio_core::canonical_json_bytes(&denied.receipt.action.parameters)?,
+    )?;
+    assert_eq!(
+        signed_invocation.action.request_id.as_str(),
+        request.request_id
+    );
+    assert_eq!(
+        hex::encode(signed_invocation.action.request_namespace.as_bytes()),
+        operation.binding().request_namespace_digest().as_str()
+    );
+    let (native_operation, input) = store
+        .load_native_security_input_join(
+            operation.binding().operation_id(),
+            &f.authority.mutation_fence(),
+            now_ms()?,
+        )?
+        .ok_or("changed annotation refusal native operation absent")?;
+    let input = input.ok_or("changed annotation refusal native Input journal absent")?;
+    input.validate()?;
+    assert_eq!(native_operation, operation);
+    assert_eq!(
+        input.input.operation_id(),
+        operation.binding().operation_id()
+    );
+    assert_eq!(input.join.operation_id, *operation.binding().operation_id());
+    assert_eq!(input.join.binding, deployment.native_authority);
+    assert_eq!(
+        input.input.key(),
+        &recovery_flow_key(&deployment.security_context)
+    );
+    let source = store.observe_security_participant_flow(
+        &deployment.native_authority,
+        input.input.key(),
+        &f.authority.mutation_fence(),
+        now_ms()?,
+    )?;
+    assert_eq!(source.snapshot(), Some(&input.join.snapshot));
+    assert!(store
+        .load_security_participant_output(
+            operation.binding().operation_id(),
+            &f.authority.mutation_fence(),
+            now_ms()?,
+        )?
+        .is_none());
+    assert_eq!(f.effects.load(Ordering::SeqCst), 0);
+    let observed = store
+        .observe_knowledge_influence(
+            &profile.plan.scope,
+            &f.authority.mutation_fence(),
+            now_ms()?,
+        )?
+        .ok_or("observed changed annotation refusal was not retained as native influence")?;
+    assert!(observed.externally_influenced);
+    assert!(!observed.unknown);
+    let (runtime, next, mut followup) = prepare(
+        &f,
+        "independent-after-annotation-refusal",
+        SemanticOutputDispositionV1::Withhold,
+    )?;
+    let step = &followup.plan.steps.as_slice()[0];
+    assert!(step.dependencies.as_slice().is_empty());
+    assert!(step
+        .inputs
+        .as_slice()
+        .iter()
+        .all(|input| matches!(input, SemanticPlanInputV1::Exact { .. })));
+    assert!(!followup.package.body().operations.as_slice()[0].external_influence);
+    assert!(next.model_metadata.is_none());
+    followup.invocation.action.externally_influenced = false;
+    followup.invocation.action.influence =
+        semantic_content_digest(&(&followup.invocation.action.inputs, false))?;
+    let framed = runtime.frame_action(&next, followup.invocation.action, &followup.payload)?;
+    assert!(
+        framed.externally_influenced,
+        "a selected annotator's observed refusal must survive without Output, FutureOutput, artifact or model provenance"
+    );
+    assert_eq!(f.effects.load(Ordering::SeqCst), 0);
     Ok(())
 }

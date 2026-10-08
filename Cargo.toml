@@ -215,6 +215,8 @@ members = [
     "integrations/editors/zed-chio",
 ]
 exclude = [
+    # Upstream transparent-layout repair for borrowed demangler newtypes.
+    "third_party/cpp-demangle-chio",
     # DES parity normalization and effective-key checks for the selected release.
     "third_party/aws-lc-rs-chio",
     # Upstream UTF-8 search-start validation backported to the pinned release.
@@ -250,6 +252,7 @@ exclude = [
 
 [patch.crates-io]
 aws-lc-rs = { path = "third_party/aws-lc-rs-chio" }
+cpp_demangle = { path = "third_party/cpp-demangle-chio" }
 regress = { path = "third_party/regress-chio" }
 ignore = { path = "third_party/ignore-chio" }
 nono = { path = "third_party/nono-upstream-chio" }
@@ -265,7 +268,7 @@ sigstore-trust-root = { path = "third_party/sigstore-trust-root-chio" }
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.94"
+rust-version = "1.95"
 license = "Apache-2.0"
 repository = "https://github.com/backbay-labs/chio"
 

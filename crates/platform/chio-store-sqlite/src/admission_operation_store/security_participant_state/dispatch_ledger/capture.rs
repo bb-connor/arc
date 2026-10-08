@@ -34,6 +34,26 @@ pub(crate) struct VerifiedNativeCapture<'tx> {
     dpop_credential: Option<DpopReplayCredentialV1>,
 }
 
+/// Fresh capture needs its original, prepaid finishing obligations. Neither a
+/// retained bounds profile nor an absent predecessor profile supplies funding.
+/// Until the complete native phase factory exists, authenticate the original
+/// owner and refuse here, before any physical capture or dispatch mutation.
+fn require_native_capture_finishing_funding(
+    tx: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    input: &NativeCaptureBinding<'_>,
+    original: &chio_kernel::admission_operation::RetainedToolAdmissionRequestV1,
+    now: u64,
+) -> Result<(), AdmissionOperationStoreError> {
+    let custody = &input.custody;
+    verify_participant_recovery_tx(tx, owner, custody.operation, custody.lease, now)?;
+    original.validate_native_security_authority(custody.binding)?;
+    original.validate_native_security_context(custody.security_context)?;
+    Err(invalid(
+        "fresh native capture lacks authenticated finishing funding",
+    ))
+}
+
 impl<'tx> VerifiedNativeCapture<'tx> {
     pub(crate) fn verify(
         tx: &'tx Transaction<'_>,
@@ -60,7 +80,6 @@ impl<'tx> VerifiedNativeCapture<'tx> {
                 custody.request,
                 now,
             )?;
-        verify_participant_recovery_tx(tx, owner, operation, custody.lease, now)?;
         ensure_no_reserved_terminal_stage(tx, operation.binding().operation_id())?;
         let original = retained_request::load_retained_request_tx(tx, operation)?
             .ok_or_else(|| invalid("native capture lost its original request"))?;
@@ -88,8 +107,7 @@ impl<'tx> VerifiedNativeCapture<'tx> {
                 return Err(invalid("native capture capability or ancestor is revoked"));
             }
         }
-        original.validate_native_security_authority(custody.binding)?;
-        original.validate_native_security_context(custody.security_context)?;
+        require_native_capture_finishing_funding(tx, owner, input, &original, now)?;
         storage::verify_coverage(tx)?;
         let record = storage::load(tx, operation.binding().operation_id().as_str())?
             .ok_or_else(|| invalid("native capture requires its exact preparation ledger"))?;

@@ -213,6 +213,41 @@ impl AdmissionOperationStore for TestAdmissionOperationStore {
         self.native_recovery.join_input(operation, binding, input)
     }
 
+    fn join_native_security_input_classified<'call>(
+        &self,
+        classification: &'call crate::admission_operation::NativeSecurityInputClassificationAuthority<'call>,
+    ) -> Result<
+        crate::admission_operation::NativeSecurityInputJoinOutcome<'call>,
+        AdmissionOperationStoreError,
+    > {
+        self.revalidate_recovery_claim(
+            classification.operation(),
+            classification.lease().untrusted_claim(),
+            classification.trusted_now_unix_ms(),
+            classification.lease().store_fence(),
+        )?;
+        let retained = self
+            .state
+            .lock()
+            .map_err(|_| {
+                AdmissionOperationStoreError::Unavailable("input fixture state is fenced".into())
+            })?
+            .retained_request
+            .clone()
+            .ok_or_else(|| {
+                AdmissionOperationStoreError::Invariant("input fixture original is absent".into())
+            })?;
+        retained.validate_request_material(classification.request())?;
+        retained.validate_native_security_context(classification.context())?;
+        retained.validate_native_security_authority(classification.binding())?;
+        let record = self.native_recovery.join_input(
+            classification.operation(),
+            classification.binding(),
+            classification.input(),
+        )?;
+        classification.eligible(record)
+    }
+
     fn load_native_security_input_join(
         &self,
         operation_id: &AdmissionOperationId,

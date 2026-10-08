@@ -2,6 +2,12 @@ use super::*;
 mod captured_terminal_format;
 mod command_alias_format;
 mod knowledge_encoding_format;
+mod physical_write_catalog;
+#[cfg(test)]
+pub(in crate::admission_operation_store) use physical_write_catalog::command_catalog_difference_for_test;
+#[cfg(test)]
+pub(in crate::admission_operation_store) use physical_write_catalog::current_command_catalog_model_for_test;
+pub(in crate::admission_operation_store) use physical_write_catalog::verify_physical_command_catalog;
 
 mod clock;
 mod migration_v17;
@@ -623,6 +629,8 @@ fn verify_admission_operation_inventory(
         .map(|_| ())
         .map_err(invariant)?;
     super::security_participant_migration::verify_all(connection)?;
+    super::knowledge::publication_capacity::verify_catalog(connection)?;
+    super::product::evidence_reclamation::verify_product_reclamation_inventory(connection)?;
     super::security_participant_state::egress::verify_catalog(connection)?;
     super::security_participant_state::output::verify_catalog(connection)?;
     super::security_participant_state::nonce_preflight::verify_catalog(connection)?;
@@ -643,6 +651,13 @@ fn verify_admission_operation_schema(
         ));
     }
     Ok(())
+}
+
+/// Construct the fixed compiled current catalog DATA. This is not an actual
+/// source, reservation, financing role or successor-format acceptance.
+pub(in crate::admission_operation_store) fn current_admission_write_catalog_model(
+) -> Result<Connection, AdmissionOperationStoreError> {
+    expected_admission_operation_schema(40)
 }
 
 fn expected_admission_operation_schema(

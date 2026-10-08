@@ -1,7 +1,7 @@
 //! Selected restrict-only annotations are current protected observations.
 use super::*;
 
-fn annotation_key(
+pub(super) fn annotation_key(
     scope: &RecoveryScopeV1,
     signer: RoleKeyDigest,
     input: &SemanticInputVersionV1,

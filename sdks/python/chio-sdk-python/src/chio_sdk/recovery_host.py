@@ -179,6 +179,9 @@ class RecoveryHostSession:
             self._attempts += 1
             if not isinstance(choice, str) or choice not in self._commands:
                 return RecoveryHostOutcome(RecoveryHostCategory.INVALID_CHOICE)
+            # Completion callbacks can be queued after the next explicit action.
+            # Only unfinished native requests or cleanup retain admission.
+            self._retained_tasks = {task for task in self._retained_tasks if not task.done()}
             if self._active_action or self._sync_worker_active or self._retained_tasks:
                 return RecoveryHostOutcome(RecoveryHostCategory.BUSY)
             self._active_action = True

@@ -6,6 +6,9 @@ on:
       - ".github/workflows/formal-pr-smoke.yml"
       - ".github/workflows/fuzz.yml"
       - ".kani/harnesses.toml"
+      - "scripts/check-kani-toolchain.sh"
+      - "scripts/tests/check-kani-toolchain.test.sh"
+      - "scripts/tests/check-kani-probe-lifecycle.test.py"
       - "Cargo.lock"
       - "Cargo.toml"
       - "rust-toolchain.toml"
@@ -15,6 +18,8 @@ on:
       - "crates/economy/chio-anchor/src/**"
       - "crates/economy/chio-credit/Cargo.toml"
       - "crates/economy/chio-credit/src/**"
+      - "crates/economy/chio-open-market/Cargo.toml"
+      - "crates/economy/chio-open-market/src/**"
       - "crates/economy/chio-web3/Cargo.toml"
       - "crates/economy/chio-web3/src/**"
       - "crates/kernel/chio-kernel-core/Cargo.toml"
@@ -54,7 +59,7 @@ env:
   CARGO_TERM_COLOR: always
   CHIO_CI_RUSTFLAGS: "-D warnings -C link-arg=-Wl,--threads=1"
   # These pins must stay in lockstep with nightly.yml.
-  CHIO_KANI_VERSION: 0.67.0
+  CHIO_KANI_VERSION: 0.68.0
   CHIO_ELAN_VERSION: v4.2.1
   CHIO_ELAN_TARBALL_SHA256: 4e717523217af592fa2d7b9c479410a31816c065d66ccbf0c2149337cfec0f5c
 
@@ -106,10 +111,10 @@ jobs:
           }
 
           workflow='^\.github/workflows/formal-pr-smoke\.yml$'
-          rust_common="${workflow}|^(Cargo\.lock|Cargo\.toml|rust-toolchain\.toml)$"
+          rust_common="${workflow}|^(Cargo\.lock|Cargo\.toml|rust-toolchain\.toml|scripts/check-kani-toolchain\.sh|scripts/tests/check-kani-toolchain\.test\.sh|scripts/tests/check-kani-probe-lifecycle\.test\.py)$"
           set_output lean "${workflow}|^(formal/lean4/|formal/(proof-manifest\.toml|theorem-inventory\.json|assumptions\.toml)$|docs/reference/CLAIM_REGISTRY\.md$|scripts/(check-formal-proofs\.sh|lean-assumption-audit\.lean|generate-lean-json-fixtures\.py)$|scripts/tests/lean-assumption-audit\.test\.sh$|tests/bindings/vectors/canonical/v1\.json$)"
           set_output kani_core "${rust_common}|^(\.kani/harnesses\.toml$|formal/rust-verification/kani-public-harnesses\.toml$|scripts/check-kani-public-core\.sh$|crates/(kernel/chio-kernel-core|core/chio-core-types|trust/chio-revocation-oracle)/(src/|Cargo\.toml$))"
-          set_output kani_manifest "${rust_common}|^(\.kani/harnesses\.toml$|scripts/run-kani-manifest\.sh$|crates/(economy/chio-anchor|economy/chio-credit|economy/chio-web3|trust/chio-attest-verify|trust/chio-weights)/(src/|Cargo\.toml$))"
+          set_output kani_manifest "${rust_common}|^(\.kani/harnesses\.toml$|scripts/run-kani-manifest\.sh$|crates/(economy/chio-anchor|economy/chio-credit|economy/chio-open-market|economy/chio-web3|trust/chio-attest-verify|trust/chio-weights)/(src/|Cargo\.toml$))"
           set_output metadata "${workflow}|^(\.kani/harnesses\.toml$|formal/rust-verification/|scripts/check-rust-verification-gates\.sh$)"
           set_output fuzz_smoke "${workflow}|^(\.github/workflows/fuzz\.yml$|fuzz/)"
 
@@ -251,20 +256,18 @@ jobs:
             ~/.cargo/bin/cargo-kani
             ~/.cargo/bin/kani
             ~/.kani
-          key: ${{ runner.os }}-kani-${{ env.CHIO_KANI_VERSION }}
+          key: ${{ runner.os }}-${{ runner.arch }}-kani-${{ env.CHIO_KANI_VERSION }}-${{ hashFiles('scripts/check-kani-toolchain.sh') }}
 
       - name: Install Kani
         env:
           CARGO_TARGET_DIR: ${{ runner.temp }}/chio-kani-tool-target
         run: |
           set -euo pipefail
-          if ! cargo kani --version >/dev/null 2>&1; then
-            cargo install kani-verifier --locked --version "${CHIO_KANI_VERSION}"
-          fi
+          cargo install kani-verifier --locked --version "${CHIO_KANI_VERSION}" --force
           cargo kani setup
 
       - name: Verify Kani version
-        run: cargo kani --version
+        run: bash scripts/check-kani-toolchain.sh
 
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
 
@@ -312,20 +315,18 @@ jobs:
             ~/.cargo/bin/cargo-kani
             ~/.cargo/bin/kani
             ~/.kani
-          key: ${{ runner.os }}-kani-${{ env.CHIO_KANI_VERSION }}
+          key: ${{ runner.os }}-${{ runner.arch }}-kani-${{ env.CHIO_KANI_VERSION }}-${{ hashFiles('scripts/check-kani-toolchain.sh') }}
 
       - name: Install Kani
         env:
           CARGO_TARGET_DIR: ${{ runner.temp }}/chio-kani-tool-target
         run: |
           set -euo pipefail
-          if ! cargo kani --version >/dev/null 2>&1; then
-            cargo install kani-verifier --locked --version "${CHIO_KANI_VERSION}"
-          fi
+          cargo install kani-verifier --locked --version "${CHIO_KANI_VERSION}" --force
           cargo kani setup
 
       - name: Verify Kani version
-        run: cargo kani --version
+        run: bash scripts/check-kani-toolchain.sh
 
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
 

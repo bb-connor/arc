@@ -37,6 +37,9 @@ pub(crate) struct DurableToolReturnContext {
     request_material_digest: AdmissionDigest,
     pub(super) matched_grant_index: usize,
     pub(super) stream_limits: InvocationStreamLimitsV1,
+    // Original immutable DATA, not current configuration or financing authority.
+    pub(super) native_output_retention:
+        Option<Box<crate::admission_operation::NativeOutputRetentionProfileV1>>,
     admitted_metadata: Option<serde_json::Value>,
     purchase_replay_metadata: Option<serde_json::Value>,
     recovery_replay_metadata: Option<serde_json::Value>,
@@ -108,6 +111,15 @@ impl DurableToolReturnContext {
         {
             return Err(KernelError::DurableAdmission(
                 "request differs from its frozen admission material".into(),
+            ));
+        }
+        if self.native_output_retention.as_deref()
+            != admission
+                .original_retained_request()
+                .and_then(|original| original.native_output_retention())
+        {
+            return Err(KernelError::DurableAdmission(
+                "frozen output retention differs from original admission".into(),
             ));
         }
         if !admission.permits_grant(self.matched_grant_index) {
@@ -256,6 +268,11 @@ impl ChioKernel {
             .map_err(durable_store_error)?,
             matched_grant_index,
             stream_limits: self.durable_stream_limits()?,
+            native_output_retention: admission
+                .original_retained_request()
+                .and_then(|original| original.native_output_retention())
+                .cloned()
+                .map(Box::new),
             admitted_metadata,
             purchase_replay_metadata,
             recovery_replay_metadata,

@@ -10,14 +10,17 @@ use crate::{digest, Checkpoint, ProcessError, ProcessLimits, ProcessSnapshot, Pr
 
 mod blobs;
 mod children;
+mod confined_delivery;
 mod confined_slots;
 #[cfg(feature = "worker-server")]
 mod credentials;
 mod knowledge;
+pub(crate) mod native_return_custody;
 mod nonces;
 mod objects;
 mod original_snapshot;
 mod recovery;
+mod unused_recovery_reservation;
 pub(crate) use original_snapshot::OriginalProcessSnapshot;
 
 pub(crate) struct Store {
@@ -49,6 +52,8 @@ impl Store {
         connection.pragma_update(None, "synchronous", "FULL")?;
         connection.pragma_update(None, "foreign_keys", "ON")?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        confined_delivery::verify_before_open(&tx)?;
+        unused_recovery_reservation::verify_before_open(&tx)?;
         // Earlier triggers fenced a single version instead of preventing only
         // downgrades. Replace them before a supported journal upgrade.
         tx.execute_batch(
@@ -99,7 +104,7 @@ impl Store {
             "SELECT version, namespace, authority, kernel_key FROM process_runtime WHERE singleton = 1",
             [], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
         )?;
-        if !matches!(version, 1..=5) || stored_authority != authority || stored_key != kernel_key {
+        if !matches!(version, 1..=7) || stored_authority != authority || stored_key != kernel_key {
             return Err(ProcessError::Configuration(
                 "process journal belongs to a different durable authority, kernel key or version",
             ));
@@ -115,6 +120,8 @@ impl Store {
                 "confined return data requires its journal version",
             ));
         }
+        unused_recovery_reservation::install_or_verify(&tx, version)?;
+        confined_delivery::install_or_verify(&tx, version)?;
         tx.commit()?;
         Ok(Self {
             connection,
@@ -234,6 +241,7 @@ impl Store {
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        unused_recovery_reservation::require_open_recovery_reservation(&tx, id, key)?;
         let process =
             read_process(&tx, id)?.ok_or_else(|| ProcessError::NotFound(id.to_owned()))?;
         require_running(&process)?;
@@ -365,7 +373,11 @@ impl Store {
                 UNION ALL SELECT p.id FROM processes p JOIN descendants d ON p.parent_id = d.id
              ) UPDATE processes SET state = 'cancelled' WHERE id IN (SELECT id FROM descendants) AND state = 'running'", [id],
         )?;
+        let ordered = confined_delivery::cancellation_has_ordered_return(&tx, id);
         tx.commit()?;
+        if ordered? {
+            return Err(ProcessError::ConfinedReturnAlreadyOrdered);
+        }
         Ok(count)
     }
 }

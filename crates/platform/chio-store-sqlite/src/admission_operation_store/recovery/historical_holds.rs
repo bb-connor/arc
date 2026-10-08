@@ -77,14 +77,111 @@ pub(super) fn require_unheld(
     Ok(())
 }
 
+/// Only original private finalization may discharge the old signer-only hold.
+/// Fresh dispatch, current result release and every other hold keep require_unheld.
+pub(super) fn blocks_original_private_settlement(
+    tx: &Connection,
+    record: &RecoveryWorkflowRecordV1,
+) -> Result<bool, AdmissionOperationStoreError> {
+    Ok(effective(tx, record)?.is_some_and(|hold| {
+        hold.reason != RecoveryHistoricalHoldReasonV1::FrozenSigningCustodyUnavailable
+    }))
+}
+
+/// Authenticate retained hold data without reading the quota's terminal pointer.
+/// This is not an effective-workflow view or permission to bypass a hold.
+pub(super) fn retained_hold_data(
+    tx: &Connection,
+    record: &RecoveryWorkflowRecordV1,
+) -> Result<Option<RecoveryHistoricalHoldV1>, AdmissionOperationStoreError> {
+    let workflow = workflow_key(&record.scope, &record.workflow_id)?;
+    let row = raw_checked(tx, &workflow)?
+        .ok_or_else(|| invariant("private settlement hold workflow absent"))?;
+    let source = source_reference(tx, &workflow)?;
+    if row.payload != encode(record)? || row.version != record.revision.get() {
+        return Err(invariant(
+            "private settlement hold physical workflow changed",
+        ));
+    }
+    let key = format!(
+        "workflow-quota:{}:{}",
+        scope_key(&record.scope)?,
+        record.workflow_id.as_str()
+    );
+    let auxiliary = if let Some(quota) = raw_checked(tx, &key)? {
+        source_reference(tx, &key)?;
+        if quota.kind != "command" || quota.scope != scope_key(&record.scope)? {
+            return Err(invariant("private settlement hold quota source changed"));
+        }
+        let value: serde_json::Value = decode(&quota.payload)?;
+        match value.get("native_hold").filter(|value| !value.is_null()) {
+            None => None,
+            Some(allocation) => {
+                let version: SafeInteger = serde_json::from_value(
+                    allocation
+                        .get("workflow_record_version")
+                        .cloned()
+                        .ok_or_else(|| {
+                            invariant("private settlement hold workflow version absent")
+                        })?,
+                )
+                .map_err(|_| invariant("private settlement hold workflow version refused"))?;
+                let digest: ProjectionDigest = serde_json::from_value(
+                    allocation
+                        .get("workflow_record_digest")
+                        .cloned()
+                        .ok_or_else(|| {
+                            invariant("private settlement hold workflow digest absent")
+                        })?,
+                )
+                .map_err(|_| invariant("private settlement hold workflow digest refused"))?;
+                if version.get() != row.version || &digest != source.digest() {
+                    return Err(invariant("private settlement hold workflow anchor changed"));
+                }
+                Some(
+                    serde_json::from_value::<RecoveryHistoricalHoldV1>(
+                        allocation
+                            .get("hold")
+                            .cloned()
+                            .ok_or_else(|| invariant("private settlement retained hold absent"))?,
+                    )
+                    .map_err(|_| invariant("private settlement retained hold refused"))?,
+                )
+            }
+        }
+    } else {
+        None
+    };
+    require_exclusive(record.historical_hold.as_ref(), auxiliary.as_ref())?;
+    let hold = record.historical_hold.clone().or(auxiliary);
+    if let Some(hold) = &hold {
+        verify_operation(tx, record, hold)?;
+    }
+    Ok(hold)
+}
+
 /// Only authorized outward reads receive this clone. Writers retain raw records.
 pub(super) fn view(
     tx: &Connection,
     record: RecoveryWorkflowRecordV1,
 ) -> Result<RecoveryWorkflowRecordV1, AdmissionOperationStoreError> {
     let hold = effective(tx, &record)?;
+    let signer_hold_discharged =
+        hold.as_ref().is_some_and(|hold| {
+            hold.reason == RecoveryHistoricalHoldReasonV1::FrozenSigningCustodyUnavailable
+        }) && super::terminal_custody::private_settlement_committed(tx, &record)?;
     let mut record = super::terminal_custody::view(tx, record)?;
     if let Some(hold) = hold {
+        if signer_hold_discharged
+            && record.admission_closed
+            && matches!(record.effect, EffectObservationV1::Complete { .. })
+        {
+            // The signed original/current settlement was independently read
+            // back. The old physical hold remains immutable audit data.
+            record.control = WorkflowControlV1::Active;
+            record.historical_hold = None;
+            return Ok(record);
+        }
         record.control = WorkflowControlV1::Quarantined;
         record.historical_hold = Some(hold);
     }

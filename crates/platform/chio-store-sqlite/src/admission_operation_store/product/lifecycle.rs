@@ -49,6 +49,13 @@ struct ReviewedReportDisposition {
     receipt: NativePolicyChangeReceiptV1,
 }
 
+pub(super) fn archived_proposal_source(
+    tx: &Connection,
+    proposal: &StoredPolicyMaintenanceProposalV1,
+) -> Result<Option<(protected::ProtectedSourceReference, u64)>, AdmissionOperationStoreError> {
+    archive::proposal_archive_source(tx, proposal)
+}
+
 pub(super) fn quota_key(
     scope: &RecoveryScopeV1,
     kind: ProductWorkKind,

@@ -210,6 +210,64 @@ impl ConfinedFixture {
         let count:i64=connection.query_row("SELECT json_extract(payload,'$') FROM admission_operation_recovery_records WHERE record_key GLOB 'confined-count:*'",[],|r|r.get(0))?;
         Ok(u64::try_from(count)?)
     }
+
+    fn held_input_owner_count(
+        &self,
+        reference: &ArtifactVersionRefV1,
+        boundary: &IsolationBoundaryV1,
+    ) -> TestResult<usize> {
+        let connection = rusqlite::Connection::open(self.knowledge.f.path.join("admission.db"))?;
+        let mut statement = connection.prepare(
+            "SELECT payload FROM admission_operation_recovery_records
+             WHERE record_key GLOB 'knowledge-reference-owner:*'
+               AND json_extract(payload,'$.owner.owner')='confined_inputs'
+               AND json_extract(payload,'$.owner.request')=?1
+               AND json_extract(payload,'$.owner.boundary')=?2
+               AND json_extract(payload,'$.state')='active'",
+        )?;
+        let mut rows = statement.query(rusqlite::params![
+            boundary.request.as_str(),
+            boundary.boundary.as_str()
+        ])?;
+        let mut count = 0usize;
+        while let Some(row) = rows.next()? {
+            let payload: Vec<u8> = row.get(0)?;
+            let retained: serde_json::Value = serde_json::from_slice(&payload)?;
+            let owner_scope: RecoveryScopeV1 = serde_json::from_value(
+                retained
+                    .get("owner")
+                    .and_then(|owner| owner.get("scope"))
+                    .cloned()
+                    .ok_or("confined input owner has no scope")?,
+            )?;
+            let selected: ArtifactVersionRefV1 = serde_json::from_value(
+                retained
+                    .get("reference")
+                    .cloned()
+                    .ok_or("confined input owner has no reference")?,
+            )?;
+            if owner_scope == boundary.scope && selected == *reference {
+                count = count
+                    .checked_add(1)
+                    .ok_or("confined owner count overflow")?;
+            }
+        }
+        Ok(count)
+    }
+
+    fn cold_input_reference_count(&self, request: &RequestId) -> TestResult<usize> {
+        Ok(self
+            .knowledge
+            .f
+            .authority
+            .admission_operation_store()
+            .inspect_confined_input_cold_reference_count(
+                &self.profile.scope,
+                request,
+                &self.knowledge.f.authority.mutation_fence(),
+                now_ms()?,
+            )?)
+    }
 }
 
 #[test]
@@ -529,6 +587,15 @@ fn native_cancel_revokes_context_and_keeps_inputs_pinned_and_slot_consumed() -> 
     let f = ConfinedFixture::new()?;
     let cap = child(&f.knowledge, "child-a", 201)?;
     let reservation = f.reserve("spawn-a", &cap)?;
+    assert_eq!(
+        f.held_input_owner_count(&f.observation, &reservation.boundary)?,
+        1,
+        "the original observation has no typed confinement custody"
+    );
+    assert_eq!(
+        f.cold_input_reference_count(&RequestId::new("spawn-a")?)?,
+        1
+    );
     f.runtime.cancel(
         &f.knowledge.f.control,
         &f.knowledge.f.process,
@@ -539,6 +606,15 @@ fn native_cancel_revokes_context_and_keeps_inputs_pinned_and_slot_consumed() -> 
         IsolationStateV1::Cancelled
     );
     assert_eq!(f.count()?, 1);
+    assert_eq!(
+        f.held_input_owner_count(&f.observation, &reservation.boundary)?,
+        1,
+        "Stop retired the original observation owner"
+    );
+    assert_eq!(
+        f.cold_input_reference_count(&RequestId::new("spawn-a")?)?,
+        1
+    );
     assert!(f
         .knowledge
         .f
@@ -551,6 +627,91 @@ fn native_cancel_revokes_context_and_keeps_inputs_pinned_and_slot_consumed() -> 
         .collect(&f.knowledge.f.control, &f.observation)
         .is_err());
     assert!(f.reserve("new-epoch-same-cap", &cap).is_err());
+    Ok(())
+}
+
+#[test]
+fn native_original_confined_seed_and_observation_remain_held_after_stop_and_reopen() -> TestResult {
+    let mut f = ConfinedFixture::new()?;
+    let seed = f
+        .knowledge
+        .publish("confined-control-seed", br#"{"control":true}"#)?;
+    let unrelated = f
+        .knowledge
+        .publish("unrelated-collectible-input", br#"{"unrelated":true}"#)?;
+    let request = RequestId::new("retained-confined-inputs")?;
+    let cap = child(&f.knowledge, "retained-input-child", 202)?;
+    let reservation = f.runtime.reserve(
+        &f.knowledge.f.control,
+        &f.knowledge.f.process,
+        &request,
+        &cap,
+        core::slice::from_ref(&seed),
+        &f.observation,
+    )?;
+    for reference in [&seed, &f.observation] {
+        assert_eq!(
+            f.held_input_owner_count(reference, &reservation.boundary)?,
+            1,
+            "the original input has no typed confinement owner"
+        );
+    }
+    assert_eq!(f.cold_input_reference_count(&request)?, 2);
+    f.runtime
+        .cancel(&f.knowledge.f.control, &f.knowledge.f.process, &request)?;
+    for reference in [&seed, &f.observation] {
+        assert_eq!(
+            f.held_input_owner_count(reference, &reservation.boundary)?,
+            1,
+            "Stop retired an original input owner"
+        );
+        assert!(f
+            .knowledge
+            .runtime
+            .collect(&f.knowledge.f.control, reference)
+            .is_err());
+    }
+    assert_eq!(f.cold_input_reference_count(&request)?, 2);
+    f.knowledge
+        .runtime
+        .collect(&f.knowledge.f.control, &unrelated)?;
+
+    let knowledge_profile = f.knowledge.profile.clone();
+    let deployment = f.knowledge.f.kernel.recovery_deployment(&f.profile.scope)?;
+    let scope = f.profile.scope.clone();
+    let control = f.knowledge.f.control.clone();
+    let observation = f.observation.clone();
+    let path = f.knowledge.f.path.clone();
+    let directory = f.knowledge.f._directory.take();
+    drop(f);
+    let reopened = RecoveryFixture::open(path, directory, false)?;
+    reopened.kernel.set_capability_trust_root(
+        reopened.seed.capability.issuer.clone(),
+        scope_hash(&reopened.seed.capability.scope)?,
+    );
+    let store = reopened.authority.admission_operation_store();
+    store.configure_recovery_deployment(&deployment)?;
+    let broker = Arc::new(reopened.process.enable_durable_knowledge()?);
+    let runtime = NativeKnowledgeRuntime::new(
+        reopened.kernel.clone(),
+        Arc::new(reopened.authority.admission_operation_store()),
+        broker,
+        knowledge_profile,
+        reopened.authority.mutation_fence(),
+    )?;
+    assert_eq!(
+        store.inspect_confined_input_cold_reference_count(
+            &scope,
+            &request,
+            &reopened.authority.mutation_fence(),
+            now_ms()?,
+        )?,
+        2,
+        "reopen lost original input custody"
+    );
+    for reference in [&seed, &observation] {
+        assert!(runtime.collect(&control, reference).is_err());
+    }
     Ok(())
 }
 #[test]
@@ -1072,6 +1233,50 @@ fn native_reserved_confined_child_rejects_generic_blob_staging() -> TestResult {
     assert_eq!(
         f.knowledge.broker.read_private(&ordinary)?,
         b"ordinary-parent-bytes"
+    );
+    Ok(())
+}
+
+#[test]
+fn native_reserved_candidate_enters_current_verification_without_filling_the_slot() -> TestResult {
+    let f = ConfinedFixture::new()?;
+    let capability = child(&f.knowledge, "verified-return-slot-child", 201)?;
+    let reservation = f.reserve("verified-return-slot-boundary", &capability)?;
+    let actor = f.knowledge.actor(RecoveryPermission::ConfinedLaunch)?;
+    let observation = chio_kernel::knowledge::observe_confined_candidate_verification_fixture(
+        actor.scope(),
+        &reservation.boundary.request,
+    );
+    let before = f.storage()?;
+    for candidate in [
+        b"true".as_slice(),
+        b"false".as_slice(),
+        b"not-json".as_slice(),
+    ] {
+        assert!(f
+            .knowledge
+            .broker
+            .stage_confined_return(&actor, &reservation.boundary, candidate)
+            .is_err());
+    }
+    let connection = rusqlite::Connection::open(f.knowledge.f.path.join("process.db"))?;
+    let (empty, filled, ordinary, legacy): (i64, i64, i64, i64) = connection.query_row(
+        "SELECT
+            (SELECT count(*) FROM process_confined_return_slots
+             WHERE child_id=?1 AND data IS NULL AND sha256 IS NULL),
+            (SELECT count(*) FROM process_confined_return_slots
+             WHERE child_id=?1 AND (data IS NOT NULL OR sha256 IS NOT NULL)),
+            (SELECT count(*) FROM process_artifact_objects WHERE process_id=?1),
+            (SELECT count(*) FROM process_state_blobs WHERE process_id=?1)",
+        [reservation.boundary.child.as_str()],
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+    )?;
+    assert_eq!((empty, filled, ordinary, legacy), (1, 0, 0, 0));
+    assert_eq!(f.storage()?, before);
+    assert_eq!(
+        observation.invocations(),
+        3,
+        "reserved candidates never reached the current native verifier"
     );
     Ok(())
 }

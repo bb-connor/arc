@@ -212,6 +212,13 @@ fn legacy_envelope(
 }
 
 fn seed_legacy(f: &KnowledgeFixture, records: &[(String, &LabeledCheckpointV1)]) -> TestResult {
+    let mut identities = Vec::new();
+    for (_, checkpoint) in records {
+        let identity = (checkpoint.checkpoint.clone(), checkpoint.revision.get());
+        if !identities.contains(&identity) {
+            identities.push(identity);
+        }
+    }
     let records = records
         .iter()
         .map(|(key, envelope)| {
@@ -227,6 +234,20 @@ fn seed_legacy(f: &KnowledgeFixture, records: &[(String, &LabeledCheckpointV1)])
         &f.f.authority.mutation_fence(),
         &records,
     )?;
+    // These old-format sources were inserted after the native fixture opened.
+    // Exercise the real scoped storage migration before the unchanged public
+    // save, restore and collection paths consume this simulated upgrade.
+    let store = f.f.authority.admission_operation_store();
+    let admin = f.actor(RecoveryPermission::KnowledgeAdmin)?;
+    for (id, revision) in identities {
+        store.migrate_checkpoint_reference_custody(
+            &admin,
+            &id,
+            revision,
+            &f.f.authority.mutation_fence(),
+            now_ms()?,
+        )?;
+    }
     Ok(())
 }
 

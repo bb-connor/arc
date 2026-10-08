@@ -99,6 +99,8 @@ pub mod payment;
 #[cfg(not(loom))]
 pub mod post_invocation;
 #[cfg(not(loom))]
+pub mod process_return_custody;
+#[cfg(not(loom))]
 #[allow(deprecated)]
 pub mod provider_verdict;
 #[cfg(not(loom))]

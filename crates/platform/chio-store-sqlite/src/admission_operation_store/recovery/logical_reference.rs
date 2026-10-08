@@ -16,6 +16,8 @@ use std::ops::Deref;
 mod reference_capacity;
 #[path = "logical_reference/reference_cold.rs"]
 mod reference_cold;
+#[path = "logical_reference/reference_knowledge.rs"]
+mod reference_knowledge;
 #[path = "logical_reference/reference_product.rs"]
 mod reference_product;
 
@@ -26,6 +28,10 @@ pub(in crate::admission_operation_store) use reference_cold::{
     initialize_knowledge_reference_account, persist_knowledge_new_artifact_reference_baseline,
     persist_knowledge_reference_cold_baseline, persist_knowledge_reference_ready,
     VerifiedKnowledgeReferenceColdProgress,
+};
+pub(in crate::admission_operation_store) use reference_knowledge::{
+    persist_knowledge_reference_retain, persist_knowledge_reference_retirement,
+    persist_product_reference_retirement,
 };
 pub(in crate::admission_operation_store) use reference_product::{
     bind_product_reference_source, persist_knowledge_reference_progress,

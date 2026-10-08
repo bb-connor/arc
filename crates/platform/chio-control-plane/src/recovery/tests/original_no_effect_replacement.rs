@@ -79,6 +79,76 @@ fn replacement_command(
     )
 }
 
+async fn approve_replacement(
+    fixture: &RecoveryFixture,
+    create: &RecoveryCommandV1,
+) -> TestResult<WorkflowId> {
+    let result = Box::pin(fixture.runtime.execute_command(&fixture.control, create)).await?;
+    let workflow = result.status.workflow_id;
+    let record = fixture.record(&workflow)?;
+    let action = record.action.as_ref().ok_or("replacement action absent")?;
+    let bytes = recovery_digest(
+        chio_core_types::recovery::RecoveryDigestDomain::ActionIntent,
+        action,
+    )?;
+    let offer = format!(
+        "offer:{}",
+        bytes
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>()
+    );
+    Box::pin(fixture.execute(
+        "replacement-select",
+        RecoveryCommandBodyV1::SelectOffer {
+            workflow_id: workflow.clone(),
+            expected_revision: record.revision,
+            offer_id: OfferId::new(&offer)?,
+        },
+    ))
+    .await?;
+    let intent = fixture
+        .runtime
+        .approval_intent(&fixture.control, &workflow)?;
+    let record = fixture.record(&workflow)?;
+    let action = record
+        .action
+        .as_ref()
+        .ok_or("replacement review action absent")?;
+    let coverage = AuthorityCoverageAttestationV1 {
+        schema: AuthorityCoverageSchema::V1,
+        version: VersionV1,
+        scope: fixture.runtime.scope().clone(),
+        approval_intent: intent.approval_intent.clone(),
+        challenge: intent.challenge.clone(),
+        action_intent: intent.action_intent,
+        authorization_requirements: intent.authorization_requirements,
+        source_basis: action.basis,
+        issuer_id: IssuerId::new("reviewer")?,
+        principal: PrincipalId::new("reviewer")?,
+        obligations: intent.obligations.clone(),
+        issued_at_unix_ms: intent.issued_at_unix_ms,
+        expires_at_unix_ms: intent.expires_at_unix_ms,
+    };
+    let submission = RecoveryApprovalSubmissionV1 {
+        intent,
+        coverage: NonEmptyBoundedList::new(vec![SignedAuthorityCoverageAttestationV1::sign(
+            coverage,
+            &fixture.approval_key,
+        )?])?,
+    };
+    Box::pin(fixture.execute(
+        "replacement-approve",
+        RecoveryCommandBodyV1::SubmitApproval {
+            workflow_id: workflow.clone(),
+            expected_revision: record.revision,
+            approval: text(&submission)?,
+        },
+    ))
+    .await?;
+    Ok(workflow)
+}
+
 #[tokio::test]
 async fn recovery_cancelled_never_admitted_original_can_acquire_one_new_workflow() -> TestResult {
     let diagnostics = QuotaTestDiagnostics::new();
@@ -206,6 +276,50 @@ async fn recovery_cancelled_never_admitted_original_can_acquire_one_new_workflow
         assert_eq!(immutable_original_claim(&fixture)?, claim);
         assert_eq!(fixture.process.process("root")?.tree_calls, process_calls);
         assert_eq!(external_count(&fixture.path)?, 0);
+        diagnostics.phase("the single successor captures and completes exactly one real effect");
+        let ready = Box::pin(approve_replacement(&fixture, &next)).await?;
+        assert_eq!(ready, accepted.workflow_id);
+        let completed = Box::pin(fixture.execute(
+            "replacement-resume",
+            RecoveryCommandBodyV1::ResumeWorkflow {
+                workflow_id: ready.clone(),
+                expected_revision: fixture.record(&ready)?.revision,
+            },
+        ))
+        .await?;
+        assert!(matches!(
+            completed.status.effect,
+            EffectObservationV1::Complete { .. }
+        ));
+        let replacement = fixture.record(&ready)?;
+        assert!(replacement.captured);
+        assert_eq!(
+            replacement.effect.applied_effects(),
+            Some(SafeInteger::new(1)?)
+        );
+        assert!(matches!(
+            replacement.release,
+            ReleaseDispositionV1::Released { .. }
+        ));
+        assert_eq!(
+            fixture.process.process("root")?.tree_calls,
+            process_calls + 1
+        );
+        assert_eq!(external_count(&fixture.path)?, 1);
+        assert_eq!(
+            owned_workflow_rows(&fixture, &initial.workflow_id)?,
+            old_rows
+        );
+        assert_eq!(immutable_original_claim(&fixture)?, claim);
+        let after = protected_usage(&fixture)?;
+        let _ = Box::pin(
+            fixture
+                .runtime
+                .execute_command(&fixture.control, &first_resume),
+        )
+        .await;
+        assert_eq!(protected_usage(&fixture)?, after);
+        assert_eq!(external_count(&fixture.path)?, 1);
         Ok(())
     })
     .await;

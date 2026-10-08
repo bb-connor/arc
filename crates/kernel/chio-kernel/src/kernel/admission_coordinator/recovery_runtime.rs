@@ -276,15 +276,14 @@ impl ChioKernel {
                 self.compensate_durable_admission_before_dispatch(&operation,
                     serde_json::json!({"authority":"scoped-recovery","cause":"original-pre-dispatch-closure"}), now, None)?;
             }
-            AdmissionOperationState::ApprovalRequired => {
+            AdmissionOperationState::ApprovalRequired
                 if record.control != WorkflowControlV1::Active
                     || operation
                         .parked_approval_deadline_unix_ms()?
-                        .is_some_and(|deadline| deadline <= now)
-                {
-                    self.compensate_durable_admission_before_dispatch(&operation,
-                        serde_json::json!({"authority":"scoped-recovery","cause":"original-approval-closure"}), now, None)?;
-                }
+                        .is_some_and(|deadline| deadline <= now) =>
+            {
+                self.compensate_durable_admission_before_dispatch(&operation,
+                    serde_json::json!({"authority":"scoped-recovery","cause":"original-approval-closure"}), now, None)?;
             }
             AdmissionOperationState::DispatchCommitted => {
                 self.reconcile_scoped_dispatch_committed_original(&operation, now)?;
@@ -607,13 +606,16 @@ impl ChioKernel {
             return Err(unsupported());
         }
         let profile = self.admission_authority_profile()?;
-        let plan = self.durable_post_return_plan()?;
+        let plan = self.durable_post_return_plan_for_fresh_native_profile(
+            self.native_output_retention.as_deref(),
+        )?;
         let immutable = immutable_tool_admission_request_hash(
             request,
             &grants,
             &plan,
             Some(&security),
             Some(&profile),
+            self.native_output_retention.as_deref(),
         )?;
         let nonce = self.durable_nonce_participant_required(
             &runtime.store.admission_projection_capabilities(),
@@ -756,24 +758,33 @@ impl ChioKernel {
                     nonce_preflight: None,
                     _live_owner: None,
                 };
-                if self.frozen_recovery_signer_unavailable(&admission)? {
-                    RecoveryHistoricalHoldReasonV1::FrozenSigningCustodyUnavailable
-                } else {
-                    // A configured hook can explicitly declare that its old
-                    // deterministic implementation is unavailable. Only that pure
-                    // declaration is typed absence; physical errors still escape.
-                    let declarations = super::super::security_dispatch::callback(
-                        "historical output verifier selection",
-                        || Ok(self.post_invocation_pipeline.durable_identities()),
-                    )?;
-                    if declarations.is_ok()
-                        && original.post_return_steps()
-                            == self.durable_post_return_plan()?.frozen_steps.as_slice()
-                    {
-                        return Ok(false);
-                    }
-                    RecoveryHistoricalHoldReasonV1::FrozenOutputVerifierUnavailable
+                // Signing rotation cannot orphan an authenticated effect. The
+                // private finalizer selects current signing for a distinct
+                // withheld attestation; immutable raw faults still propagate.
+                self.frozen_recovery_signer_unavailable(&admission)?;
+                let declarations = super::super::security_dispatch::callback(
+                    "historical output verifier selection",
+                    || Ok(self.post_invocation_pipeline.durable_identities()),
+                )?;
+                if declarations.is_ok()
+                    && original.post_return_steps()
+                        == self.durable_post_return_plan()?.frozen_steps.as_slice()
+                {
+                    return Ok(false);
                 }
+                // An older signer hold stays authenticated and immutable if a
+                // second, unavailable verifier prevents its private discharge.
+                if operation.state() == AdmissionOperationState::Finalizing {
+                    let (port, runtime, now) = self.recovery_port()?;
+                    if port
+                        .historical_release(operation.binding().operation_id(), &runtime.fence, now)
+                        .map_err(durable_store_error)?
+                        .is_some_and(|record| record.historical_hold.is_some())
+                    {
+                        return Ok(true);
+                    }
+                }
+                RecoveryHistoricalHoldReasonV1::FrozenOutputVerifierUnavailable
             }
         };
         let (port, runtime, now) = self.recovery_port()?;

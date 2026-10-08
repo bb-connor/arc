@@ -38,6 +38,7 @@ fn publication(
     {
         return Err(refused("publication conflict"));
     }
+    super::publication_capacity::validate_retained_allocation(tx, &record)?;
     Ok(record)
 }
 fn write_record(
@@ -45,13 +46,21 @@ fn write_record(
     owner: &SqliteServingOwner,
     record: &NativeArtifactRecordV1,
 ) -> Result<(), AdmissionOperationStoreError> {
-    save(
+    let key = record_publication_key(record)?;
+    let previous = protected::source_reference(tx, &key)?;
+    let progress = super::publication_source::VerifiedKnowledgePublicationProgress::new(
         tx,
-        owner,
-        &record.metadata.scope,
-        &record_publication_key(record)?,
-        record,
-    )
+        previous,
+        record.clone(),
+    )?;
+    progress.verify(tx)?;
+    super::publication_capacity::validate_existing_allocation(tx, record)?;
+    save(tx, owner, &record.metadata.scope, &key, record)?;
+    if record.state == ArtifactPublicationStateV1::Retired {
+        super::reference_retirement::retire_publication_references(tx, owner, record)
+    } else {
+        super::reference_custody::retain_publication_references(tx, owner, record)
+    }
 }
 fn validate_certificate(
     tx: &Transaction<'_>,
@@ -179,7 +188,7 @@ impl SqliteAdmissionOperationStore {
         {
             return Err(refused("publication authority"));
         }
-        mutate(self, actor, fence, now, |tx, profile, _| {
+        mutate(self, actor, fence, now, |tx, profile, now| {
             let key = publication_key(actor.scope(), actor.principal(), &input.publication)?;
             if let Some(existing) = load::<NativeArtifactRecordV1>(&tx, &key)? {
                 if existing.input != *input
@@ -191,6 +200,7 @@ impl SqliteAdmissionOperationStore {
                     return Err(refused("publication identity"));
                 }
                 ensure_publication_audience(&tx, actor, &existing)?;
+                super::publication_capacity::validate_existing_allocation(&tx, &existing)?;
                 return Ok((tx, existing));
             }
             // Older envelopes omitted writer identity. Preserve their custody
@@ -203,10 +213,7 @@ impl SqliteAdmissionOperationStore {
             {
                 return Err(refused("legacy publication owner unproven"));
             }
-            let count:i64=tx.query_row("SELECT count(*) FROM admission_operation_recovery_records WHERE record_key GLOB 'knowledge-publication:*'",[],|row|row.get(0)).map_err(sqlite_error)?;
-            if count >= 512 {
-                return Err(refused("artifact quota"));
-            }
+            super::publication_capacity::require_intake_capacity(&tx, actor.scope())?;
             let dependencies =
                 traversal::dependencies(&tx, actor.scope(), input.dependencies.as_slice())?;
             let mut label = source(&tx, &profile.native_authority, &profile.producer_context)?;
@@ -336,7 +343,14 @@ impl SqliteAdmissionOperationStore {
                 publication_principal: Some(actor.principal().clone()),
             };
             ensure_publication_audience(&tx, actor, &record)?;
-            write_record(&tx, &self.serving_owner, &record)?;
+            let intake = super::publication_source::VerifiedKnowledgePublicationIntake::new(
+                &tx,
+                actor,
+                profile,
+                now,
+                record.clone(),
+            )?;
+            super::publication_capacity::admit_publication(&tx, &self.serving_owner, intake)?;
             Ok((tx, record))
         })
     }

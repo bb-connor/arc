@@ -4,14 +4,14 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct OriginClaim {
-    scope: RecoveryScopeV1,
-    workflow_id: WorkflowId,
-    continuation_id: ContinuationId,
-    origin: RecoveryOriginV1,
+pub(super) struct OriginClaim {
+    pub(super) scope: RecoveryScopeV1,
+    pub(super) workflow_id: WorkflowId,
+    pub(super) continuation_id: ContinuationId,
+    pub(super) origin: RecoveryOriginV1,
 }
 
-fn claim_key(origin: &RecoveryOriginV1) -> Result<String, AdmissionOperationStoreError> {
+pub(super) fn claim_key(origin: &RecoveryOriginV1) -> Result<String, AdmissionOperationStoreError> {
     // The native operation is exclusive across every tenant/process scope in
     // this authority. A different creation key cannot mint another owner.
     Ok(format!(
@@ -21,6 +21,44 @@ fn claim_key(origin: &RecoveryOriginV1) -> Result<String, AdmissionOperationStor
             origin.operation.operation_id()
         )?)
     ))
+}
+
+pub(super) fn load_claim_by_key(
+    tx: &Connection,
+    key: &str,
+) -> Result<(OriginClaim, ProtectedSourceReference), AdmissionOperationStoreError> {
+    let row =
+        raw_checked(tx, key)?.ok_or_else(|| invariant("recovery original claim disappeared"))?;
+    let source = source_reference(tx, key)?;
+    let claim: OriginClaim = decode(&row.payload)?;
+    let ordinary: bool = tx.query_row(
+        "SELECT native_namespace IS NULL AND native_request IS NULL FROM admission_operation_recovery_records WHERE record_key=?1",
+        [key], |row| row.get(0),
+    ).map_err(sqlite_error)?;
+    if row.kind != "command"
+        || row.version != 1
+        || row.payload.len() > 4096
+        || row.scope != scope_key(&claim.scope)?
+        || key != claim_key(&claim.origin)?
+        || !ordinary
+        || source.version() != 1
+    {
+        return Err(invariant("recovery original immutable claim changed"));
+    }
+    Ok((claim, source))
+}
+
+pub(super) fn load_immutable_claim(
+    tx: &Connection,
+    origin: &RecoveryOriginV1,
+) -> Result<(OriginClaim, ProtectedSourceReference), AdmissionOperationStoreError> {
+    let (claim, source) = load_claim_by_key(tx, &claim_key(origin)?)?;
+    if claim.origin != *origin {
+        return Err(invariant(
+            "recovery original claim changed native provenance",
+        ));
+    }
+    Ok((claim, source))
 }
 
 fn require_linked_history(tx: &Transaction<'_>) -> Result<(), AdmissionOperationStoreError> {
@@ -56,6 +94,17 @@ fn verify_history_workflow(tx: &Connection, key: &str) -> Result<(), AdmissionOp
         return Err(invariant("recovery workflow history owner changed"));
     }
     if let Some(origin) = &record.origin {
+        let version: Option<i32> = tx
+            .query_row(
+                "SELECT version FROM chio_store_schema_versions WHERE store_key=?1",
+                [ADMISSION_OPERATION_SCHEMA_KEY],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(sqlite_error)?;
+        if version == Some(41) {
+            return verify_original_owner_membership(tx, &record);
+        }
         let retained = raw(tx, &claim_key(origin)?)?
             .ok_or_else(|| invariant("recovery history lost its original claim"))?;
         let claim: OriginClaim = decode(&retained.payload)?;
@@ -154,16 +203,23 @@ pub(super) fn verify(
     {
         return Err(invariant("recovery original binding changed"));
     }
-    let retained = raw(tx, &claim_key(origin)?)?
-        .ok_or_else(|| invariant("recovery original ownership is absent"))?;
-    let claim: OriginClaim = decode(&retained.payload)?;
-    if retained.version != 1
-        || claim.scope != record.scope
-        || claim.workflow_id != record.workflow_id
-        || claim.continuation_id != record.continuation_id
-        || claim.origin != *origin
+    // Fresh validators also receive an owning producer's prospective clone
+    // before its next mutation. Authorize the authenticated physical owner,
+    // then bind the clone's immutable creation identity to that source.
+    let physical = workflow_tx(tx, &record.scope, &record.workflow_id)?;
+    if physical.scope != record.scope
+        || physical.workflow_id != record.workflow_id
+        || physical.step_id != record.step_id
+        || physical.continuation_id != record.continuation_id
+        || physical.created_by != record.created_by
+        || physical.creation_seed != record.creation_seed
+        || physical.origin != record.origin
+        || physical.deployment_digest != record.deployment_digest
+        || physical.effect_cardinality != record.effect_cardinality
     {
-        return Err(invariant("recovery original ownership changed"));
+        return Err(invariant(
+            "recovery prospective progress changed its immutable original owner",
+        ));
     }
-    Ok(())
+    require_current_original_owner(tx, &physical)
 }

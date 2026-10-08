@@ -11,7 +11,7 @@ pub struct RecoveryProviderLookupBudget {
 }
 impl RecoveryProviderLookupBudget {
     pub fn from_duration(duration: Duration) -> Result<Self, crate::KernelError> {
-        let fraction = u128::from(duration.subsec_nanos() % 1_000_000 != 0);
+        let fraction = u128::from(!duration.subsec_nanos().is_multiple_of(1_000_000));
         let millis = duration
             .as_millis()
             .checked_add(fraction)

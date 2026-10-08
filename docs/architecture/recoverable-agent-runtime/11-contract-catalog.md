@@ -8,6 +8,33 @@ Signed artifacts use the existing Ed25519/canonical-body primitives and an expli
 
 Proposed digest domains are UTF-8 strings terminated by a zero byte, followed by canonical body bytes: `chio.recovery.action-intent.v1`, `chio.recovery.offer.v1`, `chio.recovery.plan.v1`, `chio.recovery.basis.v1`, `chio.recovery.explanation.v1`, `chio.semantic.deployment.v1`, `chio.artifact.provenance.v1`, and `chio.isolation.return-contract.v1`. Digests use existing SHA-256. The framing is `SHA256(domain || 0x00 || canonical_body)` with no implicit whitespace or string interpolation. These new digest meanings never replace existing request/receipt digest algorithms.
 
+The current explanation implementation uses the following closed meanings. The
+[digest registry](../../../crates/core/chio-core-types/src/recovery/domains.rs)
+retains the exact names and framing; the
+[report producer](../../../crates/security/chio-recovery/src/report.rs) commits
+the four distinct canonical inputs. The
+[native explanation adapter](../../../crates/platform/chio-control-plane/src/recovery/explanation/native.rs)
+constructs its separate advisory influence observation.
+
+| Meaning | Domain |
+|---|---|
+| Explanation snapshot digest | `chio.recovery.explanation-snapshot.v1` |
+| Remedy registry digest | `chio.recovery.remedy-registry.v1` |
+| Explanation evaluation digest | `chio.recovery.explanation-evaluation.v1` |
+| Authorized explanation projection digest | `chio.recovery.explanation-projection.v1` |
+| Native influence observation digest | `chio.recovery.influence.v1` |
+| Explanation report signature | `chio:recovery-explanation-report:v1` |
+| Explanation view signature | `chio:recovery-explanation-view:v1` |
+
+The [signed explanation types](../../../crates/core/chio-core-types/src/recovery/explanation.rs)
+frame each signature under its own domain. `chio.recovery.explanation.v1`
+remains a registered retained name; its registration does not imply an active
+report digest producer. Explanation commitments and signatures identify the
+observed advisory basis. Native effect capture independently revalidates the
+original operation, authority and actual source. Historical phase records retain
+their original names, commands and evidence; current source correspondence is
+an additive observation with separate execution evidence.
+
 Grant v2 uses signature domain `chio:declassification-grant:v2`, distinct from existing `chio:declassification-grant:v1`, followed by a zero byte and canonical v2 body exactly as the existing grant signing helper frames v1. All signed bodies bind their schema/version and authority/deployment scope where relevant. The signer key identifier is verified against the selected trust policy; an embedded public key is not its own trust root. Raw digest bytes use the existing generated digest representation, not a new case-insensitive string convention.
 
 The new tool-request protocol carries an explicitly version-selected disclosure-grant sum type. Its request/profile version and signed body's version must agree. Do not implement an untagged decoder that tries v2 and falls back to v1, or add security-relevant optional fields that old hosts silently ignore. Historical v1 request bytes retain their original decoder and identity; new recovery requests require the v2-capable profile.
