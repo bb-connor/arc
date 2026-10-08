@@ -464,3 +464,47 @@ fn a_deadline_stream_reads_a_buffered_response_after_both_directions_close() {
     stream.read_to_end(&mut response).test_unwrap();
     assert_eq!(response, b"response");
 }
+
+#[test]
+fn canonical_frames_refuse_bad_lengths_exactly_and_keep_transfer_faults() {
+    use std::io::Cursor;
+
+    let read = |bytes: Vec<u8>| {
+        super::read_canonical_frame::<_, serde_json::Value>(&mut Cursor::new(bytes))
+    };
+    for declared in [
+        0,
+        u32::try_from(super::MAX_KEY_LOG_IPC_FRAME_BYTES + 1).test_unwrap(),
+    ] {
+        let result = read(declared.to_be_bytes().to_vec());
+        assert!(
+            matches!(&result, Err(KeyringError::Canonical(message))
+                if message == "canonical IPC frame has an invalid length"),
+            "{result:?}"
+        );
+    }
+    let result = read(vec![0, 0]);
+    assert!(
+        matches!(&result, Err(KeyringError::Io(error))
+            if error.kind() == std::io::ErrorKind::UnexpectedEof),
+        "{result:?}"
+    );
+    let mut truncated = 12_u32.to_be_bytes().to_vec();
+    truncated.extend_from_slice(b"{}{}");
+    let result = read(truncated);
+    assert!(
+        matches!(&result, Err(KeyringError::Io(error))
+            if error.kind() == std::io::ErrorKind::UnexpectedEof),
+        "{result:?}"
+    );
+
+    let oversized = serde_json::Value::String("x".repeat(super::MAX_KEY_LOG_IPC_FRAME_BYTES));
+    let mut written = Vec::new();
+    let result = super::write_canonical_frame(&mut written, &oversized);
+    assert!(
+        matches!(&result, Err(KeyringError::Canonical(message))
+            if message == "canonical IPC record has an invalid length"),
+        "{result:?}"
+    );
+    assert!(written.is_empty());
+}
