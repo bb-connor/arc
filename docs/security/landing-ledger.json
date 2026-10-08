@@ -1930,19 +1930,68 @@
     },
     {"path":"docs/security/audits/native-attachment-diagnostic-20261008.json","commit":"24e97760481275a824a3572bab1b8eed24da5b63","sha256":"90bffa7e29b954c759691c53652128dfa5a254ee6d99fc94bc8afc89b1a2078f","requirement_ids":["incoming-pr1160-review-20261008:native:MINISW-PDEATH","incoming-pr1160-review-20261008:native:MINISW-NATIVE-DENY","incoming-pr1160-review-20261008:native:BROKER-SELECT"]},
     {"path":"docs/security/audits/review-reconciliation-obligations-20261008.json","commit":"b6d38fceca3951c2f6900c0c3e83372b426a5e3a","sha256":"6a445336bfa8184168a334ba9ac549e054b8a2c01f40bc42bfbc702971e08fcf","requirement_ids":["incoming-pr1160-review-20261008:reconciliation:MCP-RESERVE","incoming-pr1160-review-20261008:reconciliation:MCP-PROJECTION","incoming-pr1160-review-20261008:reconciliation:MCP-GENERATION","incoming-pr1160-review-20261008:reconciliation:FX-CLOCK","incoming-pr1160-review-20261008:reconciliation:EF-FINALITY","incoming-pr1160-review-20261008:reconciliation:EF-FREEZE"]},
-    {"path":"docs/security/audits/repair-batch-local-checkpoint-20261008.json","commit":"ebdf52364cbafed33bd04e17c25be57ab055755b","sha256":"6e3781eb1b9e8eeb56f7d31ad10ef2cb9bd609bf7013c1477e998326a16a21b9","requirement_ids":["incoming-pr1160-review-20261006:F016","incoming-pr1160-review-20261007:resume:F016-TC","incoming-pr1160-review-20261006:F042","incoming-pr1160-review-20261007:resume:F042-CURRENT","incoming-pr1160-review-20261006:F044","incoming-pr1160-review-20261007:resume:F044-CURRENT","incoming-pr1160-review-20261007:resume:TEARDOWN-TTL","incoming-pr1160-review-20261007:resume:PG-HISTORY","incoming-pr1160-review-20261008:native:BROKER-SELECT","incoming-pr1160-review-20261008:reconciliation:MCP-RESERVE","incoming-pr1160-review-20261008:reconciliation:MCP-GENERATION","incoming-pr1160-review-20261008:reconciliation:MCP-PROJECTION","incoming-pr1160-review-20261008:reconciliation:FX-CLOCK","incoming-pr1160-review-20261007:resume:MINISW-ATTACH","incoming-pr1160-review-20261008:native:MINISW-PDEATH","incoming-pr1160-review-20261008:native:MINISW-NATIVE-DENY","incoming-pr1160-review-20261007:effects:durable-plan-binding","incoming-pr1160-review-20261008:reconciliation:EF-FINALITY","incoming-pr1160-review-20261008:reconciliation:EF-FREEZE","incoming-pr1160-review-20261008:reconciliation:EF-REPLAY"]}
+    {
+      "path": "docs/security/audits/repair-batch-local-checkpoint-20261008.json",
+      "commit": "ebdf52364cbafed33bd04e17c25be57ab055755b",
+      "sha256": "6e3781eb1b9e8eeb56f7d31ad10ef2cb9bd609bf7013c1477e998326a16a21b9",
+      "requirement_ids": [
+        "incoming-pr1160-review-20261008:reconciliation:EF-REPLAY"
+      ],
+      "evidence_requirement_ids": [
+        "incoming-pr1160-review-20261006:F016",
+        "incoming-pr1160-review-20261007:resume:F016-TC",
+        "incoming-pr1160-review-20261006:F042",
+        "incoming-pr1160-review-20261007:resume:F042-CURRENT",
+        "incoming-pr1160-review-20261006:F044",
+        "incoming-pr1160-review-20261007:resume:F044-CURRENT",
+        "incoming-pr1160-review-20261007:resume:TEARDOWN-TTL",
+        "incoming-pr1160-review-20261007:resume:PG-HISTORY",
+        "incoming-pr1160-review-20261008:native:BROKER-SELECT",
+        "incoming-pr1160-review-20261008:reconciliation:MCP-RESERVE",
+        "incoming-pr1160-review-20261008:reconciliation:MCP-GENERATION",
+        "incoming-pr1160-review-20261008:reconciliation:MCP-PROJECTION",
+        "incoming-pr1160-review-20261008:reconciliation:FX-CLOCK",
+        "incoming-pr1160-review-20261007:resume:MINISW-ATTACH",
+        "incoming-pr1160-review-20261008:native:MINISW-PDEATH",
+        "incoming-pr1160-review-20261008:native:MINISW-NATIVE-DENY",
+        "incoming-pr1160-review-20261007:effects:durable-plan-binding",
+        "incoming-pr1160-review-20261008:reconciliation:EF-FINALITY",
+        "incoming-pr1160-review-20261008:reconciliation:EF-FREEZE"
+      ]
+    }
   ,
 {
-  "path": "docs/security/audits/fixture-correction-checkpoint-20261008.json",
-  "commit": "a43226e8e4af96f96fb3a768047796891e0a06cb",
-  "sha256": "72540d5201a1c396a60b4a6051247ca0908ab32276ef2fb6b11dc83bd214cd11",
-  "requirement_ids": [
-    "incoming-pr1160-review-20261008:reconciliation:MCP-PROJECTION",
-    "incoming-pr1160-review-20261008:native:BROKER-SELECT",
-    "incoming-pr1160-review-20261007:effects:durable-plan-binding",
-    "incoming-pr1160-review-20261008:reconciliation:EF-REPLAY"
-  ]
-}
+      "path": "docs/security/audits/fixture-correction-checkpoint-20261008.json",
+      "commit": "a43226e8e4af96f96fb3a768047796891e0a06cb",
+      "sha256": "72540d5201a1c396a60b4a6051247ca0908ab32276ef2fb6b11dc83bd214cd11",
+      "requirement_ids": [],
+      "evidence_requirement_ids": [
+        "incoming-pr1160-review-20261008:reconciliation:MCP-PROJECTION",
+        "incoming-pr1160-review-20261008:native:BROKER-SELECT",
+        "incoming-pr1160-review-20261007:effects:durable-plan-binding",
+        "incoming-pr1160-review-20261008:reconciliation:EF-REPLAY"
+      ]
+    },
+    {
+      "path": "docs/security/audits/mcp-and-diagnostic-integration-checkpoint-20261008.json",
+      "commit": "759bb100ccfb16d1e37fe8b48db96cb40f5197fe",
+      "sha256": "dc0cb4f803830f4aade07f228f8ed60cc6c629d760d937b6794161986838233a",
+      "requirement_ids": [
+        "incoming-pr1160-review-20261008:resume:MCP-INIT400",
+        "incoming-pr1160-review-20261008:resume:MCP-PEERS",
+        "incoming-pr1160-review-20261008:resume:MCP-GET",
+        "incoming-pr1160-review-20261008:resume:MCP-CANCEL",
+        "incoming-pr1160-review-20261008:resume:MCP-REJECT-READER"
+      ]
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/budget_custody.rs",
+      "commit": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+      "sha256": "f3aeaff012d4334b224e0e7f0c7005896f83a3e086a2671ff4f4c35c3de9e68f",
+      "requirement_ids": [
+        "incoming-pr1160-review-20261008:native:NRB001"
+      ]
+    }
 ],
   "pull_requests": [
     {

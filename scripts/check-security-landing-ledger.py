@@ -16,6 +16,51 @@ def git(*args: str) -> bytes:
     return subprocess.check_output(["git", *args], cwd=ROOT, stderr=subprocess.PIPE)
 
 
+def requirement_ids(value: object, path: str, kind: str, errors: list[str]) -> list[str]:
+    if not isinstance(value, list) or any(not isinstance(item, str) or not item for item in value):
+        errors.append(f"invalid {kind} requirement identities: {path}")
+        return []
+    if len(set(value)) != len(value):
+        errors.append(f"duplicate {kind} requirement identities: {path}")
+    return value
+
+
+def full_commit(value: object) -> bool:
+    return isinstance(value, str) and re.fullmatch(r"[0-9a-f]{40}", value) is not None
+
+
+def repair_checkpoint(repair: dict, identity: str, errors: list[str]) -> str | None:
+    paths = repair.get("files")
+    valid_paths = (isinstance(paths, list) and bool(paths)
+                   and all(isinstance(path, str) and bool(path) for path in paths))
+    if "checkpoint" in repair:
+        checkpoint = repair["checkpoint"]
+        if not full_commit(checkpoint) or not valid_paths:
+            errors.append("repair requires an exact checkpoint and files: " + identity)
+            return None
+        return checkpoint
+
+    commits = repair.get("commits")
+    head, tree = repair.get("observed_source_head"), repair.get("observed_source_tree")
+    if (not valid_paths or not full_commit(head) or not full_commit(tree)
+            or not isinstance(commits, list) or not commits
+            or any(not full_commit(commit) for commit in commits)
+            or len(set(commits)) != len(commits)):
+        errors.append("modern repair requires exact commits, head, tree and files: " + identity)
+        return None
+    try:
+        actual_tree = git("rev-parse", head + "^{tree}").decode().strip()
+        if actual_tree != tree:
+            errors.append("modern repair tree differs from its recorded head: " + identity)
+            return None
+        for commit in commits:
+            git("merge-base", "--is-ancestor", commit, head)
+    except subprocess.CalledProcessError:
+        errors.append("modern repair commits or head are not retained: " + identity)
+        return None
+    return head
+
+
 def check(path: Path) -> list[str]:
     ledger = json.loads(path.read_text())
     errors = []
@@ -34,9 +79,12 @@ def check(path: Path) -> list[str]:
         raw = git("show", source["commit"] + ":" + source["path"])
         if hashlib.sha256(raw).hexdigest() != source["sha256"]:
             errors.append("source hash mismatch: " + source["path"])
-        expected = source["requirement_ids"]
-        if len(set(expected)) != len(expected):
-            errors.append("duplicate source requirement: " + source["path"])
+        expected = requirement_ids(source.get("requirement_ids"), source["path"], "primary", errors)
+        associated = requirement_ids(source.get("evidence_requirement_ids", []),
+                                     source["path"], "evidence", errors)
+        for identity in associated:
+            if identity not in by_id:
+                errors.append(f"unknown evidence requirement: {identity}: {source['path']}")
         lines = raw.decode().splitlines()
         for identity in expected:
             if identity not in by_id:
@@ -45,9 +93,16 @@ def check(path: Path) -> list[str]:
             row = by_id[identity]
             location = row["source"]
             if location["path"] != source["path"]:
-                errors.append("requirement points at different source: " + identity)
+                errors.append(f"requirement points at different source: {identity}: "
+                              f"{location['path']} != {source['path']}")
+                continue
             if "line" in location:
-                line = lines[location["line"] - 1]
+                number = location["line"]
+                if type(number) is not int or not 1 <= number <= len(lines):
+                    errors.append(f"invalid requirement source line: {identity}: "
+                                  f"{source['path']}:{number!r} (1..{len(lines)})")
+                    continue
+                line = lines[number - 1]
                 if hashlib.sha256(line.encode()).hexdigest() != location["line_sha256"]:
                     errors.append("requirement source line mismatch: " + identity)
         if source["path"].endswith("process-security-review-dispositions.json"):
@@ -92,12 +147,10 @@ def check(path: Path) -> list[str]:
             except subprocess.CalledProcessError:
                 errors.append("missing repair record: " + repair)
         elif isinstance(repair, dict):
-            checkpoint = repair.get("checkpoint", "")
-            paths = repair.get("files", [])
-            if not re.fullmatch(r"[0-9a-f]{40}", checkpoint) or not paths:
-                errors.append("repair requires an exact checkpoint and files: " + row["id"])
+            checkpoint = repair_checkpoint(repair, row["id"], errors)
+            if checkpoint is None:
                 continue
-            for repair_path in paths:
+            for repair_path in repair["files"]:
                 try:
                     git("cat-file", "-e", checkpoint + ":" + repair_path)
                 except subprocess.CalledProcessError:

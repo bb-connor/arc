@@ -7,6 +7,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 from unittest import mock
@@ -125,6 +126,126 @@ class LedgerOriginalTests(unittest.TestCase):
             "observed_source_tree": TREE, "files": ["src/repair.rs"],
             "application": "Source integrated; final acceptance pending",
             "scope": "Metadata correspondence only"}
+        self.assertEqual(run_check(data), [])
+
+
+def modern_repair():
+    return {"commits": [REFERENCE], "observed_source_head": REFERENCE,
+            "observed_source_tree": TREE, "files": ["src/repair.rs"],
+            "application": "Source integrated; final acceptance pending",
+            "scope": "Metadata correspondence only"}
+
+
+class LedgerRefusalControls(unittest.TestCase):
+    def test_evidence_associations_cannot_replace_primary_markdown_finding_coverage(self):
+        data = fixture()
+        path = "fixture-origin.md"
+        raw = b"- [ ] first obligation\n- [ ] second obligation\n"
+        data["requirements"][0]["source"] = {
+            "path": path, "line": 1, "additional_lines": [2],
+            "line_sha256": digest(raw.decode().splitlines()[0].encode()),
+            "checkpoint": REFERENCE}
+        data["sources"] = [{"path": path, "commit": REFERENCE,
+                            "sha256": digest(raw), "requirement_ids": [],
+                            "evidence_requirement_ids": [IDENTITY]}]
+
+        def reads(*args):
+            if args == ("show", REFERENCE + ":" + path):
+                return raw
+            return fake_git(*args)
+
+        with tempfile.TemporaryDirectory(prefix="ledger-markdown-") as folder:
+            ledger = Path(folder) / "ledger.json"
+            ledger.write_text(json.dumps(data))
+            with mock.patch.object(checker, "git", side_effect=reads):
+                errors = checker.check(ledger)
+        self.assertTrue(any("unrepresented obligation" in error and ":2" in error
+                            for error in errors), errors)
+
+    def test_duplicate_evidence_associations_refuse(self):
+        data = fixture()
+        data["sources"][1]["evidence_requirement_ids"] = [IDENTITY, IDENTITY]
+        self.assertTrue(any("duplicate" in error for error in run_check(data)))
+
+    def test_malformed_evidence_associations_refuse(self):
+        for value in [IDENTITY, None, {}, [True], [7], [""]]:
+            with self.subTest(value=value):
+                data = fixture()
+                data["sources"][1]["evidence_requirement_ids"] = value
+                self.assertTrue(run_check(data))
+
+    def test_evidence_file_hash_mismatch_still_refuses(self):
+        data = fixture()
+        data["sources"][1]["sha256"] = "0" * 64
+        self.assertTrue(any(EVIDENCE_PATH in error for error in run_check(data)))
+
+    def test_invalid_or_duplicate_modern_commits_refuse(self):
+        for commits in [[], ["short"], [True], [REFERENCE, REFERENCE]]:
+            with self.subTest(commits=commits):
+                data = fixture()
+                data["requirements"][0]["source_repair"] = modern_repair()
+                data["requirements"][0]["source_repair"]["commits"] = commits
+                self.assertTrue(any(IDENTITY in error for error in run_check(data)))
+
+    def test_modern_tree_must_match_the_recorded_head(self):
+        data = fixture()
+        data["requirements"][0]["source_repair"] = modern_repair()
+        data["requirements"][0]["source_repair"]["observed_source_tree"] = "c" * 40
+        self.assertTrue(any(IDENTITY in error for error in run_check(data)))
+
+    def test_unretained_modern_commit_refuses(self):
+        data = fixture()
+        foreign = "c" * 40
+        data["requirements"][0]["source_repair"] = modern_repair()
+        data["requirements"][0]["source_repair"]["commits"] = [foreign]
+
+        def reads(*args):
+            if args == ("merge-base", "--is-ancestor", foreign, REFERENCE):
+                raise subprocess.CalledProcessError(1, ["git", *args])
+            return fake_git(*args)
+
+        with tempfile.TemporaryDirectory(prefix="ledger-ancestry-") as folder:
+            ledger = Path(folder) / "ledger.json"
+            ledger.write_text(json.dumps(data))
+            with mock.patch.object(checker, "git", side_effect=reads):
+                errors = checker.check(ledger)
+        self.assertTrue(any(IDENTITY in error for error in errors), errors)
+
+    def test_missing_modern_file_refuses(self):
+        data = fixture()
+        data["requirements"][0]["source_repair"] = modern_repair()
+        data["requirements"][0]["source_repair"]["files"] = ["src/missing.rs"]
+
+        def reads(*args):
+            if args == ("cat-file", "-e", REFERENCE + ":src/missing.rs"):
+                raise subprocess.CalledProcessError(1, ["git", *args])
+            return fake_git(*args)
+
+        with tempfile.TemporaryDirectory(prefix="ledger-file-") as folder:
+            ledger = Path(folder) / "ledger.json"
+            ledger.write_text(json.dumps(data))
+            with mock.patch.object(checker, "git", side_effect=reads):
+                errors = checker.check(ledger)
+        self.assertTrue(any(IDENTITY in error for error in errors), errors)
+
+    def test_malformed_modern_files_refuse(self):
+        for paths in [[], "src/repair.rs", [False], [""]]:
+            with self.subTest(paths=paths):
+                data = fixture()
+                data["requirements"][0]["source_repair"] = modern_repair()
+                data["requirements"][0]["source_repair"]["files"] = paths
+                self.assertTrue(any(IDENTITY in error for error in run_check(data)))
+
+    def test_malformed_legacy_checkpoint_cannot_fall_back_to_modern_metadata(self):
+        data = fixture()
+        data["requirements"][0]["source_repair"] = modern_repair()
+        data["requirements"][0]["source_repair"]["checkpoint"] = "not-a-commit"
+        self.assertTrue(any(IDENTITY in error for error in run_check(data)))
+
+    def test_valid_legacy_checkpoint_and_files_remain_accepted(self):
+        data = fixture()
+        data["requirements"][0]["source_repair"] = {
+            "checkpoint": REFERENCE, "files": ["src/repair.rs"]}
         self.assertEqual(run_check(data), [])
 
 
