@@ -1,5 +1,10 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+//! Composite hold authorization, quota and approval accounting, and mutation
+//! journaling for the in-memory budget store.
+use super::*;
+
 impl InMemoryBudgetStoreInner {
-    fn has_composite_history(&self, capability_id: &str, grant_index: usize) -> bool {
+    pub(super) fn has_composite_history(&self, capability_id: &str, grant_index: usize) -> bool {
         self.events.iter().any(|event| {
             event.capability_id == capability_id
                 && usize::try_from(event.grant_index) == Ok(grant_index)
@@ -7,7 +12,7 @@ impl InMemoryBudgetStoreInner {
         })
     }
 
-    fn ensure_latest_hold_event(
+    pub(super) fn ensure_latest_hold_event(
         &self,
         hold_id: &str,
         event_seq: u64,
@@ -25,7 +30,7 @@ impl InMemoryBudgetStoreInner {
         Ok(())
     }
 
-    fn ensure_latest_usage_event(
+    pub(super) fn ensure_latest_usage_event(
         &self,
         capability_id: &str,
         grant_index: usize,
@@ -47,7 +52,7 @@ impl InMemoryBudgetStoreInner {
         Ok(())
     }
 
-    fn grant_quota_for_legacy_mutation(
+    pub(super) fn grant_quota_for_legacy_mutation(
         &self,
         capability_id: &str,
         grant_index: u32,
@@ -80,7 +85,7 @@ impl InMemoryBudgetStoreInner {
         }))
     }
 
-    fn invocation_quota_usages(
+    pub(super) fn invocation_quota_usages(
         &self,
         quotas: &[BudgetInvocationQuota],
     ) -> Result<Vec<BudgetInvocationQuotaUsage>, BudgetStoreError> {
@@ -102,7 +107,7 @@ impl InMemoryBudgetStoreInner {
             .collect()
     }
 
-    fn invocation_quota_mutations(
+    pub(super) fn invocation_quota_mutations(
         before: &[BudgetInvocationQuotaUsage],
         after: &[BudgetInvocationQuotaUsage],
     ) -> Result<Vec<BudgetInvocationQuotaMutation>, BudgetStoreError> {
@@ -129,7 +134,7 @@ impl InMemoryBudgetStoreInner {
             .collect())
     }
 
-    fn cumulative_approval_usage(
+    pub(super) fn cumulative_approval_usage(
         &self,
         request: &BudgetCumulativeApprovalRequest,
         state: BudgetCumulativeApprovalState,
@@ -162,7 +167,7 @@ impl InMemoryBudgetStoreInner {
         })
     }
 
-    fn cumulative_approval_mutation(
+    pub(super) fn cumulative_approval_mutation(
         &self,
         request: &BudgetCumulativeApprovalRequest,
         state_before: Option<BudgetCumulativeApprovalState>,
@@ -193,7 +198,7 @@ impl InMemoryBudgetStoreInner {
         })
     }
 
-    fn get_cumulative_approval_operation_usage(
+    pub(super) fn get_cumulative_approval_operation_usage(
         &self,
         operation_id: &str,
     ) -> Option<BudgetCumulativeApprovalUsage> {
@@ -206,7 +211,7 @@ impl InMemoryBudgetStoreInner {
         })
     }
 
-    fn authorize_composite_budget_hold(
+    pub(super) fn authorize_composite_budget_hold(
         &mut self,
         request: &BudgetAuthorizeHoldRequest,
     ) -> Result<BudgetMutationRecord, BudgetStoreError> {
@@ -659,7 +664,7 @@ impl InMemoryBudgetStoreInner {
         })
     }
 
-    fn authorize_cumulative_approval(
+    pub(super) fn authorize_cumulative_approval(
         &mut self,
         request: &BudgetAuthorizeCumulativeApprovalRequest,
     ) -> Result<(bool, BudgetMutationRecord), BudgetStoreError> {
@@ -860,7 +865,7 @@ impl InMemoryBudgetStoreInner {
             })
     }
 
-    fn duplicate_mutation(
+    pub(super) fn duplicate_mutation(
         &self,
         event_id: Option<&str>,
         request: &BudgetMutationRequest,
@@ -884,7 +889,7 @@ impl InMemoryBudgetStoreInner {
         Ok(Some(existing.clone()))
     }
 
-    fn append_mutation(
+    pub(super) fn append_mutation(
         &mut self,
         explicit_event_id: Option<&str>,
         request: BudgetMutationRequest,
@@ -901,7 +906,7 @@ impl InMemoryBudgetStoreInner {
         }
     }
 
-    fn validate_hold(
+    pub(super) fn validate_hold(
         &self,
         hold_id: &str,
         capability_id: &str,
@@ -918,7 +923,7 @@ impl InMemoryBudgetStoreInner {
         Ok(hold)
     }
 
-    fn validate_hold_authority(
+    pub(super) fn validate_hold_authority(
         hold_id: &str,
         current: Option<&BudgetEventAuthority>,
         requested: Option<&BudgetEventAuthority>,
@@ -957,7 +962,11 @@ impl InMemoryBudgetStoreInner {
         }
     }
 
-    fn default_usage_record(capability_id: &str, grant_index: u32, now: i64) -> BudgetUsageRecord {
+    pub(super) fn default_usage_record(
+        capability_id: &str,
+        grant_index: u32,
+        now: i64,
+    ) -> BudgetUsageRecord {
         BudgetUsageRecord {
             capability_id: capability_id.to_string(),
             grant_index,

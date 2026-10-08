@@ -222,7 +222,7 @@ struct InMemoryBudgetStoreInner {
 
 mod accounting;
 
-include!("in_memory/composite.rs");
+mod composite;
 include!("in_memory/admission.rs");
 include!("in_memory/terminal.rs");
 mod trait_impl;
