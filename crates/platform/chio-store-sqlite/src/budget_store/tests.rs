@@ -5,7 +5,7 @@ use chio_kernel::InMemoryBudgetStore;
 mod composite_lifecycle;
 
 #[path = "tests/support.rs"]
-mod support;
+pub(super) mod support;
 use support::*;
 
 #[test]

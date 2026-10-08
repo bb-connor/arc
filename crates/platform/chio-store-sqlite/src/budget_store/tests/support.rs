@@ -8,7 +8,7 @@ pub(super) fn unique_db_path(prefix: &str) -> std::path::PathBuf {
     std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
 }
 
-pub(super) fn usage_record(
+pub(in crate::budget_store) fn usage_record(
     capability_id: &str,
     grant_index: u32,
     invocation_count: u32,
@@ -32,7 +32,10 @@ pub(super) fn install_usage_anchor(store: &SqliteBudgetStore, record: &BudgetUsa
     install_usage_anchors(store, std::slice::from_ref(record));
 }
 
-pub(super) fn install_usage_anchors(store: &SqliteBudgetStore, records: &[BudgetUsageRecord]) {
+pub(in crate::budget_store) fn install_usage_anchors(
+    store: &SqliteBudgetStore,
+    records: &[BudgetUsageRecord],
+) {
     let mut connection = store.connection().unwrap();
     let transaction = store.begin_write(&mut connection).unwrap();
     transaction

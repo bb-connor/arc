@@ -1,15 +1,6 @@
 use super::store::{LIST_ALL_USAGES_SQL, LIST_CAPABILITY_USAGES_SQL};
+use super::tests::support::{install_usage_anchors, usage_record};
 use super::*;
-
-#[path = "support.rs"]
-#[allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    dead_code,
-    reason = "Shared fixtures fail on violated setup invariants; this module uses only the usage-anchor helpers."
-)]
-mod support;
-use support::*;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
