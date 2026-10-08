@@ -456,6 +456,97 @@ fn run_daemon_serving_worker<F>(
     let _send_result = failure_sender.send(result);
 }
 
+/// How long a serving worker waits for work before it rechecks the stop
+/// request. It bounds shutdown latency, not request latency: a connection
+/// that arrives during the wait is served at once.
+#[cfg(unix)]
+const SERVING_WAIT: std::time::Duration = std::time::Duration::from_millis(50);
+
+/// Serve both endpoints until `shutdown` is set or a worker fails. Endpoints
+/// contain every fault they can attribute to one request, connection or
+/// session; an error that reaches a worker is fatal to the daemon.
+#[cfg(unix)]
+fn serve_endpoints_until_stopped(
+    endpoint: &UnixBrokerEndpoint,
+    audit_endpoint: &BrokerPrivilegedAuditEndpoint,
+    shutdown: &std::sync::atomic::AtomicBool,
+) -> Result<()> {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::mpsc;
+    use std::time::Duration;
+
+    // Control, prepared execution, and audit each have a fixed worker.
+    // An authenticated idle execution descriptor never occupies control
+    // or audit capacity, and clients cannot create additional threads.
+    const NORMAL_IPC_WORKERS: usize = 1;
+    let stop = AtomicBool::new(false);
+    let (failure_sender, failure_receiver) =
+        mpsc::sync_channel::<Result<()>>(NORMAL_IPC_WORKERS + 2);
+    let outcome = std::thread::scope(|scope| {
+        for _ in 0..NORMAL_IPC_WORKERS {
+            let normal_sender = failure_sender.clone();
+            let normal_stop = &stop;
+            scope.spawn(move || {
+                run_daemon_serving_worker("normal IPC", normal_sender, || {
+                    while !normal_stop.load(Ordering::Acquire) {
+                        endpoint.serve_one_within(SERVING_WAIT)?;
+                    }
+                    Ok(())
+                });
+            });
+        }
+        let prepared_sender = failure_sender.clone();
+        let prepared_stop = &stop;
+        scope.spawn(move || {
+            run_daemon_serving_worker("prepared execution", prepared_sender, || {
+                while !prepared_stop.load(Ordering::Acquire) {
+                    endpoint.wait_prepared(SERVING_WAIT)?;
+                    endpoint.try_serve_prepared()?;
+                }
+                Ok(())
+            });
+        });
+        let audit_sender = failure_sender.clone();
+        let audit_stop = &stop;
+        scope.spawn(move || {
+            run_daemon_serving_worker("privileged audit", audit_sender, || {
+                while !audit_stop.load(Ordering::Acquire) {
+                    audit_endpoint.serve_one_within(SERVING_WAIT)?;
+                }
+                Ok(())
+            });
+        });
+        drop(failure_sender);
+        let outcome = loop {
+            if shutdown.load(Ordering::Acquire) {
+                break Ok(());
+            }
+            match failure_receiver.recv_timeout(Duration::from_millis(20)) {
+                Ok(Err(error)) => break Err(error),
+                Ok(Ok(())) | Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    break Err(BrokerError::Invariant(
+                        "broker daemon serving thread terminated without a stop request".to_owned(),
+                    ));
+                }
+                Err(mpsc::RecvTimeoutError::Timeout) => {}
+            }
+        };
+        stop.store(true, Ordering::Release);
+        outcome
+    });
+    outcome?;
+    // A failure that races the stop request must not become a clean exit.
+    // The scope has joined every producer, so this drains terminal results.
+    for completion in failure_receiver.try_iter() {
+        completion?;
+    }
+    Ok(())
+}
+
+#[cfg(all(test, target_os = "linux"))]
+#[path = "daemon_runtime/serving_tests.rs"]
+mod serving_tests;
+
 impl BrokerDaemonRuntime {
     #[cfg(unix)]
     pub fn build(
@@ -787,93 +878,7 @@ impl BrokerDaemonRuntime {
     /// releasing daemon custody. Existing I/O keeps its configured deadlines.
     #[cfg(unix)]
     pub fn serve_until_stopped(&self, shutdown: &std::sync::atomic::AtomicBool) -> Result<()> {
-        use std::sync::atomic::{AtomicBool, Ordering};
-        use std::sync::mpsc;
-        use std::time::Duration;
-
-        // Control, prepared execution, and audit each have a fixed worker.
-        // An authenticated idle execution descriptor never occupies control
-        // or audit capacity, and clients cannot create additional threads.
-        const NORMAL_IPC_WORKERS: usize = 1;
-        self.endpoint.set_nonblocking(true)?;
-        self.privileged_audit_endpoint.set_nonblocking(true)?;
-        let stop = AtomicBool::new(false);
-        let (failure_sender, failure_receiver) =
-            mpsc::sync_channel::<Result<()>>(NORMAL_IPC_WORKERS + 2);
-        let outcome = std::thread::scope(|scope| {
-            for _ in 0..NORMAL_IPC_WORKERS {
-                let normal_sender = failure_sender.clone();
-                let normal_stop = &stop;
-                let normal_endpoint = &self.endpoint;
-                scope.spawn(move || {
-                    run_daemon_serving_worker("normal IPC", normal_sender, || {
-                        while !normal_stop.load(Ordering::Acquire) {
-                            match normal_endpoint.try_serve_one() {
-                                Ok(Some(_)) => {}
-                                Ok(None) => std::thread::sleep(Duration::from_millis(2)),
-                                Err(error) => return Err(error),
-                            }
-                        }
-                        Ok(())
-                    });
-                });
-            }
-            let prepared_sender = failure_sender.clone();
-            let prepared_stop = &stop;
-            let prepared_endpoint = &self.endpoint;
-            scope.spawn(move || {
-                run_daemon_serving_worker("prepared execution", prepared_sender, || {
-                    while !prepared_stop.load(Ordering::Acquire) {
-                        match prepared_endpoint.try_serve_prepared() {
-                            Ok(Some(_)) => {}
-                            Ok(None) => std::thread::sleep(Duration::from_millis(2)),
-                            Err(error) => return Err(error),
-                        }
-                    }
-                    Ok(())
-                });
-            });
-            let audit_sender = failure_sender.clone();
-            let audit_stop = &stop;
-            let audit_endpoint = &self.privileged_audit_endpoint;
-            scope.spawn(move || {
-                run_daemon_serving_worker("privileged audit", audit_sender, || {
-                    while !audit_stop.load(Ordering::Acquire) {
-                        match audit_endpoint.try_serve_one() {
-                            Ok(Some(_)) => {}
-                            Ok(None) => std::thread::sleep(Duration::from_millis(2)),
-                            Err(error) => return Err(error),
-                        }
-                    }
-                    Ok(())
-                });
-            });
-            drop(failure_sender);
-            let outcome = loop {
-                if shutdown.load(Ordering::Acquire) {
-                    break Ok(());
-                }
-                match failure_receiver.recv_timeout(Duration::from_millis(20)) {
-                    Ok(Err(error)) => break Err(error),
-                    Ok(Ok(())) | Err(mpsc::RecvTimeoutError::Disconnected) => {
-                        break Err(BrokerError::Invariant(
-                            "broker daemon serving thread terminated without a stop request"
-                                .to_owned(),
-                        ));
-                    }
-                    Err(mpsc::RecvTimeoutError::Timeout) => {}
-                }
-            };
-            stop.store(true, Ordering::Release);
-            outcome
-        });
-        outcome?;
-        // A failure that races the stop request must not become a clean exit.
-        // The scope has joined every producer, so this drains terminal results.
-        for completion in failure_receiver.try_iter() {
-            completion?;
-        }
-        Ok(())
+        serve_endpoints_until_stopped(&self.endpoint, &self.privileged_audit_endpoint, shutdown)
     }
 
     #[cfg(not(unix))]
