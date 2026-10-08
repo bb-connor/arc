@@ -19,6 +19,9 @@ use std::{
     time::{Duration, Instant},
 };
 
+/// Largest frame exchanged with the repository child in either direction.
+const MAX_REPOSITORY_FRAME_BYTES: usize = 524_288;
+
 mod launch;
 #[cfg(test)]
 mod native_cause_tests;
@@ -193,10 +196,12 @@ impl RepositoryAdapter {
             schema: String,
             configuration_sha256: String,
         }
-        let ready: Ready =
-            chio_core_types::canonical::UntrustedJsonText::from_wire(&ready, 524_288)
-                .and_then(|text| text.decode_signed())
-                .map_err(|_| unavailable())?;
+        let ready: Ready = chio_core_types::canonical::UntrustedJsonText::from_wire(
+            &ready,
+            MAX_REPOSITORY_FRAME_BYTES,
+        )
+        .and_then(|text| text.decode_signed())
+        .map_err(|_| unavailable())?;
         if ready.schema != "chio.repository-adapter-ready.v1"
             || ready.configuration_sha256 != config.configuration_sha256
         {
@@ -241,9 +246,12 @@ impl JsonAdapter for RepositoryAdapter {
             child.write_frame(bytes, deadline)?;
             let body = child.read_frame(deadline)?;
             let output: serde_json::Value =
-                chio_core_types::canonical::UntrustedJsonText::from_wire(&body, 524_288)
-                    .and_then(|text| text.decode_signed())
-                    .map_err(|_| unavailable())?;
+                chio_core_types::canonical::UntrustedJsonText::from_wire(
+                    &body,
+                    MAX_REPOSITORY_FRAME_BYTES,
+                )
+                .and_then(|text| text.decode_signed())
+                .map_err(|_| unavailable())?;
             if output
                 .pointer("/workspace/configuration_sha256")
                 .and_then(serde_json::Value::as_str)

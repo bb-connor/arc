@@ -34,9 +34,9 @@ fn ready(fd: &impl AsFd, events: PollFlags, deadline: Instant) -> Result<()> {
 
 impl RepositoryChild {
     pub(super) fn write_frame(&mut self, bytes: &[u8], deadline: Instant) -> Result<()> {
-        let prefix = u32::try_from(bytes.len())
-            .map_err(|_| denied())?
-            .to_be_bytes();
+        let prefix =
+            chio_secure_ipc::frame::encode_frame_length(bytes.len(), MAX_REPOSITORY_FRAME_BYTES)
+                .map_err(|_| denied())?;
         for mut remaining in [prefix.as_slice(), bytes] {
             while !remaining.is_empty() {
                 ready(&self.input, PollFlags::OUT, deadline)?;
@@ -71,12 +71,10 @@ impl RepositoryChild {
         Ok(())
     }
     pub(super) fn read_frame(&mut self, deadline: Instant) -> Result<Vec<u8>> {
-        let mut prefix = [0; 4];
+        let mut prefix = [0; chio_secure_ipc::frame::FRAME_PREFIX_BYTES];
         self.read_exact(&mut prefix, deadline)?;
-        let size = usize::try_from(u32::from_be_bytes(prefix)).map_err(|_| unavailable())?;
-        if !(1..=524_288).contains(&size) {
-            return Err(unavailable());
-        }
+        let size = chio_secure_ipc::frame::decode_frame_length(prefix, MAX_REPOSITORY_FRAME_BYTES)
+            .map_err(|_| unavailable())?;
         let mut body = vec![0; size];
         self.read_exact(&mut body, deadline)?;
         Ok(body)
