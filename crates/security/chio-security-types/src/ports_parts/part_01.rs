@@ -548,12 +548,31 @@ where
             where
                 A: SeqAccess<'de>,
             {
+                struct ElementSeed<T> {
+                    available: bool,
+                    marker: core::marker::PhantomData<T>,
+                }
+
+                impl<'de, T: Deserialize<'de>> de::DeserializeSeed<'de> for ElementSeed<T> {
+                    type Value = T;
+
+                    fn deserialize<D>(self, deserializer: D) -> Result<T, D::Error>
+                    where
+                        D: Deserializer<'de>,
+                    {
+                        if !self.available {
+                            return Err(de::Error::custom("collection exceeds the item limit"));
+                        }
+                        T::deserialize(deserializer)
+                    }
+                }
+
                 let capacity = sequence.size_hint().unwrap_or(0).min(MAX);
                 let mut values = Vec::with_capacity(capacity);
-                while let Some(value) = sequence.next_element::<T>()? {
-                    if values.len() == MAX {
-                        return Err(de::Error::custom("collection exceeds the item limit"));
-                    }
+                while let Some(value) = sequence.next_element_seed(ElementSeed::<T> {
+                    available: values.len() < MAX,
+                    marker: core::marker::PhantomData,
+                })? {
                     values.push(value);
                 }
                 Ok(BoundedVec(values))
@@ -1035,8 +1054,7 @@ impl DeclassificationTransitionBinding {
             | Self::RecoveryUndeliveredConsumption { .. } => {
                 Some(DeclassificationUseState::DispatchFailed)
             }
-            Self::OutcomeUnknownAfterDispatch { .. }
-            | Self::RecoveryOutcomeUnknown { .. } => {
+            Self::OutcomeUnknownAfterDispatch { .. } | Self::RecoveryOutcomeUnknown { .. } => {
                 Some(DeclassificationUseState::OutcomeUnknown)
             }
         }

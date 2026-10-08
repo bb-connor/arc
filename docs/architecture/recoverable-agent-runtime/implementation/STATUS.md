@@ -148,8 +148,28 @@ controls. The attached-state parent test also executed its otherwise ignored
 subprocess helper. These 48 scoped passes retain their exact source manifest
 `366fc5d02d2837a29c367f0c785f9adf4e2228f300f1d0a6be8cd9d730204bb4`.
 Independent Source review approved the bounded sentinel and its exact-query
-coverage. The full owning store library is being tested separately; the scoped
-passes do not establish that library's result.
+coverage. Its full owning store-library run reached the fixed 1,080-second limit
+without completing: the retained output records 615 passes and 17 failures.
+Three exact follow-ups also failed. They exposed a deliberate-corruption fixture
+blocked by foreign-key enforcement, fault fixtures blocked by the managed TEMP
+authorization boundary, and a restore fixture blocked by the serving handle's
+ATTACH refusal. The original failures remain retained; the scoped passes do not
+establish a passing owning-library result.
+
+Two later isolated inventory compositions compiled all five libraries. The first
+recorded 56 scoped passes and one failure caused by a removed SQLite builtin
+override leaving an unusable function registration. Its successor closes and
+reopens the fixture handle and recorded 63 scoped passes with no failures. An
+otherwise ignored attached-state subprocess helper was executed by its owning
+parent. Their exact subjects and original exports are retained under
+`target/recovery-pr/current-review-followup/linux-current/history-inventory-cost-20261008T1817/`
+and `history-inventory-proof-controls-20261008T1855/` in the same directory.
+Neither composition is installed in the working tree. Independent dependency
+review still blocks read-role acceptance on raw SQLite authorizer displacement
+and execution through overridden builtin function names. Complete caller and
+dependency closure also remains open. The task host completed its fixed stop
+at 19:11 UTC; the protected binaries, all five original capture roots and original
+exports remain retained.
 
 A third genuine old-build capture exposed a missing `zeroblob(0)` builtin in the
 bounded retained-output projection. Its startup failure remains retained. After
@@ -173,6 +193,22 @@ Clippy repair passed strict Clippy and its four owning tests. Their successor
 hosted results remain pending. The Process Source failure is an open integration
 obligation, not a fixture assertion to remove. Workspace formatting was also
 repaired; none of these checks qualifies the complete recovery runtime.
+
+Commit `8343749a211997b0def8b57308b06a28d41ba1b7` published those reviewed browser
+bundles and strict-check repairs. Its hosted dependency audit then identified
+two newly published Next.js advisories against 15.5.26. The current SDK manifest
+and lock select the upstream 15.5.27 security patch without waiving those
+advisories. Nine local adapter controls and eight advisory-wrapper controls
+passed. The local installed Next.js package was not replaced by the lock-only
+update, so those controls do not establish patched Next.js runtime behavior.
+A fresh hosted scan of the successor bytes remains required.
+
+The current bounded-sequence decoder rejects an excess element before entering
+that element's deserializer. Its regression failed on the original decoder and
+passed after repair; all 62 owning security-types tests, strict Clippy and the
+Rust 1.93 `no_std` library check passed. Independent Source review found no
+concrete P0/P1/P2 in that narrow repair. These results do not qualify the recovery
+reader, native funding or the complete runtime.
 
 The original build and first capture export is retained under
 `target/recovery-pr/current-review-followup/linux-current/current-baseline-source-package-20261008T1253/`.
