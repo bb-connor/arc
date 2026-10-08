@@ -35,6 +35,9 @@ mod tenant_isolation;
 #[path = "response_dispatch/dispatch_lease_readback.rs"]
 mod dispatch_lease_readback;
 
+#[path = "response_dispatch/overlay_inventory.rs"]
+mod overlay_inventory;
+
 fn now_unix_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
