@@ -18,7 +18,7 @@ required_mappings=(
   'cargo test -p chio-conformance --test protocol_primitives_authority_bindings threshold_proposal_mutations_and_exact_quorum_fail_closed -- --exact'
   'cargo test -p chio-kernel --lib kernel::tests::approval_flow::governed_approval_token_binds_every_authorization_field_and_time_window -- --exact'
   'cargo test -p chio-core-types --test governed_active_response_intent active_response_plan_uses_an_explicit_typed_variant_and_binds_the_complete_body -- --exact'
-  'cargo test -p chio-kernel --lib kernel::tests::approval_flow::active_response_approval_is_durable_and_recovery_does_not_recommit_dispatch -- --exact'
+  'cargo test -p chio-control-plane --lib security::event_consumer::admission::real_adapter_tests::legacy_commit::legacy_active_response_commit_refuses_without_consuming_approval -- --exact'
   'cargo test -p chio-quarantine --lib approval::tests::governed_prepare_returns_only_an_exact_live_kernel_binding -- --exact'
   'cargo test -p chio-quarantine --lib approval::tests::malformed_reservations_wrong_bindings_and_zero_digests_fail_closed -- --exact'
   'cargo test -p chio-quarantine --lib approval::tests::reconstruction_is_exact_missing_aware_and_never_rebinds -- --exact'

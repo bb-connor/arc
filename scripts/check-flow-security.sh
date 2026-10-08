@@ -110,6 +110,10 @@ run_exact_target --label "security response-dispatch types" --expected \
   dispatch_lease_and_load_outcome_are_explicit \
   dispatch_recovery_binds_the_exact_action_and_fencing_observation \
   execution_dispatch_binding_rejects_zero_and_mismatched_authority_fields \
+  execution_binding_requires_exact_artifact_schema_pairing \
+  legacy_dispatch_authorization_v1_preserves_canonical_bytes_and_hash \
+  legacy_execution_binding_v1_preserves_canonical_bytes_and_hash \
+  legacy_prepared_descriptor_v1_preserves_canonical_bytes_and_hash \
   -- cargo test -p chio-security-types --features std --test response_dispatch
 run_exact_target --label "security response types" --expected \
   execution_binding_preserves_its_closed_wire_shape \
@@ -128,6 +132,8 @@ run_exact_target --label "security response types" --expected \
   response_plans_and_authorization_require_explicit_execution \
   response_targets_and_mutation_records_reject_unknown_fields \
   response_transition_matrix_contains_only_the_specified_edges \
+  prepared_dispatch_binding_requires_exact_artifact_schema_pairing \
+  response_plan_holds_at_most_one_leading_issuance_fence \
   -- cargo test -p chio-security-types --test response
 run_exact_target --label "security session-throttle types" --expected \
   limits_are_nonzero_and_bounded \
@@ -397,6 +403,29 @@ run_exact_target --label "native flow custody" --allow-filtered --expected \
   admission_operation_store::tests::security_participant_state::observation::inherited_labels_do_not_forge_an_exact_context_generation \
   admission_operation_store::tests::security_participant_state::observation::observation_rejects_wrong_initialization_fence_and_time_without_writes \
   admission_operation_store::tests::security_participant_state::observation::unanchored_current_row_changes_cannot_be_observed_as_valid_state \
+  admission_operation_store::tests::security_participant_state::checkpoint::checkpoint_abort_child \
+  admission_operation_store::tests::security_participant_state::checkpoint::image_visit_controls::image_counter_measures_actual_current_copy_and_sealed_row_visits \
+  admission_operation_store::tests::security_participant_state::checkpoint::image_visit_controls::image_observer_preserves_snapshot_corruption_refusal \
+  admission_operation_store::tests::security_participant_state::checkpoint::image_visit_controls::image_observer_preserves_typed_fence_refusal_without_checkpoint_writes \
+  admission_operation_store::tests::security_participant_state::checkpoint::native_journal_checkpoint_abort_reopens_complete_old_or_new_state \
+  admission_operation_store::tests::security_participant_state::checkpoint::native_journal_checkpoint_byte_cap_resumes_after_checkpoint \
+  admission_operation_store::tests::security_participant_state::checkpoint::native_journal_checkpoint_cancelled_transactions_are_atomic \
+  admission_operation_store::tests::security_participant_state::checkpoint::native_journal_checkpoint_older_journal_corruption_refuses_reopen \
+  admission_operation_store::tests::security_participant_state::checkpoint::native_journal_checkpoint_ordinary_coverage_work_ignores_sealed_archive \
+  admission_operation_store::tests::security_participant_state::checkpoint::native_journal_checkpoint_reader_preserves_serde_data_source_without_mutation \
+  admission_operation_store::tests::security_participant_state::checkpoint::native_journal_checkpoint_reader_preserves_utf8_source_without_mutation \
+  admission_operation_store::tests::security_participant_state::checkpoint::native_journal_checkpoint_rehashed_local_record_cannot_replace_global_authority \
+  admission_operation_store::tests::security_participant_state::checkpoint::native_journal_checkpoint_rejects_foreign_initialization_or_stale_fence \
+  admission_operation_store::tests::security_participant_state::checkpoint::native_journal_checkpoint_repeated_segments_keep_archived_bytes_and_current_labels \
+  admission_operation_store::tests::security_participant_state::checkpoint::native_journal_checkpoint_snapshot_corruption_and_missing_global_reference_refuse \
+  admission_operation_store::tests::security_participant_state::checkpoint::native_journal_checkpoint_wrong_owner_clock_refuses \
+  admission_operation_store::tests::security_participant_state::checkpoint_migration::native_journal_migration_immutable_checkpoint_history_is_enforced \
+  admission_operation_store::tests::security_participant_state::checkpoint_migration::native_journal_migration_v35_preserves_populated_recovery_and_native_bytes \
+  admission_operation_store::tests::security_participant_state::checkpoint_migration::native_journal_migration_v35_rejects_existing_checkpoint_evidence_without_repair \
+  admission_operation_store::tests::security_participant_state::checkpoint_migration::native_journal_migration_v35_rejects_partial_checkpoint_catalog_without_repair \
+  admission_operation_store::tests::security_participant_state::egress::native_journal_checkpoint_preserves_egress_pending_then_commit \
+  admission_operation_store::tests::security_participant_state::mutations::journal_capacity::native_journal_capacity_resumes_after_operator_checkpoint \
+  admission_operation_store::tests::security_participant_state::mutations::nonce_preflight::native_journal_checkpoint_preserves_nonce_preflight_and_current_label \
   -- cargo test -p chio-store-sqlite --lib admission_operation_store::tests::security_participant_state::
 
 run_exact_target --label "native dispatch ledger callbacks" --allow-filtered --expected \
@@ -527,6 +556,9 @@ run_exact_target --label "kernel-owned native egress" --allow-filtered --expecte
   kernel::tests::durable_admission::native_egress::native_egress_generation_change_after_acquisition_prevents_commitment \
   kernel::tests::durable_admission::native_egress::native_egress_observation_time_must_fall_inside_the_read_interval \
   kernel::tests::durable_admission::native_egress::native_egress_operation_change_after_preparation_prevents_acquisition \
+  kernel::tests::durable_admission::native_egress::capture_once::direct::native_direct_retention_is_classified_by_committed_egress_readback \
+  kernel::tests::durable_admission::native_egress::capture_once::native_lifecycle_capture_is_single_use_and_classified_by_store_entry \
+  kernel::tests::durable_admission::native_egress::capture_once::retained::native_authority_retention_classifies_failures_by_first_durable_write \
   -- cargo test -p chio-kernel --lib kernel::tests::durable_admission::native_egress
 
 run_exact_target --label "native dispatch attachment contracts" --allow-filtered --expected \
@@ -687,6 +719,31 @@ run_exact_target --label "native post-join policy" --allow-filtered --expected \
   security::adapters::tests::native_flow::native_policy_rejects_unrecorded_operator_floor_without_rejoining \
   security::adapters::tests::native_flow::native_policy_requires_admitted_manifest_before_classification \
   security::adapters::tests::native_flow::native_policy_requires_taint_propagation_in_each_recorded_label \
+  security::adapters::tests::native_flow::support::caller::approval_wait::native_caller_approval_resume_refuses_substituted_or_missing_original_custody \
+  security::adapters::tests::native_flow::support::caller::approval_wait::native_caller_approval_wait_past_nonce_ttl_releases_output_and_reopens \
+  security::adapters::tests::native_flow::support::caller::approval_wait::native_caller_approval_within_nonce_ttl_resumes_original_native_custody \
+  security::adapters::tests::native_flow::support::capture::direct_retention::native_direct_retention_fence_expiry_before_any_write_is_a_clean_rejection \
+  security::adapters::tests::native_flow::support::capture::direct_retention::native_direct_retention_healthy_capture_executes_once \
+  security::adapters::tests::native_flow::support::capture::direct_retention::native_direct_retention_ledger_fault_after_egress_commit_stays_unconfirmed \
+  security::adapters::tests::native_flow::support::capture::direct_retention::native_direct_retention_runtime_expiry_after_egress_commit_stays_unconfirmed \
+  security::adapters::tests::native_flow::support::capture::fault_class::native_dispatch_fault_is_absent_one_millisecond_before_each_deadline \
+  security::adapters::tests::native_flow::support::capture::fault_class::native_dispatch_fault_names_the_handoff_deadline_at_entry \
+  security::adapters::tests::native_flow::support::capture::fault_class::native_dispatch_fault_names_the_hook_refusal_before_capture \
+  security::adapters::tests::native_flow::support::capture::fault_class::native_dispatch_fault_names_the_retention_deadline_comparison \
+  security::adapters::tests::native_flow::support::capture::output::return_binding::native_original_ledger_reader_preserves_commitment_serde_source_without_authority \
+  security::adapters::tests::native_flow::support::capture::output::return_binding::native_original_ledger_reader_preserves_digest_serde_source_without_authority \
+  security::adapters::tests::native_flow::support::capture::output::return_binding::native_original_ledger_reader_preserves_operation_serde_source_without_authority \
+  security::adapters::tests::native_flow::support::capture::output::return_binding::native_original_ledger_reader_preserves_signed_input_source_without_authority \
+  security::adapters::tests::native_flow::support::capture::output::return_binding::native_original_ledger_reader_preserves_utf8_source_without_authority \
+  security::adapters::tests::native_flow::support::capture::output::return_binding::native_raw_store_rejects_substituted_original_dispatch_bindings \
+  security::adapters::tests::native_flow::support::declassification::capture_order::native_declassification_credential_expiry_before_capture_consumes_no_authority \
+  security::adapters::tests::native_flow::support::declassification::capture_order::native_declassification_ledger_fault_after_consumption_remains_unconfirmed \
+  security::adapters::tests::native_flow::support::declassification::capture_order::native_declassification_unconfirmed_retention_refuses_grant_reuse \
+  security::adapters::tests::native_flow::support::lifecycle::native_captured_lifecycle_refuses_retry_after_a_failed_freeze \
+  security::adapters::tests::native_flow::support::participant_history_cadence::native_participant_history_verification_stays_bounded_across_sequential_calls \
+  security::adapters::tests::native_flow::support::process_recovery::races::evaluation_failure_before_capture_preserves_the_actual_typed_cause \
+  security::adapters::tests::native_flow::support::process_recovery::races::observer_unwind_disconnects_a_full_event_channel_before_joining \
+  security::adapters::tests::native_flow::support::process_recovery::races::worker_panic_before_capture_reports_completion_instead_of_waiting_for_entry \
   -- cargo test -p chio-control-plane --lib security::adapters::tests::native_flow::
 
 run_exact_target --label "native declassification row semantics" --allow-filtered --expected \
@@ -783,6 +840,10 @@ run_exact_target --label "frozen dispatch participant context" --allow-filtered 
   kernel::tests::durable_admission::return_context::signing::nested_completed_replay_uses_original_signer_without_reinvocation \
   kernel::tests::durable_admission::return_context::signing::raw_signing_identity_codec_rejects_omission_downgrade_and_invalid_floor \
   kernel::tests::durable_admission::return_context::signing::unfinished_return_cannot_be_signed_by_a_replacement_authority \
+  kernel::tests::durable_admission::return_context::signing::recovery_classification::malformed_retained_identity_stays_global_before_signer_comparison \
+  kernel::tests::durable_admission::return_context::signing::recovery_classification::misreported_backend_algorithm_stays_global_with_a_replaced_signer \
+  kernel::tests::durable_admission::return_context::signing::recovery_classification::panicking_backend_key_selection_stays_global \
+  kernel::tests::durable_admission::return_context::signing::recovery_classification::replaced_signer_defers_until_the_original_authority_returns \
   -- cargo test -p chio-kernel --lib return_context::
 
 run_exact_target --label "durable caller participant persistence" --allow-filtered --expected \
@@ -817,6 +878,10 @@ run_exact_target --label "frozen durable receipt signing" --allow-filtered --exp
   kernel::tests::durable_admission::return_context::signing::nested_completed_replay_uses_original_signer_without_reinvocation \
   kernel::tests::durable_admission::return_context::signing::raw_signing_identity_codec_rejects_omission_downgrade_and_invalid_floor \
   kernel::tests::durable_admission::return_context::signing::unfinished_return_cannot_be_signed_by_a_replacement_authority \
+  kernel::tests::durable_admission::return_context::signing::recovery_classification::malformed_retained_identity_stays_global_before_signer_comparison \
+  kernel::tests::durable_admission::return_context::signing::recovery_classification::misreported_backend_algorithm_stays_global_with_a_replaced_signer \
+  kernel::tests::durable_admission::return_context::signing::recovery_classification::panicking_backend_key_selection_stays_global \
+  kernel::tests::durable_admission::return_context::signing::recovery_classification::replaced_signer_defers_until_the_original_authority_returns \
   -- cargo test -p chio-kernel --lib kernel::tests::durable_admission::return_context::signing::
 
 run_exact_target --label "durable security release recovery" --expected \

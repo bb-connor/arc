@@ -87,10 +87,10 @@ def parse(source: str) -> dict[str, tuple[bool, list[str], list[str]]]:
 expected_counts = {
     "live admission ownership": 5,
     "frozen federation context": 13,
-    "frozen dispatch participant context": 32,
+    "frozen dispatch participant context": 36,
     "durable caller participant persistence": 3,
     "native compiled catalog identity": 2,
-    "native post-join policy": 142,
+    "native post-join policy": 167,
     "native declassification row semantics": 1,
     "native declassification issuer window": 1,
     "public nested credential custody": 6,
@@ -107,14 +107,14 @@ expected_counts = {
     "security event types": 3,
     "security issuance-freeze types": 4,
     "security port contracts": 7,
-    "security response-dispatch types": 4,
-    "security response types": 16,
+    "security response-dispatch types": 8,
+    "security response types": 18,
     "security session-throttle types": 3,
     "flow lattice and enforcement engine": 47,
     "strict manifest v2": 25,
     "security kernel adapters": 34,
     "durable flow state": 44,
-    "native flow custody": 94,
+    "native flow custody": 117,
     "native dispatch participant snapshots": 3,
     "native dispatch ledger callbacks": 3,
     "native dispatch attachment contracts": 4,
@@ -125,7 +125,7 @@ expected_counts = {
     "native authority admission integration": 12,
     "physical dispatch hold ownership": 9,
     "kernel-owned native preparation": 11,
-    "kernel-owned native egress": 8,
+    "kernel-owned native egress": 11,
     "qualified recovery lease boundary": 5,
     "runtime recovery lease containment": 1,
     "prepared flow dispatch binding": 13,
@@ -133,7 +133,7 @@ expected_counts = {
     "security dispatch credential boundaries": 10,
     "durable security release recovery": 25,
     "durable release output binding": 2,
-    "frozen durable receipt signing": 9,
+    "frozen durable receipt signing": 13,
     "dispatch rejection payment custody": 8,
     "OpenAPI bridge canonical flow": 1,
     "MCP flow sidecar": 1,
@@ -336,7 +336,7 @@ restart_expected = restart_tokens[restart_tokens.index("--expected") + 1:restart
 restart_prefix = "security::adapters::tests::native_flow::support::process_recovery::"
 native_process = [name for name in parse(source)["native post-join policy"][1]
                   if name.startswith(restart_prefix)]
-if len(restart_expected) != 47 or sorted(restart_expected) != sorted(native_process):
+if len(restart_expected) != 50 or sorted(restart_expected) != sorted(native_process):
     raise SystemExit("native restart and composed flow inventories disagree")
 if restart_tokens[restart_separator + 1:] != [
     "cargo", "test", "-p", "chio-control-plane", "--lib", "--locked", restart_prefix,

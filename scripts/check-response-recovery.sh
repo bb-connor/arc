@@ -48,7 +48,7 @@ main() {
   run_tests "approval proposal mutation and exact quorum matrix" cargo test -p chio-conformance --test protocol_primitives_authority_bindings threshold_proposal_mutations_and_exact_quorum_fail_closed -- --exact
   run_tests "approval token binding and validity-window matrix" cargo test -p chio-kernel --lib kernel::tests::approval_flow::governed_approval_token_binds_every_authorization_field_and_time_window -- --exact
   run_tests "approval ordered-effect mutation binding" cargo test -p chio-core-types --test governed_active_response_intent active_response_plan_uses_an_explicit_typed_variant_and_binds_the_complete_body -- --exact
-  run_tests "active-response approval durable replay" cargo test -p chio-kernel --lib kernel::tests::approval_flow::active_response_approval_is_durable_and_recovery_does_not_recommit_dispatch -- --exact
+  run_tests "retired legacy approval commit refuses without consumption" cargo test -p chio-control-plane --lib security::event_consumer::admission::real_adapter_tests::legacy_commit::legacy_active_response_commit_refuses_without_consuming_approval -- --exact
   run_tests "governed approval port exact live binding" cargo test -p chio-quarantine --lib approval::tests::governed_prepare_returns_only_an_exact_live_kernel_binding -- --exact
   run_tests "governed approval port malformed reservation denial" cargo test -p chio-quarantine --lib approval::tests::malformed_reservations_wrong_bindings_and_zero_digests_fail_closed -- --exact
   run_tests "governed approval port exact reconstruction" cargo test -p chio-quarantine --lib approval::tests::reconstruction_is_exact_missing_aware_and_never_rebinds -- --exact

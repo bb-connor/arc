@@ -54,6 +54,9 @@ export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-1}"
   security::adapters::tests::native_flow::support::process_recovery::races::duplicate_native_start_cannot_steal_the_live_operation \
   security::adapters::tests::native_flow::support::process_recovery::races::revocation_after_native_capture_fences_connector_handoff \
   security::adapters::tests::native_flow::support::process_recovery::races::revocation_wins_before_native_capture \
+  security::adapters::tests::native_flow::support::process_recovery::races::evaluation_failure_before_capture_preserves_the_actual_typed_cause \
+  security::adapters::tests::native_flow::support::process_recovery::races::observer_unwind_disconnects_a_full_event_channel_before_joining \
+  security::adapters::tests::native_flow::support::process_recovery::races::worker_panic_before_capture_reports_completion_instead_of_waiting_for_entry \
   -- cargo test -p chio-control-plane --lib --locked security::adapters::tests::native_flow::support::process_recovery::
 
 ./scripts/run-exact-cargo-test-inventory.sh --label "live admission ownership" --allow-filtered --expected \
