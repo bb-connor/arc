@@ -83,7 +83,7 @@ pub use canonical::{
 };
 pub use crypto::{
     sha256_hex, Ed25519Backend, Keypair, PublicKey, Signature, SigningAlgorithm, SigningBackend,
-    SigningOutcome,
+    SigningOutcome, TrustedPublicKey,
 };
 #[cfg(feature = "pq")]
 pub use crypto::{HybridBackend, MlDsa65Backend};

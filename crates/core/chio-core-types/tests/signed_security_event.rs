@@ -277,3 +277,29 @@ fn strict_wire_decode_rejects_unknown_or_unsigned_envelopes() {
         "deserialization alone must never establish trusted-producer provenance"
     );
 }
+
+#[test]
+fn weak_producer_key_universal_signature_rejects() {
+    let weak_key = "0100000000000000000000000000000000000000000000000000000000000000";
+    let mut value = serde_json::to_value(signed_event(&Keypair::from_seed(&[7; 32])))
+        .unwrap_or_else(|error| panic!("serialize event: {error}"));
+    replace_at_pointer(&mut value, "/producer_key", json!(weak_key));
+    replace_at_pointer(
+        &mut value,
+        "/signature",
+        json!(format!("01{}", "00".repeat(63))),
+    );
+    let forged: SignedSecurityEvent = serde_json::from_value(value)
+        .unwrap_or_else(|error| panic!("deserialize forged event: {error}"));
+    let trusted_key = chio_core_types::PublicKey::from_hex(weak_key)
+        .unwrap_or_else(|error| panic!("weak key: {error}"));
+
+    assert!(matches!(
+        forged.verify_trusted_producer(
+            &producer_id("detector-a"),
+            &record_id("detector-key-a"),
+            &trusted_key,
+        ),
+        Ok(false)
+    ));
+}

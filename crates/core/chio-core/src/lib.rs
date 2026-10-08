@@ -170,7 +170,7 @@ pub use crypto::{
     canonical_json_shared_bytes, sha256_hex, sign_canonical_with_backend,
     sign_canonical_with_backend_shared, sign_shared_canonical_with_backend, Ed25519Backend,
     Keypair, PublicKey, SharedCanonicalBytes, Signature, SignedCanonicalPayload, SigningAlgorithm,
-    SigningBackend,
+    SigningBackend, TrustedPublicKey,
 };
 #[cfg(feature = "pq")]
 pub use crypto::{HybridBackend, MlDsa65Backend};

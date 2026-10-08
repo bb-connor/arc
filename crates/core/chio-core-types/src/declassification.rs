@@ -175,6 +175,21 @@ mod tests {
     }
 
     #[test]
+    fn weak_authority_key_universal_signature_rejects() -> crate::Result<()> {
+        let mut grant = SignedDeclassificationGrant::sign(body(), &Keypair::from_seed(&[7; 32]))?;
+        assert!(grant.verify_signature()?);
+        grant.authority_key = crate::PublicKey::from_hex(
+            "0100000000000000000000000000000000000000000000000000000000000000",
+        )?;
+        grant.signature = crate::Signature::from_hex(
+            "0100000000000000000000000000000000000000000000000000000000000000\
+             0000000000000000000000000000000000000000000000000000000000000000",
+        )?;
+        assert!(matches!(grant.verify_signature(), Ok(false)));
+        Ok(())
+    }
+
+    #[test]
     fn substituted_body_and_unknown_envelope_field_reject() {
         let key = Keypair::from_seed(&[7; 32]);
         let first = SignedDeclassificationGrant::sign(body(), &key)
