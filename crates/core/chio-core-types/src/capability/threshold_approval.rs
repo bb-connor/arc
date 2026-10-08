@@ -14,12 +14,29 @@ pub const MAX_THRESHOLD_APPROVAL_TOKENS: usize = 32;
 pub const MAX_THRESHOLD_APPROVAL_IDENTIFIER_BYTES: usize = 256;
 
 /// Exact request route passed to durable threshold-approval coordination.
+/// Deserialization applies the same validation as [`Self::new`].
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase", try_from = "ThresholdApprovalRequestWire")]
 pub struct ThresholdApprovalRequest {
     request_id: String,
     server_id: String,
     tool_name: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ThresholdApprovalRequestWire {
+    request_id: String,
+    server_id: String,
+    tool_name: String,
+}
+
+impl TryFrom<ThresholdApprovalRequestWire> for ThresholdApprovalRequest {
+    type Error = String;
+
+    fn try_from(wire: ThresholdApprovalRequestWire) -> Result<Self, Self::Error> {
+        Self::new(wire.request_id, wire.server_id, wire.tool_name)
+    }
 }
 
 impl ThresholdApprovalRequest {
@@ -216,6 +233,73 @@ mod tests {
             identifier: identifier.to_string(),
             public_key: keypair.public_key(),
         }
+    }
+
+    #[test]
+    fn request_route_deserialization_applies_constructor_validation() {
+        let oversized = "r".repeat(MAX_THRESHOLD_APPROVAL_IDENTIFIER_BYTES + 1);
+        for (request_id, server_id, tool_name, expected) in [
+            (
+                "",
+                "server",
+                "tool",
+                "threshold approval request_id is invalid",
+            ),
+            (
+                oversized.as_str(),
+                "server",
+                "tool",
+                "threshold approval request_id is invalid",
+            ),
+            (
+                "request-1",
+                " server",
+                "tool",
+                "threshold approval server_id is invalid",
+            ),
+            (
+                "request-1",
+                "server",
+                "tool\n",
+                "threshold approval tool_name is invalid",
+            ),
+        ] {
+            assert_eq!(
+                ThresholdApprovalRequest::new(request_id, server_id, tool_name).unwrap_err(),
+                expected
+            );
+            let error = serde_json::from_value::<ThresholdApprovalRequest>(serde_json::json!({
+                "requestId": request_id,
+                "serverId": server_id,
+                "toolName": tool_name,
+            }))
+            .unwrap_err();
+            assert_eq!(error.to_string(), expected);
+        }
+
+        let error = serde_json::from_value::<ThresholdApprovalRequest>(serde_json::json!({
+            "requestId": "request-1",
+            "serverId": "server",
+            "toolName": "tool",
+            "extra": true,
+        }))
+        .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "unknown field `extra`, expected one of `requestId`, `serverId`, `toolName`"
+        );
+    }
+
+    #[test]
+    fn request_route_wire_bytes_round_trip_unchanged() {
+        let route = ThresholdApprovalRequest::new("request-1", "server", "tool").unwrap();
+        let expected = br#"{"requestId":"request-1","serverId":"server","toolName":"tool"}"#;
+        assert_eq!(serde_json::to_vec(&route).unwrap(), expected);
+        assert_eq!(canonical_json_bytes(&route).unwrap(), expected);
+
+        let decoded: ThresholdApprovalRequest = serde_json::from_slice(expected).unwrap();
+        assert_eq!(decoded, route);
+        assert_eq!(serde_json::to_vec(&decoded).unwrap(), expected);
     }
 
     #[test]
