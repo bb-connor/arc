@@ -675,10 +675,11 @@ impl SessionThrottleStore for SqliteSecurityStateStore {
             super::lifecycle_observation::throttle_committed(&request.command);
             return Ok(stored);
         }
+        // Effect-keyed limits compose as a conjunction, so a new
+        // contribution is bound to the generation it was predicted from, not
+        // to the plan's observed base.
         if binding.is_some()
             || current.generation != request.expected_generation
-            || session_throttle_version_hash(&current)?
-                != request.command.request.expected_version_hash
             || request.contribution.expires_at_unix_ms <= trusted_now
         {
             return Err(PortError::conflict());

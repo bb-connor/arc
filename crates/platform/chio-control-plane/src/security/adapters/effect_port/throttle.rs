@@ -93,6 +93,10 @@ impl SessionThrottleBackend {
             contribution_hash: request.contribution_hash,
             expires_at_unix_ms: request.plan_expires_at_unix_ms,
         };
+        // Contributions are keyed by effect and enforced as a conjunction of
+        // independent windows, so a snapshot without this effect's
+        // contribution differs from the observed base only by other effects'
+        // limits.
         if let Some(existing) = current
             .contributions
             .as_slice()
@@ -102,8 +106,6 @@ impl SessionThrottleBackend {
             if existing != &desired {
                 return Err(PortError::conflict());
             }
-        } else if session_throttle_version_hash(&current)? != request.expected_version_hash {
-            return Err(PortError::conflict());
         }
         let predicted =
             predict_session_throttle_apply(&current, &desired, request.scheduler_fencing_token)?;
