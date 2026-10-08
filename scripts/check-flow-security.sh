@@ -252,25 +252,25 @@ run_exact_target --label "security kernel adapters" --expected \
 
 run_exact_target --label "durable flow state" --expected \
   acknowledged_correlation_tombstone_source_binding_corruption_fails_readiness \
-  lineage_fences_are_durable_and_orphans_recover_with_higher_fencing_tokens \
-  concurrent_joins_retain_every_restriction_and_new_sessions_inherit \
+  flow_and_scheduler::lineage_fences_are_durable_and_orphans_recover_with_higher_fencing_tokens \
+  flow_and_scheduler::concurrent_joins_retain_every_restriction_and_new_sessions_inherit \
   correlation_ingress_orders_due_event_time_ahead_of_a_future_fifo_prefix \
   correlation_ingress_pending_snapshot_survives_a_concurrent_acknowledgement \
   correlation_ingress_upgrades_the_known_legacy_pending_index \
   correlation_schema_drift_fails_startup \
-  corrupt_canonical_hash_fails_closed_on_read \
-  egress_dispatch_commitment_is_idempotent_and_immutable \
-  egress_fence_binds_the_canonical_request_hash \
-  egress_fence_rejects_corrupt_flow_state \
-  generation_change_invalidates_an_egress_fence \
-  injected_clock_controls_scheduler_lease_and_overlay_mutations \
-  isolation_epoch_must_be_verified_and_preserves_lineage_taint \
-  lineage_change_invalidates_every_principal_context \
+  flow_and_scheduler::corrupt_canonical_hash_fails_closed_on_read \
+  flow_and_scheduler::egress_dispatch_commitment_is_idempotent_and_immutable \
+  flow_and_scheduler::egress_fence_binds_the_canonical_request_hash \
+  flow_and_scheduler::egress_fence_rejects_corrupt_flow_state \
+  flow_and_scheduler::generation_change_invalidates_an_egress_fence \
+  flow_and_scheduler::injected_clock_controls_scheduler_lease_and_overlay_mutations \
+  flow_and_scheduler::isolation_epoch_must_be_verified_and_preserves_lineage_taint \
+  flow_and_scheduler::lineage_change_invalidates_every_principal_context \
   database_path_inputs::migration_is_idempotent_and_preserves_existing_tables \
-  missing_flow_context_generation_fails_closed \
-  missing_flow_epoch_or_session_row_fails_closed \
-  new_lineage_inherits_existing_epoch_and_cannot_bootstrap_a_new_epoch \
-  no_op_shared_label_joins_preserve_sibling_context_integrity \
+  flow_and_scheduler::missing_flow_context_generation_fails_closed \
+  flow_and_scheduler::missing_flow_epoch_or_session_row_fails_closed \
+  flow_and_scheduler::new_lineage_inherits_existing_epoch_and_cannot_bootstrap_a_new_epoch \
+  flow_and_scheduler::no_op_shared_label_joins_preserve_sibling_context_integrity \
   open_path::a_group_writable_parent_is_refused_before_the_store_is_created \
   open_path::a_hard_linked_legacy_database_is_refused_without_repairing_the_alias \
   open_path::a_hard_linked_path_is_refused_before_it_is_written \
@@ -284,15 +284,15 @@ run_exact_target --label "durable flow state" --expected \
   open_path::legacy_world_readable_sidecars_are_private_before_sqlite_opens_them \
   overlapping_overlay_contributions_are_removed_independently \
   overlay_effect_identity_cannot_cross_action_boundaries \
-  response_effect_generation_migration_preserves_existing_intent \
-  response_effect_owner_migration_rejects_unbound_existing_intent \
+  flow_and_scheduler::response_effect_generation_migration_preserves_existing_intent \
+  flow_and_scheduler::response_effect_owner_migration_rejects_unbound_existing_intent \
   scheduler_and_effect_reads_verify_canonical_hashes \
-  scheduler_retry_health_migration_preserves_age_conservatively \
-  scheduler_retry_health_outbox_survives_restart_and_ack_is_idempotent \
-  scheduler_takeover_fences_stale_overlay_mutations \
+  flow_and_scheduler::scheduler_retry_health_migration_preserves_age_conservatively \
+  flow_and_scheduler::scheduler_retry_health_outbox_survives_restart_and_ack_is_idempotent \
+  flow_and_scheduler::scheduler_takeover_fences_stale_overlay_mutations \
   database_path_inputs::security_state_rejects_ephemeral_sqlite_paths \
-  session_change_invalidates_same_session_fences_across_lineages \
-  session_taint_is_shared_across_lineages_within_an_epoch \
+  flow_and_scheduler::session_change_invalidates_same_session_fences_across_lineages \
+  flow_and_scheduler::session_taint_is_shared_across_lineages_within_an_epoch \
   verified_event_capacity_and_rule_index_roll_back_as_one_sqlite_transaction \
   verified_event_correlation_is_durable_and_advisory_events_remain_segregated \
   -- cargo test -p chio-store-sqlite --test security_state

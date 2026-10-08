@@ -40,7 +40,7 @@ main() {
   run_tests "application-time lineage fence exact recovery" cargo test -p chio-quarantine --lib blast::tests::exact_fence_is_requeried_and_can_be_recovered_by_exact_action_binding -- --exact
   run_tests "authoritative issuance freeze blocks issue and delegation" cargo test -p chio-security-kernel --test issuance_freeze active_freeze_store_outage_and_tamper_all_fail_closed -- --exact
   run_tests "kernel enforces the installed issuance freeze authority" cargo test -p chio-kernel --lib kernel::tests::capability_validation::installed_issuance_admission_rejects_freeze_and_principal_substitution -- --exact
-  run_tests "orphan lineage fence expiry and recovery" cargo test -p chio-store-sqlite --test security_state lineage_fences_are_durable_and_orphans_recover_with_higher_fencing_tokens -- --exact
+  run_tests "orphan lineage fence expiry and recovery" cargo test -p chio-store-sqlite --test security_state flow_and_scheduler::lineage_fences_are_durable_and_orphans_recover_with_higher_fencing_tokens -- --exact
 
   # Governed approval is isolated from the ordinary admission saga on current
   # main. Exercise its typed bindings, durable kernel replay, and production

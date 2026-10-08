@@ -1,11 +1,16 @@
-use std::collections::BTreeSet;
-use std::sync::{Arc, Barrier};
-use std::thread;
-use std::time::{SystemTime, UNIX_EPOCH};
+//! Flow-state joins, egress fences, lineage and isolation epochs, and response
+//! scheduler migrations, with the imports and fixtures the suite shares.
 
-use chio_core::canonical::canonical_json_bytes;
-use chio_core::hashing::sha256;
-use chio_core::{
+use super::*;
+
+pub(super) use std::collections::BTreeSet;
+pub(super) use std::sync::{Arc, Barrier};
+pub(super) use std::thread;
+pub(super) use std::time::{SystemTime, UNIX_EPOCH};
+
+pub(super) use chio_core::canonical::canonical_json_bytes;
+pub(super) use chio_core::hashing::sha256;
+pub(super) use chio_core::{
     crypto::{Ed25519Backend, Keypair},
     receipt::{
         body::{ChioReceipt, ChioReceiptBody},
@@ -14,7 +19,7 @@ use chio_core::{
     },
     SignedSecurityEvent,
 };
-use chio_security_types::ports::{
+pub(super) use chio_security_types::ports::{
     containment_installed_version_hash, containment_overlay_version_hash,
     containment_session_target, predict_containment_overlay_apply,
     predict_containment_overlay_remove, AdvisorySecurityEvent, CanonicalBody,
@@ -32,28 +37,28 @@ use chio_security_types::ports::{
     SchedulerWorkKey, SecurityEventStore, SecurityEventVerificationRecord, SessionId, TenantId,
     TenantScopedId, UnverifiedSecurityEvent,
 };
-use chio_security_types::ports::{
+pub(super) use chio_security_types::ports::{
     ActionId, LineageFenceRelease, LineageFenceRequest, LineageFenceStore,
 };
-use chio_security_types::{
+pub(super) use chio_security_types::{
     Compartment, InformationLabel, PrincipalId, ResponseEffectKind, ResponseTarget,
     SecurityEventBody, SecurityEventBodyInput, SecurityEventKind, SecuritySeverity,
     SecuritySubject,
 };
-use chio_store_sqlite::{
+pub(super) use chio_store_sqlite::{
     security_state::Clock, SqliteEncryptedBlobStore, SqliteReceiptStore, SqliteSecurityStateStore,
     TenantId as BlobTenantId, TenantKey,
 };
 
-fn tenant(value: &str) -> TenantId {
+pub(super) fn tenant(value: &str) -> TenantId {
     TenantId::new(value).unwrap_or_else(|error| panic!("tenant id: {error}"))
 }
 
-fn record(value: &str) -> RecordId {
+pub(super) fn record(value: &str) -> RecordId {
     RecordId::new(value).unwrap_or_else(|error| panic!("record id: {error}"))
 }
 
-fn encrypted_ref(path: &std::path::Path, tenant_id: &str, payload: &[u8]) -> RecordId {
+pub(super) fn encrypted_ref(path: &std::path::Path, tenant_id: &str, payload: &[u8]) -> RecordId {
     let store = SqliteEncryptedBlobStore::open(path)
         .unwrap_or_else(|error| panic!("open encrypted store: {error}"));
     let handle = store
@@ -66,7 +71,7 @@ fn encrypted_ref(path: &std::path::Path, tenant_id: &str, payload: &[u8]) -> Rec
     record(handle.blob_id())
 }
 
-struct TestIsolationEpochVerifier;
+pub(super) struct TestIsolationEpochVerifier;
 
 impl IsolationEpochEvidenceVerifierPort for TestIsolationEpochVerifier {
     fn verify(
@@ -84,7 +89,7 @@ impl IsolationEpochEvidenceVerifierPort for TestIsolationEpochVerifier {
     }
 }
 
-fn key(session: &str) -> FlowStateKey {
+pub(super) fn key(session: &str) -> FlowStateKey {
     FlowStateKey {
         tenant_id: tenant("tenant-a"),
         principal_id: PrincipalId::new("principal-a")
@@ -97,7 +102,7 @@ fn key(session: &str) -> FlowStateKey {
     }
 }
 
-fn compartment_label(value: &str) -> InformationLabel {
+pub(super) fn compartment_label(value: &str) -> InformationLabel {
     InformationLabel::try_known(
         Default::default(),
         BTreeSet::from([
@@ -107,20 +112,20 @@ fn compartment_label(value: &str) -> InformationLabel {
     .unwrap_or_else(|error| panic!("label: {error}"))
 }
 
-fn digest(bytes: &[u8]) -> Digest32 {
+pub(super) fn digest(bytes: &[u8]) -> Digest32 {
     let hash = sha256(bytes);
     let mut value = [0_u8; 32];
     value.copy_from_slice(hash.as_ref());
     Digest32::new(value)
 }
 
-fn authenticated_correlation_event(
+pub(super) fn authenticated_correlation_event(
     event_id: &str,
 ) -> (UnverifiedSecurityEvent, SecurityEventVerificationRecord) {
     authenticated_correlation_event_at(event_id, 10, 11)
 }
 
-fn authenticated_correlation_event_at(
+pub(super) fn authenticated_correlation_event_at(
     event_id: &str,
     event_time_unix_ms: u64,
     received_at_unix_ms: u64,
@@ -194,21 +199,21 @@ fn authenticated_correlation_event_at(
     (unverified, verified)
 }
 
-fn require_error<T>(result: PortResult<T>) -> PortError {
+pub(super) fn require_error<T>(result: PortResult<T>) -> PortError {
     match result {
         Ok(_) => panic!("operation unexpectedly succeeded"),
         Err(error) => error,
     }
 }
 
-fn current_unix_ms() -> u64 {
+pub(super) fn current_unix_ms() -> u64 {
     let duration = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_else(|error| panic!("clock: {error}"));
     u64::try_from(duration.as_millis()).unwrap_or_else(|error| panic!("clock range: {error}"))
 }
 
-fn overlay_apply_request(
+pub(super) fn overlay_apply_request(
     current: &OverlaySnapshot,
     session_id: &str,
     action_id: ActionId,
@@ -237,7 +242,7 @@ fn overlay_apply_request(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn overlay_apply_request_with_expiry(
+pub(super) fn overlay_apply_request_with_expiry(
     current: &OverlaySnapshot,
     session_id: &str,
     action_id: ActionId,
@@ -304,7 +309,7 @@ fn overlay_apply_request_with_expiry(
     }
 }
 
-fn overlay_remove_request(
+pub(super) fn overlay_remove_request(
     apply: &OverlayApplyRequest,
     current: &OverlaySnapshot,
     session_id: &str,
@@ -350,7 +355,7 @@ fn overlay_remove_request(
     }
 }
 
-fn overlay_target(session_id: &str) -> TenantScopedId {
+pub(super) fn overlay_target(session_id: &str) -> TenantScopedId {
     containment_session_target(
         &tenant("tenant-a"),
         &SessionId::new(session_id).unwrap_or_else(|error| panic!("session id: {error}")),
@@ -358,7 +363,7 @@ fn overlay_target(session_id: &str) -> TenantScopedId {
     .unwrap_or_else(|error| panic!("containment target: {error}"))
 }
 
-fn empty_overlay(target: TenantScopedId) -> OverlaySnapshot {
+pub(super) fn empty_overlay(target: TenantScopedId) -> OverlaySnapshot {
     OverlaySnapshot {
         target,
         generation: 0,

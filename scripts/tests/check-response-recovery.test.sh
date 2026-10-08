@@ -14,7 +14,7 @@ required_mappings=(
   'cargo test -p chio-quarantine --lib blast::tests::exact_fence_is_requeried_and_can_be_recovered_by_exact_action_binding -- --exact'
   'cargo test -p chio-security-kernel --test issuance_freeze active_freeze_store_outage_and_tamper_all_fail_closed -- --exact'
   'cargo test -p chio-kernel --lib kernel::tests::capability_validation::installed_issuance_admission_rejects_freeze_and_principal_substitution -- --exact'
-  'cargo test -p chio-store-sqlite --test security_state lineage_fences_are_durable_and_orphans_recover_with_higher_fencing_tokens -- --exact'
+  'cargo test -p chio-store-sqlite --test security_state flow_and_scheduler::lineage_fences_are_durable_and_orphans_recover_with_higher_fencing_tokens -- --exact'
   'cargo test -p chio-conformance --test protocol_primitives_authority_bindings threshold_proposal_mutations_and_exact_quorum_fail_closed -- --exact'
   'cargo test -p chio-kernel --lib kernel::tests::approval_flow::governed_approval_token_binds_every_authorization_field_and_time_window -- --exact'
   'cargo test -p chio-core-types --test governed_active_response_intent active_response_plan_uses_an_explicit_typed_variant_and_binds_the_complete_body -- --exact'
