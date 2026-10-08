@@ -528,7 +528,12 @@ jobs:
           })"
           test "$(jq -r '.ref' <<< "${merge_ref}")" = "refs/pull/${INPUT_PR_NUMBER}/merge"
           test "$(jq -r '.object.type' <<< "${merge_ref}")" = commit
-          test "$(jq -r '.object.sha' <<< "${merge_ref}")" = "${INPUT_MERGE_COMMIT_SHA}"
+          live_merge_sha="$(jq -r '.object.sha' <<< "${merge_ref}")"
+          [[ "${live_merge_sha}" =~ ^[0-9a-f]{40}$ ]]
+          live_merge_commit="$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/git/commits/${live_merge_sha}")"
+          test "$(jq -r '.sha' <<< "${live_merge_commit}")" = "${live_merge_sha}"
+          test "$(jq -cS '[.parents[].sha]' <<< "${live_merge_commit}")" = "[\"${INPUT_BASE_SHA}\",\"${INPUT_SOURCE_SHA}\"]"
+          test "$(jq -r '.tree.sha' <<< "${live_merge_commit}")" = "${INPUT_MERGE_TREE_SHA}"
           labels_json="$(jq -cS '[.labels[].name] | sort' <<< "${live_pr}")"
           labels_digest="$(printf '%s' "${labels_json}" | sha256sum | cut -d' ' -f1)"
           test "${labels_digest}" = "${INPUT_LABELS_DIGEST}"
@@ -636,13 +641,10 @@ jobs:
           })"
           test "$(jq -r '.ref' <<< "${stable_merge_ref}")" = "refs/pull/${INPUT_PR_NUMBER}/merge"
           test "$(jq -r '.object.type' <<< "${stable_merge_ref}")" = commit
-          test "$(jq -r '.object.sha' <<< "${stable_merge_ref}")" = "${INPUT_MERGE_COMMIT_SHA}"
-          stable_merge_commit="$({
-            gh api \
-              -H "Accept: application/vnd.github+json" \
-              -H "X-GitHub-Api-Version: 2026-03-10" \
-              "repos/${GITHUB_REPOSITORY}/git/commits/${INPUT_MERGE_COMMIT_SHA}"
-          })"
+          stable_merge_sha="$(jq -r '.object.sha' <<< "${stable_merge_ref}")"
+          [[ "${stable_merge_sha}" =~ ^[0-9a-f]{40}$ ]]
+          stable_merge_commit="$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/git/commits/${stable_merge_sha}")"
+          test "$(jq -r '.sha' <<< "${stable_merge_commit}")" = "${stable_merge_sha}"
           test "$(jq -cS '[.parents[].sha]' <<< "${stable_merge_commit}")" = "[\"${INPUT_BASE_SHA}\",\"${INPUT_SOURCE_SHA}\"]"
           test "$(jq -r '.tree.sha' <<< "${stable_merge_commit}")" = "${INPUT_MERGE_TREE_SHA}"
 
