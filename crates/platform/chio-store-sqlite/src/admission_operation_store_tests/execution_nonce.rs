@@ -19,6 +19,9 @@ mod lifecycle;
 mod native_preflight;
 #[path = "execution_nonce/preflight.rs"]
 mod preflight;
+#[cfg(unix)]
+#[path = "execution_nonce/supplemental_selector.rs"]
+mod supplemental_selector;
 
 struct NonceFixture {
     fixture: Fixture,
