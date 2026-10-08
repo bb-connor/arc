@@ -1,3 +1,7 @@
+//! Governance cases and sealed claim snapshots.
+
+use super::*;
+
 // Governance cases and sealed claim snapshots.
 
 impl SqliteFindingChallengeStore {
