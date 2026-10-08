@@ -35,6 +35,11 @@ struct AuditHealth {
 }
 
 const MAX_AUDIT_SYNC_PAGES: usize = 4_096;
+/// How long the IPC loop waits for a connection before it rechecks the
+/// poll loop's fatal state. A connection that arrives during the wait is
+/// served at once.
+#[cfg(unix)]
+const AUDIT_ACCEPT_WAIT: Duration = Duration::from_millis(50);
 
 struct PollLoopConfig {
     monitor: Arc<KeyLogAuditMonitor>,
@@ -163,13 +168,13 @@ fn run() -> chio_keyring::Result<()> {
     });
 
     let listener = bind_private_unix_listener(&config.socket_path)?;
-    listener.set_nonblocking(true)?;
     loop {
         if let Some(error) = health_lock(&health)?.fatal_error.clone() {
             return Err(KeyringError::Storage(error));
         }
-        match listener.accept() {
-            Ok(connection) => {
+        match listener.accept_within(AUDIT_ACCEPT_WAIT) {
+            Ok(None) => {}
+            Ok(Some(connection)) => {
                 let result = (|| {
                     let mut stream =
                         connection.authenticate(chio_keyring::KEY_LOG_IPC_REQUEST_DEADLINE)?;
@@ -189,9 +194,6 @@ fn run() -> chio_keyring::Result<()> {
                 if let Err(error) = result {
                     eprintln!("chio-keylog-audit rejected IPC request: {error}");
                 }
-            }
-            Err(error) if error.kind() == ErrorKind::WouldBlock => {
-                thread::sleep(Duration::from_millis(10));
             }
             Err(error)
                 if matches!(

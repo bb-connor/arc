@@ -20,7 +20,7 @@ const GENERATION_RECORD_BYTES: usize = 65;
 /// A bound service socket, the lifecycle lock that keeps another instance
 /// from unlinking it, and the generation of the socket recorded in that lock.
 ///
-/// Only `accept` and `set_nonblocking` reach the listener, so no supported
+/// Only `accept`, `accept_within` and `set_nonblocking` reach the listener, so no supported
 /// holder can keep the socket listening after it releases the lock. Dropping
 /// the listener removes the socket name only while the name still holds this
 /// generation, then closes the listener and releases the lock.
@@ -60,6 +60,35 @@ impl PrivateUnixListener {
             stream,
             authorized_peer_uid: self.authorized_peer_uid,
         })
+    }
+
+    /// Wait up to `timeout` for a connection and accept it. `None` means no
+    /// connection arrived, or one was withdrawn or interrupted before it could
+    /// be accepted; the caller rechecks its own state and waits again. The
+    /// listener is left nonblocking so a withdrawn connection never blocks
+    /// the caller past `timeout`.
+    pub fn accept_within(
+        &self,
+        timeout: std::time::Duration,
+    ) -> std::io::Result<Option<AcceptedServiceConnection>> {
+        self.listener.set_nonblocking(true)?;
+        if !chio_secure_ipc::listener::wait_readable(&self.listener, timeout)? {
+            return Ok(None);
+        }
+        match self.accept() {
+            Ok(connection) => Ok(Some(connection)),
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::WouldBlock
+                        | std::io::ErrorKind::Interrupted
+                        | std::io::ErrorKind::ConnectionAborted
+                ) =>
+            {
+                Ok(None)
+            }
+            Err(error) => Err(error),
+        }
     }
 
     pub fn set_nonblocking(&self, nonblocking: bool) -> std::io::Result<()> {

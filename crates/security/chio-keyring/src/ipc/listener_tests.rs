@@ -508,3 +508,38 @@ fn canonical_frames_refuse_bad_lengths_exactly_and_keep_transfer_faults() {
     );
     assert!(written.is_empty());
 }
+
+#[test]
+fn a_bounded_accept_returns_at_its_deadline_or_with_the_next_connection() {
+    use std::time::{Duration, Instant};
+
+    let (_directory, root) = private_root();
+    let socket = root.join("audit.sock");
+    let listener = bind_listener(&socket).test_unwrap();
+    let started = Instant::now();
+    assert!(listener
+        .accept_within(Duration::from_millis(100))
+        .test_unwrap()
+        .is_none());
+    let elapsed = started.elapsed();
+    assert!(elapsed >= Duration::from_millis(90), "{elapsed:?}");
+    assert!(elapsed < Duration::from_secs(2), "{elapsed:?}");
+
+    let connector = std::thread::spawn({
+        let socket = socket.clone();
+        move || {
+            std::thread::sleep(Duration::from_millis(50));
+            std::os::unix::net::UnixStream::connect(&socket)
+        }
+    });
+    let started = Instant::now();
+    let connection = listener
+        .accept_within(Duration::from_secs(5))
+        .test_unwrap()
+        .test_unwrap();
+    assert!(started.elapsed() < Duration::from_secs(2));
+    let _client = connector.join().test_unwrap().test_unwrap();
+    connection
+        .authenticate(Duration::from_secs(5))
+        .test_unwrap();
+}
