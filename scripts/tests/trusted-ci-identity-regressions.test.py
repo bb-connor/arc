@@ -105,21 +105,6 @@ def installation_repositories() -> dict:
                                           "repositories": [{"id": int(REPOSITORY_ID), "full_name": REPOSITORY}]}}
 
 
-def with_ci_run_censuses(data: dict) -> dict:
-    """Mirror the recorded ci.yml run listing into the CI run censuses the producers read.
-
-    GitHub lists every ci.yml run under the workflow file name, under its
-    numeric workflow ID and in the repository-wide run listing; the shared
-    fixtures record the file-name listing.
-    """
-    data = dict(data)
-    listing = data.get(f"{PREFIX}/actions/workflows/ci.yml/runs")
-    if listing is not None:
-        data.setdefault(f"{PREFIX}/actions/runs", copy.deepcopy(listing))
-        data.setdefault(f"{PREFIX}/actions/workflows/{CI_WORKFLOW}/runs", copy.deepcopy(listing))
-    return data
-
-
 def run_publisher(data: dict, extra_outputs: dict[str, str] | None = None):
     """Run the publish-security-contract step for the sealed binding of the candidate identity on E."""
     binding = LANDING.publication_binding()
@@ -139,7 +124,7 @@ def run_publisher(data: dict, extra_outputs: dict[str, str] | None = None):
     }
     script, environment = render_step(PUBLISHER, context)
     script = without_token_exchange(script, 'repositories="$({')
-    return LANDING.run_offline_step(REFUSAL_TRACE + script, with_ci_run_censuses(data) | installation_repositories(),
+    return LANDING.run_offline_step(REFUSAL_TRACE + script, data | installation_repositories(),
                                     environment | {"installation_token": LANDING.INSTALLATION_TOKEN},
                                     collect=("summary.md",))
 
@@ -243,7 +228,7 @@ def run_auditor(data: dict, pr: int = PR, workflow_sha: str = LANDING.PROTECTED)
         raise AssertionError(f"audit job environment changed: {sorted(job['env'])}")
     body = next(step["run"] for step in job["steps"] if "run" in step)
     script = ROOT / "scripts/audit-security-merge-qualification.py"
-    run = LANDING.run_offline_step(body, with_ci_run_censuses(data), {
+    run = LANDING.run_offline_step(body, data, {
         "AUDIT_WORKFLOW_SHA": workflow_sha, "GH_TOKEN": "offline-fixture-token", "PR_NUMBER": str(pr),
         "SECURITY_APP_ID": str(APP_ID), "SECURITY_DEFINITION_SHA": DEFINITION, "PYTHONDONTWRITEBYTECODE": "1",
     }, files={f"authorized-auditor/scripts/{script.name}": script.read_bytes()}, collect=("audit.json",))
@@ -263,11 +248,26 @@ def retarget(data: dict, mapping: dict[str, str]) -> dict:
     return json.loads(text)
 
 
+# GitHub lists every ci.yml run under the workflow file name, under its numeric
+# workflow ID and in the repository-wide run census.
+CI_RUN_LISTINGS = (f"{PREFIX}/actions/workflows/ci.yml/runs", f"{PREFIX}/actions/workflows/{CI_WORKFLOW}/runs",
+                   f"{PREFIX}/actions/runs")
+
+
+def ci_run_listings(data: dict) -> list[dict]:
+    """Each distinct ci.yml run listing the fixture records."""
+    distinct: dict[int, dict] = {}
+    for key in CI_RUN_LISTINGS:
+        if key in data:
+            distinct.setdefault(id(data[key]), data[key])
+    return list(distinct.values())
+
+
 def set_ci_title(data: dict, run_id: int, title: str) -> None:
     for key in (f"{PREFIX}/actions/runs/{run_id}", f"{PREFIX}/actions/runs/{run_id}/attempts/1"):
         data[key]["display_title"] = title
-    for listing in (f"{PREFIX}/actions/runs", f"{PREFIX}/actions/workflows/ci.yml/runs"):
-        for run in data[listing]["workflow_runs"]:
+    for listing in ci_run_listings(data):
+        for run in listing["workflow_runs"]:
             if run["id"] == run_id:
                 run["display_title"] = title
 
@@ -463,9 +463,9 @@ def another_pull_request_ci_run(data: dict) -> None:
     """A successful CI run on E titled for another pull request, with its own job inventory and checks."""
     run = copy.deepcopy(data[f"{PREFIX}/actions/runs/{CI_RUN}"])
     run.update(id=202, display_title=f"CI N={OTHER_PR} E={EVIDENCE} B={BASE} M={OTHER_MERGE}", check_suite_id=402)
-    listing = data[f"{PREFIX}/actions/runs"]
-    listing["workflow_runs"].append(run)
-    listing["total_count"] = len(listing["workflow_runs"])
+    for listing in ci_run_listings(data):
+        listing["workflow_runs"].append(copy.deepcopy(run))
+        listing["total_count"] = len(listing["workflow_runs"])
     data[f"{PREFIX}/actions/runs/202"] = copy.deepcopy(run)
     data[f"{PREFIX}/actions/runs/202/attempts/1"] = copy.deepcopy(run)
     jobs = []
