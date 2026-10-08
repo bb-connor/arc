@@ -197,3 +197,105 @@ def test_failure_artifact_publishes_attachment_classes_without_raw_text(qualifie
         "docker_wait_failed",
     ]
     assert list(output.iterdir()) == [output / "operator-failure.json"]
+
+
+NATIVE_DISPATCH_FAULT = (
+    "WARN chio::native_dispatch message=native dispatch failed request_id={request} "
+    "native_dispatch_fault={fault}\n"
+)
+NATIVE_DISPATCH_FAULTS = [
+    "hook_before_capture",
+    "hook_after_custody",
+    "hook_suppressed_capture_failure",
+    "hook_skipped_capture",
+    "retention_before_store",
+    "retention_deadline",
+    "retention_store",
+    "capture_before_store",
+    "capture_store_panicked",
+    "capture_store_fenced",
+    "capture_store_outcome_unknown",
+    "capture_store_rejected",
+    "capture_readback",
+    "handoff_entry",
+    "handoff_deadline_at_entry",
+    "handoff_readback",
+    "handoff_flow",
+    "handoff_deadline_after_readback",
+    "handoff_custody",
+]
+
+
+def test_failure_artifact_maps_each_native_dispatch_line_to_its_fixed_class(qualifier, tmp_path):
+    secret = "never-publish-this-native-credential"
+    output = tmp_path / "output"
+    output.mkdir()
+    for fault in NATIVE_DISPATCH_FAULTS:
+        stderr = (
+            "WARN chio_kernel durable dispatch preparation failed reason="
+            + secret
+            + "\n"
+            + NATIVE_DISPATCH_FAULT.format(request=secret, fault=fault)
+            + secret
+        )
+        for failure in (
+            subprocess.CalledProcessError(
+                1, ["chio-mini-swe", "run", "--state", secret], output="", stderr=stderr
+            ),
+            subprocess.TimeoutExpired(
+                ["chio-mini-swe", "run", "--state", secret], 120, stderr=stderr.encode()
+            ),
+        ):
+            qualifier.save_failure_diagnostics(tmp_path, output, failure)
+            text = (output / "operator-failure.json").read_text()
+            for private in (secret, "request_id", "native_dispatch_fault=", "dispatch failed"):
+                assert private not in text
+            assert list(output.iterdir()) == [output / "operator-failure.json"]
+            assert json.loads(text)["host_failure_classes"] == ["native_dispatch_" + fault]
+
+
+def test_native_dispatch_marker_refuses_unknown_truncated_extra_and_worker_lines(
+    qualifier, tmp_path
+):
+    secret = "never-publish-this-native-credential"
+    line = NATIVE_DISPATCH_FAULT.format(
+        request="native-request-1", fault="handoff_deadline_at_entry"
+    )
+    for text in [
+        NATIVE_DISPATCH_FAULT.format(request="native-request-1", fault="handoff_deadline"),
+        NATIVE_DISPATCH_FAULT.format(request="native-request-1", fault=secret),
+        NATIVE_DISPATCH_FAULT.format(request="native-request-1", fault="handoff_deadline_at"),
+        NATIVE_DISPATCH_FAULT.format(
+            request="native-request-1", fault="handoff_deadline_at_entryx"
+        ),
+        NATIVE_DISPATCH_FAULT.format(
+            request="native-request-1", fault="handoff_deadline_at_entry " + secret
+        ),
+        line[:-1],
+        "x" * (65536 - len(line)) + "\n" + line,
+        line.replace("native_dispatch_fault=", ""),
+        line.replace("native_dispatch_fault=", "fault="),
+        line.replace(" request_id=native-request-1", ""),
+        line.replace("chio::native_dispatch", "chio::worker"),
+        line.replace("native dispatch failed", secret),
+        "worker output " + line,
+    ]:
+        assert qualifier.failure_classes(text, host=True) == [], text
+    assert qualifier.failure_classes("x" * (65535 - len(line)) + "\n" + line, host=True) == [
+        "native_dispatch_handoff_deadline_at_entry"
+    ]
+    logs = tmp_path / "run/host/run-logs"
+    logs.mkdir(parents=True)
+    (logs / "coder-1.stderr").write_text(line)
+    output = tmp_path / "output"
+    output.mkdir()
+    failure = subprocess.CalledProcessError(
+        1, ["chio-mini-swe", "run", "--state", secret], output="", stderr=secret + "\n" + line
+    )
+    qualifier.save_failure_diagnostics(tmp_path, output, failure)
+    text = (output / "operator-failure.json").read_text()
+    assert secret not in text
+    result = json.loads(text)
+    assert result["host_failure_classes"] == ["native_dispatch_handoff_deadline_at_entry"]
+    assert result["worker_logs"][1]["classes"] == []
+    assert qualifier.failure_classes(line) == []
