@@ -3,9 +3,10 @@ use super::security_state_lifecycle_lock_path;
 use super::{
     append_verified_in_transaction, body_hash, canonical_json_bytes, canonical_request_hash,
     decode_digest, from_i64, load_event_identity, params, parse_trust_class, record_transition,
-    scan_verified_partition, sqlite_error, to_i64, transition_status, validate_canonical_json_body,
-    validate_correlation_durable_schema, CanonicalBody, ChioReceipt, Connection,
-    CorrelationCasRequest, CorrelationEventIndexRequest, CorrelationIngressStore,
+    scan_verified_partition, schema_object_definition_is_exact, sqlite_error,
+    table_definition_is_exact, table_has_foreign_key_violation, to_i64, transition_status,
+    validate_canonical_json_body, validate_correlation_durable_schema, CanonicalBody, ChioReceipt,
+    Connection, CorrelationCasRequest, CorrelationEventIndexRequest, CorrelationIngressStore,
     CorrelationOutcomeKey, CorrelationOutcomePublication, CorrelationOutcomeStatus,
     CorrelationPartial, CorrelationPartitionKey, Digest32, EventAppend, EventId, OptionalExtension,
     PortError, PortResult, ProducerId, ProducerTrustClass, RuleId, SecurityEventVerificationRecord,
@@ -13,6 +14,48 @@ use super::{
     UnverifiedEventBatch, UnverifiedSecurityEvent, MAX_EVENT_SCAN_RESULTS,
 };
 use chio_core::security_event::{EVENT_EVIDENCE_HASH_DOMAIN, EVENT_RECEIPT_EVIDENCE_HASH_DOMAIN};
+use chio_security_types::ports::{CorrelationIngressRejection, CorrelationIngressRejectionReason};
+
+// tenant-read-contract: security_ingress_rejections; class=tenant-predicate; principal=security-runtime
+const INGRESS_REJECTIONS_CANONICAL_DDL: &str = r#"
+CREATE TABLE security_ingress_rejections (
+    tenant_id TEXT NOT NULL,
+    event_id TEXT NOT NULL,
+    producer_id TEXT NOT NULL,
+    trust_class TEXT NOT NULL CHECK (trust_class IN ('internal_detector', 'verified_receipt')),
+    reason TEXT NOT NULL CHECK (reason IN (
+        'unconfigured_producer', 'unconfigured_producer_key', 'unconfigured_policy_version'
+    )),
+    evidence_hash BLOB NOT NULL CHECK (length(evidence_hash) = 32),
+    PRIMARY KEY (tenant_id, event_id),
+    FOREIGN KEY (tenant_id, event_id)
+        REFERENCES security_correlation_ingress (tenant_id, event_id)
+)
+"#;
+const INGRESS_REJECTIONS_IMMUTABLE_TRIGGER_DDL: &str = r#"
+CREATE TRIGGER security_ingress_rejections_immutable
+BEFORE UPDATE ON security_ingress_rejections
+BEGIN
+    SELECT RAISE(ABORT, 'ingress rejection mutation is rejected');
+END
+"#;
+const INGRESS_REJECTIONS_DELETE_TRIGGER_DDL: &str = r#"
+CREATE TRIGGER security_ingress_rejections_delete_rejected
+BEFORE DELETE ON security_ingress_rejections
+BEGIN
+    SELECT RAISE(ABORT, 'ingress rejection deletion is rejected');
+END
+"#;
+
+fn ingress_rejection_reason_name(reason: CorrelationIngressRejectionReason) -> &'static str {
+    match reason {
+        CorrelationIngressRejectionReason::UnconfiguredProducer => "unconfigured_producer",
+        CorrelationIngressRejectionReason::UnconfiguredProducerKey => "unconfigured_producer_key",
+        CorrelationIngressRejectionReason::UnconfiguredPolicyVersion => {
+            "unconfigured_policy_version"
+        }
+    }
+}
 
 fn correlation_outcome_status_name(value: CorrelationOutcomeStatus) -> &'static str {
     match value {
@@ -592,10 +635,115 @@ fn validate_stored_correlation_ingress(
     }
 }
 
+type StoredIngressRejection = (String, String, String, Vec<u8>);
+
+fn load_ingress_rejection(
+    connection: &Connection,
+    tenant_id: &TenantId,
+    event_id: &EventId,
+) -> PortResult<Option<StoredIngressRejection>> {
+    connection
+        .query_row(
+            r#"
+            SELECT producer_id, trust_class, reason, evidence_hash
+            FROM security_ingress_rejections
+            WHERE tenant_id = ?1 AND event_id = ?2
+            "#,
+            params![tenant_id.as_str(), event_id.as_str()],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+        )
+        .optional()
+        .map_err(sqlite_error)
+}
+
+/// A rejected row is terminal: it can no longer be admitted again, correlated
+/// or acknowledged.
+fn refuse_rejected_ingress(
+    connection: &Connection,
+    event: &UnverifiedSecurityEvent,
+) -> PortResult<()> {
+    if load_ingress_rejection(connection, &event.tenant_id, &event.event_id)?.is_some() {
+        return Err(PortError::conflict());
+    }
+    Ok(())
+}
+
+fn validate_ingress_rejections(connection: &Connection) -> PortResult<()> {
+    let extensions: i64 = connection
+        .query_row(
+            r#"
+            SELECT COUNT(*)
+            FROM sqlite_master
+            WHERE type IN ('index', 'trigger')
+              AND sql IS NOT NULL
+              AND (
+                  tbl_name = 'security_ingress_rejections'
+                  OR instr(lower(sql), 'security_ingress_rejections') > 0
+              )
+              AND name NOT IN (
+                  'security_ingress_rejections_immutable',
+                  'security_ingress_rejections_delete_rejected'
+              )
+            "#,
+            [],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)?;
+    if extensions != 0
+        || !table_definition_is_exact(
+            connection,
+            "security_ingress_rejections",
+            INGRESS_REJECTIONS_CANONICAL_DDL,
+        )?
+        || !schema_object_definition_is_exact(
+            connection,
+            "trigger",
+            "security_ingress_rejections_immutable",
+            INGRESS_REJECTIONS_IMMUTABLE_TRIGGER_DDL,
+        )?
+        || !schema_object_definition_is_exact(
+            connection,
+            "trigger",
+            "security_ingress_rejections_delete_rejected",
+            INGRESS_REJECTIONS_DELETE_TRIGGER_DDL,
+        )?
+        || table_has_foreign_key_violation(connection, "security_ingress_rejections")?
+    {
+        return Err(PortError::integrity_failure());
+    }
+    let unbound: bool = connection
+        .query_row(
+            r#"
+            SELECT EXISTS(
+                SELECT 1
+                FROM security_ingress_rejections AS rejection
+                LEFT JOIN security_correlation_ingress AS ingress
+                  USING (tenant_id, event_id)
+                LEFT JOIN security_verified_events AS events
+                  USING (tenant_id, event_id)
+                WHERE ingress.sequence IS NULL
+                   OR events.trust_class IS NULL
+                   OR ingress.acknowledged != 0
+                   OR ingress.producer_id != rejection.producer_id
+                   OR ingress.evidence_hash != rejection.evidence_hash
+                   OR events.trust_class != rejection.trust_class
+            )
+            "#,
+            [],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)?;
+    if unbound {
+        return Err(PortError::integrity_failure());
+    }
+    Ok(())
+}
+
 impl CorrelationIngressStore for SqliteSecurityStateStore {
     fn ensure_correlation_ingress_ready(&self) -> PortResult<()> {
         let connection = self.connection()?;
         validate_correlation_durable_schema(&connection)?;
+        validate_ingress_rejections(&connection)?;
         let invalid: bool = connection
             .query_row(
                 r#"
@@ -703,6 +851,7 @@ impl CorrelationIngressStore for SqliteSecurityStateStore {
             load_correlation_ingress(&transaction, &event.tenant_id, &event.event_id)?
         {
             validate_stored_correlation_ingress(&stored, event, &verified.evidence_hash)?;
+            refuse_rejected_ingress(&transaction, event)?;
         } else {
             transaction
                 .execute(
@@ -745,6 +894,9 @@ impl CorrelationIngressStore for SqliteSecurityStateStore {
                        body, body_hash, source_evidence, evidence_hash, acknowledged
                 FROM security_correlation_ingress
                 WHERE acknowledged = 0
+                  AND (tenant_id, event_id) NOT IN (
+                      SELECT tenant_id, event_id FROM security_ingress_rejections
+                  )
                 ORDER BY event_time, sequence
                 LIMIT ?1
                 "#,
@@ -828,6 +980,7 @@ impl CorrelationIngressStore for SqliteSecurityStateStore {
         let stored = load_correlation_ingress(&transaction, &event.tenant_id, &event.event_id)?
             .ok_or_else(PortError::integrity_failure)?;
         validate_stored_correlation_ingress(&stored, event, &verified.evidence_hash)?;
+        refuse_rejected_ingress(&transaction, event)?;
         transaction.commit().map_err(sqlite_error)
     }
 
@@ -840,6 +993,7 @@ impl CorrelationIngressStore for SqliteSecurityStateStore {
             .ok_or_else(PortError::integrity_failure)?;
         let evidence_hash = decode_digest(stored.6.clone())?;
         let acknowledged = validate_stored_correlation_ingress(&stored, event, &evidence_hash)?;
+        refuse_rejected_ingress(&transaction, event)?;
         if !acknowledged {
             let updated = transaction
                 .execute(
@@ -862,7 +1016,95 @@ impl CorrelationIngressStore for SqliteSecurityStateStore {
         let connection = self.connection()?;
         let count: i64 = connection
             .query_row(
-                "SELECT COUNT(*) FROM security_correlation_ingress WHERE acknowledged = 0",
+                r#"
+                SELECT COUNT(*)
+                FROM security_correlation_ingress
+                WHERE acknowledged = 0
+                  AND (tenant_id, event_id) NOT IN (
+                      SELECT tenant_id, event_id FROM security_ingress_rejections
+                  )
+                "#,
+                [],
+                |row| row.get(0),
+            )
+            .map_err(sqlite_error)?;
+        from_i64(count)
+    }
+
+    fn reject_pending_correlation_event(
+        &self,
+        event: &UnverifiedSecurityEvent,
+        rejection: &CorrelationIngressRejection,
+    ) -> PortResult<()> {
+        validate_canonical_json_body(&event.canonical_body, &event.body_hash)?;
+        validate_correlation_source_evidence(
+            rejection.trust_class,
+            &event.source_evidence,
+            &rejection.evidence_hash,
+        )?;
+        let mut connection = self.connection()?;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(sqlite_error)?;
+        let stored = load_correlation_ingress(&transaction, &event.tenant_id, &event.event_id)?
+            .ok_or_else(PortError::integrity_failure)?;
+        if validate_stored_correlation_ingress(&stored, event, &rejection.evidence_hash)? {
+            return Err(PortError::conflict());
+        }
+        let trust_class: String = transaction
+            .query_row(
+                r#"
+                SELECT trust_class FROM security_verified_events
+                WHERE tenant_id = ?1 AND event_id = ?2
+                "#,
+                params![event.tenant_id.as_str(), event.event_id.as_str()],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(sqlite_error)?
+            .ok_or_else(PortError::integrity_failure)?;
+        if parse_trust_class(&trust_class)? != rejection.trust_class {
+            return Err(PortError::integrity_failure());
+        }
+        let reason = ingress_rejection_reason_name(rejection.reason);
+        match load_ingress_rejection(&transaction, &event.tenant_id, &event.event_id)? {
+            Some((producer_id, stored_trust_class, stored_reason, evidence_hash)) => {
+                if producer_id != event.producer_id.as_str()
+                    || stored_trust_class != trust_class
+                    || stored_reason != reason
+                    || decode_digest(evidence_hash)? != rejection.evidence_hash
+                {
+                    return Err(PortError::conflict());
+                }
+            }
+            None => {
+                transaction
+                    .execute(
+                        r#"
+                        INSERT INTO security_ingress_rejections (
+                            tenant_id, event_id, producer_id, trust_class, reason, evidence_hash
+                        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+                        "#,
+                        params![
+                            event.tenant_id.as_str(),
+                            event.event_id.as_str(),
+                            event.producer_id.as_str(),
+                            trust_class,
+                            reason,
+                            rejection.evidence_hash.as_bytes().as_slice(),
+                        ],
+                    )
+                    .map_err(sqlite_error)?;
+            }
+        }
+        transaction.commit().map_err(sqlite_error)
+    }
+
+    fn count_rejected_correlation_events(&self) -> PortResult<u64> {
+        let connection = self.connection()?;
+        let count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM security_ingress_rejections",
                 [],
                 |row| row.get(0),
             )

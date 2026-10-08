@@ -138,6 +138,7 @@ mod events;
 pub use events::{
     AdvisorySecurityEvent, CorrelationCasRequest, CorrelationDeleteRequest,
     CorrelationEventAdmission, CorrelationEventAdmissionRequest, CorrelationEventIndexRequest,
+    CorrelationIngressRejection, CorrelationIngressRejectionReason,
     CorrelationOutcomeCommitRequest, CorrelationOutcomeKey, CorrelationOutcomePublication,
     CorrelationOutcomeStatus, CorrelationPartial, CorrelationPartitionKey, CorrelationScan,
     CreateOutcome, EventAppend, EventPartitionScan, ProducerTrustClass,

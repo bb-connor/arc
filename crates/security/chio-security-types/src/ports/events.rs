@@ -45,6 +45,30 @@ pub struct SecurityEventVerificationRecord {
     pub evidence_hash: Digest32,
 }
 
+/// Why an admitted ingress row can no longer be correlated under the current
+/// producer configuration. Every reason is a configuration mismatch for an
+/// envelope whose canonical bytes, hashes and signature still verify; corrupt
+/// evidence is never a rejection reason.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CorrelationIngressRejectionReason {
+    /// No producer binding exists for the event tenant and producer.
+    UnconfiguredProducer,
+    /// The producer binding names a different key id or key.
+    UnconfiguredProducerKey,
+    /// The producer binding pins a different policy version.
+    UnconfiguredPolicyVersion,
+}
+
+/// Terminal refusal of one pending ingress row. `evidence_hash` is the
+/// recomputed source evidence hash and must equal the hash stored when the
+/// row was admitted.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CorrelationIngressRejection {
+    pub trust_class: ProducerTrustClass,
+    pub reason: CorrelationIngressRejectionReason,
+    pub evidence_hash: Digest32,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct AdvisorySecurityEvent {
@@ -258,6 +282,9 @@ pub trait SecurityEventStore: Send + Sync {
 /// envelope in one transaction. Acknowledgements are permanent tombstones:
 /// replaying the same authenticated envelope after acknowledgement must not
 /// make it pending again, while any identity rebinding must fail closed.
+///
+/// Rejections are permanent too. A rejected row is never pending, correlated
+/// or acknowledged again, and an acknowledged row cannot be rejected.
 #[cfg(feature = "std")]
 pub trait CorrelationIngressStore: Send + Sync {
     fn ensure_correlation_ingress_ready(&self) -> PortResult<()>;
@@ -275,4 +302,12 @@ pub trait CorrelationIngressStore: Send + Sync {
     ) -> PortResult<()>;
     fn acknowledge_correlated_event(&self, event: &UnverifiedSecurityEvent) -> PortResult<()>;
     fn count_pending_correlation_events(&self) -> PortResult<u64>;
+    /// Records `rejection` for an unacknowledged row in the transaction that
+    /// rechecks the row's admitted envelope and evidence hash.
+    fn reject_pending_correlation_event(
+        &self,
+        event: &UnverifiedSecurityEvent,
+        rejection: &CorrelationIngressRejection,
+    ) -> PortResult<()>;
+    fn count_rejected_correlation_events(&self) -> PortResult<u64>;
 }

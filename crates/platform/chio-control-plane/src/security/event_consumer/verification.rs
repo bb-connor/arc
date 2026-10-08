@@ -1,3 +1,4 @@
+use super::ingress::SealedEventDisposition;
 use super::{
     canonical_json_bytes, json, sha256, Arc, BTreeMap, BoundaryClass, ChioReceipt, Clock,
     CorrelationEventVerifier, Deserialize, Digest32, Error, NativeSecurityEventVerifier,
@@ -8,6 +9,7 @@ use super::{
 };
 use chio_core_types::security_event::EVENT_EVIDENCE_HASH_DOMAIN;
 use chio_core_types::security_event::EVENT_RECEIPT_EVIDENCE_HASH_DOMAIN;
+use chio_security_types::ports::{CorrelationIngressRejection, CorrelationIngressRejectionReason};
 
 pub const SECURITY_EVENT_RECEIPT_PROJECTION_VERSION: &str =
     "chio.security-event-receipt-projection.v1";
@@ -166,12 +168,42 @@ impl NativeSecurityEventVerifier {
         Ok(body)
     }
 
+    fn dispose(
+        &self,
+        event: &UnverifiedSecurityEvent,
+        trust_class: ProducerTrustClass,
+        evidence_hash: Digest32,
+        mismatch: Option<CorrelationIngressRejectionReason>,
+        enforce_freshness: bool,
+    ) -> PortResult<SealedEventDisposition> {
+        if let Some(reason) = mismatch {
+            return Ok(SealedEventDisposition::Rejected(
+                CorrelationIngressRejection {
+                    trust_class,
+                    reason,
+                    evidence_hash,
+                },
+            ));
+        }
+        if enforce_freshness {
+            self.verify_time_bounds(event.event_time_unix_ms, event.received_at_unix_ms)?;
+        }
+        Ok(SealedEventDisposition::Verified(self.verified_event(
+            event,
+            trust_class,
+            evidence_hash,
+        )))
+    }
+
+    /// Verifies the detector envelope under the key it carries before
+    /// comparing that key, its id and the policy pin with the configured
+    /// producer, so only a sealed envelope can reach a configuration mismatch.
     fn verify_internal_event(
         &self,
         event: &UnverifiedSecurityEvent,
         body: &SecurityEventBody,
         enforce_freshness: bool,
-    ) -> PortResult<SecurityEventVerificationRecord> {
+    ) -> PortResult<SealedEventDisposition> {
         let signed: SignedSecurityEvent = chio_core::canonical::UntrustedJsonText::from_wire(
             event.source_evidence.as_bytes(),
             64 * 1024 * 1024,
@@ -186,41 +218,54 @@ impl NativeSecurityEventVerifier {
         })?;
         let canonical_signed =
             canonical_json_bytes(&signed).map_err(|_| PortError::invalid_data())?;
-        let trusted = self
-            .trusted
-            .get(&(event.tenant_id.clone(), event.producer_id.clone()))
-            .ok_or_else(PortError::integrity_failure)?;
-        let signature_valid = signed
+        let sealed = signed
             .verify_trusted_producer(
-                &trusted.producer_id,
-                &trusted.producer_key_id,
-                &trusted.producer_key,
+                &body.producer_id,
+                &body.producer_key_id,
+                signed.producer_key(),
             )
             .map_err(|_| PortError::integrity_failure())?;
         if canonical_signed.as_slice() != event.source_evidence.as_bytes()
-            || !signature_valid
+            || !sealed
             || signed.body() != body
-            || body.policy_version != trusted.policy_version
             || body.trust_class != ProducerTrustClass::InternalDetector
         {
             return Err(PortError::integrity_failure());
         }
-        if enforce_freshness {
-            self.verify_time_bounds(event.event_time_unix_ms, event.received_at_unix_ms)?;
-        }
-        Ok(self.verified_event(
+        let mismatch = match self
+            .trusted
+            .get(&(event.tenant_id.clone(), event.producer_id.clone()))
+        {
+            None => Some(CorrelationIngressRejectionReason::UnconfiguredProducer),
+            Some(trusted)
+                if trusted.producer_key_id != body.producer_key_id
+                    || &trusted.producer_key != signed.producer_key() =>
+            {
+                Some(CorrelationIngressRejectionReason::UnconfiguredProducerKey)
+            }
+            Some(trusted) if trusted.policy_version != body.policy_version => {
+                Some(CorrelationIngressRejectionReason::UnconfiguredPolicyVersion)
+            }
+            Some(_) => None,
+        };
+        self.dispose(
             event,
             ProducerTrustClass::InternalDetector,
             domain_hash(EVENT_EVIDENCE_HASH_DOMAIN, &canonical_signed),
-        ))
+            mismatch,
+            enforce_freshness,
+        )
     }
 
+    /// Verifies the receipt under the kernel key it carries, and every
+    /// projection field, before comparing that key and key id with the
+    /// configured receipt producer.
     fn verify_receipt_event(
         &self,
         event: &UnverifiedSecurityEvent,
         body: &SecurityEventBody,
         enforce_freshness: bool,
-    ) -> PortResult<SecurityEventVerificationRecord> {
+    ) -> PortResult<SealedEventDisposition> {
         let receipt: ChioReceipt = chio_core::canonical::UntrustedJsonText::from_wire(
             event.source_evidence.as_bytes(),
             64 * 1024 * 1024,
@@ -235,11 +280,7 @@ impl NativeSecurityEventVerifier {
         })?;
         let canonical_receipt =
             canonical_json_bytes(&receipt).map_err(|_| PortError::invalid_data())?;
-        let trusted = self
-            .trusted_receipts
-            .get(&(event.tenant_id.clone(), event.producer_id.clone()))
-            .ok_or_else(PortError::integrity_failure)?;
-        let signature_valid = receipt
+        let sealed = receipt
             .verify_signature()
             .map_err(|_| PortError::integrity_failure())?;
         let projection_value = receipt
@@ -259,9 +300,7 @@ impl NativeSecurityEventVerifier {
         let expected_metadata = json!({"security_event_projection": projection});
         let expected_content_hash = hex::encode(event.body_hash.as_bytes());
         if canonical_receipt.as_slice() != event.source_evidence.as_bytes()
-            || !signature_valid
-            || receipt.kernel_key != trusted.signer_key
-            || body.producer_key_id != trusted.signer_key_id
+            || !sealed
             || body.trust_class != ProducerTrustClass::VerifiedReceipt
             || projection.version != SECURITY_EVENT_RECEIPT_PROJECTION_VERSION
             || projection.body != *body
@@ -288,39 +327,56 @@ impl NativeSecurityEventVerifier {
         {
             return Err(PortError::integrity_failure());
         }
-        if enforce_freshness {
-            self.verify_time_bounds(event.event_time_unix_ms, event.received_at_unix_ms)?;
-        }
-        Ok(self.verified_event(
+        let mismatch = match self
+            .trusted_receipts
+            .get(&(event.tenant_id.clone(), event.producer_id.clone()))
+        {
+            None => Some(CorrelationIngressRejectionReason::UnconfiguredProducer),
+            Some(trusted)
+                if receipt.kernel_key != trusted.signer_key
+                    || body.producer_key_id != trusted.signer_key_id =>
+            {
+                Some(CorrelationIngressRejectionReason::UnconfiguredProducerKey)
+            }
+            Some(_) => None,
+        };
+        self.dispose(
             event,
             ProducerTrustClass::VerifiedReceipt,
             domain_hash(EVENT_RECEIPT_EVIDENCE_HASH_DOMAIN, &canonical_receipt),
-        ))
+            mismatch,
+            enforce_freshness,
+        )
     }
 
-    fn verify_durable(
+    fn verify_disposition(
         &self,
         event: &UnverifiedSecurityEvent,
-    ) -> PortResult<SecurityEventVerificationRecord> {
+        enforce_freshness: bool,
+    ) -> PortResult<SealedEventDisposition> {
         self.ensure_ready()?;
         let body = self.parse_bound_body(event)?;
         match body.trust_class {
-            ProducerTrustClass::InternalDetector => self.verify_internal_event(event, &body, false),
-            ProducerTrustClass::VerifiedReceipt => self.verify_receipt_event(event, &body, false),
+            ProducerTrustClass::InternalDetector => {
+                self.verify_internal_event(event, &body, enforce_freshness)
+            }
+            ProducerTrustClass::VerifiedReceipt => {
+                self.verify_receipt_event(event, &body, enforce_freshness)
+            }
         }
     }
 }
 
 impl SecurityEventVerifierPort for NativeSecurityEventVerifier {
+    /// Admission accepts only the current producer configuration. A
+    /// configuration mismatch refuses the event exactly as a forged one.
     fn verify(
         &self,
         event: &UnverifiedSecurityEvent,
     ) -> PortResult<SecurityEventVerificationRecord> {
-        self.ensure_ready()?;
-        let body = self.parse_bound_body(event)?;
-        match body.trust_class {
-            ProducerTrustClass::InternalDetector => self.verify_internal_event(event, &body, true),
-            ProducerTrustClass::VerifiedReceipt => self.verify_receipt_event(event, &body, true),
+        match self.verify_disposition(event, true)? {
+            SealedEventDisposition::Verified(verified) => Ok(verified),
+            SealedEventDisposition::Rejected(_) => Err(PortError::integrity_failure()),
         }
     }
 }
@@ -354,7 +410,7 @@ impl CorrelationEventVerifier for NativeSecurityEventVerifier {
     fn verify_durable(
         &self,
         event: &UnverifiedSecurityEvent,
-    ) -> PortResult<SecurityEventVerificationRecord> {
-        NativeSecurityEventVerifier::verify_durable(self, event)
+    ) -> PortResult<SealedEventDisposition> {
+        self.verify_disposition(event, false)
     }
 }

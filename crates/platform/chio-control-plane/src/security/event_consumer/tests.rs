@@ -992,6 +992,19 @@ impl CorrelationIngressStore for AckLossCorrelationIngressStore {
     fn count_pending_correlation_events(&self) -> PortResult<u64> {
         self.inner.count_pending_correlation_events()
     }
+
+    fn reject_pending_correlation_event(
+        &self,
+        event: &UnverifiedSecurityEvent,
+        rejection: &chio_security_types::ports::CorrelationIngressRejection,
+    ) -> PortResult<()> {
+        self.inner
+            .reject_pending_correlation_event(event, rejection)
+    }
+
+    fn count_rejected_correlation_events(&self) -> PortResult<u64> {
+        self.inner.count_rejected_correlation_events()
+    }
 }
 
 pub(super) struct AckLossAttestedFindingBatchPlanner {

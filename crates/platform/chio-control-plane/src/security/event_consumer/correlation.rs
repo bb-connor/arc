@@ -1,3 +1,4 @@
+use super::ingress::SealedEventDisposition;
 #[cfg(test)]
 use super::SecurityEventVerifierPort;
 use super::{
@@ -289,14 +290,27 @@ impl ProductionCorrelationConsumer {
         Ok(verified)
     }
 
+    #[cfg(test)]
     pub(super) fn verify_durable(
         &self,
         event: &UnverifiedSecurityEvent,
     ) -> PortResult<SecurityEventVerificationRecord> {
+        match self.verify_pending(event)? {
+            SealedEventDisposition::Verified(verified) => Ok(verified),
+            SealedEventDisposition::Rejected(_) => Err(PortError::integrity_failure()),
+        }
+    }
+
+    pub(super) fn verify_pending(
+        &self,
+        event: &UnverifiedSecurityEvent,
+    ) -> PortResult<SealedEventDisposition> {
         self.ensure_ready()?;
-        let verified = self.verifier.verify_durable(event)?;
-        self.ensure_supported_policy(&verified)?;
-        Ok(verified)
+        let disposition = self.verifier.verify_durable(event)?;
+        if let SealedEventDisposition::Verified(verified) = &disposition {
+            self.ensure_supported_policy(verified)?;
+        }
+        Ok(disposition)
     }
 
     fn ensure_supported_policy(

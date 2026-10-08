@@ -4,6 +4,7 @@ use super::{
     SecurityEventIngress, SecurityEventVerificationRecord, SecurityEventVerifierPort,
     SqliteSecurityStateStore, UnverifiedSecurityEvent,
 };
+use chio_security_types::ports::CorrelationIngressRejection;
 
 /// Production adapter that publishes the complete ordered finding batch and a
 /// durable response outbox. Batch bindings reserve planning identities only.
@@ -33,6 +34,22 @@ impl SecurityEventIngress for VerifiedSecurityEventIngress {
         self.store
             .enqueue_verified_correlation_event(event, &verified)
     }
+}
+
+/// Outcome of reverifying one admitted ingress row. `Rejected` is reachable
+/// only after the canonical body, source evidence and signature verified under
+/// the envelope's own key; it names the configured producer binding, key or
+/// policy pin the row no longer matches.
+pub(super) enum SealedEventDisposition {
+    Verified(SecurityEventVerificationRecord),
+    Rejected(CorrelationIngressRejection),
+}
+
+/// Rows retired from the pending queue by one drain pass.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) struct CorrelationIngressDrain {
+    pub(crate) acknowledged: u32,
+    pub(crate) rejected: u32,
 }
 
 /// Durable delivery loop from the authenticated ingress ledger into temporal
@@ -72,21 +89,49 @@ impl DurableCorrelationIngress {
     }
 
     pub(crate) fn drain_once(&self, max_results: u32) -> PortResult<u32> {
+        self.drain_pass(max_results)
+            .map(|drained| drained.acknowledged)
+    }
+
+    /// A row that no longer matches the producer configuration is rejected
+    /// durably and the pass continues. Every other reverification, store or
+    /// correlation error, including a failed rejection write, ends the pass.
+    pub(crate) fn drain_pass(&self, max_results: u32) -> PortResult<CorrelationIngressDrain> {
         let pending = self.store.load_pending_correlation_events(max_results)?;
-        let mut acknowledged = 0_u32;
+        let mut drained = CorrelationIngressDrain::default();
         for event in pending.as_slice() {
-            let verified = self.consumer.verify_durable(event)?;
+            let verified = match self.consumer.verify_pending(event)? {
+                SealedEventDisposition::Verified(verified) => verified,
+                SealedEventDisposition::Rejected(rejection) => {
+                    self.store
+                        .reject_pending_correlation_event(event, &rejection)?;
+                    tracing::warn!(
+                        tenant_id = event.tenant_id.as_str(),
+                        event_id = event.event_id.as_str(),
+                        producer_id = event.producer_id.as_str(),
+                        trust_class = ?rejection.trust_class,
+                        reason = ?rejection.reason,
+                        "rejected an ingress row the producer configuration no longer admits"
+                    );
+                    drained.rejected = drained
+                        .rejected
+                        .checked_add(1)
+                        .ok_or_else(PortError::integrity_failure)?;
+                    continue;
+                }
+            };
             self.store
                 .validate_pending_correlation_event(event, &verified)?;
             let consumed = self.consumer.consume_verified(&verified)?;
             if consumed.finalized {
                 self.store.acknowledge_correlated_event(event)?;
-                acknowledged = acknowledged
+                drained.acknowledged = drained
+                    .acknowledged
                     .checked_add(1)
                     .ok_or_else(PortError::integrity_failure)?;
             }
         }
-        Ok(acknowledged)
+        Ok(drained)
     }
 
     pub(crate) fn drain_until_empty(
@@ -95,26 +140,33 @@ impl DurableCorrelationIngress {
     ) -> PortResult<u64> {
         let started = Instant::now();
         let mut acknowledged = 0_u64;
-        while acknowledged < limits.max_startup_records {
+        let mut retired = 0_u64;
+        while retired < limits.max_startup_records {
             if u64::try_from(started.elapsed().as_millis())
                 .map_or(true, |elapsed| elapsed > limits.max_startup_wall_clock_ms)
             {
                 return Err(PortError::unavailable());
             }
-            let remaining = limits.max_startup_records.saturating_sub(acknowledged);
+            let remaining = limits.max_startup_records.saturating_sub(retired);
             let max_results = u64::from(limits.max_records_per_pass)
                 .min(remaining)
                 .try_into()
                 .map_err(|_| PortError::integrity_failure())?;
-            let drained = self.drain_once(max_results)?;
+            let drained = self.drain_pass(max_results)?;
+            let pass_retired = u64::from(drained.acknowledged)
+                .checked_add(u64::from(drained.rejected))
+                .ok_or_else(PortError::integrity_failure)?;
             acknowledged = acknowledged
-                .checked_add(u64::from(drained))
+                .checked_add(u64::from(drained.acknowledged))
+                .ok_or_else(PortError::integrity_failure)?;
+            retired = retired
+                .checked_add(pass_retired)
                 .ok_or_else(PortError::integrity_failure)?;
             let pending = self.store.count_pending_correlation_events()?;
             if pending == 0 {
                 return Ok(acknowledged);
             }
-            if drained == 0 {
+            if pass_retired == 0 {
                 // A bounded-lateness tail remains durably pending until the
                 // worker clock advances its idle watermark.
                 return Ok(acknowledged);
@@ -135,8 +187,6 @@ pub(super) trait CorrelationEventVerifier: Send + Sync {
         &self,
         event: &UnverifiedSecurityEvent,
     ) -> PortResult<SecurityEventVerificationRecord>;
-    fn verify_durable(
-        &self,
-        event: &UnverifiedSecurityEvent,
-    ) -> PortResult<SecurityEventVerificationRecord>;
+    fn verify_durable(&self, event: &UnverifiedSecurityEvent)
+        -> PortResult<SealedEventDisposition>;
 }

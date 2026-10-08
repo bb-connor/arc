@@ -45,6 +45,7 @@ const SECURITY_STATE_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &[
 // tenant-read-contract: security_event_ids; class=tenant-predicate; principal=security-runtime
 // tenant-read-contract: security_flow_contexts; class=tenant-predicate; principal=security-runtime
 // tenant-read-contract: security_flow_sequences; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_ingress_rejections; class=tenant-predicate; principal=security-runtime
 // tenant-read-contract: security_isolation_epochs; class=tenant-predicate; principal=security-runtime
 // tenant-read-contract: security_issuance_freeze_commands; class=tenant-predicate; principal=security-runtime
 // tenant-read-contract: security_issuance_freeze_effects; class=tenant-predicate; principal=security-runtime
@@ -1115,6 +1116,37 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
         ensure_attested_finding_response_outbox_schema(connection)?;
         upgrade_correlation_ingress_pending_index(connection)?;
         validate_correlation_durable_schema(connection)?;
+        connection
+            .execute_batch(
+                r#"
+            CREATE TABLE IF NOT EXISTS security_ingress_rejections (
+                tenant_id TEXT NOT NULL,
+                event_id TEXT NOT NULL,
+                producer_id TEXT NOT NULL,
+                trust_class TEXT NOT NULL CHECK (trust_class IN ('internal_detector', 'verified_receipt')),
+                reason TEXT NOT NULL CHECK (reason IN (
+                    'unconfigured_producer', 'unconfigured_producer_key', 'unconfigured_policy_version'
+                )),
+                evidence_hash BLOB NOT NULL CHECK (length(evidence_hash) = 32),
+                PRIMARY KEY (tenant_id, event_id),
+                FOREIGN KEY (tenant_id, event_id)
+                    REFERENCES security_correlation_ingress (tenant_id, event_id)
+            );
+
+            CREATE TRIGGER IF NOT EXISTS security_ingress_rejections_immutable
+            BEFORE UPDATE ON security_ingress_rejections
+            BEGIN
+                SELECT RAISE(ABORT, 'ingress rejection mutation is rejected');
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS security_ingress_rejections_delete_rejected
+            BEFORE DELETE ON security_ingress_rejections
+            BEGIN
+                SELECT RAISE(ABORT, 'ingress rejection deletion is rejected');
+            END;
+                "#,
+            )
+            .map_err(sqlite_error)?;
         ensure_response_effect_generation_column(connection)?;
         ensure_response_dispatch_commit_mode_column(connection)?;
         ensure_scheduler_lease_body_hash_column(connection)?;
