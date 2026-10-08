@@ -1841,3 +1841,95 @@ fn effect_router_without_plan_authority_refuses_commands_and_result_queries() {
         "a router without the durable plan authority must refuse every command and result query"
     );
 }
+
+#[test]
+fn bound_effect_router_keeps_plan_binding_and_routing_refusals() {
+    use crate::security::adapters::effect_port::{
+        ActiveResponseEffectPort, ResponseEffectBackend, RestrictEgressOverlayBackend,
+    };
+    let fixture = ProductionEffectsFixture::new();
+    let planned_session = session("production-effects-bound-planned-session");
+    let unplanned_session = session("production-effects-bound-unplanned-session");
+    let (plan, work) = fixture.dispatch(
+        "production-effects-bound-action",
+        vec![record(planned_session.as_str())],
+        vec![fixture.egress_spec(&planned_session, &["server-a"])],
+    );
+    let router = || {
+        let backend: Arc<dyn ResponseEffectBackend> =
+            Arc::new(RestrictEgressOverlayBackend::new(fixture.store.clone()));
+        ActiveResponseEffectPort::from_backends(vec![backend])
+            .unwrap_or_else(|error| panic!("egress router: {error}"))
+    };
+    let refusal = |error: PortError| (error.kind(), error.code().as_str().to_owned());
+
+    let unrouted = unplanned_request(
+        &plan,
+        fixture.throttle_spec(&planned_session),
+        &work,
+        "bound-unrouted-throttle",
+    );
+    assert_eq!(
+        router()
+            .execute(&unrouted)
+            .map(|result| result.applied)
+            .map_err(refusal),
+        Err((PortErrorKind::Unavailable, "store.unavailable".to_owned())),
+        "a kind without a backend keeps its routing refusal"
+    );
+
+    let bound = router().with_plan_authority(fixture.store.clone());
+    let planned = plan
+        .effects
+        .as_slice()
+        .first()
+        .unwrap_or_else(|| panic!("planned egress effect missing"));
+    let planned_request = effect_request(&plan, planned, &work, "bound-planned-egress");
+    let applied = bound
+        .execute(&planned_request)
+        .unwrap_or_else(|error| panic!("bound router applies the planned egress: {error}"));
+    assert!(applied.applied);
+    assert_eq!(
+        bound
+            .load_result(&query(&planned_request))
+            .unwrap_or_else(|error| panic!("bound router reads the planned result: {error}")),
+        chio_security_types::ports::EffectExecutionStatus::Completed { result: applied }
+    );
+
+    let unplanned = unplanned_request(
+        &plan,
+        fixture.egress_spec(&unplanned_session, &["server-b"]),
+        &work,
+        "bound-unplanned-egress",
+    );
+    assert_eq!(
+        (
+            bound
+                .execute(&unplanned)
+                .map(|result| result.applied)
+                .map_err(|error| error.kind()),
+            bound
+                .load_result(&query(&unplanned))
+                .map(|status| {
+                    matches!(
+                        status,
+                        chio_security_types::ports::EffectExecutionStatus::Completed { .. }
+                    )
+                })
+                .map_err(|error| error.kind()),
+            egress_effect_ids(
+                &fixture.store,
+                &EgressRestrictionSessionKey {
+                    tenant_id: tenant(),
+                    session_id: unplanned_session.clone(),
+                },
+            ),
+        ),
+        (
+            Err(PortErrorKind::IntegrityFailure),
+            Err(PortErrorKind::IntegrityFailure),
+            Vec::<String>::new()
+        ),
+        "a bound router still refuses effects outside the durable plan"
+    );
+}
