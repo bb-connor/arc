@@ -1,3 +1,8 @@
+//! Scheduler claim replay, automatic dispatch fences, dispatch recovery and
+//! receipt cursor coverage.
+
+use super::*;
+
 #[test]
 fn empty_scheduler_claim_replay_rejects_corrupt_commit_time() {
     let directory = chio_test_support::private_tempdir()
@@ -403,7 +408,8 @@ fn simultaneous_two_handle_commit_and_fence_preserve_durable_exclusivity() {
         created_at_unix_ms,
         created_at_unix_ms + 10_000,
     );
-    let pin_store = SqliteSecurityStateStore::open(&path).unwrap_or_else(|error| panic!("pin store: {error}"));
+    let pin_store =
+        SqliteSecurityStateStore::open(&path).unwrap_or_else(|error| panic!("pin store: {error}"));
     pin_automatic_fixture(&pin_store, &dispatch);
     drop(pin_store);
     let fence_request = automatic_fence_request(&dispatch);
@@ -1130,17 +1136,29 @@ fn response_receipt_cursor_is_plan_bound_and_exactly_cas_idempotent() {
         Some(next.clone())
     );
     let mut foreign_key = key.clone();
-    foreign_key.tenant_id = TenantId::new("foreign-tenant")
-        .unwrap_or_else(|error| panic!("foreign tenant: {error}"));
-    assert_eq!(store.load_receipt_cursor(&foreign_key)
-        .unwrap_or_else(|error| panic!("foreign cursor: {error}")), None);
+    foreign_key.tenant_id =
+        TenantId::new("foreign-tenant").unwrap_or_else(|error| panic!("foreign tenant: {error}"));
+    assert_eq!(
+        store
+            .load_receipt_cursor(&foreign_key)
+            .unwrap_or_else(|error| panic!("foreign cursor: {error}")),
+        None
+    );
     drop(store);
     let reopened = SqliteSecurityStateStore::open(&path)
         .unwrap_or_else(|error| panic!("reopen cursor: {error}"));
-    assert_eq!(reopened.load_receipt_cursor(&key)
-        .unwrap_or_else(|error| panic!("owned cursor after restart: {error}")), Some(next));
-    assert_eq!(reopened.load_receipt_cursor(&foreign_key)
-        .unwrap_or_else(|error| panic!("foreign cursor after restart: {error}")), None);
+    assert_eq!(
+        reopened
+            .load_receipt_cursor(&key)
+            .unwrap_or_else(|error| panic!("owned cursor after restart: {error}")),
+        Some(next)
+    );
+    assert_eq!(
+        reopened
+            .load_receipt_cursor(&foreign_key)
+            .unwrap_or_else(|error| panic!("foreign cursor after restart: {error}")),
+        None
+    );
 }
 
 #[test]

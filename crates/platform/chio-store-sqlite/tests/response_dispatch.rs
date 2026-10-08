@@ -1002,4 +1002,5 @@ fn scheduled_response_cas_sequences_one_fence_and_rejects_forged_mutation_fences
     );
 }
 
-include!("response_dispatch_tail.inc");
+#[path = "response_dispatch_tail.inc"]
+mod tail;

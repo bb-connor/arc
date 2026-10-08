@@ -518,12 +518,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         max_lines=2_929,
         max_fragments=2,
     ),
-    "crates/platform/chio-store-sqlite/tests/response_dispatch.rs": allow(
-        "2026-11-30",
-        "response dispatch store suite assembled from include! fragments; capped until the fragments become modules",
-        max_lines=2_332,
-        max_fragments=1,
-    ),
     "crates/security/chio-cage/src/lib.rs": allow(
         "2026-10-31",
         "cage crate surface assembled from include! fragments; capped until the fragments become modules",
