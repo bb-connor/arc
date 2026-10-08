@@ -949,7 +949,7 @@ EXPECTED_TRUST_JOB_DIGESTS = {
     (
         "enterprise evidence finalizer",
         "publish-security-contract",
-    ): "c3d09b25af56e575f5c77390d21e6c2ff592211fe8c0ffb90144076558d9f2e6",
+    ): "65d89014f7f9024ca1ca94a64648368ba6ea38b9bd7391de987e8dbbc55179c3",
     (
         "security contract revocation",
         "bind-revocation",
@@ -1874,6 +1874,7 @@ def validate_environment_provisioning_document(root: Path) -> None:
         "paginates the complete CI history\nof the evidence head",
         "A run title is never\nauthentication and never removes a run from this history.",
         "such a run is never positive\nevidence and never tombstones `E`.",
+        "A head repository name alone never removes a run from this history.",
         "leaves the history incomplete.",
         "It never falls back to an unfiltered listing.",
         "It normalizes the dedicated-App\n`Security contract` namespace before the four Actions mirrors",
@@ -7075,7 +7076,10 @@ def validate(root: Path) -> None:
             'test "$(jq -r \'length\' <<< "${page_runs}")" = 100',
             'test "$(jq -r \'[.[].id] | unique | length\' <<< "${ci_runs}")" = "${total_count}"',
             "list_matching_ci_runs()",
-            ".head_repository.full_name != $repository",
+            '(.head_repository.id | type) == "number" and',
+            "(.head_repository.id | tostring) != $repository_id and",
+            '(.head_repository.full_name | test("^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$")) and',
+            "(.head_repository.full_name | ascii_downcase) != ($repository | ascii_downcase)",
             "authoritative_ci_identity()",
             '(.repository.id | tostring) == $repository_id and',
             "(.head_repository.id | tostring) == $repository_id",

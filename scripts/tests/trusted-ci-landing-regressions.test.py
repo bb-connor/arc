@@ -720,7 +720,7 @@ class RunIdentityLivenessTests(unittest.TestCase):
         command = ["jq", "-c", "--arg", "evidence_sha", EVIDENCE,
                    "--arg", "expected_run_name", run["display_title"],
                    "--arg", "head_ref", run["head_branch"], "--arg", "repository", REPOSITORY,
-                   "--arg", "workflow_id", str(CI_WORKFLOW), predicate]
+                   "--arg", "repository_id", "1195888645", "--arg", "workflow_id", str(CI_WORKFLOW), predicate]
         result = subprocess.run(command, input=json.dumps([run]), capture_output=True, text=True, check=False)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual([item["id"] for item in json.loads(result.stdout)], [CI_RUN])

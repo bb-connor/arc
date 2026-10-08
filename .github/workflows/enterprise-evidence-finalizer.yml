@@ -2808,17 +2808,33 @@ jobs:
                 page="$((page + 1))"
               done
               test "$(jq -r '[.[].id] | unique | length' <<< "${ci_runs}")" = "${total_count}" || return 1
-              # A run whose head is another repository is outside this
-              # history. Every other listed run, whatever its title, belongs
-              # to it; one without a proven identity makes the history
+              # A run is outside this history only when it is a trusted CI
+              # run of this repository for E whose head repository has both
+              # a distinct ID and a distinct well-formed name.
+              # Every other listed run, whatever its title, belongs to the
+              # history; one without a proven identity makes the history
               # incomplete rather than disappearing from it.
               jq -cS \
+                --arg evidence_sha "${EVIDENCE_SHA}" \
                 --arg repository "${GITHUB_REPOSITORY}" \
+                --arg repository_id "${REPOSITORY_ID}" \
+                --arg workflow_id "${CI_WORKFLOW_ID}" \
                 '[.[] | select((
                   .path == ".github/workflows/ci.yml" and
+                  .event == "pull_request" and
+                  (.workflow_id | tostring) == $workflow_id and
+                  .head_sha == $evidence_sha and
+                  (.repository | type) == "object" and
+                  .repository.full_name == $repository and
+                  (.repository.id | tostring) == $repository_id and
                   (.head_repository | type) == "object" and
+                  (.head_repository.id | type) == "number" and
+                  .head_repository.id > 0 and
+                  (.head_repository.id | floor) == .head_repository.id and
+                  (.head_repository.id | tostring) != $repository_id and
                   (.head_repository.full_name | type) == "string" and
-                  .head_repository.full_name != $repository
+                  (.head_repository.full_name | test("^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$")) and
+                  (.head_repository.full_name | ascii_downcase) != ($repository | ascii_downcase)
                 ) | not)] | sort_by(.id)' <<< "${ci_runs}" || return 1
             }
 

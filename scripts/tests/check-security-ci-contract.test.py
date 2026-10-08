@@ -4139,6 +4139,11 @@ for label, old, new in (
         "such a run may tombstone `E`.",
     ),
     (
+        "publisher contract lets a head repository name alone remove a run from history",
+        "A head repository name alone never removes a run from this history.",
+        "A head repository name that differs from this repository removes a run from this history.",
+    ),
+    (
         "publisher contract silently drops runs without a proven identity",
         "leaves the history incomplete.",
         "is ignored.",
@@ -4537,8 +4542,8 @@ assert_rejected(
     "enterprise-evidence-finalizer.yml",
     replace_in_named_step(
         "Reconcile exact five-context merge authority",
-        ".head_repository.full_name != $repository",
-        '.head_repository.full_name != $repository or .display_title != ""',
+        "(.head_repository.full_name | ascii_downcase) != ($repository | ascii_downcase)",
+        '(.head_repository.full_name | ascii_downcase) != ($repository | ascii_downcase) or .display_title != ""',
     ),
     "is not the complete evidence-head history",
 )
@@ -4562,6 +4567,29 @@ assert_rejected(
     ),
     "bad-CI evidence does not dominate failure reconciliation",
 )
+for label, old in (
+    (
+        "publisher history excludes a foreign-looking run by its name alone",
+        '                  (.head_repository.id | type) == "number" and\n'
+        "                  .head_repository.id > 0 and\n"
+        "                  (.head_repository.id | floor) == .head_repository.id and\n"
+        "                  (.head_repository.id | tostring) != $repository_id and\n",
+    ),
+    (
+        "publisher history excludes a foreign-looking run that carries this repository ID",
+        "                  (.head_repository.id | tostring) != $repository_id and\n",
+    ),
+    (
+        "publisher history excludes a run with a malformed foreign-looking name",
+        '                  (.head_repository.full_name | test("^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$")) and\n',
+    ),
+):
+    assert_rejected(
+        label,
+        "enterprise-evidence-finalizer.yml",
+        replace_in_named_step("Reconcile exact five-context merge authority", old, ""),
+        "weakens App, main-ref, binding, or check payload authentication",
+    )
 assert_rejected(
     "publisher accepts CI history without the head repository ID",
     "enterprise-evidence-finalizer.yml",

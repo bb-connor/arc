@@ -364,9 +364,13 @@ authority reconciler: before every success POST, immediately after every
 success POST, and after the complete set, it paginates the complete CI history
 of the evidence head: every `ci.yml` `pull_request` run whose API head is `E`,
 for any pull request, base, test merge, or run title. A run title is never
-authentication and never removes a run from this history. A run whose head
-repository is another repository is outside it: such a run is never positive
-evidence and never tombstones `E`. A listed run without a proven
+authentication and never removes a run from this history. A run is outside it
+only when it is a trusted-workflow `pull_request` run of this repository for `E`
+whose head repository has a numeric ID and a well-formed name that both differ
+from this repository: such a run is never positive
+evidence and never tombstones `E`.
+A head repository name alone never removes a run from this history.
+A listed run without a proven
 same-repository head and repository identity, the trusted workflow ID and path,
 the `pull_request` event, and API head `E` leaves the history incomplete.
 For every matching run it reads the current
