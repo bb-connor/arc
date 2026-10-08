@@ -1,4 +1,5 @@
 use super::*;
+use crate::project_tool_result as value_to_tool_result;
 
 pub(in crate::runtime) struct KernelResponseToToolResultArgs<'a> {
     pub pending_notifications: &'a mut Vec<Value>,
@@ -242,56 +243,6 @@ pub(in crate::runtime) fn default_tool_failure_reason(
         | OperationTerminalState::Incomplete { reason } => reason.clone(),
     }
 }
-pub(in crate::runtime) fn value_to_tool_result(value: Value) -> Value {
-    if let Some(object) = value.as_object() {
-        let has_mcp_shape = object.contains_key("content")
-            || object.contains_key("structuredContent")
-            || object.contains_key("isError");
-        if has_mcp_shape {
-            let mut object = object.clone();
-            object
-                .entry("isError".to_string())
-                .or_insert_with(|| Value::Bool(false));
-            if !object.contains_key("content") {
-                if let Some(structured) = object.get("structuredContent") {
-                    object.insert(
-                        "content".to_string(),
-                        json!([{"type": "text", "text": serde_json::to_string(structured).unwrap_or_default()}]),
-                    );
-                }
-            }
-            return Value::Object(object);
-        }
-
-        return json!({
-            "content": [
-                {
-                    "type": "text",
-                    "text": serde_json::to_string(&value).unwrap_or_default(),
-                }
-            ],
-            "structuredContent": value,
-            "isError": false,
-        });
-    }
-
-    match value {
-        Value::String(text) => json!({
-            "content": [{ "type": "text", "text": text }],
-            "isError": false,
-        }),
-        other => json!({
-            "content": [
-                {
-                    "type": "text",
-                    "text": serde_json::to_string(&other).unwrap_or_default(),
-                }
-            ],
-            "isError": false,
-        }),
-    }
-}
-
 pub(in crate::runtime) fn tool_error_result(reason: &str) -> Value {
     json!({
         "content": [

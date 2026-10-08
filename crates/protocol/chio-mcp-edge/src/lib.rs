@@ -14,6 +14,8 @@ pub mod ingress;
 pub use ingress::decode_mcp_request;
 pub mod metrics;
 mod runtime;
+mod tool_result;
+pub use tool_result::project_tool_result;
 
 #[cfg(feature = "otel")]
 pub mod otel;

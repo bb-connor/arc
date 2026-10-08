@@ -20,6 +20,9 @@ const DELIVERY_SCHEMA: &str = "chio.mcp.delivery-ack.v1";
 mod reservation;
 pub(super) use reservation::rollback_not_enqueued_call;
 
+#[path = "session_credentials/completed_result.rs"]
+mod completed_result;
+
 #[cfg(test)]
 #[path = "session_credentials_tests/durable_bounds.rs"]
 mod durable_bounds_tests;
@@ -750,42 +753,9 @@ fn reserve_at(
     Ok(CallReservation::Pending(Box::new(call)))
 }
 
+#[cfg(test)]
 fn verified_completed_response(keypair: &Keypair, call: &CredentialCall, message: &Value) -> bool {
-    let evidence = &message["result"]["_meta"]["chioEvidence"];
-    let Ok(receipt) = serde_json::from_value::<chio_core::receipt::body::ChioReceipt>(
-        evidence["receipt"].clone(),
-    ) else {
-        return false;
-    };
-    if receipt.kernel_key != keypair.public_key()
-        || !matches!(receipt.verify_signature(), Ok(true))
-        || receipt.decision != Some(chio_core::receipt::decision::Decision::Allow)
-        || receipt.tool_server != call.server_id
-        || receipt.tool_name != call.tool_name
-        || receipt.action.parameter_hash != call.parameter_hash
-        || !call.capability_ids.contains(&receipt.capability_id)
-    {
-        return false;
-    }
-    let Some(metadata) = receipt.metadata.as_ref() else {
-        return false;
-    };
-    let admission = &metadata["admission_operation"];
-    if metadata["receipt_context"]["request_id"] != call.request_id
-        || metadata["attribution"]["subject_key"] != call.subject_key
-        || admission["schema"] != "chio.admission-receipt.v1"
-        || admission["request_id"] != call.request_id
-        || admission["projected_state"] != "completed"
-        || admission["projected_dispatch_state"] != "terminal"
-        || !admission["tool_outcome_id"].is_string()
-        || evidence["outputKind"] != "value"
-    {
-        return false;
-    }
-    // A terminal tool result can report failure. Acknowledge its verified delivery
-    // without converting isError into success or treating it as an unknown dispatch.
-    canonical_json_bytes(&evidence["output"])
-        .is_ok_and(|bytes| sha256_hex(&bytes) == receipt.content_hash)
+    completed_result::verified_receipt(keypair, call, message).is_some()
 }
 
 pub(super) fn finish_call(
@@ -808,25 +778,20 @@ fn finish_at(
         .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
         .map_err(storage_error)?;
     let current = read_latch(&tx, keypair, &pending.session_id)?.ok_or_else(fence_error)?;
-    if current.request_id != pending.request_id
-        || current.request_hash != pending.request_hash
-        || current.state != "pending"
-    {
+    if current != *pending || current.state != "pending" {
         return Err(fence_error());
     }
     let mut terminal = pending.clone();
-    let mut response = message.clone();
-    if verified_completed_response(keypair, pending, message) {
-        let receipt = &message["result"]["_meta"]["chioEvidence"]["receipt"];
-        // Bind the acknowledgement to the already verified receipt and raw result.
-        let signed: chio_core::receipt::body::ChioReceipt =
-            serde_json::from_value(receipt.clone()).map_err(storage_error)?;
+    let mut response;
+    if let Some(completed) = completed_result::verify(keypair, pending, message) {
+        response = completed.message;
+        // The caller receives the canonical projection of the verified output.
         let delivery = DeliveryAcknowledgement {
             schema: DELIVERY_SCHEMA.to_owned(),
             request_id: pending.request_id.clone(),
             request_hash: pending.request_hash.clone(),
-            receipt_id: signed.id,
-            result_hash: signed.content_hash,
+            receipt_id: completed.receipt.id,
+            result_hash: completed.receipt.content_hash,
             acknowledgement: URL_SAFE_NO_PAD.encode(Keypair::generate().seed_bytes()),
         };
         response["result"]["_meta"]["chioDelivery"] =
@@ -834,6 +799,9 @@ fn finish_at(
         terminal.delivery_ack = Some(delivery);
         terminal.state = "completed_unacknowledged".to_owned();
     } else {
+        response = json!({"jsonrpc":"2.0","id":message["id"],
+            "error":{"code":-32603,"message":"credential outcome could not be verified; effect is uncertain"}});
+        terminal.delivery_ack = None;
         terminal.state = "fenced".to_owned();
     }
     terminal.response = Some(response.clone());
