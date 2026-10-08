@@ -1,3 +1,5 @@
+mod owner;
+
 use std::io;
 use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
 use std::os::unix::process::{CommandExt, ExitStatusExt};
@@ -40,18 +42,29 @@ pub(super) struct Outcome {
 
 /// A spawned worker and a descriptor naming exactly that process. Signals go
 /// through the descriptor, so a process id reused after the worker is reaped
-/// can never receive one meant for the worker.
+/// can never receive one meant for the worker. The thread that forked the
+/// worker reaps it; dropping an unobserved handle kills the worker first.
 pub(super) struct Spawned {
+    // Field order matters: the guard kills an abandoned worker before the
+    // reaper releases its owner thread to wait for it.
+    guard: Guard,
     child: Child,
-    process: ProcessFd,
     resident: ResidentProcess,
-    observation: Observation,
+    reaper: owner::Reaper,
 }
 
 impl Spawned {
     pub(super) fn observation(&self) -> Observation {
-        self.observation.clone()
+        self.guard.observation.clone()
     }
+}
+
+/// A worker as its owner thread started it, before supervision begins.
+struct Started {
+    pid: libc::pid_t,
+    child: Child,
+    process: ProcessFd,
+    resident: ResidentProcess,
 }
 
 #[derive(Clone)]
@@ -230,9 +243,22 @@ pub(super) fn spawn(worker: &Worker) -> io::Result<Spawned> {
 }
 
 pub(super) fn spawn_command(
-    mut command: Command,
+    command: Command,
     resources: Option<super::plan::Resources>,
 ) -> io::Result<Spawned> {
+    owner::launch(&owner::OWNERS, move || start(command, resources))?
+        .recv()
+        .map_err(|_| {
+            launch_failure(
+                io::Error::other("worker owner thread ended during launch"),
+                false,
+            )
+        })?
+}
+
+/// Runs on the worker's owner thread, which therefore is the thread the
+/// worker's parent-death signal is bound to.
+fn start(mut command: Command, resources: Option<super::plan::Resources>) -> io::Result<Started> {
     command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -272,9 +298,10 @@ pub(super) fn spawn_command(
     };
     // SAFETY: after fork, only prctl/getppid/setrlimit and nonallocating errno
     // conversion run over a vector allocated before the fork. No locks, heap
-    // operations, environment reads or Rust destructors. Spawn is called by the
-    // runner thread or one of its fixed runtime threads, which live until the
-    // runner has cancelled supervision and reconciled container ownership.
+    // operations, environment reads or Rust destructors. The forking thread is
+    // the worker's owner thread, which returns only after reaping the worker,
+    // so the parent-death signal fires while the worker lives only if the
+    // runner process itself dies.
     unsafe {
         command.pre_exec(confine_child);
     }
@@ -293,11 +320,11 @@ pub(super) fn spawn_command(
                     return Err(launch_failure(failure, false));
                 }
             };
-            Ok(Spawned {
+            Ok(Started {
+                pid,
                 child,
                 process,
                 resident,
-                observation: Observation::new(),
             })
         }
         Err(failure) => {
@@ -479,22 +506,14 @@ pub(super) async fn observe(
     output_ceiling: Option<usize>,
 ) -> io::Result<(Outcome, Diagnostics)> {
     let Spawned {
+        mut guard,
         mut child,
-        process,
         resident,
-        observation,
+        reaper,
     } = spawned;
-    let pid = libc::pid_t::try_from(child.id()).map_err(io::Error::other)?;
-    let mut guard = Guard {
-        process,
-        observation: observation.clone(),
-        reaped: false,
-    };
-    // One blocking thread waits for each active worker so the kernel's
-    // accounting of the attempt arrives with its exit status. The plan's
-    // concurrency ceiling bounds these threads.
-    let reaper = observation.clone();
-    let mut reaping = tokio::task::spawn_blocking(move || reaper.reap(pid, resident_ceiling));
+    // The owner thread that forked the worker now reaps it, so the kernel's
+    // accounting of the attempt arrives with its exit status.
+    let mut reaping = reaper.reap(resident_ceiling);
     let deadline = tokio::time::sleep(timeout);
     tokio::pin!(deadline);
     let stdout = Arc::new(Mutex::new(Vec::new()));
@@ -560,7 +579,7 @@ pub(super) async fn observe(
     let result = match reaped {
         Some(result) => result,
         None => {
-            observation.stop(end);
+            guard.observation.stop(end);
             guard.process.kill()?;
             (&mut reaping).await
         }
