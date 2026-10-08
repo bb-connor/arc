@@ -76,7 +76,6 @@
     "crates/guards/chio-wasm-guards/src/runtime/wasmtime_backend.rs",
     "crates/kernel/chio-kernel-core/src/passport_verify.rs",
     "crates/kernel/chio-kernel-mobile/src/lib.rs",
-    "crates/kernel/chio-kernel/src/admission_operation.part2.inc",
     "crates/kernel/chio-kernel/src/admission_operation.rs",
     "crates/kernel/chio-kernel/src/admission_operation/caller_dispatch_context.rs",
     "crates/kernel/chio-kernel/src/admission_operation/execution_nonce.rs",
@@ -97,7 +96,7 @@
     "crates/kernel/chio-kernel/src/dpop/replay_source/snapshot.rs",
     "crates/kernel/chio-kernel/src/finding_denial.rs",
     "crates/kernel/chio-kernel/src/kernel/active_response_committed_recovery.rs",
-    "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.inc",
+    "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.rs",
     "crates/kernel/chio-kernel/src/kernel/admission_cleanup.rs",
     "crates/kernel/chio-kernel/src/kernel/admission_coordinator/federation_context.rs",
     "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/ledger.rs",
@@ -109,6 +108,7 @@
     "crates/kernel/chio-kernel/src/kernel/mod.rs",
     "crates/kernel/chio-kernel/src/payment.rs",
     "crates/kernel/chio-kernel/src/provider_verdict.rs",
+    "crates/kernel/chio-kernel/src/security_admission_operation/validation.rs",
     "crates/kernel/chio-kernel/src/tool_outcome.rs",
     "crates/kernel/chio-kernel/src/tool_outcome/release.rs",
     "crates/kernel/chio-kernel/src/tool_outcome/release/persistence.rs",
@@ -1181,7 +1181,6 @@
     "crates/guards/chio-wasm-guards/src/input.rs::decode::from_wire",
     "crates/kernel/chio-kernel-browser/src/pure.rs::verify_receipt_pure::new",
     "crates/kernel/chio-kernel-core/src/passport_verify.rs::verify_passport::from_wire",
-    "crates/kernel/chio-kernel/src/admission_operation.part2.inc::validate_cleanup_payload::from_wire",
     "crates/kernel/chio-kernel/src/admission_operation/caller_dispatch_context.rs::from_canonical_bytes::from_wire",
     "crates/kernel/chio-kernel/src/admission_operation/caller_dispatch_context.rs::validate_payload::from_wire",
     "crates/kernel/chio-kernel/src/admission_operation/execution_nonce.rs::from_canonical_bytes::from_wire",
@@ -1214,8 +1213,8 @@
     "crates/kernel/chio-kernel/src/capability_lineage.rs::validate_synthetic_anchor::from_wire",
     "crates/kernel/chio-kernel/src/dpop/replay_source/snapshot.rs::from_canonical_bytes::from_wire",
     "crates/kernel/chio-kernel/src/kernel/active_response_committed_recovery.rs::validate_committed_dispatch::from_wire",
-    "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.inc::validate_executable_effect::from_wire",
-    "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.inc::verify_active_response_record_readback::from_wire",
+    "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.rs::validate_executable_effect::from_wire",
+    "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.rs::verify_active_response_record_readback::from_wire",
     "crates/kernel/chio-kernel/src/kernel/admission_cleanup.rs::parse_cleanup_payload::from_wire",
     "crates/kernel/chio-kernel/src/kernel/admission_coordinator/federation_context.rs::decode_retained_federation_context::from_wire",
     "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/ledger.rs::validate_ledger::from_wire",
@@ -1234,6 +1233,7 @@
     "crates/kernel/chio-kernel/src/kernel/mod.rs::scope_from_capability_snapshot::from_wire",
     "crates/kernel/chio-kernel/src/payment.rs::read_payment_json::from_wire",
     "crates/kernel/chio-kernel/src/provider_verdict.rs::build_tool_call_request::from_wire",
+    "crates/kernel/chio-kernel/src/security_admission_operation/validation.rs::validate_cleanup_payload::from_wire",
     "crates/kernel/chio-kernel/src/tool_outcome.rs::canonical_blob_bounded::from_wire",
     "crates/kernel/chio-kernel/src/tool_outcome.rs::canonical_blob_bounded::from_wire",
     "crates/kernel/chio-kernel/src/tool_outcome.rs::from_canonical_bytes::from_wire",
@@ -2282,8 +2282,8 @@
     "crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_receipt_record::from_value",
     "crates/kernel/chio-kernel/src/caller_delivery.rs::flush::from_slice",
     "crates/kernel/chio-kernel/src/caller_delivery.rs::validate_authorization::from_slice",
-    "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.inc::validate_active_response_terminal_executor_receipt::from_value",
-    "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.inc::verify_active_response_completion_receipt::from_value",
+    "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.rs::validate_active_response_terminal_executor_receipt::from_value",
+    "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.rs::verify_active_response_completion_receipt::from_value",
     "crates/kernel/chio-kernel/src/tool_outcome/release.rs::parse_artifact_value::from_value",
     "crates/kernel/chio-runtime-core/src/treaty/predicate.rs::evaluate_bounded_treaty_predicate_json::from_slice",
     "crates/kernel/chio-runtime-core/src/treaty/predicate.rs::evaluate_bounded_treaty_predicate_json::from_value",
@@ -4763,8 +4763,8 @@
     "crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_receipt_record::from_value": "Typed value conversion after its containing original-byte decoder and source verification; no new wire or database bytes enter at this conversion.",
     "crates/kernel/chio-kernel/src/caller_delivery.rs::flush::from_slice": "flush reparses canonical bytes just written by this process; validate_authorization decodes the bounded caller artifact after its retained wire validation. Neither grants fresh authority.",
     "crates/kernel/chio-kernel/src/caller_delivery.rs::validate_authorization::from_slice": "flush reparses canonical bytes just written by this process; validate_authorization decodes the bounded caller artifact after its retained wire validation. Neither grants fresh authority.",
-    "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.inc::validate_active_response_terminal_executor_receipt::from_value": "Typed value conversion after its containing original-byte decoder and source verification; no new wire or database bytes enter at this conversion.",
-    "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.inc::verify_active_response_completion_receipt::from_value": "Typed value conversion after its containing original-byte decoder and source verification; no new wire or database bytes enter at this conversion.",
+    "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.rs::validate_active_response_terminal_executor_receipt::from_value": "Typed value conversion after its containing original-byte decoder and source verification; no new wire or database bytes enter at this conversion.",
+    "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.rs::verify_active_response_completion_receipt::from_value": "Typed value conversion after its containing original-byte decoder and source verification; no new wire or database bytes enter at this conversion.",
     "crates/kernel/chio-kernel/src/tool_outcome/release.rs::parse_artifact_value::from_value": "Typed value conversion after its containing original-byte decoder and source verification; no new wire or database bytes enter at this conversion.",
     "crates/kernel/chio-runtime-core/src/treaty/predicate.rs::evaluate_bounded_treaty_predicate_json::from_slice": "Strict I-JSON canonicalization rejects duplicate/lossy input before closed predicate shape validation and typed conversion.",
     "crates/kernel/chio-runtime-core/src/treaty/predicate.rs::evaluate_bounded_treaty_predicate_json::from_value": "Strict I-JSON canonicalization rejects duplicate/lossy input before closed predicate shape validation and typed conversion.",
@@ -5725,7 +5725,7 @@
       "flush::from_slice",
       "validate_authorization::from_slice"
     ],
-    "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.inc": [
+    "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.rs": [
       "validate_active_response_terminal_executor_receipt::from_value",
       "verify_active_response_completion_receipt::from_value"
     ],
@@ -7458,7 +7458,7 @@
         }
       ]
     },
-    "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.inc": {
+    "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.rs": {
       "kind": "reviewed-signed-owner",
       "contract": "Bounded native JSON decoding rejects duplicate keys and lossy numeric lexemes before typed allocation; the owner retains exact canonical equality where required and its existing signature, digest, identity, tenant, operation and mirrored-column checks. Parsing alone grants no authority.",
       "readers": [
@@ -12184,7 +12184,7 @@
       ],
       "retained_typed_conversions": []
     },
-    "crates/kernel/chio-kernel/src/admission_operation.part2.inc": {
+    "crates/kernel/chio-kernel/src/security_admission_operation/validation.rs": {
       "contract": "Bounded native JSON decoding rejects duplicate keys and lossy numeric lexemes before typed allocation; the owner retains exact canonical equality where required and its existing signature, digest, identity, tenant, operation and mirrored-column checks. Parsing alone grants no authority.",
       "migrations": [
         [
@@ -12266,7 +12266,7 @@
       ],
       "retained_typed_conversions": []
     },
-    "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.inc": {
+    "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.rs": {
       "contract": "Bounded native JSON decoding rejects duplicate keys and lossy numeric lexemes before typed allocation; the owner retains exact canonical equality where required and its existing signature, digest, identity, tenant, operation and mirrored-column checks. Parsing alone grants no authority.",
       "migrations": [
         [
@@ -16468,7 +16468,6 @@
     "crates/guards/chio-wasm-guards/src/input.rs::decode::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel-browser/src/pure.rs::verify_receipt_pure::new#1::decode_signed",
     "crates/kernel/chio-kernel-core/src/passport_verify.rs::verify_passport::from_wire#1::decode_signed",
-    "crates/kernel/chio-kernel/src/admission_operation.part2.inc::validate_cleanup_payload::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/admission_operation/caller_dispatch_context.rs::from_canonical_bytes::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/admission_operation/caller_dispatch_context.rs::validate_payload::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/admission_operation/execution_nonce.rs::from_canonical_bytes::from_wire#1::decode_signed",
@@ -16501,8 +16500,8 @@
     "crates/kernel/chio-kernel/src/capability_lineage.rs::validate_synthetic_anchor::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/dpop/replay_source/snapshot.rs::from_canonical_bytes::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/kernel/active_response_committed_recovery.rs::validate_committed_dispatch::from_wire#1::decode_signed",
-    "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.inc::validate_executable_effect::from_wire#1::decode_signed",
-    "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.inc::verify_active_response_record_readback::from_wire#1::decode_signed",
+    "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.rs::validate_executable_effect::from_wire#1::decode_signed",
+    "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.rs::verify_active_response_record_readback::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/kernel/admission_cleanup.rs::parse_cleanup_payload::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/kernel/admission_coordinator/federation_context.rs::decode_retained_federation_context::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/ledger.rs::validate_ledger::from_wire#1::decode_signed",
@@ -16521,6 +16520,7 @@
     "crates/kernel/chio-kernel/src/kernel/mod.rs::scope_from_capability_snapshot::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/payment.rs::read_payment_json::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/provider_verdict.rs::build_tool_call_request::from_wire#1::decode_canonical",
+    "crates/kernel/chio-kernel/src/security_admission_operation/validation.rs::validate_cleanup_payload::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/tool_outcome.rs::canonical_blob_bounded::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/tool_outcome.rs::canonical_blob_bounded::from_wire#2::decode_signed",
     "crates/kernel/chio-kernel/src/tool_outcome.rs::from_canonical_bytes::from_wire#1::decode_signed",
@@ -17350,7 +17350,7 @@
       "verify_passport::shared-reader::crates/kernel/chio-kernel-core/src/passport_verify.rs::verify_passport",
       "verify_play_integrity_evidence::shared-reader::crates/trust/chio-custody-hw/src/attestation/play_integrity.rs::verify_play_integrity"
     ],
-    "crates/kernel/chio-kernel/src/admission_operation.part2.inc": [
+    "crates/kernel/chio-kernel/src/security_admission_operation/validation.rs": [
       "validate_cleanup_payload::original-json-reader::UntrustedJsonText"
     ],
     "crates/kernel/chio-kernel/src/admission_operation/caller_dispatch_context.rs": [
@@ -17440,14 +17440,22 @@
       "from_canonical_bytes::original-json-reader::UntrustedJsonText"
     ],
     "crates/kernel/chio-kernel/src/kernel/active_response_committed_recovery.rs": [
+      "durable_dispatch_binding::shared-reader::crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.rs::validate_executable_response_plan_value",
+      "reconstruct_pre_dispatch_active_response_admission::shared-reader::crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.rs::validate_executable_response_plan_value",
+      "recover_committed_active_response::shared-reader::crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.rs::validate_executable_response_plan_value",
+      "resume_dispatch_committed_active_response::shared-reader::crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.rs::validate_executable_response_plan_value",
+      "terminate_never_committed_active_response::shared-reader::crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.rs::validate_executable_response_plan_value",
       "validate_committed_dispatch::original-json-reader::UntrustedJsonText",
       "verify_committed_dispatch_authority::shared-reader::crates/kernel/chio-kernel/src/kernel/active_response_committed_recovery.rs::validate_committed_dispatch"
     ],
-    "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.inc": [
-      "validate_active_response_execution_evidence::shared-reader::crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.inc::verify_active_response_record_readback",
+    "crates/kernel/chio-kernel/src/kernel/active_response_simulation.rs": [
+      "new::shared-reader::crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.rs::validate_executable_response_plan_value"
+    ],
+    "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.rs": [
+      "validate_active_response_execution_evidence::shared-reader::crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.rs::verify_active_response_record_readback",
       "validate_executable_effect::original-json-reader::UntrustedJsonText",
-      "validate_executable_response_plan::shared-reader::crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.inc::validate_executable_response_plan_value",
-      "validate_executable_response_plan_value::shared-reader::crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.inc::validate_executable_effect",
+      "validate_executable_response_plan::shared-reader::crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.rs::validate_executable_response_plan_value",
+      "validate_executable_response_plan_value::shared-reader::crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.rs::validate_executable_effect",
       "verify_active_response_record_readback::original-json-reader::UntrustedJsonText"
     ],
     "crates/kernel/chio-kernel/src/kernel/active_response_dispatch.rs": [
