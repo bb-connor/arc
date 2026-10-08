@@ -21,7 +21,8 @@ pub(super) fn verify_pre_migration_schema(
         super::super::runtime_participant::verify_all(connection)?;
         super::super::governed_approval_claim::verify_all(connection)?;
         super::super::dpop_claim::verify_all(connection)?;
-        super::super::runtime_replay::verify_all_records(connection).map_err(invariant)?;
+        super::super::runtime_replay::verify_all_records(connection)
+            .map_err(AdmissionOperationStoreError::from)?;
         super::super::governed_approval_replay::verify_all_records(connection)
             .map_err(invariant)?;
         super::super::dpop_replay::verify_all_records(connection).map_err(invariant)?;

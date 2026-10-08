@@ -16,6 +16,8 @@ mod cutpoints;
 mod integrity;
 #[path = "runtime_replay/lifecycle.rs"]
 mod lifecycle;
+#[path = "runtime_replay/record_errors.rs"]
+mod record_errors;
 
 const SOURCE_ID: &str = "runtime-replay-source";
 const RUNTIME_ID: &str = "runtime-authority";

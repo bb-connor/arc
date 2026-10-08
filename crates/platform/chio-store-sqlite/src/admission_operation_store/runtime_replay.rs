@@ -22,7 +22,7 @@ pub(super) fn require_imported_source(
     expectation: &AdmissionIdentifier,
 ) -> Result<RuntimeReplayMigrationRecordV1, AdmissionOperationStoreError> {
     let record = load_record(connection, authority.as_str())
-        .map_err(integrity_error)?
+        .map_err(record_error)?
         .ok_or_else(|| invariant("runtime participant source expectation is absent"))?;
     if !record.is_imported() || record.expectation_id() != expectation {
         return Err(invariant(
@@ -110,9 +110,9 @@ impl SqliteAdmissionOperationStore {
             let mut connection = self.connection()?;
             let transaction = self.begin_write(&mut connection, Some(fence))?;
             let observed = migration_time(&transaction, trusted_now_unix_ms, &self.serving_owner)?;
-            verify_all_records(&transaction).map_err(integrity_error)?;
+            verify_all_records(&transaction).map_err(record_error)?;
             if let Some(existing) =
-                load_record(&transaction, runtime_authority_id.as_str()).map_err(integrity_error)?
+                load_record(&transaction, runtime_authority_id.as_str()).map_err(record_error)?
             {
                 require_same_expectation(&existing, &candidate)?;
                 return Ok(existing);
@@ -129,7 +129,7 @@ impl SqliteAdmissionOperationStore {
             }
             records::insert_expectation(&transaction, &candidate)?;
             records::insert_event(&transaction, &candidate, 1, observed, fence)?;
-            verify_all_records(&transaction).map_err(integrity_error)?;
+            verify_all_records(&transaction).map_err(record_error)?;
             append_migration_commit(
                 &self.serving_owner,
                 &transaction,
@@ -189,9 +189,9 @@ impl SqliteAdmissionOperationStore {
             let mut connection = self.connection()?;
             let transaction = self.begin_write(&mut connection, Some(fence))?;
             let observed = migration_time(&transaction, trusted_now_unix_ms, &self.serving_owner)?;
-            verify_all_records(&transaction).map_err(integrity_error)?;
+            verify_all_records(&transaction).map_err(record_error)?;
             let current = load_record(&transaction, runtime_authority_id.as_str())
-                .map_err(integrity_error)?
+                .map_err(record_error)?
                 .ok_or_else(|| invariant("runtime replay migration expectation not found"))?;
             require_same_expectation(&current, &expected)?;
             if current.is_imported() {
@@ -199,7 +199,7 @@ impl SqliteAdmissionOperationStore {
             }
             records::insert_tombstones(&transaction, &current)?;
             records::insert_event(&transaction, &current, 2, observed, fence)?;
-            verify_all_records(&transaction).map_err(integrity_error)?;
+            verify_all_records(&transaction).map_err(record_error)?;
             append_migration_commit(
                 &self.serving_owner,
                 &transaction,
@@ -235,7 +235,7 @@ impl SqliteAdmissionOperationStore {
         migration_time(&transaction, trusted_now_unix_ms, &self.serving_owner)?;
         verify_runtime_replay_projection_coverage(&transaction).map_err(map_owner_error)?;
         let record =
-            load_record(&transaction, runtime_authority_id.as_str()).map_err(integrity_error)?;
+            load_record(&transaction, runtime_authority_id.as_str()).map_err(record_error)?;
         if record.as_ref().is_some_and(|record| {
             record.snapshot.destination_authority_id() != self.serving_owner.fence.store_uuid
         }) {
@@ -305,6 +305,12 @@ fn migration_mutation(sequence: u64) -> Result<&'static str, AdmissionOperationS
 
 fn integrity_error(detail: impl std::fmt::Display) -> AdmissionOperationStoreError {
     invariant(format!("runtime replay migration integrity: {detail}"))
+}
+
+/// A record read that failed in storage stays an outage, not an integrity
+/// failure of the retained migration records.
+fn record_error(error: RecordIntegrityError) -> AdmissionOperationStoreError {
+    error.into_store_error(integrity_error)
 }
 
 fn migration_time(
