@@ -669,6 +669,12 @@ mod storage_identity_tests {
 
     const TRUSTED_FILE_REFUSAL: &str =
         "key-log database file must have trusted ownership, no untrusted write access or ACL, and one hard link";
+    const CUSTODY_FILE_REFUSAL: &str =
+        "custody-sensitive input must have trusted ownership, no untrusted write access or ACL, and one hard link";
+    const RETAINED_IDENTITY_REFUSAL: &str =
+        "key-log database descriptor identity changed or is hard-linked";
+    const TRUSTED_PARENT_REFUSAL: &str =
+        "key-log database parent must be owned by the service or root and grant no untrusted write access or extended ACL";
 
     fn refused_by(result: crate::Result<impl Sized>, rule: &str) -> bool {
         matches!(
@@ -690,7 +696,7 @@ mod storage_identity_tests {
             open_durable_sqlite_file(&database, true, true).map_err(std::io::Error::other)?;
 
         std::fs::hard_link(&database, &hardlink)?;
-        assert!(retained.validate().is_err());
+        assert!(refused_by(retained.validate(), RETAINED_IDENTITY_REFUSAL));
         std::fs::remove_file(&hardlink)?;
         assert!(retained.validate().is_ok());
 
@@ -700,7 +706,7 @@ mod storage_identity_tests {
             .create_new(true)
             .mode(0o600)
             .open(&database)?;
-        assert!(retained.validate().is_err());
+        assert!(refused_by(retained.validate(), RETAINED_IDENTITY_REFUSAL));
         Ok(())
     }
 
@@ -709,10 +715,22 @@ mod storage_identity_tests {
         assert!(validate_trusted_parent_security(501, 501, 0o700, false, false).is_ok());
         assert!(validate_trusted_parent_security(0, 501, 0o755, false, false).is_ok());
         assert!(validate_trusted_parent_security(0, 501, 0o1777, false, true).is_ok());
-        assert!(validate_trusted_parent_security(502, 501, 0o700, false, false).is_err());
-        assert!(validate_trusted_parent_security(501, 501, 0o720, false, false).is_err());
-        assert!(validate_trusted_parent_security(501, 501, 0o1777, false, false).is_err());
-        assert!(validate_trusted_parent_security(501, 501, 0o700, true, false).is_err());
+        assert!(refused_by(
+            validate_trusted_parent_security(502, 501, 0o700, false, false),
+            TRUSTED_PARENT_REFUSAL
+        ));
+        assert!(refused_by(
+            validate_trusted_parent_security(501, 501, 0o720, false, false),
+            TRUSTED_PARENT_REFUSAL
+        ));
+        assert!(refused_by(
+            validate_trusted_parent_security(501, 501, 0o1777, false, false),
+            TRUSTED_PARENT_REFUSAL
+        ));
+        assert!(refused_by(
+            validate_trusted_parent_security(501, 501, 0o700, true, false),
+            TRUSTED_PARENT_REFUSAL
+        ));
     }
 
     #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -724,7 +742,10 @@ mod storage_identity_tests {
 
         let result = open_trusted_unix_directory_chain(&trusted_directory);
         assert!(result.is_ok(), "{result:?}");
-        assert!(open_trusted_unix_directory_chain(std::path::Path::new("/tmp")).is_err());
+        assert!(refused_by(
+            open_trusted_unix_directory_chain(std::path::Path::new("/tmp")),
+            TRUSTED_PARENT_REFUSAL
+        ));
         Ok(())
     }
 
@@ -784,16 +805,22 @@ mod storage_identity_tests {
     fn custody_sensitive_file_policy_rejects_foreign_owner_writes_links_and_acl() {
         assert!(validate_custody_sensitive_file_security_values(501, 501, 0o644, 1, false).is_ok());
         assert!(validate_custody_sensitive_file_security_values(0, 501, 0o644, 1, false).is_ok());
-        assert!(
-            validate_custody_sensitive_file_security_values(502, 501, 0o644, 1, false).is_err()
-        );
-        assert!(
-            validate_custody_sensitive_file_security_values(501, 501, 0o664, 1, false).is_err()
-        );
-        assert!(
-            validate_custody_sensitive_file_security_values(501, 501, 0o644, 2, false).is_err()
-        );
-        assert!(validate_custody_sensitive_file_security_values(501, 501, 0o644, 1, true).is_err());
+        assert!(refused_by(
+            validate_custody_sensitive_file_security_values(502, 501, 0o644, 1, false),
+            CUSTODY_FILE_REFUSAL
+        ));
+        assert!(refused_by(
+            validate_custody_sensitive_file_security_values(501, 501, 0o664, 1, false),
+            CUSTODY_FILE_REFUSAL
+        ));
+        assert!(refused_by(
+            validate_custody_sensitive_file_security_values(501, 501, 0o644, 2, false),
+            CUSTODY_FILE_REFUSAL
+        ));
+        assert!(refused_by(
+            validate_custody_sensitive_file_security_values(501, 501, 0o644, 1, true),
+            CUSTODY_FILE_REFUSAL
+        ));
     }
 
     #[cfg(target_vendor = "apple")]
