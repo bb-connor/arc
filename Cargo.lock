@@ -5090,6 +5090,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-secure-fs"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "rustix",
+ "tempfile",
+ "zeroize",
+]
+
+[[package]]
 name = "chio-secure-ipc"
 version = "0.1.0"
 dependencies = [

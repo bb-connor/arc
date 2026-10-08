@@ -30,6 +30,7 @@
     "chio-decoy": "crates/security/chio-decoy/src/lib.rs",
     "chio-keyring": "crates/security/chio-keyring/src/lib.rs",
     "chio-secure-ipc": "crates/security/chio-secure-ipc/src/lib.rs",
+    "chio-secure-fs": "crates/security/chio-secure-fs/src/lib.rs",
     "chio-security-kernel": "crates/security/chio-security-kernel/src/lib.rs",
     "chio-active-response-authority": "crates/security/chio-active-response-authority/src/lib.rs",
     "chio-control-plane": "crates/platform/chio-control-plane/src/lib.rs",

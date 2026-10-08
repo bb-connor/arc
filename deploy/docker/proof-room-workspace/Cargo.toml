@@ -333,6 +333,7 @@ chio-settle = { version = "=0.1.0", path = "crates/economy/chio-settle" }
 chio-security-types = { version = "=0.1.0", path = "crates/security/chio-security-types" }
 chio-security-kernel = { path = "crates/security/chio-security-kernel" }
 chio-active-response-authority = { path = "crates/security/chio-active-response-authority" }
+chio-secure-fs = { path = "crates/security/chio-secure-fs" }
 chio-secure-ipc = { path = "crates/security/chio-secure-ipc" }
 chio-secret-broker = { path = "crates/security/chio-secret-broker" }
 chio-siem = { path = "crates/observability/chio-siem" }

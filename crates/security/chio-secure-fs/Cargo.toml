@@ -1,0 +1,23 @@
+[package]
+name = "chio-secure-fs"
+description = "Fail-closed private file and directory custody primitives for Chio"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[target.'cfg(unix)'.dependencies]
+rustix = { workspace = true }
+zeroize = { workspace = true }
+
+# Supplies the search-only open mode where the syscall layer names no flag.
+[target.'cfg(all(unix, not(any(target_os = "linux", target_os = "android"))))'.dependencies]
+libc = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[lints]
+workspace = true
