@@ -2268,5 +2268,75 @@ class AuditSiblingMarkedMergedOriginalRedTests(unittest.TestCase):
         self.assertNotIn("GitHub read failed", report.get("error", ""))
         self.assertNotEqual(run.result.returncode, 0)
 
+
+def positive_authority_checks() -> tuple[dict, ...]:
+    return tuple(copy.deepcopy(snapshot()[f"repos/{REPOSITORY}/commits/{MERGE}/check-runs"]["check_runs"]))
+
+
+class SecurityContractDenialPreservationTests(unittest.TestCase):
+    def assert_exact_denial(self, run: OfflineRun, existing: tuple[dict, ...]) -> None:
+        prefix = f"repos/{REPOSITORY}"
+        self.assertEqual([key for key in run.data if key.startswith(f"{prefix}/commits/") and key.endswith("/check-runs")
+                          and run.data[key]["check_runs"]], [f"{prefix}/commits/{MERGE}/check-runs"])
+        checks = {check["id"]: check for check in run.data[f"{prefix}/commits/{MERGE}/check-runs"]["check_runs"]}
+        self.assertEqual(sorted(checks), sorted(check["id"] for check in existing))
+        authority = next(check for check in existing if check["name"] == "Security contract")
+        denied = checks[authority["id"]]
+        self.assertEqual((denied["name"], denied["head_sha"], denied["app"], denied["external_id"], denied["status"],
+                          denied["conclusion"]),
+                         ("Security contract", MERGE, {"id": APP_ID, "slug": "chio-security-authority"}, EXTERNAL_ID,
+                          "completed", "failure"))
+        self.assertEqual(denied["output"]["text"], authority["output"]["text"])
+        metadata = json.loads(denied["output"]["text"])
+        self.assertEqual(metadata["identity"], {"pr_number": str(PR), "authorized_source_sha": SOURCE,
+                                                "evidence_sha": EVIDENCE, "merge_commit_sha": MERGE})
+        for original in existing:
+            if original["id"] == authority["id"]:
+                continue
+            mirror = checks[original["id"]]
+            self.assertEqual((mirror["head_sha"], mirror["app"], mirror["external_id"], mirror["output"]["text"],
+                              mirror["conclusion"]),
+                             (MERGE, {"id": 15368, "slug": "github-actions"}, original["external_id"],
+                              original["output"]["text"], "failure"))
+        writes = check_mutations(run)
+        self.assertNotIn(f"POST {prefix}/check-runs", writes)
+        self.assertEqual(writes[0], f"PATCH {prefix}/check-runs/{authority['id']}")
+        self.assertEqual(len(writes), len(existing))
+
+    def test_revoker_denies_the_exact_dedicated_authority_before_the_mirrors(self) -> None:
+        existing = positive_authority_checks()
+        for event_name in ("workflow_run", "workflow_dispatch"):
+            with self.subTest(event=event_name):
+                run = revoke_five_contexts(revoker_fixture(mirrors=existing), event_name)
+                self.assertEqual(run.result.returncode, 0, run.result.stderr)
+                self.assert_exact_denial(run, existing)
+
+    def test_revoker_creates_the_exact_dedicated_tombstone_before_the_mirrors(self) -> None:
+        prefix = f"repos/{REPOSITORY}"
+        for event_name in ("workflow_run", "workflow_dispatch"):
+            with self.subTest(event=event_name):
+                run = revoke_five_contexts(revoker_fixture(), event_name)
+                self.assertEqual(run.result.returncode, 0, run.result.stderr)
+                created = sorted((check for key, store in run.data.items()
+                                  if key.startswith(f"{prefix}/commits/") and key.endswith("/check-runs")
+                                  for check in store["check_runs"]), key=lambda check: check["id"])
+                self.assertEqual([(check["name"], check["head_sha"], check["app"], check["external_id"],
+                                   check["status"], check["conclusion"]) for check in created],
+                                 [("Security contract", MERGE, {"id": APP_ID, "slug": "chio-security-authority"},
+                                   EXTERNAL_ID, "completed", "failure")]
+                                 + [(f"Security mirror / {name}", MERGE, {"id": 15368, "slug": "github-actions"},
+                                     f"{EXTERNAL_ID}:actions:{key}", "completed", "failure") for name, key in ORDINARY])
+                self.assertEqual(check_mutations(run), [f"POST {prefix}/check-runs"] * 5)
+
+    def test_publisher_bad_ci_denies_the_exact_dedicated_authority_before_the_mirrors(self) -> None:
+        existing = positive_authority_checks()
+        bad = prior_failed_ci_run(MERGE)
+        assert_authoritative_history(self, bad)
+        run = reconcile_bad_ci_then_publish(bad_ci_fixture(bad, mirrors=existing))
+        self.assertNotIn(PUBLICATION_PROBE, run.result.stdout)
+        self.assertNotEqual(run.result.returncode, 0)
+        self.assert_exact_denial(run, existing)
+
+
 if __name__ == "__main__":
     unittest.main()
