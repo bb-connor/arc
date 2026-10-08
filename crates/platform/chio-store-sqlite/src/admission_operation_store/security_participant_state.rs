@@ -11,6 +11,8 @@ pub(super) mod output;
 pub(crate) use nonce_preflight::NativeNoncePreflightJoinAuthority;
 pub(crate) use output::NativeOutputJoinAuthority;
 mod history;
+#[cfg(feature = "admission-test-support")]
+mod image_visit_test_support;
 pub(crate) use egress::NativeEgressAuthority;
 pub use egress::SecurityParticipantEgressHistory;
 #[cfg(test)]

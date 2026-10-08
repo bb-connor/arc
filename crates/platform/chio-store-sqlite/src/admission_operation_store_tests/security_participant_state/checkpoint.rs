@@ -1,6 +1,9 @@
 use super::*;
 use chio_kernel::SecurityInvocationContext;
 
+#[cfg(feature = "admission-test-support")]
+mod image_visit_controls;
+
 fn join(
     fixture: &Fixture,
     initialized: &SecurityParticipantStateInitialization,

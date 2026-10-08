@@ -202,6 +202,9 @@ pub(super) fn verify_rows(
     source: &SecurityParticipantMigrationRecord,
 ) -> Result<(), AdmissionOperationStoreError> {
     let authority = source.snapshot().binding().security_authority_id().as_str();
+    #[cfg(feature = "admission-test-support")]
+    let mut current_probe =
+        super::image_visit_test_support::ImageVisitProbe::start(connection, "current")?;
     for table in schema::TABLES {
         let expected = source
             .snapshot()
@@ -237,6 +240,8 @@ pub(super) fn verify_rows(
         let mut rows = statement.query([authority]).map_err(sqlite_error)?;
         let mut hasher = TableHasher::new(table.source);
         while let Some(row) = rows.next().map_err(sqlite_error)? {
+            #[cfg(feature = "admission-test-support")]
+            current_probe.advance(connection)?;
             let values = (0..fields.len())
                 .map(|index| row.get_ref(index))
                 .collect::<rusqlite::Result<Vec<_>>>()

@@ -59,6 +59,9 @@ pub(in crate::admission_operation_store::security_participant_state) fn verify_r
             )
         })?;
     } else {
+        #[cfg(feature = "admission-test-support")]
+        let mut imported_probe =
+            super::super::image_visit_test_support::ImageVisitProbe::start(connection, "imported")?;
         let mut statement = connection
             .prepare(
                 "SELECT table_name, canonical_row FROM security_participant_migration_rows
@@ -67,6 +70,8 @@ pub(in crate::admission_operation_store::security_participant_state) fn verify_r
             .map_err(sqlite_error)?;
         let mut rows = statement.query([authority]).map_err(sqlite_error)?;
         while let Some(row) = rows.next().map_err(sqlite_error)? {
+            #[cfg(feature = "admission-test-support")]
+            imported_probe.advance(connection)?;
             let table: String = row.get(0).map_err(sqlite_error)?;
             let bytes = row
                 .get_ref(1)
@@ -102,6 +107,9 @@ pub(in crate::admission_operation_store::security_participant_state) fn verify_r
         }
         Ok(())
     })?;
+    #[cfg(feature = "admission-test-support")]
+    let mut current_probe =
+        super::super::image_visit_test_support::ImageVisitProbe::start(connection, "current")?;
     for table in schema::TABLES {
         let fields = retained_security_columns(table.source).map_err(invalid)?;
         let columns = fields
@@ -117,6 +125,8 @@ pub(in crate::admission_operation_store::security_participant_state) fn verify_r
             .map_err(sqlite_error)?;
         let mut rows = statement.query([authority]).map_err(sqlite_error)?;
         while let Some(row) = rows.next().map_err(sqlite_error)? {
+            #[cfg(feature = "admission-test-support")]
+            current_probe.advance(connection)?;
             let values = (0..fields.len())
                 .map(|index| row.get_ref(index))
                 .collect::<rusqlite::Result<Vec<_>>>()

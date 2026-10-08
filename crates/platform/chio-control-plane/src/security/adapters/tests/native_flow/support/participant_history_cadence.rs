@@ -28,6 +28,7 @@ struct Walk {
 struct Walks {
     walks: Mutex<Vec<Walk>>,
     gaps: AtomicUsize,
+    image_walks: Mutex<Vec<(&'static str, u64)>>,
 }
 
 impl Walks {
@@ -46,6 +47,39 @@ impl Walks {
         } else {
             self.gaps.fetch_add(1, Ordering::SeqCst);
         }
+    }
+
+    fn observe_image(&self, kind: &'static str, visited: u64) {
+        let mut walks = self
+            .image_walks
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        if visited == 0 {
+            walks.push((kind, 0));
+        } else if let Some(walk) = walks
+            .last_mut()
+            .filter(|walk| walk.0 == kind && walk.1.checked_add(1) == Some(visited))
+        {
+            walk.1 = visited;
+        } else {
+            self.gaps.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    fn image_len(&self) -> usize {
+        self.image_walks
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .len()
+    }
+
+    fn image_since(&self, start: usize) -> Vec<(&'static str, u64)> {
+        self.image_walks
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(start..)
+            .unwrap_or_default()
+            .to_vec()
     }
 
     fn len(&self) -> usize {
@@ -74,6 +108,7 @@ struct Cost {
     image_after: u64,
     sealed_after: [u64; 2],
     elapsed: std::time::Duration,
+    image_walks: Vec<(&'static str, u64)>,
 }
 
 impl Cost {
@@ -272,6 +307,7 @@ fn call(fixture: &mut Fixture, walks: &Walks, index: usize) -> TestResult<Cost> 
     fixture.request.execution_nonce = None;
     let before = journal(fixture)?;
     let start = walks.len();
+    let image_start = walks.image_len();
     let started = std::time::Instant::now();
     // The trusted host refreshes mutable flow state before each evaluation.
     fixture.context = fixture
@@ -296,6 +332,7 @@ fn call(fixture: &mut Fixture, walks: &Walks, index: usize) -> TestResult<Cost> 
         .evaluate_tool_call_blocking_with_security_context(&fixture.request, &fixture.context)?;
     let elapsed = started.elapsed();
     let (call_walks, threads) = walks.since(start);
+    let image_walks = walks.image_since(image_start);
     assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
     assert!(
         matches!(&response.output, Some(chio_kernel::ToolCallOutput::Value(value)) if value == &fixture.request.arguments)
@@ -338,6 +375,7 @@ fn call(fixture: &mut Fixture, walks: &Walks, index: usize) -> TestResult<Cost> 
         image_after: image(fixture)?.values().sum(),
         sealed_after: sealed(fixture)?,
         elapsed,
+        image_walks,
     })
 }
 
@@ -439,11 +477,33 @@ fn native_participant_history_verification_stays_bounded_across_sequential_calls
             move |visited| walks.observe(visited)
         })?;
 
+    fixture
+        .authority
+        .admission_operation_store()
+        .observe_native_image_visits_for_test({
+            let walks = walks.clone();
+            move |kind, visited| walks.observe_image(kind, visited)
+        })?;
+
     eprintln!("native participant history visits\n{HEADER}");
     let mut costs: Vec<Cost> = Vec::with_capacity(CALLS);
     for index in 1..=CALLS {
         let cost = call(&mut fixture, &walks, index)?;
         eprintln!("{}", row(index, &cost));
+        for kind in ["snapshot", "current", "imported", "copy"] {
+            let visits: Vec<_> = cost
+                .image_walks
+                .iter()
+                .filter(|(tag, _)| *tag == kind)
+                .map(|(_, visited)| *visited)
+                .collect();
+            eprintln!(
+                "image call={index} kind={kind} traversals={} visits={} max_traversal={}",
+                visits.len(),
+                visits.iter().sum::<u64>(),
+                visits.iter().max().copied().unwrap_or_default()
+            );
+        }
         if index == 1 {
             calibrate(&fixture, &walks)?;
         }

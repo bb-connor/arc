@@ -72,6 +72,9 @@ pub(super) fn copy(
     authority: &str,
     sequence: u64,
 ) -> Result<(Vec<Fingerprint>, u64, u64), AdmissionOperationStoreError> {
+    #[cfg(feature = "admission-test-support")]
+    let mut copy_probe =
+        super::super::image_visit_test_support::ImageVisitProbe::start(tx, "copy")?;
     let mut fingerprints = Vec::new();
     let mut total_rows = 0_u64;
     let mut total_bytes = 0_u64;
@@ -93,6 +96,8 @@ pub(super) fn copy(
         let mut rows = statement.query([authority]).map_err(sqlite_error)?;
         let mut hasher = Hasher::new(table.source);
         while let Some(row) = rows.next().map_err(sqlite_error)? {
+            #[cfg(feature = "admission-test-support")]
+            copy_probe.advance(tx)?;
             let values = (0..fields.len())
                 .map(|index| row.get_ref(index))
                 .collect::<rusqlite::Result<Vec<_>>>()
@@ -157,6 +162,9 @@ pub(super) fn visit(
     {
         return Err(invalid("native checkpoint snapshot bounds differ"));
     }
+    #[cfg(feature = "admission-test-support")]
+    let mut snapshot_probe =
+        super::super::image_visit_test_support::ImageVisitProbe::start(connection, "snapshot")?;
     let mut seen = 0_u64;
     for (table, expected) in super::super::schema::TABLES.iter().zip(&record.tables) {
         let mut hasher = Hasher::new(table.source);
@@ -172,6 +180,8 @@ pub(super) fn visit(
             ])
             .map_err(sqlite_error)?;
         while let Some(row) = rows.next().map_err(sqlite_error)? {
+            #[cfg(feature = "admission-test-support")]
+            snapshot_probe.advance(connection)?;
             if row.get::<_, i64>(0).map_err(sqlite_error)?
                 != i64::try_from(hasher.count).map_err(invalid)?
             {
