@@ -1,8 +1,16 @@
 # Security and process landing ledger
 
-Current protected landing queue: [#1195](https://github.com/bb-connor/arc/pull/1195) then #1160. The trusted v3 definition prerequisite is published at `8e689abfa7`; at this recorded handoff its ordinary hosted checks remain pending and the PR is unmerged. Publication has not activated Source, definition or evidence authorization. The older `3764d4ac48` reconciliation below remains a scoped snapshot; final source, native, trusted, hosted and protected landing acceptance remain open.
+Current protected landing queue: #1160. [#1195](https://github.com/bb-connor/arc/pull/1195) merged at `5bb4ae6a52` after all four required checks passed on reviewed head `8e689abfa7`. The [landing receipt](audits/trusted-definition-landing-20261008.json) verifies normal two-parent history, exact reviewed-head ancestry and trusted workflow blob identity on refreshed `main`. The existing administrator update permission was required; the separate required-check ruleset permits no bypass and remained unchanged. No source, definition or evidence authorization was activated.
 
-## Current landing boundary (2026-10-08)
+## Current qualification repairs (2026-10-08)
+
+Published foundation source `71b0e88c24` is still unqualified and unmerged. Its Next.js security repair passed the hosted CVE job. The current local batch is repairing stale exact test inventories, formal source anchors and an approval-count fixture that submits a token before issuance. Genuine failing campaigns remain retained; repairs require owning checks and independent review before another push. All 1,794 existing canonical requirements remain byte-identical.
+
+The nonfinal native run on `0884b8fe2c` failed on its eighth call with a capture-store refusal after seven successful calls. The worker is stopped and private evidence retained. Its exact store cause is still unproven; isolated fixed-code diagnostics are being validated. Neither the earlier successful builds nor the diagnostic proposal qualify native execution.
+
+The trusted post-merge work needs a fresh minimal open qualification PR. Controller, capture and finalizer reject a closed owner PR, so merged #1160 cannot itself own that later positive campaign. Preserve old failed/tombstoned evidence and the two-PR limit; keep HAMMER follow-ups separate.
+
+## Earlier landing-boundary checkpoint (2026-10-08)
 
 The [landing-boundary checkpoint](audits/foundation-landing-boundary-20261008.json) records Connor's decision relayed by Claude at 13:26:46 UTC: the four required GitHub checks, local qualification and review-thread dispositions gate #1160's merge. The 35-campaign trusted capture and per-PR App enforcement remain unfinished post-merge, pre-release requirements. No tag or release is permitted before those gates pass. Remaining native, cold and platform evidence stays explicitly pending; moving an acceptance boundary supplies no evidence. HAMMER architecture/security trains follow #1160 in separate landing waves. Confirmed exploitable foundation blockers still require repair before merge.
 

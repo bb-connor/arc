@@ -1,0 +1,105 @@
+{
+  "schema": "chio.trusted-definition-landing.v1",
+  "observed_at": "2026-10-08T15:43:42.141030+00:00",
+  "source_observed": "71b0e88c2423566a0bfaae7f467be40400a698a8",
+  "pr": 1195,
+  "status": "merged",
+  "definition_commit": "8e689abfa7577100f06302fa78a3d938d305dc4a",
+  "main_merge_commit": "5bb4ae6a52f3f6858d0c0cdc6b7e098277b537d8",
+  "merge_parents": [
+    "6573b8980a1e5331028b7e688169f033a39d0384",
+    "8e689abfa7577100f06302fa78a3d938d305dc4a"
+  ],
+  "definition_main_ancestry_verified": true,
+  "runtime_blob_identities": {
+    ".github/workflows/enterprise-linux-capture.yml": {
+      "8e689abfa7577100f06302fa78a3d938d305dc4a": "6c77547a8193e4406a73e733558819e43924194e",
+      "5bb4ae6a52f3f6858d0c0cdc6b7e098277b537d8": "6c77547a8193e4406a73e733558819e43924194e",
+      "origin/main": "6c77547a8193e4406a73e733558819e43924194e",
+      "HEAD": "6c77547a8193e4406a73e733558819e43924194e"
+    },
+    ".github/workflows/enterprise-evidence-finalizer.yml": {
+      "8e689abfa7577100f06302fa78a3d938d305dc4a": "b5d364bc86083c2a00d6615002a0bec59aa3b450",
+      "5bb4ae6a52f3f6858d0c0cdc6b7e098277b537d8": "b5d364bc86083c2a00d6615002a0bec59aa3b450",
+      "origin/main": "b5d364bc86083c2a00d6615002a0bec59aa3b450",
+      "HEAD": "b5d364bc86083c2a00d6615002a0bec59aa3b450"
+    },
+    ".github/workflows/security-contract-revocation.yml": {
+      "8e689abfa7577100f06302fa78a3d938d305dc4a": "9c396095688c094b0f46e606583692583a5847ea",
+      "5bb4ae6a52f3f6858d0c0cdc6b7e098277b537d8": "9c396095688c094b0f46e606583692583a5847ea",
+      "origin/main": "9c396095688c094b0f46e606583692583a5847ea",
+      "HEAD": "9c396095688c094b0f46e606583692583a5847ea"
+    },
+    "scripts/audit-security-merge-qualification.py": {
+      "8e689abfa7577100f06302fa78a3d938d305dc4a": "aa1420154c87c74550e3024bf105202bda287864",
+      "5bb4ae6a52f3f6858d0c0cdc6b7e098277b537d8": "aa1420154c87c74550e3024bf105202bda287864",
+      "origin/main": "aa1420154c87c74550e3024bf105202bda287864",
+      "HEAD": "aa1420154c87c74550e3024bf105202bda287864"
+    }
+  },
+  "required_checks": [
+    {
+      "id": 113320151520,
+      "name": "Build, lint, test",
+      "head_sha": "8e689abfa7577100f06302fa78a3d938d305dc4a",
+      "run_id": 37779922962,
+      "conclusion": "success",
+      "started_at": "2026-10-08T12:51:47Z",
+      "completed_at": "2026-10-08T15:32:17Z"
+    },
+    {
+      "id": 113320151761,
+      "name": "MSRV build and test",
+      "head_sha": "8e689abfa7577100f06302fa78a3d938d305dc4a",
+      "run_id": 37779922962,
+      "conclusion": "success",
+      "started_at": "2026-10-08T12:51:47Z",
+      "completed_at": "2026-10-08T15:09:15Z"
+    },
+    {
+      "id": 113320151178,
+      "name": "cargo-vet (locked supply-chain audit)",
+      "head_sha": "8e689abfa7577100f06302fa78a3d938d305dc4a",
+      "run_id": 37779922962,
+      "conclusion": "success",
+      "started_at": "2026-10-08T12:51:46Z",
+      "completed_at": "2026-10-08T12:55:47Z"
+    },
+    {
+      "id": 113320151659,
+      "name": "cargo-deny (supply-chain bans/advisories/licenses)",
+      "head_sha": "8e689abfa7577100f06302fa78a3d938d305dc4a",
+      "run_id": 37779922962,
+      "conclusion": "success",
+      "started_at": "2026-10-08T12:51:46Z",
+      "completed_at": "2026-10-08T12:54:27Z"
+    }
+  ],
+  "unresolved_review_threads": 0,
+  "independent_review": {
+    "path": "/tmp/pr1160-trusted-definitions-v3-independent-review/final-8e689abfa7/REVIEW.md",
+    "sha256": "1305ec9a0a2d1cc6a1d313ad351ac837547c24e1e32349671e5e60e1f5dfa139",
+    "scope": "Exact nine-file prerequisite code and local verification. Review-bot quotas remain unavailable; no fabricated bot approval."
+  },
+  "merge_mechanism": {
+    "mode": "normal_two_parent_merge_using_existing_admin_update_permission",
+    "update_ruleset": 24671648,
+    "required_check_ruleset": 22033486,
+    "required_check_bypass_actors": [],
+    "required_checks_bypassed": false,
+    "rulesets_unchanged_before_after": true
+  },
+  "evidence": {
+    "directory": "/tmp/pr1195-protected-landing-20261008",
+    "seal_sha256": "b4039bf803613febc1d4e106717cb674beb890395717cd054b8eb7df1aedfb6d",
+    "public_comment": "https://github.com/bb-connor/arc/pull/1195#issuecomment-6063460655"
+  },
+  "authorization_rotated": false,
+  "release_permitted": false,
+  "remaining_acceptance": [
+    "Complete and independently review the current foundation CI inventory, formal-anchor and approval-fixture repairs; obtain exact-candidate required checks and protected foundation landing.",
+    "Preserve native0884 as a failed nonfinal run; fixed diagnostic instrumentation and actual causal/native qualification remain open.",
+    "Use a fresh minimal open qualification PR after foundation landing for the 35-campaign, signed-evidence and per-PR App gates; a closed PR cannot own positive capture or publication.",
+    "Retain final source and signed evidence binding, App enforcement, native/cold/platform and release acceptance; this prerequisite merge supplies none of those results."
+  ]
+}

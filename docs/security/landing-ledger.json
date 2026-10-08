@@ -6,7 +6,6 @@
   "main_snapshot": "f5566d9a765c21cb36652a99c79de64968a656bf",
   "semantics": "Source claims are historical unless separately qualified. Coverage is bookkeeping, not proof of security. Null repair or PR means not established or not yet assigned; it never means complete.",
   "active_landing_prs": [
-    1195,
     1160
   ],
   "waiting_foundation_pr": null,
@@ -133220,5 +133219,6 @@
     "path": "docs/security/audits/foundation-landing-boundary-20261008.json",
     "sha256": "c5b206178164527ce083d2bdf23f28a7c4b21fc6f39c29fad180770da34a68a7",
     "meaning": "Current relayed landing decision and bounded local evidence; historical rows/views preserved; unfinished pre-release requirements remain pending."
-  }
+  },
+  "trusted_definition_landing_20261008": {"audit_path":"docs/security/audits/trusted-definition-landing-20261008.json","audit_sha256":"c0c5e1dc4c5347c32bc3b0ded9a58df009723914586ccbf0a03fb837e4233b73","definition_commit":"8e689abfa7577100f06302fa78a3d938d305dc4a","main_merge_commit":"5bb4ae6a52f3f6858d0c0cdc6b7e098277b537d8","status":"merged_required_checks_passed_authority_not_activated","active_landing_prs":[1160]}
 }

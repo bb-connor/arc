@@ -10,6 +10,10 @@
 
 **Spec:** `docs/security/landing-ledger.md`, `docs/security/foundation-acceptance-scope.md`, the October 1 execution reviews, and `docs/superpowers/plans/2026-10-05-foundation-ci-feedback.md`.
 
+## Current execution checkpoint (2026-10-08)
+
+Use the [authoritative landing ledger](../../security/landing-ledger.md) and its current requirement states before implementing a historical checkbox below. Trusted prerequisite #1195 is merged with its four required checks passed and exact definition ancestry verified. #1160 remains unmerged: the current CI inventory/formal-anchor/approval-fixture repairs and native diagnostic work are in progress. Source integration and a moved acceptance boundary do not establish production readiness; trusted, native, platform and release obligations remain explicit.
+
 ## Global constraints
 
 - Preserve the original 1609 requirement identities and all failed, cancelled, ignored and unavailable evidence.
