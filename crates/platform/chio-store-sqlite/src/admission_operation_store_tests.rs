@@ -52,6 +52,9 @@ mod anchored_terminal;
 mod authority_clock;
 #[path = "admission_operation_store_tests/budget_atomicity.rs"]
 mod budget_atomicity;
+#[cfg(unix)]
+#[path = "admission_operation_store_tests/budget_selector_corruption.rs"]
+mod budget_selector_corruption;
 #[path = "admission_operation_store_tests/clock_migration.rs"]
 mod clock_migration;
 #[path = "admission_operation_store_tests/credit_authorization.rs"]

@@ -1,4 +1,5 @@
-//! Valid originals are controls; database damage below is explicit corruption.
+//! Valid originals are controls. External corruption poisons the serving owner.
+//! Those refusals occur before selection; private store controls pin its branches.
 use super::*;
 use crate::authority_ipc::BrokerAdmissionAuthority;
 use crate::kernel_admission::BrokerKernelAdmissionAuthority;
@@ -195,7 +196,7 @@ impl CompletedOriginal {
 }
 
 #[test]
-fn malformed_selector_and_replaced_index_fail_with_typed_integrity() -> TestResult {
+fn malformed_selector_is_integrity_and_external_index_tamper_poisoned() -> TestResult {
     let fixture = CompletedOriginal::new()?;
     assert!(matches!(
         fixture.select(&"a".repeat(63)),
@@ -214,7 +215,7 @@ fn malformed_selector_and_replaced_index_fail_with_typed_integrity() -> TestResu
     )?;
     assert!(matches!(
         fixture.select(&fixture.digest),
-        Err(chio_kernel::admission_operation::AdmissionOperationStoreError::Invariant(_))
+        Err(chio_kernel::admission_operation::AdmissionOperationStoreError::OutcomeUnknown(_))
     ));
     assert_eq!(fixture.broker.pending_dispatches()?, 0);
     assert_eq!(
@@ -259,12 +260,12 @@ fn duplicate_hold_index(fixture: &CompletedOriginal) -> TestResult {
 }
 
 #[test]
-fn corrupt_duplicate_hold_index_never_selects_the_first_valid_original() -> TestResult {
+fn external_corrupt_duplicate_hold_index_poisoning_returns_no_original() -> TestResult {
     let fixture = CompletedOriginal::new()?;
     duplicate_hold_index(&fixture)?;
     assert!(matches!(
         fixture.select(&fixture.digest),
-        Err(chio_kernel::admission_operation::AdmissionOperationStoreError::Invariant(_))
+        Err(chio_kernel::admission_operation::AdmissionOperationStoreError::OutcomeUnknown(_))
     ));
     assert_eq!(fixture.broker.pending_dispatches()?, 0);
     assert_eq!(
@@ -275,7 +276,7 @@ fn corrupt_duplicate_hold_index_never_selects_the_first_valid_original() -> Test
 }
 
 #[test]
-fn oversized_hold_operation_index_refuses_without_an_original_result() -> TestResult {
+fn external_oversized_hold_operation_index_poisoning_returns_no_original() -> TestResult {
     let fixture = CompletedOriginal::new()?;
     // Corruption injection: a physical selector ID exceeds the 512-byte
     // bound. The separately retained original request is unchanged.
@@ -289,7 +290,7 @@ fn oversized_hold_operation_index_refuses_without_an_original_result() -> TestRe
     );
     assert!(matches!(
         fixture.select(&fixture.digest),
-        Err(chio_kernel::admission_operation::AdmissionOperationStoreError::Invariant(_))
+        Err(chio_kernel::admission_operation::AdmissionOperationStoreError::OutcomeUnknown(_))
     ));
     assert_eq!(fixture.broker.pending_dispatches()?, 0);
     assert_eq!(
