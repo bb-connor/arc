@@ -702,6 +702,49 @@ fn ensure_runtime_quiescent(
     Ok(())
 }
 
+/// One bounded pass of new response work: durable correlation ingress
+/// followed by resumption of incomplete planning.
+trait ResponseAdmissionPass: Send + Sync {
+    fn ensure_ready(&self) -> Result<(), ResponseWorkerTickError>;
+
+    fn run_once(&self) -> Result<(), ResponseWorkerTickError>;
+}
+
+struct DurableResponseAdmissionPass {
+    planner: Arc<DurableAttestedFindingBatchPlanner>,
+    correlation_ingress: Arc<DurableCorrelationIngress>,
+    recovery_limits: AttestedFindingResponseRecoveryLimits,
+    runtime_leases: Arc<ProductionRuntimeLeaseState>,
+}
+
+impl ResponseAdmissionPass for DurableResponseAdmissionPass {
+    fn ensure_ready(&self) -> Result<(), ResponseWorkerTickError> {
+        self.planner.ensure_bootstrap_ready()?;
+        self.correlation_ingress.ensure_ready()?;
+        Ok(())
+    }
+
+    fn run_once(&self) -> Result<(), ResponseWorkerTickError> {
+        // Only published runtime admission starts ingress or planning work;
+        // pending events and outbox records wait for restart. An ingress
+        // event that cannot be acknowledged never stalls planning recovery.
+        if !(self.runtime_leases.admission_published()
+            && self.planner.response_coordinator_is_ready())
+        {
+            return Ok(());
+        }
+        let drained = self
+            .correlation_ingress
+            .drain_once(self.recovery_limits.max_records_per_pass());
+        let resumed = self
+            .planner
+            .resume_incomplete_pass(self.recovery_limits.max_records_per_pass());
+        drained?;
+        resumed?;
+        Ok(())
+    }
+}
+
 /// Production active-defense services built around one durable security store
 /// and one indexed evidence authority.
 ///
@@ -714,36 +757,19 @@ fn ensure_runtime_quiescent(
 /// sole admission and execution coordinator.
 struct PlanningRecoveryResponseWorkerPort {
     inner: Arc<dyn ResponseWorkerPort>,
-    planner: Arc<DurableAttestedFindingBatchPlanner>,
-    correlation_ingress: Arc<DurableCorrelationIngress>,
-    recovery_limits: AttestedFindingResponseRecoveryLimits,
-    runtime_leases: Arc<ProductionRuntimeLeaseState>,
+    admission: Arc<dyn ResponseAdmissionPass>,
 }
 
 impl PlanningRecoveryResponseWorkerPort {
-    fn new(
-        inner: Arc<dyn ResponseWorkerPort>,
-        planner: Arc<DurableAttestedFindingBatchPlanner>,
-        correlation_ingress: Arc<DurableCorrelationIngress>,
-        recovery_limits: AttestedFindingResponseRecoveryLimits,
-        runtime_leases: Arc<ProductionRuntimeLeaseState>,
-    ) -> Self {
-        Self {
-            inner,
-            planner,
-            correlation_ingress,
-            recovery_limits,
-            runtime_leases,
-        }
+    fn new(inner: Arc<dyn ResponseWorkerPort>, admission: Arc<dyn ResponseAdmissionPass>) -> Self {
+        Self { inner, admission }
     }
 }
 
 impl ResponseWorkerPort for PlanningRecoveryResponseWorkerPort {
     fn ensure_ready(&self) -> Result<(), ResponseWorkerTickError> {
         self.inner.ensure_ready()?;
-        self.planner.ensure_bootstrap_ready()?;
-        self.correlation_ingress.ensure_ready()?;
-        Ok(())
+        self.admission.ensure_ready()
     }
 
     fn ensure_recovery_ready(&self) -> Result<(), ResponseWorkerTickError> {
@@ -759,22 +785,29 @@ impl ResponseWorkerPort for PlanningRecoveryResponseWorkerPort {
         // expiry, rollback and receipt recovery before admitting new response
         // work, so a failed ingress or planner cannot strand an active overlay.
         // Planning errors still reach the worker and keep host readiness closed.
-        // An ingress event that cannot be acknowledged never stalls outbox
-        // recovery. Only published runtime admission starts ingress or
-        // planning work; pending events and outbox records wait for restart.
-        let tick = self.inner.tick(tick_sequence, shutdown_requested)?;
-        if self.runtime_leases.admission_published() && self.planner.response_coordinator_is_ready()
-        {
-            let drained = self
-                .correlation_ingress
-                .drain_once(self.recovery_limits.max_records_per_pass());
-            let resumed = self
-                .planner
-                .resume_incomplete_pass(self.recovery_limits.max_records_per_pass());
-            drained?;
-            resumed?;
+        match self.inner.tick(tick_sequence, shutdown_requested) {
+            Ok(tick) => {
+                self.admission.run_once()?;
+                Ok(tick)
+            }
+            // Expired leases on terminal plans beyond one bounded cleanup pass
+            // are backlog, not a fault: the pass committed and the next tick
+            // continues it. Admission only adds durable work that a later claim
+            // services, so it still runs, and the pending error keeps readiness
+            // closed. Every other recovery error stops the tick.
+            Err(error @ ResponseWorkerTickError::TerminalSchedulerCleanupPending)
+                if !shutdown_requested =>
+            {
+                if let Err(admission_error) = self.admission.run_once() {
+                    tracing::warn!(
+                        error = %admission_error,
+                        "active-defense response admission failed during terminal scheduler cleanup"
+                    );
+                }
+                Err(error)
+            }
+            Err(error) => Err(error),
         }
-        Ok(tick)
     }
 
     fn shutdown(&self) -> Result<(), ResponseWorkerTickError> {
@@ -950,10 +983,12 @@ impl ProductionActiveDefenseOrchestrator {
         let worker_port: Arc<dyn ResponseWorkerPort> =
             Arc::new(PlanningRecoveryResponseWorkerPort::new(
                 scheduler_worker_port,
-                Arc::clone(&durable_planner),
-                Arc::clone(&correlation_ingress),
-                response_recovery_limits,
-                Arc::clone(&lifecycle.runtime_leases),
+                Arc::new(DurableResponseAdmissionPass {
+                    planner: Arc::clone(&durable_planner),
+                    correlation_ingress: Arc::clone(&correlation_ingress),
+                    recovery_limits: response_recovery_limits,
+                    runtime_leases: Arc::clone(&lifecycle.runtime_leases),
+                }),
             ));
         let worker = Arc::new(ProductionResponseWorker::new(Arc::clone(&worker_port))?);
         lifecycle.bind_worker(&worker)?;
@@ -1061,3 +1096,6 @@ pub use teardown::ProductionActiveDefenseHost;
 
 #[cfg(test)]
 mod runtime_lease_tests;
+
+#[cfg(test)]
+mod planning_recovery_tests;
