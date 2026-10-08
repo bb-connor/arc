@@ -176,3 +176,6 @@ pub(super) fn assert_interrupted_payment(
     assert!(native_source.source().is_none());
     Ok(())
 }
+
+#[path = "ordinary_operation/rail_acknowledged_restart.rs"]
+mod rail_acknowledged_restart;

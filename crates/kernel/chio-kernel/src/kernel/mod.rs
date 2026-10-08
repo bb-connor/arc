@@ -554,7 +554,21 @@ pub(crate) fn run_payment_adapter_operation<T>(
     operation_name: &'static str,
     operation: impl FnOnce() -> Result<T, PaymentError>,
 ) -> Result<T, PaymentError> {
-    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(operation)) {
+    // A rail call blocks its thread. A multi-thread runtime worker hands its
+    // other tasks off first; a current-thread runtime cannot, so it and
+    // callers outside any runtime call the adapter directly.
+    let blocking = || match tokio::runtime::Handle::try_current() {
+        Ok(handle)
+            if matches!(
+                handle.runtime_flavor(),
+                tokio::runtime::RuntimeFlavor::MultiThread
+            ) =>
+        {
+            tokio::task::block_in_place(operation)
+        }
+        _ => operation(),
+    };
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(blocking)) {
         Ok(result) => result,
         Err(_) => Err(PaymentError::RailError(format!(
             "payment adapter {operation_name} panicked; outcome unknown"
