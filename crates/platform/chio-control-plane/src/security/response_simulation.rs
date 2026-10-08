@@ -446,3 +446,6 @@ mod diagnostic_classification_tests {
         assert!(!format!("{error} {error:?}").contains("private"));
     }
 }
+
+#[cfg(test)]
+mod production_effects_tests;
