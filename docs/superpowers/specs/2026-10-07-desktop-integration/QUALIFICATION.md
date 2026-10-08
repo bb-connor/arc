@@ -122,10 +122,13 @@ its own read-authority/freshness gates without a task-lifetime dependency.
 The Pi wrapper refuses `approval-decide` before native invocation. The audited
 bundled bridge still exposes its native utility, so wrapper refusal is not a
 fix for that utility. The platform research records the source/archive pin.
-The native owner must repair exact decision and approval-ID matching, replace
-the packaged dependency, and run Q05 against the installed binary including
-direct invocation. Until that evidence exists, attributable approvals and any
-publication requiring them are disabled. A source-level fix alone is insufficient.
+Any profile that ships or exposes this utility must repair exact decision and
+approval-ID matching, replace the packaged dependency, and run Q05 against the
+installed binary including direct invocation. Until that evidence exists, that
+profile's affected approvals and publication remain disabled. A separate
+approval route with no affected utility in its reachable installed closure still
+requires Q05/Q06 against its actual native owner and production verifier; it does
+not require installing Pi. A source-level fix alone is insufficient.
 
 Other owner defects remain explicit dependencies: durable stop and mounted
 authorized routes, safe observation without reserve consumption, live process
@@ -153,7 +156,7 @@ a complete inventory of every predecessor obligation.
 | Profile | Mandatory acceptance | Runtime gate |
 | --- | --- | --- |
 | Observe | Q04, Q10-Q11, Q16-Q17, Q21; Q09 for exposed streams; Q15 projection cases for an exposed budget view; Q02 for every exposed effecting mutation, including support export/lifecycle; applicable Q01/Q03 for exposed W1 views or recovery capability | Authenticated bounded non-persisting selected owner reads, trust-control GETs and truthful hook source attribution; S5 A/B gate selected unified stream sources, not non-streaming reads; W1/M20 are not basic receipt/hook observation gates |
-| Approve | Q02-Q06, Q09-Q10, Q16-Q17 | Qualified native approval owner, S28 identity, production verifier and installed utility binding; no stop capability implied |
+| Approve | Q02-Q06, Q09-Q10, Q16-Q17 | Qualified native approval owner, S28 identity, production verifier and exact installed approval-route binding (including the utility when present); no stop capability implied |
 | Per-task stop | Q02-Q04, Q07, Q09-Q10, Q16-Q17, Q19 | Qualified S4/process closure and its native route authorization; Q05/Q06 are not prerequisites when approval is absent |
 | Kernel stop | Q02-Q04, Q08-Q10, Q16-Q17; Q19 additionally for any claimed process cleanup | Qualified S8 phase-1 scope, durability and native route authorization; no S28 approval or per-task closure prerequisite and no implied process termination |
 | Sealed work | Q01-Q22 applicable to its concrete backend, with exclusions justified by owner; Q22's alternate native-shell negative is mandatory | W1, recovery, restricted host, runner, S7 and installed release tuple |
@@ -301,7 +304,7 @@ name the absent UI surface and retain all equivalent native read/effect cases.
 
 | ID | Owner and stimulus | Required result |
 | --- | --- | --- |
-| Q23 | Native host and independent consumers: remove all Chio UI/projection components; run useful installed harness and application operations; kill/restart/replace clients and lose responses | Native functions remain usable within the selected profile; current owner state, original IDs and resources survive; no implicit replay or cancellation. User-session and service-principal evidence remain distinct. CONSUMERS C01/C02/C05 and W3's independent applications retain their exact scope. |
+| Q23 | Native host and independent consumers: remove all Chio UI/projection components; run useful installed harness and application operations; kill/restart/replace clients and lose responses; apply FIRST-CLASS-INTEGRATIONS H01-H08 to the required Claude Code/Codex/Pi/Hermes and separate Herdr coverage | Native functions remain usable within the selected profile; current owner state, original IDs and resources survive; no implicit replay or cancellation. User-session and service-principal evidence remain distinct. CONSUMERS C01/C02/C05 and W3's independent applications retain their exact scope. |
 | Q24 | Credential/current-admission owner: valid passport plus selected holder challenge; substitute subject, issuer, audience, challenge or workload; expire/revoke under the relying-party policy; present a valid passport without a grant | Useful approved scope succeeds; no invalid credential or missing grant yields effects/private bytes. Require configured fresh lifecycle when the profile claims current passport status. Bare portable verification is never promoted to current native admission. C09 supplies independent resource/disclosure controls. |
 | Q25 | Delegation/current-admission and budget owners: useful child/grandchild within supported form; widen scopes/constraints, extend expiry, change delegator, exceed allocation; revoke an ancestor; retry after restart | Effective authority only narrows; unsupported forms reject; current descendant work refuses after revocation becomes effective under the qualified contract. Original uncertain effects remain retained. One-hop aggregate examples cannot qualify recursive aggregate conservation. C10 observes actual effects and native accounting. |
 | Q26 | Swarm/runtime/W1 owners: fan-out/fan-in; corrupt graph/witness/route/epoch/allocation/continuation binding; race replay and additive extensions; present correctly signed join with unaccepted/wrong/duplicate parents | Qualified runtime admission plus protected graph head and durable issuance/replay prevent duplicated/forked authority. Exact required parent acceptance, producer/task/artifact/evaluator/contract identity gates the successor. Pure bundle verification or fixture minting cannot supply that fact. C11 observes graph/allocation records and downstream effects. |

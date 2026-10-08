@@ -115,6 +115,7 @@ execution.
 
 | Decision | Grounding | Required evidence |
 | --- | --- | --- |
+| Required harnesses and workspace use their actual owners | User amendment; Megastart native-agent and Herdr split; existing plugin/launcher repositories in FIRST-CLASS-INTEGRATIONS | Claude Code, Codex, Pi and Hermes each pass installed platform H01-H08/I01-I08; Herdr passes its own plugin/consumer matrix. Mini-swe never substitutes. |
 | Native owners and headless consumers precede UI | K layer/TCB rules; public process/SDK docs; G host/Herdr split | Q23/Q30; C01/C02/C05; installed independent app and harness; no optional projection dependency |
 | Separate user-session and service principal | Actual OS identity/credential/lifecycle primitives and current native authority | Q29 and platform boot/lock/logout/expiry tests; explicit unavailable service profile until implemented |
 | Reuse Rust core, native policy and owner schemas | Existing kernel/guard/SDK contracts; K R11/R12 | Source/API reconciliation and real owner conformance; no second security/ledger implementation |

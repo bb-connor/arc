@@ -29,9 +29,14 @@ after implementation and owner approval.
 
 Platform wiring belongs to the existing native lifecycle/activation owners
 selected in O0/M0 and adapters in `integrations/linux/` and `integrations/macos/`.
-Those packets must record concrete owner entrypoints before coding. Shared
-packet 2a cannot close without actual code-level call sites and installed tests
-at both selected platform activation paths; an unbound verifier CLI is incomplete.
+Those packets must record concrete owner entrypoints before coding. Packet 2a
+has a shared verifier implementation gate and separate Linux and macOS wiring
+gates. The shared gate closes on the implemented library/CLI and owner tests;
+each platform's gate additionally requires its own actual activation call sites
+and installed tests. O7 depends on the shared plus Linux gates; M10 depends on
+the shared plus macOS gates. Neither platform waits for the other platform's
+wiring or results. Full packet completion records all gates separately; an
+unbound verifier CLI cannot close any platform's activation gate.
 This is release eligibility enforcement, not a replacement for current native
 capability, credential or resource admission.
 
@@ -140,5 +145,6 @@ manifest linter alone. Require a useful signed installed positive control, then:
 Run existing `cargo test --locked -p chio-release-evidence` regressions and,
 after adding the proposed test, the owner-approved native-profile suite and
 platform installed activation suites. Record their actual commands, source
-and bytes. Packet 2a delivers the executable gate before O7/M10 rely on it;
+and bytes. Packet 2a delivers the shared verifier and the relevant platform's
+executable gate before that platform's O7/M10 promotion relies on it;
 final installed case results still come from O7/M9 and are consumed at promotion.
