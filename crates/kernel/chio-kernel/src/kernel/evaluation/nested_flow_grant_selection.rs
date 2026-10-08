@@ -248,9 +248,8 @@ impl ChioKernel {
                             runtime_admission_metadata,
                         );
                     if !runtime_release_confirmed {
-                        budget_error = Some(KernelError::DurableAdmission(
-                            "runtime admission reservation retained on pending approval"
-                                .to_string(),
+                        budget_error = Some(KernelError::admission_pending(
+                            "runtime admission reservation retained on pending approval",
                         ));
                         budget_error_metadata = runtime_admission_metadata;
                         break;
@@ -278,10 +277,7 @@ impl ChioKernel {
                         if required_delivery_grant_index == Some(matching.index)
                             && matching_grants.len() > 1
                         {
-                            KernelError::DurableAdmission(
-                                "a delivery-marked grant cannot be bypassed by sibling grant selection"
-                                    .to_string(),
-                            )
+                            KernelError::admission_refused("a delivery-marked grant cannot be bypassed by sibling grant selection")
                         } else {
                             error
                         },
@@ -363,8 +359,8 @@ impl ChioKernel {
                 }
             }
             let error = budget_error.or(governed_error).unwrap_or_else(|| {
-                KernelError::DurableAdmission(
-                    "retained budget hold does not identify a matching grant".to_string(),
+                KernelError::admission_record(
+                    "retained budget hold does not identify a matching grant",
                 )
             });
             let msg = error.to_string();

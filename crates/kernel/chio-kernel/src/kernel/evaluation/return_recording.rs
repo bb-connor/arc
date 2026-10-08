@@ -31,7 +31,7 @@ impl ChioKernel {
             return Ok(ControlFlow::Continue(None));
         };
         let context = input.context.ok_or_else(|| {
-            KernelError::DurableAdmission("tool return lost its frozen dispatch context".into())
+            KernelError::admission_invariant("tool return lost its frozen dispatch context")
         })?;
         let recorded_at = self
             .read_authority_time()?

@@ -131,7 +131,7 @@ impl ChioKernel {
             DispatchMode::CallerStart | DispatchMode::CallerReport(_)
         ) {
             let nonce = request.execution_nonce.as_ref().ok_or_else(|| {
-                KernelError::DurableAdmission("caller resume requires its original nonce".into())
+                KernelError::admission_refused("caller resume requires its original nonce")
             })?;
             self.caller_reserved_tenant_id(nonce, now_unix_ms)
         } else {
@@ -155,7 +155,7 @@ impl ChioKernel {
             .filter(|admission| admission.operation().dispatch_commit().is_some())
             .and_then(DurableToolAdmission::issued_nonce)
             .ok_or_else(|| {
-                KernelError::DurableAdmission("caller start lost its committed nonce".into())
+                KernelError::admission_record("caller start lost its committed nonce")
             })?;
         self.build_execution_nonce_preflight_allow_response_with_metadata(
             request,
@@ -177,7 +177,7 @@ impl ChioKernel {
     ) -> Result<(), KernelError> {
         executor
             .validate()
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+            .map_err(|error| KernelError::admission(DurableAdmissionError::dependency(error)))?;
         self.caller_executor = Some(executor);
         Ok(())
     }
@@ -260,7 +260,7 @@ impl ChioKernel {
         let authorization = self
             .committed_caller_authorization(nonce, arguments)?
             .ok_or_else(|| {
-                KernelError::DurableAdmission("caller start did not retain a commitment".into())
+                KernelError::admission_record("caller start did not retain a commitment")
             })?;
         Ok(CallerStartResponse::Authorized(Box::new(authorization)))
     }
@@ -447,25 +447,19 @@ impl ChioKernel {
         report: CallerExecutionReport,
     ) -> Result<ToolCallResponse, KernelError> {
         if self.caller_executor.is_some() {
-            return Err(KernelError::DurableAdmission(
-                "configured caller executor requires authenticated start and delivery; unsigned reports are not accepted".into(),
-            ));
+            return Err(KernelError::admission_refused("configured caller executor requires authenticated start and delivery; unsigned reports are not accepted"));
         }
         let mut request = self.caller_reserved_request(nonce, self.read_authority_time()?.get())?;
         let presented = ToolCallAction::from_parameters(arguments.clone()).map_err(|error| {
-            KernelError::DurableAdmission(format!(
-                "caller report arguments cannot be hashed: {error}"
-            ))
+            KernelError::admission_in("caller report arguments cannot be hashed", error)
         })?;
         let retained =
             ToolCallAction::from_parameters(request.arguments.clone()).map_err(|error| {
-                KernelError::DurableAdmission(format!(
-                    "retained request arguments cannot be hashed: {error}"
-                ))
+                KernelError::admission_in("retained request arguments cannot be hashed", error)
             })?;
         if presented.parameter_hash != retained.parameter_hash {
-            return Err(KernelError::DurableAdmission(
-                "caller report arguments do not match the reserved call".to_owned(),
+            return Err(KernelError::admission_refused(
+                "caller report arguments do not match the reserved call",
             ));
         }
         request.execution_nonce = Some(nonce.clone());

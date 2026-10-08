@@ -130,9 +130,11 @@ fn a_report_for_other_arguments_is_refused_and_keeps_the_reservation() -> TestRe
         report(),
     );
     assert!(
-        refused
-            .as_ref()
-            .is_err_and(|error| error.to_string().contains("do not match the reserved call")),
+        matches!(
+            refused.as_ref().map_err(chio_kernel::KernelError::durable_admission),
+            Err(Some(chio_kernel::DurableAdmissionError::Refused(reason)))
+                if reason == "caller report arguments do not match the reserved call"
+        ),
         "{refused:?}"
     );
     assert_state(&fixture, &execution, "ready_to_dispatch")?;

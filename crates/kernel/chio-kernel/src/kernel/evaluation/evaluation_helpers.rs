@@ -235,9 +235,8 @@ impl ChioKernel {
             finalization.recovery,
         );
         if finalization.recovery.is_some() {
-            return Err(KernelError::DurableAdmission(
-                "finding recovery requires an atomic durable admission terminal projection"
-                    .to_owned(),
+            return Err(KernelError::admission_unsupported(
+                "finding recovery requires an atomic durable admission terminal projection",
             ));
         }
         self.with_pre_invocation_guard_evidence(finalization.guard_evidence, || {
