@@ -4524,4 +4524,5 @@ fn schema_shape_is_verified_on_every_open() {
     }
     crate::test_authority::open_serving(&database, &lock_root).expect("reopen with intact schema");
 }
-include!("finding_challenge_store_tests/effect_root_recovery.rs");
+#[path = "finding_challenge_store_tests/effect_root_recovery.rs"]
+mod effect_root_recovery;

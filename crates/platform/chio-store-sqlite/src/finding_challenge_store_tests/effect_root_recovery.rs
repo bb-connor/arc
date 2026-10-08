@@ -1,3 +1,7 @@
+//! Legacy anchor root-binding recovery and its trigger migrations.
+
+use super::*;
+
 #[test]
 fn legacy_anchor_binding_reconciliation_is_exact_and_idempotent() {
     let fixture = fixture();
@@ -35,11 +39,7 @@ fn legacy_anchor_binding_reconciliation_is_exact_and_idempotent() {
     );
     fixture
         .store
-        .advance_effect_intent(
-            &intent_key,
-            FindingEffectIntentState::Dispatched,
-            NOW + 2,
-        )
+        .advance_effect_intent(&intent_key, FindingEffectIntentState::Dispatched, NOW + 2)
         .expect("dispatch reconstructed anchor");
     fixture
         .store
@@ -132,11 +132,7 @@ fn assert_legacy_anchor_recovery_trigger_migrates(previous_version: i32) {
         .expect("adopt previous database"),
         0
     );
-    crate::stamp_schema_version(
-        &connection,
-        FINDING_CHALLENGE_SCHEMA_KEY,
-        previous_version,
-    )
+    crate::stamp_schema_version(&connection, FINDING_CHALLENGE_SCHEMA_KEY, previous_version)
         .expect("stamp previous schema");
 
     initialize_finding_challenge_schema(&mut connection).expect("migrate legacy schema");
