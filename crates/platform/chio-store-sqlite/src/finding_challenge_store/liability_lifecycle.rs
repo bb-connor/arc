@@ -1,3 +1,7 @@
+//! Liability opening, upholding, appeal windows, finalizing and settlement.
+
+use super::*;
+
 // Liability open, uphold, appeal, finalizing, settlement, and reads.
 
 impl SqliteFindingChallengeStore {
@@ -133,7 +137,7 @@ impl SqliteFindingChallengeStore {
         )
     }
 
-    fn uphold_liability_inner(
+    pub(super) fn uphold_liability_inner(
         &self,
         liability_key: &str,
         challenge_id: &str,
