@@ -1,0 +1,33 @@
+{
+  "schema": "chio.foundation-ci-closeout-wave.v1",
+  "source_baseline": "71b0e88c2423566a0bfaae7f467be40400a698a8",
+  "local_history_checkpoint": "369b00c48aae7d1e55a2f9a28f527692188c9740",
+  "pr": 1160,
+  "requirements_before": 1794,
+  "requirements_after": 1799,
+  "new_requirement_ids": [
+    "incoming-pr1160-review-20261008:ci-closeout:XTC001",
+    "incoming-pr1160-review-20261008:ci-closeout:ADI001",
+    "incoming-pr1160-review-20261008:ci-closeout:APF001",
+    "incoming-pr1160-review-20261008:ci-closeout:CLOCK001",
+    "incoming-pr1160-review-20261008:ci-closeout:NCD001"
+  ],
+  "status": "repairs-and-independent-review-in-progress",
+  "preservation": "All existing requirement objects and source records remain unchanged. Existing failure, cancellation and unqualified states remain separate.",
+  "trusted_definition_merge": "5bb4ae6a52f3f6858d0c0cdc6b7e098277b537d8",
+  "hosted_failures": [
+    {
+      "job": 113365001571,
+      "kind": "stale-authorized-source-controller-refusal"
+    },
+    {
+      "job": 113379679515,
+      "kind": "stale-exact-test-inventory"
+    },
+    {
+      "job": 113379679581,
+      "kind": "stale-authorized-source-tooling-cohort"
+    }
+  ],
+  "remaining_boundary": "Four exact required checks, local qualification and current thread dispositions before foundation landing; native/trusted platform and release acceptance remain independently open."
+}
