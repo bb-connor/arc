@@ -1208,31 +1208,3 @@ pub trait AdmissionOperationStore: Send + Sync {
         ))
     }
 }
-
-#[derive(Default)]
-pub struct InMemoryAdmissionOperationStore {
-    state: Mutex<InMemoryAdmissionOperationState>,
-}
-
-#[derive(Default)]
-struct InMemoryAdmissionOperationState {
-    operations: HashMap<String, AdmissionOperation>,
-    cleanup_actions: HashMap<String, AdmissionCleanupAction>,
-}
-
-impl InMemoryAdmissionOperationStore {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    fn lock(
-        &self,
-    ) -> Result<std::sync::MutexGuard<'_, InMemoryAdmissionOperationState>, AdmissionOperationError>
-    {
-        self.state.lock().map_err(|_| {
-            AdmissionOperationError::Unavailable(
-                "in-memory admission operation lock poisoned".to_string(),
-            )
-        })
-    }
-}

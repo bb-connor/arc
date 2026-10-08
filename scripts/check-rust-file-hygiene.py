@@ -511,8 +511,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/kernel/chio-kernel/src/security_admission_operation.rs": allow(
         "2027-01-31",
         "kernel security admission operation assembled from include! fragments; capped until the fragments become modules",
-        max_lines=2_194,
-        max_fragments=2,
+        max_fragments=1,
     ),
     "crates/platform/chio-store-sqlite/tests/security_state_contract.rs": allow(
         "2026-12-31",
