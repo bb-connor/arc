@@ -106,8 +106,7 @@ use chio_security_kernel::{
     CapabilitySetSuspensionGuard, Clock, ContainmentGuard, EgressRestrictionGuard,
     FlowPostInvocationHook, FlowPostInvocationPort, FlowPreDispatchHook, FlowPreDispatchPort,
     FlowPreInvocationGuard, FlowPreInvocationPort, IssuanceFreezeAdmission, MissingContextPolicy,
-    RawOutputTripwireHook, SessionThrottleGuard, SystemClock, TripwireEventPublisher,
-    TripwireGuard,
+    RawOutputTripwireHook, SessionThrottleGuard, TripwireEventPublisher, TripwireGuard,
 };
 use chio_security_types::ports::TripwireDetectorPort;
 use chio_store_sqlite::security_state::ActiveDefenseOverlayInventory;
@@ -161,6 +160,7 @@ impl ActiveDefenseRuntime {
         flow_pre_dispatch: Arc<dyn FlowPreDispatchPort>,
         flow_post_invocation: Arc<dyn FlowPostInvocationPort>,
         security_context_authority: Arc<dyn SecurityInvocationContextAuthority>,
+        clock: Arc<dyn Clock>,
     ) -> Self {
         Self {
             state,
@@ -171,15 +171,8 @@ impl ActiveDefenseRuntime {
             flow_pre_dispatch,
             flow_post_invocation,
             security_context_authority,
-            clock: Arc::new(SystemClock),
+            clock,
         }
-    }
-
-    /// Replace the system clock with an authenticated runtime clock.
-    #[must_use]
-    pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
-        self.clock = clock;
-        self
     }
 
     /// Check every external authority and all persistent restrictive stores.
@@ -370,7 +363,7 @@ mod tests {
         let publisher = Arc::new(
             TripwireEventPublisher::new(
                 Arc::new(AcceptingIngress),
-                Arc::new(SystemClock),
+                chio_test_support::clock::clock(),
                 Arc::new(Ed25519Backend::new(Keypair::from_seed(&[37; 32]))),
                 ProducerId::new("control-plane-active-defense").expect("producer id"),
                 RecordId::new("control-plane-active-defense-key-v1").expect("key id"),
@@ -388,6 +381,7 @@ mod tests {
             flow.clone(),
             flow,
             Arc::new(UncalledSecurityContextAuthority),
+            chio_test_support::clock::clock(),
         )
     }
 

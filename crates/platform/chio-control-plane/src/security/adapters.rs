@@ -21,7 +21,7 @@ use chio_manifest::{AdmittedToolSecurity, BridgeSecurityMetadata, VerifiedManife
 use chio_security_kernel::{
     Clock, FlowDispatchOutcomeRecorder, FlowPostInvocationInput, FlowPostInvocationResolver,
     FlowPreDispatchInput, FlowPreDispatchPort, FlowPreInvocationInput, FlowPreInvocationPort,
-    FlowPreInvocationResolver, SystemClock,
+    FlowPreInvocationResolver,
 };
 use chio_security_types::flow::DeclassificationPurpose;
 use chio_security_types::ports::{

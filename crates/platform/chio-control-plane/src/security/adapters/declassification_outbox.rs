@@ -8,8 +8,7 @@ use super::{
     DeclassificationOutcomeEvidenceCommit, DeclassificationOutcomeRequest,
     DeclassificationRetriedEvidenceQuery, DeclassificationTransitionBinding,
     DeclassificationUseState, Digest32, ExactSecurityReceiptSink, FlowDenial, GrantId, PortError,
-    PortErrorKind, PortResult, ReceiptAppendRequest, SystemClock, TenantId,
-    MAX_DECLASSIFICATION_EVIDENCE_BATCH,
+    PortErrorKind, PortResult, ReceiptAppendRequest, TenantId, MAX_DECLASSIFICATION_EVIDENCE_BATCH,
 };
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -64,13 +63,6 @@ pub struct DeclassificationReceiptOutboxDrainer {
 }
 
 impl DeclassificationReceiptOutboxDrainer {
-    pub fn new(
-        store: Arc<dyn DeclassificationEvidenceCommitStore>,
-        sink: Arc<dyn ExactSecurityReceiptSink>,
-    ) -> PortResult<Self> {
-        Self::new_with_clock(store, sink, Arc::new(SystemClock))
-    }
-
     pub fn new_with_clock(
         store: Arc<dyn DeclassificationEvidenceCommitStore>,
         sink: Arc<dyn ExactSecurityReceiptSink>,
