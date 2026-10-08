@@ -472,7 +472,9 @@
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/jwt_support.rs",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/session_core.rs",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_core/writer.rs",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials.rs",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials/completed_result.rs",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/session_resume.rs",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/session_store.rs",
     "crates/protocol/chio-mistral-tools-adapter/src/lib.rs",
@@ -2399,8 +2401,7 @@
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs::parse_request_time_transaction_context_from_value::from_value",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs::validate_chio_oauth_authorization_profile_metadata::from_value",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials.rs::acknowledge_call::from_value",
-    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials.rs::finish_at::from_value",
-    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials.rs::verified_completed_response::from_value",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials/completed_result.rs::verified_receipt::from_value",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/session_resume.rs::load_resume_hmac_keyring_at::Deserializer::from_slice",
     "crates/protocol/chio-openai-adapter/src/lib.rs::extract_tool_calls::from_value",
     "crates/protocol/chio-openapi/src/input.rs::decode::Deserializer::from_slice",
@@ -4836,8 +4837,6 @@
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs::parse_request_time_transaction_context_from_value::from_value": "Authorization-details and transaction-context form JSON are bounded and duplicate-checked before typed conversion; sender-constraint JSON/base64 failures retain their local sources.",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs::validate_chio_oauth_authorization_profile_metadata::from_value": "Authorization-details and transaction-context form JSON are bounded and duplicate-checked before typed conversion; sender-constraint JSON/base64 failures retain their local sources.",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials.rs::acknowledge_call::from_value": "Credential exchange bodies, persisted credential records and call arguments pass bounded duplicate-aware parsing before typed projection. Parsing does not establish capability or session authority.",
-    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials.rs::finish_at::from_value": "Credential exchange bodies, persisted credential records and call arguments pass bounded duplicate-aware parsing before typed projection. Parsing does not establish capability or session authority.",
-    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials.rs::verified_completed_response::from_value": "Credential exchange bodies, persisted credential records and call arguments pass bounded duplicate-aware parsing before typed projection. Parsing does not establish capability or session authority.",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/session_resume.rs::load_resume_hmac_keyring_at::Deserializer::from_slice": "The HMAC keyring has a 64 KiB nofollow file bound and uses strict deny_unknown_fields typed DTO deserialization plus end-of-input validation. This rejects duplicate and unknown keys without copying secrets into Value; secret material retains zeroizing ownership.",
     "crates/protocol/chio-openai-adapter/src/lib.rs::extract_tool_calls::from_value": "Native execution parses original argument text through the bounded I-JSON object reader. Existing Values are converted to untrusted tool-call shapes. Capabilities, peer features, nonces and approvals are checked by the kernel before dispatch; ToolCallResult is a transport DTO, not a verification witness.",
     "crates/protocol/chio-openapi/src/input.rs::decode::Deserializer::from_slice": "OpenApiSpec::parse bounds original bytes at 8 MiB before UTF-8 and format detection. Unsigned JSON uses duplicate-aware document decoding with ordinary numeric defaults and examples. YAML rejects duplicate/nonstring keys and multiple documents with depth 64, 100000 nodes and 8 MiB cumulative expanded strings before projection. Bridge and fuzz callers pass original bytes; native decoder sources remain local.",
@@ -4901,7 +4900,8 @@
     "crates/trust/chio-weights/src/card.rs::schema::custom_deserialize": "Model-card import requires 1 MiB bounded native canonical typed byte equality and existing card validation. StringSet custom Deserialize still rejects duplicates, blanks and padding; signature/cosign verification remains outside structural decoding.",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs::deserialize::from_slice": "Lexical census alias for the Shape read inside initialize_request_shape. The fixed Source witness requires the original 8 MiB wire bound, object gate, borrowed RawValue method and ignored-value id presence; no full DOM is built. A classified initialize body can only return an immediate refusal before session resolution. Every nonclassification falls through to the same original body through accounted inbox decode; parsing grants no authority.",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs::deserialize::from_str": "Lexical census alias for the bounded method conversion inside initialize_request_shape: borrow the original RawValue and require its wire length <=62 before decoding a small Cow string. The only successful classification is initialize id presence for immediate refusal; nonmatches/malformed values keep the original accounted decode. No positive request admission or authority is created.",
-    "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs::initialize_request_shape::custom_deserialize": "Lexical enclosing-function alias for nested Present::deserialize. IgnoredAny discards one id value and records presence only, including null; it does not build a Value document or interpret id authority. The containing reject-only helper and immediate-refusal caller are pinned by the finite Source witness."
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs::initialize_request_shape::custom_deserialize": "Lexical enclosing-function alias for nested Present::deserialize. IgnoredAny discards one id value and records presence only, including null; it does not build a Value document or interpret id authority. The containing reject-only helper and immediate-refusal caller are pinned by the finite Source witness.",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials/completed_result.rs::verified_receipt::from_value": "Typed receipt projection from bounded MCP worker values. Verify the pinned kernel signature, exact call identity and parameter binding, and signed output hash before rebuilding delivery. Optional nonce metadata uses the shared duplicate-aware signed reader with a 64 KiB ceiling, then verifies schema/domain, binding, signature and the signed receipt-time window; it grants no fresh execution authority."
   },
   "proofs": [
     {
@@ -6276,9 +6276,7 @@
       "validate_chio_oauth_authorization_profile_metadata::from_value"
     ],
     "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials.rs": [
-      "acknowledge_call::from_value",
-      "finish_at::from_value",
-      "verified_completed_response::from_value"
+      "acknowledge_call::from_value"
     ],
     "crates/protocol/chio-mcp-remote/src/remote_mcp/session_resume.rs": [
       "load_resume_hmac_keyring_at::Deserializer::from_slice"
@@ -6578,6 +6576,9 @@
       "deserialize::from_slice",
       "deserialize::from_str",
       "initialize_request_shape::custom_deserialize"
+    ],
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials/completed_result.rs": [
+      "verified_receipt::from_value"
     ]
   },
   "decoder_file_contracts": {
@@ -10082,26 +10083,6 @@
             "serde_json::from_value"
           ],
           "checked": true
-        },
-        {
-          "reader": "finish_at",
-          "decoders": [
-            "from_value"
-          ],
-          "apis": [
-            "serde_json::from_value"
-          ],
-          "checked": true
-        },
-        {
-          "reader": "verified_completed_response",
-          "decoders": [
-            "from_value"
-          ],
-          "apis": [
-            "serde_json::from_value"
-          ],
-          "checked": true
         }
       ]
     },
@@ -11491,6 +11472,22 @@
           "apis": [
             "UntrustedJsonText::from_wire#1::bounds_only",
             "bounded-reject-only::object+borrowed-method62+immediate-refusal+same-wire-admission"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials/completed_result.rs": {
+      "kind": "reviewed-protocol-reader",
+      "contract": "Typed receipt projection from bounded MCP worker values. Verify the pinned kernel signature, exact call identity and parameter binding, and signed output hash before rebuilding delivery. Optional nonce metadata uses the shared duplicate-aware signed reader with a 64 KiB ceiling, then verifies schema/domain, binding, signature and the signed receipt-time window; it grants no fresh execution authority.",
+      "readers": [
+        {
+          "reader": "verified_receipt",
+          "decoders": [
+            "from_value"
+          ],
+          "apis": [
+            "serde_json::from_value"
           ],
           "checked": true
         }
@@ -16377,6 +16374,14 @@
     "crates/protocol/chio-mcp-edge/src/ingress/framing.rs": {
       "kind": "bounded-original-reader",
       "contract": "Bounded upstream document frames retain the original line, reserve its structural/aggregate footprint before DOM decoding, and decode_document the whitespace-trimmed bytes of that same line. The non-cloned reservation follows the returned message. This unsigned peer-data decoder does not construct invocation proof or capability authority."
+    },
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_core/writer.rs": {
+      "contract": "Private session writer extracted from session_core.rs without changing its reader. write checks fragments against the unchanged 8 MiB aggregate ceiling before extension; flush_complete_lines calls the shared duplicate-aware signed decode helper at that same ceiling. Projection retains request-generation classification and creates no session or execution authority.",
+      "scope": "Finite source review of BroadcastJsonRpcWriter::write and flush_complete_lines; inherited decode_json alias remains outside the separate lexical call census."
+    },
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials/completed_result.rs": {
+      "contract": "Typed receipt projection from bounded MCP worker values. Verify the pinned kernel signature, exact call identity and parameter binding, and signed output hash before rebuilding delivery. Optional nonce metadata uses the shared duplicate-aware signed reader with a 64 KiB ceiling, then verifies schema/domain, binding, signature and the signed receipt-time window; it grants no fresh execution authority.",
+      "scope": "Finite source review of verified_receipt and verified_nonce. The inherited decode_json alias delegates to input::decode/from_wire/decode_signed; lexical evidence covers typed receipt projection, not full alias closure."
     }
   },
   "decoding_contracts": [
@@ -17915,7 +17920,7 @@
       "decode_issuance_freeze_spec::original-json-reader::UntrustedJsonText",
       "execute::shared-reader::crates/platform/chio-control-plane/src/security/adapters/effect_port/issuance.rs::decode_issuance_freeze_spec",
       "maintain_external_fence::shared-reader::crates/platform/chio-control-plane/src/security/adapters/effect_port/issuance.rs::decode_issuance_freeze_spec",
-      "validate_plan_binding::shared-reader::crates/core/chio-response-model/src/state.rs::decode_response_record",
+      "validate_plan_binding::shared-reader::crates/platform/chio-control-plane/src/security/adapters/effect_port/dispatch.rs::validate_durable_plan_binding",
       "verify_active_query::shared-reader::crates/core/chio-response-model/src/state.rs::decode_response_record"
     ],
     "crates/platform/chio-control-plane/src/security/adapters/effect_port/suspension.rs": [
@@ -22102,6 +22107,11 @@
     ],
     "crates/trust/chio-weights/src/card.rs": [
       "from_canonical_json::original-json-reader::UntrustedJsonText"
+    ],
+    "crates/platform/chio-control-plane/src/security/adapters/effect_port/dispatch.rs": [
+      "execute::shared-reader::crates/platform/chio-control-plane/src/security/adapters/effect_port/dispatch.rs::validate_durable_plan_binding",
+      "load_result::shared-reader::crates/platform/chio-control-plane/src/security/adapters/effect_port/dispatch.rs::validate_durable_plan_binding",
+      "validate_durable_plan_binding::shared-reader::crates/core/chio-response-model/src/state.rs::decode_response_record"
     ]
   },
   "retired_direct_readers": {
