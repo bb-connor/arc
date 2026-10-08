@@ -219,13 +219,14 @@ Protected-interactive production activation follows a recorded qualified sealed-
 
 | Condition | Required result | Platform oracle |
 | --- | --- | --- |
-| Owner/IPC/backend missing, bad signature, wrong peer | Refuse affected action and show reason; no unconfined fallback | No child launch, secret release or external effect |
+| Owner/IPC/backend missing, bad signature or wrong peer before admission | Refuse affected action and show reason; no unconfined fallback | No new child launch, secret release or protected dispatch from the refused request; prior operations remain separately reconciled |
 | Dropped subscription hints or controller restart | Refresh owner's bounded views using stable cursor semantics | Native work identities unchanged; gaps visible; no duplicate work |
 | Lost approval/create/export reply | Resolve original operation under owner retry rules | Independent effect count remains correct |
 | Lock/logout/user switch | Clear sensitive display, reject stale authority/session and reconcile | Second user and lock-screen captures disclose no task data |
 | Worker escape/direct egress/descendant bypass | Deny and mark backend qualification failed | Outside sentinel unchanged, external sink receives no payload |
 | Stop accepted but child/remote effect survives | Separate fence from incomplete closure/unknown outcome | Process and network observer agree with reported uncertainty |
-| Disk full, queue saturation, clock/freshness unavailable | Bounded diagnostic gaps; affected authorization refuses | No effect after failed required persistence |
+| Disk full, queue saturation or clock/freshness unavailable before required pre-dispatch admission/persistence | Refuse affected new admission; preserve existing custody and bounded diagnostic gaps | No dispatch or effect from the rejected attempt; already-dispatched operations remain separately reconciled |
+| Output handling, receipt signing or persistence fails after dispatch | Preserve original-operation identity, evidence and native uncertainty; reconcile before retry | Independent effect marker may show a committed effect; original-ID lookup prevents duplicate dispatch/effects and no terminal receipt or effect-free result is fabricated |
 | Update crash/mixed versions/backup restore | Reconcile native owner; keep affected admission closed | No replayed spent grant or duplicated effect |
 | Wrong artifact/base/destination or malicious archive | Refuse apply/export; keep original custody | Independent destination inventory unchanged |
 | ES/NE entitlement denied or provider exits | Managed profile unavailable with explicit remaining state | Effective OS/provider inventory, flow and file probes |
