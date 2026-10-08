@@ -4,7 +4,9 @@ use std::collections::BTreeSet;
 
 use super::*;
 
-pub(super) fn pins(values: &[String]) -> Result<BTreeMap<String, PublicKey>, CliError> {
+pub(super) fn pins(
+    values: &[String],
+) -> Result<BTreeMap<String, chio_core::TrustedPublicKey>, CliError> {
     let mut pins = BTreeMap::new();
     for value in values {
         let (server, key) = value
@@ -12,8 +14,11 @@ pub(super) fn pins(values: &[String]) -> Result<BTreeMap<String, PublicKey>, Cli
             .ok_or_else(|| error("native policy pin must be SERVER=PUBLIC_KEY"))?;
         super::super::state::identifier(server)?;
         require(
-            pins.insert(server.to_string(), PublicKey::from_hex(key).map_err(error)?)
-                .is_none(),
+            pins.insert(
+                server.to_string(),
+                chio_core::TrustedPublicKey::from_hex(key).map_err(error)?,
+            )
+            .is_none(),
             "duplicate native policy signer pin",
         )?;
     }
@@ -22,7 +27,7 @@ pub(super) fn pins(values: &[String]) -> Result<BTreeMap<String, PublicKey>, Cli
 
 pub(super) fn verify(
     evidence: &Evidence,
-    pins: &BTreeMap<String, PublicKey>,
+    pins: &BTreeMap<String, chio_core::TrustedPublicKey>,
 ) -> Result<(), CliError> {
     let mut used = BTreeSet::new();
     for call in evidence.results.values() {
@@ -109,7 +114,7 @@ pub(super) fn verify(
 #[cfg(target_os = "linux")]
 pub(super) struct ExportedLaunches {
     pub(super) confinement: BTreeMap<String, crate::mcp_cli::NativeLaunchEvidence>,
-    pub(super) pins: BTreeMap<String, PublicKey>,
+    pub(super) pins: BTreeMap<String, chio_core::TrustedPublicKey>,
 }
 
 #[cfg(target_os = "linux")]
@@ -143,7 +148,7 @@ pub(super) fn export(
             .iter()
             .find(|server| server.id == server_id)
             .ok_or_else(|| error("native receipt server is absent from operator configuration"))?;
-        let key = PublicKey::from_hex(
+        let key = chio_core::TrustedPublicKey::from_hex(
             server
                 .launch_policy_signer
                 .as_deref()

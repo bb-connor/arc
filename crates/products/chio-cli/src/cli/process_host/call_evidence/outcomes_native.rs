@@ -3,7 +3,9 @@
 
 use super::*;
 
-pub(super) fn pins(values: &[String]) -> Result<BTreeMap<String, PublicKey>, CliError> {
+pub(super) fn pins(
+    values: &[String],
+) -> Result<BTreeMap<String, chio_core::TrustedPublicKey>, CliError> {
     let mut pins = BTreeMap::new();
     for value in values {
         let (server, key) = value
@@ -11,8 +13,11 @@ pub(super) fn pins(values: &[String]) -> Result<BTreeMap<String, PublicKey>, Cli
             .ok_or_else(|| error("native policy pin must be SERVER=PUBLIC_KEY"))?;
         super::super::super::state::identifier(server)?;
         require(
-            pins.insert(server.to_owned(), PublicKey::from_hex(key).map_err(error)?)
-                .is_none(),
+            pins.insert(
+                server.to_owned(),
+                chio_core::TrustedPublicKey::from_hex(key).map_err(error)?,
+            )
+            .is_none(),
             "duplicate native policy signer pin",
         )?;
     }
@@ -29,7 +34,7 @@ fn response(call: &ChioReceipt) -> Result<ChioReceipt, CliError> {
 
 pub(super) fn verify(
     run: &Outcomes,
-    pins: &BTreeMap<String, PublicKey>,
+    pins: &BTreeMap<String, chio_core::TrustedPublicKey>,
 ) -> Result<BTreeMap<String, Value>, CliError> {
     let mut used = BTreeSet::new();
     let mut servers = BTreeSet::new();
@@ -140,7 +145,7 @@ pub(super) fn verify(
 #[cfg(target_os = "linux")]
 pub(super) struct Exported {
     pub confinement: BTreeMap<String, crate::mcp_cli::NativeLaunchObservation>,
-    pub pins: BTreeMap<String, PublicKey>,
+    pub pins: BTreeMap<String, chio_core::TrustedPublicKey>,
 }
 
 #[cfg(target_os = "linux")]
@@ -170,7 +175,7 @@ pub(super) fn export(
             .iter()
             .find(|server| server.id == server_id)
             .ok_or_else(|| error("native server absent from operator configuration"))?;
-        let key = PublicKey::from_hex(
+        let key = chio_core::TrustedPublicKey::from_hex(
             server
                 .launch_policy_signer
                 .as_deref()
@@ -198,6 +203,21 @@ mod tests {
     use super::*;
 
     #[test]
+    fn native_policy_signer_pins_reject_weak_keys() {
+        let weak = format!("01{}", "00".repeat(31));
+        let Err(error) = pins(&[format!("server-a={weak}")]) else {
+            panic!("a weak native policy signer pin must be refused");
+        };
+        assert!(error
+            .to_string()
+            .contains("weak (small-order) Ed25519 public key"));
+        let strong = chio_core::crypto::Keypair::from_seed(&[95; 32])
+            .public_key()
+            .to_hex();
+        assert!(pins(&[format!("server-a={strong}")]).is_ok_and(|pins| pins.len() == 1));
+    }
+
+    #[test]
     fn historical_signed_outcomes_do_not_qualify_current_enforcement(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let key = PublicKey::from_hex(
@@ -213,14 +233,14 @@ mod tests {
         let selected: Value = crate::input::text(include_str!(
             "../../../../tests/fixtures/process-worker-outcomes/v2-budget-pins.json"
         ))?;
-        let pins: BTreeMap<String, PublicKey> = selected["launch_policy_signers"]
+        let pins: BTreeMap<String, chio_core::TrustedPublicKey> = selected["launch_policy_signers"]
             .as_object()
             .ok_or("pins")?
             .iter()
             .map(|(server, value)| {
                 Ok((
                     server.clone(),
-                    PublicKey::from_hex(value.as_str().ok_or("key")?)?,
+                    chio_core::TrustedPublicKey::from_hex(value.as_str().ok_or("key")?)?,
                 ))
             })
             .collect::<Result<_, Box<dyn std::error::Error>>>()?;
@@ -255,14 +275,14 @@ mod tests {
         let selected: Value = crate::input::text(include_str!(
             "../../../../tests/fixtures/process-worker-outcomes/current-native-budget-pins.json"
         ))?;
-        let pins: BTreeMap<String, PublicKey> = selected["launch_policy_signers"]
+        let pins: BTreeMap<String, chio_core::TrustedPublicKey> = selected["launch_policy_signers"]
             .as_object()
             .ok_or("pins")?
             .iter()
             .map(|(server, value)| {
                 Ok((
                     server.clone(),
-                    PublicKey::from_hex(value.as_str().ok_or("key")?)?,
+                    chio_core::TrustedPublicKey::from_hex(value.as_str().ok_or("key")?)?,
                 ))
             })
             .collect::<Result<_, Box<dyn std::error::Error>>>()?;
@@ -277,10 +297,13 @@ mod tests {
         assert_eq!(report["dave"]["terminal_verified"], false);
         assert!(verify(&run, &BTreeMap::new()).is_err());
         let mut extra_pin = pins.clone();
-        extra_pin.insert("unused-server".into(), key.clone());
+        extra_pin.insert(
+            "unused-server".into(),
+            chio_core::TrustedPublicKey::new(key.clone())?,
+        );
         assert!(verify(&run, &extra_pin).is_err());
         let mut wrong_pin = pins.clone();
-        wrong_pin.insert("alice-probe".into(), key);
+        wrong_pin.insert("alice-probe".into(), chio_core::TrustedPublicKey::new(key)?);
         assert!(verify(&run, &wrong_pin).is_err());
 
         // Test the native composition boundary after the original signatures

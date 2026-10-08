@@ -43,7 +43,7 @@ pub(crate) struct NativeObservedWindow {
 pub(crate) fn verify_native_launch_observation(
     evidence: &NativeLaunchObservation,
     server_id: &str,
-    trusted_policy_signer: &chio_core::PublicKey,
+    trusted_policy_signer: &chio_core::TrustedPublicKey,
 ) -> Result<NativeObservedWindow, CliError> {
     if let Some(terminal) = &evidence.terminal {
         let window = verify_native_launch_evidence(
@@ -107,7 +107,7 @@ fn verify_policy_bound_enforcement(
     signed_policy: &str,
     receipt: &ChioReceipt,
     server_id: &str,
-    trusted_policy_signer: &chio_core::PublicKey,
+    trusted_policy_signer: &chio_core::TrustedPublicKey,
     brokered: bool,
 ) -> Result<(McpCageLaunchPolicy, CageReceiptBody), CliError> {
     require(
@@ -204,7 +204,7 @@ fn verify_policy_bound_enforcement(
 pub(crate) fn verify_native_launch_evidence(
     evidence: &NativeLaunchEvidence,
     server_id: &str,
-    trusted_policy_signer: &chio_core::PublicKey,
+    trusted_policy_signer: &chio_core::TrustedPublicKey,
 ) -> Result<NativeLaunchWindow, CliError> {
     verify_launch(evidence, server_id, trusted_policy_signer, false)
 }
@@ -212,7 +212,7 @@ pub(crate) fn verify_native_launch_evidence(
 pub(crate) fn verify_broker_native_launch_evidence(
     evidence: &NativeLaunchEvidence,
     server_id: &str,
-    trusted_policy_signer: &chio_core::PublicKey,
+    trusted_policy_signer: &chio_core::TrustedPublicKey,
 ) -> Result<NativeLaunchWindow, CliError> {
     verify_launch(evidence, server_id, trusted_policy_signer, true)
 }
@@ -220,7 +220,7 @@ pub(crate) fn verify_broker_native_launch_evidence(
 fn verify_launch(
     evidence: &NativeLaunchEvidence,
     server_id: &str,
-    trusted_policy_signer: &chio_core::PublicKey,
+    trusted_policy_signer: &chio_core::TrustedPublicKey,
     brokered: bool,
 ) -> Result<NativeLaunchWindow, CliError> {
     let (policy, enforcement) = verify_policy_bound_enforcement(
@@ -280,7 +280,7 @@ fn verify_launch(
 pub(crate) fn export_native_launch_evidence(
     policy_path: &Path,
     server_id: &str,
-    trusted_policy_signer: &chio_core::PublicKey,
+    trusted_policy_signer: &chio_core::TrustedPublicKey,
     receipt_ids: &BTreeSet<String>,
 ) -> Result<BTreeMap<String, NativeLaunchEvidence>, CliError> {
     export_native_launch_observations(policy_path, server_id, trusted_policy_signer, receipt_ids)?
@@ -305,7 +305,7 @@ pub(crate) fn export_native_launch_evidence(
 pub(crate) fn export_native_launch_observations(
     policy_path: &Path,
     server_id: &str,
-    trusted_policy_signer: &chio_core::PublicKey,
+    trusted_policy_signer: &chio_core::TrustedPublicKey,
     receipt_ids: &BTreeSet<String>,
 ) -> Result<BTreeMap<String, NativeLaunchObservation>, CliError> {
     export_observations(
@@ -321,7 +321,7 @@ pub(crate) fn export_native_launch_observations(
 pub(crate) fn export_broker_native_launch_evidence(
     policy_path: &Path,
     server_id: &str,
-    trusted_policy_signer: &chio_core::PublicKey,
+    trusted_policy_signer: &chio_core::TrustedPublicKey,
     receipt_ids: &BTreeSet<String>,
 ) -> Result<BTreeMap<String, NativeLaunchEvidence>, CliError> {
     export_observations(
@@ -352,7 +352,7 @@ pub(crate) fn export_broker_native_launch_evidence(
 fn export_observations(
     policy_path: &Path,
     server_id: &str,
-    trusted_policy_signer: &chio_core::PublicKey,
+    trusted_policy_signer: &chio_core::TrustedPublicKey,
     receipt_ids: &BTreeSet<String>,
     brokered: bool,
 ) -> Result<BTreeMap<String, NativeLaunchObservation>, CliError> {

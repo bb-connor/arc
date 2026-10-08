@@ -1029,9 +1029,11 @@ fn validate_existing_provision(inputs: &ProvisionInputs) -> Result<ProvisionRepo
         .skip(1)
         .map(String::as_str)
         .collect::<Vec<_>>();
+    let policy_signer = chio_core::TrustedPublicKey::new_ed25519(signers.policy.public_key())
+        .map_err(|error| CliError::cli_other_error(format!("invalid policy signer: {error}")))?;
     super::cage_policy::validate_provisioned_policy(
         &inputs.output_directory.join(CAGE_POLICY_FILE),
-        &signers.policy.public_key(),
+        &policy_signer,
         path_utf8(&inputs.target_path, "target executable")?,
         &target_args,
         &inputs.server_id,

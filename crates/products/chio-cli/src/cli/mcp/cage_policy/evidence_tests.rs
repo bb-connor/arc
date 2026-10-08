@@ -1,5 +1,5 @@
 //! Synthetic signed fixtures check composition, not actual kernel enforcement.
-use super::super::tests::{policy, signed_policy};
+use super::super::tests::{policy, signed_policy, trusted_signer};
 use super::*;
 use chio_cage::*;
 use chio_core::{Ed25519Backend, Keypair, canonical_json_bytes};
@@ -117,7 +117,7 @@ fn fixture() -> Result<(NativeLaunchEvidence, McpCageLaunchPolicy, Keypair)> {
 fn native_run_evidence_requires_external_policy_pin_and_same_observed_launch() -> Result {
     let (evidence, policy, signer) = fixture()?;
     let verify = |evidence: &NativeLaunchEvidence| {
-        verify_native_launch_evidence(evidence, "cage-policy-test", &signer.public_key())
+        verify_native_launch_evidence(evidence, "cage-policy-test", &trusted_signer(&signer))
     };
     let window = verify(&evidence)?;
     assert_eq!(window.started_at_unix_ms, 1300);
@@ -127,12 +127,12 @@ fn native_run_evidence_requires_external_policy_pin_and_same_observed_launch() -
         verify_native_launch_evidence(
             &evidence,
             "cage-policy-test",
-            &Keypair::from_seed(&[92; 32]).public_key()
+            &trusted_signer(&Keypair::from_seed(&[92; 32]))
         )
         .is_err()
     );
     assert!(
-        verify_native_launch_evidence(&evidence, "other-server", &signer.public_key()).is_err()
+        verify_native_launch_evidence(&evidence, "other-server", &trusted_signer(&signer)).is_err()
     );
     for field in ["helper", "target", "identity", "stage"] {
         let mut policy = policy.clone();
@@ -189,7 +189,7 @@ fn native_run_evidence_requires_external_policy_pin_and_same_observed_launch() -
             &evidence.signed_policy,
             &receipt,
             "cage-policy-test",
-            &signer.public_key(),
+            &trusted_signer(&signer),
             false,
         )
         .err()
@@ -228,6 +228,15 @@ fn native_start_verification_binds_original_receipt_without_claiming_exit() -> R
         )
         .is_err()
     );
+    assert!(verify(
+        "cage-policy-test",
+        "0100000000000000000000000000000000000000000000000000000000000000",
+        &evidence.enforcement.id,
+        target,
+    )
+    .is_err_and(|error| error
+        .to_string()
+        .contains("cage policy trust root must be strong Ed25519")));
     assert!(verify("cage-policy-test", &pin, &"a".repeat(64), target).is_err());
     assert!(
         verify(
@@ -298,14 +307,14 @@ fn native_policy_substitutions_by_the_same_operator_fail_all_verifiers() -> Resu
         decode_cage_policy(
             &policy_path,
             changed.signed_policy.as_bytes(),
-            &signer.public_key(),
+            &trusted_signer(&signer),
         )?;
         std::fs::write(&policy_path, &changed.signed_policy)?;
         let error = verify_native_start_file(
             &policy_path,
             &receipt_path,
             "cage-policy-test",
-            &signer.public_key().to_hex(),
+            &trusted_signer(&signer).to_hex(),
             &evidence.enforcement.id,
             &policy.runtime.target_binding_digest,
         )
@@ -318,7 +327,7 @@ fn native_policy_substitutions_by_the_same_operator_fail_all_verifiers() -> Resu
             "{field}: {error}"
         );
         assert!(
-            verify_native_launch_evidence(&changed, "cage-policy-test", &signer.public_key())
+            verify_native_launch_evidence(&changed, "cage-policy-test", &trusted_signer(&signer))
                 .is_err(),
             "{field}"
         );
@@ -328,8 +337,12 @@ fn native_policy_substitutions_by_the_same_operator_fail_all_verifiers() -> Resu
             terminal: None,
         };
         assert!(
-            verify_native_launch_observation(&observed, "cage-policy-test", &signer.public_key())
-                .is_err(),
+            verify_native_launch_observation(
+                &observed,
+                "cage-policy-test",
+                &trusted_signer(&signer)
+            )
+            .is_err(),
             "{field}"
         );
         assert_eq!(std::fs::read(&receipt_path)?, original_receipt);
@@ -340,7 +353,7 @@ fn native_policy_substitutions_by_the_same_operator_fail_all_verifiers() -> Resu
     changed.signed_policy =
         String::from_utf8(canonical_json_bytes(&signed_policy(policy, &replacement))?)?;
     assert!(
-        verify_native_launch_evidence(&changed, "cage-policy-test", &replacement.public_key())
+        verify_native_launch_evidence(&changed, "cage-policy-test", &trusted_signer(&replacement))
             .is_err()
     );
     Ok(())
@@ -361,14 +374,16 @@ fn native_policy_verification_rejects_legacy_and_mismatched_terminal_commitments
     terminal.admitted_policy_digest = None;
     evidence.terminal = sign_cage_receipt(terminal.clone(), &legacy_context, &backend)?;
     assert!(
-        verify_native_launch_evidence(&evidence, "cage-policy-test", &signer.public_key()).is_err()
+        verify_native_launch_evidence(&evidence, "cage-policy-test", &trusted_signer(&signer))
+            .is_err()
     );
     let alternate = legacy_context
         .clone()
         .with_admitted_policy_digest("a".repeat(64))?;
     evidence.terminal = sign_cage_receipt(terminal, &alternate, &backend)?;
     assert!(
-        verify_native_launch_evidence(&evidence, "cage-policy-test", &signer.public_key()).is_err()
+        verify_native_launch_evidence(&evidence, "cage-policy-test", &trusted_signer(&signer))
+            .is_err()
     );
     let mut legacy = verify_signed_cage_receipt(&evidence.enforcement)?;
     legacy.admitted_policy_digest = None;
@@ -377,7 +392,7 @@ fn native_policy_verification_rejects_legacy_and_mismatched_terminal_commitments
         &evidence.signed_policy,
         &evidence.enforcement,
         "cage-policy-test",
-        &signer.public_key(),
+        &trusted_signer(&signer),
         false,
     )
     .err()
@@ -399,7 +414,7 @@ fn native_observation_keeps_missing_exit_distinct_and_rejects_substituted_termin
         terminal: None,
     };
     let verify = |value: &NativeLaunchObservation| {
-        verify_native_launch_observation(value, "cage-policy-test", &signer.public_key())
+        verify_native_launch_observation(value, "cage-policy-test", &trusted_signer(&signer))
     };
     let start = verify(&observed)?;
     assert_eq!(start.started_at_unix_ms, 1300);
@@ -408,7 +423,7 @@ fn native_observation_keeps_missing_exit_distinct_and_rejects_substituted_termin
         verify_native_launch_observation(
             &observed,
             "cage-policy-test",
-            &Keypair::from_seed(&[92; 32]).public_key()
+            &trusted_signer(&Keypair::from_seed(&[92; 32]))
         )
         .is_err()
     );

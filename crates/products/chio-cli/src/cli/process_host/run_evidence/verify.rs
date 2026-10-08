@@ -18,7 +18,7 @@ pub(super) fn verify(
     evidence: &Evidence,
     key: &PublicKey,
     runtime_id: &str,
-    native_pins: &BTreeMap<String, PublicKey>,
+    native_pins: &BTreeMap<String, chio_core::TrustedPublicKey>,
 ) -> Result<(), CliError> {
     verified_receipt(signed, key)?;
     observation(signed, "attest_completed_fanout")?;

@@ -54,7 +54,7 @@ fn verify_outcomes(
     run: &Outcomes,
     key: &PublicKey,
     runtime: &str,
-    pins: &BTreeMap<String, PublicKey>,
+    pins: &BTreeMap<String, chio_core::TrustedPublicKey>,
 ) -> Result<BTreeMap<String, Value>, CliError> {
     receipt(signed, key)?;
     observation(signed, "attest_worker_outcomes")?;

@@ -109,6 +109,10 @@ pub(super) fn policy(
     }
 }
 
+pub(super) fn trusted_signer(signer: &chio_core::Keypair) -> chio_core::TrustedPublicKey {
+    chio_core::TrustedPublicKey::new_ed25519(signer.public_key()).test_expect("trusted signer")
+}
+
 pub(super) fn signed_policy(
     policy: McpCageLaunchPolicy,
     signer: &chio_core::Keypair,
@@ -253,7 +257,12 @@ fn cage_policy_requires_canonical_deny_unknown_json() {
     let signer = chio_core::Keypair::from_seed(&[92; 32]);
     let signed = signed_policy(body, &signer);
     let canonical = chio_core::canonical_json_bytes(&signed).test_unwrap();
-    decode_cage_policy(Path::new("policy.json"), &canonical, &signer.public_key()).test_unwrap();
+    decode_cage_policy(
+        Path::new("policy.json"),
+        &canonical,
+        &trusted_signer(&signer),
+    )
+    .test_unwrap();
 
     let mut noncanonical = canonical.clone();
     noncanonical.push(b'\n');
@@ -261,7 +270,7 @@ fn cage_policy_requires_canonical_deny_unknown_json() {
         decode_cage_policy(
             Path::new("policy.json"),
             &noncanonical,
-            &signer.public_key(),
+            &trusted_signer(&signer),
         )
         .test_unwrap_err()
         .to_string()
@@ -271,12 +280,14 @@ fn cage_policy_requires_canonical_deny_unknown_json() {
     let mut value = serde_json::to_value(signed).test_unwrap();
     value["unknown"] = serde_json::json!(true);
     let unknown = chio_core::canonical_json_bytes(&value).test_unwrap();
-    assert!(decode_cage_policy(Path::new("policy.json"), &unknown, &signer.public_key(),).is_err());
+    assert!(
+        decode_cage_policy(Path::new("policy.json"), &unknown, &trusted_signer(&signer)).is_err()
+    );
     assert!(
         decode_cage_policy(
             Path::new("policy.json"),
             &canonical,
-            &chio_core::Keypair::from_seed(&[93; 32]).public_key(),
+            &trusted_signer(&chio_core::Keypair::from_seed(&[93; 32])),
         )
         .is_err()
     );
@@ -291,7 +302,7 @@ fn cage_policy_requires_canonical_deny_unknown_json() {
     let forged = signed_policy(forged_body, &signer);
     let forged = chio_core::canonical_json_bytes(&forged).test_unwrap();
     assert!(
-        decode_cage_policy(Path::new("policy.json"), &forged, &signer.public_key(),)
+        decode_cage_policy(Path::new("policy.json"), &forged, &trusted_signer(&signer),)
             .test_unwrap_err()
             .to_string()
             .contains("execution identity")
@@ -403,7 +414,44 @@ fn an_identity_point_trust_root_cannot_authenticate_a_forged_policy() {
         chio_core::canonical_json_bytes(&forged).test_expect("canonical forged policy"),
     )
     .test_expect("write forged policy");
-    assert!(SignedCagePolicyLaunchFactory::new(path, IDENTITY_POINT_HEX.to_string()).is_err());
+    let error = SignedCagePolicyLaunchFactory::new(path.clone(), IDENTITY_POINT_HEX.to_string())
+        .test_expect_err("identity point trust root");
+    assert!(error
+        .to_string()
+        .contains("cage policy trust root must be strong Ed25519"));
+    let error = load_native_mcp_launch(&path, IDENTITY_POINT_HEX, "/operator/mcp-server", &[], None)
+        .test_expect_err("identity point trust root for a direct launch");
+    assert!(error
+        .to_string()
+        .contains("cage policy trust root must be strong Ed25519"));
+}
+
+#[test]
+fn cage_policy_trust_root_requires_a_strong_ed25519_key() {
+    let strong = chio_core::Keypair::from_seed(&[94; 32]).public_key();
+    assert_eq!(
+        parse_cage_policy_trust_root(&strong.to_hex())
+            .test_unwrap()
+            .public_key(),
+        &strong
+    );
+    for weak in [
+        IDENTITY_POINT_HEX,
+        "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+        "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a",
+    ] {
+        assert!(parse_cage_policy_trust_root(weak)
+            .test_expect_err("weak trust root")
+            .to_string()
+            .contains("cage policy trust root must be strong Ed25519"));
+    }
+    let mut p256_point = vec![0x04_u8];
+    p256_point.extend([0_u8; 64]);
+    let p256 = format!("p256:{}", hex::encode(p256_point));
+    assert!(parse_cage_policy_trust_root(&p256)
+        .test_expect_err("P-256 trust root")
+        .to_string()
+        .contains("cage policy trust root must be strong Ed25519"));
 }
 
 #[test]
@@ -745,7 +793,7 @@ fn inactive_signed_policies_cannot_prepare_native_launches() {
         let error = load_native_mcp_launch_from_bytes(
             Path::new("/not-opened/policy.json"),
             &bytes,
-            &signer.public_key(),
+            &trusted_signer(&signer),
             "/operator/mcp-server",
             &[],
             None,

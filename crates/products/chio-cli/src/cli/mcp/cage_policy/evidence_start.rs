@@ -21,8 +21,7 @@ pub(crate) fn verify_native_start_file(
     expected_receipt_id: &str,
     expected_target_sha256: &str,
 ) -> Result<(), CliError> {
-    let key = chio_core::PublicKey::from_hex(trusted_policy_signer)
-        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    let key = parse_cage_policy_trust_root(trusted_policy_signer)?;
     let policy_text = bounded_text(policy_path, MAX_CAGE_POLICY_BYTES as u64)?;
     let policy = decode_cage_policy(policy_path, policy_text.as_bytes(), &key)?;
     let receipt_key = chio_core::PublicKey::from_hex(&policy.receipt.trusted_signer_public_key)

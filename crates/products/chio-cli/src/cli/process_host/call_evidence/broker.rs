@@ -147,7 +147,7 @@ pub(super) fn verify(
         .iter()
         .find(|manifest| manifest.server_id == call.tool_server)
         .ok_or_else(|| error("missing selected broker manifest"))?;
-    let signer = PublicKey::from_hex(
+    let signer = chio_core::TrustedPublicKey::from_hex(
         server
             .launch_policy_signer
             .as_deref()
@@ -202,7 +202,7 @@ pub(super) fn export(
         .iter()
         .find(|server| server.id == call.tool_server)
         .ok_or_else(|| error("missing broker route"))?;
-    let signer = PublicKey::from_hex(
+    let signer = chio_core::TrustedPublicKey::from_hex(
         server
             .launch_policy_signer
             .as_deref()

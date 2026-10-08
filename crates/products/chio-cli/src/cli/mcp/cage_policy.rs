@@ -31,7 +31,7 @@ mod receipt_tests;
 pub(crate) struct SignedCagePolicyLaunchFactory {
     path: PathBuf,
     trusted_policy_signer: String,
-    trusted_policy_signer_key: chio_core::PublicKey,
+    trusted_policy_signer_key: chio_core::TrustedPublicKey,
     signed_policy_bytes: Arc<[u8]>,
 }
 
@@ -136,8 +136,9 @@ impl chio_mcp_adapter::transport::NativeMcpLaunchFactory for SignedCagePolicyLau
                 "prepared broker policy must enforce the exact tool server".to_string(),
             ));
         }
-        let contract = cage_launch_contract_digests(&policy, &self.trusted_policy_signer_key)
-            .map_err(|error| AdapterError::ConnectionFailed(error.to_string()))?;
+        let contract =
+            cage_launch_contract_digests(&policy, self.trusted_policy_signer_key.public_key())
+                .map_err(|error| AdapterError::ConnectionFailed(error.to_string()))?;
         compose_cage_required_launch_with_prepared_broker(
             policy,
             &chio_core::sha256_hex(self.signed_policy_bytes.as_ref()),
@@ -745,10 +746,7 @@ pub(crate) fn load_native_mcp_launch(
     admitted_manifest_registry: Option<Arc<chio_manifest::VerifiedManifestRegistry>>,
 ) -> Result<chio_mcp_adapter::transport::CageRequiredLaunch, CliError> {
     let bytes = read_cage_policy(path)?;
-    let trusted_policy_signer =
-        chio_core::PublicKey::from_hex(trusted_policy_signer).map_err(|error| {
-            CliError::cli_other_error(format!("invalid cage policy trust root: {error}"))
-        })?;
+    let trusted_policy_signer = parse_cage_policy_trust_root(trusted_policy_signer)?;
     load_native_mcp_launch_from_bytes(
         path,
         &bytes,
@@ -768,7 +766,7 @@ pub(crate) fn load_native_mcp_launch(
 #[allow(dead_code)]
 pub(super) fn validate_provisioned_policy(
     path: &Path,
-    trusted_policy_signer: &chio_core::PublicKey,
+    trusted_policy_signer: &chio_core::TrustedPublicKey,
     command: &str,
     args: &[&str],
     expected_server_id: &str,
@@ -795,7 +793,8 @@ pub(super) fn validate_provisioned_policy(
                 .to_string(),
         ));
     }
-    let launch_contract = cage_launch_contract_digests(&policy, trusted_policy_signer)?;
+    let launch_contract =
+        cage_launch_contract_digests(&policy, trusted_policy_signer.public_key())?;
     let mut migration = policy.enterprise_migration;
     migration.state_database_path = physical_migration_database_path.to_path_buf();
     let binding = load_cage_migration_enforcer(
@@ -820,7 +819,7 @@ pub(super) fn validate_provisioned_policy(
 fn load_native_mcp_launch_from_bytes(
     path: &Path,
     bytes: &[u8],
-    trusted_policy_signer: &chio_core::PublicKey,
+    trusted_policy_signer: &chio_core::TrustedPublicKey,
     command: &str,
     args: &[&str],
     admitted_manifest_registry: Option<Arc<chio_manifest::VerifiedManifestRegistry>>,
@@ -835,7 +834,8 @@ fn load_native_mcp_launch_from_bytes(
             "native MCP launch requires an enforced migration stage",
         ));
     }
-    let launch_contract = cage_launch_contract_digests(&policy, trusted_policy_signer)?;
+    let launch_contract =
+        cage_launch_contract_digests(&policy, trusted_policy_signer.public_key())?;
     compose_cage_required_launch(
         policy,
         &chio_core::sha256_hex(bytes),
@@ -856,22 +856,21 @@ fn read_cage_policy(path: &Path) -> Result<Vec<u8>, CliError> {
 
 /// Parse an operator-pinned cage policy trust root. Only a strong Ed25519 key
 /// can authenticate a launch policy.
-pub(crate) fn parse_cage_policy_trust_root(hex: &str) -> Result<chio_core::PublicKey, CliError> {
+pub(crate) fn parse_cage_policy_trust_root(
+    hex: &str,
+) -> Result<chio_core::TrustedPublicKey, CliError> {
     let key = chio_core::PublicKey::from_hex(hex).map_err(|error| {
         CliError::cli_other_error(format!("invalid cage policy trust root: {error}"))
     })?;
-    if key.algorithm() != chio_core::SigningAlgorithm::Ed25519 || key.is_weak_ed25519() {
-        return Err(CliError::cli_other_error(
-            "cage policy trust root must be strong Ed25519".to_string(),
-        ));
-    }
-    Ok(key)
+    chio_core::TrustedPublicKey::new_ed25519(key).map_err(|_| {
+        CliError::cli_other_error("cage policy trust root must be strong Ed25519".to_string())
+    })
 }
 
 fn decode_cage_policy(
     path: &Path,
     bytes: &[u8],
-    trusted_policy_signer: &chio_core::PublicKey,
+    trusted_policy_signer: &chio_core::TrustedPublicKey,
 ) -> Result<McpCageLaunchPolicy, CliError> {
     let policy: SignedMcpCageLaunchPolicy = crate::input::json(bytes).map_err(|error| {
         CliError::cli_other_error(format!(
@@ -891,7 +890,7 @@ fn decode_cage_policy(
             path.display()
         )));
     }
-    if &policy.signer_public_key != trusted_policy_signer
+    if &policy.signer_public_key != trusted_policy_signer.public_key()
         || !trusted_policy_signer
             .verify_canonical(&policy.body, &policy.signature)
             .map_err(|error| {
