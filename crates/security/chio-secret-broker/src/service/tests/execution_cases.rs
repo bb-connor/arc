@@ -192,6 +192,32 @@ fn framing_rejects_empty_and_oversized_frames() {
 }
 
 #[test]
+fn broker_frames_keep_their_refusal_and_transfer_errors() {
+    let empty = 0_u32.to_be_bytes();
+    assert!(matches!(
+        read_bounded_frame(&mut empty.as_slice()),
+        Err(BrokerError::InvalidRequest(message)) if message == "IPC frame is empty or oversized"
+    ));
+    assert!(matches!(
+        read_bounded_frame(&mut [0_u8, 0].as_slice()),
+        Err(BrokerError::InvalidRequest(message)) if message.starts_with("IPC frame prefix failed:")
+    ));
+    let mut truncated = 3_u32.to_be_bytes().to_vec();
+    truncated.extend_from_slice(b"ab");
+    assert!(matches!(
+        read_bounded_sensitive_frame(&mut truncated.as_slice()).map(drop),
+        Err(BrokerError::InvalidRequest(message)) if message.starts_with("IPC frame body failed:")
+    ));
+    let mut written = Vec::new();
+    assert!(matches!(
+        write_bounded_frame(&mut written, b""),
+        Err(BrokerError::InvalidRequest(message))
+            if message == "IPC response frame is empty or oversized"
+    ));
+    assert!(written.is_empty());
+}
+
+#[test]
 fn partial_sensitive_frame_is_zeroized_before_the_read_error_escapes() {
     let mut frame = Zeroizing::new(vec![0xaa; 32]);
     let mut partial = b"partial-secret-frame".as_slice();
