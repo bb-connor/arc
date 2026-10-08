@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-process/v1/request.schema.json",
+  "title": "Chio Process Worker Request Frame",
+  "description": "One chio.process.v1 request: compact or whitespace-separated UTF-8 JSON followed by a single newline, at most 2097152 bytes including that newline. One request per connection. Unknown fields at the request and operation level, duplicate field names there, and any other protocol value are refused with invalid_request before authentication. Normative text: spec/PROTOCOL.md section 8.6.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocol", "credential", "operation"],
+  "properties": {
+    "protocol": { "const": "chio.process.v1" },
+    "credential": {
+      "description": "Bearer secret issued by the host for exactly one process: 256 bits of OS randomness as 64 lowercase hex digits. Any other value, and any well-formed value the host does not hold, is refused with unauthenticated.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "operation": { "$ref": "#/$defs/Operation" }
+  },
+  "$defs": {
+    "Operation": {
+      "type": "object",
+      "required": ["op"],
+      "properties": {
+        "op": {
+          "enum": [
+            "inspect",
+            "prepare_invocation",
+            "invoke",
+            "checkpoint",
+            "blob_put",
+            "blob_read",
+            "cancel"
+          ]
+        }
+      },
+      "oneOf": [
+        { "$ref": "#/$defs/Inspect" },
+        { "$ref": "#/$defs/PrepareInvocation" },
+        { "$ref": "#/$defs/Invoke" },
+        { "$ref": "#/$defs/Checkpoint" },
+        { "$ref": "#/$defs/BlobPut" },
+        { "$ref": "#/$defs/BlobRead" },
+        { "$ref": "#/$defs/Cancel" }
+      ]
+    },
+    "Inspect": {
+      "description": "Report the authenticated process. The result never carries a capability token.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op"],
+      "properties": { "op": { "const": "inspect" } }
+    },
+    "PrepareInvocation": {
+      "description": "Retain one host-prepared invocation envelope under operation_key without dispatching an effect. Hosts without a preparation service refuse it with runtime_error.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "operation_key", "server_id", "tool_name", "arguments"],
+      "properties": {
+        "op": { "const": "prepare_invocation" },
+        "operation_key": { "$ref": "#/$defs/OperationKey" },
+        "server_id": { "type": "string" },
+        "tool_name": { "type": "string" },
+        "arguments": true
+      }
+    },
+    "Invoke": {
+      "description": "Admit or recover one logical tool call through the kernel. A kernel denial is a successful response carrying its signed receipt.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "operation_key", "server_id", "tool_name", "arguments"],
+      "properties": {
+        "op": { "const": "invoke" },
+        "operation_key": { "$ref": "#/$defs/OperationKey" },
+        "server_id": { "type": "string" },
+        "tool_name": { "type": "string" },
+        "arguments": true,
+        "governed_intent": {
+          "description": "Untrusted request input validated by the kernel against the host-owned capability. Absent and null are equivalent; clients omit an absent intent.",
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "../../chio-wire/v1/agent/governed-transaction-intent.schema.json" }
+          ]
+        },
+        "known_outcome_only": {
+          "description": "When true, an unknown outcome never earns another dispatch. Bound to the logical operation: changing it on the same key returns conflict. Clients omit the field when false.",
+          "type": "boolean"
+        }
+      }
+    },
+    "Checkpoint": {
+      "description": "Compare-and-set the process checkpoint. The canonical JSON encoding of value is at most 1048576 bytes.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "expected_revision", "value"],
+      "properties": {
+        "op": { "const": "checkpoint" },
+        "expected_revision": { "$ref": "#/$defs/Revision" },
+        "value": true
+      }
+    },
+    "BlobPut": {
+      "description": "Store immutable process-owned bytes. data_base64 must be the canonical padded standard base64 of at most 1048576 bytes, and sha256 their digest.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "sha256", "data_base64"],
+      "properties": {
+        "op": { "const": "blob_put" },
+        "sha256": { "$ref": "#/$defs/Sha256" },
+        "data_base64": {
+          "type": "string",
+          "maxLength": 1398104,
+          "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+        }
+      }
+    },
+    "BlobRead": {
+      "description": "Read a blob owned by the authenticated process.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "sha256"],
+      "properties": {
+        "op": { "const": "blob_read" },
+        "sha256": { "$ref": "#/$defs/Sha256" }
+      }
+    },
+    "Cancel": {
+      "description": "Permanently stop new admissions for the authenticated process and its descendants.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op"],
+      "properties": { "op": { "const": "cancel" } }
+    },
+    "OperationKey": {
+      "description": "Names one logical effect, not an attempt. 1 to 256 UTF-8 bytes (maxLength bounds characters only), no control characters, and no leading or trailing Unicode whitespace.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[^\\u0000-\\u0020\\u007f-\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000](?:[^\\u0000-\\u001f\\u007f-\\u009f]*[^\\u0000-\\u0020\\u007f-\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000])?$"
+    },
+    "Revision": {
+      "description": "Canonical decimal string of an unsigned 64-bit checkpoint revision: no sign, no leading zero, at most 18446744073709551615.",
+      "type": "string",
+      "maxLength": 20,
+      "pattern": "^(?:0|[1-9][0-9]*)$"
+    },
+    "Sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
