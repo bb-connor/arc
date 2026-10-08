@@ -1927,6 +1927,116 @@ class PublisherFullHistoryOriginalRedTests(unittest.TestCase):
                     extra, f"failed CI run {PRIOR_CI_RUN} on the evidence head titled for another {label} was ignored")
 
 
+FOREIGN_CI_RUN = 203
+# A fork pull request run: the run, its trusted CI workflow and its event
+# belong to this repository, and only its head repository is the fork.
+FOREIGN_HEAD_REPOSITORY = {"id": 1201234567, "full_name": "contributor/arc"}
+
+
+def foreign_head_ci_run(run_id: int = FOREIGN_CI_RUN, conclusion: str | None = "failure",
+                        head_repository: dict | None = None) -> dict:
+    run = pull_request_ci_run(run_id, MERGE, conclusion=conclusion, check_suite_id=406)
+    run["head_repository"] = copy.deepcopy(FOREIGN_HEAD_REPOSITORY if head_repository is None else head_repository)
+    run["head_branch"] = "main"
+    return run
+
+
+def ci_history_fixture(*runs: dict) -> dict:
+    data = live_tuple()
+    add_ci_runs(data, *runs)
+    data[f"repos/{REPOSITORY}/commits/{MERGE}/check-runs"] = {"total_count": 0, "check_runs": []}
+    return data
+
+
+def check_mutations(run: OfflineRun) -> list[str]:
+    return [call for call in run.calls if call.startswith(("POST ", "PATCH "))]
+
+
+MISSING_HEAD_REPOSITORY_IDS = {
+    "absent": {"full_name": FOREIGN_HEAD_REPOSITORY["full_name"]},
+    "null": {"id": None, "full_name": FOREIGN_HEAD_REPOSITORY["full_name"]},
+}
+INCONSISTENT_HEAD_REPOSITORIES = {
+    "foreign name with this repository ID": {"id": 1195888645, "full_name": FOREIGN_HEAD_REPOSITORY["full_name"]},
+    "empty name": {"id": FOREIGN_HEAD_REPOSITORY["id"], "full_name": ""},
+    "this repository name in another case": {"id": FOREIGN_HEAD_REPOSITORY["id"], "full_name": REPOSITORY.upper()},
+}
+
+
+class PublisherForeignHeadIdentityOriginalRedTests(unittest.TestCase):
+    def healthy_control(self) -> None:
+        healthy = reconcile_bad_ci_then_publish(bad_ci_fixture())
+        self.assertEqual(healthy.result.returncode, 0, healthy.result.stderr)
+        self.assertIn(PUBLICATION_PROBE, healthy.result.stdout)
+        self.assertEqual(check_mutations(healthy), [])
+
+    def assert_refused_without_tombstone(self, run: OfflineRun, reason: str) -> None:
+        self.assertIn(f"GET repos/{REPOSITORY}/{CI_HISTORY_QUERY}", run.calls)
+        self.assertNotIn("unprovided API", run.result.stderr)
+        self.assertNotIn(PUBLICATION_PROBE, run.result.stdout, reason)
+        self.assertNotEqual(run.result.returncode, 0)
+        self.assertEqual(security_contract_failures(run.data), [])
+        self.assertEqual(check_mutations(run), [])
+
+    def test_fully_identified_foreign_head_run_stays_outside_the_evidence_history(self) -> None:
+        self.healthy_control()
+        foreign = foreign_head_ci_run()
+        self.assertEqual((foreign["repository"]["id"], foreign["workflow_id"], foreign["path"], foreign["event"],
+                          foreign["head_sha"]),
+                         (1195888645, CI_WORKFLOW, ".github/workflows/ci.yml", "pull_request", EVIDENCE))
+        run = reconcile_bad_ci_then_publish(bad_ci_fixture(foreign))
+        self.assertIn(f"GET repos/{REPOSITORY}/{CI_HISTORY_QUERY}", run.calls)
+        self.assertEqual(run.result.returncode, 0, run.result.stderr)
+        self.assertIn(PUBLICATION_PROBE, run.result.stdout)
+        self.assertEqual(security_contract_failures(run.data), [])
+        self.assertEqual(check_mutations(run), [])
+        self.assertFalse(any(call.startswith(f"GET repos/{REPOSITORY}/actions/runs/{FOREIGN_CI_RUN}")
+                             for call in run.calls))
+        source = reconcile_bad_ci_then_publish(ci_history_fixture(foreign_head_ci_run(CI_RUN, conclusion="success")))
+        self.assert_refused_without_tombstone(source, f"foreign-head CI run {CI_RUN} qualified as the publication source")
+
+    def test_foreign_looking_run_without_a_head_repository_id_refuses_without_a_tombstone(self) -> None:
+        self.healthy_control()
+        for label, head_repository in MISSING_HEAD_REPOSITORY_IDS.items():
+            with self.subTest(head_repository_id=label):
+                run = reconcile_bad_ci_then_publish(bad_ci_fixture(foreign_head_ci_run(head_repository=head_repository)))
+                self.assert_refused_without_tombstone(
+                    run, f"CI run {FOREIGN_CI_RUN} on the evidence head with a foreign-looking head repository name "
+                         f"and a {label} head repository ID left the history instead of making it incomplete")
+
+    def test_inconsistent_foreign_looking_identity_refuses_without_a_tombstone(self) -> None:
+        self.healthy_control()
+        for label, head_repository in INCONSISTENT_HEAD_REPOSITORIES.items():
+            with self.subTest(head_repository=label):
+                run = reconcile_bad_ci_then_publish(bad_ci_fixture(foreign_head_ci_run(head_repository=head_repository)))
+                self.assert_refused_without_tombstone(
+                    run, f"CI run {FOREIGN_CI_RUN} on the evidence head with an inconsistent head repository "
+                         f"identity ({label}) left the history instead of making it incomplete")
+
+    def test_authenticated_bad_ci_still_denies_the_security_contract_beside_incomplete_identity(self) -> None:
+        bad = prior_failed_ci_run(MERGE)
+        assert_authoritative_history(self, bad)
+        incomplete = MISSING_HEAD_REPOSITORY_IDS | INCONSISTENT_HEAD_REPOSITORIES
+        for label, head_repository in incomplete.items():
+            with self.subTest(head_repository=label):
+                run = reconcile_bad_ci_then_publish(bad_ci_fixture(bad, foreign_head_ci_run(head_repository=head_repository)))
+                self.assertIn(f"GET repos/{REPOSITORY}/{CI_HISTORY_QUERY}", run.calls)
+                self.assertIn(f"GET repos/{REPOSITORY}/actions/runs/{PRIOR_CI_RUN}/attempts/1", run.calls)
+                self.assertNotIn(PUBLICATION_PROBE, run.result.stdout)
+                self.assertNotEqual(run.result.returncode, 0)
+                self.assertEqual(len(security_contract_failures(run.data)), 1, run.result.stderr)
+                created = sorted((check for key, store in run.data.items()
+                                  if key.startswith(f"repos/{REPOSITORY}/commits/") and key.endswith("/check-runs")
+                                  for check in store["check_runs"]), key=lambda check: check["id"])
+                denial = created[0]
+                self.assertEqual((denial["name"], denial["app"], denial["head_sha"], denial["external_id"],
+                                  denial["status"], denial["conclusion"]),
+                                 ("Security contract", {"id": APP_ID, "slug": "chio-security-authority"}, MERGE,
+                                  EXTERNAL_ID, "completed", "failure"))
+                self.assertEqual({check["head_sha"] for check in created}, {MERGE})
+                self.assertEqual(check_mutations(run)[0], f"POST repos/{REPOSITORY}/check-runs")
+
+
 class PublisherSharedHeadOriginalRedTests(unittest.TestCase):
     def test_publication_refuses_a_second_open_pull_request_on_the_evidence_head(self) -> None:
         control = publish_five_contexts(publication_fixture())
