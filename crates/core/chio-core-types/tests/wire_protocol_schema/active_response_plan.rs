@@ -148,3 +148,207 @@ fn active_response_schema_matches_native_plan_bounds() {
         assert!(!schema_accepts(&instance), "schema accepted {label}");
     }
 }
+
+fn without(base: &Value, field: &str) -> Value {
+    let mut instance = base.clone();
+    instance
+        .as_object_mut()
+        .expect("plan is an object")
+        .remove(field);
+    instance
+}
+
+const REQUIRED_FIELDS: [&str; 12] = [
+    "plan_schema",
+    "plan_id",
+    "operator_capability_id",
+    "operator_capability_hash",
+    "operator_capability_expires_at",
+    "executor_subject",
+    "canonical_plan_body",
+    "plan_body_hash",
+    "target_binding",
+    "ordered_effects",
+    "expires_at",
+    "rollback_binding",
+];
+
+#[test]
+fn active_response_schema_and_native_agree_on_structure_and_scalars() {
+    let base = fixture("active-response-intent");
+    let p256 = format!("p256:{}", "a".repeat(130));
+    let p384 = format!("p384:{}", "b".repeat(194));
+    let accepted = [
+        (
+            "p256 executor",
+            with(&base, "executor_subject", json!(p256)),
+        ),
+        (
+            "p384 executor",
+            with(&base, "executor_subject", json!(p384)),
+        ),
+        (
+            "unicode identifier",
+            with(&base, "plan_id", json!("plan\u{e9}-1")),
+        ),
+        (
+            "interior space identifier",
+            with(&base, "plan_id", json!("plan 1")),
+        ),
+        ("equal expiries", with(&base, "expires_at", json!(300))),
+        (
+            "nested hash key in plan body",
+            with(
+                &base,
+                "canonical_plan_body",
+                json!({ "action": { "planHash": "x" } }),
+            ),
+        ),
+    ];
+    for (label, instance) in accepted {
+        // A changed plan body no longer matches its recorded digest, and a
+        // p256 or p384 subject must be a point on its curve; only the native
+        // validator checks either, so the schema is asserted alone for those.
+        if label == "nested hash key in plan body"
+            || label.ends_with("executor") && label != "ed25519 executor"
+        {
+            assert!(schema_accepts(&instance), "schema rejected {label}");
+            continue;
+        }
+        assert!(native_accepts(&instance), "native rejected {label}");
+        assert!(schema_accepts(&instance), "schema rejected {label}");
+    }
+
+    let mut rejected = vec![
+        ("unknown field".to_owned(), with(&base, "extra", json!(1))),
+        (
+            "unsupported plan schema".to_owned(),
+            with(&base, "plan_schema", json!("chio.response-plan.v2")),
+        ),
+        (
+            "non-string plan id".to_owned(),
+            with(&base, "plan_id", json!(7)),
+        ),
+        (
+            "empty plan id".to_owned(),
+            with(&base, "plan_id", json!("")),
+        ),
+        (
+            "leading tab plan id".to_owned(),
+            with(&base, "plan_id", json!("\tplan-1")),
+        ),
+        (
+            "short capability hash".to_owned(),
+            with(&base, "operator_capability_hash", json!("ab")),
+        ),
+        (
+            "uppercase capability hash".to_owned(),
+            with(&base, "operator_capability_hash", json!("B".repeat(64))),
+        ),
+        (
+            "non-hex plan body hash".to_owned(),
+            with(&base, "plan_body_hash", json!("g".repeat(64))),
+        ),
+        (
+            "uppercase executor".to_owned(),
+            with(&base, "executor_subject", json!("C".repeat(64))),
+        ),
+        (
+            "short executor".to_owned(),
+            with(&base, "executor_subject", json!("cc")),
+        ),
+        (
+            "prefixed executor with wrong length".to_owned(),
+            with(&base, "executor_subject", json!("p256:aa")),
+        ),
+        (
+            "unknown effect".to_owned(),
+            with(&base, "ordered_effects", json!(["wipe_disk"])),
+        ),
+        (
+            "effects not an array".to_owned(),
+            with(&base, "ordered_effects", json!("throttle_session")),
+        ),
+        (
+            "zero expiry".to_owned(),
+            with(&base, "expires_at", json!(0)),
+        ),
+        (
+            "zero operator expiry".to_owned(),
+            with(&base, "operator_capability_expires_at", json!(0)),
+        ),
+        (
+            "negative expiry".to_owned(),
+            with(&base, "expires_at", json!(-1)),
+        ),
+        (
+            "fractional expiry".to_owned(),
+            with(&base, "expires_at", json!(1.5)),
+        ),
+        (
+            "array plan body".to_owned(),
+            with(&base, "canonical_plan_body", json!([1])),
+        ),
+        (
+            "array target binding".to_owned(),
+            with(&base, "target_binding", json!([1])),
+        ),
+        (
+            "string rollback binding".to_owned(),
+            with(&base, "rollback_binding", json!("automatic")),
+        ),
+        (
+            "null target binding".to_owned(),
+            with(&base, "target_binding", Value::Null),
+        ),
+    ];
+    for field in REQUIRED_FIELDS {
+        rejected.push((format!("missing {field}"), without(&base, field)));
+    }
+    for (label, instance) in rejected {
+        assert!(
+            !native_accepts(&instance),
+            "native validator accepted {label}"
+        );
+        assert!(!schema_accepts(&instance), "schema accepted {label}");
+    }
+}
+
+#[test]
+fn active_response_native_rules_the_schema_cannot_express_fail_closed() {
+    let base = fixture("active-response-intent");
+    let deep = (0..40).fold(json!({ "leaf": 1 }), |inner, _| json!({ "n": inner }));
+    let wide: Vec<Value> = (0..4_200).map(|n| json!(n)).collect();
+    let rejected = [
+        (
+            "identifier over 256 bytes with fewer than 257 characters",
+            with(&base, "plan_id", json!("\u{e9}".repeat(129))),
+        ),
+        (
+            "expiry past the operator capability expiry",
+            with(&base, "expires_at", json!(301)),
+        ),
+        (
+            "plan body that does not match its digest",
+            with(&base, "canonical_plan_body", json!({ "action": "other" })),
+        ),
+        (
+            "target binding over the byte ceiling",
+            with(&base, "target_binding", json!({ "k": "x".repeat(16_385) })),
+        ),
+        (
+            "rollback binding nested past the depth ceiling",
+            with(&base, "rollback_binding", deep),
+        ),
+        (
+            "target binding past the node ceiling",
+            with(&base, "target_binding", json!({ "values": wide })),
+        ),
+    ];
+    for (label, instance) in rejected {
+        assert!(
+            !native_accepts(&instance),
+            "native validator accepted {label}"
+        );
+    }
+}

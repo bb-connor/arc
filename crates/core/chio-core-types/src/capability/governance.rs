@@ -815,7 +815,7 @@ struct GovernedResponsePlanIntentBodyWire {
     operator_capability_id: String,
     operator_capability_hash: String,
     operator_capability_expires_at: u64,
-    executor_subject: PublicKey,
+    executor_subject: String,
     canonical_plan_body: serde_json::Value,
     plan_body_hash: String,
     target_binding: serde_json::Value,
@@ -828,13 +828,19 @@ impl TryFrom<GovernedResponsePlanIntentBodyWire> for GovernedResponsePlanIntentB
     type Error = Error;
 
     fn try_from(wire: GovernedResponsePlanIntentBodyWire) -> Result<Self> {
+        let executor_subject = PublicKey::from_hex(&wire.executor_subject)?;
+        if executor_subject.to_hex() != wire.executor_subject {
+            return Err(Error::CanonicalJson(
+                "governed response plan executor subject is not canonical lowercase hex".into(),
+            ));
+        }
         Self::new(
             wire.plan_schema,
             wire.plan_id,
             wire.operator_capability_id,
             wire.operator_capability_hash,
             wire.operator_capability_expires_at,
-            wire.executor_subject,
+            executor_subject,
             wire.canonical_plan_body,
             wire.plan_body_hash,
             wire.target_binding,
