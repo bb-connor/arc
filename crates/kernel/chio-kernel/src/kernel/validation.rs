@@ -1843,6 +1843,7 @@ impl ChioKernel {
                     }));
                     (converted_units, false)
                 }
+                Err(error @ KernelError::Clock(_)) => return Err(error),
                 Err(error) => {
                     warn!(
                         request_id = %request.request_id,
@@ -2165,6 +2166,8 @@ impl ChioKernel {
                 })?;
         let rate =
             self.block_on_price_oracle(oracle.get_rate(&reported_cost.currency, grant_currency))?;
+        // Oracle I/O may advance time beyond the caller's trusted reading.
+        let timestamp = self.trusted_now_millis()?.as_secs().max(timestamp);
         let converted_units =
             convert_supported_units(reported_cost.units, &rate, rate.conversion_margin_bps)
                 .map_err(|error| KernelError::CrossCurrencyOracle(error.to_string()))?;

@@ -144,6 +144,7 @@ impl ChioKernel {
                                     pricing.oracle_evidence = Some(evidence);
                                     units
                                 }
+                                Err(error @ KernelError::Clock(_)) => return Err(error),
                                 Err(error) => {
                                     warn!(operation_id = %journal.operation_id, reason = %redacted!(&error), "post-dispatch conversion unavailable; capture remains within original exposure");
                                     pricing.failure =
