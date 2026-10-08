@@ -13,6 +13,8 @@ use std::sync::Arc;
 
 #[path = "delegated_share/boundaries.rs"]
 mod boundaries;
+#[path = "delegated_share/indexed.rs"]
+mod indexed;
 #[path = "delegated_share/outcome_unknown.rs"]
 mod outcome_unknown;
 #[path = "delegated_share/pending.rs"]

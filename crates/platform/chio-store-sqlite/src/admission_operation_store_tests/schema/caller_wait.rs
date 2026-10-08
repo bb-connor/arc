@@ -77,6 +77,7 @@ fn rebuild_predecessor(connection: &Connection) -> rusqlite::Result<()> {
 pub(in crate::admission_operation_store::tests) fn remove_empty_checkpoint_catalog(
     connection: &Connection,
 ) -> rusqlite::Result<()> {
+    remove_caller_share_index(connection)?;
     for table in [
         "security_participant_checkpoint_rows",
         "security_participant_checkpoint_events",
@@ -102,6 +103,14 @@ pub(in crate::admission_operation_store::tests) fn remove_empty_checkpoint_catal
     assert_eq!(connection.query_row("SELECT COUNT(*) FROM authority_global_commits WHERE projection_kind = 'security_participant_checkpoint'",[],|row|row.get::<_,i64>(0))?,0,
         "predecessor fixture cannot discard checkpoint references");
     Ok(())
+}
+
+/// The v37 parent index is derived from retained requests, so a predecessor
+/// fixture drops it and the migration rebuilds it from the operations.
+pub(in crate::admission_operation_store::tests) fn remove_caller_share_index(
+    connection: &Connection,
+) -> rusqlite::Result<()> {
+    connection.execute_batch("DROP TABLE IF EXISTS admission_operation_caller_shares")
 }
 
 fn remove_empty_recovery_schema(connection: &Connection) -> rusqlite::Result<()> {

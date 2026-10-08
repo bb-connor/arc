@@ -8,6 +8,8 @@ type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 #[path = "execution_nonce/caller_dispatch_context.rs"]
 mod caller_dispatch_context;
+#[path = "execution_nonce/caller_share_index.rs"]
+mod caller_share_index;
 #[path = "execution_nonce/domain.rs"]
 mod domain;
 #[path = "execution_nonce/issuance.rs"]
