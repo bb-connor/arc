@@ -2,6 +2,7 @@ use super::*;
 use chio_kernel::SecurityInvocationContext;
 
 #[cfg(feature = "admission-test-support")]
+#[path = "checkpoint/image_visit_controls.rs"]
 mod image_visit_controls;
 
 fn join(
