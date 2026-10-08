@@ -260,6 +260,7 @@ fn executing_fixture() -> (HostFixture, Arc<ExecutingResponseCoordinator>) {
             Arc::clone(&fixture.security_store),
             Arc::clone(&fixture.config.alert_outbox),
             Arc::clone(&fixture.config.blast_radius),
+            chio_test_support::clock::clock(),
         )
         .unwrap_or_else(|error| panic!("response effects: {error}")),
     );

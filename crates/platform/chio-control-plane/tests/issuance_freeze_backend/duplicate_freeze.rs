@@ -102,7 +102,12 @@ fn shared_fence_consequence(
     let freezes = Arc::new(PersistFaultFreezes::new(Arc::clone(store)));
     let freeze_port: Arc<dyn IssuanceFreezeStore> = freezes.clone();
     let scheduler_port: Arc<dyn ResponseSchedulerStore> = store.clone();
-    let backend = IssuanceFreezeBackend::new_with_scheduler(freeze_port, blast, scheduler_port);
+    let backend = IssuanceFreezeBackend::new_with_scheduler(
+        freeze_port,
+        blast,
+        scheduler_port,
+        chio_test_support::clock::clock(),
+    );
 
     let first = planned_apply(&plan, 0, &work);
     let first_freeze_applied = backend

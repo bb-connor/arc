@@ -480,6 +480,7 @@ impl HostFixture {
                 Arc::clone(&self.security_store),
                 Arc::clone(&self.config.alert_outbox),
                 Arc::clone(&self.config.blast_radius),
+                chio_test_support::clock::clock(),
             )
             .unwrap_or_else(|error| panic!("construct TTL response effects: {error}")),
         );

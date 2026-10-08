@@ -177,7 +177,7 @@ fn apply_escalation_plan(fixture: &HostFixture, created_at_unix_ms: u64) {
     })
     .unwrap_or_else(|error| panic!("build escalation response plan: {error}"));
     let effects = Arc::new(
-        ActiveResponseEffectPort::production_with_clock(
+        ActiveResponseEffectPort::production(
             Arc::clone(&fixture.security_store),
             Arc::clone(&fixture.config.alert_outbox),
             Arc::clone(&fixture.config.blast_radius),

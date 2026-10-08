@@ -13,7 +13,7 @@ use super::{
     LineageFenceRelease, LineageFenceRenewal, LineageFenceRequest, LineageFenceTakeover, PortError,
     PortResult, RecordId, ResponseEffectBackend, ResponseEffectKind, ResponseEffectProgress,
     ResponsePlanKey, ResponseSchedulerStore, ResponseSnapshot, ResponseState, ResponseTarget,
-    ScheduledWork, SystemClock, TenantId, LINEAGE_FENCE_MAX_LEASE_MS,
+    ScheduledWork, TenantId, LINEAGE_FENCE_MAX_LEASE_MS,
 };
 use chio_quarantine::lineage_fence_lapsed_error;
 use std::cmp::Ordering;
@@ -40,34 +40,31 @@ impl IssuanceFreezeBackend {
     pub fn new(
         freezes: Arc<dyn IssuanceFreezeStore>,
         blast_radius: Arc<dyn BlastRadiusPort>,
+        clock: Arc<dyn Clock>,
     ) -> Self {
         Self {
             freezes,
             blast_radius,
             scheduler: None,
-            clock: Arc::new(SystemClock),
+            clock,
         }
     }
 
     /// Construct an executable backend bound to the authoritative response
-    /// plan and scheduler lease store.
+    /// plan and scheduler lease store. The clock judges fence lease windows.
     #[must_use]
     pub fn new_with_scheduler(
         freezes: Arc<dyn IssuanceFreezeStore>,
         blast_radius: Arc<dyn BlastRadiusPort>,
         scheduler: Arc<dyn ResponseSchedulerStore>,
+        clock: Arc<dyn Clock>,
     ) -> Self {
         Self {
             freezes,
             blast_radius,
             scheduler: Some(scheduler),
-            clock: Arc::new(SystemClock),
+            clock,
         }
-    }
-
-    pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
-        self.clock = clock;
-        self
     }
 
     fn key(&self, tenant_id: &TenantId, target: &ResponseTarget) -> PortResult<IssuanceFreezeKey> {

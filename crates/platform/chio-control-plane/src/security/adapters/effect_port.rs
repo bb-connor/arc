@@ -1,6 +1,6 @@
 use super::native_evidence::SqliteSiemOutbox;
 use chio_quarantine::decode_response_record;
-use chio_security_types::clock::{Clock, SystemClock};
+use chio_security_types::clock::Clock;
 use chio_security_types::ports::{
     capability_set_suspension_installed_version_hash, capability_set_suspension_version_hash,
     containment_installed_version_hash, containment_overlay_version_hash,

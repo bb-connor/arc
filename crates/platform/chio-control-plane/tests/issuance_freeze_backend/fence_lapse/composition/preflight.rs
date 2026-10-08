@@ -57,8 +57,8 @@ fn exercise_preflight(corrupt: bool) {
     let freezes: Arc<dyn IssuanceFreezeStore> = harness.store.clone();
     let authority: Arc<dyn ResponseSchedulerStore> = harness.store.clone();
     let clock: Arc<dyn Clock> = harness.clock.clone();
-    let backend = IssuanceFreezeBackend::new_with_scheduler(freezes, blast, Arc::clone(&authority))
-        .with_clock(clock);
+    let backend =
+        IssuanceFreezeBackend::new_with_scheduler(freezes, blast, Arc::clone(&authority), clock);
     let effects = ActiveResponseEffectPort::from_backends(vec![
         Arc::new(backend) as Arc<dyn ResponseEffectBackend>
     ])

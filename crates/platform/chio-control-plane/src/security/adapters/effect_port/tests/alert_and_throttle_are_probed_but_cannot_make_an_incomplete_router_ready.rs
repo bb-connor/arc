@@ -4,8 +4,10 @@ use super::*;
 fn alert_and_throttle_are_probed_but_cannot_make_an_incomplete_router_ready() {
     let alerts = Arc::new(RecordingAlertStore::default());
     let alert_store: Arc<dyn EscalateAlertStore> = alerts.clone();
-    let alert_backend: Arc<dyn ResponseEffectBackend> =
-        Arc::new(EscalateAlertBackend::new(alert_store));
+    let alert_backend: Arc<dyn ResponseEffectBackend> = Arc::new(EscalateAlertBackend::new(
+        alert_store,
+        chio_test_support::clock::clock(),
+    ));
     let overlays = Arc::new(RecordingOverlayStore::default());
     let suspension_backend: Arc<dyn ResponseEffectBackend> =
         Arc::new(SessionSuspensionOverlayBackend::new(overlays.clone()));

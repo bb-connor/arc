@@ -124,14 +124,12 @@ fn build_scheduler(
     let authority: Arc<dyn ResponseSchedulerStore> = store.clone();
     let clock: Arc<dyn Clock> = harness.clock.clone();
     let effects = ActiveResponseEffectPort::from_backends(vec![
-        Arc::new(
-            IssuanceFreezeBackend::new_with_scheduler(
-                freezes,
-                Arc::clone(&harness.blast),
-                Arc::clone(&authority),
-            )
-            .with_clock(clock),
-        ) as Arc<dyn ResponseEffectBackend>,
+        Arc::new(IssuanceFreezeBackend::new_with_scheduler(
+            freezes,
+            Arc::clone(&harness.blast),
+            Arc::clone(&authority),
+            clock,
+        )) as Arc<dyn ResponseEffectBackend>,
         Arc::new(CapabilitySetSuspensionBackend::new(suspensions)),
     ])
     .unwrap_or_else(|error| panic!("composition effect router: {error}"))

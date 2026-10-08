@@ -1011,7 +1011,12 @@ fn backend(
     let freeze_port: Arc<dyn IssuanceFreezeStore> = freezes;
     let blast_port: Arc<dyn BlastRadiusPort> = blast;
     let scheduler_port: Arc<dyn ResponseSchedulerStore> = scheduler;
-    IssuanceFreezeBackend::new_with_scheduler(freeze_port, blast_port, scheduler_port)
+    IssuanceFreezeBackend::new_with_scheduler(
+        freeze_port,
+        blast_port,
+        scheduler_port,
+        chio_test_support::clock::clock(),
+    )
 }
 
 fn maintenance_plan(apply: &mut EffectRequest) -> ResponsePlan {
@@ -1118,7 +1123,8 @@ fn no_scheduler_backend_cannot_apply_an_unbound_issuance_freeze() {
     let blast = Arc::new(FakeBlastRadius::default());
     let freeze_port: Arc<dyn IssuanceFreezeStore> = freezes.clone();
     let blast_port: Arc<dyn BlastRadiusPort> = blast.clone();
-    let backend = IssuanceFreezeBackend::new(freeze_port, blast_port);
+    let backend =
+        IssuanceFreezeBackend::new(freeze_port, blast_port, chio_test_support::clock::clock());
     let request = apply_request();
 
     let error = backend
@@ -1498,8 +1504,12 @@ fn maintenance_ack_loss_rebinds_durably_fences_stale_owner_and_lifts_once() {
     let freeze_port: Arc<dyn IssuanceFreezeStore> = freezes.clone();
     let blast_port: Arc<dyn BlastRadiusPort> = blast.clone();
     let scheduler_port: Arc<dyn ResponseSchedulerStore> = scheduler.clone();
-    let backend =
-        IssuanceFreezeBackend::new_with_scheduler(freeze_port, blast_port, scheduler_port);
+    let backend = IssuanceFreezeBackend::new_with_scheduler(
+        freeze_port,
+        blast_port,
+        scheduler_port,
+        chio_test_support::clock::clock(),
+    );
     let applied = backend
         .execute(&apply)
         .unwrap_or_else(|error| panic!("apply maintained freeze: {error:?}"));
@@ -1657,8 +1667,12 @@ fn maintenance_completes_release_pending_without_recreating_the_external_fence()
     let freeze_port: Arc<dyn IssuanceFreezeStore> = freezes.clone();
     let blast_port: Arc<dyn BlastRadiusPort> = blast.clone();
     let scheduler_port: Arc<dyn ResponseSchedulerStore> = scheduler.clone();
-    let backend =
-        IssuanceFreezeBackend::new_with_scheduler(freeze_port, blast_port, scheduler_port);
+    let backend = IssuanceFreezeBackend::new_with_scheduler(
+        freeze_port,
+        blast_port,
+        scheduler_port,
+        chio_test_support::clock::clock(),
+    );
     let applied = backend
         .execute(&apply)
         .unwrap_or_else(|error| panic!("apply freeze: {error:?}"));

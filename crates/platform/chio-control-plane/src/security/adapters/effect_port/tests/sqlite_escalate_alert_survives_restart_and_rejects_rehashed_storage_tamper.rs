@@ -20,7 +20,10 @@ fn sqlite_escalate_alert_survives_restart_and_rejects_rehashed_storage_tamper() 
         .unwrap_or_else(|error| panic!("open alert outbox: {error}")),
     );
     let alert_store: Arc<dyn EscalateAlertStore> = outbox.clone();
-    let backend: Arc<dyn ResponseEffectBackend> = Arc::new(EscalateAlertBackend::new(alert_store));
+    let backend: Arc<dyn ResponseEffectBackend> = Arc::new(EscalateAlertBackend::new(
+        alert_store,
+        chio_test_support::clock::clock(),
+    ));
     let port = BackendEffects::new(backend);
     let result = port
         .execute(&request)
@@ -37,7 +40,10 @@ fn sqlite_escalate_alert_survives_restart_and_rejects_rehashed_storage_tamper() 
         .unwrap_or_else(|error| panic!("reopen alert outbox: {error}")),
     );
     let alert_store: Arc<dyn EscalateAlertStore> = reopened.clone();
-    let backend: Arc<dyn ResponseEffectBackend> = Arc::new(EscalateAlertBackend::new(alert_store));
+    let backend: Arc<dyn ResponseEffectBackend> = Arc::new(EscalateAlertBackend::new(
+        alert_store,
+        chio_test_support::clock::clock(),
+    ));
     let restarted = BackendEffects::new(backend);
     assert_eq!(
         restarted.load_result(&query(&request)),

@@ -1457,7 +1457,7 @@ fn unbound_effect_router_never_reports_ready() {
     let alerts: Arc<dyn EscalateAlertStore> = fixture.outbox.clone();
     let blast: Arc<dyn BlastRadiusPort> = fixture.resolver.clone();
     let backends: Vec<Arc<dyn ResponseEffectBackend>> = vec![
-        Arc::new(EscalateAlertBackend::with_clock(
+        Arc::new(EscalateAlertBackend::new(
             alerts,
             Arc::clone(&fixture.trusted_clock),
         )),
@@ -1465,14 +1465,12 @@ fn unbound_effect_router_never_reports_ready() {
         Arc::new(RestrictEgressOverlayBackend::new(fixture.store.clone())),
         Arc::new(SessionSuspensionOverlayBackend::new(fixture.store.clone())),
         Arc::new(CapabilitySetSuspensionBackend::new(fixture.store.clone())),
-        Arc::new(
-            IssuanceFreezeBackend::new_with_scheduler(
-                fixture.store.clone(),
-                blast,
-                fixture.store.clone(),
-            )
-            .with_clock(Arc::clone(&fixture.trusted_clock)),
-        ),
+        Arc::new(IssuanceFreezeBackend::new_with_scheduler(
+            fixture.store.clone(),
+            blast,
+            fixture.store.clone(),
+            Arc::clone(&fixture.trusted_clock),
+        )),
     ];
     let unbound = ActiveResponseEffectPort::from_backends(backends)
         .unwrap_or_else(|error| panic!("unbound router: {error}"));

@@ -764,7 +764,10 @@ fn port(store: Arc<RecordingOverlayStore>) -> BackendEffects {
 
 fn alert_port(store: Arc<RecordingAlertStore>) -> BackendEffects {
     let alert_store: Arc<dyn EscalateAlertStore> = store;
-    BackendEffects::new(Arc::new(EscalateAlertBackend::new(alert_store)))
+    BackendEffects::new(Arc::new(EscalateAlertBackend::new(
+        alert_store,
+        chio_test_support::clock::clock(),
+    )))
 }
 
 fn throttle_port(store: Arc<RecordingThrottleStore>) -> BackendEffects {

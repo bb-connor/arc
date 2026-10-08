@@ -3,7 +3,7 @@ use super::{
     AlertDeliveryStatus, Arc, CanonicalBody, Clock, Digest32, EffectExecutionStatus, EffectId,
     EffectOperation, EffectRequest, EffectResult, EffectResultQuery, PortError, PortResult,
     RecordId, ResponseEffectBackend, ResponseEffectKind, ResponseTarget, SecurityAlert,
-    SecurityAlertPort, Serialize, SqliteSiemOutbox, SystemClock, TenantId,
+    SecurityAlertPort, Serialize, SqliteSiemOutbox, TenantId,
 };
 
 pub(super) const ESCALATE_ALERT_SCHEMA_VERSION: u8 = 1;
@@ -84,12 +84,9 @@ pub struct EscalateAlertBackend {
 }
 
 impl EscalateAlertBackend {
+    /// The clock stamps each paged escalation alert.
     #[must_use]
-    pub fn new(alerts: Arc<dyn EscalateAlertStore>) -> Self {
-        Self::with_clock(alerts, Arc::new(SystemClock))
-    }
-
-    pub fn with_clock(alerts: Arc<dyn EscalateAlertStore>, clock: Arc<dyn Clock>) -> Self {
+    pub fn new(alerts: Arc<dyn EscalateAlertStore>, clock: Arc<dyn Clock>) -> Self {
         Self { alerts, clock }
     }
 

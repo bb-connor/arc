@@ -400,7 +400,7 @@ pub(super) fn production_response_effects(
 ) -> PortResult<Arc<dyn EffectPort>> {
     match mode {
         ResponseExecutionMode::Live => Ok(Arc::new(
-            super::adapters::effect_port::ActiveResponseEffectPort::production_with_clock(
+            super::adapters::effect_port::ActiveResponseEffectPort::production(
                 security_store,
                 alert_outbox,
                 blast_radius,

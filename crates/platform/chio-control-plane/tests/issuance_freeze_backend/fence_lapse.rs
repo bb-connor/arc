@@ -444,8 +444,12 @@ impl FenceLapseHarness {
         let freezes: Arc<dyn IssuanceFreezeStore> = self.freezes.clone();
         let scheduler: Arc<dyn ResponseSchedulerStore> = self.store.clone();
         let clock: Arc<dyn Clock> = self.clock.clone();
-        IssuanceFreezeBackend::new_with_scheduler(freezes, Arc::clone(&self.blast), scheduler)
-            .with_clock(clock)
+        IssuanceFreezeBackend::new_with_scheduler(
+            freezes,
+            Arc::clone(&self.blast),
+            scheduler,
+            clock,
+        )
     }
 
     fn scheduler(&self) -> LapseScheduler {
@@ -1072,8 +1076,12 @@ fn foreign_live_fences_are_refused_and_left_untouched() {
     let freeze_port: Arc<dyn IssuanceFreezeStore> = freezes.clone();
     let blast_port: Arc<dyn BlastRadiusPort> = blast.clone();
     let scheduler_port: Arc<dyn ResponseSchedulerStore> = scheduler.clone();
-    let backend =
-        IssuanceFreezeBackend::new_with_scheduler(freeze_port, blast_port, scheduler_port);
+    let backend = IssuanceFreezeBackend::new_with_scheduler(
+        freeze_port,
+        blast_port,
+        scheduler_port,
+        chio_test_support::clock::clock(),
+    );
     let applied = backend
         .execute(&apply)
         .unwrap_or_else(|error| panic!("apply freeze: {error:?}"));
