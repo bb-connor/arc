@@ -29,5 +29,19 @@
       "kind": "stale-authorized-source-tooling-cohort"
     }
   ],
-  "remaining_boundary": "Four exact required checks, local qualification and current thread dispositions before foundation landing; native/trusted platform and release acceptance remain independently open."
+  "remaining_boundary": "Four exact required checks, local qualification and current thread dispositions before foundation landing; native/trusted platform and release acceptance remain independently open.",
+  "source_integrations": {
+    "APF001": {
+      "commit": "fc82c723ce8f165e021f0a7c5e213c18fa680779",
+      "producer_commit": "26de0050eef43cf3287fe098c95691543eec8300",
+      "independent_review_seal_sha256": "2795fe6cc76a02f69413238ffea41bbb644e30e0c045e53d28fd728976bb9eb4",
+      "qualified": false
+    },
+    "ADI001": {
+      "commit": "439793268ddae842762c6eef29975f537462e093",
+      "producer_commit": "7fcd65355c3eb8b4fa5cea53f12f758194424ef4",
+      "independent_review_seal_sha256": "a5839736dde117752a74b20e13f5e4862ecc3a49da85f0d78eafee3637f46459",
+      "qualified": false
+    }
+  }
 }
