@@ -217,6 +217,31 @@ pub(crate) async fn submit_approval_handler(
         ));
     }
     let approval_id = format!("ap-{}", uuid::Uuid::now_v7());
+    let approvers = config.approvers.clone();
+    let kernel = Arc::clone(kernel);
+    let submitted = blocking(move || {
+        retain_submitted_approval(&state, &kernel, body, subject, approval_id, approvers)
+    })
+    .await;
+    match submitted {
+        Ok(Ok(response)) => approval_json(StatusCode::CREATED, response),
+        Ok(Err(rejection)) => rejection,
+        Err(WorkerFailed) => approval_error_response(ApprovalHandlerError::Internal(
+            "approval worker did not complete".into(),
+        )),
+    }
+}
+
+/// Bind the exact invocation intent on the shared kernel and retain the pending
+/// approval. Runs on the blocking pool.
+fn retain_submitted_approval(
+    state: &ProxyState,
+    kernel: &chio_kernel::ChioKernel,
+    body: SubmitApprovalRequest,
+    subject: PublicKey,
+    approval_id: String,
+    approvers: Vec<PublicKey>,
+) -> Result<SubmitApprovalResponse, Response> {
     let request = chio_kernel::ToolCallRequest {
         request_id: approval_id.clone(),
         capability: body.capability,
@@ -235,29 +260,19 @@ pub(crate) async fn submit_approval_handler(
         federated_origin_kernel_id: None,
         declassification_grant: None,
     };
-    let kernel = kernel.lock().await;
-    let intent = match kernel.bind_tool_approval_intent(&request) {
-        Ok(intent) => intent,
-        Err(error) => {
-            return approval_error_response(ApprovalHandlerError::Rejected(error.to_string()))
-        }
-    };
-    let now = match state.clock.seconds() {
-        Ok(now) => now,
-        Err(error) => return clock::rejection(error),
-    };
+    let intent = kernel.bind_tool_approval_intent(&request).map_err(|error| {
+        approval_error_response(ApprovalHandlerError::Rejected(error.to_string()))
+    })?;
+    let now = state.clock.seconds().map_err(clock::rejection)?;
     let ttl = if body.ttl_seconds == 0 {
         3600
     } else {
         body.ttl_seconds.min(3600)
     };
     let expires_at = now.saturating_add(ttl).min(request.capability.expires_at);
-    let parameter_hash = match intent.binding_hash() {
-        Ok(hash) => hash,
-        Err(error) => {
-            return approval_error_response(ApprovalHandlerError::Rejected(error.to_string()))
-        }
-    };
+    let parameter_hash = intent.binding_hash().map_err(|error| {
+        approval_error_response(ApprovalHandlerError::Rejected(error.to_string()))
+    })?;
     let approval = ApprovalRequest {
         approval_id: approval_id.clone(),
         policy_id: kernel.policy_hash().to_owned(),
@@ -275,21 +290,20 @@ pub(crate) async fn submit_approval_handler(
             .summary
             .unwrap_or_else(|| "exact tool invocation".into()),
         governed_intent: Some(intent),
-        trusted_approvers: config.approvers.clone(),
+        trusted_approvers: approvers.clone(),
         triggered_by: body.triggered_by,
     };
-    if let Err(error) = state.approval_admin.store().store_pending(&approval) {
-        return approval_error_response(error.into());
-    }
-    approval_json(
-        StatusCode::CREATED,
-        SubmitApprovalResponse {
-            approval_id,
-            expires_at,
-            created_at: now,
-            trusted_approvers: config.approvers.iter().map(PublicKey::to_hex).collect(),
-        },
-    )
+    state
+        .approval_admin
+        .store()
+        .store_pending(&approval)
+        .map_err(|error| approval_error_response(error.into()))?;
+    Ok(SubmitApprovalResponse {
+        approval_id,
+        expires_at,
+        created_at: now,
+        trusted_approvers: approvers.iter().map(PublicKey::to_hex).collect(),
+    })
 }
 
 /// The compatibility route requires the same signer-authenticated response.
@@ -323,9 +337,7 @@ async fn require_current_approver(
     let kernel = state
         .mediation_kernel
         .as_ref()
-        .ok_or_else(|| ApprovalHandlerError::Rejected("approval admission is unavailable".into()))?
-        .lock()
-        .await;
+        .ok_or_else(|| ApprovalHandlerError::Rejected("approval admission is unavailable".into()))?;
     let context = pending
         .governed_intent
         .as_ref()

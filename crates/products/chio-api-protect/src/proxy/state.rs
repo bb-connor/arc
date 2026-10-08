@@ -156,19 +156,26 @@ pub(crate) struct ProxyState {
     /// reconciled by nonce or reclaimed by the TTL reaper.
     pub(crate) mediation_hold_capable: bool,
     /// The process-lifetime kernel-mediation authority, built once when a budget
-    /// store is configured. Held behind a `Mutex` because admitting the
-    /// caller-named tool server (registration) needs `&mut self`, and reused
-    /// across requests so the approval-token and DPoP replay stores stay
-    /// authoritative, and so the nonce it mints on `/v1/evaluate` is the one it
-    /// verifies and consumes on `/v1/reconcile`.
-    pub(crate) mediation_kernel: Option<Arc<Mutex<chio_kernel::ChioKernel>>>,
+    /// store is configured and fully configured before serving starts. It is
+    /// shared, never locked: every request and the maintenance worker call its
+    /// `&self` API from the blocking pool, and its replay, nonce, budget and
+    /// admission stores carry their own synchronization. One instance keeps the
+    /// approval-token and DPoP replay stores authoritative, and the nonce it
+    /// mints on `/v1/evaluate` is the one it verifies and consumes on
+    /// `/v1/reconcile`.
+    pub(crate) mediation_kernel: Option<Arc<chio_kernel::ChioKernel>>,
     /// Request ids claimed for a live reservation window on `/v1/evaluate`. The
     /// kernel derives the durable budget hold identity from the request id, so
     /// each id is admitted at most once inside its window; a reuse is rejected
     /// fail-closed (409) to preserve the over-subscription guard. Entries expire
     /// with the reservation (execution-nonce) TTL and are pruned lazily, so the
-    /// set stays bounded rather than growing on every request.
-    pub(crate) minted_request_ids: Mutex<MintedRequestIdWindow>,
+    /// set stays bounded rather than growing on every request. The guard is
+    /// only ever held for in-memory window updates.
+    pub(crate) minted_request_ids: std::sync::Mutex<MintedRequestIdWindow>,
+    /// One live flight per request id on `/v1/evaluate`: the reuse check,
+    /// claim, authorization and claim cleanup of an id never interleave with
+    /// another request for the same id.
+    pub(crate) request_flights: RequestFlights,
     pub(crate) allow_advisory: bool,
     pub(crate) receipt_backend: &'static str,
     pub(crate) revocation_backend: &'static str,
@@ -181,26 +188,42 @@ impl ProxyState {
     /// Fails closed: if the durable store cannot be queried, treat the capability
     /// as revoked rather than admit one that may have been released.
     pub(crate) async fn capability_is_revoked(&self, capability_id: &str) -> bool {
-        if self
-            .revoked_capability_ids
-            .lock()
+        self.any_capability_revoked(vec![capability_id.to_owned()])
             .await
-            .contains(capability_id)
+    }
+
+    /// Whether any listed capability is revoked, with the same fail-closed rule
+    /// as [`Self::capability_is_revoked`]. The in-memory set is consulted first;
+    /// the durable lookups for the whole list run in one blocking-pool call.
+    pub(crate) async fn any_capability_revoked(&self, capability_ids: Vec<String>) -> bool {
         {
-            return true;
-        }
-        if let Some(revocation_store) = &self.revocation_store {
-            match revocation_store.is_revoked(capability_id) {
-                Ok(false) => {}
-                Ok(true) => return true,
-                Err(error) => {
-                    warn!("failed to query durable revocation store: {error}");
-                    return true;
-                }
+            let released = self.revoked_capability_ids.lock().await;
+            if capability_ids.iter().any(|id| released.contains(id)) {
+                return true;
             }
         }
-        false
+        let Some(revocation_store) = self.revocation_store.clone() else {
+            return false;
+        };
+        blocking(move || durable_lineage_revoked(revocation_store.as_ref(), &capability_ids))
+            .await
+            .unwrap_or(true)
     }
+}
+
+fn durable_lineage_revoked(
+    revocation_store: &dyn chio_kernel::RevocationStore,
+    capability_ids: &[String],
+) -> bool {
+    capability_ids
+        .iter()
+        .any(|capability_id| match revocation_store.is_revoked(capability_id) {
+            Ok(revoked) => revoked,
+            Err(error) => {
+                warn!("failed to query durable revocation store: {error}");
+                true
+            }
+        })
 }
 
 impl ProxyState {
@@ -649,7 +672,7 @@ impl ProtectProxy {
                         .reconcile_durable_admission_startup()
                         .map_err(|error| ProtectError::Config(error.to_string()))?;
                 }
-                Some(Arc::new(Mutex::new(kernel)))
+                Some(Arc::new(kernel))
             }
             None if self.caller_executor.is_some() || self.config.approval.is_some() => {
                 return Err(ProtectError::Config(
@@ -690,9 +713,10 @@ impl ProtectProxy {
             budget_store,
             mediation_hold_capable,
             mediation_kernel,
-            minted_request_ids: Mutex::new(MintedRequestIdWindow::new(
+            minted_request_ids: std::sync::Mutex::new(MintedRequestIdWindow::new(
                 chio_kernel::DEFAULT_EXECUTION_NONCE_TTL_SECS,
             )),
+            request_flights: RequestFlights::default(),
             allow_advisory: self.config.allow_advisory,
             receipt_backend,
             revocation_backend,
@@ -792,7 +816,6 @@ impl ProtectProxy {
                 ticks_completed = health.ticks_completed,
                 recovered = health.recovered,
                 reaped = health.reaped,
-                busy_skips = health.busy_skips,
                 worker_running = health.worker_running,
                 worker_joined = health.worker_joined,
                 shutdown_overdue = health.shutdown_overdue,

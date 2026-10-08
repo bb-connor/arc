@@ -27,7 +27,7 @@ async fn public_caller_routes_require_commit_and_authenticated_durable_delivery(
     let budget = Arc::clone(&durable.budget_store);
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     let cap = issue_invocation_capability(&kernel, &agent, "caller-server", "effect", 1);
-    let state = mediated_test_state_with_durable_admission(
+    let mut state = mediated_test_state_with_durable_admission(
         signer.clone(),
         budget,
         Vec::new(),
@@ -38,12 +38,10 @@ async fn public_caller_routes_require_commit_and_authenticated_durable_delivery(
         None,
         Some(durable),
     );
-    state
-        .mediation_kernel
-        .as_ref()
-        .ok_or("kernel")?
-        .lock()
-        .await
+    Arc::get_mut(&mut state)
+        .and_then(|state| state.mediation_kernel.as_mut())
+        .and_then(Arc::get_mut)
+        .ok_or("unshared kernel")?
         .set_caller_executor(executor.clone())?;
     let parameters = serde_json::json!({"operation": "external"});
     let (status, reserved) = post_evaluate(

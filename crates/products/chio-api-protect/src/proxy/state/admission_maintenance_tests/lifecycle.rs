@@ -117,26 +117,59 @@ async fn admission_host_retry_known_pending_keeps_health_ready() -> TestResult {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn admission_host_retry_busy_kernel_shutdown_does_not_deadlock() -> TestResult {
-    let fixture = Fixture::new()?;
-    let kernel = fixture
-        .state
-        .mediation_kernel
-        .as_ref()
-        .ok_or("original kernel")?;
-    let held_request = kernel.lock().await;
+    let mut fixture = Fixture::new()?;
+    let kernel = Arc::clone(
+        fixture
+            .state
+            .mediation_kernel
+            .as_ref()
+            .ok_or("original kernel")?,
+    );
+    let preflight = kernel.evaluate_tool_call(&fixture.request).await?;
+    assert_eq!(
+        preflight.verdict,
+        chio_kernel::Verdict::Allow,
+        "{:?}",
+        preflight.reason
+    );
+    fixture.request.execution_nonce = Some(*preflight.execution_nonce.ok_or("original nonce")?);
+    fixture.trace.pending.store(false, Ordering::SeqCst);
+    fixture.trace.gate.close()?;
+    // A request's kernel call is parked inside the payment rail on a blocking
+    // worker, holding its live operation, while maintenance runs.
+    let request = fixture.request.clone();
+    let in_flight_kernel = Arc::clone(&kernel);
+    let in_flight = tokio::task::spawn_blocking(move || {
+        in_flight_kernel.evaluate_tool_call_blocking(&request)
+    });
+    wait_until(|| fixture.trace.gate.entered()).await?;
     let controller = Arc::new(ShutdownController::manual());
     let owner = start(&fixture, controller.clone())?;
     let control = owner.control();
-    wait_until(|| control.health().busy_skips > 0).await?;
+    wait_until(|| control.health().ticks_completed > 0).await?;
+    assert!(
+        !fixture.trace.gate.returned(),
+        "maintenance ticks while the request's kernel call is still in flight"
+    );
     let started = std::time::Instant::now();
     drop(owner);
     assert!(started.elapsed() < Duration::from_secs(1));
     assert!(control.health().worker_joined);
     assert!(!control.health().worker_running);
     assert!(!controller.is_shutdown());
-    drop(held_request);
+    assert!(control.failure().is_none());
+    fixture.trace.gate.release()?;
+    let response = in_flight.await??;
+    assert_eq!(
+        response.verdict,
+        chio_kernel::Verdict::Allow,
+        "{:?}",
+        response.reason
+    );
+    assert_eq!(fixture.trace.dispatches.load(Ordering::SeqCst), 1);
+    assert_eq!(fixture.trace.financial_effects.load(Ordering::SeqCst), 1);
     Ok(())
 }
 

@@ -340,19 +340,29 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
     // a completion endpoint (and so the sidecar never consumes the downstream
     // nonce, which would make the real tool server reject the caller as a
     // replay).
-    let Some(mediation_kernel) = state.mediation_kernel.as_ref() else {
+    let Some(kernel) = state.mediation_kernel.clone() else {
         return internal_json_error_response(
             "chio_mediation_unavailable",
             "mediated tool-call route requires a configured budget store (--control-url or --budget-db)",
         );
     };
+    let request_id = parsed
+        .request_id
+        .clone()
+        .or_else(|| parsed.approval_id.clone())
+        .unwrap_or_else(|| uuid::Uuid::now_v7().to_string());
+    // The request id's flight owns the reuse check/claim/authorization/cleanup
+    // sequence below: another request for this id runs only after this owner
+    // has released or retained its claim. Unrelated requests share the kernel
+    // and run concurrently.
+    let flight = match state.request_flights.enter(&request_id).await {
+        Ok(flight) => flight,
+        Err(error) => return request_id_rejection(error),
+    };
     // Under durable admission the reservation is the operation's own and an
     // approved retry presents the nonce the strict preflight issued. The
     // legacy reservation mints nonces and never accepts one: a presented nonce
     // would be consumed here instead of by the tool server that expects it.
-    // The kernel mutex also owns the reuse check/claim/authorization/cleanup sequence.
-    // No request-id claim can age out while its owner waits for this lock.
-    let kernel = mediation_kernel.lock().await;
     let durable_reservation = kernel.has_durable_admission_store();
     let presented_nonce = parsed.execution_nonce.take();
     if presented_nonce.is_some() && !durable_reservation {
@@ -398,10 +408,10 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
     }
     // Fail-closed: reject the presented capability when its own id OR any ancestor
     // in its delegation chain is revoked, so a delegated child of a revoked root
-    // cannot keep earning mediated reservations until expiry. `capability_is_revoked`
-    // consults the in-memory release set first (no I/O for a known-revoked id) and
-    // then the durable revocation store, failing closed if that store cannot be
-    // read, so a revocation a sibling replica or `chio trust revoke --revocation-db`
+    // cannot keep earning mediated reservations until expiry. The walk consults
+    // the in-memory release set first (no I/O for a known-revoked id) and then
+    // the durable revocation store, failing closed if that store cannot be read,
+    // so a revocation a sibling replica or `chio trust revoke --revocation-db`
     // recorded after this process booted is honored here exactly as it is on the
     // proxy and validate paths. The kernel's own revocation store starts empty, so
     // this sidecar-side walk is the authority.
@@ -416,16 +426,16 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
     if parsed.capability.delegation_chain.len() > MAX_MEDIATED_DELEGATION_CHAIN {
         return sidecar_bad_request("capability delegation chain is too long").into_response();
     }
-    let mut revoked = state.capability_is_revoked(&parsed.capability.id).await;
-    if !revoked {
-        for ancestor in &parsed.capability.delegation_chain {
-            if state.capability_is_revoked(&ancestor.capability_id).await {
-                revoked = true;
-                break;
-            }
-        }
-    }
-    if revoked {
+    let lineage = std::iter::once(parsed.capability.id.clone())
+        .chain(
+            parsed
+                .capability
+                .delegation_chain
+                .iter()
+                .map(|ancestor| ancestor.capability_id.clone()),
+        )
+        .collect();
+    if state.any_capability_revoked(lineage).await {
         return (
             StatusCode::FORBIDDEN,
             axum::Json(serde_json::json!({
@@ -438,20 +448,7 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
     let agent_id = parsed
         .agent_id
         .unwrap_or_else(|| parsed.capability.subject.to_hex());
-    let request_id = parsed
-        .request_id
-        .clone()
-        .or_else(|| parsed.approval_id.clone())
-        .unwrap_or_else(|| uuid::Uuid::now_v7().to_string());
-    // Durable reuse guard that survives a restart, which the in-memory window
-    // below cannot: after a restart the window is empty, but a reservation opened
-    // before it persists as a budget hold. Rejecting the reuse fail-closed (409)
-    // is load-bearing because a reused id would either collapse into an idempotent
-    // authorize that mints a second nonce against one reservation without
-    // reserving more budget, or (for a closed, settled-or-reaped hold) make the
-    // kernel reject the duplicate hold id on creation and turn an otherwise valid
-    // later authorization into a 500 instead of the documented bounded-reuse 409.
-    let Some(budget_store) = state.budget_store.as_ref() else {
+    let Some(budget_store) = state.budget_store.clone() else {
         return internal_json_error_response(
             "chio_mediation_requires_local_budget_store",
             "mediated authorization requires a configured hold-capable budget store",
@@ -465,97 +462,8 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
     if parsed.capability.scope.grants.len() > MAX_MEDIATED_SCOPE_GRANTS {
         return sidecar_bad_request("capability scope carries too many grants").into_response();
     }
-    // Prefer the capability-agnostic durable probe. The kernel derives each hold
-    // id from (request_id, capability id, grant index), so the per-grant exact-id
-    // lookup below only sees a reuse under the SAME capability: a caller that
-    // replays this request_id under a DIFFERENT capability token would miss the
-    // existing `budget-hold:{request_id}:{other_cap}:..` row and win a second
-    // reservation once a restart cleared the in-memory window. When the store can
-    // enumerate holds by the `budget-hold:{request_id}:` prefix it rejects the
-    // reuse regardless of which capability opened the hold; when it cannot
-    // (`Ok(None)`), fall back to the per-grant exact-id probe.
-    match budget_store.request_id_has_reserved_hold(&request_id) {
-        Ok(Some(true)) => {
-            return (
-                StatusCode::CONFLICT,
-                axum::Json(serde_json::json!({
-                    "error": "chio_request_id_reused",
-                    "message": "request_id already backs a reservation; choose a fresh request_id",
-                })),
-            )
-                .into_response();
-        }
-        Ok(Some(false)) => {}
-        Ok(None) => {
-            for grant_index in 0..parsed.capability.scope.grants.len() {
-                let hold_id = format!(
-                    "budget-hold:{}:{}:{}",
-                    request_id, parsed.capability.id, grant_index
-                );
-                match budget_store.get_budget_hold(&hold_id) {
-                    Ok(Some(_)) => {
-                        return (
-                            StatusCode::CONFLICT,
-                            axum::Json(serde_json::json!({
-                                "error": "chio_request_id_reused",
-                                "message": "request_id already backs a reservation; choose a fresh request_id",
-                            })),
-                        )
-                            .into_response();
-                    }
-                    Ok(None) => {}
-                    Err(error) => {
-                        warn!("durable hold lookup failed: {error}");
-                        return internal_json_error_response(
-                            "chio_mediation_failed",
-                            &error.to_string(),
-                        );
-                    }
-                }
-            }
-        }
-        Err(error) => {
-            warn!("durable hold lookup failed: {error}");
-            return internal_json_error_response("chio_mediation_failed", &error.to_string());
-        }
-    }
-    // Fail-closed over-subscription guard: the kernel derives the durable budget
-    // hold identity from `request_id`, so a reused id inside a live reservation
-    // window would collapse into an idempotent authorize with no fresh
-    // reservation. Claim the id for this window before authorizing and reject a
-    // reuse with 409. The claim is released below when the authorization places
-    // no durable hold, so a denied or failed attempt does not permanently burn
-    // the id; claimed ids expire with the reservation TTL, keeping the set
-    // bounded.
-    let now_unix = match state.clock.signed_seconds() {
-        Ok(now) => now,
-        Err(error) => return clock::rejection(error),
-    };
-    let request_claim = match state
-        .minted_request_ids
-        .lock()
-        .await
-        .claim(&request_id, now_unix)
-    {
-        Ok(claim) => claim,
-        Err(error) => {
-            let status = match error {
-                RequestIdClaimError::Reused => StatusCode::CONFLICT,
-                RequestIdClaimError::Shape => StatusCode::BAD_REQUEST,
-                _ => StatusCode::SERVICE_UNAVAILABLE,
-            };
-            return input::with_source(
-                (
-                    status,
-                    axum::Json(serde_json::json!({"error": error.to_string()})),
-                )
-                    .into_response(),
-                error,
-            );
-        }
-    };
     let mut kernel_request = ToolCallRequest {
-        request_id: request_id.clone(),
+        request_id,
         capability: parsed.capability,
         tool_name: parsed.tool_name,
         server_id: parsed.tool_server,
@@ -574,69 +482,48 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         federated_origin_kernel_id: None,
         declassification_grant: None,
     };
-    if let Some(approval_id) = parsed.approval_id.as_deref() {
-        if let Err(error) =
-            super::approval::redeem_approval(&state, &kernel, &mut kernel_request, approval_id)
-        {
-            state
-                .minted_request_ids
-                .lock()
-                .await
-                .release(&request_claim);
-            return approval_error_response(error);
+    let approval_id = parsed.approval_id;
+    // The flight moves into the blocking worker, so the claim cleanup it
+    // protects completes even when the HTTP caller disconnects mid-reservation.
+    let reserved = blocking({
+        let state = Arc::clone(&state);
+        move || -> Result<chio_kernel::ToolCallResponse, Response> {
+            let _flight = flight;
+            let claim = claim_for_reservation(
+                &state,
+                &kernel,
+                budget_store.as_ref(),
+                &mut kernel_request,
+                approval_id.as_deref(),
+            )?;
+            // Reservation on the shared, process-lifetime kernel: verify +
+            // reserve the budget hold (kept open) + mint a fresh execution
+            // nonce. The reserve-for-caller path never dispatches, so it does
+            // not require the caller-named server to be registered. No
+            // dispatch, no reconcile, no settlement. Under durable admission
+            // the reservation is the operation's own: the strict preflight
+            // issues the operation-bound nonce and the execution's first half
+            // reserves the executable hold and nonce. Only the separate
+            // authenticated start can commit them for external execution.
+            let reserved = if durable_reservation {
+                kernel.reserve_caller_execution_blocking(&kernel_request)
+            } else {
+                kernel.authorize_tool_call_reserving_blocking_with_metadata(&kernel_request, None)
+            };
+            settle_reservation_claim(&state, &claim, reserved)
         }
-    }
-    // Reservation on the shared, process-lifetime kernel: verify +
-    // reserve the budget hold (kept open) + mint a fresh execution nonce. The
-    // reserve-for-caller path never dispatches, so it does not require the
-    // caller-named server to be registered; the route therefore never registers
-    // it and holds the kernel behind a shared (non-mut) lock. No dispatch, no
-    // reconcile, no settlement. The lock is released at the end of the block,
-    // before any await, so authorizations serialize without holding the kernel
-    // across receipt-persistence I/O.
-    let response = {
-        // Under durable admission the reservation is the operation's own: the
-        // strict preflight issues the operation-bound nonce and the execution's
-        // first half reserves the executable hold and nonce. Only the separate
-        // authenticated start can commit them for external execution.
-        let reserved = if durable_reservation {
-            kernel.reserve_caller_execution_blocking(&kernel_request)
-        } else {
-            kernel.authorize_tool_call_reserving_blocking_with_metadata(&kernel_request, None)
-        };
-        match reserved {
-            Ok(response) => response,
-            Err(error) => {
-                // The reservation did not open; release the claimed id so a
-                // failed authorization does not permanently burn it.
-                state
-                    .minted_request_ids
-                    .lock()
-                    .await
-                    .release(&request_claim);
-                warn!("mediated authorization error: {error}");
-                return internal_json_error_response("chio_mediation_failed", &error.to_string());
-            }
+    })
+    .await;
+    let response = match reserved {
+        Ok(Ok(response)) => response,
+        Ok(Err(rejection)) => return rejection,
+        Err(WorkerFailed) => {
+            return internal_json_error_response(
+                "chio_mediation_failed",
+                "mediated authorization worker did not complete",
+            )
         }
     };
-    // Only a successful reservation (Verdict::Allow) keeps its request-id claim: a
-    // denied or pending verdict placed no durable hold, so release the id to let
-    // the caller retry it without a spurious 409.
-    if !matches!(response.verdict, chio_kernel::Verdict::Allow) {
-        state
-            .minted_request_ids
-            .lock()
-            .await
-            .release(&request_claim);
-    }
-    if let Some(nonce) = response.execution_nonce.as_deref() {
-        state
-            .minted_request_ids
-            .lock()
-            .await
-            .retain_until(&request_claim, nonce.nonce.expires_at);
-    }
-    drop(kernel);
     // Kernel delivery is idempotent on the shared sink. An irreversible reserve
     // may return its signed nonce after an append failure; retry persistence and
     // report that outcome without discarding the caller's only recovery evidence.
@@ -678,6 +565,163 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         })),
     )
         .into_response()
+}
+
+/// The durable reuse check, request-id claim and approval redemption that
+/// precede one `/v1/evaluate` reservation. Runs on the blocking pool while the
+/// caller holds the request id's flight; a claim it returns is settled by
+/// [`settle_reservation_claim`] before that flight ends.
+fn claim_for_reservation(
+    state: &ProxyState,
+    kernel: &ChioKernel,
+    budget_store: &dyn BudgetStore,
+    kernel_request: &mut ToolCallRequest,
+    approval_id: Option<&str>,
+) -> Result<RequestIdClaim, Response> {
+    let request_id = kernel_request.request_id.clone();
+    // Durable reuse guard that survives a restart, which the in-memory window
+    // below cannot: after a restart the window is empty, but a reservation opened
+    // before it persists as a budget hold. Rejecting the reuse fail-closed (409)
+    // is load-bearing because a reused id would either collapse into an idempotent
+    // authorize that mints a second nonce against one reservation without
+    // reserving more budget, or (for a closed, settled-or-reaped hold) make the
+    // kernel reject the duplicate hold id on creation and turn an otherwise valid
+    // later authorization into a 500 instead of the documented bounded-reuse 409.
+    //
+    // Prefer the capability-agnostic durable probe. The kernel derives each hold
+    // id from (request_id, capability id, grant index), so the per-grant exact-id
+    // lookup below only sees a reuse under the SAME capability: a caller that
+    // replays this request_id under a DIFFERENT capability token would miss the
+    // existing `budget-hold:{request_id}:{other_cap}:..` row and win a second
+    // reservation once a restart cleared the in-memory window. When the store can
+    // enumerate holds by the `budget-hold:{request_id}:` prefix it rejects the
+    // reuse regardless of which capability opened the hold; when it cannot
+    // (`Ok(None)`), fall back to the per-grant exact-id probe.
+    match budget_store.request_id_has_reserved_hold(&request_id) {
+        Ok(Some(true)) => return Err(request_id_reused()),
+        Ok(Some(false)) => {}
+        Ok(None) => {
+            for grant_index in 0..kernel_request.capability.scope.grants.len() {
+                let hold_id = format!(
+                    "budget-hold:{}:{}:{}",
+                    request_id, kernel_request.capability.id, grant_index
+                );
+                match budget_store.get_budget_hold(&hold_id) {
+                    Ok(Some(_)) => return Err(request_id_reused()),
+                    Ok(None) => {}
+                    Err(error) => {
+                        warn!("durable hold lookup failed: {error}");
+                        return Err(internal_json_error_response(
+                            "chio_mediation_failed",
+                            &error.to_string(),
+                        ));
+                    }
+                }
+            }
+        }
+        Err(error) => {
+            warn!("durable hold lookup failed: {error}");
+            return Err(internal_json_error_response(
+                "chio_mediation_failed",
+                &error.to_string(),
+            ));
+        }
+    }
+    // Fail-closed over-subscription guard: the kernel derives the durable budget
+    // hold identity from `request_id`, so a reused id inside a live reservation
+    // window would collapse into an idempotent authorize with no fresh
+    // reservation. Claim the id for this window before authorizing and reject a
+    // reuse with 409. The claim is released when the authorization places no
+    // durable hold, so a denied or failed attempt does not permanently burn the
+    // id; claimed ids expire with the reservation TTL, keeping the set bounded.
+    // The clock is read under the window guard so concurrent claims for
+    // different ids reach the window in clock order.
+    let request_claim = {
+        let mut window = state
+            .minted_request_ids
+            .lock()
+            .map_err(|_| request_id_rejection(RequestIdClaimError::Unavailable))?;
+        let now_unix = state.clock.signed_seconds().map_err(clock::rejection)?;
+        window
+            .claim(&request_id, now_unix)
+            .map_err(request_id_rejection)?
+    };
+    if let Some(approval_id) = approval_id {
+        if let Err(error) =
+            super::approval::redeem_approval(state, kernel, kernel_request, approval_id)
+        {
+            request_window(state).release(&request_claim);
+            return Err(approval_error_response(error));
+        }
+    }
+    Ok(request_claim)
+}
+
+/// Release or retain a reservation's request-id claim from the kernel outcome.
+fn settle_reservation_claim(
+    state: &ProxyState,
+    request_claim: &RequestIdClaim,
+    reserved: Result<chio_kernel::ToolCallResponse, chio_kernel::KernelError>,
+) -> Result<chio_kernel::ToolCallResponse, Response> {
+    let response = match reserved {
+        Ok(response) => response,
+        Err(error) => {
+            // The reservation did not open; release the claimed id so a
+            // failed authorization does not permanently burn it.
+            request_window(state).release(request_claim);
+            warn!("mediated authorization error: {error}");
+            return Err(internal_json_error_response(
+                "chio_mediation_failed",
+                &error.to_string(),
+            ));
+        }
+    };
+    // Only a successful reservation (Verdict::Allow) keeps its request-id claim: a
+    // denied or pending verdict placed no durable hold, so release the id to let
+    // the caller retry it without a spurious 409.
+    if !matches!(response.verdict, chio_kernel::Verdict::Allow) {
+        request_window(state).release(request_claim);
+    }
+    if let Some(nonce) = response.execution_nonce.as_deref() {
+        request_window(state).retain_until(request_claim, nonce.nonce.expires_at);
+    }
+    Ok(response)
+}
+
+/// Claim cleanup proceeds on a poisoned window: release and retention only
+/// remove or extend this owner's own entry.
+fn request_window(state: &ProxyState) -> std::sync::MutexGuard<'_, MintedRequestIdWindow> {
+    state
+        .minted_request_ids
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+fn request_id_reused() -> Response {
+    (
+        StatusCode::CONFLICT,
+        axum::Json(serde_json::json!({
+            "error": "chio_request_id_reused",
+            "message": "request_id already backs a reservation; choose a fresh request_id",
+        })),
+    )
+        .into_response()
+}
+
+fn request_id_rejection(error: RequestIdClaimError) -> Response {
+    let status = match error {
+        RequestIdClaimError::Reused => StatusCode::CONFLICT,
+        RequestIdClaimError::Shape => StatusCode::BAD_REQUEST,
+        _ => StatusCode::SERVICE_UNAVAILABLE,
+    };
+    input::with_source(
+        (
+            status,
+            axum::Json(serde_json::json!({"error": error.to_string()})),
+        )
+            .into_response(),
+        error,
+    )
 }
 
 /// `POST /v1/reconcile` request shape. The caller presents the execution nonce
@@ -727,7 +771,7 @@ pub(crate) async fn sidecar_reconcile_handler(
             Ok(parsed) => parsed,
             Err(error) => return input::rejected(error),
         };
-    let Some(mediation_kernel) = state.mediation_kernel.as_ref() else {
+    let Some(kernel) = state.mediation_kernel.clone() else {
         return internal_json_error_response(
             "chio_mediation_unavailable",
             "reconcile route requires a configured budget store (--control-url or --budget-db)",
@@ -745,11 +789,11 @@ pub(crate) async fn sidecar_reconcile_handler(
         );
     }
     // Settle on the shared kernel. The same instance minted the nonce, so its
-    // configured nonce authority prevents a second settlement. Legacy replay is
-    // rejected; durable completion can redeliver its retained receipt. The lock
-    // releases at the end of the block, before sidecar receipt-persistence I/O.
-    let reconciled = {
-        let kernel = mediation_kernel.lock().await;
+    // configured nonce authority prevents a second settlement: the store closes
+    // the hold atomically, so concurrent presentations of one nonce cannot both
+    // settle. Legacy replay is rejected; durable completion can redeliver its
+    // retained receipt.
+    let reconciled = blocking(move || {
         if kernel.has_durable_admission_store() {
             kernel.reconcile_caller_execution_blocking(
                 &parsed.execution_nonce,
@@ -768,10 +812,17 @@ pub(crate) async fn sidecar_reconcile_handler(
                 &parsed.realized_cost,
             )
         }
-    };
+    })
+    .await;
     let reconciled = match reconciled {
-        Ok(response) => response,
-        Err(error) => {
+        Ok(Ok(response)) => response,
+        Err(WorkerFailed) => {
+            return internal_json_error_response(
+                "chio_mediation_failed",
+                "reconcile worker did not complete",
+            )
+        }
+        Ok(Err(error)) => {
             warn!("reconcile rejected: {error}");
             return (
                 StatusCode::BAD_REQUEST,
@@ -811,9 +862,10 @@ pub(crate) async fn reap_expired_reserved_holds_once(
     state: &Arc<ProxyState>,
     now_unix_secs: i64,
 ) -> Result<usize, chio_kernel::KernelError> {
-    let Some(mediation_kernel) = state.mediation_kernel.as_ref() else {
+    let Some(kernel) = state.mediation_kernel.clone() else {
         return Ok(0);
     };
-    let kernel = mediation_kernel.lock().await;
-    kernel.reap_expired_reserved_budget_holds(now_unix_secs)
+    blocking(move || kernel.reap_expired_reserved_budget_holds(now_unix_secs))
+        .await
+        .map_err(|error| chio_kernel::KernelError::Internal(error.to_string()))?
 }

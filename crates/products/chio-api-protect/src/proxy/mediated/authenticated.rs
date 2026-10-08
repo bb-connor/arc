@@ -65,17 +65,20 @@ pub(crate) async fn start(
     {
         return rejected();
     }
-    let Some(kernel) = state.mediation_kernel.as_ref() else {
+    let Some(kernel) = state.mediation_kernel.clone() else {
         return rejected();
     };
-    let result = kernel
-        .lock()
-        .await
-        .start_caller_execution_with_credentials_blocking(
+    let result = blocking(move || {
+        kernel.start_caller_execution_with_credentials_blocking(
             &request.execution_nonce,
             &request.arguments,
             request.credentials,
-        );
+        )
+    })
+    .await;
+    let Ok(result) = result else {
+        return rejected();
+    };
     match result {
         Ok(chio_kernel::CallerStartResponse::Authorized(authorization)) => {
             (StatusCode::OK, axum::Json(serde_json::json!({
@@ -115,13 +118,19 @@ pub(crate) async fn report(
     {
         return rejected();
     }
-    let Some(kernel) = state.mediation_kernel.as_ref() else {
+    let Some(kernel) = state.mediation_kernel.clone() else {
         return rejected();
     };
-    let result = kernel
-        .lock()
-        .await
-        .reconcile_authenticated_caller_execution_blocking(&request.authorization, &request.report);
+    let result = blocking(move || {
+        kernel.reconcile_authenticated_caller_execution_blocking(
+            &request.authorization,
+            &request.report,
+        )
+    })
+    .await;
+    let Ok(result) = result else {
+        return rejected();
+    };
     match result {
         Ok(response) => {
             // This route returns only the kernel's guard-evaluated value. The

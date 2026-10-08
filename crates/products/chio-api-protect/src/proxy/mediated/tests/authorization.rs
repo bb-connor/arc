@@ -1248,8 +1248,6 @@ async fn durable_mediation_reserves_the_operation_and_settles_the_caller_report(
             .mediation_kernel
             .as_ref()
             .unwrap()
-            .lock()
-            .await
             .has_durable_admission_store(),
         "the mediation kernel runs under durable admission"
     );

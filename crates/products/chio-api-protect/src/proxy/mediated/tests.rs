@@ -10,6 +10,8 @@ mod approvals;
 mod authenticated;
 #[path = "tests/authorization.rs"]
 mod authorization;
+#[path = "tests/concurrency.rs"]
+mod concurrency;
 #[path = "../tests/mediated_boundary_tests.rs"]
 mod boundary_tests;
 #[path = "tests/reconcile_numbers.rs"]
@@ -267,7 +269,7 @@ fn mediated_test_state_with_durable_admission(
     // reuse keeps the approval-token and DPoP replay stores authoritative and
     // makes the nonce minted on `/v1/evaluate` the one settled on
     // `/v1/reconcile`.
-    let mediation_kernel = Mutex::new(
+    let mediation_kernel = Arc::new(
         build_mediation_kernel(
             &signer,
             Arc::clone(&budget),
@@ -309,10 +311,11 @@ fn mediated_test_state_with_durable_admission(
         sidecar_control_token,
         budget_store: Some(budget),
         mediation_hold_capable: hold_capable,
-        mediation_kernel: Some(Arc::new(mediation_kernel)),
-        minted_request_ids: Mutex::new(MintedRequestIdWindow::new(
+        mediation_kernel: Some(mediation_kernel),
+        minted_request_ids: std::sync::Mutex::new(MintedRequestIdWindow::new(
             chio_kernel::DEFAULT_EXECUTION_NONCE_TTL_SECS,
         )),
+        request_flights: RequestFlights::default(),
         allow_advisory: false,
         receipt_backend: "ephemeral",
         revocation_backend: "ephemeral",
@@ -742,7 +745,7 @@ async fn mediated_receipt_persistence_failure_returns_nonce_and_keeps_reservatio
     // The request-id claim is retained: the id backs a live reservation, so a
     // reuse must still collide rather than mint a second nonce.
     assert_eq!(
-        state.minted_request_ids.lock().await.len(),
+        state.minted_request_ids.lock().unwrap().len(),
         1,
         "a returned reservation must retain its request-id claim"
     );
@@ -791,7 +794,7 @@ async fn mediated_receipt_persistence_success_keeps_reservation() {
         "a persisted authorization must keep its reserved hold"
     );
     assert_eq!(
-        state.minted_request_ids.lock().await.len(),
+        state.minted_request_ids.lock().unwrap().len(),
         1,
         "a persisted authorization must retain its request-id claim"
     );

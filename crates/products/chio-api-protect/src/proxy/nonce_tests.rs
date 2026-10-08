@@ -54,9 +54,10 @@ fn strict_nonce_state_with_upstream(routes: Vec<RouteEntry>, upstream: String) -
         budget_store: None,
         mediation_hold_capable: false,
         mediation_kernel: None,
-        minted_request_ids: Mutex::new(MintedRequestIdWindow::new(
+        minted_request_ids: std::sync::Mutex::new(MintedRequestIdWindow::new(
             chio_kernel::DEFAULT_EXECUTION_NONCE_TTL_SECS,
         )),
+        request_flights: RequestFlights::default(),
         allow_advisory: false,
         receipt_backend: "ephemeral",
         revocation_backend: "ephemeral",

@@ -314,10 +314,11 @@ impl Fixture {
             sidecar_control_token: None,
             budget_store: Some(budget),
             mediation_hold_capable: true,
-            mediation_kernel: Some(Arc::new(Mutex::new(kernel))),
-            minted_request_ids: Mutex::new(MintedRequestIdWindow::new(
+            mediation_kernel: Some(Arc::new(kernel)),
+            minted_request_ids: std::sync::Mutex::new(MintedRequestIdWindow::new(
                 chio_kernel::DEFAULT_EXECUTION_NONCE_TTL_SECS,
             )),
+            request_flights: RequestFlights::default(),
             allow_advisory: false,
             receipt_backend: "fixture-joint",
             revocation_backend: "fixture-none",
@@ -370,13 +371,12 @@ impl Fixture {
         ),
         Box<dyn std::error::Error>,
     > {
-        let kernel = self
-            .state
-            .mediation_kernel
-            .as_ref()
-            .ok_or("original kernel")?
-            .lock()
-            .await;
+        let kernel = Arc::clone(
+            self.state
+                .mediation_kernel
+                .as_ref()
+                .ok_or("original kernel")?,
+        );
         let preflight = kernel.evaluate_tool_call(&self.request).await?;
         assert_eq!(
             preflight.verdict,
@@ -419,13 +419,13 @@ async fn admission_host_retry_pending_payment_completes_without_new_request() ->
     let mut fixture = Fixture::new()?;
     let operation_id;
     {
-        let kernel = fixture
-            .state
-            .mediation_kernel
-            .as_ref()
-            .ok_or("original kernel")?
-            .lock()
-            .await;
+        let kernel = Arc::clone(
+            fixture
+                .state
+                .mediation_kernel
+                .as_ref()
+                .ok_or("original kernel")?,
+        );
         let preflight = kernel.evaluate_tool_call(&fixture.request).await?;
         assert_eq!(
             preflight.verdict,

@@ -58,6 +58,8 @@ pub use approval_authority::ProtectApprovalConfig;
 mod approval;
 #[path = "proxy/attenuation.rs"]
 mod attenuation;
+#[path = "proxy/blocking.rs"]
+mod blocking;
 #[path = "proxy/clock.rs"]
 mod clock;
 #[path = "proxy/config.rs"]
@@ -98,6 +100,7 @@ use request_ids::*;
 
 pub(crate) use self::approval::*;
 pub(crate) use self::attenuation::*;
+pub(crate) use self::blocking::{blocking, WorkerFailed};
 pub(crate) use self::control::*;
 pub(crate) use self::decision::*;
 pub(crate) use self::errors::*;

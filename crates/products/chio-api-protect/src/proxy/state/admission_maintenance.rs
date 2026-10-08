@@ -23,7 +23,6 @@ pub(crate) struct MaintenanceHealth {
     pub(crate) ticks_completed: u64,
     pub(crate) recovered: u64,
     pub(crate) reaped: u64,
-    pub(crate) busy_skips: u64,
     pub(crate) worker_running: bool,
     pub(crate) worker_joined: bool,
     pub(crate) shutdown_overdue: bool,
@@ -53,7 +52,6 @@ impl MaintenanceControl {
                     ticks_completed: 0,
                     recovered: 0,
                     reaped: 0,
-                    busy_skips: 0,
                     worker_running: true,
                     worker_joined: false,
                     shutdown_overdue: false,
@@ -162,7 +160,7 @@ pub(crate) struct AdmissionMaintenance {
 
 impl AdmissionMaintenance {
     pub(crate) fn spawn(
-        kernel: Arc<Mutex<ChioKernel>>,
+        kernel: Arc<ChioKernel>,
         hold_capable: bool,
         controller: Arc<ShutdownController>,
         interval: Duration,
@@ -236,14 +234,14 @@ impl AdmissionMaintenance {
 
 impl Drop for AdmissionMaintenance {
     fn drop(&mut self) {
-        // try_lock tick entry never waits for a Tokio request holder. Custom
+        // Ticks share the kernel with requests and never wait for one. Custom
         // synchronous rails can still delay this mandatory ownership barrier.
         self.join_now();
     }
 }
 
 fn run_worker(
-    kernel: &Mutex<ChioKernel>,
+    kernel: &ChioKernel,
     hold_capable: bool,
     control: &MaintenanceControl,
     interval: Duration,
@@ -252,12 +250,6 @@ fn run_worker(
         control.update(|state| {
             state.health.ticks_attempted = state.health.ticks_attempted.saturating_add(1);
         })?;
-        let Ok(kernel) = kernel.try_lock() else {
-            control.update(|state| {
-                state.health.busy_skips = state.health.busy_skips.saturating_add(1);
-            })?;
-            continue;
-        };
         // Exactly one physical page on this original kernel. Ok(0) can mean a
         // known parked item or concurrent progress; it does not settle money.
         let recovered =

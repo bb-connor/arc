@@ -59,7 +59,7 @@ async fn product_default_guards_caller_reservation_refuses_internal_target_witho
         receipt.decision,
         Some(chio_core_types::receipt::decision::Decision::Deny { .. })
     ));
-    let kernel = state.mediation_kernel.as_ref().test_unwrap().lock().await;
+    let kernel = state.mediation_kernel.as_ref().test_unwrap();
     assert_eq!(
         kernel.guard_names(),
         ["internal-network", "agent-velocity", "advisory-pipeline"]

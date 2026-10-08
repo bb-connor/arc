@@ -174,7 +174,7 @@ impl ApprovalHarness {
         let mutable = Arc::get_mut(&mut state).ok_or("unexpected shared fixture state")?;
         mutable.receipt_store = Some(Mutex::new(SqliteReceiptStore::from_shared(evidence)));
         mutable.clock = self.clock.clone();
-        mutable.mediation_kernel = Some(Arc::new(Mutex::new(kernel)));
+        mutable.mediation_kernel = Some(Arc::new(kernel));
         mutable.approval_admin = ApprovalAdmin::new(Arc::new(SqliteApprovalStore::open(
             self.directory.path().join("approvals.db"),
         )?));
@@ -187,8 +187,6 @@ impl ApprovalHarness {
             .mediation_kernel
             .as_ref()
             .ok_or("kernel")?
-            .lock()
-            .await
             .issue_capability(
                 &self.subject.public_key(),
                 ChioScope {
@@ -509,7 +507,7 @@ async fn ap23_capability_revocation_rejects_approved_call_before_reservation() -
 async fn ap23_fresh_start_rechecks_signer_retirement_and_capability_revocation() -> TestResult {
     for retire_signer in [true, false] {
         let harness = ApprovalHarness::new()?;
-        let state = harness.open(harness.config.clone()).await?;
+        let mut state = harness.open(harness.config.clone()).await?;
         let capability = harness.capability(&state).await?;
         let pending = harness.submit(state.clone(), &capability).await?;
         let token = harness.approve(state.clone(), &pending).await?;
@@ -518,12 +516,12 @@ async fn ap23_fresh_start_rechecks_signer_retirement_and_capability_revocation()
         assert_eq!(status, StatusCode::OK, "{reserved}");
         assert_eq!(reserved["status"], "reserved", "{reserved}");
         if retire_signer {
-            state
-                .mediation_kernel
-                .as_ref()
-                .ok_or("kernel")?
-                .lock()
-                .await
+            // Serving has quiesced, so this test is the kernel's only owner and
+            // may reconfigure it as a restart with a new roster would.
+            Arc::get_mut(&mut state)
+                .and_then(|state| state.mediation_kernel.as_mut())
+                .and_then(Arc::get_mut)
+                .ok_or("quiesced kernel owner")?
                 .set_governed_approval_policy(
                     "tenant-a".into(),
                     vec![Keypair::generate().public_key()],
