@@ -69,7 +69,9 @@ mod governed_approval_replay;
 mod native_capture_readback;
 pub use native_capture_readback::NativeDispatchCaptureWitness;
 mod native_capture_diagnostic;
-pub(crate) use native_capture_diagnostic::{NativeCaptureDiagnostic, NativeCaptureStage};
+pub(crate) use native_capture_diagnostic::{
+    NativeCaptureDiagnostic, NativeCapturePhase, NativeCaptureStage, NativeCaptureTime,
+};
 #[cfg(feature = "admission-test-support")]
 mod native_capture_test_support;
 pub(crate) use governed_approval_claim::{

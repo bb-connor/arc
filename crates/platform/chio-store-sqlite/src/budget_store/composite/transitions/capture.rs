@@ -52,8 +52,11 @@ impl SqliteBudgetStore {
                 .as_ref()
                 .is_some_and(|binding| binding.native.is_some()),
         );
-        self.capture_composite_invocation_with_diagnostic(request, admission, &diagnostic)
-            .inspect_err(|error| diagnostic.budget_refused(error))
+        let result = self
+            .capture_composite_invocation_with_diagnostic(request, admission, &diagnostic)
+            .inspect_err(|error| diagnostic.budget_refused(error));
+        diagnostic.profile(result.is_ok());
+        result
     }
 
     fn capture_composite_invocation_with_diagnostic(

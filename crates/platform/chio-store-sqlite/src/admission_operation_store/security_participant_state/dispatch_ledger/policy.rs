@@ -26,7 +26,7 @@ pub(super) struct Inputs {
     pub observed_at_unix_ms: u64,
     #[serde(deserialize_with = "required_option")]
     stored_context_generation: Option<u64>,
-    prepared_at_unix_ms: u64,
+    pub prepared_at_unix_ms: u64,
     pub valid_until_unix_ms: u64,
     pub declassification:
         Option<chio_kernel::admission_operation::NativeSecurityDeclassificationGrantV1>,

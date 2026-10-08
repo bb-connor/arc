@@ -64,7 +64,7 @@ serde_json = { workspace = true }
 subtle = "2.6"
 rusqlite = { workspace = true, features = ["functions", "hooks"] }
 rand_core = { workspace = true }
-rustix = { workspace = true }
+rustix = { workspace = true, features = ["time"] }
 libc = "0.2"
 nix = { version = "0.31.2", features = ["user"] }
 tracing = { workspace = true }

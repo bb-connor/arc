@@ -69,6 +69,29 @@ impl SqliteAdmissionOperationStore {
             .remove_function("native_capture_expiry_advance", 1)
             .map_err(sqlite_error)
     }
+
+    /// Advance the configured clock at final verification to the retained
+    /// policy's validity end. The policy and its fence are unchanged.
+    pub fn inject_native_capture_policy_expiry_for_test(
+        &self,
+        advance: impl Fn(u64) -> Result<(), String> + Send + std::panic::UnwindSafe + 'static,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        let connection = self.connection()?;
+        install_advance(&connection, advance)?;
+        connection.execute_batch("CREATE TEMP TABLE native_capture_policy_expiry_test_fault (singleton INTEGER PRIMARY KEY CHECK(singleton = 1))").map_err(sqlite_error)
+    }
+
+    pub fn clear_native_capture_policy_expiry_for_test(
+        &self,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        let connection = self.connection()?;
+        connection
+            .execute_batch("DROP TABLE temp.native_capture_policy_expiry_test_fault")
+            .map_err(sqlite_error)?;
+        connection
+            .remove_function("native_capture_expiry_advance", 1)
+            .map_err(sqlite_error)
+    }
 }
 
 pub(super) fn wait_after_verification(
@@ -77,25 +100,44 @@ pub(super) fn wait_after_verification(
     runtime_until: Option<u64>,
     nonce_until: Option<u64>,
     declassification_until: Option<u64>,
+    policy_until: u64,
 ) -> Result<Option<&'static str>, AdmissionOperationStoreError> {
-    let installed: bool = tx.query_row(
-        "SELECT EXISTS(SELECT 1 FROM sqlite_temp_schema WHERE type = 'table' AND name = 'native_capture_runtime_expiry_test_fault')",
-        [], |row| row.get(0),
-    ).map_err(sqlite_error)?;
-    let nonce_installed: bool = tx.query_row(
-        "SELECT EXISTS(SELECT 1 FROM sqlite_temp_schema WHERE type = 'table' AND name = 'native_capture_nonce_expiry_test_fault')",
-        [], |row| row.get(0),
-    ).map_err(sqlite_error)?;
-    let declassification_installed: bool = tx.query_row(
-        "SELECT EXISTS(SELECT 1 FROM sqlite_temp_schema WHERE type = 'table' AND name = 'native_capture_declassification_expiry_test_fault')",
-        [], |row| row.get(0),
-    ).map_err(sqlite_error)?;
-    let (kind, until) = match (installed, nonce_installed, declassification_installed) {
-        (false, false, false) => return Ok(None),
-        (true, false, false) => ("runtime", runtime_until),
-        (false, true, false) => ("nonce", nonce_until),
-        (false, false, true) => ("declassification", declassification_until),
-        _ => return Err(invalid("expiry cutpoint selects multiple credentials")),
+    let mut selected = None;
+    for (table, kind, until) in [
+        (
+            "native_capture_runtime_expiry_test_fault",
+            "runtime",
+            runtime_until,
+        ),
+        (
+            "native_capture_nonce_expiry_test_fault",
+            "nonce",
+            nonce_until,
+        ),
+        (
+            "native_capture_declassification_expiry_test_fault",
+            "declassification",
+            declassification_until,
+        ),
+        (
+            "native_capture_policy_expiry_test_fault",
+            "policy",
+            Some(policy_until),
+        ),
+    ] {
+        let installed: bool = tx
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM sqlite_temp_schema WHERE type = 'table' AND name = ?1)",
+                [table],
+                |row| row.get(0),
+            )
+            .map_err(sqlite_error)?;
+        if installed && selected.replace((kind, until)).is_some() {
+            return Err(invalid("expiry cutpoint selects multiple credentials"));
+        }
+    }
+    let Some((kind, until)) = selected else {
+        return Ok(None);
     };
     let until = until.ok_or_else(|| invalid("expiry cutpoint lacks selected credential"))?;
     let before = super::super::super::super::schema::observe_authority_time(tx, owner)?;

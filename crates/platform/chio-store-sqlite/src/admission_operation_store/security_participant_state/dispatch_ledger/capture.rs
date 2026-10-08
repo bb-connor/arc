@@ -3,7 +3,10 @@ use super::*;
 use crate::admission_operation_store::threshold_approval::{
     reserved_nonce_capture_approval, ReservedThresholdApproval,
 };
-use crate::admission_operation_store::{NativeCaptureDiagnostic, NativeCaptureStage as Stage};
+use crate::admission_operation_store::{
+    NativeCaptureDiagnostic, NativeCapturePhase as Phase, NativeCaptureStage as Stage,
+    NativeCaptureTime as Time,
+};
 use chio_kernel::admission_operation::{
     dpop_claim::DpopReplayCredentialV1, governed_approval_claim::GovernedApprovalCredentialV1,
 };
@@ -104,6 +107,16 @@ impl<'tx> VerifiedNativeCapture<'tx> {
         if value != record.policy {
             return Err(invalid("native capture changed its live policy evidence"));
         }
+        for (time, unix_ms) in [
+            (Time::PolicyPrepared, policy.inputs.prepared_at_unix_ms),
+            (Time::PolicyValidUntil, policy.inputs.valid_until_unix_ms),
+            (Time::RetainDecision, record.decision_at),
+            (Time::RetainEntry, record.observed_at),
+            (Time::CaptureDecision, custody.trusted_now_unix_ms),
+            (Time::CaptureEntry, now),
+        ] {
+            diagnostic.observe(time, unix_ms);
+        }
         policy.validate_live_declassification(custody.request)?;
         policy.validate_owned_declassification(tx, operation, &value)?;
         if policy.inputs.declassification.is_some() {
@@ -129,6 +142,7 @@ impl<'tx> VerifiedNativeCapture<'tx> {
         policy
             .validate_current_for_capture(tx, now, Some(diagnostic))
             .map_err(|error| {
+                diagnostic.phase(Phase::CaptureEntry);
                 invalid(format!(
                     "native capture policy at transaction entry: {error}"
                 ))
@@ -278,7 +292,10 @@ impl<'tx> VerifiedNativeCapture<'tx> {
         }
         // An interval ending here must be valid in every original participant,
         // including credential, policy, lease, capability and nonce deadlines.
-        self.validate_time(custody.valid_until_unix_ms() - 1)
+        let endpoint = custody.valid_until_unix_ms() - 1;
+        self.diagnostic.observe(Time::CallerInterval, endpoint);
+        self.validate_time(endpoint)
+            .inspect_err(|_| self.diagnostic.phase(Phase::CallerInterval))
     }
 
     pub(crate) fn verify_transition(
@@ -323,7 +340,9 @@ impl<'tx> VerifiedNativeCapture<'tx> {
         }
         self.diagnostic.at(Stage::CommitClock);
         let now = observed_time(tx, self.observed_at, owner)?;
-        self.validate_time(now)?;
+        self.diagnostic.observe(Time::CommitState, now);
+        self.validate_time(now)
+            .inspect_err(|_| self.diagnostic.phase(Phase::CommitState))?;
         self.diagnostic.at(Stage::CommitApproval);
         governed_approval_claim::verify_fresh_approval_tx(tx, &self.operation, now, owner)?;
         self.diagnostic.at(Stage::CommitDpop);
@@ -332,6 +351,7 @@ impl<'tx> VerifiedNativeCapture<'tx> {
         self.policy
             .validate_current_for_capture(tx, now, Some(self.diagnostic))
             .map_err(|error| {
+                self.diagnostic.phase(Phase::CommitState);
                 invalid(format!(
                     "native capture policy before physical commit: {error}"
                 ))
@@ -347,6 +367,7 @@ impl<'tx> VerifiedNativeCapture<'tx> {
                 .declassification
                 .as_ref()
                 .and_then(|grant| grant.body.expires_at_unix_seconds().checked_mul(1000)),
+            self.policy.inputs.valid_until_unix_ms,
         )?;
         // State verification can outlive its initial clock sample. The claims
         // above and the captured credentials name the same immutable episodes
@@ -354,20 +375,26 @@ impl<'tx> VerifiedNativeCapture<'tx> {
         // followed only by bounded time checks and the physical commit.
         self.diagnostic.at(Stage::CommitClock);
         let commit_now = super::super::super::schema::observe_authority_time(tx, owner)?;
+        self.diagnostic.observe(Time::CommitTime, commit_now);
         if commit_now < now {
             return Err(invalid("native capture clock regressed before commit"));
         }
         if let Some(threshold) = &self.threshold {
             self.diagnostic.at(Stage::CommitApproval);
-            threshold.validate_at(commit_now)?;
+            threshold
+                .validate_at(commit_now)
+                .inspect_err(|_| self.diagnostic.phase(Phase::CommitTime))?;
         }
+        let result = self
+            .validate_time(commit_now)
+            .inspect_err(|_| self.diagnostic.phase(Phase::CommitTime));
         #[cfg(feature = "admission-test-support")]
         {
-            expiry_test_support::annotate_rejection(delayed, self.validate_time(commit_now))
+            expiry_test_support::annotate_rejection(delayed, result)
         }
         #[cfg(not(feature = "admission-test-support"))]
         {
-            self.validate_time(commit_now)
+            result
         }
     }
 

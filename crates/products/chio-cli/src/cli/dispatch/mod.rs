@@ -175,6 +175,44 @@ mod redacted_format_tests {
         ]);
         Ok(())
     }
+
+    #[test]
+    fn native_capture_phase_and_profile_use_the_production_redaction_formatter(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use std::sync::{Arc, Mutex, PoisonError};
+        use tracing_subscriber::prelude::*;
+        let lines = Arc::new(Mutex::new(Vec::new()));
+        let retained = lines.clone();
+        let layer = chio_log_redact::RedactionLayer::new(move |event| {
+            retained
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .push(format_redacted_event_line(&event));
+        })?;
+        let timeline = "valid_until:10000,retain_decision:8366,retain_entry:9142,\
+            capture_decision:9600,capture_entry:9612,caller_interval:9999,commit_state:9990,\
+            commit_time:4294967295";
+        let stages = "store_callback:12/11,connection:4294967295/4294967295,\
+            transaction_begin:1530/40,native_evidence:812345/790001,\
+            declassification_not_yet_valid:0/0,commit_capability_expired:7/7";
+        let subscriber = tracing_subscriber::registry().with(layer);
+        tracing::subscriber::with_default(subscriber, || {
+            tracing::warn!(target: "chio::native_capture",
+                native_capture_stage = "policy_expired",
+                native_capture_category = "invariant",
+                native_capture_phase = "capture_entry", "native capture refused");
+            tracing::warn!(target: "chio::native_capture_profile",
+                native_capture_outcome = "refused",
+                native_capture_timeline = timeline,
+                native_capture_stages = stages,
+                "native capture profile");
+        });
+        assert_eq!(lines.lock().map_err(|_| "test trace mutex")?.as_slice(), &[
+            "WARN chio::native_capture message=native capture refused native_capture_stage=policy_expired native_capture_category=invariant native_capture_phase=capture_entry".to_owned(),
+            format!("WARN chio::native_capture_profile message=native capture profile native_capture_outcome=refused native_capture_timeline={timeline} native_capture_stages={stages}"),
+        ]);
+        Ok(())
+    }
 }
 
 /// Install the process tracing subscriber whose ONLY event-formatting layer is
