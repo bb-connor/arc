@@ -1092,3 +1092,85 @@ fn egress_restrictions_planned_on_one_base_both_hold() {
         "an egress restriction planned on the same base must compose with the first and outlive its lift"
     );
 }
+
+fn throttle_effect_ids(store: &SqliteSecurityStateStore, key: &SessionThrottleKey) -> Vec<String> {
+    chio_security_types::ports::SessionThrottleStore::load_session_throttles(store, key)
+        .unwrap_or_else(|error| panic!("load session throttles: {error}"))
+        .map(|snapshot| {
+            snapshot
+                .contributions
+                .as_slice()
+                .iter()
+                .map(|entry| entry.effect_id.as_str().to_owned())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn throttle_version(store: &SqliteSecurityStateStore, key: &SessionThrottleKey) -> Digest32 {
+    let snapshot =
+        chio_security_types::ports::SessionThrottleStore::load_session_throttles(store, key)
+            .unwrap_or_else(|error| panic!("load session throttles: {error}"))
+            .map_or_else(|| empty_session_throttle_snapshot(key.clone()), Ok)
+            .unwrap_or_else(|error| panic!("throttle snapshot: {error}"));
+    session_throttle_version_hash(&snapshot)
+        .unwrap_or_else(|error| panic!("throttle version: {error}"))
+}
+
+#[test]
+fn session_throttles_planned_on_one_base_both_hold() {
+    let fixture = ProductionEffectsFixture::new();
+    let shared_session = session("production-effects-shared-throttle-session");
+    let throttle = |max_invocations: u32| {
+        let mut spec = fixture.throttle_spec(&shared_session);
+        let (canonical_contribution, contribution_hash) = canonical(&SessionThrottleLimits {
+            window_ms: 5_000,
+            max_invocations,
+        });
+        spec.canonical_contribution = canonical_contribution;
+        spec.contribution_hash = contribution_hash;
+        spec
+    };
+    let (first_plan, first_work) = fixture.dispatch_with_ttl(
+        "production-effects-shared-throttle-first",
+        vec![record(shared_session.as_str())],
+        vec![throttle(10)],
+        600_000,
+    );
+    let (second_plan, second_work) = fixture.dispatch_with_ttl(
+        "production-effects-shared-throttle-second",
+        vec![record(shared_session.as_str())],
+        vec![throttle(3)],
+        3_600_000,
+    );
+    let first = LeasedEffect {
+        plan: &first_plan,
+        work: &first_work,
+        ordinal: 0,
+    };
+    let second = LeasedEffect {
+        plan: &second_plan,
+        work: &second_work,
+        ordinal: 0,
+    };
+    let throttle_key = SessionThrottleKey {
+        tenant_id: tenant(),
+        session_id: shared_session.clone(),
+    };
+    let version = || throttle_version(&fixture.store, &throttle_key);
+    let installed = || throttle_effect_ids(&fixture.store, &throttle_key);
+    let effects = fixture.effects();
+    assert_eq!(
+        shared_base_outcome(
+            effects.as_ref(),
+            &SharedKey {
+                version: &version,
+                installed: &installed,
+            },
+            &first,
+            &second,
+        ),
+        SharedBaseOutcome::composed(&first, &second),
+        "a session throttle planned on the same base must compose with the first and outlive its lift"
+    );
+}
