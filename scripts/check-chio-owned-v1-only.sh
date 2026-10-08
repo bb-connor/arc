@@ -106,24 +106,39 @@ while IFS= read -r line; do
     fi
   fi
 
-  # The trusted qualification auditor consumes internal App metadata v2.
-  # Exempt only this exact quoted identifier in reviewed producer and validator paths;
-  # an adjacent future core-wire or normative claim must still fail.
+  # The trusted qualification auditor consumes internal App metadata v3.
+  # Exempt only this exact quoted identifier in reviewed producer, validator
+  # and regression paths, and its backtick-quoted form only in the reviewed
+  # evidence narrative. An adjacent future core-wire, normative or other
+  # authority claim on the same line must still fail.
+  authority_text="$text"
   if [[ "$path" == "scripts/audit-security-merge-qualification.py" ||
         "$path" == "scripts/check-security-ci-contract.py" ||
+        "$path" == "scripts/tests/check-security-definitions.test.py" ||
+        "$path" == "scripts/tests/trusted-ci-identity-regressions.test.py" ||
         "$path" == "scripts/tests/trusted-ci-landing-regressions.test.py" ||
+        "$path" == "scripts/tests/trusted-ci-revocation-regressions.test.py" ||
         "$path" == "scripts/tests/trusted-main-codegen-regressions.test.py" ]]; then
-    authority_text="${text//\"chio.security-check-authority.v2\"/}"
-    if [[ "$authority_text" != "$text" ]]; then
-      authority_scan_status=0
-      rg -q "$pattern|$normative_claim_pattern" <<<"$authority_text" || authority_scan_status=$?
-      if ((authority_scan_status > 1)); then
-        echo "ripgrep failed while rechecking the trusted auditor schema line" >&2
-        exit "$authority_scan_status"
-      fi
-      if ((authority_scan_status == 1)); then
-        continue
-      fi
+    authority_text="${authority_text//\"chio.security-check-authority.v3\"/}"
+  fi
+  if [[ "$path" == "docs/security/committed-linux-evidence.md" ]]; then
+    authority_text="${authority_text//\`chio.security-check-authority.v3\`/}"
+  fi
+  # The legacy quoted v2 identifier is exempt only where the contract checker
+  # and the identity regressions hold it as the record they must refuse.
+  if [[ "$path" == "scripts/check-security-ci-contract.py" ||
+        "$path" == "scripts/tests/trusted-ci-identity-regressions.test.py" ]]; then
+    authority_text="${authority_text//\"chio.security-check-authority.v2\"/}"
+  fi
+  if [[ "$authority_text" != "$text" ]]; then
+    authority_scan_status=0
+    rg -q "$pattern|$normative_claim_pattern" <<<"$authority_text" || authority_scan_status=$?
+    if ((authority_scan_status > 1)); then
+      echo "ripgrep failed while rechecking the trusted auditor schema line" >&2
+      exit "$authority_scan_status"
+    fi
+    if ((authority_scan_status == 1)); then
+      continue
     fi
   fi
 
