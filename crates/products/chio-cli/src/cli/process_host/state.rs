@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 use std::io::Read;
-use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -371,6 +371,15 @@ impl Config {
     }
 }
 
+/// The host lock is a singly linked regular file with no group or other
+/// permissions. Ownership is not checked.
+const HOST_LOCK_POLICY: chio_secure_fs::OwnerPolicy = chio_secure_fs::OwnerPolicy {
+    owner: chio_secure_fs::Owner::Unchecked,
+    forbidden_mode: 0o077,
+    require_single_link: true,
+    reject_acl: false,
+};
+
 /// A single host owns startup reconciliation and serving. Offline management
 /// cannot open another kernel and reconcile an active host's in-flight calls.
 pub(super) struct Lease {
@@ -393,21 +402,13 @@ impl Lease {
         {
             return Err(error("initialization requires an empty state directory"));
         }
-        let file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .truncate(false)
-            .mode(0o600)
-            .custom_flags(libc::O_NOFOLLOW)
-            .open(directory.path().join("host.lock"))?;
-        let metadata = file.metadata()?;
-        if !metadata.is_file()
-            || metadata.nlink() != 1
-            || metadata.permissions().mode() & 0o077 != 0
-        {
-            return Err(error("invalid host lock file"));
-        }
+        let file = directory
+            .custody()
+            .open_lock(std::ffi::OsStr::new("host.lock"), 0o600, &HOST_LOCK_POLICY)
+            .map_err(|failure| match chio_secure_fs::refusal(&failure) {
+                Some(_) => error("invalid host lock file"),
+                None => CliError::from(failure),
+            })?;
         file.try_lock().map_err(|_| {
             error(
                 "host state is already in use; stop the serving host before administrative changes",
@@ -811,6 +812,43 @@ mod tests {
                 "unexpected validation error: {failure}"
             );
         }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod lease_lock_tests {
+    use super::*;
+
+    #[test]
+    fn lease_refuses_a_hard_linked_or_shared_host_lock() -> Result<(), Box<dyn std::error::Error>> {
+        let root = chio_test_support::private_tempdir()?;
+        let state = root.path().join("state");
+        let alias = root.path().join("alias.lock");
+        std::fs::create_dir(&state)?;
+        std::fs::set_permissions(&state, std::fs::Permissions::from_mode(0o700))?;
+        drop(Lease::acquire(&state, true)?);
+
+        std::fs::hard_link(state.join("host.lock"), &alias)?;
+        let linked = Lease::acquire(&state, false)
+            .err()
+            .ok_or("a hard-linked host lock was accepted")?;
+        std::fs::remove_file(&alias)?;
+        std::fs::set_permissions(
+            state.join("host.lock"),
+            std::fs::Permissions::from_mode(0o640),
+        )?;
+        let shared = Lease::acquire(&state, false)
+            .err()
+            .ok_or("a group-readable host lock was accepted")?;
+        std::fs::set_permissions(
+            state.join("host.lock"),
+            std::fs::Permissions::from_mode(0o600),
+        )?;
+
+        assert!(linked.to_string().contains("invalid host lock file"));
+        assert!(shared.to_string().contains("invalid host lock file"));
+        drop(Lease::acquire(&state, false)?);
         Ok(())
     }
 }
