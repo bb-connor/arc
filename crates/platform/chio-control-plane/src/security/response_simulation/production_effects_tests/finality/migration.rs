@@ -318,3 +318,100 @@ fn upgraded_revision1_is_refused_by_the_actual_legacy_writer_version_gate() {
     ));
     assert_eq!(schema_snapshot(&case), before);
 }
+
+#[test]
+fn concurrent_connections_cannot_reinstall_an_effect_after_the_real_remove_commits() {
+    for (index, kind) in REMOVABLE_KINDS.into_iter().enumerate() {
+        for attempt in 0..4 {
+            let label = format!("atomic-lift-{index}-{attempt}");
+            let case = FinalityCase::new(kind, &label);
+            let apply = case.request(&format!("{label}-original"));
+            let applied = case
+                .effects
+                .execute(&apply)
+                .unwrap_or_else(|error| panic!("original concurrent Apply: {error}"));
+            assert!(applied.applied);
+            let mut remove = case.request(&format!("{label}-remove"));
+            remove.operation = EffectOperation::Remove;
+            remove.expected_version_hash = applied.resulting_version_hash;
+            let mut concurrent_apply = apply.clone();
+            concurrent_apply.idempotency_key =
+                record(format!("response_effect_command:{label}-concurrent"));
+            let other_store = Arc::new(
+                reopen(&case).unwrap_or_else(|error| panic!("second real connection: {error}")),
+            );
+            let blast: Arc<dyn BlastRadiusPort> = case.fixture.resolver.clone();
+            let other_effects = production_response_effects(
+                ResponseExecutionMode::Live,
+                other_store,
+                Arc::clone(&case.fixture.outbox),
+                blast,
+                Arc::clone(&case.fixture.trusted_clock),
+            )
+            .unwrap_or_else(|error| panic!("second real effect router: {error}"));
+            let start = Arc::new(std::sync::Barrier::new(3));
+            let (removed, concurrent) = std::thread::scope(|scope| {
+                let remove_start = Arc::clone(&start);
+                let apply_start = Arc::clone(&start);
+                let remove_effects = Arc::clone(&case.effects);
+                let apply_effects = Arc::clone(&other_effects);
+                let remove_request = remove.clone();
+                let apply_request = concurrent_apply.clone();
+                let remove_handle = scope.spawn(move || {
+                    remove_start.wait();
+                    remove_effects.execute(&remove_request)
+                });
+                let apply_handle = scope.spawn(move || {
+                    apply_start.wait();
+                    apply_effects.execute(&apply_request)
+                });
+                start.wait();
+                (
+                    remove_handle
+                        .join()
+                        .unwrap_or_else(|_| panic!("real Remove thread panicked")),
+                    apply_handle
+                        .join()
+                        .unwrap_or_else(|_| panic!("real Apply thread panicked")),
+                )
+            });
+            assert!(
+                !removed
+                    .unwrap_or_else(|error| panic!("concurrent Remove: {error}"))
+                    .applied
+            );
+            match concurrent {
+                Ok(result) => assert_eq!(result, applied),
+                Err(error) if error.kind() == PortErrorKind::Conflict => {}
+                Err(error) if error.kind() == PortErrorKind::IntegrityFailure => {
+                    // Some backends recheck their committed aggregate after
+                    // returning from the store. Removal can win that read;
+                    // it is acceptable only with the exact durable Apply.
+                    assert_eq!(
+                        other_effects
+                            .load_result(&query(&concurrent_apply))
+                            .unwrap_or_else(|read_error| panic!(
+                                "concurrent Apply readback: {read_error}"
+                            )),
+                        EffectExecutionStatus::Completed {
+                            result: applied.clone()
+                        }
+                    );
+                }
+                Err(error) => panic!("unexpected concurrent Apply error: {error}"),
+            }
+            assert!(
+                case.installed_ids().is_empty(),
+                "a cross-connection Apply committed after removal and resurrected {kind:?}"
+            );
+            let mut after = apply;
+            after.idempotency_key = record(format!("response_effect_command:{label}-after"));
+            let before = case.snapshot();
+            assert_eq!(
+                case.effects.execute(&after).map_err(|error| error.kind()),
+                Err(PortErrorKind::Conflict)
+            );
+            assert_eq!(case.snapshot(), before);
+        }
+    }
+}
