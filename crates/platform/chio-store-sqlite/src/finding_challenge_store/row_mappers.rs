@@ -1,6 +1,10 @@
+//! Row decoding and bounded loads for challenges, locks, liabilities and cases.
+
+use super::*;
+
 // Row mappers and per-record load helpers.
 
-fn map_challenge(row: &rusqlite::Row<'_>) -> rusqlite::Result<RawChallenge> {
+pub(super) fn map_challenge(row: &rusqlite::Row<'_>) -> rusqlite::Result<RawChallenge> {
     Ok(RawChallenge {
         challenge_id: row.get(0)?,
         finding_id: row.get(1)?,
@@ -18,7 +22,7 @@ fn map_challenge(row: &rusqlite::Row<'_>) -> rusqlite::Result<RawChallenge> {
     })
 }
 
-fn challenge_from_raw(
+pub(super) fn challenge_from_raw(
     raw: RawChallenge,
 ) -> Result<FindingChallengeRecord, FindingChallengeStoreError> {
     Ok(FindingChallengeRecord {
@@ -41,7 +45,7 @@ fn challenge_from_raw(
     })
 }
 
-fn load_challenge_tx(
+pub(super) fn load_challenge_tx(
     transaction: &Transaction<'_>,
     challenge_id: &str,
 ) -> Result<Option<FindingChallengeRecord>, FindingChallengeStoreError> {
@@ -56,7 +60,7 @@ fn load_challenge_tx(
     raw.map(challenge_from_raw).transpose()
 }
 
-fn load_dispute_lock_tx(
+pub(super) fn load_dispute_lock_tx(
     transaction: &Transaction<'_>,
     challenge_id: &str,
 ) -> Result<Option<FindingDisputeLockRecord>, FindingChallengeStoreError> {
@@ -129,7 +133,7 @@ fn load_dispute_lock_tx(
     }))
 }
 
-const LIABILITY_COLUMNS: &str = r#"
+pub(super) const LIABILITY_COLUMNS: &str = r#"
     liability_key, defect_key, finding_id, listing_id, allocation_id, seller_hex,
     venue_id, chain_id, vault_contract, vault_id, state, upheld_challenge_id,
     purchase_cutoff_slot, claim_deadline, appeal_window_opened_at,
@@ -137,33 +141,33 @@ const LIABILITY_COLUMNS: &str = r#"
     allocation_digest, publication_pending, quarantined, opened_at, updated_at
 "#;
 
-struct RawLiability {
-    liability_key: String,
-    defect_key: String,
-    finding_id: String,
-    listing_id: String,
-    allocation_id: String,
-    seller_hex: String,
-    venue_id: String,
-    chain_id: String,
-    vault_contract: String,
-    vault_id: String,
-    state: String,
-    upheld_challenge_id: Option<String>,
-    purchase_cutoff_slot: Option<i64>,
-    claim_deadline: Option<i64>,
-    appeal_window_opened_at: Option<i64>,
-    appeal_deadline: Option<i64>,
-    appeal_terms_envelope_sha256: Option<String>,
-    snapshot_digest: Option<String>,
-    allocation_digest: Option<String>,
-    publication_pending: i64,
-    quarantined: i64,
-    opened_at: i64,
-    updated_at: i64,
+pub(super) struct RawLiability {
+    pub(super) liability_key: String,
+    pub(super) defect_key: String,
+    pub(super) finding_id: String,
+    pub(super) listing_id: String,
+    pub(super) allocation_id: String,
+    pub(super) seller_hex: String,
+    pub(super) venue_id: String,
+    pub(super) chain_id: String,
+    pub(super) vault_contract: String,
+    pub(super) vault_id: String,
+    pub(super) state: String,
+    pub(super) upheld_challenge_id: Option<String>,
+    pub(super) purchase_cutoff_slot: Option<i64>,
+    pub(super) claim_deadline: Option<i64>,
+    pub(super) appeal_window_opened_at: Option<i64>,
+    pub(super) appeal_deadline: Option<i64>,
+    pub(super) appeal_terms_envelope_sha256: Option<String>,
+    pub(super) snapshot_digest: Option<String>,
+    pub(super) allocation_digest: Option<String>,
+    pub(super) publication_pending: i64,
+    pub(super) quarantined: i64,
+    pub(super) opened_at: i64,
+    pub(super) updated_at: i64,
 }
 
-fn map_liability(row: &rusqlite::Row<'_>) -> rusqlite::Result<RawLiability> {
+pub(super) fn map_liability(row: &rusqlite::Row<'_>) -> rusqlite::Result<RawLiability> {
     Ok(RawLiability {
         liability_key: row.get(0)?,
         defect_key: row.get(1)?,
@@ -191,7 +195,7 @@ fn map_liability(row: &rusqlite::Row<'_>) -> rusqlite::Result<RawLiability> {
     })
 }
 
-fn liability_from_raw(
+pub(super) fn liability_from_raw(
     raw: RawLiability,
 ) -> Result<FindingLiabilityRecord, FindingChallengeStoreError> {
     Ok(FindingLiabilityRecord {
@@ -233,7 +237,7 @@ fn liability_from_raw(
     })
 }
 
-fn load_liability_tx(
+pub(super) fn load_liability_tx(
     transaction: &Transaction<'_>,
     liability_key: &str,
 ) -> Result<Option<FindingLiabilityRecord>, FindingChallengeStoreError> {
@@ -248,25 +252,25 @@ fn load_liability_tx(
     raw.map(liability_from_raw).transpose()
 }
 
-const CASE_COLUMNS: &str = r#"
+pub(super) const CASE_COLUMNS: &str = r#"
     case_id, finding_id, listing_id, liability_key, case_kind, case_state,
     appeal_of_case_id, supersedes_case_id, superseded_by_case_id, recorded_at
 "#;
 
-struct RawCase {
-    case_id: String,
-    finding_id: String,
-    listing_id: String,
-    liability_key: String,
-    case_kind: String,
-    case_state: String,
-    appeal_of_case_id: Option<String>,
-    supersedes_case_id: Option<String>,
-    superseded_by_case_id: Option<String>,
-    recorded_at: i64,
+pub(super) struct RawCase {
+    pub(super) case_id: String,
+    pub(super) finding_id: String,
+    pub(super) listing_id: String,
+    pub(super) liability_key: String,
+    pub(super) case_kind: String,
+    pub(super) case_state: String,
+    pub(super) appeal_of_case_id: Option<String>,
+    pub(super) supersedes_case_id: Option<String>,
+    pub(super) superseded_by_case_id: Option<String>,
+    pub(super) recorded_at: i64,
 }
 
-fn map_case(row: &rusqlite::Row<'_>) -> rusqlite::Result<RawCase> {
+pub(super) fn map_case(row: &rusqlite::Row<'_>) -> rusqlite::Result<RawCase> {
     Ok(RawCase {
         case_id: row.get(0)?,
         finding_id: row.get(1)?,
@@ -281,7 +285,9 @@ fn map_case(row: &rusqlite::Row<'_>) -> rusqlite::Result<RawCase> {
     })
 }
 
-fn case_from_raw(raw: RawCase) -> Result<FindingGovernanceCaseRecord, FindingChallengeStoreError> {
+pub(super) fn case_from_raw(
+    raw: RawCase,
+) -> Result<FindingGovernanceCaseRecord, FindingChallengeStoreError> {
     Ok(FindingGovernanceCaseRecord {
         case_id: raw.case_id,
         finding_id: raw.finding_id,
@@ -296,7 +302,7 @@ fn case_from_raw(raw: RawCase) -> Result<FindingGovernanceCaseRecord, FindingCha
     })
 }
 
-fn load_case_tx(
+pub(super) fn load_case_tx(
     transaction: &Transaction<'_>,
     case_id: &str,
 ) -> Result<Option<FindingGovernanceCaseRecord>, FindingChallengeStoreError> {
@@ -351,7 +357,7 @@ pub(crate) fn resolve_case_head_tx(
     Ok(Some(head))
 }
 
-fn load_claim_snapshot_tx(
+pub(super) fn load_claim_snapshot_tx(
     transaction: &Transaction<'_>,
     liability_key: &str,
 ) -> Result<Option<FindingClaimSnapshotRecord>, FindingChallengeStoreError> {
@@ -410,24 +416,24 @@ fn load_claim_snapshot_tx(
     }))
 }
 
-const EFFECT_INTENT_COLUMNS: &str = r#"
+pub(super) const EFFECT_INTENT_COLUMNS: &str = r#"
     intent_key, liability_key, kind, intent_digest, settlement_required, state,
     attempt_count, recorded_at, updated_at
 "#;
 
-struct RawEffectIntent {
-    intent_key: String,
-    liability_key: Option<String>,
-    kind: String,
-    intent_digest: String,
-    settlement_required: i64,
-    state: String,
-    attempt_count: i64,
-    recorded_at: i64,
-    updated_at: i64,
+pub(super) struct RawEffectIntent {
+    pub(super) intent_key: String,
+    pub(super) liability_key: Option<String>,
+    pub(super) kind: String,
+    pub(super) intent_digest: String,
+    pub(super) settlement_required: i64,
+    pub(super) state: String,
+    pub(super) attempt_count: i64,
+    pub(super) recorded_at: i64,
+    pub(super) updated_at: i64,
 }
 
-fn map_effect_intent(row: &rusqlite::Row<'_>) -> rusqlite::Result<RawEffectIntent> {
+pub(super) fn map_effect_intent(row: &rusqlite::Row<'_>) -> rusqlite::Result<RawEffectIntent> {
     Ok(RawEffectIntent {
         intent_key: row.get(0)?,
         liability_key: row.get(1)?,
@@ -441,7 +447,7 @@ fn map_effect_intent(row: &rusqlite::Row<'_>) -> rusqlite::Result<RawEffectInten
     })
 }
 
-fn effect_intent_from_raw(
+pub(super) fn effect_intent_from_raw(
     raw: RawEffectIntent,
 ) -> Result<FindingEffectIntentRecord, FindingChallengeStoreError> {
     Ok(FindingEffectIntentRecord {
@@ -457,7 +463,7 @@ fn effect_intent_from_raw(
     })
 }
 
-fn load_effect_intent_tx(
+pub(super) fn load_effect_intent_tx(
     transaction: &Transaction<'_>,
     intent_key: &str,
 ) -> Result<Option<FindingEffectIntentRecord>, FindingChallengeStoreError> {
@@ -472,7 +478,7 @@ fn load_effect_intent_tx(
     raw.map(effect_intent_from_raw).transpose()
 }
 
-fn load_seller_impairment_reconciliation_tx(
+pub(super) fn load_seller_impairment_reconciliation_tx(
     transaction: &Transaction<'_>,
     intent_key: &str,
 ) -> Result<Option<FindingSellerImpairmentReconciliationRecord>, FindingChallengeStoreError> {
@@ -519,7 +525,7 @@ fn load_seller_impairment_reconciliation_tx(
         )
         .transpose()
 }
-fn advance_challenge_state_tx(
+pub(super) fn advance_challenge_state_tx(
     transaction: &Transaction<'_>,
     challenge_id: &str,
     from: &str,
