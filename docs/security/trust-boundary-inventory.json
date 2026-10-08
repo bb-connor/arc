@@ -1217,7 +1217,7 @@
     "crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller.rs::committed_caller_authorization::from_wire",
     "crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller.rs::decode_caller_return_payload::from_wire",
     "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/compacted_replay.rs::completed_compacted_value_response::from_wire",
-    "crates/kernel/chio-kernel/src/kernel/admission_terminal_receipt.rs::recover_terminal_receipt_outboxes_with_store::from_wire",
+    "crates/kernel/chio-kernel/src/kernel/admission_terminal_receipt.rs::recover_terminal_receipt_outboxes_progress::from_wire",
     "crates/kernel/chio-kernel/src/kernel/admission_terminal_receipt.rs::validate_staged_compensation_receipt::from_wire",
     "crates/kernel/chio-kernel/src/kernel/admission_terminal_receipt.rs::validate_terminal_compensation_receipt::from_wire",
     "crates/kernel/chio-kernel/src/kernel/admission_terminal_receipt.rs::validate_terminal_receipt_binding_with_store::from_wire",
@@ -3982,17 +3982,18 @@
     {
       "path": "crates/platform/chio-store-sqlite/src/security_state.rs",
       "owner": "active_defense_overlay_inventory",
-      "sha256": "b004a2156d3dcec3ffa3e2c2f04b2242e1fec84f9d5eab49e6df879aa72b1f94",
+      "sha256": "8b6b5f98acebc7586d25cf250c10b6e3e3f1faa3c05e87896fb718a7443e94dc",
       "tables": [
         "security_capability_set_suspension_effects",
         "security_effect_contributions",
         "security_egress_restriction_effects",
         "security_issuance_freeze_effects",
+        "security_scheduler_retries",
         "security_session_throttle_effects"
       ],
-      "sql": "SELECT (SELECT COUNT(*) FROM security_effect_contributions), (SELECT COUNT(*) FROM security_session_throttle_effects), (SELECT COUNT(*) FROM security_capability_set_suspension_effects), (SELECT COUNT(*) FROM security_issuance_freeze_effects), (SELECT COUNT(*) FROM security_egress_restriction_effects)",
+      "sql": "SELECT (SELECT COUNT(*) FROM security_effect_contributions), (SELECT COUNT(*) FROM security_session_throttle_effects), (SELECT COUNT(*) FROM security_capability_set_suspension_effects), (SELECT COUNT(*) FROM security_issuance_freeze_effects), (SELECT COUNT(*) FROM security_egress_restriction_effects), (SELECT COUNT(*) FROM security_scheduler_retries WHERE (tenant_id, action_id) IN ( SELECT tenant_id, action_id FROM security_effect_contributions UNION SELECT tenant_id, action_id FROM security_session_throttle_effects UNION SELECT tenant_id, action_id FROM security_capability_set_suspension_effects UNION SELECT tenant_id, action_id FROM security_issuance_freeze_effects UNION SELECT tenant_id, action_id FROM security_egress_restriction_effects))",
       "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+      "contract": "Store-bound restrictive-overlay teardown inventory, not a tenant-facing lookup or release authority. Overlay readiness, quick integrity and foreign-key checks precede scalar counts. Contributing retries match full tenant/action identities across all five overlay families; malformed inventory remains a global refusal."
     },
     {
       "path": "crates/platform/chio-store-sqlite/src/security_state/automatic_preparation.rs",
@@ -16454,7 +16455,7 @@
     "crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller.rs::committed_caller_authorization::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller.rs::decode_caller_return_payload::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/compacted_replay.rs::completed_compacted_value_response::from_wire#1::decode_canonical",
-    "crates/kernel/chio-kernel/src/kernel/admission_terminal_receipt.rs::recover_terminal_receipt_outboxes_with_store::from_wire#1::decode_signed",
+    "crates/kernel/chio-kernel/src/kernel/admission_terminal_receipt.rs::recover_terminal_receipt_outboxes_progress::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/kernel/admission_terminal_receipt.rs::validate_staged_compensation_receipt::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/kernel/admission_terminal_receipt.rs::validate_terminal_compensation_receipt::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/kernel/admission_terminal_receipt.rs::validate_terminal_receipt_binding_with_store::from_wire#1::decode_signed",
@@ -17431,7 +17432,7 @@
       "completed_compacted_value_response::original-json-reader::UntrustedJsonText"
     ],
     "crates/kernel/chio-kernel/src/kernel/admission_terminal_receipt.rs": [
-      "recover_terminal_receipt_outboxes_with_store::original-json-reader::UntrustedJsonText",
+      "recover_terminal_receipt_outboxes_progress::original-json-reader::UntrustedJsonText",
       "validate_staged_compensation_receipt::original-json-reader::UntrustedJsonText",
       "validate_terminal_compensation_receipt::original-json-reader::UntrustedJsonText",
       "validate_terminal_receipt_binding_with_store::original-json-reader::UntrustedJsonText"
@@ -18486,7 +18487,8 @@
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/budget_custody.rs": [
       "load_admission_budget_custody::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx",
-      "load_retained_tool_admission_custody::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx"
+      "load_retained_tool_admission_custody::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx",
+      "load_retained_tool_admission_custody_by_supplemental_artifact::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx"
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/caller_budget.rs": [
       "caller_budget_shares::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx_with_history"
@@ -18956,11 +18958,11 @@
       "verify_predecessor::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/records.rs::verify_all_version"
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint.rs": [
-      "checkpoint_security_participant_history::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs::observed_time",
-      "checkpoint_security_participant_history::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint.rs::latest",
-      "checkpoint_security_participant_history::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/rows.rs::copy",
-      "checkpoint_security_participant_history::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/rows.rs::visit",
-      "checkpoint_security_participant_history::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/records.rs::load",
+      "checkpoint_history::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs::observed_time",
+      "checkpoint_history::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint.rs::latest",
+      "checkpoint_history::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/rows.rs::copy",
+      "checkpoint_history::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/rows.rs::visit",
+      "checkpoint_history::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/records.rs::load",
       "floors::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint.rs::latest",
       "latest::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/record.rs::latest",
       "projection_reference::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/record.rs::load_local",
