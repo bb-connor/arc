@@ -448,7 +448,7 @@ fn nonce_only_tampered_artifact_member_refuses_instead_of_appearing_unselected()
     let identity = AdmissionNoncePreflightIdentityV1::for_operation(&operation, 0)?;
     let changed = "f".repeat(64);
     assert_ne!(changed, fixture.digest);
-    let mut artifacts = vec![
+    let mut artifacts = [
         operation
             .binding()
             .authorization_capability_hash()
