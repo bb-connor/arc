@@ -21,6 +21,7 @@ priority. See [required integration scope](FIRST-CLASS-INTEGRATIONS.md).
 
 ## Read in order
 
+0. [North-star flows](NORTH-STAR-FLOWS.md): proposed governing design, pending owner review. It turns the three verbs into the M1, M2 and M3 flows that the other documents will be restructured around.
 1. [Accepted native host decision](../../../adr/ADR-0038-desktop-operator-program.md).
 2. [Product research and alternatives](research/product-grounding.md).
 3. [Capability and roadmap traceability](CAPABILITIES.md).
