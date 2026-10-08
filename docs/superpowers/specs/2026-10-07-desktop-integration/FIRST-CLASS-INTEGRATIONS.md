@@ -96,6 +96,35 @@ stay open. C09-C11 and Q24-Q28 gate additional advertised semantics. The program
 full coordination/resource/organizational ambition remains a separate completion
 requirement, including independently administered counterparties.
 
+## Catalog scope for independent promotion
+
+The release owner catalogs subcases by the claim being qualified. H06a is the
+same-harness positive; H06b is mixed coordination involving all four. H08a is
+headless harness independence; H08b is Herdr with only the selected harness
+installed and truthful unavailable alternatives. These labels disambiguate
+existing stimuli; they introduce no new wire operations.
+
+- Individual harness/platform promotion requires its own H01-H05, H06a and H08a,
+  I01-I08 and applicable native/owner cases. Neither H06b nor Herdr evidence is
+  a predecessor. A profile advertising a mixed-harness capability additionally
+  qualifies the composition it actually exposes.
+- A Herdr/platform/harness tuple requires its applicable H07 and H08b, actual
+  application/native owner gates and the selected harness's qualified profile.
+  It does not wait for other harness selections. Missing selections remain
+  unavailable and cannot silently switch harnesses.
+- Complete platform first-class coverage requires all four qualified harness
+  cells, H06b and H07/H08b for all four Herdr selections. Cross-platform completion
+  additionally requires both platforms. Partial promotion cannot close either
+  aggregate claim.
+
+At the actual release verifier/activation owner, remove unrelated harness and
+Herdr records from a complete single-host candidate and verify that its approved
+single-host catalog still permits promotion. Remove that host's own required
+subcase and require refusal. Missing H06b or a required Herdr selection must
+refuse the aggregate completion claim, without disabling an otherwise complete
+individual tuple. The approved catalog is selected independently of submitted
+results; a caller cannot relabel an aggregate capability to evade its gates.
+
 ## Delivery, promotion and completion
 
 Shared packet 1 reconciles source and per-host capabilities; packets 3/4 deliver

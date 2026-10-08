@@ -86,3 +86,24 @@ A subsequent shared Codex P2 identified a cross-platform packet 2a dependency.
 RELEASE and the plan now track shared verifier, Linux wiring and macOS wiring
 separately: each platform requires only shared plus its own installed activation
 gates. An unbound verifier still cannot qualify a native activation path.
+
+A final independent catalog review, then the matching Codex P2, found that
+combined H06/H08 labels could accidentally require all four harnesses or Herdr
+for individual promotion. FIRST-CLASS-INTEGRATIONS and RELEASE now separate
+per-harness H06a/H08a, mixed H06b and Herdr H07/H08b scope. Platform plans apply
+that split and test both allowed partial promotion and refused incomplete
+aggregate claims at the real verifier. The focused follow-up closed the finding.
+
+The final product/architecture review checked passport admission, delegation,
+swarm custody, accepted work, resource conservation, recovery and independently
+administered cooperation against the source/roadmap crosswalk. No material
+missing decision traceability or P0-P2 remained in that reviewed scope. This is
+specification review, not implementation or installed capability acceptance.
+
+The subsequent provider-limit P2 is repaired at the shared native contract and
+Linux/Mac consumption points: dimensions required by policy/grant/profile now
+refuse before provider dispatch if their exact route lacks an enforceable bound.
+Output and monetary bounds remain distinct, reservations survive uncertainty,
+and a narrower explicitly approved profile is never an automatic fallback.
+The pinned limitation is attributed to Pi's fixed Codex-subscription route, not
+to all Codex harnesses. Installed provider acceptance remains future work.

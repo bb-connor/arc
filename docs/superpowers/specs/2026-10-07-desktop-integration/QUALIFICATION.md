@@ -359,3 +359,16 @@ nonempty fresh readiness (Q16), masked-test prevention and artifact crosswalks
 (Q20/release sequence), and native approval binding (Q05). Deleting the old
 platform schemas does not waive these owner obligations. Their old synthetic
 fixture counts are intentionally not reported as acceptance of this program.
+
+## Required provider-limit admission
+
+HOST-CONTRACT's model-provider resource boundary expands Q15/Q27/C04 wherever
+an inference dimension is required by the selected grant/policy or claimed
+profile. The exact route must enforce that bound before admission; show-only
+unknown limits cannot pass. Include route/model/account substitution, missing or
+ineffective ceiling, concurrent reservation exhaustion and post-dispatch response
+loss with retained obligations. Independently observe real route dispatch/usage
+and the authoritative ledger beside a useful bounded control. The release
+catalog distinguishes an explicitly approved narrower profile from a bounded
+one; removing required-limit evidence refuses the latter, never silently selects
+the former. Filesystem confinement alone cannot qualify provider accounting.

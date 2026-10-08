@@ -167,3 +167,40 @@ through real Chio owners on an installed host, with every Chio frontend absent.
 The complete ambition additionally demonstrates shared resources and separately
 authorized organizational cooperation. A coding patch is one test workload,
 not the product definition or a mandatory frontend dependency.
+
+## Model-provider resource boundaries
+
+Bind each inference route to its actual harness, endpoint, model/account, credential
+custodian and resource-admission owner. Invocation, output-token, monetary and
+OS-local limits are distinct dimensions. Any dimension required by the selected
+grant, owner policy or advertised profile must have an enforceable bound before
+provider dispatch. Missing enforcement makes that requested capability unavailable;
+displaying an unknown limit does not authorize it.
+
+An output-token claim requires a route-supported hard ceiling including reasoning
+output where applicable. A monetary claim additionally requires a defensible
+worst-case bound for applicable input/output/cache/pricing/fees and an atomic
+conservative reservation at the existing budget owner. An estimate or output
+ceiling alone cannot bound unknown total cost. If no finite bound can be
+established, that bounded request refuses before credential release or dispatch.
+Client byte truncation, timeouts and disconnects cannot prove provider work or
+billing stopped. Retain unresolved obligations across response loss, cancellation
+and restart; do not release the reservation or replay a call on those signals.
+
+The pinned Pi fixed Codex-subscription route has no demonstrated enforceable
+output-token ceiling. It cannot satisfy a requested bounded-output or unsupported
+bounded-spend profile merely by reporting the missing dimension. This is a
+specific route limitation, not a finding about every Codex harness or endpoint.
+A separately approved narrower filesystem/egress-protected profile may remain
+usable with token/spend explicitly unclaimed, provided its grants/policy do not
+require them. No automatic switch to that profile, another account or API billing
+is permitted when a requested bound cannot be met.
+
+At each selected route owner, qualify useful bounded inference and pre-dispatch
+refusal for unsupported, stripped or ineffective required limits, route/model/
+account substitution and concurrent exhausted reservations. Use independent
+provider-dispatch/usage and native owner ledger observations. Lost post-dispatch
+replies, disconnect and restart retain original identity, charges/reservations
+and uncertainty without a fresh dispatch or renewed capacity. Mock provider
+behavior cannot establish a real route's ceiling. Q15/Q27/C04 and the release
+catalog retain the exact supported dimensions and route tuple.
