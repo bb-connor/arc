@@ -182,6 +182,11 @@ impl Timeline {
             .collect())
     }
 
+    fn clear_reads(&self) -> Fallible<()> {
+        self.reads.lock().map_err(|_| "oracle read log")?.clear();
+        Ok(())
+    }
+
     fn last_quote(&self) -> Fallible<ExchangeRate> {
         Ok(self
             .reads
@@ -469,9 +474,13 @@ fn durable_recovery_prices_a_quote_stamped_during_oracle_io() -> TestResult {
         fx.store.operation().state(),
         AdmissionOperationState::Finalizing
     );
-    assert_eq!(fx.timeline.reads()?.len(), 0);
+    // The quote is read before the mutation lock, so the attempt that failed
+    // under the lock read the oracle once, priced nothing, and took its
+    // recovery claim when that read completed.
+    assert_eq!(fx.timeline.reads()?.len(), 1);
     assert_eq!(fx.captures()?.len(), 0);
-    let recovery_start = fx.timeline.start + CLAIM_EXPIRY_SECS;
+    fx.timeline.clear_reads()?;
+    let recovery_start = fx.timeline.start + ORACLE_IO_SECS + CLAIM_EXPIRY_SECS;
     fx.timeline.clock.set_secs(recovery_start)?;
     assert_eq!(fx.kernel.reconcile_recoverable_admissions()?, 1);
     let replay = fx.kernel.evaluate_tool_call_blocking(&fx.request)?;
