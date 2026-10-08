@@ -720,22 +720,23 @@ mod dispute_locks;
 mod effect_intents;
 mod effect_root_recovery;
 mod governance_claims;
-mod liability_lifecycle;
-use effect_root_recovery::*;
-mod write_transactions;
-use write_transactions::*;
-mod row_mappers;
-use row_mappers::*;
-mod record_validation;
-use record_validation::*;
-mod schema_migrations;
-pub(crate) use schema_migrations::initialize_finding_challenge_schema;
-use schema_migrations::*;
 mod input_bounds;
-pub(crate) use input_bounds::begin_finalizing_under_sanction_tx;
+mod liability_lifecycle;
+mod record_validation;
 #[path = "finding_challenge_store_root_refresh.rs"]
 mod root_refresh;
+mod row_mappers;
+mod schema_migrations;
+mod write_transactions;
+
+use effect_root_recovery::*;
+pub(crate) use input_bounds::begin_finalizing_under_sanction_tx;
+use record_validation::*;
 use root_refresh::*;
+use row_mappers::*;
+pub(crate) use schema_migrations::initialize_finding_challenge_schema;
+use schema_migrations::*;
+use write_transactions::*;
 
 #[cfg(all(test, unix))]
 mod connection_recovery;
