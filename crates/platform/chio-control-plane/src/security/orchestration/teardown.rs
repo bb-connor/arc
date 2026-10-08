@@ -72,6 +72,12 @@ impl ActiveDefenseTeardownRetry {
         }
         tokio::time::sleep(self.parked_interval).await;
     }
+
+    /// Paces an expected wait at the retry interval without spending any of
+    /// the bounded fault attempts.
+    async fn pace_expected_wait(&self) {
+        tokio::time::sleep(ACTIVE_DEFENSE_TEARDOWN_RETRY_INTERVAL).await;
+    }
 }
 
 pub(super) static ACTIVE_DEFENSE_TEARDOWN_SUPERVISOR: OnceLock<
@@ -1261,6 +1267,9 @@ impl DetachedActiveDefenseTeardown {
             loop {
                 match self.prepare_worker_stop().await {
                     Ok(()) => break,
+                    Err(error) if self.awaiting_overlay_expiry(&error) => {
+                        retry.pace_expected_wait().await;
+                    }
                     Err(error) => {
                         if let Err(worker_error) = self.ensure_teardown_worker_running().await {
                             tracing::warn!(
@@ -1330,6 +1339,20 @@ impl DetachedActiveDefenseTeardown {
                 break 'worker_phase;
             }
         }
+    }
+
+    /// A held overlay is an expected wait rather than a fault only while the
+    /// running recovery worker keeps completing clean ticks, since those
+    /// ticks are what expire it.
+    fn awaiting_overlay_expiry(&self, error: &ProductionActiveDefenseHostError) -> bool {
+        matches!(
+            error,
+            ProductionActiveDefenseHostError::ActiveOverlayContributions { .. }
+        ) && self
+            .worker_handle
+            .as_ref()
+            .is_some_and(ProductionResponseWorkerHandle::is_running)
+            && self.active_worker.recovery_progressing()
     }
 
     async fn wait_for_tick_completion(

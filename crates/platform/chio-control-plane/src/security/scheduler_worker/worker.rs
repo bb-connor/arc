@@ -93,6 +93,16 @@ impl ProductionResponseWorker {
         self.port.ensure_ready()
     }
 
+    /// The published loop is live and completing clean ticks within its
+    /// progress deadline. Admission readiness is not consulted.
+    pub(in crate::security) fn recovery_progressing(&self) -> bool {
+        self.publication_ready.load(Ordering::Acquire)
+            && self
+                .live_lifecycle()
+                .is_ok_and(ResponseWorkerLifecycle::is_ready)
+            && self.ensure_progress().is_ok()
+    }
+
     fn ensure_recovery_start_ready(&self) -> Result<(), ResponseWorkerTickError> {
         self.live_lifecycle()?;
         self.port.ensure_recovery_ready()
