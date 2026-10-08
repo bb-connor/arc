@@ -32,8 +32,10 @@ regenerated, pass `{ knownOutcomeOnly: true }` to `invoke`. Chio can dispatch
 it once and replay a completed outcome, but never redispatches an unknown one,
 even for a tool its server declares read-only. Keep the option unchanged
 across retries of the same key. `prepareInvocation` retains a host-prepared
-envelope without dispatching an effect. The Python package's
-`BrokerProcessClient` has no Node equivalent yet.
+envelope without dispatching an effect. `BrokerProcessClient` prepares through
+the host and invokes with the original signed envelope; a failed preparation
+never dispatches. `decodeBrokerOutput` reads a broker response's body as strict
+UTF-8 JSON without duplicate members and does not verify its evidence.
 
 Preserve `receipt_json` unchanged for a Chio verifier. The client returns
 receipts without verifying their signatures. Revision strings remain strings;
