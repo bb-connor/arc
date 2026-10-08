@@ -135,7 +135,15 @@ fn legacy0_completed_lifts_backfill_without_changing_original_journal_bytes() {
             Some(original_journal)
         );
         let before = case.snapshot();
-        let restarted_effects = case.fixture.effects();
+        let blast: Arc<dyn BlastRadiusPort> = case.fixture.resolver.clone();
+        let restarted_effects = production_response_effects(
+            ResponseExecutionMode::Live,
+            Arc::new(reopened),
+            Arc::clone(&case.fixture.outbox),
+            blast,
+            Arc::clone(&case.fixture.trusted_clock),
+        )
+        .unwrap_or_else(|error| panic!("production effects over reopened store: {error}"));
         for (request, result) in [
             (&removed.apply, &removed.applied),
             (&removed.remove, &removed.removed),
@@ -158,7 +166,6 @@ fn legacy0_completed_lifts_backfill_without_changing_original_journal_bytes() {
             Err(PortErrorKind::Conflict)
         );
         assert_eq!(case.snapshot(), before);
-        drop(reopened);
     }
 }
 
