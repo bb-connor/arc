@@ -20,14 +20,14 @@ jobs:
   authorize-security-check-publication:
     runs-on: ubuntu-latest
     outputs:
-      merge_commit_sha: ${{ steps.merge.outputs.sha }}
+      evidence_sha: ${{ steps.merge.outputs.sha }}
     steps:
       - id: merge
         run: echo 'sha=fixture' >> "$GITHUB_OUTPUT"
   publish-security-contract:
     needs: authorize-security-check-publication
     concurrency:
-      group: security-check-authority-${{ needs.authorize-security-check-publication.outputs.merge_commit_sha }}
+      group: security-check-authority-${{ needs.authorize-security-check-publication.outputs.evidence_sha }}
       cancel-in-progress: false
       queue: max
     runs-on: ubuntu-latest
