@@ -34,6 +34,7 @@ use std::os::unix::net::{UnixListener, UnixStream};
 use serde::{Deserialize, Serialize};
 
 pub mod credentials;
+pub mod frame;
 
 pub const MAX_UNIX_SOCKET_PATH_BYTES: usize = 100;
 pub const MAX_INHERITED_DESCRIPTOR: u32 = 65_535;
@@ -503,28 +504,25 @@ pub fn harden_process_custody() -> Result<()> {
     ))
 }
 
+impl From<frame::FrameError> for SecureIpcError {
+    fn from(error: frame::FrameError) -> Self {
+        use frame::FrameError;
+        match error {
+            FrameError::InvalidLimit { .. } => {
+                Self::InvalidConfig("frame limit is invalid".to_string())
+            }
+            FrameError::Empty | FrameError::Oversized { .. } => {
+                Self::InvalidFrame("frame is empty or oversized".to_string())
+            }
+            FrameError::Prefix(error) => Self::InvalidFrame(format!("prefix read failed: {error}")),
+            FrameError::Body(error) => Self::InvalidFrame(format!("body read failed: {error}")),
+            FrameError::Write(error) => Self::Io(format!("frame write failed: {error}")),
+        }
+    }
+}
+
 pub fn read_bounded_frame(reader: &mut impl Read, maximum_bytes: usize) -> Result<Vec<u8>> {
-    if maximum_bytes == 0 || u32::try_from(maximum_bytes).is_err() {
-        return Err(SecureIpcError::InvalidConfig(
-            "frame limit is invalid".to_string(),
-        ));
-    }
-    let mut prefix = [0_u8; 4];
-    reader
-        .read_exact(&mut prefix)
-        .map_err(|error| SecureIpcError::InvalidFrame(format!("prefix read failed: {error}")))?;
-    let length = usize::try_from(u32::from_be_bytes(prefix))
-        .map_err(|_| SecureIpcError::InvalidFrame("length overflow".to_string()))?;
-    if length == 0 || length > maximum_bytes {
-        return Err(SecureIpcError::InvalidFrame(
-            "frame is empty or oversized".to_string(),
-        ));
-    }
-    let mut frame = vec![0_u8; length];
-    reader
-        .read_exact(&mut frame)
-        .map_err(|error| SecureIpcError::InvalidFrame(format!("body read failed: {error}")))?;
-    Ok(frame)
+    Ok(frame::read_frame(reader, maximum_bytes)?)
 }
 
 pub fn write_bounded_frame(
@@ -532,18 +530,7 @@ pub fn write_bounded_frame(
     frame: &[u8],
     maximum_bytes: usize,
 ) -> Result<()> {
-    if frame.is_empty() || frame.len() > maximum_bytes {
-        return Err(SecureIpcError::InvalidFrame(
-            "frame is empty or oversized".to_string(),
-        ));
-    }
-    let length = u32::try_from(frame.len())
-        .map_err(|_| SecureIpcError::InvalidFrame("length overflow".to_string()))?;
-    writer
-        .write_all(&length.to_be_bytes())
-        .and_then(|()| writer.write_all(frame))
-        .and_then(|()| writer.flush())
-        .map_err(|error| SecureIpcError::Io(format!("frame write failed: {error}")))
+    Ok(frame::write_frame(writer, frame, maximum_bytes)?)
 }
 
 #[cfg(test)]
