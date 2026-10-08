@@ -1,5 +1,7 @@
 //! The handling a failure requires from the loop or endpoint that ran it.
 
+mod causes;
+
 /// What a recovery loop, worker or endpoint does with one failure.
 ///
 /// Classifiers match error types, never message text. A failure that no
