@@ -412,7 +412,9 @@ subject to the existing no-create rule.
 
 The post-merge audit first requires every attempt of every `ci.yml`
 `pull_request` run whose API head is `E`, for any pull request, base, test merge,
-or run title, to have completed successfully. A run whose head is another
+or run title, to have completed successfully, and each run's listed and current
+projections to agree with its latest successful attempt.
+A run whose head is another
 repository is outside this history only when that identity is complete and
 distinct; any other run without a proven same-repository identity leaves the
 landing unverified. Only then does a run title select the positive source. The

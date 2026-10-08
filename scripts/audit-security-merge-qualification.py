@@ -218,6 +218,7 @@ def audit_qualification(api: GitHub, repository: str, pr_number: int,
         require_attempt(current, run_id, maximum, workflow_id, ci_path, None, evidence, repository, repository_id,
                         successful=False)
         history[run_id] = (maximum, current.get("status"), current.get("conclusion"))
+        latest: tuple = ()
         for attempt in range(1, maximum + 1):
             exact = api.get(f"actions/runs/{run_id}/attempts/{attempt}")
             require_attempt(exact, run_id, attempt, workflow_id, ci_path, None, evidence, repository, repository_id,
@@ -225,6 +226,11 @@ def audit_qualification(api: GitHub, repository: str, pr_number: int,
             require(exact.get("event") == "pull_request", "CI historical event mismatch")
             require(exact.get("status") == "completed" and exact.get("conclusion") == "success",
                     "CI history for the evidence head contains an incomplete or unsuccessful attempt")
+            latest = (positive_id(exact.get("run_attempt")), exact.get("status"), exact.get("conclusion"))
+        require((run.get("run_attempt"), run.get("status"), run.get("conclusion"))
+                == (current.get("run_attempt"), current.get("status"), current.get("conclusion"))
+                == latest == (maximum, "completed", "success"),
+                "CI history run projection disagrees with its latest successful attempt")
     candidates: dict[str, list[dict]] = {}
     for run in runs:
         title = CI_TITLE.fullmatch(str(run.get("display_title", "")))
