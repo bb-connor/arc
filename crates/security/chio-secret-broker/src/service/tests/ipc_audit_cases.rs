@@ -251,27 +251,6 @@ fn response_envelope_validation_table_enforces_success_and_error_shapes() {
     }
 }
 
-#[cfg(unix)]
-#[test]
-fn provisional_socket_cleanup_removes_exact_socket_after_validation_failure() {
-    use std::os::unix::fs::PermissionsExt;
-    use std::os::unix::net::UnixListener;
-
-    let directory = crate::private_tempdir().test_expect("IPC directory");
-    let socket_path = directory.path().join("broker.sock");
-    let listener = UnixListener::bind(&socket_path).test_expect("bind provisional socket");
-    let cleanup =
-        ProvisionalBrokerSocketCleanup::new(&socket_path).test_expect("capture exact identity");
-    std::fs::set_permissions(&socket_path, std::fs::Permissions::from_mode(0o666))
-        .test_expect("inject insecure socket mode");
-    validate_broker_socket_identity(&socket_path, rustix::process::geteuid().as_raw())
-        .test_expect_err("injected post-bind validation failure");
-
-    drop(cleanup);
-    assert!(!socket_path.exists());
-    drop(listener);
-}
-
 #[cfg(target_os = "linux")]
 #[test]
 fn trickling_same_uid_client_cannot_extend_the_absolute_read_deadline() {

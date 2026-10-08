@@ -6,14 +6,15 @@ use super::{
     PrepareDispatchAcknowledgement, Read, Result, Sha256, Write, MAX_WIRE_BYTES,
 };
 #[cfg(unix)]
-use super::{
-    is_well_formed_broker_execute_diagnostic_code, File, Instant, OpenOptions, OpenOptionsExt,
-    PathBuf, PermissionsExt, UnixListener, UnixStream,
-};
+use super::{is_well_formed_broker_execute_diagnostic_code, Instant, UnixStream};
 #[cfg(test)]
 use super::{
     sign_failure_receipt, BrokerDispatchKnowledge, BrokerFailureOutcome, BrokerFailureReceiptBody,
     BrokerFailureStage, Ed25519Backend, Keypair, BROKER_FAILURE_RECEIPT_SCHEMA,
+};
+#[cfg(unix)]
+use chio_secure_ipc::listener::{
+    CustodialUnixListener, ListenerError, PeerPolicy, SocketAccess, SocketCustody,
 };
 
 pub trait BrokerIpcHandler: Send + Sync {
@@ -43,22 +44,10 @@ pub(super) enum BrokerIpcServeFailure {
 }
 
 #[cfg(unix)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct BrokerSocketIdentity {
-    device: u64,
-    inode: u64,
-}
-
-#[cfg(unix)]
 pub struct UnixBrokerEndpoint {
-    listener: UnixListener,
+    listener: CustodialUnixListener,
     handler: Arc<dyn BrokerIpcHandler>,
-    authorized_client_uid: u32,
     deadlines: BrokerIpcDeadlines,
-    socket_path: PathBuf,
-    socket_identity: BrokerSocketIdentity,
-    trusted_service_uid: u32,
-    _lifecycle_lock: File,
     prepared: PreparedIpcSlot,
 }
 
@@ -79,6 +68,9 @@ impl UnixBrokerEndpoint {
         )
     }
 
+    /// Bind the broker socket owner-only in a service-private directory. Each
+    /// accepted client must run as `authorized_client_uid` before any byte of
+    /// its request is read.
     pub fn bind_with_deadlines(
         path: impl AsRef<Path>,
         handler: Arc<dyn BrokerIpcHandler>,
@@ -97,35 +89,21 @@ impl UnixBrokerEndpoint {
                 "broker IPC path must be absolute".to_string(),
             ));
         }
-        let lifecycle_lock = acquire_broker_socket_lifecycle_lock(path, trusted_service_uid)?;
-        if path.exists() {
-            return Err(BrokerError::Storage(
-                "broker IPC path already exists".to_string(),
-            ));
-        }
-        let listener = UnixListener::bind(path)
-            .map_err(|error| BrokerError::Storage(format!("IPC bind failed: {error}")))?;
-        let mut provisional_cleanup = ProvisionalBrokerSocketCleanup::new(path)?;
-        fs_permissions(path, 0o600)?;
-        let socket_identity = validate_broker_socket_identity(path, trusted_service_uid)?;
-        if socket_identity != provisional_cleanup.identity() {
-            return Err(BrokerError::Custody(
-                "broker IPC socket identity changed during bind".to_string(),
-            ));
-        }
-        let endpoint = Self {
+        let listener = CustodialUnixListener::bind(SocketCustody {
+            socket_path: path.to_path_buf(),
+            trusted_service_uid,
+            access: SocketAccess::Owner,
+            peer: PeerPolicy::User {
+                uid: authorized_client_uid,
+            },
+        })
+        .map_err(broker_listener_error)?;
+        Ok(Self {
             listener,
             handler,
-            authorized_client_uid,
             deadlines,
-            socket_path: path.to_path_buf(),
-            socket_identity,
-            trusted_service_uid,
-            _lifecycle_lock: lifecycle_lock,
             prepared: PreparedIpcSlot::default(),
-        };
-        provisional_cleanup.disarm();
-        Ok(endpoint)
+        })
     }
 
     /// Serve one accepted connection under the v2 deadline contract.
@@ -133,69 +111,54 @@ impl UnixBrokerEndpoint {
     /// Peer-controlled faults return a typed nonfatal outcome. Service faults
     /// return `Err` so daemon supervision observes the failure.
     pub fn serve_one(&self) -> Result<BrokerIpcServeOutcome> {
-        let (stream, _) = self
-            .listener
-            .accept()
-            .map_err(|error| BrokerError::Storage(format!("IPC accept failed: {error}")))?;
-        match self.serve_stream(stream) {
-            Ok(()) => Ok(BrokerIpcServeOutcome::ResponseWritten),
-            Err(BrokerIpcServeFailure::Client(error)) => Ok(BrokerIpcServeOutcome::ClientFault {
-                diagnostic_code: error.diagnostic_code(),
-            }),
-            Err(BrokerIpcServeFailure::Internal(error)) => Err(error),
-        }
+        self.serve_accepted(self.listener.accept_authenticated())
     }
 
     pub fn set_nonblocking(&self, nonblocking: bool) -> Result<()> {
         self.listener
             .set_nonblocking(nonblocking)
-            .map_err(|error| BrokerError::Storage(format!("IPC listener mode failed: {error}")))
+            .map_err(broker_listener_error)
     }
 
     /// Serve at most one connection from a nonblocking listener.
     pub fn try_serve_one(&self) -> Result<Option<BrokerIpcServeOutcome>> {
-        let stream = match self.listener.accept() {
-            Ok((stream, _)) => stream,
-            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => return Ok(None),
-            Err(error) => {
-                return Err(BrokerError::Storage(format!(
-                    "IPC nonblocking accept failed: {error}"
-                )))
-            }
-        };
-        let outcome = match self.serve_stream(stream) {
-            Ok(()) => BrokerIpcServeOutcome::ResponseWritten,
-            Err(BrokerIpcServeFailure::Client(error)) => BrokerIpcServeOutcome::ClientFault {
-                diagnostic_code: error.diagnostic_code(),
-            },
-            Err(BrokerIpcServeFailure::Internal(error)) => return Err(error),
-        };
-        Ok(Some(outcome))
+        match self.listener.try_accept_authenticated() {
+            Ok(None) => Ok(None),
+            Ok(Some(stream)) => self.serve_accepted(Ok(stream)).map(Some),
+            Err(error) => self.serve_accepted(Err(error)).map(Some),
+        }
     }
 
-    fn serve_stream(
+    /// Serve one accepted connection. A client the peer policy refuses is a
+    /// contained client fault; every other accept failure reaches supervision.
+    fn serve_accepted(
         &self,
-        stream: std::os::unix::net::UnixStream,
-    ) -> std::result::Result<(), BrokerIpcServeFailure> {
+        accepted: std::result::Result<UnixStream, ListenerError>,
+    ) -> Result<BrokerIpcServeOutcome> {
+        let failure = match accepted {
+            Ok(stream) => match self.serve_stream(stream) {
+                Ok(()) => return Ok(BrokerIpcServeOutcome::ResponseWritten),
+                Err(failure) => failure,
+            },
+            Err(error @ ListenerError::UnauthorizedPeer { .. }) => {
+                BrokerIpcServeFailure::Client(broker_listener_error(error))
+            }
+            Err(error) => BrokerIpcServeFailure::Internal(broker_listener_error(error)),
+        };
+        match failure {
+            BrokerIpcServeFailure::Client(error) => Ok(BrokerIpcServeOutcome::ClientFault {
+                diagnostic_code: error.diagnostic_code(),
+            }),
+            BrokerIpcServeFailure::Internal(error) => Err(error),
+        }
+    }
+
+    fn serve_stream(&self, stream: UnixStream) -> std::result::Result<(), BrokerIpcServeFailure> {
         let mut stream = BrokerIpcDeadlineIo::new(stream, self.deadlines).map_err(|error| {
             BrokerIpcServeFailure::Internal(BrokerError::Storage(format!(
                 "IPC stream deadline setup failed: {error}"
             )))
         })?;
-        if let Err(error) = validate_broker_peer_uid(stream.stream(), self.authorized_client_uid) {
-            return Err(
-                if matches!(
-                    &error,
-                    BrokerError::AuthorizationDenied(_)
-                        | BrokerError::AdapterAuthorizationDenied(_)
-                        | BrokerError::CredentialUnavailable(_)
-                ) {
-                    BrokerIpcServeFailure::Client(error)
-                } else {
-                    BrokerIpcServeFailure::Internal(error)
-                },
-            );
-        }
         let frame = match read_bounded_sensitive_frame(&mut stream) {
             Ok(frame) => frame,
             Err(_error) if stream.read_deadline_setup_failed() => {
@@ -249,39 +212,33 @@ impl UnixBrokerEndpoint {
     }
 }
 
-#[cfg(target_os = "linux")]
-pub(super) fn validate_broker_peer_uid(
-    stream: &std::os::unix::net::UnixStream,
-    authorized_client_uid: u32,
-) -> Result<()> {
-    let credentials = rustix::net::sockopt::socket_peercred(stream).map_err(|error| {
-        BrokerError::Storage(format!(
-            "broker IPC client credential lookup failed: {error}"
-        ))
-    })?;
-    if credentials.uid.as_raw() != authorized_client_uid {
-        return Err(BrokerError::AuthorizationDenied(
-            "broker IPC client UID is not authorized".to_string(),
-        ));
-    }
-    Ok(())
-}
-
-#[cfg(all(unix, not(target_os = "linux")))]
-pub(super) fn validate_broker_peer_uid(
-    _stream: &std::os::unix::net::UnixStream,
-    _authorized_client_uid: u32,
-) -> Result<()> {
-    Err(BrokerError::AuthorityUnavailable(
-        "kernel-observed broker IPC client credentials require Linux".to_string(),
-    ))
-}
-
+/// A listener fault as a broker error. A refused client is denied; a lock held
+/// by another daemon is an unavailable authority; custody faults mean the
+/// broker can no longer trust its own socket.
 #[cfg(unix)]
-fn fs_permissions(path: &Path, mode: u32) -> Result<()> {
-    let permissions = std::fs::Permissions::from_mode(mode);
-    std::fs::set_permissions(path, permissions)
-        .map_err(|error| BrokerError::Storage(format!("IPC permissions failed: {error}")))
+pub(super) fn broker_listener_error(error: ListenerError) -> BrokerError {
+    match error {
+        ListenerError::UnauthorizedPeer { .. } => {
+            BrokerError::AuthorizationDenied("broker IPC client UID is not authorized".to_string())
+        }
+        ListenerError::InvalidPath | ListenerError::InvalidPeerPolicy(_) => {
+            BrokerError::InvalidRequest(format!("broker IPC socket configuration: {error}"))
+        }
+        ListenerError::Unsupported => BrokerError::AuthorityUnavailable(
+            "authenticated broker IPC peer credentials require Linux".to_string(),
+        ),
+        ListenerError::LockHeld(source) => BrokerError::AuthorityUnavailable(format!(
+            "broker IPC socket is owned by another daemon: {source}"
+        )),
+        ListenerError::PathOccupied => {
+            BrokerError::Storage("broker IPC path already exists".to_string())
+        }
+        ListenerError::Io { .. } => BrokerError::Storage(format!("broker IPC {error}")),
+        ListenerError::DirectoryCustody
+        | ListenerError::LockCustody
+        | ListenerError::SocketCustody
+        | ListenerError::SocketReplaced => BrokerError::Custody(format!("broker IPC {error}")),
+    }
 }
 
 mod deadline;
@@ -300,17 +257,10 @@ mod response;
 #[cfg(unix)]
 use response::write_broker_ipc_response;
 
-mod lifecycle;
-
-#[cfg(unix)]
-use lifecycle::acquire_broker_socket_lifecycle_lock;
-
 #[cfg(all(test, unix))]
 #[path = "error_wire_tests.rs"]
 mod error_wire_tests;
 
-#[cfg(unix)]
-pub(super) use lifecycle::{validate_broker_socket_identity, ProvisionalBrokerSocketCleanup};
 #[cfg(test)]
 pub(super) use response::is_well_formed_broker_ipc_error_code;
 #[cfg(unix)]

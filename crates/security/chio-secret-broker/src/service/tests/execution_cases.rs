@@ -467,15 +467,56 @@ fn response_write_disconnect_is_classified_as_a_client_fault() {
 fn broker_endpoint_peer_uid_is_kernel_observed_and_fail_closed() {
     use std::os::unix::net::UnixStream;
 
-    let (client, _server) = UnixStream::pair().test_expect("Unix stream pair");
-    let observed_uid = rustix::process::geteuid().as_raw();
-    validate_broker_peer_uid(&client, observed_uid).test_expect("matching client UID");
+    let directory = crate::private_tempdir().test_expect("IPC directory");
+    let socket_path = directory.path().join("broker.sock");
+    let uid = rustix::process::geteuid().as_raw();
+    let handler = || -> Arc<dyn BrokerIpcHandler> {
+        Arc::new(EndpointTestHandler {
+            invalid_envelope: false,
+            response_gate: None,
+            response_bytes: None,
+        })
+    };
+    let endpoint = UnixBrokerEndpoint::bind(&socket_path, handler(), uid, uid)
+        .test_expect("bind endpoint for the matching client UID");
+    let server = thread::spawn(move || endpoint.serve_one());
+    let mut client = UnixStream::connect(&socket_path).test_expect("connect matching client");
+    send_endpoint_test_request(&mut client);
+    assert_eq!(
+        server
+            .join()
+            .test_expect("endpoint server thread")
+            .test_expect("matching client is served"),
+        BrokerIpcServeOutcome::ResponseWritten
+    );
 
-    let error = validate_broker_peer_uid(&client, observed_uid.wrapping_add(1))
-        .test_expect_err("a self-declared or substituted client UID must fail");
-    assert!(error
-        .to_string()
-        .contains("IPC client UID is not authorized"));
+    let endpoint = UnixBrokerEndpoint::bind(&socket_path, handler(), uid, uid.wrapping_add(1))
+        .test_expect("bind endpoint for another client UID");
+    let server = thread::spawn(move || endpoint.serve_one());
+    let mut client = UnixStream::connect(&socket_path).test_expect("connect substituted client");
+    send_endpoint_test_request(&mut client);
+    assert_eq!(
+        server
+            .join()
+            .test_expect("endpoint server thread")
+            .test_expect("a refused client is contained"),
+        BrokerIpcServeOutcome::ClientFault {
+            diagnostic_code: "authorization_denied"
+        }
+    );
+    let mut response = Vec::new();
+    let _ = std::io::Read::read_to_end(&mut client, &mut response);
+    assert!(response.is_empty(), "a refused client received a response");
+
+    let error = broker_listener_error(chio_secure_ipc::listener::ListenerError::UnauthorizedPeer {
+        observed: chio_secure_ipc::PeerIdentity {
+            process_id: std::process::id(),
+            user_id: uid,
+            group_id: rustix::process::getegid().as_raw(),
+        },
+    });
+    assert!(matches!(&error, BrokerError::AuthorizationDenied(message)
+        if message == "broker IPC client UID is not authorized"));
 }
 
 #[test]

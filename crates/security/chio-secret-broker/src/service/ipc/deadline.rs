@@ -100,10 +100,6 @@ impl<S: BrokerIpcDeadlineStream> BrokerIpcDeadlineIo<S> {
         })
     }
 
-    pub(super) fn stream(&self) -> &S {
-        &self.stream
-    }
-
     pub(super) fn into_inner(self) -> S {
         self.stream
     }
