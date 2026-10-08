@@ -209,15 +209,29 @@ fn marker_update_and_delete_are_denied_and_missing_coverage_is_not_rebuilt() {
     case.remove_original("marker-immutable");
     let connection = open_connection(&case);
     let before = schema_snapshot(&case);
-    assert!(connection
-        .execute(
+    for (sql, reason) in [
+        (
             "UPDATE security_response_effect_finality SET action_id = 'foreign-action'",
-            []
-        )
-        .is_err());
-    assert!(connection
-        .execute("DELETE FROM security_response_effect_finality", [])
-        .is_err());
+            "completed effect removal mutation is rejected",
+        ),
+        (
+            "DELETE FROM security_response_effect_finality",
+            "completed effect removal deletion is rejected",
+        ),
+    ] {
+        let error = connection
+            .execute(sql, [])
+            .err()
+            .unwrap_or_else(|| panic!("immutable marker mutation was accepted: {sql}"));
+        match error {
+            rusqlite::Error::SqliteFailure(code, Some(message)) => {
+                assert_eq!(code.code, rusqlite::ErrorCode::ConstraintViolation);
+                assert_eq!(code.extended_code, rusqlite::ffi::SQLITE_CONSTRAINT_TRIGGER);
+                assert_eq!(message, reason);
+            }
+            other => panic!("marker mutation failed for a different reason: {other}"),
+        }
+    }
     assert_eq!(schema_snapshot(&case), before);
     let deletion_sql: String = connection
         .query_row(

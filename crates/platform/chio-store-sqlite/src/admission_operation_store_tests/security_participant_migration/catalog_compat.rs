@@ -90,7 +90,14 @@ fn legacy0_and_current1_sources_import_through_the_real_destination_owner() -> A
             "SELECT canonical_bytes FROM chio_security_participant_source_seal WHERE singleton = 1",
             [], |row| row.get::<_, Vec<u8>>(0),
         )?, seal_before);
-        assert!(crate::SqliteSecurityStateStore::open(&path).is_err());
+        let error = crate::SqliteSecurityStateStore::open(&path)
+            .err()
+            .ok_or("sealed source was reopened as a writable serving store")?;
+        assert_eq!(
+            error.kind(),
+            chio_security_types::ports::PortErrorKind::Conflict
+        );
+        assert_eq!(error.code().as_str(), "store.conflict");
         drop(source);
         let reopened = SqliteSecurityParticipantSource::open(&path)?;
         reopened.verify_seal(expected.snapshot())?;

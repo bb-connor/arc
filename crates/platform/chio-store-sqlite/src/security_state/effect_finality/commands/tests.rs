@@ -27,7 +27,10 @@ fn authenticated_snapshot_over_two_mib_keeps_its_existing_canonical_reader_contr
     })
     .unwrap_or_else(|error| panic!("canonical contribution: {error}"));
     let contribution_hash = Digest32::new(body_hash(&spec_bytes));
-    assert!(spec_bytes.len() <= chio_security_types::ports::MAX_CANONICAL_BODY_BYTES);
+    assert!(
+        spec_bytes.len() <= 1_048_576,
+        "the existing contribution body bound is unchanged"
+    );
     let key = CapabilitySetSuspensionKey {
         tenant_id: tenant.clone(),
         affected_set_hash: response_affected_set_hash(&tenant, &ids)

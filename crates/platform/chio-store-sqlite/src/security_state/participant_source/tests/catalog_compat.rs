@@ -206,9 +206,18 @@ fn source_refuses_revision_and_finality_schema_combinations_without_repair() -> 
             [],
             |row| row.get(0),
         )?;
+        let reason = match damage {
+            "zero-with-marker" => "source version and finality schema disagree",
+            "one-without-marker" => "source finality schema is not qualified",
+            "future-version" => "source security schema version is not canonical",
+            _ => return Err("unknown compatibility damage".into()),
+        };
+        let error = SqliteSecurityParticipantSource::open(&path)
+            .err()
+            .ok_or("invalid source revision/schema combination was accepted")?;
         assert!(
-            SqliteSecurityParticipantSource::open(&path).is_err(),
-            "{damage}"
+            matches!(error, Error::Invalid(actual) if actual == reason),
+            "{damage}: {error}"
         );
         assert_eq!(
             connection.query_row("PRAGMA schema_version", [], |row| row.get::<_, i64>(0))?,
@@ -270,11 +279,27 @@ fn revision1_seal_cannot_be_laundered_into_legacy0_by_removing_marker_schema() -
     );
     let before_schema: i64 = connection.query_row("PRAGMA schema_version", [], |row| row.get(0))?;
     let before_data: i64 = connection.query_row("PRAGMA data_version", [], |row| row.get(0))?;
-    assert!(source.verify_seal(&expected).is_err());
-    drop(source);
+    let error = source
+        .verify_seal(&expected)
+        .err()
+        .ok_or("downgraded source authenticated the current seal")?;
     assert!(
-        SqliteSecurityParticipantSource::open(&path).is_err(),
-        "a revision1 seal authenticated under the restored old schema/version"
+        matches!(
+            error,
+            Error::Invalid("source differs from pinned expectation")
+        ),
+        "{error}"
+    );
+    drop(source);
+    let error = SqliteSecurityParticipantSource::open(&path)
+        .err()
+        .ok_or("a revision1 seal authenticated under the restored old schema/version")?;
+    assert!(
+        matches!(
+            error,
+            Error::Invalid("source differs from pinned expectation")
+        ),
+        "{error}"
     );
     assert_eq!(
         connection.query_row(
