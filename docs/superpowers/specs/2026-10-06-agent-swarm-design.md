@@ -506,6 +506,122 @@ Still open, resolved during execution:
 
 ## 13. Out of scope
 
-Linear; a central dispatcher service; E2B; Cursor cloud agents; automatic
-merges to `main`; changes to how the security pair works before #1160 lands;
-any product code, schema or protocol change.
+Linear as the source of truth (section 14.7); a central dispatcher service;
+E2B; Cursor cloud agents; merges to `main` outside the section 8.3 gate;
+changes to how the security pair works before #1160 lands, beyond the build
+scheduler it has been asked to adopt; any product code, schema or protocol
+change.
+
+## 14. Amendment 2026-10-08: swarm v2, lessons from the #1160 session
+
+Approved by Connor ("C. Both, with B first"). Sections 14.1-14.9 supersede
+earlier sections where they conflict.
+
+### 14.1 Evidence (workstation-2, 2026-10-07 to 2026-10-08)
+
+- Build capacity, not agent count, bounds throughput: load average about 40 on
+  12 cores, CPU pressure about 75% sustained (the section 7.6 trigger is 30%),
+  42 cargo and rustc processes. Six lane targets (17.5 GB) compiled the same
+  dependency graph until a hand-built flock queue serialized them; a
+  70-minute stall left about 90 commits uncompiled. Codex's integration
+  target held 46 GB, 21.6 GB of it untouched for 24 hours.
+- Message traffic consumed the conductor: about 340 mailbox entries on one
+  day, 704 coordination commits in 48 hours, and about 270 notifications to
+  Claude's main thread against 14 human messages, with a watcher re-armed
+  every 30 minutes.
+- Quota: all 58 Claude subagents ran on Opus; the session limit stopped every
+  lane twice.
+- Process drift: Connor restated the lean directive three times. The
+  seven-section working agreement was confirmed in writing, then drifted,
+  because it lived only in prose.
+- Double integration: a Claude conductor built each train and Codex re-ran
+  the same heavy verification before pushing.
+
+### 14.2 Roles
+
+- **Coders** write code and its regression test, one commit per fix, and run
+  only cheap checks for the crates they own (`cargo check`, Clippy, the owning
+  crate's unit tests) at coder build priority. No workspace builds and no
+  native, Kani or hosted runs.
+- **One integrator per target branch** composes, builds once per train, fixes
+  integration, test, gate and fixture breaks in place (bouncing work back only
+  for large redesigns inside an active lane), pushes once, and lands through
+  the section 8.3 gate. The integrator never claims implementation items.
+- **Reviewers** review trains, not items: one batched cross-vendor whole-PR
+  review per pushed head (section 8.3), plus the review bots.
+- **The conductor** plans, slices and unblocks from digests (section 14.5).
+
+### 14.3 Lean per-change process
+
+One commit per fix containing the code and its regression test; exact
+assertions; fail closed; no weakened checks, caps, timeouts or authority.
+Dropped: separate RED commits (taken only when free), per-item independent
+review, mutation and calibration campaigns, per-item evidence write-ups.
+Hosted CI is the full-suite verifier; a batch pushes once its focused local
+gates pass. This replaces the per-item cross-vendor review step of section
+6.2 (step 4).
+
+### 14.4 Check trains
+
+Every 20-30 minutes, or when at least four lanes have new submitted commits,
+the integrator (or a builder janitor) runs one check train:
+
+1. Stack every submitted lane head onto the current integration tip in a
+   throwaway worktree, in submission order. A lane that conflicts is dropped
+   from the train and returned with the conflicting paths.
+2. Run one workspace `cargo check --all-targets`, one Clippy pass and the
+   tests of every crate the train touches, all as integrator-class builds.
+3. Attribute each failure to lanes by the file paths each lane changed
+   (stigmergic signal: the failure lands on the item, not in a mailbox).
+   Passing lanes move to `ready`; failing lanes return to `in-progress` with
+   the exact error excerpt as evidence.
+
+One build verifies many lanes. `submit` therefore moves an item to
+`submitted` (awaiting a check train) instead of `review`.
+
+### 14.5 Coordination: state first, messages for decisions
+
+The `swarm` branch is the shared environment. Items, claims, file ownership,
+build results and CI results are the signals agents react to (`swarm wait`).
+Mailboxes carry only decisions, blockers and requests, are role-addressed and
+terse. The conductor receives a digest at most every 20 minutes, except
+messages of kind `blocker` or headings marked URGENT, which wake it
+immediately.
+
+### 14.6 Shared build scheduler (shipped 2026-10-08)
+
+Every agent on a host, including the security pair, builds through
+`swarm build`: slot 0 is integrator-only; each slot caps `CARGO_BUILD_JOBS`
+(workstation-2: 2 slots x 5 jobs); coder builds run at CPUWeight 20; nothing
+starts below the disk floor (25 GB; 12 GB temporarily until the 500 GB
+resize). Host settings live in `~/.swarm/build.env`. Each agent keeps one
+warm target per branch family and prunes it with `swarm prune-target`, which
+holds cargo's own `.cargo-lock` so a running build is never pruned under.
+
+### 14.7 Linear
+
+Not adopted as the source of truth: claims cannot be made atomic, agents
+spend tokens on tracker bookkeeping, and it does not touch the bottleneck. A
+one-way mirror of `BOARD.md` for Connor's phone view is an optional later
+addition.
+
+### 14.8 Quota and session hygiene
+
+Coder lanes default to the mid tier (Sonnet 5.5, Codex 6.1-sol at medium
+effort); Opus and Codex at max effort are reserved for the integrator,
+design-heavy items and whole-PR review. Work spreads across vendors so one
+vendor's limit pauses, rather than stops, the swarm; the runner already
+throttles and resumes on usage caps. Long-lived sessions rotate after a
+handoff digest instead of growing without bound (Codex's root thread reached
+529 MB).
+
+### 14.9 Rollout
+
+- **Phase 0 (done 2026-10-08):** scheduler and pruning shipped; adoption,
+  digest and model-tier requests posted to the #1160 pair.
+- **Phase 1 (with Connor):** grow workstation-2 to 500 GB; provision the
+  section 7.6 build box now that its trigger has fired; route coder checks and
+  check trains to it.
+- **Phase 2 (after #1160 merges):** the HAMMER follow-up lanes become swarm
+  items; check trains replace hand-composed trains; `submit` moves items to
+  `submitted`.
