@@ -1147,8 +1147,11 @@ impl GovernedTransactionIntentBody {
     }
 }
 
-/// Canonical intent attached to a governed transaction request.
+/// Canonical intent attached to a governed transaction request. Unknown
+/// members are refused: the binding hash covers only declared fields, so a
+/// member the kernel would drop must not reach it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct GovernedTransactionIntent {
     /// Unique intent identifier (UUIDv7 recommended).
     pub id: String,

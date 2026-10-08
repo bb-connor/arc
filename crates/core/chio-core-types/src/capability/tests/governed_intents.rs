@@ -138,3 +138,23 @@ fn bound_tool_invocation_intent_hash_commits_canonical_parameters() {
     assert_eq!(legacy.body, GovernedTransactionIntentBody::ToolInvocation);
     assert_eq!(serde_json::to_value(legacy).unwrap(), wire);
 }
+
+#[test]
+fn governed_intent_refuses_unknown_members_and_keeps_its_wire_form() {
+    let mut wire = serde_json::json!({
+        "id": "intent-1",
+        "server_id": "tools",
+        "tool_name": "read",
+        "purpose": "read the reviewed file",
+        "context": {"caller_defined": {"nested": true}}
+    });
+    let intent: GovernedTransactionIntent = serde_json::from_value(wire.clone()).unwrap();
+    assert_eq!(serde_json::to_value(&intent).unwrap(), wire);
+
+    wire["process_id"] = serde_json::json!("other");
+    let error = serde_json::from_value::<GovernedTransactionIntent>(wire).unwrap_err();
+    assert!(
+        error.to_string().starts_with("unknown field `process_id`"),
+        "{error}"
+    );
+}

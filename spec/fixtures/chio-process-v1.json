@@ -306,6 +306,14 @@
         }
       },
       {
+        "name": "invoke-governed-intent-unknown-member",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"invoke\",\"operation_key\":\"read-2\",\"server_id\":\"tools\",\"tool_name\":\"read\",\"arguments\":{\"text\":\"hi\"},\"governed_intent\":{\"id\":\"intent-1\",\"server_id\":\"tools\",\"tool_name\":\"read\",\"purpose\":\"fixture\",\"process_id\":\"other\"}}}",
+        "schema_valid": false,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
         "name": "invoke-missing-arguments",
         "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"invoke\",\"operation_key\":\"read-2\",\"server_id\":\"tools\",\"tool_name\":\"read\"}}",
         "schema_valid": false,
