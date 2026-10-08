@@ -2,6 +2,12 @@
 
 Execute the existing production-readiness plan with one integration writer. This extension covers the actual October 7 counterexamples, not new product work. PR #1160 remains unqualified and unmerged.
 
+## Current landing order (2026-10-08)
+
+Use the authoritative [landing-boundary checkpoint](../../security/audits/foundation-landing-boundary-20261008.json). Connor's decision, relayed through the coordination mailbox at 13:26:46 UTC, makes the four required exact-candidate GitHub checks, local qualification and review-thread dispositions the foundation merge bar. The 35-campaign trusted capture and per-PR App enforcement run after merge and before any tag or release; native, cold and platform acceptance remains open. No result is waived or relabeled. HAMMER architecture/security trains land afterward; confirmed exploitable foundation blockers remain mandatory before merge.
+
+Compose reviewed #1195 head `8e689abfa7577100f06302fa78a3d938d305dc4a` and pin it now to overlap ordinary CI. Before #1160 merge or definition authorization, require #1195 landed, exact commit ancestry on refreshed main and matching trusted workflow blobs. Preserve both histories and reassess if the prerequisite is squashed, rebased or the base requirements change.
+
 ## Evidence before implementation
 
 The first active-response capture had 12 genuine defect failures and two prefix-oracle mistakes. The corrected current capture has 17 passing controls and eight runtime counterexamples. Its earlier five compilation errors are setup failures, retained separately. The two recovery Originals fail at the current composition; their six source/control commits are integrated, with current qualification running.

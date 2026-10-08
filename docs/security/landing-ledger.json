@@ -133215,5 +133215,10 @@
     "scope": "Latest finite accounting: F077 facts updated to 3764; all other requirement facts remain the preserved 5a56 snapshot. No whole-source qualification.",
     "F077_followup_source_checkpoint": "3764d4ac48dd88792f62de4de6d4fba319e547e0",
     "baseline_source_checkpoint": "5a56b7a17f9fb38374b3bfca8adee8add47d87da"
+  },
+  "foundation_landing_boundary_20261008": {
+    "path": "docs/security/audits/foundation-landing-boundary-20261008.json",
+    "sha256": "c5b206178164527ce083d2bdf23f28a7c4b21fc6f39c29fad180770da34a68a7",
+    "meaning": "Current relayed landing decision and bounded local evidence; historical rows/views preserved; unfinished pre-release requirements remain pending."
   }
 }

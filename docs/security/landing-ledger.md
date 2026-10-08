@@ -2,6 +2,14 @@
 
 Current protected landing queue: [#1195](https://github.com/bb-connor/arc/pull/1195) then #1160. The trusted v3 definition prerequisite is published at `8e689abfa7`; at this recorded handoff its ordinary hosted checks remain pending and the PR is unmerged. Publication has not activated Source, definition or evidence authorization. The older `3764d4ac48` reconciliation below remains a scoped snapshot; final source, native, trusted, hosted and protected landing acceptance remain open.
 
+## Current landing boundary (2026-10-08)
+
+The [landing-boundary checkpoint](audits/foundation-landing-boundary-20261008.json) records Connor's decision relayed by Claude at 13:26:46 UTC: the four required GitHub checks, local qualification and review-thread dispositions gate #1160's merge. The 35-campaign trusted capture and per-PR App enforcement remain unfinished post-merge, pre-release requirements. No tag or release is permitted before those gates pass. Remaining native, cold and platform evidence stays explicitly pending; moving an acceptance boundary supplies no evidence. HAMMER architecture/security trains follow #1160 in separate landing waves. Confirmed exploitable foundation blockers still require repair before merge.
+
+Reviewed #1195 commit `8e689abfa7` is composed into Source through a normal history merge. The foundation caller pins that immutable definition so ordinary CI can run concurrently. Before definition authorization or #1160 merge, #1195 must actually land, that exact commit must be reachable from freshly fetched `main`, and the trusted workflow blobs must match. Squash, rebase or changed requirements require reassessment and, where necessary, repinning and fresh checks. No authorization, ruleset or check has been removed or changed.
+
+The complete local security-CI mutation suite passed at `05c990ad0d` in 916.7 seconds. At `0884b8fe2c`, seven local readiness gates passed, including eight-owner strict Clippy, 30 production-effect tests and 25 issuance tests. Its immutable native package is a separate nonfinal diagnostic, currently building; it does not qualify the later source or hosted capture. All 1,794 canonical requirements and existing current-view values are preserved. Historical checkpoints below describe their original source and acceptance boundary.
+
 ## Current source reconciliation (2026-10-08, Source `3764d4ac48`)
 
 The [finite source reconciliation](audits/current-source-reconciliation-20261008.json) updates 24 existing current-view keys and the two effect-clock/shared-freeze aliases. It adds NRB001 once, bringing the total to 1,794 requirements while preserving all 1,793 prior canonical rows, their raw bytes, and every historical/evidence field. Earlier sections retain their capture dates and outcomes; their older current labels do not override this scoped checkpoint.

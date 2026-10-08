@@ -563,8 +563,8 @@ jobs:
       contents: read
 
   enterprise-security-contract:
-    # CHIO_ENTERPRISE_HARDENING_BOOTSTRAP_SHA=6573b8980a1e5331028b7e688169f033a39d0384
-    uses: bb-connor/arc/.github/workflows/enterprise-hardening.yml@6573b8980a1e5331028b7e688169f033a39d0384
+    # CHIO_ENTERPRISE_HARDENING_BOOTSTRAP_SHA=8e689abfa7577100f06302fa78a3d938d305dc4a
+    uses: bb-connor/arc/.github/workflows/enterprise-hardening.yml@8e689abfa7577100f06302fa78a3d938d305dc4a
     permissions:
       actions: read
       artifact-metadata: write
