@@ -1,5 +1,17 @@
 # Security and process landing ledger
 
+## Current source reconciliation (2026-10-08, Source `3764d4ac48`)
+
+The [finite source reconciliation](audits/current-source-reconciliation-20261008.json) updates 24 existing current-view keys and the two effect-clock/shared-freeze aliases. It adds NRB001 once, bringing the total to 1,794 requirements while preserving all 1,793 prior canonical rows, their raw bytes, and every historical/evidence field. Earlier sections retain their capture dates and outcomes; their older current labels do not override this scoped checkpoint.
+
+EF-COMP is source-integrated: its stale board tip `c472f5c79e` is not an ancestor, but its exact patch matches integrated `8fb315b9dd`. Trusted-clock composition, durable plan binding, all four shared-base contribution repairs, router authority and later effect/removal finality are integrated. NDR001, F011R1, financial recovery, persisted disposition, single-use capture, cancellation and return-guard repairs are also integrated. The JSON keeps explicit full commit and evidence mappings; source integration does not settle the whole acceptance contract.
+
+NRB001 retains the primary two genuine Original failures and the secondary physical-member Original. At `a13d10b58d`, SQLite execution-nonce 88 cases and the exact broker-authority case pass. The array-only correction, later committed as `a5942b8ca6`, passes six SQLite selectors and both owners' strict lint. Its control-plane zero-test selection is filtered, not a runtime pass. Earlier setup, typed-refusal expectation and strict-lint failures remain separate. The native EOF causal claim is unproven.
+
+F077 D/P4/P6/P5/H source is integrated through `3764d4ac48`: P5/H at `07c5628a22`, identity ports at `a7f3bcc5c1`/`8010adbdcf`/`35848a4fa9`, and revocation ports at `fa6943194c`/`3764d4ac48`. The exact final combined suite, outstanding old-definition fixture port and trusted-definition prerequisite still require acceptance. Other requirement facts remain the preserved `5a56b7a17f` reconciliation. F075's measured r1 repair is integrated; its inseparable durable APK/binary/source/recipe/notices unit remains later, local and unpublished. F043's complete-history redesign also remains later.
+
+The actual enforcing native trajectory, immutable final-source owning/default/PQ/platform/cold checks, trusted capture, terminal exact-source hosted checks, final independent review and protected landing remain open. The foundation remains unqualified and unmerged. This metadata checkpoint adds no runtime result, source/definition authorization rotation or hosted acceptance.
+
 ## Current finality and legacy import checkpoint (2026-10-08)
 
 The [finality and legacy import checkpoint](audits/finality-and-legacy-import-checkpoint-20261008.json) records the integrated effect-finality, shared-lineage freeze and authenticated historical-replay repairs. At `f2bb8c91d3`, all 30 production-effect tests and the whole 25-test issuance target pass, including the original refusal regression and zero-external-call controls. Eight-owner strict Clippy and all four unchanged source gates pass. Security-type and quarantine targets add 87 passing tests.

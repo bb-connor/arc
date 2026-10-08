@@ -7974,7 +7974,123 @@
     {"id":"incoming-pr1160-review-20261008:reconciliation:FX-CLOCK","label":"FX-CLOCK","priority":"P2","requirement":"Check fetched FX evidence against fresh trusted time without changing stored settlement replay or accepting future quotes.","source":{"path":"docs/security/audits/review-reconciliation-obligations-20261008.json","line":59,"line_sha256":"bd922e45b27a785c651866a69024fa0059fe3c11c84005e5b084c203c6360fc6","checkpoint":"b6d38fceca3951c2f6900c0c3e83372b426a5e3a","reviewed_source":"b82c92262879b0929c729ff7e6a635eda74244ed"},"disposition":"source-hypothesis-deterministic-original-and-proposal-pending","source_repair":null,"verification_evidence":[{"path":"docs/security/audits/review-reconciliation-obligations-20261008.json","sha256":"6a445336bfa8184168a334ba9ac549e054b8a2c01f40bc42bfbc702971e08fcf","scope":"Source review or explicitly limited hypothesis; Original and composed repair acceptance pending."}],"remaining_acceptance":["An injected trusted clock advancing during oracle I/O distinguishes a valid newly fetched quote from a truly future quote.","Both ordinary and durable callers preserve future/stale refusal, global clock/fence failure and original stored-disposition replay.","Genuine Original failure, reviewed repair and current focused controls for each new obligation.","Combined-source owning/strict/native/cold/trusted/hosted qualification and protected landing; no quota or baseline waiver."],"landing_unit":"foundation","landing_pr":1160,"main_ancestry_verified":false,"review_scope":"now","work_status":"in-progress","owner":"codex","review_thread_urls":[]},
     {"id":"incoming-pr1160-review-20261008:reconciliation:EF-FINALITY","label":"EF-FINALITY","priority":"P2","requirement":"A fresh Apply command cannot reinstall the same effect after its committed removal; exact historical command replay remains read-only.","source":{"path":"docs/security/audits/review-reconciliation-obligations-20261008.json","line":76,"line_sha256":"734158957d91dcd896fdcb1f5fd6e9a1a799f118efb58a8c062e58d96479006e","checkpoint":"b6d38fceca3951c2f6900c0c3e83372b426a5e3a","reviewed_source":"c472f5c79e"},"disposition":"proposed-effect-repair-regression-confirmed-original-and-producer-pending","source_repair":null,"verification_evidence":[{"path":"docs/security/audits/review-reconciliation-obligations-20261008.json","sha256":"6a445336bfa8184168a334ba9ac549e054b8a2c01f40bc42bfbc702971e08fcf","scope":"Source review or explicitly limited hypothesis; Original and composed repair acceptance pending."}],"remaining_acceptance":["Real egress, throttle, capability-set and session suspension Apply/Remove/fresh-Apply controls, preserving exact old command replay.","Atomic same tenant/action/effect journal barrier with bounded verified reads and fatal malformed or unavailable custody.","Genuine Original failure, reviewed repair and current focused controls for each new obligation.","Combined-source owning/strict/native/cold/trusted/hosted qualification and protected landing; no quota or baseline waiver."],"landing_unit":"foundation","landing_pr":1160,"main_ancestry_verified":false,"review_scope":"now","work_status":"in-progress","owner":"codex","review_thread_urls":[]},
     {"id":"incoming-pr1160-review-20261008:reconciliation:EF-FREEZE","label":"EF-FREEZE","priority":"P2","requirement":"Concurrent plans freezing the same lineage retain each plan contribution through renewal, restart and independent lift.","source":{"path":"docs/security/audits/review-reconciliation-obligations-20261008.json","line":91,"line_sha256":"5bc4e6c8659f25a47490d05caa6def19e314e734b36b38c25670086779c6849f","checkpoint":"b6d38fceca3951c2f6900c0c3e83372b426a5e3a","reviewed_source":"c472f5c79e"},"disposition":"effect-composition-gap-confirmed-original-and-producer-proposal-pending","source_repair":null,"verification_evidence":[{"path":"docs/security/audits/review-reconciliation-obligations-20261008.json","sha256":"6a445336bfa8184168a334ba9ac549e054b8a2c01f40bc42bfbc702971e08fcf","scope":"Source review or explicitly limited hypothesis; Original and composed repair acceptance pending."}],"remaining_acceptance":["Use the normal executor: the second plan must reach its intended suspension with its authenticated observed base.","Lifting the first plan preserves the second restriction and external issuance fence; renew/restart retain both obligations.","Genuine Original failure, reviewed repair and current focused controls for each new obligation.","Combined-source owning/strict/native/cold/trusted/hosted qualification and protected landing; no quota or baseline waiver."],"landing_unit":"foundation","landing_pr":1160,"main_ancestry_verified":false,"review_scope":"now","work_status":"in-progress","owner":"codex","review_thread_urls":[]},
-    {"id":"incoming-pr1160-review-20261008:reconciliation:EF-REPLAY","label":"EF-REPLAY","priority":"P2","requirement":"An exact historical capability-set Apply query recognizes authenticated removal while refusing an unexplained missing active contribution.","source":{"path":"docs/security/audits/repair-batch-local-checkpoint-20261008.json","line":880,"line_sha256":"f463d31a71711a9dd93212a7a9a83c22b4b6fdacbe214e6f8ed974868ddb2eed","checkpoint":"ebdf52364cbafed33bd04e17c25be57ab055755b","reviewed_source":"29e9a39d19ec944a60ebf2f0c813eccbf54b8d9e"},"disposition":"genuine-original-red-repair-and-tamper-preservation-control-pending","source_repair":null,"verification_evidence":[{"path":"docs/security/audits/repair-batch-local-checkpoint-20261008.json","sha256":"6e3781eb1b9e8eeb56f7d31ad10ef2cb9bd609bf7013c1477e998326a16a21b9","scope":"Actual pre-repair historical-query refusal at29e9 and finite independent source review."}],"remaining_acceptance":["Real Apply/Remove then exact Apply query returns its original authenticated result without reinstalling a contribution.","Direct removal of an active contribution without a matching authenticated completed Remove remains IntegrityFailure.","Malformed, foreign or unavailable removal evidence cannot authorize historical completion.","Complete effect finality, same-lineage freeze and authenticated historical result-query repairs with Original and preservation controls.","Complete MCP genuine-v2 positive fixture and extra broker integrity controls; fresh owning and strict checks for the composed source.","Measure and qualify actual production native trajectory with eight receipts, the unchanged10000ms fence and current enforcing artifacts; bounded journal tests do not establish this.","Finish F077 protected merge/App/ruleset evidence, current independent review, default/PQ/platform/cold/trusted/hosted checks and protected landing."],"landing_unit":"foundation","landing_pr":1160,"main_ancestry_verified":false,"review_scope":"now","work_status":"in-progress","owner":"codex","review_thread_urls":[]}
+    {"id":"incoming-pr1160-review-20261008:reconciliation:EF-REPLAY","label":"EF-REPLAY","priority":"P2","requirement":"An exact historical capability-set Apply query recognizes authenticated removal while refusing an unexplained missing active contribution.","source":{"path":"docs/security/audits/repair-batch-local-checkpoint-20261008.json","line":880,"line_sha256":"f463d31a71711a9dd93212a7a9a83c22b4b6fdacbe214e6f8ed974868ddb2eed","checkpoint":"ebdf52364cbafed33bd04e17c25be57ab055755b","reviewed_source":"29e9a39d19ec944a60ebf2f0c813eccbf54b8d9e"},"disposition":"genuine-original-red-repair-and-tamper-preservation-control-pending","source_repair":null,"verification_evidence":[{"path":"docs/security/audits/repair-batch-local-checkpoint-20261008.json","sha256":"6e3781eb1b9e8eeb56f7d31ad10ef2cb9bd609bf7013c1477e998326a16a21b9","scope":"Actual pre-repair historical-query refusal at29e9 and finite independent source review."}],"remaining_acceptance":["Real Apply/Remove then exact Apply query returns its original authenticated result without reinstalling a contribution.","Direct removal of an active contribution without a matching authenticated completed Remove remains IntegrityFailure.","Malformed, foreign or unavailable removal evidence cannot authorize historical completion.","Complete effect finality, same-lineage freeze and authenticated historical result-query repairs with Original and preservation controls.","Complete MCP genuine-v2 positive fixture and extra broker integrity controls; fresh owning and strict checks for the composed source.","Measure and qualify actual production native trajectory with eight receipts, the unchanged10000ms fence and current enforcing artifacts; bounded journal tests do not establish this.","Finish F077 protected merge/App/ruleset evidence, current independent review, default/PQ/platform/cold/trusted/hosted checks and protected landing."],"landing_unit":"foundation","landing_pr":1160,"main_ancestry_verified":false,"review_scope":"now","work_status":"in-progress","owner":"codex","review_thread_urls":[]},
+    {
+      "id": "incoming-pr1160-review-20261008:native:NRB001",
+      "label": "NRB001",
+      "priority": "P1",
+      "requirement": "Select the authenticated original native broker admission despite owned nonce-only budget aliases, and reject physical authorization-artifact member corruption at the owning budget boundary.",
+      "context": "Newly indexed finite NRB001 obligation from genuine Original42ee and secondary322e captures. The code anchor below identifies the integrated repair, not a newly alleged current defect. Prior setup and lint failures remain retained; no native EOF causal claim.",
+      "source": {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/budget_custody.rs",
+        "line": 70,
+        "line_sha256": "f150bb5f132eaa48bd9a687f05693ea23633e1f4b6ae669065aa5557706ed5b5",
+        "checkpoint": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "reviewed_source": "5a56b7a17f9fb38374b3bfca8adee8add47d87da"
+      },
+      "disposition": "source-integrated-pending-final-acceptance",
+      "source_repair": {
+        "commits": [
+          "41939f1094f06a0483d604a0d6be697a2f2075d7",
+          "7d115b70564e3f936c418b50d90e0445e8a6170b",
+          "27c426c96628a952fb9ebe3fcc15fa84efeabc7b",
+          "a13d10b58dba99d4442500de7b62fb54a56be197",
+          "a5942b8ca6a30ed69a6f8c2cb73464a3cf059f77"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "files": [
+          "crates/platform/chio-store-sqlite/src/admission_operation_store/budget_custody.rs",
+          "crates/platform/chio-store-sqlite/src/budget_store/composite/preflight.rs"
+        ],
+        "application": "Authenticated parent selection and full typed authorization-artifact vector refusal integrated; final acceptance pending.",
+        "origin_to_integration": {
+          "b5a44916d76c0448779f350729b21046872a3ca4": "41939f1094f06a0483d604a0d6be697a2f2075d7",
+          "322e0897a32b56aa34607f03273d77ae325fec72": "7d115b70564e3f936c418b50d90e0445e8a6170b",
+          "fd9b1c6192bbdeb7a200f1926d4b155a1ba5ba86": "27c426c96628a952fb9ebe3fcc15fa84efeabc7b",
+          "71c2000999f6b7df75201e525310d193401afbb0": "a13d10b58dba99d4442500de7b62fb54a56be197"
+        },
+        "scope": "Read-only owned store authentication. Native EOF causation and unprivileged storage-write reachability are not established."
+      },
+      "verification_evidence": [
+        {
+          "path": "/tmp/pr1160-broker-readback-triage-20261008/original-runtime/nrb001-original-test-receipt.json",
+          "sha256": "2d97b1b8ef7853d4ee038623b5128e66bb12012832436d959e68d68a4c4527f7",
+          "result": "Genuine owning Original:2failed/2passed; source42ee. Earlier fixture setup failures remain separate.",
+          "scope": "Direct owning SQLite selector Original; not native EOF causation."
+        },
+        {
+          "path": "/tmp/pr1160-broker-readback-triage-20261008/repair-runtime/nrb001-repair-test-receipt.json",
+          "sha256": "d24b98c181608e81faa5c87df03b45b089f44bca12da1c0a513ac34087679978",
+          "result": "Primary isolated selector repair has5passing owning cases atb5a449.",
+          "scope": "Owned nonce aliases versus real supplemental parents; physical event/global-commit authentication."
+        },
+        {
+          "path": "/tmp/pr1160-nrb001-followup/root-original-runtime/nrb001-member-original-test-receipt.json",
+          "sha256": "a5609d559ef329570bd06657163f74d095e63381c2dc62fe30e9ab34f52cf739",
+          "result": "Additional physical other-member Original:5passed/1genuine failed Ok(None) at322e.",
+          "scope": "Full authorization-artifact vector must match the authenticated original; no unprivileged storage injection claim."
+        },
+        {
+          "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/nrb001-source/chio_store_sqlite-runtime.json",
+          "sha256": "7a610d8718862072950395e4ad427ad24fb02461b59a0361bb6b90dc06b678b3",
+          "result": "Selected88SQLite execution-nonce cases passed.",
+          "scope": "Actual a13d Source/binary/log-bound module scope, not all SQLite/native qualification.",
+          "source": "a13d10b58dba99d4442500de7b62fb54a56be197"
+        },
+        {
+          "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/nrb001-source/chio_control_plane-runtime.json",
+          "sha256": "076ad6a260e1342453a98f57d9b389459ef8cb26bed536157301978d92822d9a",
+          "result": "Exact broker-authority case passed1/0.",
+          "scope": "Actual a13d Source/binary/log-bound owning control, not full native trajectory.",
+          "source": "a13d10b58dba99d4442500de7b62fb54a56be197"
+        },
+        {
+          "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/nrb001-source/nrb001-source-clippy-receipt.json",
+          "sha256": "6eaabafb6f07994360f6402aca359c32e31751c0b3e76874f452a98486cd90e2",
+          "result": "Initial strict run exited101on test-only useless_vec.",
+          "scope": "Retained unsuccessful lint capture; no production source fault attributed."
+        },
+        {
+          "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/nrb001-source/nrb001-source-clippy-array-receipt.json",
+          "sha256": "2cd60b1014d589556fb9e400409a7fb32b83ca09c4e20a7ddd1d550b9f4a5dd2",
+          "result": "Both owners all-target strict Clippy exited0after array-only correction.",
+          "scope": "a13d plus exact dirtyc679828f, subsequently committed asa594; no ignored warnings or waived gates."
+        },
+        {
+          "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/nrb001-source/nrb001-source-array-tests-receipt.json",
+          "sha256": "af504472531cc7e832a654043c8e7b2b49acd209f00de490fcd8df649e284672",
+          "result": "SQLite selectors6passed; control-plane selection0filtered is not a runtime PASS.",
+          "scope": "Exact array-only correction captured before commita594; all selector corruption/no-effect assertions unchanged."
+        },
+        {
+          "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/nrb001-source/array-commit.json",
+          "sha256": "ec00191b652f64a5b66709aee00ebd31929cdfc7786626f4a29fa9c58ed77ebb",
+          "result": "Array-only followup commit links strict0, selectors6/0, format0and diff hygiene0.",
+          "scope": "One test-fixture container change; no production mutation.",
+          "source": "a5942b8ca6a30ed69a6f8c2cb73464a3cf059f77"
+        },
+        {
+          "path": "/tmp/pr1160-nrb001-independent-review/P2-SOURCE-CLOSURE.json",
+          "sha256": "bd42a16defe430bd943d06aa5832baf14dc19bde17b2607eb5663768fe07a7cd",
+          "result": "Finite independent source closure accepted; original and earlier-message mismatch retained.",
+          "scope": "Owned full vector equality; no new API/SQL/schema/serialization and no whole-broker causal claim."
+        }
+      ],
+      "remaining_acceptance": [
+        "Keep primary owning Original42ee2RED/2PASS and secondary322e5PASS/1RED, the first5/1refusal-location mismatch and initial strict101as separate historical outcomes. The migrated typed refusal and array correction do not weaken the corruption/no-effect oracles.",
+        "Actual a13d owner SQLite88/0and broker1/0plus the array-followup selectors6/0and both-owner strict0are bounded component acceptance. Native EOF causal attribution remains unproven.",
+        "Complete immutable final-source owning/default/PQ/platform/cold, native, trusted, hosted, final review and protected #1160 landing; source integration is not full qualification."
+      ],
+      "landing_unit": "foundation",
+      "landing_pr": 1160,
+      "main_ancestry_verified": false,
+      "review_scope": "now",
+      "work_status": "integrated",
+      "owner": "codex",
+      "merged": false,
+      "full_qualified": false
+    }
   ],
   "incoming_review_execution": {
     "snapshot_date": "2026-10-06",
@@ -113285,16 +113401,16 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "source-integrated-current-financial29-green-final-acceptance-pending",
+      "current_state": "source-integrated-final-acceptance-pending",
       "source_repair": {
-        "commit": "de519d7776d8c9ea101d1aec271fd0be54dca632",
         "commits": [
           "de519d7776d8c9ea101d1aec271fd0be54dca632"
         ],
-        "files": [],
-        "current_source_file_hashes": {},
-        "observed_source_head": "b8f061ca578beb9c9a94accde304962a42f7a5c2",
-        "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification."
       },
       "source_integrated": true,
       "focused_green": true,
@@ -113389,8 +113505,7 @@
         }
       ],
       "remaining_acceptance": [
-        "Complete remaining now source repairs and the exact combined-source owning/default/PQ matrix.",
-        "Obtain final native, cold, trusted and hosted evidence plus protected landing; scoped results do not qualify the foundation."
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification."
       ],
       "historical_source_claim": {
         "source": {
@@ -113443,7 +113558,24 @@
         }
       ],
       "source_checkpoint": "de519d7776d8c9ea101d1aec271fd0be54dca632",
-      "qualified": false
+      "qualified": false,
+      "current_source_reconciliation_20261008": {
+        "audit_path": "docs/security/audits/current-source-reconciliation-20261008.json",
+        "audit_sha256": "23f73f936683a43044eb210850f80b83eb7d9853abdeb43f797c9619bbc674c4",
+        "source_checkpoint": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "evidence_scope": "Accepted money/financial source mapping; financial29 at11647 and39fcc default1638/support1646/PQ1674;41 payment and12FX controls. Original failures retained.",
+        "source_is_not_full_qualification": true
+      },
+      "source_repair_previous_observation_20261008": {
+        "commit": "de519d7776d8c9ea101d1aec271fd0be54dca632",
+        "commits": [
+          "de519d7776d8c9ea101d1aec271fd0be54dca632"
+        ],
+        "files": [],
+        "current_source_file_hashes": {},
+        "observed_source_head": "b8f061ca578beb9c9a94accde304962a42f7a5c2",
+        "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
+      }
     },
     "incoming-pr1160-review-20261006:F003": {
       "requirement_id": "incoming-pr1160-review-20261006:F003",
@@ -113460,19 +113592,20 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "source-integrated-native-chronology-and-revoked-caller-isolation-scoped-green",
+      "current_state": "source-integrated-final-acceptance-pending",
       "source_repair": {
-        "commit": "e518ef3256861175f17a665dc6caffa677482ce4",
         "commits": [
           "e518ef3256861175f17a665dc6caffa677482ce4",
+          "a0062b0e0ae2d1edd9d732b1be4f6e89d3fb9dc1",
           "f23efdf43ad15d981e7a3e20d78a5b73f59acb39",
           "1225dc4893cf8b8e90b362a67774b1cc9c4b4078",
           "9d1dc8fcc9b1c6ebc226107d866a95e5f18fcf45"
         ],
-        "files": [],
-        "current_source_file_hashes": {},
-        "observed_source_head": "e446a408ea69c7cbb5539dc15deb00da7f24d485",
-        "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Linear history cost disclosed; global clock/store/history faults remain fatal."
       },
       "source_integrated": true,
       "focused_green": true,
@@ -113819,12 +113952,7 @@
         }
       ],
       "remaining_acceptance": [
-        "Native chronology12 and paid-clock6 passed in their retained scope.",
-        "Revoked leaf/ancestor same3 and global5 pass; clock/store/history/view faults remain fatal.",
-        "Complete the remaining combined-source owning suites and optional feature matrix, with exact package/feature/environment scope.",
-        "Complete required native platform, cold mutation, trusted capture/publication and terminal exact-source hosted checks.",
-        "Obtain positive independent review of the exact final source; request Greptile when available and preserve unavailable service attempts without an availability blocker.",
-        "Land only the clean, qualified candidate through protected main checks; component evidence is not whole-roadmap or production activation acceptance."
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Linear history cost disclosed; global clock/store/history faults remain fatal."
       ],
       "historical_source_claim": {
         "source": {
@@ -114252,7 +114380,27 @@
             "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
           ]
         }
-      ]
+      ],
+      "current_source_reconciliation_20261008": {
+        "audit_path": "docs/security/audits/current-source-reconciliation-20261008.json",
+        "audit_sha256": "23f73f936683a43044eb210850f80b83eb7d9853abdeb43f797c9619bbc674c4",
+        "source_checkpoint": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "evidence_scope": "Native12+paid-clock6 plus revoked-caller3/global5 scoped GREEN. Original chronology/clock RED preserved; initial strict failure separate.",
+        "source_is_not_full_qualification": true
+      },
+      "source_repair_previous_observation_20261008": {
+        "commit": "e518ef3256861175f17a665dc6caffa677482ce4",
+        "commits": [
+          "e518ef3256861175f17a665dc6caffa677482ce4",
+          "f23efdf43ad15d981e7a3e20d78a5b73f59acb39",
+          "1225dc4893cf8b8e90b362a67774b1cc9c4b4078",
+          "9d1dc8fcc9b1c6ebc226107d866a95e5f18fcf45"
+        ],
+        "files": [],
+        "current_source_file_hashes": {},
+        "observed_source_head": "e446a408ea69c7cbb5539dc15deb00da7f24d485",
+        "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
+      }
     },
     "incoming-pr1160-review-20261006:F004": {
       "requirement_id": "incoming-pr1160-review-20261006:F004",
@@ -114269,17 +114417,26 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "source-integrated-persisted-disposition-restart-coverage-scoped-green",
+      "current_state": "source-integrated-final-acceptance-pending",
       "source_repair": {
-        "commit": "de519d7776d8c9ea101d1aec271fd0be54dca632",
         "commits": [
           "de519d7776d8c9ea101d1aec271fd0be54dca632",
           "8efb4178461cf112a9ce8ed7d5e784a78b98d9e5"
         ],
-        "files": [],
-        "current_source_file_hashes": {},
-        "observed_source_head": "e446a408ea69c7cbb5539dc15deb00da7f24d485",
-        "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Panic-unwind/new-owner reopen does not prove SIGKILL, power-loss or external rails.",
+        "integration_aliases": [
+          {
+            "original": "75127f0a2f",
+            "integrated_alias": "8efb417846",
+            "original_patch_id": "ff007625463c0a51e3d726b725bcf3361d7cbde9",
+            "integrated_patch_id": "ff007625463c0a51e3d726b725bcf3361d7cbde9",
+            "equal": true
+          }
+        ]
       },
       "source_integrated": true,
       "focused_green": true,
@@ -114378,11 +114535,7 @@
         }
       ],
       "remaining_acceptance": [
-        "Added actual PostReturnResolved panic/unwind/reopen coverage; this is not SIGKILL/power-loss acceptance.",
-        "Complete the remaining combined-source owning suites and optional feature matrix, with exact package/feature/environment scope.",
-        "Complete required native platform, cold mutation, trusted capture/publication and terminal exact-source hosted checks.",
-        "Obtain positive independent review of the exact final source; request Greptile when available and preserve unavailable service attempts without an availability blocker.",
-        "Land only the clean, qualified candidate through protected main checks; component evidence is not whole-roadmap or production activation acceptance."
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Panic-unwind/new-owner reopen does not prove SIGKILL, power-loss or external rails."
       ],
       "historical_source_claim": {
         "source": {
@@ -114430,7 +114583,25 @@
             "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
           ]
         }
-      ]
+      ],
+      "current_source_reconciliation_20261008": {
+        "audit_path": "docs/security/audits/current-source-reconciliation-20261008.json",
+        "audit_sha256": "23f73f936683a43044eb210850f80b83eb7d9853abdeb43f797c9619bbc674c4",
+        "source_checkpoint": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "evidence_scope": "75127 original test aliases exactly8efb by patch ID.77b9 default/support cutpoints;39fcc SQLite38/0 and support2/0.",
+        "source_is_not_full_qualification": true
+      },
+      "source_repair_previous_observation_20261008": {
+        "commit": "de519d7776d8c9ea101d1aec271fd0be54dca632",
+        "commits": [
+          "de519d7776d8c9ea101d1aec271fd0be54dca632",
+          "8efb4178461cf112a9ce8ed7d5e784a78b98d9e5"
+        ],
+        "files": [],
+        "current_source_file_hashes": {},
+        "observed_source_head": "e446a408ea69c7cbb5539dc15deb00da7f24d485",
+        "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
+      }
     },
     "incoming-pr1160-review-20261006:F005": {
       "requirement_id": "incoming-pr1160-review-20261006:F005",
@@ -114447,16 +114618,17 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "source-integrated-current-financial29-green-final-acceptance-pending",
+      "current_state": "source-integrated-final-acceptance-pending",
       "source_repair": {
-        "commit": "de519d7776d8c9ea101d1aec271fd0be54dca632",
         "commits": [
-          "de519d7776d8c9ea101d1aec271fd0be54dca632"
+          "de519d7776d8c9ea101d1aec271fd0be54dca632",
+          "300a5854cc33522999ba4805ac3e64976099ef8d"
         ],
-        "files": [],
-        "current_source_file_hashes": {},
-        "observed_source_head": "b8f061ca578beb9c9a94accde304962a42f7a5c2",
-        "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification."
       },
       "source_integrated": true,
       "focused_green": true,
@@ -114551,8 +114723,7 @@
         }
       ],
       "remaining_acceptance": [
-        "Complete remaining now source repairs and the exact combined-source owning/default/PQ matrix.",
-        "Obtain final native, cold, trusted and hosted evidence plus protected landing; scoped results do not qualify the foundation."
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification."
       ],
       "historical_source_claim": {
         "source": {
@@ -114602,7 +114773,24 @@
         }
       ],
       "source_checkpoint": "de519d7776d8c9ea101d1aec271fd0be54dca632",
-      "qualified": false
+      "qualified": false,
+      "current_source_reconciliation_20261008": {
+        "audit_path": "docs/security/audits/current-source-reconciliation-20261008.json",
+        "audit_sha256": "23f73f936683a43044eb210850f80b83eb7d9853abdeb43f797c9619bbc674c4",
+        "source_checkpoint": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "evidence_scope": "Accepted money/financial source mapping; financial29 at11647 and39fcc default1638/support1646/PQ1674;41 payment and12FX controls. Original failures retained.",
+        "source_is_not_full_qualification": true
+      },
+      "source_repair_previous_observation_20261008": {
+        "commit": "de519d7776d8c9ea101d1aec271fd0be54dca632",
+        "commits": [
+          "de519d7776d8c9ea101d1aec271fd0be54dca632"
+        ],
+        "files": [],
+        "current_source_file_hashes": {},
+        "observed_source_head": "b8f061ca578beb9c9a94accde304962a42f7a5c2",
+        "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
+      }
     },
     "incoming-pr1160-review-20261006:F006": {
       "requirement_id": "incoming-pr1160-review-20261006:F006",
@@ -116064,23 +116252,29 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "source-integrated-single-use-capture-coverage-scoped-green",
+      "current_state": "source-integrated-final-acceptance-pending",
       "source_repair": {
-        "commit": "de519d7776d8c9ea101d1aec271fd0be54dca632",
         "commits": [
           "de519d7776d8c9ea101d1aec271fd0be54dca632",
           "c28fd9797d7b3fc8ae175c692e8b38a7f87f9f95"
         ],
-        "files": [
-          "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/capture.rs",
-          "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/lifecycle.rs"
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Real native lost-ack/partial-write capture acceptance remains open.",
+        "preservation_dependency_commits": [
+          "b82c92262879b0929c729ff7e6a635eda74244ed"
         ],
-        "current_source_file_hashes": {
-          "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/capture.rs": "bd1b4ee1475944e0912a48fd4a9494dc8b44bd400c2049f20ff8107010dfb1be",
-          "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/lifecycle.rs": "65c54444211fec84424016f26c784fe8bb43c6473e26a68742787abf2315a9b9"
-        },
-        "observed_source_head": "e446a408ea69c7cbb5539dc15deb00da7f24d485",
-        "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
+        "integration_aliases": [
+          {
+            "original": "2fb5bcfe4b",
+            "integrated_alias": "c28fd9797d",
+            "original_patch_id": "8ef9f92d90f01e5af65fd79c6d906f65084efb14",
+            "integrated_patch_id": "8ef9f92d90f01e5af65fd79c6d906f65084efb14",
+            "equal": true
+          }
+        ]
       },
       "source_integrated": true,
       "focused_green": true,
@@ -116147,11 +116341,7 @@
         }
       ],
       "remaining_acceptance": [
-        "Trusted in-memory CapturePending readback coverage does not qualify real native lost-ack/partial-write recovery.",
-        "Complete the remaining combined-source owning suites and optional feature matrix, with exact package/feature/environment scope.",
-        "Complete required native platform, cold mutation, trusted capture/publication and terminal exact-source hosted checks.",
-        "Obtain positive independent review of the exact final source; request Greptile when available and preserve unavailable service attempts without an availability blocker.",
-        "Land only the clean, qualified candidate through protected main checks; component evidence is not whole-roadmap or production activation acceptance."
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Real native lost-ack/partial-write capture acceptance remains open."
       ],
       "historical_source_claim": {
         "source": {
@@ -116196,7 +116386,31 @@
             "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
           ]
         }
-      ]
+      ],
+      "current_source_reconciliation_20261008": {
+        "audit_path": "docs/security/audits/current-source-reconciliation-20261008.json",
+        "audit_sha256": "23f73f936683a43044eb210850f80b83eb7d9853abdeb43f797c9619bbc674c4",
+        "source_checkpoint": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "evidence_scope": "2fb5 aliases exactlyc28f; default1/support2 capture lifecycle controls; NF-CAP focused11 and kernel12 preserve single-use.",
+        "source_is_not_full_qualification": true
+      },
+      "source_repair_previous_observation_20261008": {
+        "commit": "de519d7776d8c9ea101d1aec271fd0be54dca632",
+        "commits": [
+          "de519d7776d8c9ea101d1aec271fd0be54dca632",
+          "c28fd9797d7b3fc8ae175c692e8b38a7f87f9f95"
+        ],
+        "files": [
+          "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/capture.rs",
+          "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/lifecycle.rs"
+        ],
+        "current_source_file_hashes": {
+          "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/capture.rs": "bd1b4ee1475944e0912a48fd4a9494dc8b44bd400c2049f20ff8107010dfb1be",
+          "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/lifecycle.rs": "65c54444211fec84424016f26c784fe8bb43c6473e26a68742787abf2315a9b9"
+        },
+        "observed_source_head": "e446a408ea69c7cbb5539dc15deb00da7f24d485",
+        "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
+      }
     },
     "incoming-pr1160-review-20261006:F019": {
       "requirement_id": "incoming-pr1160-review-20261006:F019",
@@ -117188,21 +117402,17 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "source-integrated-F022-onefile-oracle-SourceAccepted-external-bounded-red-green-currentkernel-owning-strict-pending",
+      "current_state": "source-integrated-final-acceptance-pending",
       "source_repair": {
-        "commit": "576f7d4d2f077ea83384ec0ccfdd4e315e7144c8",
         "commits": [
+          "de519d7776d8c9ea101d1aec271fd0be54dca632",
           "576f7d4d2f077ea83384ec0ccfdd4e315e7144c8"
         ],
-        "files": [
-          "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/review_boundaries.rs"
-        ],
-        "current_source_file_hashes": {
-          "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/review_boundaries.rs": "8a41ebda8e1ace51ca63fa29876150118a67b7fef926467b59328f22c64abcdb"
-        },
-        "observed_source_head": "576f7d4d2f077ea83384ec0ccfdd4e315e7144c8",
-        "scope": "F022 exact one-file stronger test oracle correction; earlier production reversible-hold cleanup repair remains historical/integrated.",
-        "basis": "Exact accepted component receipt, selective integrated commit/path proof and current bytes; not containing-commit inference."
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification."
       },
       "source_integrated": true,
       "focused_green": false,
@@ -117317,11 +117527,7 @@
         }
       ],
       "remaining_acceptance": [
-        "Run fresh integrated exactF022 and owningkernel/default/PQ/required-target strict/fmt at current576 or finalcomposition; externalclippy/fmt labels without literal argv are author-asserted0 only.",
-        "Preserve externalOriginal0/1, identicalcorrected1/0x3/module4/0 as bounded separate evidence without summing repeats/wholecrate claims; earlier productioncleanup remains intact.",
-        "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
-        "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
-        "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification."
       ],
       "historical_source_claim": {
         "source": {
@@ -117443,6 +117649,28 @@
         "no_repetition_sum_or_wholepackage_claim": true,
         "external_clippy_fmt": "Author-asserted0 only; retained command argvabsent, no strict/default/PQ/--no-deps inference",
         "fresh_current_integrated_F022_kernel_owning_strict": "PENDING"
+      },
+      "current_source_reconciliation_20261008": {
+        "audit_path": "docs/security/audits/current-source-reconciliation-20261008.json",
+        "audit_sha256": "23f73f936683a43044eb210850f80b83eb7d9853abdeb43f797c9619bbc674c4",
+        "source_checkpoint": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "evidence_scope": "Corrected exact settled+release/no-effect compensation oracle integrated;39fcc default/support/PQ owning PASS includes it; earlier RED preserved.",
+        "source_is_not_full_qualification": true
+      },
+      "source_repair_previous_observation_20261008": {
+        "commit": "576f7d4d2f077ea83384ec0ccfdd4e315e7144c8",
+        "commits": [
+          "576f7d4d2f077ea83384ec0ccfdd4e315e7144c8"
+        ],
+        "files": [
+          "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/review_boundaries.rs"
+        ],
+        "current_source_file_hashes": {
+          "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/review_boundaries.rs": "8a41ebda8e1ace51ca63fa29876150118a67b7fef926467b59328f22c64abcdb"
+        },
+        "observed_source_head": "576f7d4d2f077ea83384ec0ccfdd4e315e7144c8",
+        "scope": "F022 exact one-file stronger test oracle correction; earlier production reversible-hold cleanup repair remains historical/integrated.",
+        "basis": "Exact accepted component receipt, selective integrated commit/path proof and current bytes; not containing-commit inference."
       }
     },
     "incoming-pr1160-review-20261006:F023": {
@@ -117460,25 +117688,26 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "source-integrated-return-guard-denial-coverage-scoped-green",
+      "current_state": "source-integrated-final-acceptance-pending",
       "source_repair": {
-        "commit": "de519d7776d8c9ea101d1aec271fd0be54dca632",
         "commits": [
           "de519d7776d8c9ea101d1aec271fd0be54dca632",
           "cd0d2dcb4a1bbecec842c1bcc3f3d629bcb1a9c6"
         ],
-        "files": [
-          "crates/kernel/chio-kernel/src/kernel/evaluation/return_recording.rs",
-          "crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_core.rs",
-          "crates/kernel/chio-kernel/src/kernel/evaluation/nested_flow_evaluation.rs"
-        ],
-        "current_source_file_hashes": {
-          "crates/kernel/chio-kernel/src/kernel/evaluation/return_recording.rs": "b1f0e1bd3ee4d244e57730db05e40863971dcca9f6109f079c752749dd1d091e",
-          "crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_core.rs": "00648bd2d20b55510a14f2a8c0d10173e969586e7624140b3f15e337b7b5ca1f",
-          "crates/kernel/chio-kernel/src/kernel/evaluation/nested_flow_evaluation.rs": "f13115fac6938d0de11cc7524294380d18cacb00be27927001194ceeb946ca80"
-        },
-        "observed_source_head": "e446a408ea69c7cbb5539dc15deb00da7f24d485",
-        "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Backend/native return-recording acceptance remains separate.",
+        "integration_aliases": [
+          {
+            "original": "b83529a504",
+            "integrated_alias": "cd0d2dcb4a",
+            "original_patch_id": "413c5639438cc134af534f606bc93cd2b1b144f2",
+            "integrated_patch_id": "413c5639438cc134af534f606bc93cd2b1b144f2",
+            "equal": true
+          }
+        ]
       },
       "source_integrated": true,
       "focused_green": true,
@@ -117568,11 +117797,7 @@
         }
       ],
       "remaining_acceptance": [
-        "Ordinary/nested returned-output guard denial and accepting controls pass; no fresh output authority from denial.",
-        "Complete the remaining combined-source owning suites and optional feature matrix, with exact package/feature/environment scope.",
-        "Complete required native platform, cold mutation, trusted capture/publication and terminal exact-source hosted checks.",
-        "Obtain positive independent review of the exact final source; request Greptile when available and preserve unavailable service attempts without an availability blocker.",
-        "Land only the clean, qualified candidate through protected main checks; component evidence is not whole-roadmap or production activation acceptance."
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Backend/native return-recording acceptance remains separate."
       ],
       "historical_source_claim": {
         "source": {
@@ -117621,7 +117846,33 @@
             "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
           ]
         }
-      ]
+      ],
+      "current_source_reconciliation_20261008": {
+        "audit_path": "docs/security/audits/current-source-reconciliation-20261008.json",
+        "audit_sha256": "23f73f936683a43044eb210850f80b83eb7d9853abdeb43f797c9619bbc674c4",
+        "source_checkpoint": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "evidence_scope": "b835 aliases exactlycd0d; ordinary/nested no-output guard controls and accepting case;39fcc all3 included.",
+        "source_is_not_full_qualification": true
+      },
+      "source_repair_previous_observation_20261008": {
+        "commit": "de519d7776d8c9ea101d1aec271fd0be54dca632",
+        "commits": [
+          "de519d7776d8c9ea101d1aec271fd0be54dca632",
+          "cd0d2dcb4a1bbecec842c1bcc3f3d629bcb1a9c6"
+        ],
+        "files": [
+          "crates/kernel/chio-kernel/src/kernel/evaluation/return_recording.rs",
+          "crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_core.rs",
+          "crates/kernel/chio-kernel/src/kernel/evaluation/nested_flow_evaluation.rs"
+        ],
+        "current_source_file_hashes": {
+          "crates/kernel/chio-kernel/src/kernel/evaluation/return_recording.rs": "b1f0e1bd3ee4d244e57730db05e40863971dcca9f6109f079c752749dd1d091e",
+          "crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_core.rs": "00648bd2d20b55510a14f2a8c0d10173e969586e7624140b3f15e337b7b5ca1f",
+          "crates/kernel/chio-kernel/src/kernel/evaluation/nested_flow_evaluation.rs": "f13115fac6938d0de11cc7524294380d18cacb00be27927001194ceeb946ca80"
+        },
+        "observed_source_head": "e446a408ea69c7cbb5539dc15deb00da7f24d485",
+        "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
+      }
     },
     "incoming-pr1160-review-20261006:F024": {
       "requirement_id": "incoming-pr1160-review-20261006:F024",
@@ -117815,16 +118066,20 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "source-integrated-current-monetary-cancel-controls-green-final-acceptance-pending",
+      "current_state": "source-integrated-final-acceptance-pending",
       "source_repair": {
-        "commit": "de519d7776d8c9ea101d1aec271fd0be54dca632",
         "commits": [
-          "de519d7776d8c9ea101d1aec271fd0be54dca632"
+          "de519d7776d8c9ea101d1aec271fd0be54dca632",
+          "b318b50caf11c59ea918df69b9a31ae2c7f28ac6",
+          "fed577591f6fba0c48ce208b6a4c255e7f7fecbe",
+          "f19dfbdb4e4388357f8996187f85cfb5a6af8058",
+          "280133b31209d1d15661a83e4e7e273b13c39884"
         ],
-        "files": [],
-        "current_source_file_hashes": {},
-        "observed_source_head": "b8f061ca578beb9c9a94accde304962a42f7a5c2",
-        "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. No guarantee beyond the accepted threshold-claim/cancellation contract."
       },
       "source_integrated": true,
       "focused_green": true,
@@ -117866,8 +118121,7 @@
         }
       ],
       "remaining_acceptance": [
-        "Complete remaining now source repairs and the exact combined-source owning/default/PQ matrix.",
-        "Obtain final native, cold, trusted and hosted evidence plus protected landing; scoped results do not qualify the foundation."
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. No guarantee beyond the accepted threshold-claim/cancellation contract."
       ],
       "historical_source_claim": {
         "source": {
@@ -117913,7 +118167,24 @@
         }
       ],
       "source_checkpoint": "3beb954ac0c233a271d1ae98f4d3c5b949e51aaf",
-      "qualified": false
+      "qualified": false,
+      "current_source_reconciliation_20261008": {
+        "audit_path": "docs/security/audits/current-source-reconciliation-20261008.json",
+        "audit_sha256": "23f73f936683a43044eb210850f80b83eb7d9853abdeb43f797c9619bbc674c4",
+        "source_checkpoint": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "evidence_scope": "Both session/pre-dispatch cancellation producers and Originals integrated;39fcc includes6 session +3 pre-dispatch cancellation nodes and monetary controls.",
+        "source_is_not_full_qualification": true
+      },
+      "source_repair_previous_observation_20261008": {
+        "commit": "de519d7776d8c9ea101d1aec271fd0be54dca632",
+        "commits": [
+          "de519d7776d8c9ea101d1aec271fd0be54dca632"
+        ],
+        "files": [],
+        "current_source_file_hashes": {},
+        "observed_source_head": "b8f061ca578beb9c9a94accde304962a42f7a5c2",
+        "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
+      }
     },
     "incoming-pr1160-review-20261006:F027": {
       "requirement_id": "incoming-pr1160-review-20261006:F027",
@@ -119194,31 +119465,19 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "source-integrated-cancel-and-expired-plan-retry-reconciliation-scoped-green",
+      "current_state": "source-integrated-final-acceptance-pending",
       "source_repair": {
-        "commit": "672fb2fd633b0bf36e8f44625ec517c896c70d53",
         "commits": [
-          "30dcb256c1dca5b579968edaa43f121b13e80f31",
           "63defbe6dc0535c3b9401aebe3a5bd93bc00c496",
-          "5f764c42f6a5e933fefa439383bb70fc45cf8783",
-          "672fb2fd633b0bf36e8f44625ec517c896c70d53",
           "c35c1779ac7b1f3dc22acf27c55a7184cb8b73e5",
           "0736d99bacbb2b3791f9a76a32a0105fed2b1cfa",
           "4c1f1feb5b422d8b2f154346fffa71ca2b3136f1"
         ],
-        "files": [
-          "crates/kernel/chio-kernel/src/kernel/active_response_coordinator.rs",
-          "crates/platform/chio-control-plane/src/security/event_consumer/tests/real_adapter/kernel_review.rs",
-          "crates/platform/chio-control-plane/src/security/event_consumer/tests/real_adapter/kernel_review/operator_cancel.rs"
-        ],
-        "current_source_file_hashes": {
-          "crates/kernel/chio-kernel/src/kernel/active_response_coordinator.rs": "0ba12c76836d691d38a0ae09a9b350c93f7a4be686ec1d3b696bc3b7ceccf5d5",
-          "crates/platform/chio-control-plane/src/security/event_consumer/tests/real_adapter/kernel_review.rs": "d0950212a2ade43eaec8a47fad4d78a5702376bbb69ee959f86be35d37d3701c",
-          "crates/platform/chio-control-plane/src/security/event_consumer/tests/real_adapter/kernel_review/operator_cancel.rs": "a2ff0137c716b819bb7fc76bfc3aad8cacbb9159955a48847576f6d6a7b10643"
-        },
-        "observed_source_head": "e446a408ea69c7cbb5539dc15deb00da7f24d485",
-        "scope": "Public cancellation exact-bound committed-approval reconciliation only; startup repair retained and publiccommitretry pending.",
-        "basis": "Exact accepted component receipt, selective integrated commit/path proof and current bytes; not containing-commit inference."
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Public retry trigger observed plan expiry; no pure capability-expiry or fresh-effect guarantee."
       },
       "source_integrated": true,
       "focused_green": true,
@@ -119359,11 +119618,7 @@
         }
       ],
       "remaining_acceptance": [
-        "Committed approval is reconciled before cancellation and retry compensation; verified trigger is plan expiry, not an independent capability-expiry guarantee.",
-        "Complete the remaining combined-source owning suites and optional feature matrix, with exact package/feature/environment scope.",
-        "Complete required native platform, cold mutation, trusted capture/publication and terminal exact-source hosted checks.",
-        "Obtain positive independent review of the exact final source; request Greptile when available and preserve unavailable service attempts without an availability blocker.",
-        "Land only the clean, qualified candidate through protected main checks; component evidence is not whole-roadmap or production activation acceptance."
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Public retry trigger observed plan expiry; no pure capability-expiry or fresh-effect guarantee."
       ],
       "historical_source_claim": {
         "source": {
@@ -119817,7 +120072,39 @@
             "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
           ]
         }
-      ]
+      ],
+      "current_source_reconciliation_20261008": {
+        "audit_path": "docs/security/audits/current-source-reconciliation-20261008.json",
+        "audit_sha256": "23f73f936683a43044eb210850f80b83eb7d9853abdeb43f797c9619bbc674c4",
+        "source_checkpoint": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "evidence_scope": "Current cancellation/retry8 scoped GREEN; literal child extraction1990 under unchanged2046 cap; strict/hygiene pass.",
+        "source_is_not_full_qualification": true
+      },
+      "source_repair_previous_observation_20261008": {
+        "commit": "672fb2fd633b0bf36e8f44625ec517c896c70d53",
+        "commits": [
+          "30dcb256c1dca5b579968edaa43f121b13e80f31",
+          "63defbe6dc0535c3b9401aebe3a5bd93bc00c496",
+          "5f764c42f6a5e933fefa439383bb70fc45cf8783",
+          "672fb2fd633b0bf36e8f44625ec517c896c70d53",
+          "c35c1779ac7b1f3dc22acf27c55a7184cb8b73e5",
+          "0736d99bacbb2b3791f9a76a32a0105fed2b1cfa",
+          "4c1f1feb5b422d8b2f154346fffa71ca2b3136f1"
+        ],
+        "files": [
+          "crates/kernel/chio-kernel/src/kernel/active_response_coordinator.rs",
+          "crates/platform/chio-control-plane/src/security/event_consumer/tests/real_adapter/kernel_review.rs",
+          "crates/platform/chio-control-plane/src/security/event_consumer/tests/real_adapter/kernel_review/operator_cancel.rs"
+        ],
+        "current_source_file_hashes": {
+          "crates/kernel/chio-kernel/src/kernel/active_response_coordinator.rs": "0ba12c76836d691d38a0ae09a9b350c93f7a4be686ec1d3b696bc3b7ceccf5d5",
+          "crates/platform/chio-control-plane/src/security/event_consumer/tests/real_adapter/kernel_review.rs": "d0950212a2ade43eaec8a47fad4d78a5702376bbb69ee959f86be35d37d3701c",
+          "crates/platform/chio-control-plane/src/security/event_consumer/tests/real_adapter/kernel_review/operator_cancel.rs": "a2ff0137c716b819bb7fc76bfc3aad8cacbb9159955a48847576f6d6a7b10643"
+        },
+        "observed_source_head": "e446a408ea69c7cbb5539dc15deb00da7f24d485",
+        "scope": "Public cancellation exact-bound committed-approval reconciliation only; startup repair retained and publiccommitretry pending.",
+        "basis": "Exact accepted component receipt, selective integrated commit/path proof and current bytes; not containing-commit inference."
+      }
     },
     "incoming-pr1160-review-20261006:F031": {
       "requirement_id": "incoming-pr1160-review-20261006:F031",
@@ -120696,16 +120983,18 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "source-integrated-requirement-focused-acceptance-pending",
+      "current_state": "source-integrated-final-acceptance-pending",
       "source_repair": {
-        "commit": "37ec10c205bc7d24c0676c504d3a4944c873dade",
         "commits": [
-          "37ec10c205bc7d24c0676c504d3a4944c873dade"
+          "37ec10c205bc7d24c0676c504d3a4944c873dade",
+          "e47f4de5c7983228184e221215b5aa013736e593",
+          "5ec396fd53bb451ff46c974154abaec5ed06b57b"
         ],
-        "files": [],
-        "current_source_file_hashes": {},
-        "observed_source_head": "b8f061ca578beb9c9a94accde304962a42f7a5c2",
-        "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Actual enforcing native eight-receipt trajectory under unchanged10000ms fence and image cost remain open."
       },
       "source_integrated": true,
       "focused_green": false,
@@ -120750,11 +121039,7 @@
         }
       ],
       "remaining_acceptance": [
-        "Source repair is established; exact ordinary coverage/bounded-history residual and current13/migration4/owning qualification remain pending.",
-        "Establish current exact requirement-focused behavioral qualification; shared/older component evidence is bounded.",
-        "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
-        "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
-        "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Actual enforcing native eight-receipt trajectory under unchanged10000ms fence and image cost remain open."
       ],
       "historical_source_claim": {
         "source": {
@@ -120786,6 +121071,23 @@
         "Codex_required": false,
         "Codex_quota_blocker": false,
         "review_acceptance_established": false
+      },
+      "current_source_reconciliation_20261008": {
+        "audit_path": "docs/security/audits/current-source-reconciliation-20261008.json",
+        "audit_sha256": "23f73f936683a43044eb210850f80b83eb7d9853abdeb43f797c9619bbc674c4",
+        "source_checkpoint": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "evidence_scope": "Authenticated compaction-read reuse and kernel maintenance integrated; N16 history1/0 at98d with unchanged custody.",
+        "source_is_not_full_qualification": true
+      },
+      "source_repair_previous_observation_20261008": {
+        "commit": "37ec10c205bc7d24c0676c504d3a4944c873dade",
+        "commits": [
+          "37ec10c205bc7d24c0676c504d3a4944c873dade"
+        ],
+        "files": [],
+        "current_source_file_hashes": {},
+        "observed_source_head": "b8f061ca578beb9c9a94accde304962a42f7a5c2",
+        "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
       }
     },
     "incoming-pr1160-review-20261006:F040": {
@@ -121019,9 +121321,19 @@
       "scope": "now-control-mutex-and-attributed-native-history; later-broad-audit-split",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "mutex-source-integrated-focused-green-complete-history-audit-split-later",
-      "source_repair": null,
-      "source_integrated": null,
+      "current_state": "now-mutex-source-integrated-history-audit-redesign-later-final-acceptance-pending",
+      "source_repair": {
+        "commits": [
+          "c9c846cfbe51b5e737c972e65bebe262f0d8b009",
+          "1c6222f7952d7817b8f3c30fcdbacb872ad49c45"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "now mutex source-integrated; history audit redesign later",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Complete-history audit architecture explicitly stays later."
+      },
+      "source_integrated": true,
       "focused_green": true,
       "owning_pending": true,
       "native_pending": true,
@@ -121038,8 +121350,7 @@
         }
       ],
       "remaining_acceptance": [
-        "Complete remaining now source repairs and the exact combined-source owning/default/PQ matrix.",
-        "Obtain final native, cold, trusted and hosted evidence plus protected landing; scoped results do not qualify the foundation."
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Complete-history audit architecture explicitly stays later."
       ],
       "historical_source_claim": {
         "source": {
@@ -121088,7 +121399,15 @@
           "focused_green": null
         }
       ],
-      "source_checkpoint": "c9c846cfbe51b5e737c972e65bebe262f0d8b009"
+      "source_checkpoint": "c9c846cfbe51b5e737c972e65bebe262f0d8b009",
+      "current_source_reconciliation_20261008": {
+        "audit_path": "docs/security/audits/current-source-reconciliation-20261008.json",
+        "audit_sha256": "23f73f936683a43044eb210850f80b83eb7d9853abdeb43f797c9619bbc674c4",
+        "source_checkpoint": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "evidence_scope": "Pipeline Original-first record; reached composed host/mutex36/0 at e638 plus owning/strict scopes.",
+        "source_is_not_full_qualification": true
+      },
+      "source_repair_previous_observation_20261008": null
     },
     "incoming-pr1160-review-20261006:F044": {
       "requirement_id": "incoming-pr1160-review-20261006:F044",
@@ -124437,17 +124756,16 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "source-integrated-focused-green-final-acceptance-pending",
+      "current_state": "source-integrated-final-acceptance-pending",
       "source_repair": {
-        "commit": "92959e125407f1f4d652b8a64db9e99e220d5ff5",
         "commits": [
-          "322f08ef4d242ebc543c5d8b5254f06483648d89",
           "92959e125407f1f4d652b8a64db9e99e220d5ff5"
         ],
-        "files": [],
-        "current_source_file_hashes": {},
-        "observed_source_head": "b8f061ca578beb9c9a94accde304962a42f7a5c2",
-        "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated; operational acceptance open",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. App/ruleset enforcement and protected per-PR landing experiment remain open; source/doc disclaimers do not enforce protections."
       },
       "source_integrated": true,
       "focused_green": true,
@@ -124496,10 +124814,7 @@
         }
       ],
       "remaining_acceptance": [
-        "Repair source landed in protected prerequisite1176 and reconciled into currentS. Current requirement/foundation merged=false and final owning/trusted/hosted acceptance remain pending.",
-        "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
-        "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
-        "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. App/ruleset enforcement and protected per-PR landing experiment remain open; source/doc disclaimers do not enforce protections."
       ],
       "historical_source_claim": {
         "source": {
@@ -124531,6 +124846,24 @@
         "Codex_required": false,
         "Codex_quota_blocker": false,
         "review_acceptance_established": false
+      },
+      "current_source_reconciliation_20261008": {
+        "audit_path": "docs/security/audits/current-source-reconciliation-20261008.json",
+        "audit_sha256": "23f73f936683a43044eb210850f80b83eb7d9853abdeb43f797c9619bbc674c4",
+        "source_checkpoint": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "evidence_scope": "Protected prerequisite1176 definition/main ancestry receipt and local contract evidence retained. F074 critical non-success tombstones are intentional accepted behavior.",
+        "source_is_not_full_qualification": true
+      },
+      "source_repair_previous_observation_20261008": {
+        "commit": "92959e125407f1f4d652b8a64db9e99e220d5ff5",
+        "commits": [
+          "322f08ef4d242ebc543c5d8b5254f06483648d89",
+          "92959e125407f1f4d652b8a64db9e99e220d5ff5"
+        ],
+        "files": [],
+        "current_source_file_hashes": {},
+        "observed_source_head": "b8f061ca578beb9c9a94accde304962a42f7a5c2",
+        "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
       }
     },
     "incoming-pr1160-review-20261006:F074": {
@@ -124548,17 +124881,16 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "source-integrated-focused-green-final-acceptance-pending",
+      "current_state": "source-integrated-final-acceptance-pending",
       "source_repair": {
-        "commit": "92959e125407f1f4d652b8a64db9e99e220d5ff5",
         "commits": [
-          "322f08ef4d242ebc543c5d8b5254f06483648d89",
           "92959e125407f1f4d652b8a64db9e99e220d5ff5"
         ],
-        "files": [],
-        "current_source_file_hashes": {},
-        "observed_source_head": "b8f061ca578beb9c9a94accde304962a42f7a5c2",
-        "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated; operational acceptance open",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. App/ruleset enforcement and protected per-PR landing experiment remain open; source/doc disclaimers do not enforce protections."
       },
       "source_integrated": true,
       "focused_green": true,
@@ -124607,10 +124939,7 @@
         }
       ],
       "remaining_acceptance": [
-        "Repair source landed in protected prerequisite1176 and reconciled into currentS. Current requirement/foundation merged=false and final owning/trusted/hosted acceptance remain pending.",
-        "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
-        "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
-        "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. App/ruleset enforcement and protected per-PR landing experiment remain open; source/doc disclaimers do not enforce protections."
       ],
       "historical_source_claim": {
         "source": {
@@ -124642,6 +124971,24 @@
         "Codex_required": false,
         "Codex_quota_blocker": false,
         "review_acceptance_established": false
+      },
+      "current_source_reconciliation_20261008": {
+        "audit_path": "docs/security/audits/current-source-reconciliation-20261008.json",
+        "audit_sha256": "23f73f936683a43044eb210850f80b83eb7d9853abdeb43f797c9619bbc674c4",
+        "source_checkpoint": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "evidence_scope": "Protected prerequisite1176 definition/main ancestry receipt and local contract evidence retained. F074 critical non-success tombstones are intentional accepted behavior.",
+        "source_is_not_full_qualification": true
+      },
+      "source_repair_previous_observation_20261008": {
+        "commit": "92959e125407f1f4d652b8a64db9e99e220d5ff5",
+        "commits": [
+          "322f08ef4d242ebc543c5d8b5254f06483648d89",
+          "92959e125407f1f4d652b8a64db9e99e220d5ff5"
+        ],
+        "files": [],
+        "current_source_file_hashes": {},
+        "observed_source_head": "b8f061ca578beb9c9a94accde304962a42f7a5c2",
+        "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
       }
     },
     "incoming-pr1160-review-20261006:F075": {
@@ -124659,9 +125006,18 @@
       "scope": "later",
       "landing_pr": null,
       "landing_unit": "security-follow-ups",
-      "current_state": "bounded-r1-source-integrated-offline-closure-local-review-pending",
-      "source_repair": null,
-      "source_integrated": null,
+      "current_state": "bounded-r1-source-integrated-durable-unit-later-local-unpublished-final-acceptance-pending",
+      "source_repair": {
+        "commits": [
+          "bdc8f63ea2a30b7f487ef859a27cd808d414311b"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "bounded r1 source-integrated; durable unit remains later local/unpublished",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Durable binary/source/recipe/notices unit is inseparable and LOCAL/UNPUBLISHED. Exact checker/self-test pin requirement and accepted source-coverage/reconstruction findings remain later review/integration work. Any defect only in that unpublished unit is not a new foundation blocker. Final native image/trusted acceptance remains open."
+      },
+      "source_integrated": true,
       "focused_green": null,
       "owning_pending": true,
       "native_pending": true,
@@ -124671,10 +125027,7 @@
       "full_qualified": false,
       "verification_evidence": [],
       "remaining_acceptance": [
-        "Establish the exact current requirement-to-source repair and hash-bound behavioral/source evidence; no absence of repair or loss of historical established work is inferred.",
-        "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
-        "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
-        "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+        "Durable binary/source/recipe/notices unit is inseparable and LOCAL/UNPUBLISHED. Exact checker/self-test pin requirement and accepted source-coverage/reconstruction findings remain later review/integration work. Any defect only in that unpublished unit is not a new foundation blocker. Final native image/trusted acceptance remains open."
       ],
       "historical_source_claim": {
         "source": {
@@ -124718,7 +125071,15 @@
         "published": false,
         "independent_review": "pending",
         "remaining": "Complete binary/source/notices closure, composition and qualification before publishing archives."
-      }
+      },
+      "current_source_reconciliation_20261008": {
+        "audit_path": "docs/security/audits/current-source-reconciliation-20261008.json",
+        "audit_sha256": "23f73f936683a43044eb210850f80b83eb7d9853abdeb43f797c9619bbc674c4",
+        "source_checkpoint": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "evidence_scope": "Actual measured two-package zlib/zlib-dev r1 lock +Docker/checker pins integrated; original lock failures and203 APK measurements preserved.",
+        "source_is_not_full_qualification": true
+      },
+      "source_repair_previous_observation_20261008": null
     },
     "incoming-pr1160-review-20261006:F076": {
       "requirement_id": "incoming-pr1160-review-20261006:F076",
@@ -124735,34 +125096,16 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "source-integrated-scoped-source-acceptance-final-pending",
+      "current_state": "source-integrated-final-acceptance-pending",
       "source_repair": {
-        "commit": "de519d7776d8c9ea101d1aec271fd0be54dca632",
         "commits": [
           "de519d7776d8c9ea101d1aec271fd0be54dca632"
         ],
-        "files": [
-          "deploy/docker/security-evidence-seccomp-provenance.json",
-          "deploy/docker/security-evidence-seccomp-upstream.LICENSE",
-          "deploy/docker/security-evidence-seccomp-upstream.json",
-          "deploy/docker/security-evidence-seccomp.json",
-          "scripts/check-security-ci-contract.py",
-          "scripts/run-security-execution-container.py",
-          "scripts/tests/run-security-execution-container.test.py",
-          "scripts/tests/trusted-ci-landing-regressions.test.py"
-        ],
-        "current_source_file_hashes": {
-          "deploy/docker/security-evidence-seccomp-provenance.json": "77fda65b521f6e0cb95c65654d720f5f120d41b1b44ae75f0ef12b6885d4ba6f",
-          "deploy/docker/security-evidence-seccomp-upstream.LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
-          "deploy/docker/security-evidence-seccomp-upstream.json": "6416b47770785a41ac59073cdc77d9fe98517df2799dc83ef207e622de3053f6",
-          "deploy/docker/security-evidence-seccomp.json": "60eb492e39caacf8686d52f2ca6447045e85989b5aaa3739dbcd24b47f64ddfa",
-          "scripts/check-security-ci-contract.py": "d0d6e34ebdba32701f2c092888404ecb263f83ee0dcea0ebd2c2443bc1e793a9",
-          "scripts/run-security-execution-container.py": "4eb7b7d4f2ed72ad74fa4b0ace2ce7deb73ad6528dfe8594c5af0c31f60b0832",
-          "scripts/tests/run-security-execution-container.test.py": "327575101619112ef70d56cf61262e2a81b5e95dbda9b63b55f710602508669f",
-          "scripts/tests/trusted-ci-landing-regressions.test.py": "ae28f1b34dea92afeabbf270d3d45eaa0c7b59f6afdbe32504d038aa9733c6eb"
-        },
-        "reviewed_source_head": "488c5b7b399abd96ea44842746a604b27e17d81b",
-        "basis": "Exact ID independent accepted source/static/provenance proof, not containing-commit inference."
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated; real workload acceptance open",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Required designated Linux/X64 image/syscall/workload proof remains pending. No permissions inferred from candidate traces."
       },
       "source_integrated": true,
       "focused_green": true,
@@ -124810,11 +125153,7 @@
         }
       ],
       "remaining_acceptance": [
-        "PENDING genuine designated Linux/X64 native, trusted and cold workload coverage.",
-        "Working/minimal profile and genuine syscall/workload coverage remain unestablished; never add permissions from candidate traces.",
-        "Current owning/Cargo/supply-chain/strict and exact package/feature source-bound qualification.",
-        "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required.",
-        "Foundation landingPR1160 remains unmerged; source integration/scoped evidence is not full qualification."
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Required designated Linux/X64 image/syscall/workload proof remains pending. No permissions inferred from candidate traces."
       ],
       "historical_source_claim": {
         "source": {
@@ -124850,6 +125189,41 @@
         "Codex_required": false,
         "Codex_quota_blocker": false,
         "review_acceptance_established": false
+      },
+      "current_source_reconciliation_20261008": {
+        "audit_path": "docs/security/audits/current-source-reconciliation-20261008.json",
+        "audit_sha256": "23f73f936683a43044eb210850f80b83eb7d9853abdeb43f797c9619bbc674c4",
+        "source_checkpoint": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "evidence_scope": "Pinned default-profile derivation and canonical runner/provenance source proof accepted.",
+        "source_is_not_full_qualification": true
+      },
+      "source_repair_previous_observation_20261008": {
+        "commit": "de519d7776d8c9ea101d1aec271fd0be54dca632",
+        "commits": [
+          "de519d7776d8c9ea101d1aec271fd0be54dca632"
+        ],
+        "files": [
+          "deploy/docker/security-evidence-seccomp-provenance.json",
+          "deploy/docker/security-evidence-seccomp-upstream.LICENSE",
+          "deploy/docker/security-evidence-seccomp-upstream.json",
+          "deploy/docker/security-evidence-seccomp.json",
+          "scripts/check-security-ci-contract.py",
+          "scripts/run-security-execution-container.py",
+          "scripts/tests/run-security-execution-container.test.py",
+          "scripts/tests/trusted-ci-landing-regressions.test.py"
+        ],
+        "current_source_file_hashes": {
+          "deploy/docker/security-evidence-seccomp-provenance.json": "77fda65b521f6e0cb95c65654d720f5f120d41b1b44ae75f0ef12b6885d4ba6f",
+          "deploy/docker/security-evidence-seccomp-upstream.LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "deploy/docker/security-evidence-seccomp-upstream.json": "6416b47770785a41ac59073cdc77d9fe98517df2799dc83ef207e622de3053f6",
+          "deploy/docker/security-evidence-seccomp.json": "60eb492e39caacf8686d52f2ca6447045e85989b5aaa3739dbcd24b47f64ddfa",
+          "scripts/check-security-ci-contract.py": "d0d6e34ebdba32701f2c092888404ecb263f83ee0dcea0ebd2c2443bc1e793a9",
+          "scripts/run-security-execution-container.py": "4eb7b7d4f2ed72ad74fa4b0ace2ce7deb73ad6528dfe8594c5af0c31f60b0832",
+          "scripts/tests/run-security-execution-container.test.py": "327575101619112ef70d56cf61262e2a81b5e95dbda9b63b55f710602508669f",
+          "scripts/tests/trusted-ci-landing-regressions.test.py": "ae28f1b34dea92afeabbf270d3d45eaa0c7b59f6afdbe32504d038aa9733c6eb"
+        },
+        "reviewed_source_head": "488c5b7b399abd96ea44842746a604b27e17d81b",
+        "basis": "Exact ID independent accepted source/static/provenance proof, not containing-commit inference."
       }
     },
     "incoming-pr1160-review-20261006:F077": {
@@ -124867,20 +125241,27 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "source-integrated-focused-green-final-acceptance-pending",
+      "current_state": "D-P4-P6-P5-H-and-identity-revocation-ports-source-integrated-final-acceptance-pending",
       "source_repair": {
-        "commit": "92959e125407f1f4d652b8a64db9e99e220d5ff5",
         "commits": [
-          "322f08ef4d242ebc543c5d8b5254f06483648d89",
-          "92959e125407f1f4d652b8a64db9e99e220d5ff5"
+          "95f0aea957043edf2bf98b94c3157364411a7c64",
+          "18268d160e89b931be066fa5c42354f359f044e4",
+          "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+          "07c5628a22f2549e7a3e7eda73ec2944db12fcb8",
+          "a7f3bcc5c1b5263f20cea16115cefae27e0fb239",
+          "8010adbdcfee20b317cae797a2768b8c552177fb",
+          "35848a4fa919cdcc7edd1ce750840bae4c74d2d0",
+          "fa6943194c48fc5ca02fc9ee12ca2d8a10408260",
+          "3764d4ac48dd88792f62de4de6d4fba319e547e0"
         ],
-        "files": [],
-        "current_source_file_hashes": {},
-        "observed_source_head": "b8f061ca578beb9c9a94accde304962a42f7a5c2",
-        "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
+        "observed_source_head": "3764d4ac48dd88792f62de4de6d4fba319e547e0",
+        "observed_source_tree": "8f408d4e1949e220c33d53a17a38bfebe37bf972",
+        "application": "D/P4/P6/P5/H and identity/revocation fixture ports source-integrated; final acceptance pending",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Capture the exact final integrated F077 combined Original, preservation, identity, currency, dual-census, attempt-ceiling and revocation suites, plus complete checker/mutation/strict gates. Preserve prior genuine RED, setup/fixture-selector and unsuccessful outcomes separately. Complete the outstanding check-security-definitions.test.py fixture port and its trusted-definition prerequisite counterpart, then qualify the dedicated App/ruleset publisher and per-PR protected landing boundary. Complete immutable final-source owning/default/PQ/platform/cold, native, trusted, terminal exact-source hosted checks, final independent review and protected #1160 landing. Source integration and earlier scoped/private GREEN are not full qualification."
       },
       "source_integrated": true,
-      "focused_green": true,
+      "focused_green": false,
       "owning_pending": true,
       "native_pending": true,
       "trusted_pending": true,
@@ -124926,10 +125307,9 @@
         }
       ],
       "remaining_acceptance": [
-        "Repair source landed in protected prerequisite1176 and reconciled into currentS. Current requirement/foundation merged=false and final owning/trusted/hosted acceptance remain pending.",
-        "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
-        "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
-        "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+        "Capture the exact final integrated F077 combined Original, preservation, identity, currency, dual-census, attempt-ceiling and revocation suites, plus complete checker/mutation/strict gates. Preserve prior genuine RED, setup/fixture-selector and unsuccessful outcomes separately.",
+        "Complete the outstanding check-security-definitions.test.py fixture port and its trusted-definition prerequisite counterpart, then qualify the dedicated App/ruleset publisher and per-PR protected landing boundary.",
+        "Complete immutable final-source owning/default/PQ/platform/cold, native, trusted, terminal exact-source hosted checks, final independent review and protected #1160 landing. Source integration and earlier scoped/private GREEN are not full qualification."
       ],
       "historical_source_claim": {
         "source": {
@@ -124962,6 +125342,24 @@
         "Codex_required": false,
         "Codex_quota_blocker": false,
         "review_acceptance_established": false
+      },
+      "current_source_reconciliation_20261008": {
+        "audit_path": "docs/security/audits/current-source-reconciliation-20261008.json",
+        "audit_sha256": "23f73f936683a43044eb210850f80b83eb7d9853abdeb43f797c9619bbc674c4",
+        "source_checkpoint": "3764d4ac48dd88792f62de4de6d4fba319e547e0",
+        "evidence_scope": "P5/H integrated at 07c5628a22; identity ports a7f3bcc5c1/8010adbdcf/35848a4fa9 and revocation ports fa6943194c/3764d4ac48 integrated. Final combined suite, old-definition fixture port, trusted-definition prerequisite, native/trusted/hosted and protected landing remain pending.",
+        "source_is_not_full_qualification": true
+      },
+      "source_repair_previous_observation_20261008": {
+        "commit": "92959e125407f1f4d652b8a64db9e99e220d5ff5",
+        "commits": [
+          "322f08ef4d242ebc543c5d8b5254f06483648d89",
+          "92959e125407f1f4d652b8a64db9e99e220d5ff5"
+        ],
+        "files": [],
+        "current_source_file_hashes": {},
+        "observed_source_head": "b8f061ca578beb9c9a94accde304962a42f7a5c2",
+        "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
       }
     },
     "incoming-pr1160-review-20261006:F078": {
@@ -124979,17 +125377,16 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "source-integrated-focused-green-final-acceptance-pending",
+      "current_state": "source-integrated-final-acceptance-pending",
       "source_repair": {
-        "commit": "92959e125407f1f4d652b8a64db9e99e220d5ff5",
         "commits": [
-          "322f08ef4d242ebc543c5d8b5254f06483648d89",
           "92959e125407f1f4d652b8a64db9e99e220d5ff5"
         ],
-        "files": [],
-        "current_source_file_hashes": {},
-        "observed_source_head": "b8f061ca578beb9c9a94accde304962a42f7a5c2",
-        "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated; operational acceptance open",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. App/ruleset enforcement and protected per-PR landing experiment remain open; source/doc disclaimers do not enforce protections."
       },
       "source_integrated": true,
       "focused_green": true,
@@ -125038,10 +125435,7 @@
         }
       ],
       "remaining_acceptance": [
-        "Repair source landed in protected prerequisite1176 and reconciled into currentS. Current requirement/foundation merged=false and final owning/trusted/hosted acceptance remain pending.",
-        "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
-        "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
-        "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. App/ruleset enforcement and protected per-PR landing experiment remain open; source/doc disclaimers do not enforce protections."
       ],
       "historical_source_claim": {
         "source": {
@@ -125073,6 +125467,24 @@
         "Codex_required": false,
         "Codex_quota_blocker": false,
         "review_acceptance_established": false
+      },
+      "current_source_reconciliation_20261008": {
+        "audit_path": "docs/security/audits/current-source-reconciliation-20261008.json",
+        "audit_sha256": "23f73f936683a43044eb210850f80b83eb7d9853abdeb43f797c9619bbc674c4",
+        "source_checkpoint": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "evidence_scope": "Protected prerequisite1176 definition/main ancestry receipt and local contract evidence retained. F074 critical non-success tombstones are intentional accepted behavior.",
+        "source_is_not_full_qualification": true
+      },
+      "source_repair_previous_observation_20261008": {
+        "commit": "92959e125407f1f4d652b8a64db9e99e220d5ff5",
+        "commits": [
+          "322f08ef4d242ebc543c5d8b5254f06483648d89",
+          "92959e125407f1f4d652b8a64db9e99e220d5ff5"
+        ],
+        "files": [],
+        "current_source_file_hashes": {},
+        "observed_source_head": "b8f061ca578beb9c9a94accde304962a42f7a5c2",
+        "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
       }
     },
     "incoming-pr1160-review-20261006:F079": {
@@ -125090,46 +125502,18 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "source-integrated-dormant9-gate-generators-VetDeny-and-SOURCEpin2-scoped-accepted-final-pending",
+      "current_state": "source-integrated-final-acceptance-pending",
       "source_repair": {
-        "commit": "de519d7776d8c9ea101d1aec271fd0be54dca632",
         "commits": [
-          "de519d7776d8c9ea101d1aec271fd0be54dca632"
+          "de519d7776d8c9ea101d1aec271fd0be54dca632",
+          "a0062b0e0ae2d1edd9d732b1be4f6e89d3fb9dc1",
+          "840a71adaafababc9ad8f61a8682994a2342d3a4"
         ],
-        "files": [
-          "Cargo.toml",
-          "fuzz/Cargo.toml",
-          "deploy/docker/chio-workspace/Cargo.toml",
-          "deploy/docker/proof-room-workspace/Cargo.toml",
-          "Cargo.lock",
-          "fuzz/Cargo.lock",
-          "deploy/docker/chio-workspace/Cargo.lock",
-          "deploy/docker/proof-room-workspace/Cargo.lock",
-          "supply-chain/config.toml",
-          "supply-chain/audits.toml",
-          "supply-chain/imports.lock",
-          "deny.toml",
-          "crates/trust/chio-federation-transport-iroh/Cargo.toml",
-          "supply-chain/reviews/iroh-blobs-0.103.1-delta.md"
-        ],
-        "current_source_file_hashes": {
-          "Cargo.toml": "cafe563ad13a023e85a494af111861fde38b758583b075fefce661da4c3d1e56",
-          "fuzz/Cargo.toml": "c05acb5b25ce92773876a59bc08ffa539f6b20e5930ff9c96aac02c4eedb7546",
-          "deploy/docker/chio-workspace/Cargo.toml": "c0a2d7c76b1b1b4bc0d3da0c204b4e69e38ed7d9d8a1a4e238c28dc4d53a5db5",
-          "deploy/docker/proof-room-workspace/Cargo.toml": "63dd991928c7eea17787e32ef7028a55d76e3311c16ddca168f2c5b5ac8ad30f",
-          "Cargo.lock": "e91fb3ab16ce5979988eeb2367f7d37c1729efffa2e5dd06c05df818112b3b9b",
-          "fuzz/Cargo.lock": "89cf33c09c372f921771bb21b9908b1ad34ae90057ae0d90cc10cdb12773471f",
-          "deploy/docker/chio-workspace/Cargo.lock": "ab43a03e2110a74d97879b97ae46835f6a149faead8c7bbe58b72a456b3473d9",
-          "deploy/docker/proof-room-workspace/Cargo.lock": "bdb899bbd6566ac5f486fc2e1f9d4bc3b787d6ee60b1013a3f96be993f597ec0",
-          "supply-chain/config.toml": "abdec058fbe87da115e8ddef1e2590433638b37c717643f91ffe06ef78781b90",
-          "supply-chain/audits.toml": "d2cf061c4475af1c9a73a15b8764294916b60ce86c44a3c61b5abc7a83f87363",
-          "supply-chain/imports.lock": "1b4d498f8c3dcdc79b4f47f76c62c29c6c7c054e2cd8d242332852cac2b54b82",
-          "deny.toml": "39796be94bd1a4beee50a1d0da6d888936c0cd06c328da1a309ab2a1500aafc6",
-          "crates/trust/chio-federation-transport-iroh/Cargo.toml": "5c960b00bf3c2df41f17017910c384a7e6124ad80a14adf00adc470897b3191f",
-          "supply-chain/reviews/iroh-blobs-0.103.1-delta.md": "1346153ebc7ec19f36b42d5697305a0c58aee2ddc3b3b3537400e5bd060080d6"
-        },
-        "reviewed_source_head": "b8f061ca578beb9c9a94accde304962a42f7a5c2",
-        "basis": "Exact ID independent accepted source/static/provenance proof, not containing-commit inference."
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Valuable fork archives stay preserved; whole graph unchanged remains false."
       },
       "source_integrated": true,
       "focused_green": true,
@@ -125387,12 +125771,7 @@
         }
       ],
       "remaining_acceptance": [
-        "Retain canonicala006 Vet/Deny0 with580full/9partial/729existingexempt, acceptedSOURCE-only2ratchet/currentstatic4controls0 and e91unchanged; final combined owning/Cargo/strict/native/trusted/hosted qualification remainspending.",
-        "Complete current final-source owning/Cargo/strict/native/trusted/hosted acceptance after outstanding producer repairs and exact source composition; older a006 scoped gates do not qualify a changed final candidate or rotate authorization/lockratchet.",
-        "Preserve selected regress0.10.5, all753 third_party bytes/valuable refs, historical dormant9 acceptance and original invalid missing-script/realbaseRED/cfg_aliases drift distinctions. Whole graph unchanged remains false.",
-        "Exact-S native/trusted/hosted CI, independent review, merge and operational acceptance remain separate; full_qualified=false.",
-        "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required.",
-        "Foundation landingPR1160 remains unmerged; source integration/scoped evidence is not full qualification."
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Valuable fork archives stay preserved; whole graph unchanged remains false."
       ],
       "historical_source_claim": {
         "source": {
@@ -125717,6 +126096,53 @@
             "exit": 0
           }
         ]
+      },
+      "current_source_reconciliation_20261008": {
+        "audit_path": "docs/security/audits/current-source-reconciliation-20261008.json",
+        "audit_sha256": "23f73f936683a43044eb210850f80b83eb7d9853abdeb43f797c9619bbc674c4",
+        "source_checkpoint": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "evidence_scope": "Unused-lock/fork gates and generator proof integrated;39fcc current0e6 canonical Vet0 and Deny four categories0;580 full/9 partial/729 existing exemptions unchanged.",
+        "source_is_not_full_qualification": true
+      },
+      "source_repair_previous_observation_20261008": {
+        "commit": "de519d7776d8c9ea101d1aec271fd0be54dca632",
+        "commits": [
+          "de519d7776d8c9ea101d1aec271fd0be54dca632"
+        ],
+        "files": [
+          "Cargo.toml",
+          "fuzz/Cargo.toml",
+          "deploy/docker/chio-workspace/Cargo.toml",
+          "deploy/docker/proof-room-workspace/Cargo.toml",
+          "Cargo.lock",
+          "fuzz/Cargo.lock",
+          "deploy/docker/chio-workspace/Cargo.lock",
+          "deploy/docker/proof-room-workspace/Cargo.lock",
+          "supply-chain/config.toml",
+          "supply-chain/audits.toml",
+          "supply-chain/imports.lock",
+          "deny.toml",
+          "crates/trust/chio-federation-transport-iroh/Cargo.toml",
+          "supply-chain/reviews/iroh-blobs-0.103.1-delta.md"
+        ],
+        "current_source_file_hashes": {
+          "Cargo.toml": "cafe563ad13a023e85a494af111861fde38b758583b075fefce661da4c3d1e56",
+          "fuzz/Cargo.toml": "c05acb5b25ce92773876a59bc08ffa539f6b20e5930ff9c96aac02c4eedb7546",
+          "deploy/docker/chio-workspace/Cargo.toml": "c0a2d7c76b1b1b4bc0d3da0c204b4e69e38ed7d9d8a1a4e238c28dc4d53a5db5",
+          "deploy/docker/proof-room-workspace/Cargo.toml": "63dd991928c7eea17787e32ef7028a55d76e3311c16ddca168f2c5b5ac8ad30f",
+          "Cargo.lock": "e91fb3ab16ce5979988eeb2367f7d37c1729efffa2e5dd06c05df818112b3b9b",
+          "fuzz/Cargo.lock": "89cf33c09c372f921771bb21b9908b1ad34ae90057ae0d90cc10cdb12773471f",
+          "deploy/docker/chio-workspace/Cargo.lock": "ab43a03e2110a74d97879b97ae46835f6a149faead8c7bbe58b72a456b3473d9",
+          "deploy/docker/proof-room-workspace/Cargo.lock": "bdb899bbd6566ac5f486fc2e1f9d4bc3b787d6ee60b1013a3f96be993f597ec0",
+          "supply-chain/config.toml": "abdec058fbe87da115e8ddef1e2590433638b37c717643f91ffe06ef78781b90",
+          "supply-chain/audits.toml": "d2cf061c4475af1c9a73a15b8764294916b60ce86c44a3c61b5abc7a83f87363",
+          "supply-chain/imports.lock": "1b4d498f8c3dcdc79b4f47f76c62c29c6c7c054e2cd8d242332852cac2b54b82",
+          "deny.toml": "39796be94bd1a4beee50a1d0da6d888936c0cd06c328da1a309ab2a1500aafc6",
+          "crates/trust/chio-federation-transport-iroh/Cargo.toml": "5c960b00bf3c2df41f17017910c384a7e6124ad80a14adf00adc470897b3191f",
+          "supply-chain/reviews/iroh-blobs-0.103.1-delta.md": "1346153ebc7ec19f36b42d5697305a0c58aee2ddc3b3b3537400e5bd060080d6"
+        },
+        "reviewed_source_head": "b8f061ca578beb9c9a94accde304962a42f7a5c2",
+        "basis": "Exact ID independent accepted source/static/provenance proof, not containing-commit inference."
       }
     },
     "incoming-pr1160-review-20261006:F080": {
@@ -128901,17 +129327,18 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "source-integrated-focused-green-final-acceptance-pending",
+      "current_state": "source-integrated-final-acceptance-pending",
       "source_repair": {
-        "commit": "b8f061ca578beb9c9a94accde304962a42f7a5c2",
         "commits": [
+          "de519d7776d8c9ea101d1aec271fd0be54dca632",
           "d57fa1c713280b8822f18c60e9ab7e8977192853",
           "b8f061ca578beb9c9a94accde304962a42f7a5c2"
         ],
-        "files": [],
-        "current_source_file_hashes": {},
-        "observed_source_head": "b8f061ca578beb9c9a94accde304962a42f7a5c2",
-        "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Signed restart/physical substitution and pre-fix raw-row handling remain bounded acceptance gaps; do not claim existing stuck historical rows repaired."
       },
       "source_integrated": true,
       "focused_green": true,
@@ -129028,12 +129455,7 @@
         }
       ],
       "remaining_acceptance": [
-        "Current nativeclock1 passed exact corrected test contract; retain olderfailed diagnostic/Ok0 attribution and separate open F003 production recovery-clock gap. Broader native/cold/trusted/final still pending.",
-        "Run same1 native-clock expectation at installed97b9, acceptedde0a/e6e85. Same1 remains UNRUN; priorOk0 diagnostics/failed predicates retained without advancing-clock/effect inference.",
-        "Current native7 is focused runtime evidence, not whole owning/physical/trusted/hosted acceptance.",
-        "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
-        "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
-        "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Signed restart/physical substitution and pre-fix raw-row handling remain bounded acceptance gaps; do not claim existing stuck historical rows repaired."
       ],
       "historical_source_claim": {
         "source": {
@@ -129108,6 +129530,24 @@
         "whole_source_unchanged": true,
         "not_full_owning_or_final_native_qualification": true,
         "scope": "Three exact ordinary credential broker capture/TLS/MCP completion/upstream cancellation cases; not the pending native threshold composition, full confinement or final native/cold matrix."
+      },
+      "current_source_reconciliation_20261008": {
+        "audit_path": "docs/security/audits/current-source-reconciliation-20261008.json",
+        "audit_sha256": "23f73f936683a43044eb210850f80b83eb7d9853abdeb43f797c9619bbc674c4",
+        "source_checkpoint": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "evidence_scope": "Original ID/hash/raw/ledger binding retained in de519; native-v3 lifecycle7 at92959; exact real broker daemon/MCP/upstream3 atcac4; b8 broker312/0 with4 unavailable and74af strict scoped.",
+        "source_is_not_full_qualification": true
+      },
+      "source_repair_previous_observation_20261008": {
+        "commit": "b8f061ca578beb9c9a94accde304962a42f7a5c2",
+        "commits": [
+          "d57fa1c713280b8822f18c60e9ab7e8977192853",
+          "b8f061ca578beb9c9a94accde304962a42f7a5c2"
+        ],
+        "files": [],
+        "current_source_file_hashes": {},
+        "observed_source_head": "b8f061ca578beb9c9a94accde304962a42f7a5c2",
+        "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
       }
     },
     "incoming-pr1160-review-20261006:CR001": {
@@ -129507,16 +129947,16 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "source-integrated-focused-green-final-acceptance-pending",
+      "current_state": "source-integrated-final-acceptance-pending",
       "source_repair": {
-        "commit": "21ebd9d3bc6b12aa5a157a489dc824caf8592f24",
         "commits": [
           "21ebd9d3bc6b12aa5a157a489dc824caf8592f24"
         ],
-        "files": [],
-        "current_source_file_hashes": {},
-        "observed_source_head": "b8f061ca578beb9c9a94accde304962a42f7a5c2",
-        "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Keep CR001 write-path tenant/cause invariants and fatal InvalidReference/Sqlite; no resolve/read race closure claimed."
       },
       "source_integrated": true,
       "focused_green": true,
@@ -129570,9 +130010,7 @@
         }
       ],
       "remaining_acceptance": [
-        "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
-        "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
-        "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Keep CR001 write-path tenant/cause invariants and fatal InvalidReference/Sqlite; no resolve/read race closure claimed."
       ],
       "historical_source_claim": {
         "source": {
@@ -129675,6 +130113,23 @@
         "dependency_inclusive": true,
         "runtime_b8_not_repeated": "312pass/0fail/4unavailable retained",
         "broader_current_matrix": "PENDING"
+      },
+      "current_source_reconciliation_20261008": {
+        "audit_path": "docs/security/audits/current-source-reconciliation-20261008.json",
+        "audit_sha256": "23f73f936683a43044eb210850f80b83eb7d9853abdeb43f797c9619bbc674c4",
+        "source_checkpoint": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "evidence_scope": "Genuine store4/2 +broker6/4 Original; exactly one retained store6/broker10 GREEN16 packet13dfacef, source/evidence digest checked; duplicate overwrite disclosure preserved.",
+        "source_is_not_full_qualification": true
+      },
+      "source_repair_previous_observation_20261008": {
+        "commit": "21ebd9d3bc6b12aa5a157a489dc824caf8592f24",
+        "commits": [
+          "21ebd9d3bc6b12aa5a157a489dc824caf8592f24"
+        ],
+        "files": [],
+        "current_source_file_hashes": {},
+        "observed_source_head": "b8f061ca578beb9c9a94accde304962a42f7a5c2",
+        "basis": "Exact requirement owner/integration receipt and source/evidence mapping; not mere commit containment."
       }
     },
     "incoming-pr1160-review-20261006:F035-R1": {
@@ -130051,15 +130506,17 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "confirmed-review-obligation-pending-integration-and-final-acceptance",
+      "current_state": "source-integrated-final-acceptance-pending",
       "source_repair": {
-        "checkpoint": "89d79ac6ab79de5d55b99a7c8ec611bc8b021cb2",
-        "files": [
-          "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007.json"
+        "commits": [
+          "4cd60463f8995a03db300ac82109a58189302f66"
         ],
-        "application": "This pins the original review record only. It does not establish an implemented repair; current owner handoffs must be integrated and verified separately."
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated; exact scoped evidence retained; final acceptance pending",
+        "basis": "The original effects:trusted-clock obligation aliases the accepted effect-port clock composition repair. Production alert and issuance backends receive the owner clock; other EF-COMP changes and its scoped controls remain separately mapped."
       },
-      "source_integrated": false,
+      "source_integrated": true,
       "focused_green": false,
       "owning_pending": true,
       "native_pending": true,
@@ -130069,10 +130526,22 @@
       "full_qualified": false,
       "verification_evidence": [],
       "remaining_acceptance": [
-        "Review the exact Original-first owner handoff against the current integration candidate; retain genuine failures and separate existing-green coverage.",
-        "Integrate only reviewed repairs and run their current focused/owning strict and required native checks without baseline, resource, isolation or assertion waivers.",
-        "Complete independent full-candidate, cold/trusted and exact hosted/merge qualification before protected #1160 landing."
-      ]
+        "Complete exact combined-source owning/default/PQ/platform/cold and immutable native/trusted/hosted qualification plus final independent review and protected landing. Scoped EF controls do not qualify the entire operational contract."
+      ],
+      "current_source_reconciliation_20261008": {
+        "audit_path": "docs/security/audits/current-source-reconciliation-20261008.json",
+        "audit_sha256": "23f73f936683a43044eb210850f80b83eb7d9853abdeb43f797c9619bbc674c4",
+        "source_checkpoint": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "evidence_scope": "Original-first EF source mapping; CP production effects30/0 and issuance target25/0 atf2bb, eight-owner strict at39fcc. Each campaign keeps its actual source identity.",
+        "source_is_not_full_qualification": true
+      },
+      "source_repair_previous_observation_20261008": {
+        "checkpoint": "89d79ac6ab79de5d55b99a7c8ec611bc8b021cb2",
+        "files": [
+          "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007.json"
+        ],
+        "application": "This pins the original review record only. It does not establish an implemented repair; current owner handoffs must be integrated and verified separately."
+      }
     },
     "incoming-pr1160-review-20261007:effects:durable-plan-binding": {
   "requirement_id": "incoming-pr1160-review-20261007:effects:durable-plan-binding",
@@ -130157,15 +130626,19 @@
       "scope": "now",
       "landing_pr": 1160,
       "landing_unit": "foundation",
-      "current_state": "confirmed-review-obligation-pending-integration-and-final-acceptance",
+      "current_state": "source-integrated-final-acceptance-pending",
       "source_repair": {
-        "checkpoint": "89d79ac6ab79de5d55b99a7c8ec611bc8b021cb2",
-        "files": [
-          "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007.json"
+        "commits": [
+          "5d4d50f2bbd5907980cb108b9a8410f4771d7c61",
+          "2ebf718dccc4f08ebc749610ae74e88b4eacbde5",
+          "a8fdeb457c7e8f919222b616dc50e5015aeaacdb"
         ],
-        "application": "This pins the original review record only. It does not establish an implemented repair; current owner handoffs must be integrated and verified separately."
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated; exact scoped evidence retained; final acceptance pending",
+        "basis": "The original repeated-FreezeIssuance obligation maps to the one-freeze-per-plan refusal and the independently accepted same-lineage contribution/removal finality repairs. The latter preserve other live plans when one contribution is lifted; maintenance/TTL/native acceptance remains separate."
       },
-      "source_integrated": false,
+      "source_integrated": true,
       "focused_green": false,
       "owning_pending": true,
       "native_pending": true,
@@ -130175,10 +130648,22 @@
       "full_qualified": false,
       "verification_evidence": [],
       "remaining_acceptance": [
-        "Review the exact Original-first owner handoff against the current integration candidate; retain genuine failures and separate existing-green coverage.",
-        "Integrate only reviewed repairs and run their current focused/owning strict and required native checks without baseline, resource, isolation or assertion waivers.",
-        "Complete independent full-candidate, cold/trusted and exact hosted/merge qualification before protected #1160 landing."
-      ]
+        "Complete exact combined-source owning/default/PQ/platform/cold and immutable native/trusted/hosted qualification plus final independent review and protected landing. Scoped EF controls do not qualify the entire operational contract."
+      ],
+      "current_source_reconciliation_20261008": {
+        "audit_path": "docs/security/audits/current-source-reconciliation-20261008.json",
+        "audit_sha256": "23f73f936683a43044eb210850f80b83eb7d9853abdeb43f797c9619bbc674c4",
+        "source_checkpoint": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "evidence_scope": "Original-first EF source mapping; CP production effects30/0 and issuance target25/0 atf2bb, eight-owner strict at39fcc. Each campaign keeps its actual source identity.",
+        "source_is_not_full_qualification": true
+      },
+      "source_repair_previous_observation_20261008": {
+        "checkpoint": "89d79ac6ab79de5d55b99a7c8ec611bc8b021cb2",
+        "files": [
+          "docs/security/audits/sqlite-and-ci-repair-checkpoint-20261007.json"
+        ],
+        "application": "This pins the original review record only. It does not establish an implemented repair; current owner handoffs must be integrated and verified separately."
+      }
     },
     "incoming-pr1160-review-20261007:pipeline:recovery-readiness": {
       "requirement_id": "incoming-pr1160-review-20261007:pipeline:recovery-readiness",
@@ -130839,16 +131324,20 @@
       ]
     },
     "incoming-pr1160-review-20261008:native:MINISW-NATIVE-DENY": {
-      "state": "diagnostics-and-bounded-journal-green-production-native-refusal-acceptance-open",
+      "state": "diagnostics-and-bounded-journal-source-integrated-native-refusal-acceptance-open",
       "source_checkpoint": "34443073624f6ee016d1c2599faeb2aefbb3a1cb",
       "audit_checkpoint": "ebdf52364cbafed33bd04e17c25be57ab055755b",
       "audit_path": "docs/security/audits/repair-batch-local-checkpoint-20261008.json",
       "source_repair": {
         "commits": [
-          "dab61de13859d8396b50e76a4c492d064b06ba60"
+          "dab61de13859d8396b50e76a4c492d064b06ba60",
+          "5ec396fd53bb451ff46c974154abaec5ed06b57b"
         ],
-        "observed_source": "34443073624f6ee016d1c2599faeb2aefbb3a1cb",
-        "scope": "Source integration; exact runtime campaigns below retain their own source SHAs and limited acceptance."
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "diagnostic and bounded journal source integrated; actual native acceptance open",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Complete actual enforcing eight-receipt native trajectory, unchanged10000ms fence, current image, costs and custody. Only a reachable confirmed refusal/cost defect justifies another producer. No new one was established by this ledger pass."
       },
       "focused_green": false,
       "qualified": false,
@@ -130869,11 +131358,22 @@
         }
       ],
       "remaining_acceptance": [
-        "Complete effect finality, same-lineage freeze and authenticated historical result-query repairs with Original and preservation controls.",
-        "Complete MCP genuine-v2 positive fixture and extra broker integrity controls; fresh owning and strict checks for the composed source.",
-        "Measure and qualify actual production native trajectory with eight receipts, the unchanged10000ms fence and current enforcing artifacts; bounded journal tests do not establish this.",
-        "Finish F077 protected merge/App/ruleset evidence, current independent review, default/PQ/platform/cold/trusted/hosted checks and protected landing."
-      ]
+        "Complete actual enforcing eight-receipt native trajectory, unchanged10000ms fence, current image, costs and custody. Only a reachable confirmed refusal/cost defect justifies another producer. No new one was established by this ledger pass."
+      ],
+      "current_source_reconciliation_20261008": {
+        "audit_path": "docs/security/audits/current-source-reconciliation-20261008.json",
+        "audit_sha256": "23f73f936683a43044eb210850f80b83eb7d9853abdeb43f797c9619bbc674c4",
+        "source_checkpoint": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "evidence_scope": "Private fixed-stage diagnostics and N16 bounded-history GREEN preserved. Separate preparation helper owns current trace.",
+        "source_is_not_full_qualification": true
+      },
+      "source_repair_previous_observation_20261008": {
+        "commits": [
+          "dab61de13859d8396b50e76a4c492d064b06ba60"
+        ],
+        "observed_source": "34443073624f6ee016d1c2599faeb2aefbb3a1cb",
+        "scope": "Source integration; exact runtime campaigns below retain their own source SHAs and limited acceptance."
+      }
     },
     "incoming-pr1160-review-20261008:native:BROKER-SELECT": {
   "state": "source-integrated-selector-controls4-and-private3-green-full-owning-pending",
@@ -131080,9 +131580,188 @@
         "Finish F077 protected merge/App/ruleset evidence, current independent review, default/PQ/platform/cold/trusted/hosted checks and protected landing."
       ]
     },
-    "incoming-pr1160-review-20261008:reconciliation:EF-FINALITY": {"state":"source-integrated-focused-and-compatibility-green-final-qualification-pending","source_checkpoint":"52d98f4bea87df7fe5acdf424a29f5e10e5365cb","audit_checkpoint":"ebdf52364cbafed33bd04e17c25be57ab055755b","audit_path":"docs/security/audits/finality-and-legacy-import-checkpoint-20261008.json","source_repair":["2ebf718dcc","a8fdeb457c"],"focused_green":true,"qualified":false,"merged":false,"previous_checkpoint_state":"proposed-effect-repair-regression-confirmed-original-and-producer-pending","full_qualified":false,"owning_pending":true,"native_pending":true,"trusted_pending":true,"hosted_pending":true,"verification_evidence":[{"path":"docs/security/audits/repair-batch-local-checkpoint-20261008.json","sha256":"6e3781eb1b9e8eeb56f7d31ad10ef2cb9bd609bf7013c1477e998326a16a21b9","scope":"Per-campaign source/binary/log receipts, preserving failing Original/setup/fixture records separately. Current whole-candidate acceptance remains open."},{"path":"docs/security/audits/finality-and-legacy-import-checkpoint-20261008.json","sha256":"411c736e203c65fd9f003e31ffbee6164ba52a0809972432faaea0defd90264e","scope":"Exact per-campaign source/binary/log evidence; includes genuine regression and separately classified setup/cache failures."}],"remaining_acceptance":["Complete trusted workflow producer repairs and independent review; qualify dedicated publisher and per-PR protected landing boundary.","Complete remaining owning/default/PQ/platform/cold coverage; reconcile all review obligations without reimplementing integrated work.","Run current enforcing native trajectory with eight receipts, unchanged 10000ms fence and execution nonces; any debugging run remains nonfinal.","Freeze final source, obtain exact-source native/trusted/hosted evidence, refresh reviews and threads, and land through protections."],"checkpoint_history":[{"state":"genuine-original-red-approved-finite-producer-in-progress","source_checkpoint":"34443073624f6ee016d1c2599faeb2aefbb3a1cb","audit_path":"docs/security/audits/repair-batch-local-checkpoint-20261008.json"}]},
-    "incoming-pr1160-review-20261008:reconciliation:EF-FREEZE": {"state":"source-integrated-focused-and-compatibility-green-final-qualification-pending","source_checkpoint":"52d98f4bea87df7fe5acdf424a29f5e10e5365cb","audit_checkpoint":"ebdf52364cbafed33bd04e17c25be57ab055755b","audit_path":"docs/security/audits/finality-and-legacy-import-checkpoint-20261008.json","source_repair":["2ebf718dcc","a8fdeb457c"],"focused_green":true,"qualified":false,"merged":false,"previous_checkpoint_state":"effect-composition-gap-confirmed-original-and-producer-proposal-pending","full_qualified":false,"owning_pending":true,"native_pending":true,"trusted_pending":true,"hosted_pending":true,"verification_evidence":[{"path":"docs/security/audits/repair-batch-local-checkpoint-20261008.json","sha256":"6e3781eb1b9e8eeb56f7d31ad10ef2cb9bd609bf7013c1477e998326a16a21b9","scope":"Per-campaign source/binary/log receipts, preserving failing Original/setup/fixture records separately. Current whole-candidate acceptance remains open."},{"path":"docs/security/audits/finality-and-legacy-import-checkpoint-20261008.json","sha256":"411c736e203c65fd9f003e31ffbee6164ba52a0809972432faaea0defd90264e","scope":"Exact per-campaign source/binary/log evidence; includes genuine regression and separately classified setup/cache failures."}],"remaining_acceptance":["Complete trusted workflow producer repairs and independent review; qualify dedicated publisher and per-PR protected landing boundary.","Complete remaining owning/default/PQ/platform/cold coverage; reconcile all review obligations without reimplementing integrated work.","Run current enforcing native trajectory with eight receipts, unchanged 10000ms fence and execution nonces; any debugging run remains nonfinal.","Freeze final source, obtain exact-source native/trusted/hosted evidence, refresh reviews and threads, and land through protections."],"checkpoint_history":[{"state":"genuine-original-red-approved-finite-producer-in-progress","source_checkpoint":"34443073624f6ee016d1c2599faeb2aefbb3a1cb","audit_path":"docs/security/audits/repair-batch-local-checkpoint-20261008.json"}]},
-    "incoming-pr1160-review-20261008:reconciliation:EF-REPLAY": {"state":"source-integrated-focused-and-compatibility-green-final-qualification-pending","source_checkpoint":"52d98f4bea87df7fe5acdf424a29f5e10e5365cb","audit_checkpoint":"a43226e8e4af96f96fb3a768047796891e0a06cb","audit_path":"docs/security/audits/finality-and-legacy-import-checkpoint-20261008.json","source_repair":["2ebf718dcc","a8fdeb457c"],"focused_green":true,"qualified":false,"merged":false,"remaining_acceptance":["Complete trusted workflow producer repairs and independent review; qualify dedicated publisher and per-PR protected landing boundary.","Complete remaining owning/default/PQ/platform/cold coverage; reconcile all review obligations without reimplementing integrated work.","Run current enforcing native trajectory with eight receipts, unchanged 10000ms fence and execution nonces; any debugging run remains nonfinal.","Freeze final source, obtain exact-source native/trusted/hosted evidence, refresh reviews and threads, and land through protections."],"checkpoint_history":[{"state":"genuine-original-red-repair-and-tamper-preservation-control-pending","audit_path":"docs/security/audits/repair-batch-local-checkpoint-20261008.json","source_checkpoint":"29e9a39d19ec944a60ebf2f0c813eccbf54b8d9e"},{"state":"genuine-historical-query-red-no-remove-preservation-green-producer-pending","source_checkpoint":"ef23fba41cd3d0d8743621ee989d9bc9f5b74903","audit_path":"docs/security/audits/fixture-correction-checkpoint-20261008.json"}],"verification_evidence":[{"path":"docs/security/audits/fixture-correction-checkpoint-20261008.json","sha256":"72540d5201a1c396a60b4a6051247ca0908ab32276ef2fb6b11dc83bd214cd11","scope":"Per-campaign source, binary and log identity. Earlier failed records and corrected diagnostic history retained."},{"path":"docs/security/audits/finality-and-legacy-import-checkpoint-20261008.json","sha256":"411c736e203c65fd9f003e31ffbee6164ba52a0809972432faaea0defd90264e","scope":"Exact per-campaign source/binary/log evidence; includes genuine regression and separately classified setup/cache failures."}],"full_qualified":false,"owning_pending":true,"native_pending":true,"trusted_pending":true,"hosted_pending":true}
+    "incoming-pr1160-review-20261008:reconciliation:EF-FINALITY": {"state":"source-integrated-final-acceptance-pending","source_checkpoint":"52d98f4bea87df7fe5acdf424a29f5e10e5365cb","audit_checkpoint":"ebdf52364cbafed33bd04e17c25be57ab055755b","audit_path":"docs/security/audits/finality-and-legacy-import-checkpoint-20261008.json","source_repair":{
+        "commits": [
+          "2ebf718dccc4f08ebc749610ae74e88b4eacbde5",
+          "a8fdeb457c7e8f919222b616dc50e5015aeaacdb",
+          "9bb8b676e43ad1837e5f5f01a11083e3fd638a36",
+          "68d14089c24ae898296d6806b6e1b13be7669e75"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Genuine historical-query RED and no-Remove integrity control retained."
+      },"focused_green":true,"qualified":false,"merged":false,"previous_checkpoint_state":"proposed-effect-repair-regression-confirmed-original-and-producer-pending","full_qualified":false,"owning_pending":true,"native_pending":true,"trusted_pending":true,"hosted_pending":true,"verification_evidence":[{"path":"docs/security/audits/repair-batch-local-checkpoint-20261008.json","sha256":"6e3781eb1b9e8eeb56f7d31ad10ef2cb9bd609bf7013c1477e998326a16a21b9","scope":"Per-campaign source/binary/log receipts, preserving failing Original/setup/fixture records separately. Current whole-candidate acceptance remains open."},{"path":"docs/security/audits/finality-and-legacy-import-checkpoint-20261008.json","sha256":"411c736e203c65fd9f003e31ffbee6164ba52a0809972432faaea0defd90264e","scope":"Exact per-campaign source/binary/log evidence; includes genuine regression and separately classified setup/cache failures."}],"remaining_acceptance":[
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Genuine historical-query RED and no-Remove integrity control retained."
+      ],"checkpoint_history":[{"state":"genuine-original-red-approved-finite-producer-in-progress","source_checkpoint":"34443073624f6ee016d1c2599faeb2aefbb3a1cb","audit_path":"docs/security/audits/repair-batch-local-checkpoint-20261008.json"}],
+      "current_source_reconciliation_20261008": {
+        "audit_path": "docs/security/audits/current-source-reconciliation-20261008.json",
+        "audit_sha256": "23f73f936683a43044eb210850f80b83eb7d9853abdeb43f797c9619bbc674c4",
+        "source_checkpoint": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "evidence_scope": "Exact finality/import audit39fcc: CP30/0,issuance25/0 atf2bb; genuine old04f6-owner import1/0 at52d after separately retained setup failure; strict8.",
+        "source_is_not_full_qualification": true
+      },
+      "source_integrated": true,
+      "source_repair_previous_observation_20261008": ["2ebf718dcc","a8fdeb457c"]},
+    "incoming-pr1160-review-20261008:reconciliation:EF-FREEZE": {"state":"source-integrated-final-acceptance-pending","source_checkpoint":"52d98f4bea87df7fe5acdf424a29f5e10e5365cb","audit_checkpoint":"ebdf52364cbafed33bd04e17c25be57ab055755b","audit_path":"docs/security/audits/finality-and-legacy-import-checkpoint-20261008.json","source_repair":{
+        "commits": [
+          "2ebf718dccc4f08ebc749610ae74e88b4eacbde5",
+          "a8fdeb457c7e8f919222b616dc50e5015aeaacdb",
+          "9bb8b676e43ad1837e5f5f01a11083e3fd638a36",
+          "68d14089c24ae898296d6806b6e1b13be7669e75"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Genuine historical-query RED and no-Remove integrity control retained."
+      },"focused_green":true,"qualified":false,"merged":false,"previous_checkpoint_state":"effect-composition-gap-confirmed-original-and-producer-proposal-pending","full_qualified":false,"owning_pending":true,"native_pending":true,"trusted_pending":true,"hosted_pending":true,"verification_evidence":[{"path":"docs/security/audits/repair-batch-local-checkpoint-20261008.json","sha256":"6e3781eb1b9e8eeb56f7d31ad10ef2cb9bd609bf7013c1477e998326a16a21b9","scope":"Per-campaign source/binary/log receipts, preserving failing Original/setup/fixture records separately. Current whole-candidate acceptance remains open."},{"path":"docs/security/audits/finality-and-legacy-import-checkpoint-20261008.json","sha256":"411c736e203c65fd9f003e31ffbee6164ba52a0809972432faaea0defd90264e","scope":"Exact per-campaign source/binary/log evidence; includes genuine regression and separately classified setup/cache failures."}],"remaining_acceptance":[
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Genuine historical-query RED and no-Remove integrity control retained."
+      ],"checkpoint_history":[{"state":"genuine-original-red-approved-finite-producer-in-progress","source_checkpoint":"34443073624f6ee016d1c2599faeb2aefbb3a1cb","audit_path":"docs/security/audits/repair-batch-local-checkpoint-20261008.json"}],
+      "current_source_reconciliation_20261008": {
+        "audit_path": "docs/security/audits/current-source-reconciliation-20261008.json",
+        "audit_sha256": "23f73f936683a43044eb210850f80b83eb7d9853abdeb43f797c9619bbc674c4",
+        "source_checkpoint": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "evidence_scope": "Exact finality/import audit39fcc: CP30/0,issuance25/0 atf2bb; genuine old04f6-owner import1/0 at52d after separately retained setup failure; strict8.",
+        "source_is_not_full_qualification": true
+      },
+      "source_integrated": true,
+      "source_repair_previous_observation_20261008": ["2ebf718dcc","a8fdeb457c"]},
+    "incoming-pr1160-review-20261008:reconciliation:EF-REPLAY": {"state":"source-integrated-final-acceptance-pending","source_checkpoint":"52d98f4bea87df7fe5acdf424a29f5e10e5365cb","audit_checkpoint":"a43226e8e4af96f96fb3a768047796891e0a06cb","audit_path":"docs/security/audits/finality-and-legacy-import-checkpoint-20261008.json","source_repair":{
+        "commits": [
+          "2ebf718dccc4f08ebc749610ae74e88b4eacbde5",
+          "a8fdeb457c7e8f919222b616dc50e5015aeaacdb",
+          "9bb8b676e43ad1837e5f5f01a11083e3fd638a36",
+          "68d14089c24ae898296d6806b6e1b13be7669e75"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Genuine historical-query RED and no-Remove integrity control retained."
+      },"focused_green":true,"qualified":false,"merged":false,"remaining_acceptance":[
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Genuine historical-query RED and no-Remove integrity control retained."
+      ],"checkpoint_history":[{"state":"genuine-original-red-repair-and-tamper-preservation-control-pending","audit_path":"docs/security/audits/repair-batch-local-checkpoint-20261008.json","source_checkpoint":"29e9a39d19ec944a60ebf2f0c813eccbf54b8d9e"},{"state":"genuine-historical-query-red-no-remove-preservation-green-producer-pending","source_checkpoint":"ef23fba41cd3d0d8743621ee989d9bc9f5b74903","audit_path":"docs/security/audits/fixture-correction-checkpoint-20261008.json"}],"verification_evidence":[{"path":"docs/security/audits/fixture-correction-checkpoint-20261008.json","sha256":"72540d5201a1c396a60b4a6051247ca0908ab32276ef2fb6b11dc83bd214cd11","scope":"Per-campaign source, binary and log identity. Earlier failed records and corrected diagnostic history retained."},{"path":"docs/security/audits/finality-and-legacy-import-checkpoint-20261008.json","sha256":"411c736e203c65fd9f003e31ffbee6164ba52a0809972432faaea0defd90264e","scope":"Exact per-campaign source/binary/log evidence; includes genuine regression and separately classified setup/cache failures."}],"full_qualified":false,"owning_pending":true,"native_pending":true,"trusted_pending":true,"hosted_pending":true,
+      "current_source_reconciliation_20261008": {
+        "audit_path": "docs/security/audits/current-source-reconciliation-20261008.json",
+        "audit_sha256": "23f73f936683a43044eb210850f80b83eb7d9853abdeb43f797c9619bbc674c4",
+        "source_checkpoint": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "evidence_scope": "Exact finality/import audit39fcc: CP30/0,issuance25/0 atf2bb; genuine old04f6-owner import1/0 at52d after separately retained setup failure; strict8.",
+        "source_is_not_full_qualification": true
+      },
+      "source_integrated": true,
+      "source_repair_previous_observation_20261008": ["2ebf718dcc","a8fdeb457c"]},
+    "incoming-pr1160-review-20261008:native:NRB001": {
+      "requirement_id": "incoming-pr1160-review-20261008:native:NRB001",
+      "label": "NRB001",
+      "requirement": "Select the authenticated original native broker admission despite owned nonce-only budget aliases, and reject physical authorization-artifact member corruption at the owning budget boundary.",
+      "scope": "now",
+      "landing_pr": 1160,
+      "landing_unit": "foundation",
+      "current_state": "source-integrated-scoped-owner-green-final-acceptance-pending",
+      "source_repair": {
+        "commits": [
+          "41939f1094f06a0483d604a0d6be697a2f2075d7",
+          "7d115b70564e3f936c418b50d90e0445e8a6170b",
+          "27c426c96628a952fb9ebe3fcc15fa84efeabc7b",
+          "a13d10b58dba99d4442500de7b62fb54a56be197",
+          "a5942b8ca6a30ed69a6f8c2cb73464a3cf059f77"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "files": [
+          "crates/platform/chio-store-sqlite/src/admission_operation_store/budget_custody.rs",
+          "crates/platform/chio-store-sqlite/src/budget_store/composite/preflight.rs"
+        ],
+        "application": "Authenticated parent selection and full typed authorization-artifact vector refusal integrated; final acceptance pending.",
+        "origin_to_integration": {
+          "b5a44916d76c0448779f350729b21046872a3ca4": "41939f1094f06a0483d604a0d6be697a2f2075d7",
+          "322e0897a32b56aa34607f03273d77ae325fec72": "7d115b70564e3f936c418b50d90e0445e8a6170b",
+          "fd9b1c6192bbdeb7a200f1926d4b155a1ba5ba86": "27c426c96628a952fb9ebe3fcc15fa84efeabc7b",
+          "71c2000999f6b7df75201e525310d193401afbb0": "a13d10b58dba99d4442500de7b62fb54a56be197"
+        },
+        "scope": "Read-only owned store authentication. Native EOF causation and unprivileged storage-write reachability are not established."
+      },
+      "source_integrated": true,
+      "focused_green": true,
+      "verification_evidence": [
+        {
+          "path": "/tmp/pr1160-broker-readback-triage-20261008/original-runtime/nrb001-original-test-receipt.json",
+          "sha256": "2d97b1b8ef7853d4ee038623b5128e66bb12012832436d959e68d68a4c4527f7",
+          "result": "Genuine owning Original:2failed/2passed; source42ee. Earlier fixture setup failures remain separate.",
+          "scope": "Direct owning SQLite selector Original; not native EOF causation."
+        },
+        {
+          "path": "/tmp/pr1160-broker-readback-triage-20261008/repair-runtime/nrb001-repair-test-receipt.json",
+          "sha256": "d24b98c181608e81faa5c87df03b45b089f44bca12da1c0a513ac34087679978",
+          "result": "Primary isolated selector repair has5passing owning cases atb5a449.",
+          "scope": "Owned nonce aliases versus real supplemental parents; physical event/global-commit authentication."
+        },
+        {
+          "path": "/tmp/pr1160-nrb001-followup/root-original-runtime/nrb001-member-original-test-receipt.json",
+          "sha256": "a5609d559ef329570bd06657163f74d095e63381c2dc62fe30e9ab34f52cf739",
+          "result": "Additional physical other-member Original:5passed/1genuine failed Ok(None) at322e.",
+          "scope": "Full authorization-artifact vector must match the authenticated original; no unprivileged storage injection claim."
+        },
+        {
+          "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/nrb001-source/chio_store_sqlite-runtime.json",
+          "sha256": "7a610d8718862072950395e4ad427ad24fb02461b59a0361bb6b90dc06b678b3",
+          "result": "Selected88SQLite execution-nonce cases passed.",
+          "scope": "Actual a13d Source/binary/log-bound module scope, not all SQLite/native qualification.",
+          "source": "a13d10b58dba99d4442500de7b62fb54a56be197"
+        },
+        {
+          "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/nrb001-source/chio_control_plane-runtime.json",
+          "sha256": "076ad6a260e1342453a98f57d9b389459ef8cb26bed536157301978d92822d9a",
+          "result": "Exact broker-authority case passed1/0.",
+          "scope": "Actual a13d Source/binary/log-bound owning control, not full native trajectory.",
+          "source": "a13d10b58dba99d4442500de7b62fb54a56be197"
+        },
+        {
+          "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/nrb001-source/nrb001-source-clippy-receipt.json",
+          "sha256": "6eaabafb6f07994360f6402aca359c32e31751c0b3e76874f452a98486cd90e2",
+          "result": "Initial strict run exited101on test-only useless_vec.",
+          "scope": "Retained unsuccessful lint capture; no production source fault attributed."
+        },
+        {
+          "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/nrb001-source/nrb001-source-clippy-array-receipt.json",
+          "sha256": "2cd60b1014d589556fb9e400409a7fb32b83ca09c4e20a7ddd1d550b9f4a5dd2",
+          "result": "Both owners all-target strict Clippy exited0after array-only correction.",
+          "scope": "a13d plus exact dirtyc679828f, subsequently committed asa594; no ignored warnings or waived gates."
+        },
+        {
+          "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/nrb001-source/nrb001-source-array-tests-receipt.json",
+          "sha256": "af504472531cc7e832a654043c8e7b2b49acd209f00de490fcd8df649e284672",
+          "result": "SQLite selectors6passed; control-plane selection0filtered is not a runtime PASS.",
+          "scope": "Exact array-only correction captured before commita594; all selector corruption/no-effect assertions unchanged."
+        },
+        {
+          "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/nrb001-source/array-commit.json",
+          "sha256": "ec00191b652f64a5b66709aee00ebd31929cdfc7786626f4a29fa9c58ed77ebb",
+          "result": "Array-only followup commit links strict0, selectors6/0, format0and diff hygiene0.",
+          "scope": "One test-fixture container change; no production mutation.",
+          "source": "a5942b8ca6a30ed69a6f8c2cb73464a3cf059f77"
+        },
+        {
+          "path": "/tmp/pr1160-nrb001-independent-review/P2-SOURCE-CLOSURE.json",
+          "sha256": "bd42a16defe430bd943d06aa5832baf14dc19bde17b2607eb5663768fe07a7cd",
+          "result": "Finite independent source closure accepted; original and earlier-message mismatch retained.",
+          "scope": "Owned full vector equality; no new API/SQL/schema/serialization and no whole-broker causal claim."
+        }
+      ],
+      "remaining_acceptance": [
+        "Keep primary owning Original42ee2RED/2PASS and secondary322e5PASS/1RED, the first5/1refusal-location mismatch and initial strict101as separate historical outcomes. The migrated typed refusal and array correction do not weaken the corruption/no-effect oracles.",
+        "Actual a13d owner SQLite88/0and broker1/0plus the array-followup selectors6/0and both-owner strict0are bounded component acceptance. Native EOF causal attribution remains unproven.",
+        "Complete immutable final-source owning/default/PQ/platform/cold, native, trusted, hosted, final review and protected #1160 landing; source integration is not full qualification."
+      ],
+      "owning_pending": true,
+      "native_pending": true,
+      "trusted_pending": true,
+      "hosted_pending": true,
+      "merged": false,
+      "full_qualified": false
+    }
   },
   "current_view_refresh_488_observations_20261007": {
     "at": "2026-10-07T02:40:40.721349+00:00",
@@ -132444,5 +133123,46 @@
   "qualified": false,
   "merged": false
 },
-  "finality_and_legacy_import_checkpoint_20261008": {"source_checkpoint":"52d98f4bea87df7fe5acdf424a29f5e10e5365cb","audit_path":"docs/security/audits/finality-and-legacy-import-checkpoint-20261008.json","requirement_count":1793,"qualified":false,"merged":false}
+  "finality_and_legacy_import_checkpoint_20261008": {"source_checkpoint":"52d98f4bea87df7fe5acdf424a29f5e10e5365cb","audit_path":"docs/security/audits/finality-and-legacy-import-checkpoint-20261008.json","requirement_count":1793,"qualified":false,"merged":false},
+  "current_source_reconciliation_20261008": {
+    "source_checkpoint": "3764d4ac48dd88792f62de4de6d4fba319e547e0",
+    "audit_path": "docs/security/audits/current-source-reconciliation-20261008.json",
+    "sha256": "23f73f936683a43044eb210850f80b83eb7d9853abdeb43f797c9619bbc674c4",
+    "requirements": 1794,
+    "preserved_existing_requirements": 1793,
+    "updated_existing_current_keys": [
+      "incoming-pr1160-review-20261006:F002",
+      "incoming-pr1160-review-20261006:F005",
+      "incoming-pr1160-review-20261006:F003",
+      "incoming-pr1160-review-20261006:F004",
+      "incoming-pr1160-review-20261006:F018",
+      "incoming-pr1160-review-20261006:F026",
+      "incoming-pr1160-review-20261006:F022",
+      "incoming-pr1160-review-20261006:F023",
+      "incoming-pr1160-review-20261006:F030",
+      "production-native-return:NDR001",
+      "incoming-pr1160-review-20261006:F011R1",
+      "incoming-pr1160-review-20261008:reconciliation:EF-FINALITY",
+      "incoming-pr1160-review-20261008:reconciliation:EF-FREEZE",
+      "incoming-pr1160-review-20261008:reconciliation:EF-REPLAY",
+      "incoming-pr1160-review-20261006:F039",
+      "incoming-pr1160-review-20261006:F043",
+      "incoming-pr1160-review-20261006:F073",
+      "incoming-pr1160-review-20261006:F074",
+      "incoming-pr1160-review-20261006:F078",
+      "incoming-pr1160-review-20261006:F076",
+      "incoming-pr1160-review-20261006:F079",
+      "incoming-pr1160-review-20261006:F075",
+      "incoming-pr1160-review-20261008:native:MINISW-NATIVE-DENY",
+      "incoming-pr1160-review-20261006:F077",
+      "incoming-pr1160-review-20261007:effects:trusted-clock",
+      "incoming-pr1160-review-20261007:effects:shared-freeze-fence"
+    ],
+    "new_requirement": "incoming-pr1160-review-20261008:native:NRB001",
+    "qualified": false,
+    "merged": false,
+    "scope": "Latest finite accounting: F077 facts updated to 3764; all other requirement facts remain the preserved 5a56 snapshot. No whole-source qualification.",
+    "F077_followup_source_checkpoint": "3764d4ac48dd88792f62de4de6d4fba319e547e0",
+    "baseline_source_checkpoint": "5a56b7a17f9fb38374b3bfca8adee8add47d87da"
+  }
 }
