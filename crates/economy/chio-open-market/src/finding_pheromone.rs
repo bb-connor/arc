@@ -670,14 +670,14 @@ fn validate_current_listing(
             "listing is not current".to_string(),
         ));
     }
-    ensure_generic_listing_signed_by_namespace_owner(&listing.listing, "finding listing")
-        .map_err(FindingPheromoneError::Listing)?;
     let owner_key = &listing.listing.body.namespace_ownership.signer_public_key;
     if owner_key.is_weak_ed25519() {
         return Err(FindingPheromoneError::Listing(
             "finding listing authority key is weak".to_owned(),
         ));
     }
+    ensure_generic_listing_signed_by_namespace_owner(&listing.listing, "finding listing")
+        .map_err(FindingPheromoneError::Listing)?;
     match owner_key.verify_canonical(&listing.listing.body, &listing.listing.signature) {
         Ok(true) => {}
         Ok(false) => {

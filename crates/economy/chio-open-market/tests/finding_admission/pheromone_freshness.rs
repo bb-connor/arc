@@ -109,7 +109,8 @@ fn finding_pheromone_rejects_weak_listing_authority_signatures() {
         .test_expect_err("weak listing authority must fail strict verification");
         assert!(matches!(
             error,
-            FindingPheromoneError::Listing(message) if message.contains("weak")
+            FindingPheromoneError::Listing(message)
+                if message == "finding listing authority key is weak"
         ));
     });
 }
