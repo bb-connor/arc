@@ -23,121 +23,70 @@ impl ThresholdApprovalRequirementResolver for FixedThresholdRequirement {
 
 pub(super) type CoreKeypair = Keypair;
 
-struct ActiveResponseFixture<'a> {
-    kernel: &'a ChioKernel,
-    requirement: &'a ThresholdApprovalRequirement,
-    policy_authority: &'a CoreKeypair,
-    approvers: [&'a CoreKeypair; 2],
-    executor: &'a CoreKeypair,
-    now: u64,
+/// An operator capability, the active-response intent it authorizes and the
+/// tool-call request that carries them to intent validation.
+struct ActiveResponseIntentFixture {
+    capability: CapabilityToken,
+    intent: GovernedTransactionIntent,
+    request: ToolCallRequest,
 }
 
-impl ActiveResponseFixture<'_> {
-    fn request(
-        &self,
-        request_id: &str,
-        effects: Vec<GovernedResponseEffect>,
-        grants: Vec<ToolGrant>,
-    ) -> GovernedActiveResponseRequest {
-        let capability = make_capability(self.kernel, self.executor, make_scope(grants), 600);
-        let canonical_plan_body = serde_json::json!({
-            "actionId": request_id,
-            "effects": effects,
-            "target": {"sessionId": "session-active-1"}
-        });
-        let plan_body_hash =
-            GovernedResponsePlanIntentBody::plan_body_hash(&canonical_plan_body).unwrap();
-        let expires_at = self.now + 240;
-        let intent = GovernedTransactionIntent {
-            id: request_id.to_owned(),
-            server_id: ACTIVE_RESPONSE_SERVER_ID.to_owned(),
-            tool_name: ACTIVE_RESPONSE_PLAN_TOOL_NAME.to_owned(),
-            purpose: "contain compromised session".to_owned(),
-            max_amount: None,
-            commerce: None,
-            metered_billing: None,
-            runtime_attestation: None,
-            call_chain: None,
-            autonomy: None,
-            context: None,
-            body: GovernedTransactionIntentBody::ActiveResponsePlan(Box::new(
-                GovernedResponsePlanIntentBody::new(
-                    GOVERNED_RESPONSE_PLAN_SCHEMA,
-                    request_id,
-                    capability.id.clone(),
-                    sha256_hex(&canonical_json_bytes(&capability).unwrap()),
-                    capability.expires_at,
-                    capability.subject.clone(),
-                    canonical_plan_body,
-                    plan_body_hash,
-                    serde_json::json!({"sessionId": "session-active-1"}),
-                    effects,
-                    expires_at,
-                    serde_json::json!({"mode": "remove_contributions"}),
-                )
-                .unwrap(),
-            )),
-        };
-        let governed_intent_hash = intent.binding_hash().unwrap();
-        let proposal_created_at = self.now;
-        let proposal_deadline = ThresholdApprovalProposalBody::proposal_deadline(
-            proposal_created_at,
-            self.requirement.timeout_seconds,
-            capability.expires_at,
-            Some(expires_at),
-        )
-        .unwrap();
-        let proposal = ThresholdApprovalProposal::sign(
-            ThresholdApprovalProposalBody {
-                schema: THRESHOLD_APPROVAL_PROPOSAL_SCHEMA.to_string(),
-                proposal_id: format!("proposal-{request_id}"),
-                request_id: request_id.to_owned(),
-                governed_intent_hash: governed_intent_hash.clone(),
-                subject: capability.subject.clone(),
-                authorizing_capability_digest: sha256_hex(
-                    &canonical_json_bytes(&capability).unwrap(),
-                ),
-                policy_hash: self.requirement.policy_hash.clone(),
-                threshold: self.requirement.threshold,
-                eligible_set_digest: self.requirement.eligible_set_digest.clone(),
-                proposal_created_at,
-                proposal_deadline,
-                policy_authority: self.policy_authority.public_key(),
-            },
-            self.policy_authority,
-        )
-        .unwrap();
-        let proposal_hash = proposal.artifact_digest().unwrap();
-        let approval_tokens = self
-            .approvers
-            .into_iter()
-            .enumerate()
-            .map(|(index, approver)| {
-                GovernedApprovalToken::sign(
-                    GovernedApprovalTokenBody {
-                        id: format!("token-{request_id}-{index}"),
-                        approver: approver.public_key(),
-                        subject: capability.subject.clone(),
-                        governed_intent_hash: governed_intent_hash.clone(),
-                        request_id: request_id.to_owned(),
-                        threshold_proposal_hash: Some(proposal_hash.clone()),
-                        issued_at: self.now,
-                        expires_at: proposal_deadline,
-                        decision: GovernedApprovalDecision::Approved,
-                    },
-                    approver,
-                )
-                .unwrap()
-            })
-            .collect();
-        GovernedActiveResponseRequest {
-            request_id: request_id.to_owned(),
-            operator_capability: capability,
-            governed_intent: intent,
-            approval_tokens,
-            threshold_approval_proposal: proposal,
-            federated_origin_kernel_id: None,
-        }
+fn active_response_intent_fixture(
+    kernel: &ChioKernel,
+    request_id: &str,
+    effects: Vec<GovernedResponseEffect>,
+    grants: Vec<ToolGrant>,
+    now: u64,
+) -> ActiveResponseIntentFixture {
+    let executor = CoreKeypair::generate();
+    let capability = make_capability(kernel, &executor, make_scope(grants), 600);
+    let canonical_plan_body = serde_json::json!({
+        "actionId": request_id,
+        "effects": effects,
+        "target": {"sessionId": "session-active-1"}
+    });
+    let plan_body_hash =
+        GovernedResponsePlanIntentBody::plan_body_hash(&canonical_plan_body).unwrap();
+    let intent = GovernedTransactionIntent {
+        id: request_id.to_owned(),
+        server_id: ACTIVE_RESPONSE_SERVER_ID.to_owned(),
+        tool_name: ACTIVE_RESPONSE_PLAN_TOOL_NAME.to_owned(),
+        purpose: "contain compromised session".to_owned(),
+        max_amount: None,
+        commerce: None,
+        metered_billing: None,
+        runtime_attestation: None,
+        call_chain: None,
+        autonomy: None,
+        context: None,
+        body: GovernedTransactionIntentBody::ActiveResponsePlan(Box::new(
+            GovernedResponsePlanIntentBody::new(
+                GOVERNED_RESPONSE_PLAN_SCHEMA,
+                request_id,
+                capability.id.clone(),
+                sha256_hex(&canonical_json_bytes(&capability).unwrap()),
+                capability.expires_at,
+                capability.subject.clone(),
+                canonical_plan_body,
+                plan_body_hash,
+                serde_json::json!({"sessionId": "session-active-1"}),
+                effects,
+                now + 240,
+                serde_json::json!({"mode": "remove_contributions"}),
+            )
+            .unwrap(),
+        )),
+    };
+    let request = make_request(
+        request_id,
+        &capability,
+        ACTIVE_RESPONSE_PLAN_TOOL_NAME,
+        ACTIVE_RESPONSE_SERVER_ID,
+    );
+    ActiveResponseIntentFixture {
+        capability,
+        intent,
+        request,
     }
 }
 
@@ -563,66 +512,93 @@ fn threshold_approval_set_is_policy_bound_and_order_independent(
 }
 
 #[test]
-fn legacy_active_response_admission_requires_enabled_runtime() {
-    let policy_hash = sha256_hex(b"active-response-policy");
-    let policy_authority = CoreKeypair::generate();
-    let approver_a = CoreKeypair::generate();
-    let approver_b = CoreKeypair::generate();
-    let requirement = ThresholdApprovalRequirement::new(
-        policy_hash.clone(),
-        2,
-        vec![
-            ThresholdApproverIdentity {
-                identifier: "alice".to_owned(),
-                public_key: approver_a.public_key(),
-            },
-            ThresholdApproverIdentity {
-                identifier: "bob".to_owned(),
-                public_key: approver_b.public_key(),
-            },
-        ],
-        "active-response-directory-v1".to_owned(),
-        300,
-    )
-    .unwrap();
-    let mut config = make_config();
-    config.policy_hash = policy_hash;
-    config.ca_public_keys.push(policy_authority.public_key());
-    let mut kernel = make_kernel(config);
-    kernel.set_threshold_approval_requirement_resolver(StdArc::new(FixedThresholdRequirement(
-        requirement.clone(),
-    )));
-
-    let fence = admission_test_fence();
-    let store = StdArc::new(TestAdmissionOperationStore::new(fence.clone()));
-    kernel
-        .set_durable_admission_store(store.clone(), store.clone(), fence)
-        .unwrap();
-
-    let executor = CoreKeypair::generate();
+fn active_response_intent_validation_binds_negotiation_effects_and_grants() {
+    let mut kernel = make_kernel(make_config());
+    let now = current_unix_timestamp().saturating_add(60);
     let effects = vec![
         GovernedResponseEffect::RestrictEgress,
         GovernedResponseEffect::SuspendSession,
     ];
-    let grants = effects
-        .iter()
-        .map(|effect| make_grant(ACTIVE_RESPONSE_SERVER_ID, effect.tool_name()))
-        .collect();
-    let now = current_unix_timestamp().saturating_add(60);
-    let fixture = ActiveResponseFixture {
-        kernel: &kernel,
-        requirement: &requirement,
-        policy_authority: &policy_authority,
-        approvers: [&approver_a, &approver_b],
-        executor: &executor,
-        now,
+    let grants_for = |effects: &[GovernedResponseEffect]| -> Vec<ToolGrant> {
+        effects
+            .iter()
+            .map(|effect| make_grant(ACTIVE_RESPONSE_SERVER_ID, effect.tool_name()))
+            .collect()
     };
-    let request = fixture.request("active-response-1", effects.clone(), grants);
+    let fixture = active_response_intent_fixture(
+        &kernel,
+        "active-response-1",
+        effects.clone(),
+        grants_for(&effects),
+        now,
+    );
 
+    assert!(!kernel.governed_active_response_plans_enabled);
     assert!(matches!(
-        kernel.admit_governed_active_response_at(&request, now, now * 1_000),
+        kernel.validate_active_response_intent(
+            &fixture.request,
+            &fixture.capability,
+            &fixture.intent,
+            now
+        ),
         Err(KernelError::GovernedTransactionDenied(ref reason))
             if reason == "governed active-response plans were not negotiated"
+    ));
+
+    kernel.governed_active_response_plans_enabled = true;
+    kernel
+        .validate_active_response_intent(
+            &fixture.request,
+            &fixture.capability,
+            &fixture.intent,
+            now,
+        )
+        .unwrap();
+
+    let mut mismatched = active_response_intent_fixture(
+        &kernel,
+        "active-response-mismatched-effects",
+        vec![GovernedResponseEffect::RestrictEgress],
+        grants_for(&[GovernedResponseEffect::RestrictEgress]),
+        now,
+    );
+    let GovernedTransactionIntentBody::ActiveResponsePlan(plan) = &mut mismatched.intent.body
+    else {
+        panic!("active-response body");
+    };
+    let mut rebound = serde_json::to_value(&**plan).unwrap();
+    rebound["canonical_plan_body"]["effects"] = serde_json::json!(effects);
+    let rebound_hash =
+        GovernedResponsePlanIntentBody::plan_body_hash(&rebound["canonical_plan_body"]).unwrap();
+    rebound["plan_body_hash"] = serde_json::json!(rebound_hash);
+    **plan = serde_json::from_value::<GovernedResponsePlanIntentBody>(rebound).unwrap();
+    assert!(matches!(
+        kernel.validate_active_response_intent(
+            &mismatched.request,
+            &mismatched.capability,
+            &mismatched.intent,
+            now
+        ),
+        Err(KernelError::GovernedTransactionDenied(ref reason))
+            if reason.contains("effects do not match")
+    ));
+
+    let missing_grant = active_response_intent_fixture(
+        &kernel,
+        "active-response-missing-grant",
+        effects,
+        grants_for(&[GovernedResponseEffect::RestrictEgress]),
+        now,
+    );
+    assert!(matches!(
+        kernel.validate_active_response_intent(
+            &missing_grant.request,
+            &missing_grant.capability,
+            &missing_grant.intent,
+            now
+        ),
+        Err(KernelError::GovernedTransactionDenied(ref reason))
+            if reason.contains("suspend_session")
     ));
 }
 
