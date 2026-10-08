@@ -841,6 +841,12 @@
       "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts.",
       "runtime_family": "flow"
     },
+    "security_ingress_rejections": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts.",
+      "runtime_family": "correlation-ingress"
+    },
     "security_isolation_epochs": {
       "class": "tenant-predicate",
       "principal": "security-runtime",
@@ -2656,6 +2662,10 @@
     "security_response_automatic_preparations": [
       "crates/platform/chio-store-sqlite/src/security_state/automatic_preparation.rs"
     ],
+    "security_ingress_rejections": [
+      "crates/platform/chio-store-sqlite/src/security_state/correlation.rs",
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
+    ],
     "security_response_dispatch_fences": [
       "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
@@ -4042,11 +4052,23 @@
     {
       "path": "crates/platform/chio-store-sqlite/src/security_state/correlation.rs",
       "owner": "count_pending_correlation_events",
-      "sha256": "65b8836535c75187fa018b59949492cea37280c00f3c31f78f1681b38a95ee32",
+      "sha256": "57eaaf8be4fc6e4b2d7cecf483d50160ac4b0cdc3e82d6904de6e7376720fbcd",
       "tables": [
-        "security_correlation_ingress"
+        "security_correlation_ingress",
+        "security_ingress_rejections"
       ],
-      "sql": "SELECT COUNT(*) FROM security_correlation_ingress WHERE acknowledged = 0",
+      "sql": "SELECT COUNT(*) FROM security_correlation_ingress WHERE acknowledged = 0 AND (tenant_id, event_id) NOT IN ( SELECT tenant_id, event_id FROM security_ingress_rejections )",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/correlation.rs",
+      "owner": "count_rejected_correlation_events",
+      "sha256": "d6908430e2420583013b05d1dfadf62b8aedaf681402aba4aa12737bb073e6e7",
+      "tables": [
+        "security_ingress_rejections"
+      ],
+      "sql": "SELECT COUNT(*) FROM security_ingress_rejections",
       "principal": "security-runtime",
       "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
     },
@@ -4064,11 +4086,25 @@
     {
       "path": "crates/platform/chio-store-sqlite/src/security_state/correlation.rs",
       "owner": "load_pending_correlation_events",
-      "sha256": "2eb6d90ece50046ce51347b944fa0d5cafc7c8a4464f1c4185406aa526bb9344",
+      "sha256": "eb70b2c1ad931c9ae66d4b3ab5a850a7b9bc28ee5d6de6a5ab17d7784a01087d",
       "tables": [
-        "security_correlation_ingress"
+        "security_correlation_ingress",
+        "security_ingress_rejections"
       ],
-      "sql": "SELECT tenant_id, event_id, producer_id, event_time, received_at, body, body_hash, source_evidence, evidence_hash, acknowledged FROM security_correlation_ingress WHERE acknowledged = 0 ORDER BY event_time, sequence LIMIT ?1",
+      "sql": "SELECT tenant_id, event_id, producer_id, event_time, received_at, body, body_hash, source_evidence, evidence_hash, acknowledged FROM security_correlation_ingress WHERE acknowledged = 0 AND (tenant_id, event_id) NOT IN ( SELECT tenant_id, event_id FROM security_ingress_rejections ) ORDER BY event_time, sequence LIMIT ?1",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/correlation.rs",
+      "owner": "validate_ingress_rejections",
+      "sha256": "7b0c51fc6763244ae54bea9a4e49acdf0bde59e8ffed64ba736553d64d2c63f7",
+      "tables": [
+        "security_correlation_ingress",
+        "security_ingress_rejections",
+        "security_verified_events"
+      ],
+      "sql": "SELECT EXISTS( SELECT 1 FROM security_ingress_rejections AS rejection LEFT JOIN security_correlation_ingress AS ingress USING (tenant_id, event_id) LEFT JOIN security_verified_events AS events USING (tenant_id, event_id) WHERE ingress.sequence IS NULL OR events.trust_class IS NULL OR ingress.acknowledged != 0 OR ingress.producer_id != rejection.producer_id OR ingress.evidence_hash != rejection.evidence_hash OR events.trust_class != rejection.trust_class )",
       "principal": "security-runtime",
       "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
     },
@@ -19706,6 +19742,9 @@
       "load_correlation_outcome_record::shared-reader::crates/platform/chio-store-sqlite/src/security_state/correlation.rs::validate_correlation_outcome_storage_binding",
       "load_correlation_partial::shared-reader::crates/platform/chio-store-sqlite/src/security_state/codec.rs::validate_canonical_json_body",
       "load_pending_correlation_events::shared-reader::crates/platform/chio-store-sqlite/src/security_state/correlation.rs::validate_stored_correlation_ingress",
+      "reject_pending_correlation_event::shared-reader::crates/platform/chio-store-sqlite/src/security_state/codec.rs::validate_canonical_json_body",
+      "reject_pending_correlation_event::shared-reader::crates/platform/chio-store-sqlite/src/security_state/correlation.rs::validate_correlation_source_evidence",
+      "reject_pending_correlation_event::shared-reader::crates/platform/chio-store-sqlite/src/security_state/correlation.rs::validate_stored_correlation_ingress",
       "validate_correlation_ingress_binding::shared-reader::crates/platform/chio-store-sqlite/src/security_state/codec.rs::validate_canonical_json_body",
       "validate_correlation_ingress_binding::shared-reader::crates/platform/chio-store-sqlite/src/security_state/correlation.rs::validate_correlation_source_evidence",
       "validate_correlation_outcome_publication::shared-reader::crates/platform/chio-store-sqlite/src/security_state/codec.rs::validate_canonical_json_body",
