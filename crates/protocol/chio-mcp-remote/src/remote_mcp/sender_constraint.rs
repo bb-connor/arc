@@ -4,13 +4,7 @@ use super::*;
 /// Sender keys identify a signing authority, so decoding must reject keys
 /// whose small-order group admits signatures without a private key.
 pub(super) fn decode_sender_key(raw: &str) -> Result<PublicKey, chio_core::error::Error> {
-    let key = PublicKey::from_hex(raw)?;
-    if key.is_weak_ed25519() {
-        return Err(chio_core::error::Error::InvalidPublicKey(
-            "weak Ed25519 sender key".into(),
-        ));
-    }
-    Ok(key)
+    chio_core::TrustedPublicKey::from_hex(raw).map(chio_core::TrustedPublicKey::into_public_key)
 }
 
 pub(super) fn decode_sender_dpop_proof(raw: &str) -> Result<DpopProof, SenderConstraintError> {
