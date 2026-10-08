@@ -248,6 +248,7 @@ fn validate_recovery_posture(
                 "disputed order missing dispute state".to_string(),
             ));
         }
+        "disputed" => {}
         "refunded" => {
             if payment.refund_status != "succeeded" {
                 return Err(CommerceOrderError::PaymentFailed(
