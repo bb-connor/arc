@@ -123,7 +123,8 @@ export class ProcessClient {
         if (end < 0) return;
         let decoded;
         try {
-          const text = new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks, size));
+          // Strict UTF-8; a byte order mark is kept so JSON.parse refuses it.
+          const text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(Buffer.concat(chunks, size));
           decoded = JSON.parse(text);
         } catch { return finish(new WorkerError("invalid_response")); }
         if (decoded?.protocol !== PROTOCOL) return finish(new WorkerError("invalid_response"));
