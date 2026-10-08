@@ -3431,7 +3431,7 @@ assert_rejected(
     "enterprise-evidence-finalizer.yml",
     replace_in_named_step(
         "Authenticate exact successful current CI run",
-        'test "$(jq -r \'.tree.sha\' <<< "${merge_commit}")" = "${MERGE_TREE_SHA}"',
+        'test "$(jq -r \'.tree.sha\' <<< "${live_merge_commit}")" = "${MERGE_TREE_SHA}"',
         "true",
     ),
     "does not authenticate the exact CI run",
@@ -4761,11 +4761,11 @@ assert_rejected(
     "weakens App, main-ref, binding, or check payload authentication",
 )
 assert_rejected(
-    "publisher protected wait accepts a changed merge commit",
+    "publisher protected wait accepts a live merge with other parents",
     "enterprise-evidence-finalizer.yml",
     replace_in_named_step(
         "Reconcile exact five-context merge authority",
-        'test "$(jq -r \'.object.sha\' <<< "${merge_ref}")" = "${merge_commit_sha}"',
+        'test "$(jq -r \'.parents[0].sha\' <<< "${merge_commit}")" = "$(jq -r \'.base.sha\' <<< "${canonical_binding}")"',
         "true",
     ),
     "weakens App, main-ref, binding, or check payload authentication",
@@ -4993,11 +4993,11 @@ assert_rejected(
     "weakens App, main-ref, binding, or check payload authentication",
 )
 assert_rejected(
-    "publisher late-CI tombstone POST drops immediate live revalidation",
+    "publisher late-CI tombstone POST drops immediate E-scope revalidation",
     "enterprise-evidence-finalizer.yml",
     replace_in_named_step(
         "Reconcile exact five-context merge authority",
-        'revalidate_live_publication_head\n              failed_check="$(curl',
+        'revalidate_denial_scope\n              failed_check="$(curl',
         'true\n              failed_check="$(curl',
     ),
     "late-CI branch is not monotone failure-only",
@@ -5061,9 +5061,9 @@ for label, old, new in (
         '--signer-digest "${MERGE_COMMIT_SHA}"',
     ),
     (
-        "publication verifier uses the wrong source digest",
+        "publication verifier uses the captured merge instead of the CI merge",
+        '--source-digest "${CI_MERGE_SHA}"',
         '--source-digest "${MERGE_COMMIT_SHA}"',
-        '--source-digest "${EVIDENCE_SHA}"',
     ),
     (
         "publication verifier uses the wrong source ref",
@@ -5736,5 +5736,186 @@ assert_auditor_transport_rejected(
     '"missing or duplicate Security mirror / authority namespace"',
     "restores Actions mirror authority",
 )
+
+# P4 currency is the ordered parents and sealed tree, while M_ci authenticates
+# the exact CI attempt. Restore neither a captured-SHA selector nor an incomplete
+# PR census. Denials remain E-scoped when positive currency no longer holds.
+for label, workflow, step, old, new, error in (
+    (
+        "CI selection re-requires the captured merge SHA",
+        "enterprise-evidence-finalizer.yml", "Authenticate exact successful current CI run",
+        'expected_run_prefix="CI N=${PR_NUMBER} E=${EVIDENCE_SHA} B=${BASE_SHA} M="',
+        'expected_run_prefix="CI N=${PR_NUMBER} E=${EVIDENCE_SHA} B=${BASE_SHA} M=${MERGE_COMMIT_SHA}"',
+        "restores captured-SHA or incomplete CI-history selection",
+    ),
+    (
+        "CI selection restores the unfiltered history fallback",
+        "enterprise-evidence-finalizer.yml", "Authenticate exact successful current CI run",
+        '              return 2\n',
+        '              first_response="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?per_page=100&page=1")"\n              return 2\n',
+        "restores captured-SHA or incomplete CI-history selection",
+    ),
+    (
+        "CI ceiling refusal polls instead of failing immediately",
+        "enterprise-evidence-finalizer.yml", "Authenticate exact successful current CI run",
+        'test "${status}" != 2 || exit 1', 'test "${status}" != 2 || true',
+        "does not authenticate the exact CI run",
+    ),
+    (
+        "CI selection accepts a malformed title suffix",
+        "enterprise-evidence-finalizer.yml", "Authenticate exact successful current CI run",
+        '(.display_title | test("^CI N=[1-9][0-9]* E=[0-9a-f]{40} B=[0-9a-f]{40} M=[0-9a-f]{40}$"))',
+        'true', "does not authenticate the exact CI run",
+    ),
+    (
+        "CI title merge object is not authenticated by its returned SHA",
+        "enterprise-evidence-finalizer.yml", "Authenticate exact successful current CI run",
+        'test "$(jq -r \'.sha\' <<< "${ci_merge_commit}")" = "${ci_merge_sha}"',
+        'true', "does not authenticate the exact CI run",
+    ),
+    (
+        "CI title merge accepts unordered or foreign parents",
+        "enterprise-evidence-finalizer.yml", "Authenticate exact successful current CI run",
+        'test "$(jq -cS \'[.parents[].sha]\' <<< "${ci_merge_commit}")" = "[\\"${BASE_SHA}\\",\\"${EVIDENCE_SHA}\\"]"',
+        'true', "does not authenticate the exact CI run",
+    ),
+    (
+        "CI title merge accepts another tree",
+        "enterprise-evidence-finalizer.yml", "Authenticate exact successful current CI run",
+        'test "$(jq -r \'.tree.sha\' <<< "${ci_merge_commit}")" = "${MERGE_TREE_SHA}"',
+        'true', "does not authenticate the exact CI run",
+    ),
+    (
+        "CI authentication drops the live main ref",
+        "enterprise-evidence-finalizer.yml", "Authenticate exact successful current CI run",
+        'test "$(jq -r \'.object.sha\' <<< "${main_ref}")" = "${BASE_SHA}"',
+        'true', "does not authenticate the exact CI run",
+    ),
+    (
+        "FIN capture revalidation drops the live main ref",
+        "enterprise-evidence-finalizer.yml", "Revalidate live authorization and issuance freshness",
+        'test "$(jq -r \'.object.sha\' <<< "${main_ref}")" = "${BASE_SHA}"',
+        'true', "does not revalidate live source and issuance bindings",
+    ),
+    (
+        "publisher currency drops the live main ref",
+        "enterprise-evidence-finalizer.yml", "Reconcile exact five-context merge authority",
+        'test "$(jq -r \'.object.sha\' <<< "${main_ref}")" = "$(jq -r \'.base.sha\' <<< "${canonical_binding}")"',
+        'true', "weakens App, main-ref, binding, or check payload authentication",
+    ),
+    (
+        "attestation recheck drops the live main ref",
+        "enterprise-evidence-finalizer.yml", "Verify exact CI merge binding attestation",
+        'test "$(jq -r \'.object.sha\' <<< "${main_ref}")" = "${BASE_SHA}"',
+        'true', "does not verify one exact trusted merge-binding attestation",
+    ),
+    (
+        "attestation binds its predicate to the captured merge instead of M_ci",
+        "enterprise-evidence-finalizer.yml", "Verify exact CI merge binding attestation",
+        'test "$(jq -r \'.merge.sha\' <<< "${binding}")" = "${CI_MERGE_SHA}"',
+        'test "$(jq -r \'.merge.sha\' <<< "${binding}")" = "${MERGE_COMMIT_SHA}"',
+        "does not verify one exact trusted merge-binding attestation",
+    ),
+    (
+        "attestation binds its caller definition to the captured merge instead of M_ci",
+        "enterprise-evidence-finalizer.yml", "Verify exact CI merge binding attestation",
+        'test "$(jq -r \'.caller.definition_sha\' <<< "${binding}")" = "${CI_MERGE_SHA}"',
+        'true', "does not verify one exact trusted merge-binding attestation",
+    ),
+    (
+        "CAP restores live-SHA equality despite matching parents and tree",
+        "enterprise-linux-capture.yml", "Revalidate live merge authorization",
+        '          live_merge_sha="$(jq -r \'.object.sha\' <<< "${merge_ref}")"',
+        '          test "$(jq -r \'.object.sha\' <<< "${merge_ref}")" = "${INPUT_MERGE_COMMIT_SHA}"\n          live_merge_sha="$(jq -r \'.object.sha\' <<< "${merge_ref}")"',
+        "treats a regenerated merge SHA as identity",
+    ),
+    (
+        "CAP live merge accepts other parents",
+        "enterprise-linux-capture.yml", "Revalidate live merge authorization",
+        'test "$(jq -cS \'[.parents[].sha]\' <<< "${live_merge_commit}")" = "[\\"${INPUT_BASE_SHA}\\",\\"${INPUT_SOURCE_SHA}\\"]"',
+        'true', "does not revalidate controller, run, merge, source, and freshness bindings",
+    ),
+    (
+        "CAP stable live merge accepts other parents",
+        "enterprise-linux-capture.yml", "Revalidate live merge authorization",
+        'test "$(jq -cS \'[.parents[].sha]\' <<< "${stable_merge_commit}")" = "[\\"${INPUT_BASE_SHA}\\",\\"${INPUT_SOURCE_SHA}\\"]"',
+        'true', "does not revalidate controller, run, merge, source, and freshness bindings",
+    ),
+    (
+        "publisher late-CI denial inherits positive currency restrictions",
+        "enterprise-evidence-finalizer.yml", "Reconcile exact five-context merge authority",
+        'revalidate_denial_scope\n              failed_check="$(curl',
+        'revalidate_live_publication_head\n              failed_check="$(curl',
+        "late-CI branch is not monotone failure-only",
+    ),
+    (
+        "publisher retry denial inherits positive currency restrictions",
+        "enterprise-evidence-finalizer.yml", "Reconcile exact five-context merge authority",
+        'revalidate_denial_scope\n              retry_failed="$(curl',
+        'revalidate_live_publication_head\n              retry_failed="$(curl',
+        "retry reconciliation loses recorded authority or failure-only binding",
+    ),
+    (
+        "publisher E-scope denial trusts another returned commit",
+        "enterprise-evidence-finalizer.yml", "Reconcile exact five-context merge authority",
+        'test "$(jq -r \'.sha\' <<< "${evidence_commit}")" = "${EVIDENCE_SHA}"',
+        'true', "denial scope is not independent authenticated E",
+    ),
+    (
+        "publisher E-scope denial performs duplicate-head positive checks",
+        "enterprise-evidence-finalizer.yml", "Reconcile exact five-context merge authority",
+        '            local evidence_commit\n',
+        '            local evidence_commit\n            refuse_shared_evidence_head\n',
+        "denial scope is not independent authenticated E",
+    ),
+):
+    assert_rejected(label, workflow, replace_in_named_step(step, old, new), error)
+
+for census_step in (
+    "Authenticate exact successful current CI run",
+    "Reconcile exact five-context merge authority",
+):
+    for label, old, new in (
+        ("omits the associated-PR census", '"commits/${EVIDENCE_SHA}/pulls"', '"pulls?state=closed"'),
+        ("expands the bounded page budget", 'for page in $(seq 1 10); do', 'for page in $(seq 1 11); do'),
+        ("accepts oversized pages", 'length <= 100 and all', 'length <= 101 and all'),
+        ("accepts non-array pages", 'type == "array" and length', 'true and length'),
+        ("accepts missing PR identity", '(.number | type == "number" and . > 0 and floor == .)', 'true'),
+        ("accepts malformed PR heads", '(.head.sha | type == "string" and test("^[0-9a-f]{40}$"))', 'true'),
+        ("ignores a closed sibling on E", 'any(.[]; .head.sha == $head', 'any(.[]; .state == "open" and .head.sha == $head'),
+        ("accepts a full terminal page", 'if test "${page}" = 10; then', 'if false; then'),
+        ("defines but skips the duplicate-head check", '            refuse_shared_evidence_head\n' if census_step.startswith("Reconcile") else '          refuse_shared_evidence_head\n', '            true\n' if census_step.startswith("Reconcile") else '          true\n'),
+    ):
+        assert_rejected(
+            f"{census_step} {label}", "enterprise-evidence-finalizer.yml",
+            replace_in_named_step(census_step, old, new),
+            "bounded dual PR census changed",
+        )
+
+for label, replacement in (
+    ("removed", ""),
+    ("commented", "          # run_gate python3 ./scripts/tests/trusted-ci-currency-regressions.test.py\n"),
+    ("soft-failed", "          run_gate python3 ./scripts/tests/trusted-ci-currency-regressions.test.py || true\n"),
+    ("conditional", "          if false; then\n          run_gate python3 ./scripts/tests/trusted-ci-currency-regressions.test.py\n          fi\n"),
+):
+    assert_rejected(
+        f"CI currency-regression enforcement entry {label}", "ci.yml",
+        replace_in_named_step(
+            "Workspace structural gates",
+            "          run_gate python3 ./scripts/tests/trusted-ci-currency-regressions.test.py\n",
+            replacement,
+        ),
+        "currency regression gate is not exact and adjacent",
+    )
+
+for label, old, new in (
+    ("currency contract requires the captured merge title", 'M=<M_ci>`', 'M=<M>`'),
+    ("currency contract omits main currency", 'revalidates that `refs/heads/main` is still `<base>`', 'revalidates only the cached PR base'),
+    ("duplicate-head detection is advertised as per-PR enforcement", 'Duplicate-head refusal is detection, not per-pull-request enforcement.', 'Duplicate-head refusal enforces per-pull-request authority.'),
+    ("census contract permits incomplete pagination", 'Each census allows at most ten pages of\n100 entries and validates every returned PR number and head SHA.', 'Each census accepts the first available PR page.'),
+    ("denial contract inherits main currency", 'E-scope denial path, independent of main currency and duplicate-head detection.', 'denial path, conditional on main currency and duplicate-head detection.'),
+    ("partial v2 auditor is advertised as accepting divergent merge observations", 'The v2 landing auditor remains\nfail-closed (`unverified`) if those merge observations differ.', 'The v2 landing auditor accepts all regenerated merge observations.'),
+):
+    assert_document_rejected(label, replace_once(old, new), "publisher environment provisioning contract changed")
 
 print("security CI contract rejects trust-boundary and evidence mutations")

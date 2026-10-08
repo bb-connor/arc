@@ -196,6 +196,7 @@ def snapshot() -> dict[str, dict]:
         record = data[f"{prefix}/actions/workflows/{filename}"]
         data[f"{prefix}/actions/workflows/{record['id']}"] = copy.deepcopy(record)
     data[f"{prefix}/actions/runs"] = data[f"{prefix}/actions/workflows/ci.yml/runs"]
+    data[f"{prefix}/git/commits/{EVIDENCE}"] = {"sha": EVIDENCE}
     return data
 
 
@@ -711,6 +712,7 @@ class RunIdentityLivenessTests(unittest.TestCase):
         run["head_branch"] = "integration/process-security-m4"
         command = ["jq", "-c", "--arg", "evidence_sha", EVIDENCE,
                    "--arg", "expected_run_name", run["display_title"],
+                   "--arg", "expected_run_prefix", f"CI N={PR} E={EVIDENCE} B={BASE} M=",
                    "--arg", "head_ref", run["head_branch"], "--arg", "repository", REPOSITORY,
                    "--arg", "repository_id", "1195888645", "--arg", "workflow_id", str(CI_WORKFLOW), predicate]
         result = subprocess.run(command, input=json.dumps([run]), capture_output=True, text=True, check=False)
@@ -1004,6 +1006,7 @@ class AuthorizingFinalizerRetryTests(unittest.TestCase):
         body = next(step['run'] for step in workflow('enterprise-evidence-finalizer.yml')['jobs']['publish-security-contract']['steps']
                     if step.get('name') == 'Reconcile exact five-context merge authority')
         namespace = body[body.index('list_namespace_checks() {'):body.index('normalize_bad_ci_namespace() {')]
+        denial = body[body.index('revalidate_denial_scope() {'):body.index('list_namespace_checks() {')]
         start = body.find('reconcile_bad_authorizing_finalizer() {')
         helper = body[start:body.index('require_publishable_ci() {', start)] if start >= 0 else ''
         guard = body[body.index('require_publishable_ci() {'):body.index('publish_success_authority() {')]
@@ -1016,7 +1019,7 @@ class AuthorizingFinalizerRetryTests(unittest.TestCase):
             curl.write_text(FAKE_CURL)
             curl.chmod(0o755)
             result = subprocess.run(['bash', '-c', 'set -euo pipefail\nshopt -s inherit_errexit\n'
-                                     + namespace + helper + '\nreconcile_bad_ci() { bad_ci_observed=false; }\n'
+                                     + denial + namespace + helper + '\nreconcile_bad_ci() { bad_ci_observed=false; }\n'
                                      + '\nrevalidate_live_publication_head() { return 0; }\n' + guard
                                      + (success + '\npublish_success_authority\n' if full_publication else '\nrequire_publishable_ci\necho success-publication-allowed\n')],
                                     capture_output=True, text=True, check=False,
@@ -1377,6 +1380,7 @@ def live_tuple(live_merge: str = MERGE, main: str = BASE, base: str = BASE, head
         f"{prefix}/git/ref/pull/{PR}/merge": {"ref": f"refs/pull/{PR}/merge", "object": {"type": "commit", "sha": live_merge}},
         f"{prefix}/git/ref/heads/main": {"ref": "refs/heads/main", "object": {"type": "commit", "sha": main}},
     }
+    data[f"{prefix}/git/commits/{head}"] = {"sha": head, "tree": {"sha": tree}}
     for merge in merges:
         data[f"{prefix}/git/commits/{merge}"] = {"sha": merge, "parents": [{"sha": base}, {"sha": head}], "tree": {"sha": tree}}
     return data

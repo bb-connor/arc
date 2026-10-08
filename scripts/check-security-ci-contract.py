@@ -744,7 +744,6 @@ EXPECTED_PUBLICATION_CI_ENV = {
     "EVIDENCE_SHA": "${{ steps.bind.outputs.evidence_sha }}",
     "GH_TOKEN": "${{ github.token }}",
     "HEAD_REF": "${{ steps.bind.outputs.head_ref }}",
-    "MERGE_COMMIT_SHA": "${{ needs.validate-capture.outputs.merge_commit_sha }}",
     "MERGE_TREE_SHA": "${{ needs.validate-capture.outputs.merge_tree_sha }}",
     "PR_NUMBER": "${{ steps.bind.outputs.pr_number }}",
 }
@@ -757,7 +756,7 @@ EXPECTED_PUBLICATION_ATTESTATION_ENV = {
     "EVIDENCE_SHA": "${{ steps.bind.outputs.evidence_sha }}",
     "GH_TOKEN": "${{ github.token }}",
     "HEAD_REF": "${{ steps.bind.outputs.head_ref }}",
-    "MERGE_COMMIT_SHA": "${{ needs.validate-capture.outputs.merge_commit_sha }}",
+    "CI_MERGE_SHA": "${{ steps.ci.outputs.ci_merge_sha }}",
     "MERGE_TREE_SHA": "${{ needs.validate-capture.outputs.merge_tree_sha }}",
     "PR_NUMBER": "${{ steps.bind.outputs.pr_number }}",
     "SECURITY_DEFINITION_SHA": "${{ steps.bind.outputs.security_definition_sha }}",
@@ -921,7 +920,7 @@ EXPECTED_TRUST_JOB_DIGESTS = {
     (
         "enterprise Linux capture",
         "authorize-capture",
-    ): "385a55c096272604025962b9109d7131eeaf909fd4dfa280af55ad2c7fc0b92f",
+    ): "8d57865c1854570091f19de73a1c64a80c10c0e7daf18d3a11eefd615d594576",
     (
         "enterprise Linux capture",
         "refresh-linux-evidence",
@@ -937,7 +936,7 @@ EXPECTED_TRUST_JOB_DIGESTS = {
     (
         "enterprise evidence finalizer",
         "validate-capture",
-    ): "df011f9c62a55e6c06293536fe5686cd83424f978ac6f25a3b736e1fc7901807",
+    ): "b5d09e40df37acae0d3c18f42924d53af30caa28caffe70d1b0d72b03ad22965",
     (
         "enterprise evidence finalizer",
         "sign-validated-capture",
@@ -945,11 +944,11 @@ EXPECTED_TRUST_JOB_DIGESTS = {
     (
         "enterprise evidence finalizer",
         "authorize-security-check-publication",
-    ): "438a461c2b60eca09603933e8e809e5245f637be0ab01fe47910488edb91aa06",
+    ): "455ecd77612baf4b9e0d55c34922736e77212f6044266699ddc05d3d42aec75f",
     (
         "enterprise evidence finalizer",
         "publish-security-contract",
-    ): "a350f2aecabe9a9b1818aad6db5ad7f9941a18380769b041c3ff02b1a08a53ec",
+    ): "5865b5c2223a449343ccd91761429b047131cf6866e2564eb7cdbe9aad2cc1cc",
     (
         "security contract revocation",
         "bind-revocation",
@@ -1642,6 +1641,55 @@ def validate_read_only_landing_auditor(body: str) -> None:
         raise ContractError("trusted landing auditor is not read-only")
 
 
+def shell_function(body: str, name: str, contract: str) -> str:
+    matches = re.findall(rf"(?ms)^{re.escape(name)}\(\) \{{\n.*?^\}}", body)
+    if len(matches) != 1:
+        raise ContractError(f"{contract} helper is missing or duplicated")
+    return matches[0]
+
+
+def validate_shared_evidence_head_census(body: str) -> None:
+    contract = "bounded dual PR census changed"
+    census = shell_function(body, "refuse_shared_evidence_head", contract)
+    markers = (
+        'for endpoint in "pulls?state=open" "commits/${EVIDENCE_SHA}/pulls"; do',
+        'for page in $(seq 1 10); do',
+        '${endpoint}${separator}per_page=100&page=${page}',
+        'select(type == "array" and length <= 100 and all(.[];',
+        '(.number | type == "number" and . > 0 and floor == .)',
+        '(.head.sha | type == "string" and test("^[0-9a-f]{40}$"))',
+        "| length' <<< \"${response}\")\" || return 1",
+        '--arg head "${EVIDENCE_SHA}" --arg number "${PR_NUMBER}"',
+        'any(.[]; .head.sha == $head and (.number | tostring) != $number)',
+        '= false || return 1',
+        'if test "${count}" -lt 100; then break; fi',
+        'if test "${page}" = 10; then',
+        'echo "pull request census reaches the 1,000-result listing ceiling" >&2',
+    )
+    if (
+        any(marker not in census for marker in markers)
+        or ".state" in census
+        or census.count("|| return 1") != 3
+        or not re.search(r'if test "\$\{page\}" = 10; then\n\s+echo [^\n]+\n\s+return 1\n\s+fi', census)
+        or len(re.findall(r"(?m)^\s*refuse_shared_evidence_head$", body)) != 1
+    ):
+        raise ContractError(contract)
+
+
+def validate_independent_denial_scope(body: str) -> None:
+    contract = "publisher denial scope is not independent authenticated E"
+    denial = shell_function(body, "revalidate_denial_scope", contract)
+    if (
+        'repos/${GITHUB_REPOSITORY}/git/commits/${EVIDENCE_SHA}' not in denial
+        or 'test "$(jq -r \'.sha\' <<< "${evidence_commit}")" = "${EVIDENCE_SHA}"' not in denial
+        or any(marker in denial for marker in (
+            "revalidate_live_publication_head", "refuse_shared_evidence_head",
+            "git/ref/", "pulls/", "--request POST", "--request PATCH",
+        ))
+    ):
+        raise ContractError(contract)
+
+
 def validate_job_digest(
     job_body: dict[str, object], expected_digest: str, contract: str
 ) -> None:
@@ -1831,6 +1879,15 @@ def validate_environment_provisioning_document(root: Path) -> None:
         "Do not create a repository or organization copy of the\n"
         "installation ID or private-key secret.",
         "Publication is\nidempotent for `(<PR>, <E>, <M>, <S>)`.",
+        '`ci.yml` run title to be exactly `CI N=<PR> E=<E> B=<base> M=<M_ci>`',
+        'signer at `B`, source commit `M_ci`, `refs/pull/<PR>/merge`',
+        'revalidates that `refs/heads/main` is still `<base>`, that the live test merge has\n'
+        'ordered parents `<base>, E` and tree `T`, and that no other pull request has head\n`E`.',
+        'A regenerated test merge with the same parents and tree changes nothing.',
+        'Duplicate-head refusal is detection, not per-pull-request enforcement.',
+        'Each census allows at most ten pages of\n100 entries and validates every returned PR number and head SHA.',
+        'E-scope denial path, independent of main currency and duplicate-head detection.',
+        'The v2 landing auditor remains\nfail-closed (`unverified`) if those merge observations differ.',
         "Any prior failure in the dedicated\nApp-and-name namespace is sticky",
         "Labels authorize and describe capture only. Label\nchanges after capture cannot grant, renew, or revoke a published authority.",
         "A trusted default-branch `workflow_run` listener handles bad CI completions and\n"
@@ -5940,7 +5997,11 @@ def validate(root: Path) -> None:
             "repos/${GITHUB_REPOSITORY}/git/ref/pull/${INPUT_PR_NUMBER}/merge",
             'test "$(jq -r \'.ref\' <<< "${merge_ref}")" = "refs/pull/${INPUT_PR_NUMBER}/merge"',
             'test "$(jq -r \'.object.type\' <<< "${merge_ref}")" = commit',
-            'test "$(jq -r \'.object.sha\' <<< "${merge_ref}")" = "${INPUT_MERGE_COMMIT_SHA}"',
+            '[[ "${live_merge_sha}" =~ ^[0-9a-f]{40}$ ]]',
+            'repos/${GITHUB_REPOSITORY}/git/commits/${live_merge_sha}',
+            'test "$(jq -r \'.sha\' <<< "${live_merge_commit}")" = "${live_merge_sha}"',
+            'test "$(jq -cS \'[.parents[].sha]\' <<< "${live_merge_commit}")" = "[\\"${INPUT_BASE_SHA}\\",\\"${INPUT_SOURCE_SHA}\\"]"',
+            'test "$(jq -r \'.tree.sha\' <<< "${live_merge_commit}")" = "${INPUT_MERGE_TREE_SHA}"',
             'test "$(jq -r \'.parents[0].sha\' <<< "${merge_commit}")" = "${INPUT_BASE_SHA}"',
             'test "$(jq -r \'.parents[1].sha\' <<< "${merge_commit}")" = "${INPUT_SOURCE_SHA}"',
             'test "$(jq -r \'.tree.sha\' <<< "${merge_commit}")" = "${INPUT_MERGE_TREE_SHA}"',
@@ -5959,7 +6020,11 @@ def validate(root: Path) -> None:
             'test "${stable_labels_digest}" = "${INPUT_LABELS_DIGEST}"',
             "if jq -e '.labels | any(.name == \"refresh-linux-evidence\")' <<< \"${stable_pr}\" > /dev/null; then",
             'test "${stable_mode}" = "${INPUT_MODE}"',
-            'test "$(jq -r \'.object.sha\' <<< "${stable_merge_ref}")" = "${INPUT_MERGE_COMMIT_SHA}"',
+            '[[ "${stable_merge_sha}" =~ ^[0-9a-f]{40}$ ]]',
+            'repos/${GITHUB_REPOSITORY}/git/commits/${stable_merge_sha}',
+            'test "$(jq -r \'.sha\' <<< "${stable_merge_commit}")" = "${stable_merge_sha}"',
+            'test "$(jq -cS \'[.parents[].sha]\' <<< "${stable_merge_commit}")" = "[\\"${INPUT_BASE_SHA}\\",\\"${INPUT_SOURCE_SHA}\\"]"',
+            'test "$(jq -r \'.tree.sha\' <<< "${stable_merge_commit}")" = "${INPUT_MERGE_TREE_SHA}"',
             'test "$(jq -r \'.tree.sha\' <<< "${stable_merge_commit}")" = "${INPUT_MERGE_TREE_SHA}"',
             'echo "labels_digest=${stable_labels_digest}"',
             'echo "mode=${stable_mode}"',
@@ -5969,6 +6034,12 @@ def validate(root: Path) -> None:
     capture_authorization_run = (
         capture_authentication_run + "\n" + capture_merge_authorization_run
     )
+    for reference in ("merge_ref", "stable_merge_ref"):
+        captured_sha_equality = (
+            f'test "$(jq -r \'.object.sha\' <<< "${{{reference}}}")" = "${{INPUT_MERGE_COMMIT_SHA}}"'
+        )
+        if captured_sha_equality in capture_merge_authorization_run:
+            raise ContractError("isolated capture treats a regenerated merge SHA as identity")
     if "${{ inputs." in capture_authorization_run:
         raise ContractError(
             "isolated capture interpolates untrusted dispatch inputs into its trusted shell"
@@ -6529,7 +6600,15 @@ def validate(root: Path) -> None:
             'test "${running_controller_blob_sha}" = "${controller_blob_sha}"',
             'test "$(jq -r \'.head.sha\' <<< "${live_pr}")" = "${SOURCE_SHA}"',
             "repos/${GITHUB_REPOSITORY}/git/ref/pull/${PR_NUMBER}/merge",
-            'test "$(jq -r \'.object.sha\' <<< "${merge_ref}")" = "${MERGE_COMMIT_SHA}"',
+            '[[ "${live_merge_sha}" =~ ^[0-9a-f]{40}$ ]]',
+            'repos/${GITHUB_REPOSITORY}/git/commits/${live_merge_sha}',
+            'test "$(jq -r \'.sha\' <<< "${live_merge_commit}")" = "${live_merge_sha}"',
+            'test "$(jq -cS \'[.parents[].sha]\' <<< "${live_merge_commit}")" = "[\\"${BASE_SHA}\\",\\"${SOURCE_SHA}\\"]"',
+            'test "$(jq -r \'.tree.sha\' <<< "${live_merge_commit}")" = "${MERGE_TREE_SHA}"',
+            'repos/${GITHUB_REPOSITORY}/git/ref/heads/main',
+            'test "$(jq -r \'.ref\' <<< "${main_ref}")" = refs/heads/main',
+            'test "$(jq -r \'.object.type\' <<< "${main_ref}")" = commit',
+            'test "$(jq -r \'.object.sha\' <<< "${main_ref}")" = "${BASE_SHA}"',
             'test "$(jq -r \'.labels | any(.name == "refresh-linux-evidence")\' <<< "${live_pr}")" = "false"',
             'test "$(jq -r \'.parents[0].sha\' <<< "${merge_commit}")" = "${BASE_SHA}"',
             'test "$(jq -r \'.parents[1].sha\' <<< "${merge_commit}")" = "${SOURCE_SHA}"',
@@ -6816,22 +6895,35 @@ def validate(root: Path) -> None:
             'query="event=pull_request&head_sha=${EVIDENCE_SHA}&"',
             "actions/workflows/ci.yml/runs?${query}per_page=100&page=1",
             'if test "${total_count}" -ge 1000; then',
-            "actions/workflows/ci.yml/runs?per_page=100&page=1",
+            'CI history for ${EVIDENCE_SHA} reaches the 1,000-result listing ceiling',
+            'return 2',
             'page_response="${first_response}"',
             'test "${page_total}" = "${total_count}"',
             'test "$(jq -r \'length\' <<< "${page_runs}")" = 100',
             'test "$(jq -r \'[.[].id] | unique | length\' <<< "${runs}")" = "${total_count}"',
-            'if ! matching_runs="$(list_matching_ci_runs)"; then',
+            'matching_runs="$(list_matching_ci_runs)" || {',
+            'status=$?',
+            'test "${status}" != 2 || exit 1',
             '.path == ".github/workflows/ci.yml"',
             '.event == "pull_request"',
             "(.workflow_id | tostring) == $workflow_id",
-            ".display_title == $expected_run_name",
+            'expected_run_prefix="CI N=${PR_NUMBER} E=${EVIDENCE_SHA} B=${BASE_SHA} M="',
+            '--arg expected_run_prefix "${expected_run_prefix}"',
+            '(.display_title | type) == "string"',
+            '(.display_title | startswith($expected_run_prefix))',
+            '(.display_title | test("^CI N=[1-9][0-9]* E=[0-9a-f]{40} B=[0-9a-f]{40} M=[0-9a-f]{40}$"))',
             ".head_sha == $evidence_sha",
             '"repos/${GITHUB_REPOSITORY}/actions/runs/${ci_run_id}"',
             'test "$(jq -r \'.status\' <<< "${ci_run}")" = "completed"',
             'test "$(jq -r \'.conclusion\' <<< "${ci_run}")" = "success"',
             'test "$(jq -r \'.workflow_id\' <<< "${ci_run}")" = "${CI_WORKFLOW_ID}"',
-            'test "$(jq -r \'.display_title\' <<< "${ci_run}")" = "${expected_run_name}"',
+            '[[ "$(jq -r \'.display_title\' <<< "${ci_run}")" =~ ^CI\\ N=${PR_NUMBER}\\ E=${EVIDENCE_SHA}\\ B=${BASE_SHA}\\ M=([0-9a-f]{40})$ ]]',
+            'ci_merge_sha="${BASH_REMATCH[1]}"',
+            'repos/${GITHUB_REPOSITORY}/git/commits/${ci_merge_sha}',
+            'test "$(jq -r \'.sha\' <<< "${ci_merge_commit}")" = "${ci_merge_sha}"',
+            'test "$(jq -cS \'[.parents[].sha]\' <<< "${ci_merge_commit}")" = "[\\"${BASE_SHA}\\",\\"${EVIDENCE_SHA}\\"]"',
+            'test "$(jq -r \'.tree.sha\' <<< "${ci_merge_commit}")" = "${MERGE_TREE_SHA}"',
+            'echo "ci_merge_sha=${ci_merge_sha}"',
             'test "$(jq -r \'.head_sha\' <<< "${ci_run}")" = "${EVIDENCE_SHA}"',
             'test "$(jq -r \'.run_attempt\' <<< "${ci_run}")" = "${ci_run_attempt}"',
             "actions/runs/${ci_run_id}/attempts/${ci_run_attempt}/jobs?filter=all&per_page=100",
@@ -6848,11 +6940,15 @@ def validate(root: Path) -> None:
             'test "$(jq -r \'.base.ref\' <<< "${live_pr}")" = "${BASE_REF}"',
             'test "$(jq -r \'.base.sha\' <<< "${live_pr}")" = "${BASE_SHA}"',
             "repos/${GITHUB_REPOSITORY}/git/ref/pull/${PR_NUMBER}/merge",
-            'test "$(jq -r \'.object.sha\' <<< "${merge_ref}")" = "${MERGE_COMMIT_SHA}"',
-            '"repos/${GITHUB_REPOSITORY}/git/commits/${MERGE_COMMIT_SHA}"',
-            'test "$(jq -r \'.parents[0].sha\' <<< "${merge_commit}")" = "${BASE_SHA}"',
-            'test "$(jq -r \'.parents[1].sha\' <<< "${merge_commit}")" = "${EVIDENCE_SHA}"',
-            'test "$(jq -r \'.tree.sha\' <<< "${merge_commit}")" = "${MERGE_TREE_SHA}"',
+            '[[ "${live_merge_sha}" =~ ^[0-9a-f]{40}$ ]]',
+            'repos/${GITHUB_REPOSITORY}/git/commits/${live_merge_sha}',
+            'test "$(jq -r \'.sha\' <<< "${live_merge_commit}")" = "${live_merge_sha}"',
+            'test "$(jq -cS \'[.parents[].sha]\' <<< "${live_merge_commit}")" = "[\\"${BASE_SHA}\\",\\"${EVIDENCE_SHA}\\"]"',
+            'test "$(jq -r \'.tree.sha\' <<< "${live_merge_commit}")" = "${MERGE_TREE_SHA}"',
+            'repos/${GITHUB_REPOSITORY}/git/ref/heads/main',
+            'test "$(jq -r \'.ref\' <<< "${main_ref}")" = refs/heads/main',
+            'test "$(jq -r \'.object.type\' <<< "${main_ref}")" = commit',
+            'test "$(jq -r \'.object.sha\' <<< "${main_ref}")" = "${BASE_SHA}"',
         ),
         "security check publication does not authenticate the exact CI run, head, workflow, attempt, and Actions App",
     )
@@ -6860,6 +6956,16 @@ def validate(root: Path) -> None:
         raise ContractError(
             "security check publication trusts mutable Actions run pull-request metadata"
         )
+    if (
+        "${MERGE_COMMIT_SHA}" in publication_ci_run
+        or "actions/workflows/ci.yml/runs?per_page=" in publication_ci_run
+        or re.search(r"query=['\"]{2}", publication_ci_run)
+        or publication_ci_run.count(
+            'expected_run_prefix="CI N=${PR_NUMBER} E=${EVIDENCE_SHA} B=${BASE_SHA} M="'
+        ) != 2
+    ):
+        raise ContractError("security check publication restores captured-SHA or incomplete CI-history selection")
+    validate_shared_evidence_head_census(publication_ci_run)
     if EXPECTED_PUBLICATION_REQUIRED_NAMES_BLOCK not in publication_ci_run:
         raise ContractError(
             "security check publication omits an intended CI job or Actions aggregate"
@@ -6870,7 +6976,7 @@ def validate(root: Path) -> None:
     )
     if publication_attestation.get("env") != EXPECTED_PUBLICATION_ATTESTATION_ENV:
         raise ContractError("security check publication attestation inputs changed")
-    require_run_markers(
+    publication_attestation_run = require_run_markers(
         authorize_publication,
         "Verify exact CI merge binding attestation",
         (
@@ -6892,7 +6998,7 @@ def validate(root: Path) -> None:
             "member.file_size > 64 * member.compress_size",
             'test "$(jq -cs \'length\' "${bundle_file}")" = 1',
             'test "$(jq -cS \'keys\' <<< "${binding}")" = \'["base","builder","caller","ci","head","merge","pull_request_number","repository","schema"]\'',
-            'test "$(jq -r \'.merge.sha\' <<< "${binding}")" = "${MERGE_COMMIT_SHA}"',
+            'test "$(jq -r \'.merge.sha\' <<< "${binding}")" = "${CI_MERGE_SHA}"',
             'test "$(jq -cS \'.merge.parents\' <<< "${binding}")" = "[\\"${BASE_SHA}\\",\\"${EVIDENCE_SHA}\\"]"',
             'test "$(jq -r \'.ci.run_id\' <<< "${binding}")" = "${CI_RUN_ID}"',
             'test "$(jq -r \'.ci.run_attempt\' <<< "${binding}")" = "${CI_RUN_ATTEMPT}"',
@@ -6906,7 +7012,7 @@ def validate(root: Path) -> None:
             '--predicate-type "https://github.com/bb-connor/arc/attestations/ci-merge-binding/v1"',
             '--signer-workflow "bb-connor/arc/.github/workflows/enterprise-hardening.yml"',
             '--signer-digest "${SECURITY_DEFINITION_SHA}"',
-            '--source-digest "${MERGE_COMMIT_SHA}"',
+            '--source-digest "${CI_MERGE_SHA}"',
             '--source-ref "refs/pull/${PR_NUMBER}/merge"',
             "--deny-self-hosted-runners",
             "--format json",
@@ -6922,18 +7028,18 @@ def validate(root: Path) -> None:
             'test "$(jq -r \'.buildSignerDigest\' <<< "${certificate}")" = "${SECURITY_DEFINITION_SHA}"',
             'test "$(jq -r \'.runnerEnvironment\' <<< "${certificate}")" = github-hosted',
             'test "$(jq -r \'.sourceRepositoryURI\' <<< "${certificate}")" = "https://github.com/${GITHUB_REPOSITORY}"',
-            'test "$(jq -r \'.sourceRepositoryDigest\' <<< "${certificate}")" = "${MERGE_COMMIT_SHA}"',
+            'test "$(jq -r \'.sourceRepositoryDigest\' <<< "${certificate}")" = "${CI_MERGE_SHA}"',
             'test "$(jq -r \'.sourceRepositoryRef\' <<< "${certificate}")" = "refs/pull/${PR_NUMBER}/merge"',
             'test "$(jq -r \'.sourceRepositoryIdentifier\' <<< "${certificate}")" = "${repository_id}"',
             'test "$(jq -r \'.sourceRepositoryOwnerURI\' <<< "${certificate}")" = "https://github.com/${GITHUB_REPOSITORY_OWNER}"',
             'test "$(jq -r \'.sourceRepositoryOwnerIdentifier\' <<< "${certificate}")" = "${repository_owner_id}"',
             'test "$(jq -r \'.buildConfigURI\' <<< "${certificate}")" = "${caller_uri}"',
-            'test "$(jq -r \'.buildConfigDigest\' <<< "${certificate}")" = "${MERGE_COMMIT_SHA}"',
+            'test "$(jq -r \'.buildConfigDigest\' <<< "${certificate}")" = "${CI_MERGE_SHA}"',
             'test "$(jq -r \'.buildTrigger\' <<< "${certificate}")" = pull_request',
             'test "$(jq -r \'.runInvocationURI\' <<< "${certificate}")" = "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${CI_RUN_ID}/attempts/${CI_RUN_ATTEMPT}"',
             'test "$(jq -r \'.sourceRepositoryVisibilityAtSigning\' <<< "${certificate}")" = public',
             'test "$(jq -r \'.githubWorkflowTrigger\' <<< "${certificate}")" = pull_request',
-            'test "$(jq -r \'.githubWorkflowSHA\' <<< "${certificate}")" = "${MERGE_COMMIT_SHA}"',
+            'test "$(jq -r \'.githubWorkflowSHA\' <<< "${certificate}")" = "${CI_MERGE_SHA}"',
             'test "$(jq -r \'.githubWorkflowName\' <<< "${certificate}")" = CI',
             'test "$(jq -r \'.githubWorkflowRepository\' <<< "${certificate}")" = "${GITHUB_REPOSITORY}"',
             'test "$(jq -r \'.githubWorkflowRef\' <<< "${certificate}")" = "refs/pull/${PR_NUMBER}/merge"',
@@ -6943,11 +7049,24 @@ def validate(root: Path) -> None:
             'test "${timestamp_epoch}" -ge "$((created_epoch - 300))"',
             'test "${timestamp_epoch}" -le "$((now_epoch + 300))"',
             "repos/${GITHUB_REPOSITORY}/git/ref/pull/${PR_NUMBER}/merge",
-            'test "$(jq -r \'.object.sha\' <<< "${stable_merge_ref}")" = "${MERGE_COMMIT_SHA}"',
+            '[[ "${stable_merge_sha}" =~ ^[0-9a-f]{40}$ ]]',
+            'repos/${GITHUB_REPOSITORY}/git/commits/${stable_merge_sha}',
+            'test "$(jq -r \'.sha\' <<< "${stable_merge_commit}")" = "${stable_merge_sha}"',
+            'test "$(jq -cS \'[.parents[].sha]\' <<< "${stable_merge_commit}")" = "[\\"${BASE_SHA}\\",\\"${EVIDENCE_SHA}\\"]"',
+            'test "$(jq -r \'.tree.sha\' <<< "${stable_merge_commit}")" = "${MERGE_TREE_SHA}"',
+            'repos/${GITHUB_REPOSITORY}/git/ref/heads/main',
+            'test "$(jq -r \'.ref\' <<< "${main_ref}")" = refs/heads/main',
+            'test "$(jq -r \'.object.type\' <<< "${main_ref}")" = commit',
+            'test "$(jq -r \'.object.sha\' <<< "${main_ref}")" = "${BASE_SHA}"',
+            'test "$(jq -r \'.merge.tree_sha\' <<< "${binding}")" = "${MERGE_TREE_SHA}"',
+            'test "$(jq -r \'.ci.run_name\' <<< "${binding}")" = "CI N=${PR_NUMBER} E=${EVIDENCE_SHA} B=${BASE_SHA} M=${CI_MERGE_SHA}"',
+            'test "$(jq -r \'.caller.definition_sha\' <<< "${binding}")" = "${CI_MERGE_SHA}"',
             'test "$(jq -r \'.tree.sha\' <<< "${stable_merge_commit}")" = "${MERGE_TREE_SHA}"',
         ),
         "security check publication does not verify one exact trusted merge-binding attestation",
     )
+    if "${MERGE_COMMIT_SHA}" in publication_attestation_run:
+        raise ContractError("security check publication attestation restores the captured merge as CI identity")
 
     require_run_markers(
         authorize_publication,
@@ -7077,8 +7196,16 @@ def validate(root: Path) -> None:
             'test "$(jq -r \'.head.sha\' <<< "${live_pr}")" = "${EVIDENCE_SHA}"',
             '"https://api.github.com/repos/${GITHUB_REPOSITORY}/git/ref/pull/${PR_NUMBER}/merge"',
             'test "$(jq -r \'.object.type\' <<< "${merge_ref}")" = commit',
-            'test "$(jq -r \'.object.sha\' <<< "${merge_ref}")" = "${merge_commit_sha}"',
-            '"https://api.github.com/repos/${GITHUB_REPOSITORY}/git/commits/${merge_commit_sha}"',
+            '[[ "${live_merge_sha}" =~ ^[0-9a-f]{40}$ ]]',
+            'test "$(jq -r \'.sha\' <<< "${merge_commit}")" = "${live_merge_sha}"',
+            'test "$(jq -r \'.parents | length\' <<< "${merge_commit}")" = "2"',
+            'repos/${GITHUB_REPOSITORY}/git/ref/heads/main',
+            'test "$(jq -r \'.ref\' <<< "${main_ref}")" = refs/heads/main',
+            'test "$(jq -r \'.object.type\' <<< "${main_ref}")" = commit',
+            'test "$(jq -r \'.object.sha\' <<< "${main_ref}")" = "$(jq -r \'.base.sha\' <<< "${canonical_binding}")"',
+            'refuse_shared_evidence_head()',
+            'revalidate_denial_scope()',
+            '"https://api.github.com/repos/${GITHUB_REPOSITORY}/git/commits/${live_merge_sha}"',
             'test "$(jq -r \'.parents[0].sha\' <<< "${merge_commit}")" = "$(jq -r \'.base.sha\' <<< "${canonical_binding}")"',
             'test "$(jq -r \'.parents[1].sha\' <<< "${merge_commit}")" = "${EVIDENCE_SHA}"',
             'test "$(jq -r \'.tree.sha\' <<< "${merge_commit}")" = "$(jq -r \'.merge_tree_sha\' <<< "${canonical_binding}")"',
@@ -7220,6 +7347,8 @@ def validate(root: Path) -> None:
         )
     failure_routine = publisher_run[failure_start:reconciliation_start]
     validate_dedicated_authority_transport(publisher_run, "dedicated Security contract publisher")
+    validate_independent_denial_scope(publisher_run)
+    validate_shared_evidence_head_census(publisher_run)
 
     bad_ci_routine = publisher_run[reconciliation_start:retry_start]
     retry_routine = publisher_run[retry_start:guard_start]
@@ -7240,7 +7369,8 @@ def validate(root: Path) -> None:
         or failure_routine.count('conclusion: "failure"') != 2
         or 'conclusion: "success"' in failure_routine
         or 'status: "completed"' not in failure_routine
-        or failure_routine.count("revalidate_live_publication_head\n") != 2
+        or failure_routine.count("revalidate_denial_scope\n") != 2
+        or "revalidate_live_publication_head" in failure_routine
         or 'if test "${bad_ci_create_missing}" = false; then'
         not in failure_routine
         or 'test "${verified_metadata}" = "${preserved_metadata}"'
@@ -7318,6 +7448,8 @@ def validate(root: Path) -> None:
         or retry_routine.count('conclusion: "failure"') != 1
         or 'conclusion: "success"' in retry_routine
         or retry_routine.count("fail_existing_retry_namespace ") != 1
+        or retry_routine.count("revalidate_denial_scope\n") != 2
+        or "revalidate_live_publication_head" in retry_routine
         or "actions/workflows/enterprise-evidence-finalizer.yml/runs" in retry_routine
         or "actions/runs/${authorizing_finalizer_id}/attempts/1" not in retry_routine
         or 'test "${retry_original_blob}" = "${retry_authorized_blob}"' not in retry_routine
@@ -7372,7 +7504,8 @@ def validate(root: Path) -> None:
             1,
         ),
         (".details_url", 4),
-        ("revalidate_live_publication_head\n", 9),
+        ("revalidate_live_publication_head\n", 5),
+        ("revalidate_denial_scope\n", 4),
         ('status: "completed"', 4),
         ("--request PATCH", 2),
     ):
@@ -8221,6 +8354,18 @@ def validate(root: Path) -> None:
         ("/bin/bash -p ./scripts/tests/check-temporal-security.test.sh",),
         "required CI omits the temporal gate self-test",
     )
+    structural = named_step(check_job, "Workspace structural gates")
+    structural_lines = structural.get("run", "").splitlines()
+    landing_gate = "run_gate python3 ./scripts/tests/trusted-ci-landing-regressions.test.py"
+    currency_gate = "run_gate python3 ./scripts/tests/trusted-ci-currency-regressions.test.py"
+    stripped_structural = [line.strip() for line in structural_lines]
+    if (
+        "if" in structural or "continue-on-error" in structural
+        or stripped_structural.count(landing_gate) != 1
+        or stripped_structural.count(currency_gate) != 1
+        or stripped_structural.index(currency_gate) != stripped_structural.index(landing_gate) + 1
+    ):
+        raise ContractError("required CI currency regression gate is not exact and adjacent")
     mapping = named_step(check_job, "Formal traceability gate")
     if mapping.get("run") != "bash scripts/check-mapping.sh":
         raise ContractError("required CI omits the exact formal traceability gate")

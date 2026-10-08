@@ -216,7 +216,9 @@ installation ID or private-key secret.
 The finalizer's secret-free publication-authorizer requires
 `CHIO_COMMITTED_LINUX_EVIDENCE_SHA` to equal the live pull-request head `E`.
 It runs the strict checker from authorized source `S` against `E`, requires the
-`ci.yml` run title to be exactly `CI N=<PR> E=<E> B=<base> M=<M>`, and requires
+`ci.yml` run title to be exactly `CI N=<PR> E=<E> B=<base> M=<M_ci>`, where the
+authenticated CI merge `M_ci` has ordered parents `<base>, E` and the sealed
+tree `T`. It requires
 that run, its exact attempt, and these five GitHub Actions App `15368` jobs on
 `E` to finish successfully:
 
@@ -233,13 +235,17 @@ prerequisite, not a ruleset authority. The authorizer separately downloads the
 singleton `ci-merge-binding-<run>-<attempt>` artifact, verifies its API digest
 and bounded exact archive, and verifies the included GitHub attestation with a
 SHA-256-pinned GitHub CLI 2.96.0 binary. The certificate must bind the reusable
-signer at `B`, source commit `M`, `refs/pull/<PR>/merge`, the exact caller run
+signer at `B`, source commit `M_ci`, `refs/pull/<PR>/merge`, the exact caller run
 and attempt, repository identities, and a GitHub-hosted runner. The canonical
-predicate independently proves `M` has ordered parents `<base>, E` and the
+predicate independently proves `M_ci` has ordered parents `<base>, E` and the
 expected tree. After those checks and all committed evidence, controller,
 capture, runner, artifact, and policy bindings verify, the publisher also
 requires the protected migration-canary signing job to succeed before it
-revalidates the exact current test merge `M`. It mints the dedicated App token
+revalidates that `refs/heads/main` is still `<base>`, that the live test merge has
+ordered parents `<base>, E` and tree `T`, and that no other pull request has head
+`E`. A regenerated test merge with the same parents and tree changes nothing.
+Duplicate-head refusal is detection, not per-pull-request enforcement.
+It mints the dedicated App token
 and posts only the dedicated authority context on `M`:
 
 ```text
@@ -250,6 +256,20 @@ conclusion: success
 external_id: arc:<PR>:<E>:<M>:<S>
 app.slug: chio-security-authority
 ```
+
+Both CI authentication and each positive publication boundary read the open-PR
+census and the PRs associated with `E`. Each census allows at most ten pages of
+100 entries and validates every returned PR number and head SHA. Another PR
+with head `E`, including a closed PR returned by the associated-PR endpoint,
+refuses positive publication. Unreadable, malformed or truncated censuses also
+refuse. Negative CI or authorizing-finalizer evidence retains its authenticated
+E-scope denial path, independent of main currency and duplicate-head detection.
+
+The captured merge object `M` remains authenticated and readable. At this P4
+boundary, the dedicated v2 authority still names that captured merge, while CI
+authentication and its attestation bind `M_ci`. The v2 landing auditor remains
+fail-closed (`unverified`) if those merge observations differ. Stable content
+identity and final head placement require the separate P6 repair and acceptance.
 
 The publisher rejects App ID `15368`, the wrong App slug, owner, installation,
 repository inventory, permissions, source or evidence variable, workflow ref,
