@@ -33,10 +33,11 @@ priority. See [required integration scope](FIRST-CLASS-INTEGRATIONS.md).
 10. [Shared delivery plan](../../plans/2026-10-07-desktop-integration.md).
 11. [Omarchy/Linux annex](../2026-10-07-omarchy-integration/ANNEX.md).
 
-The dependent macOS annex lives at
-`docs/superpowers/specs/2026-10-07-macos-integration/ANNEX.md`; it is absent from
-the shared branch until integrated. The directory name is retained for review
-continuity, not as a product requirement to ship a Chio desktop.
+The [macOS annex](../2026-10-07-macos-integration/ANNEX.md) and its
+[implementation plan](../../plans/2026-10-07-macos-integration/IMPLEMENTATION.md)
+are the dependent platform change included in this composed branch. The shared
+directory name is retained for review continuity, not as a requirement to ship
+a Chio desktop.
 
 ## What a valuable integration proves
 
