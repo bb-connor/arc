@@ -182,6 +182,96 @@ fn predispatch_payment_release_uses_the_durable_operation_reference() {
 }
 
 #[test]
+fn predispatch_compensation_refuses_an_unwind_for_another_authorization() {
+    let mut grant = make_grant("durable-server", "mutate");
+    grant.max_cost_per_invocation = Some(MonetaryAmount {
+        units: 10,
+        currency: "USD".to_owned(),
+    });
+    grant.max_total_cost = Some(MonetaryAmount {
+        units: 100,
+        currency: "USD".to_owned(),
+    });
+    let (mut kernel, request, store, invocations) =
+        durable_admission_fixture_with_grants("durable-predispatch-foreign-unwind", vec![grant]);
+    let settlement_references = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    kernel.set_payment_adapter(Box::new(QualifiedDurablePaymentAdapter {
+        authorization_references: std::sync::Arc::new(std::sync::Mutex::new(Vec::new())),
+        settlement_actions: std::sync::Arc::new(std::sync::Mutex::new(Vec::new())),
+        settlement_references: settlement_references.clone(),
+    }));
+    let matching = resolve_required_matching_grants(
+        &request.capability,
+        &request.tool_name,
+        &request.server_id,
+        &request.arguments,
+        request.model_metadata.as_ref(),
+    )
+    .expect("matching grants");
+    let now = current_unix_timestamp_ms();
+    let mut admission = kernel
+        .begin_durable_tool_admission(&request, &matching, now)
+        .expect("durable monetary admission")
+        .expect("covered durable admission");
+    let (_, mutation) = kernel
+        .check_and_increment_budget(
+            &request,
+            &request.capability,
+            &matching,
+            false,
+            Some(&mut admission),
+            now,
+        )
+        .expect("combined budget authorization")
+        .into_authorized()
+        .expect("authorized budget outcome");
+    kernel
+        .authorize_payment_if_needed(
+            &request,
+            mutation.charge_result(),
+            Some(&admission),
+            now + 1,
+            None,
+        )
+        .expect("durable payment authorization")
+        .expect("payment authorization");
+    let operation = store.operation();
+    let journal_state = store.payment_journal().map(|journal| journal.state);
+    let foreign_unwind = crate::payment::PreDispatchPaymentUnwindEvidence {
+        authorization_id: "another-authorization".to_owned(),
+        transaction_id: "foreign-unwind".to_owned(),
+        settlement_status: crate::payment::PreDispatchPaymentUnwindStatus::Released,
+        credential_disposition: crate::payment::PaymentCredentialDisposition::NonePresent,
+    };
+
+    let refused = kernel.compensate_durable_admission_before_dispatch(
+        &operation,
+        serde_json::json!({"authority": "predispatch-foreign-unwind"}),
+        now + 2,
+        Some(&foreign_unwind),
+    );
+
+    assert!(
+        matches!(
+            refused.as_ref().map_err(KernelError::durable_admission),
+            Err(Some(crate::DurableAdmissionError::Record(reason)))
+                if reason == "confirmed pre-dispatch unwind conflicts with the original payment"
+        ),
+        "{refused:?}"
+    );
+    assert!(settlement_references
+        .lock()
+        .expect("settlement references")
+        .is_empty());
+    assert_eq!(store.operation().state(), operation.state());
+    assert_eq!(
+        store.payment_journal().map(|journal| journal.state),
+        journal_state
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+}
+
+#[test]
 fn unsupported_durable_participants_fail_before_dispatch() {
     let (mut kernel, request, store, invocations) =
         durable_admission_fixture("durable-versionless-post-hook");

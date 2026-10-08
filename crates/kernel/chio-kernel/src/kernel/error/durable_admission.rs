@@ -15,6 +15,7 @@ use crate::admission_operation::{
     AdmissionOperationStoreError,
 };
 use crate::disposition::Disposition;
+use crate::finding_denial::FindingDenial;
 use crate::finding_pool::FindingPoolLedgerError;
 use crate::payment::PaymentJournalError;
 use crate::receipt_store::{
@@ -88,6 +89,8 @@ pub enum DurableAdmissionError {
     Supplemental(#[from] SupplementalQuotaError),
     #[error("{0}")]
     FindingPool(#[from] FindingPoolLedgerError),
+    #[error("{0}")]
+    Finding(#[from] FindingDenial),
     /// Canonical encoding of a request or record value failed.
     #[error("{0}")]
     Encoding(#[from] chio_core::Error),
@@ -149,6 +152,7 @@ impl DurableAdmissionError {
             Self::OutcomeStore(error) => error.disposition(),
             Self::Supplemental(error) => error.disposition(),
             Self::FindingPool(error) => error.disposition(),
+            Self::Finding(denial) => denial.disposition(),
             Self::Kernel(error) => error.disposition(),
             Self::Context { source, .. } => source.disposition(),
         }

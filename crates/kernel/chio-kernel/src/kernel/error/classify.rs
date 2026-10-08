@@ -2,7 +2,6 @@
 
 use super::KernelError;
 use crate::disposition::Disposition;
-use crate::finding_denial::FindingDenialCode;
 
 impl KernelError {
     /// How a loop, worker or endpoint handles this failure.
@@ -18,15 +17,7 @@ impl KernelError {
             Self::AdmissionRecovery(error) => error.disposition(),
             Self::ReceiptPersistence(error) => error.disposition(),
             Self::RevocationStore(error) => error.disposition(),
-            Self::FindingDenied(denial) => match denial.code() {
-                FindingDenialCode::Unavailable => Disposition::Retry,
-                FindingDenialCode::CarrierInvalid
-                | FindingDenialCode::AuthorityInvalid
-                | FindingDenialCode::BindingMismatch
-                | FindingDenialCode::StaleOrSuperseded
-                | FindingDenialCode::StatusDenied
-                | FindingDenialCode::QuotaExhausted => Disposition::Deny,
-            },
+            Self::FindingDenied(denial) => denial.disposition(),
             Self::UntrustedInput(_)
             | Self::UnknownSession(_)
             | Self::SessionAlreadyExists(_)
@@ -112,7 +103,7 @@ impl KernelError {
 mod tests {
     use super::*;
     use crate::admission_operation::AdmissionOperationStoreError;
-    use crate::finding_denial::FindingDenial;
+    use crate::finding_denial::{FindingDenial, FindingDenialCode};
 
     #[test]
     fn refusals_deny_capacity_retries_and_text_causes_stay_fatal() {

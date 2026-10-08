@@ -43,7 +43,7 @@ impl ChioKernel {
             )
             .map_err(super::recovery::failure::payment_store_error)?
             .ok_or_else(|| {
-                KernelError::DurableAdmission("pre-dispatch payment journal disappeared".into())
+                KernelError::admission_record("pre-dispatch payment journal disappeared")
             })?;
         journal.validate().map_err(payment_record_error)?;
         if journal.operation_id != operation.binding().operation_id().as_str()
@@ -53,8 +53,8 @@ impl ChioKernel {
                 != operation.binding().request_namespace_digest().as_str()
             || journal.hold_id.as_deref() != operation.budget_hold_id().map(|id| id.as_str())
         {
-            return Err(KernelError::DurableAdmission(
-                "pre-dispatch payment changed its original operation binding".into(),
+            return Err(KernelError::admission_record(
+                "pre-dispatch payment changed its original operation binding",
             ));
         }
         let mut recovered_unwind = None;
@@ -121,12 +121,12 @@ impl ChioKernel {
             _ => false,
         };
         if !transition || !pre_dispatch_unwind_intent(&journal) {
-            return Err(KernelError::DurableAdmission(
-                "pre-dispatch payment has no replayable no-effect unwind intent".into(),
+            return Err(KernelError::admission_record(
+                "pre-dispatch payment has no replayable no-effect unwind intent",
             ));
         }
         let authorization_id = journal.authorization_id.as_deref().ok_or_else(|| {
-            KernelError::DurableAdmission("pre-dispatch payment omitted authorization_id".into())
+            KernelError::admission_record("pre-dispatch payment omitted authorization_id")
         })?;
         let transaction_id = if let Some(unwind) = confirmed {
             unwind.transaction_id.clone()
@@ -184,8 +184,8 @@ impl ChioKernel {
         journal =
             self.advance_compensation_payment(&input, mutation_lock, &journal, &transition, None)?;
         if !journal.is_compensated_before_dispatch() {
-            return Err(KernelError::DurableAdmission(
-                "pre-dispatch payment unwind is not durable".into(),
+            return Err(KernelError::admission_record(
+                "pre-dispatch payment unwind is not durable",
             ));
         }
         Ok(())
@@ -258,8 +258,8 @@ fn validate_confirmed_unwind(
     if journal.authorization_id.as_deref() != Some(unwind.authorization_id.as_str())
         || unwind.settlement_status != status
     {
-        return Err(KernelError::DurableAdmission(
-            "confirmed pre-dispatch unwind conflicts with the original payment".into(),
+        return Err(KernelError::admission_record(
+            "confirmed pre-dispatch unwind conflicts with the original payment",
         ));
     }
     validate_payment_adapter_identifier(&unwind.transaction_id, "confirmed unwind transaction_id")

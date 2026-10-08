@@ -20,8 +20,8 @@ impl ChioKernel {
             == Some(crate::payment::PaymentAuthorizationAttempt::NotStarted)
         {
             if input.confirmed_unwind.is_some() {
-                return Err(KernelError::DurableAdmission(
-                    "unattempted payment conflicts with a rail unwind result".into(),
+                return Err(KernelError::admission_record(
+                    "unattempted payment conflicts with a rail unwind result",
                 ));
             }
             let cancelled = self.advance_compensation_payment(

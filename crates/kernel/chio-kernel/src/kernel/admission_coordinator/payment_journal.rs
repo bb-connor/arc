@@ -12,18 +12,16 @@ impl ChioKernel {
         let journal = runtime
             .store
             .load_payment_journal(admission.operation_id(), &runtime.fence)
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?
+            .map_err(KernelError::admission)?
             .ok_or_else(|| {
-                KernelError::DurableAdmission(
-                    "durable payment participant is absent for the admission operation".to_owned(),
+                KernelError::admission_record(
+                    "durable payment participant is absent for the admission operation",
                 )
             })?;
-        journal
-            .validate()
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        journal.validate().map_err(KernelError::admission)?;
         if journal.operation_id != admission.operation_id() {
-            return Err(KernelError::DurableAdmission(
-                "durable payment participant changed operation identity".to_owned(),
+            return Err(KernelError::admission_record(
+                "durable payment participant changed operation identity",
             ));
         }
         Ok(journal)
@@ -52,10 +50,8 @@ impl ChioKernel {
                 active_fence: &runtime.fence,
                 trusted_now_unix_ms,
             })
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-        journal
-            .validate()
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+            .map_err(KernelError::admission)?;
+        journal.validate().map_err(KernelError::admission)?;
         Ok(journal)
     }
 }

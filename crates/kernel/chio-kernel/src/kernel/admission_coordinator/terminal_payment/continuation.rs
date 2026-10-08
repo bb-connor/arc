@@ -12,8 +12,8 @@ impl ChioKernel {
     ) -> Result<Option<crate::payment::PaymentJournalRecord>, KernelError> {
         journal.validate().map_err(payment_record_error)?;
         if journal.operation_id != operation.binding().operation_id().as_str() {
-            return Err(KernelError::DurableAdmission(
-                "payment settlement changed operation identity".to_owned(),
+            return Err(KernelError::admission_record(
+                "payment settlement changed operation identity",
             ));
         }
         if journal.state == crate::payment::PaymentJournalState::Settled {
@@ -29,17 +29,15 @@ impl ChioKernel {
                     | crate::payment::PaymentJournalState::ReconcileFailed
             )
         {
-            return Err(KernelError::DurableAdmission(
-                "payment journal has no replayable settlement intent".to_owned(),
+            return Err(KernelError::admission_record(
+                "payment journal has no replayable settlement intent",
             ));
         }
         let settle_action = journal.settle_action.ok_or_else(|| {
-            KernelError::DurableAdmission("settling payment journal omitted its action".to_owned())
+            KernelError::admission_record("settling payment journal omitted its action")
         })?;
         let authorization_id = journal.authorization_id.as_deref().ok_or_else(|| {
-            KernelError::DurableAdmission(
-                "settling payment journal omitted authorization_id".to_owned(),
-            )
+            KernelError::admission_record("settling payment journal omitted authorization_id")
         })?;
         let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
             item_failure(

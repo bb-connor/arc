@@ -13,6 +13,7 @@ use crate::admission_operation::{
     AdmissionCaptureError, AdmissionOperationError, AdmissionOperationStoreError,
     AdmissionRecoveryPortError, RemoteRecoveryFailureKind,
 };
+use crate::finding_denial::{FindingDenial, FindingDenialCode};
 use crate::finding_pool::FindingPoolLedgerError;
 use crate::payment::PaymentJournalError;
 use crate::receipt_store::{
@@ -148,6 +149,23 @@ impl AdmissionPaymentJournalError {
                 Disposition::Retry
             }
             Self::Fenced | Self::Invariant(_) => Disposition::Fatal,
+        }
+    }
+}
+
+impl FindingDenial {
+    /// How a loop, worker or endpoint handles this denial. An unavailable
+    /// seam retries; every other family refuses the finding.
+    #[must_use]
+    pub fn disposition(&self) -> Disposition {
+        match self.code() {
+            FindingDenialCode::Unavailable => Disposition::Retry,
+            FindingDenialCode::CarrierInvalid
+            | FindingDenialCode::AuthorityInvalid
+            | FindingDenialCode::BindingMismatch
+            | FindingDenialCode::StaleOrSuperseded
+            | FindingDenialCode::StatusDenied
+            | FindingDenialCode::QuotaExhausted => Disposition::Deny,
         }
     }
 }
