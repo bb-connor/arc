@@ -1,5 +1,7 @@
 import json
 import os
+import subprocess
+import sys
 import unittest
 from pathlib import Path
 
@@ -8,7 +10,8 @@ from support import SwarmCase
 from swarmlib import agent, agents, claims, items, lifecycle, msgs
 from swarmlib.agent import Context, Execution
 
-PROMPTS = Path(__file__).resolve().parent.parent / "prompts"
+ROOT = Path(__file__).resolve().parent.parent
+PROMPTS = ROOT / "prompts"
 
 
 class CommandTest(unittest.TestCase):
@@ -50,6 +53,17 @@ class CommandTest(unittest.TestCase):
     def test_render_missing_field_is_swarm_error(self):
         with self.assertRaises(agent.SwarmError):
             agent.render(PROMPTS / "worker.md", agent="a")
+
+
+class ExecuteTest(SwarmCase):
+    def test_agent_cli_cannot_read_the_runners_stdin(self):
+        # codex exec reads piped stdin as extra prompt input; the runner must close it.
+        code = ("import sys; from pathlib import Path; from swarmlib import agent; "
+                "print(repr(agent.execute(['cat'], Path('.'), Path(sys.argv[1])).output))")
+        proc = subprocess.run([sys.executable, "-c", code, str(self.tmp / "cat.log")], input="LEAKED-STDIN",
+                              capture_output=True, text=True, cwd=ROOT, env={**os.environ, "PYTHONPATH": str(ROOT)})
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertNotIn("LEAKED-STDIN", proc.stdout)
 
 
 class LoopTest(SwarmCase):

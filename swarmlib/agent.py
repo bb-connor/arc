@@ -41,7 +41,9 @@ def execute(command: list[str], cwd: Path, log_path: Path, timeout: float = 4 * 
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with open(log_path, "w") as log:
         try:
-            code = subprocess.run(command, cwd=cwd, stdout=log, stderr=subprocess.STDOUT, timeout=timeout).returncode
+            code = subprocess.run(
+                command, cwd=cwd, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT, timeout=timeout
+            ).returncode
         except subprocess.TimeoutExpired:
             code = 124
     return Execution(code, log_path.read_text(errors="replace"))
