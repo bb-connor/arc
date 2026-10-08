@@ -26,9 +26,14 @@ No implementation or installed release is qualified by this plan.
 
 Read [HOST-CONTRACT](../specs/2026-10-07-desktop-integration/HOST-CONTRACT.md),
 [CAPABILITIES](../specs/2026-10-07-desktop-integration/CAPABILITIES.md),
-[CONSUMERS](../specs/2026-10-07-desktop-integration/CONSUMERS.md) and
+[CONSUMERS](../specs/2026-10-07-desktop-integration/CONSUMERS.md),
+[FIRST-CLASS-INTEGRATIONS](../specs/2026-10-07-desktop-integration/FIRST-CLASS-INTEGRATIONS.md) and
 [QUALIFICATION](../specs/2026-10-07-desktop-integration/QUALIFICATION.md).
 Packet IDs remain stable so platform references survive this amendment.
+Claude Code, Codex, Pi and Hermes are required harness integrations; Herdr is a
+required workspace/plugin integration with optional installation. Mini-swe is
+only an optional reference/test workload. No existing implementation convenience
+sets product priority or substitutes for a named integration.
 
 | Location | Responsibility |
 | --- | --- |
@@ -85,7 +90,7 @@ source or open PR alone establishes runtime readiness.
 - [ ] Qualify S8 phase 1 kernel stop and S30 reach with native authorization and restart evidence (Q08). Tenant/recovery scopes remain unavailable before their own phases; kernel stop implies no task cleanup without separate custody evidence.
 - [ ] Qualify S4/process live cancel/revoke and descendant closure (Q07/Q19). Run the existing `cargo test --locked -p chio-cli --test process_host` at the reconciled owner plus its new live-control cases. Stopped-host admin tests do not prove live control.
 - [ ] Qualify W1 original preparation/command/work lookup, evaluator binding and selected recovery using actual current source and dispositions. A missing handle or response never authorizes a replacement dispatch.
-- [ ] Qualify S28, production endorsement verification and the installed utility's exact approval decision/ID binding (Q05/Q06). Native approvals, OS consent and application confirmation remain distinct.
+- [ ] Qualify S28, production endorsement verification and the actual installed approval route's exact decision/ID binding (Q05/Q06), including direct utility invocation when that component is shipped or exposed. A route without that dependency does not require installing Pi. Native approvals, OS consent and application confirmation remain distinct.
 - [ ] Commit each delta in its owner program, then update references and case evidence here. A green consumer mock cannot close an owner gate.
 
 **Acceptance:** Each capability is eligible only after its own native gates. Read,
@@ -106,7 +111,11 @@ entrypoints recorded by O0/M0 and their Linux/macOS adapters/tests.
 **Depends on:** packet 1's selected-profile inventory and native owner contracts.
 This implementation precedes O7/M10 activation/promotion tests. Candidate assembly
 can precede installed case completion, with unqualified state explicit. Packet
-2a source implementation is not itself final candidate qualification.
+2a source implementation is not itself final candidate qualification. Track
+2a-shared (verifier and owner tests), 2a-linux (Linux activation wiring/tests) and
+2a-macos (macOS activation wiring/tests) separately. O7 requires 2a-shared plus
+2a-linux; M10 requires 2a-shared plus 2a-macos. Neither waits for the other platform.
+These are planning completion records, not new runtime or manifest fields.
 
 - [ ] Preserve the existing self-signed artifact manifest and decoder. Implement a distinct versioned native-profile contract and strict bounded verifier over exact candidate inventory, independently authenticated requirement catalog/release policy and authorized evidence. Reuse existing canonical/signature owners, with trust roots provisioned independently of the submitted manifest.
 - [ ] Encode required owner/Q/C/platform subcases, positive controls and independent observations. Bind exact capability/deployment tuple, policy/catalog, source/runtime/client artifacts and current validity. Refuse empty-ready, omitted/failed/skipped/unknown evidence, unauthorized exclusions, wrong issuer, stale/revoked records and version/floor rollback. Do not let the submitted result set define which tests are required.
@@ -117,8 +126,10 @@ can precede installed case completion, with unqualified state explicit. Packet
 - [ ] Register this predecessor in O6/O7 and M9/M10. Installed tests supply exact candidate-bound outcomes after assembly; the implemented verifier then consumes them for promotion. No mock, unbound CLI, manifest hash list or source-only test closes the installed gate. Commit owner implementation and each native consumer in reviewable slices.
 
 **Acceptance:** One concrete shared owner implements evidence completeness and
-trusted eligibility; actual installed activation refuses every omitted required
-case and substituted tuple while a complete authorized candidate succeeds.
+trusted eligibility. Each platform separately proves actual installed activation
+refuses every omitted required case and substituted tuple while a complete
+authorized candidate succeeds. Shared implementation completion does not claim
+either platform accepted; one platform can promote while the other remains open.
 
 ## Packet 3: Bind real native owner interfaces and qualify candidates
 
@@ -140,6 +151,7 @@ or schema validation alone proves neither stable ABI nor native enforcement.
 **Files:** Existing SDK/application/harness owners plus proposed
 `tests/integration/native_host/`; exact consumer paths chosen in packet 1.
 
+- [ ] Record and implement each required integration in FIRST-CLASS-INTEGRATIONS through its existing plugin/launcher owner: Claude Code, Codex, Pi and Hermes, plus Herdr workspace/plugin delivery. Run H01-H08 and I01-I08 as specified for each exact native tuple; keep every missing host/platform cell open. An initial single-host slice can ship independently but cannot close required support.
 - [ ] Implement CONSUMERS' installed application and harness scenarios using supported public candidate APIs. Use distinct application logic and domain acceptance; two skins over one application-private controller do not prove reuse. W3's two-application acceptance remains an owner gate, not waived by a CLI probe.
 - [ ] Start the selected native profile with workbench, optional operator projection, menu bar and Omarchy shell absent. User-session tests may retain their enrolled login; service-principal tests separately prove authorized unattended operation. Do not infer boot service support from detach.
 - [ ] Perform useful work and an actual denied attempt; independently count dispatch, effects, resource charges and disclosure. Demonstrate application scheduling, model/context management and UX remain external while native authority/state stays with Chio.
@@ -184,8 +196,8 @@ recovery owners; selected consumer fixtures and independent test observers.
 - [ ] For accepted-result composition, qualify the original evaluator contract, exact parents, producer/task/artifact identity, protected graph head and unique joins. Application task completion or fixture minting cannot advance authority (Q26).
 - [ ] Execute unpaid cross-owner work with separate keys, stores, enrolled peers, local policies and refusal on either side (Q28). Distinguish multi-process laboratory evidence from separately administered organizations. Qualify actual W2 service/transport slice; W4/full marketplace completion is not an artificial prerequisite for narrower cooperation.
 - [ ] Lose owner/transport responses and result delivery, revoke present access while retaining historical obligations, and reconcile original identities. Evidence, acceptance, settlement and current disclosure stay separate. Funding is optional and adds its rail/finality gates only when selected.
-- [ ] For a selected sealed-coding workload, consume mini-SWE, W1 and S7 owner evidence. Qualify both recipe and evaluator boundaries separately; candidate imports/builds/tests cannot access outside files, credentials, direct egress, inherited handles, unrelated processes or the trusted acceptance channel. A known-good evaluator control must pass; failures/unknowns never accept work. Preserve safe capture/export, exact base/artifact review, separately authorized patch application and publication. Native-shell alternate access rejection remains mandatory. Coding qualification cannot be used to skip these cases or block unrelated resource profiles.
-- [ ] Qualify each selected doc 19 host with I01-I08 at its exact tuple. Historical Pi results do not qualify a new tuple or the other five hosts. Keep the six-host program open until each passes independently.
+- [ ] For a selected sealed-coding workload, consume its actual harness/resource runner plus W1 and S7 owner evidence. Mini-swe is an optional reference workload and supplies no qualification for a different harness. Qualify both recipe and evaluator boundaries separately; candidate imports/builds/tests cannot access outside files, credentials, direct egress, inherited handles, unrelated processes or the trusted acceptance channel. A known-good evaluator control must pass; failures/unknowns never accept work. Preserve safe capture/export, exact base/artifact review, separately authorized patch application and publication. Native-shell alternate access rejection remains mandatory. Coding qualification cannot be used to skip these cases or block unrelated resource profiles.
+- [ ] Close required Claude Code, Codex, Pi and Hermes support separately on Linux/Omarchy and macOS, plus Herdr plugin acceptance for each platform and required harness. Historical Pi, Megastart or mini-swe results cannot qualify another tuple. Preserve Cursor/OpenClaw and all-six acceptance in doc 19 as broader owner-program obligations; completing these four does not close that six-host program.
 
 **Acceptance:** Product claims follow completed dimensions and exact capabilities.
 No synthetic green UI, application ledger or fixture signature can supply a
@@ -200,6 +212,7 @@ and dependent macOS plan at
 
 - [ ] Build signed/reproducible candidates for the selected native profile after required owner/consumer evidence. Candidate assembly precedes installed qualification. No workbench/projection dependency may enter the baseline through packaging.
 - [ ] Run the complete selected-profile case manifest, installed CLI/harness/application tests and native lifecycle/update/rollback/removal acceptance. Test case removal, tuple substitution and authenticated malformed evidence; none may promote a profile. Exclusions require explicit owner approval and capability absence.
+- [ ] Package and qualify the required Herdr plugin against installed required harnesses without making it mandatory for headless activation. Preserve its existing app contract and authentic owner state across close/reopen/unlink.
 - [ ] Keep optional workbench/QML/Swift/notifications in an independent lane. Selected views consume native owners or the qualified optional projection. Preserve complete OPERATOR/Q17 browser, origin, privacy, accessibility, correlation and exact approval gates; close inherited workbench findings before shipping that client.
 - [ ] Verify native service identity, current credentials, package/architecture, migration/floor and single-writer custody after upgrade/reboot. No unsigned, stale, downgraded or missing backend may start an unconfined fallback.
 - [ ] Measure host resource bounds and preserve a qualified owner stop/recovery route when any UI is unavailable. Distinguish user unenrollment from authorized all-user removal and retained evidence custody.

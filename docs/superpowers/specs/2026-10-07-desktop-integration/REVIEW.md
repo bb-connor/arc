@@ -71,3 +71,18 @@ extension of `chio-release-evidence` plus installed native activation consumers.
 Its current self-signed artifact manifest is explicitly insufficient. Separate
 qualification-only candidate admission prevents an installed-evidence/promotion
 cycle without allowing production activation from incomplete evidence.
+
+## Required harness scope correction, 2026-10-08 UTC
+
+The product owner explicitly required Claude Code, Codex, Pi and Hermes through
+their existing integration owners, plus the Megastart Herdr workspace plugin.
+FIRST-CLASS-INTEGRATIONS now defines individual installed native target cells,
+H01-H08 acceptance and a separate Herdr matrix. Optional installation does not
+make support optional. Mini-swe remains a reference/test workload; its engine or
+Pi-specific launch path cannot be a universal dependency or substitute for the
+required harnesses. Broader doc 19 Cursor/OpenClaw obligations remain intact.
+
+A subsequent shared Codex P2 identified a cross-platform packet 2a dependency.
+RELEASE and the plan now track shared verifier, Linux wiring and macOS wiring
+separately: each platform requires only shared plus its own installed activation
+gates. An unbound verifier still cannot qualify a native activation path.

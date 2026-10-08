@@ -4,13 +4,19 @@ Status: accepted planning direction; implementation and installed acceptance ope
 This contract defines consumer outcomes and evidence, not new endpoints or wire
 operations. [HOST-CONTRACT](HOST-CONTRACT.md) owns the systems boundary;
 [PROGRAM-MAP](../../../architecture/PROGRAM-MAP.md) owns source/owner reconciliation;
-[QUALIFICATION](QUALIFICATION.md) owns applicable Q01-Q30 native and systems acceptance cases.
+[QUALIFICATION](QUALIFICATION.md) owns applicable Q01-Q31 native and systems acceptance cases.
 [Product grounding](research/product-grounding.md) records the public documentation,
 Megastart source and packaged Herdr compatibility used in this design.
 [CAPABILITIES](CAPABILITIES.md) maps the wider passport, delegation, swarm,
 verifiable-work, resource and competitive-research decisions to their owners.
 
 ## Consumer boundary
+
+[FIRST-CLASS-INTEGRATIONS](FIRST-CLASS-INTEGRATIONS.md) requires Claude Code,
+Codex, Pi and Hermes through their existing integration owners, and Herdr through
+its workspace plugin. Every named integration needs its own installed platform
+evidence. One selected harness in C01 is an incremental proof, not completion of
+that support commitment. Mini-swe is an optional reference/test workload only.
 
 An external agent harness and an application coordinator must be able to use the
 selected Chio capabilities with every Chio graphical frontend absent. A client
@@ -48,7 +54,7 @@ its gates pass rather than fabricating that file or port locally.
 | --- | --- | --- |
 | Agent identity, workers and lifecycle | F:`crates/kernel/chio-process/src/registry.rs`, `src/lib.rs`, `WORKER_PROTOCOL.md`; F:`crates/products/chio-cli/PROCESS_HOST.md` | Process owner supplies exact supported bootstrap/invoke/observe/control and stop semantics; reconcile historical ABI versions. Preserve host lock, attempts, credentials and original logical operations. Live control is owner work where the current CLI requires a stopped host. |
 | Authenticated native clients | F:`crates/security/chio-secure-ipc/src/lib.rs`; HOST-CONTRACT native-port inventory | IPC owner ports and qualifies actual OS peer/service identity and bounded connection handling. A token-only sample loopback API is not Darwin/Linux native-control qualification. |
-| Harness integration and model custody | F:`docs/strategy/chio-direction/19-priority-agent-integrations.md`; F:`crates/security/chio-secret-broker/README.md`; F:`sdks/python/chio-mini-swe/src/chio_mini_swe/model.py`, `gateway.py` | Selected harness owner routes supported effects/model calls and supplies provenance; secret/native owners retain credentials and confinement. Each advertised host separately passes I01-I08. |
+| Harness integration and model custody | [FIRST-CLASS-INTEGRATIONS](FIRST-CLASS-INTEGRATIONS.md) names the Claude Code, Codex, Pi and Hermes plugin/launcher owners; F:`docs/strategy/chio-direction/19-priority-agent-integrations.md`; F:`crates/security/chio-secret-broker/README.md` | Each harness owner routes its supported effects/model calls and supplies provenance; secret/native owners retain credentials and confinement. Qualify its actual runtime and transport, not mini-swe as a substitute. Each advertised protected host separately passes I01-I08. |
 | Resource mutation and capacity | `crates/kernel/chio-kernel/src/budget_store.rs`; `crates/platform/chio-store-sqlite/src/budget_store.rs`; PROGRAM-MAP's kernel/store/foundation gates | Resource and budget owners bind trusted caller, assignment/fence, exact request, reservation and result in their own transaction. Platform adapters supply missing OS ports, not a second allowance ledger. |
 | Work commitments and acceptance | W:`docs/superpowers/specs/2026-10-03-work-runtime-design.md`, W1.0-W1.6 in PROGRAM-MAP | Work owner lands preparation/command/query/acceptance and exact original lookup. Application exit, queue completion or a sample mission cannot synthesize accepted W1 work. |
 | Recovery and result release | R:`crates/security/chio-security-types/src/recovery/commands.rs`; R:`crates/platform/chio-control-plane/src/recovery/{transport,runtime}.rs`; R:`crates/kernel/chio-kernel/src/knowledge.rs` | Recovery/knowledge owners reconcile actual revision, recipient, retry disposition, endorsement and disclosure semantics. Use their non-persisting observation and original-operation recovery; retain planned versus implemented release-port differences. |
@@ -182,8 +188,10 @@ operation without a human login only where its separately enrolled principal,
 credential custody, startup and restart contract exist. Detached processes and
 GUI-free startup do not qualify unattended authority.
 
-Optional workbench, Herdr, menu bar and QML consumers then qualify their presentation
-and action bindings against the same owner state. They cannot be prerequisites
-for direct owner clients. Each native profile promotes on its own selected
+Herdr is a required supported workspace/plugin integration, with optional
+installation and use. It qualifies its presentation and action bindings against
+the same owner state and the required harness matrix in FIRST-CLASS-INTEGRATIONS.
+Workbench, menu bar and QML are optional additional consumers. None can be a
+prerequisite for direct owner clients. Each native profile promotes on its own selected
 predecessor and installed gates in QUALIFICATION; a prior sealed-coding release
 is not required. Consumer acceptance waives no applicable native obligation.

@@ -30,6 +30,12 @@ Loss of a consumer leaves original operations, capacity, fences and native
 recovery with their owners. An SDK/control-plane caller is authenticated and
 scoped like every other caller; automation is not an approval bypass.
 
+Required integration coverage is Claude Code, Codex, Pi and Hermes, plus the
+Herdr workspace plugin, as [FIRST-CLASS-INTEGRATIONS](FIRST-CLASS-INTEGRATIONS.md)
+specifies. Supporting a consumer is a product obligation; installing that
+consumer is the operator's choice. No one harness or mini-swe reference workload
+defines the kernel's API, mandatory execution backend or promotion order.
+
 ## Layers and trust
 
 ```mermaid
@@ -76,7 +82,7 @@ Every exposed capability selects exactly one qualified deployment context.
 | Embedded host | A trusted application embeds the portable kernel and provides explicitly inventoried native ports. Portable evaluation alone does not qualify effect, credential, storage, transport or isolation ports. |
 | User-session host | Headless service/host bound to one explicitly enrolled native user session. No browser/menu/terminal workspace is needed to run it. Existing lock, logout, identity, credential and session-reconciliation fences remain effective. |
 | Service host | A separately enrolled service principal with explicit operator authorization, installation identity, scopes, expiry, credential custody, persistent state and boot/restart semantics. Its permitted unattended continuation is declared independently of any human login. A lingering user manager, root UID, detached process, launch registration or unlocked keychain alone grants no authority. |
-| Optional presentation | Workbench, Herdr plugin, Omarchy panel, Mac menu app and diagnostic clients. Closing or uninstalling a presentation component cannot delete native custody or replenish capacity. A consumer with its own application host preserves that host's declared ownership instead of registering a competing authority. |
+| Optional presentation deployment | Workbench, Herdr plugin, Omarchy panel, Mac menu app and diagnostic clients. Herdr support is a required delivery obligation even though operators may omit its installation. Closing or uninstalling a presentation component cannot delete native custody or replenish capacity. A consumer with its own application host preserves that host's declared ownership instead of registering a competing authority. |
 
 A user-session host can qualify while the service-host profile remains
 unavailable, but it must not be advertised as login-independent. Service-host

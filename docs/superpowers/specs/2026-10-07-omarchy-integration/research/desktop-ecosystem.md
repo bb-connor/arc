@@ -1,10 +1,12 @@
 # Desktop ecosystem and resource research
 
+> Scope correction, 2026-10-08 UTC: [FIRST-CLASS-INTEGRATIONS](../../2026-10-07-desktop-integration/FIRST-CLASS-INTEGRATIONS.md) requires Claude Code, Codex, Pi and Hermes, each with native installed acceptance, plus Herdr workspace/plugin acceptance for each selection. Cursor/OpenClaw remain broader doc 19 obligations. Mini-swe is optional reference/conformance only, with no native-readiness, default-backend or first-product role. Older ordering and Pi-only composition proposals below are historical; pinned source findings and safety gates still apply to the profiles that actually consume them. No current native support is established.
+
 Status: Proposed. Research checked 2026-10-07. Confidence: high in the source observations below; moderate in adoption feasibility until a pinned Omarchy x86-64 machine executes the qualification cases. Reading implementations does not establish installed behavior, confinement, crash recovery or a release gate.
 
 Scope: retained source research into project resources, community desktop MCP servers, Hyprland IPC and configuration repair. The active scope is the [Omarchy annex](../ANNEX.md) and [shared desktop program](../../2026-10-07-desktop-integration/README.md). This research is non-normative; the former numbered project/desktop/repair specifications were retired.
 
-Consolidation decision (2026-10-07): former P4 compositor tools and P5 configuration repair are cut from the desktop program. Their source observations below remain useful historical research, not proposed implementation or release gates. Sealed W1 work reuses mini-swe, Pi's restricted session/coding resource and workbench intake/review; any missing importer/oracle belongs to those owners. The six-host program remains host-generic. Delegation and multihost custody belong to kernel/work/process owners and remain deferred for desktop delivery.
+Consolidation decision (2026-10-07): former P4 compositor tools and P5 configuration repair are cut from the desktop program. Their source observations below remain useful historical research, not proposed implementation or release gates. Required integrations now follow FIRST-CLASS-INTEGRATIONS with separate native owner/acceptance records. Mini-swe sealed work, Pi-specific coding resources and workbench intake/review apply only when selected; any missing importer/oracle belongs to the actual resource owner. The broader six-host program remains intact. Native delegation uses C10/Q25 through kernel/work/process owners; cross-host custody transfer/live migration remain separate extensions.
 
 ## Source inventory
 

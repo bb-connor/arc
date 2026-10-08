@@ -36,6 +36,18 @@ proof through their own owner gates. A complete cross-organization claim needs
 the cooperation acceptance, not merely two local interfaces. Sealed coding is
 one workload. It is not a prerequisite for every host integration or resource.
 
+## Required integration scope
+
+The user amendment requires first-class Claude Code, Codex, Pi and Hermes
+support through their existing integration repositories/owners, plus the Herdr
+workspace plugin. [FIRST-CLASS-INTEGRATIONS](../superpowers/specs/2026-10-07-desktop-integration/FIRST-CLASS-INTEGRATIONS.md)
+defines source handoffs and installed acceptance on both native platforms.
+Herdr support is required; its installation is optional. Each host/platform can
+ship when individually qualified, while full coverage remains an explicit open
+program obligation. Cursor/OpenClaw obligations in the broader six-host roadmap
+remain intact. Mini-swe is optional reference/test infrastructure, never a
+mandatory backend, architecture dependency or default product priority.
+
 ## Existing technology controls the design
 
 [PROGRAM-MAP](../architecture/PROGRAM-MAP.md) pins the implementation and roadmap

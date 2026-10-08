@@ -12,6 +12,11 @@ consumer acceptance; [QUALIFICATION](../QUALIFICATION.md) owns native and releas
 failure cases. Public source references use the
 [public Chio repository](https://github.com/backbay-labs/chio).
 
+The [required harness source audit](required-harnesses.md) extends this research
+with concrete Claude Code, Codex, Pi, Hermes and Herdr ownership, exact packaged
+pins and per-integration qualification gaps. FIRST-CLASS-INTEGRATIONS sets their
+required support and replaces mini-swe-first adoption assumptions.
+
 ## Product ambition
 
 **Chio is a Rust kernel for building agentic operating systems.**

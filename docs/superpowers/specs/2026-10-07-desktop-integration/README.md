@@ -13,6 +13,12 @@ do not qualify an implementation, installed profile or release.
 `planning_status: ready_after_adr`; `boundary_class` belongs to each operation.
 Consumer presentation and the optional operator projection are `advisory_only`.
 
+The required first-class integrations are **Claude Code, Codex, Pi and Hermes**,
+plus **Herdr as a workspace/plugin consumer**. Each uses its existing integration
+owner and receives separate native acceptance. Mini-swe is an optional
+reference/test workload; it does not set platform requirements or harness
+priority. See [required integration scope](FIRST-CLASS-INTEGRATIONS.md).
+
 ## Read in order
 
 1. [Accepted native host decision](../../../adr/ADR-0038-desktop-operator-program.md).
@@ -86,6 +92,7 @@ prerequisites for unrelated headless resource or process capabilities.
 | Passports, recursive delegation, swarm authority, work, recovery and competitive choices | CAPABILITIES, product research and PROGRAM-MAP |
 | Real APIs/ABI, native owners, current versus proposed status | PROGRAM-MAP; owner source controls |
 | Native deployment, OS ports, credentials, IPC, lifecycle, resource custody | HOST-CONTRACT plus platform annexes |
+| Required Claude Code, Codex, Pi, Hermes and Herdr support | FIRST-CLASS-INTEGRATIONS, per-platform H01-H08 and existing I01-I08 |
 | Harness/application reuse, shared resources and independent-owner cooperation | CONSUMERS and QUALIFICATION |
 | Optional view correlation, approval display and browser/native clients | OPERATOR; only for consumers selecting this projection |
 | Native adversarial cases, measured budgets, release/update/removal | QUALIFICATION and platform executable case manifests |
