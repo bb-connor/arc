@@ -363,6 +363,28 @@ class ContractScopeCalibration(unittest.TestCase):
             "read::from_wire#1::decode_document", "read::from_wire#2::decode_signed",
         ))
 
+    def test_contract_input_types_record_the_reader_their_type_fixes(self):
+        source = """fn read(a: &[u8], b: &[u8], c: &str) {
+            DocumentJson::from_wire(a, 64)?.decode::<Value>();
+            chio_core::canonical::SignedRecordJson::from_wire(b, 64)?.decode();
+            let text = SignedRecordJson::new(c);
+            text.decode::<Value>()
+        }"""
+        self.assertEqual(self.contracts(source), ((
+            "read::from_wire#1::decode_document",
+            "read::from_wire#2::decode_signed",
+            "read::new#3::decode_signed",
+        ), ()))
+        closure = "fn read(a: &[u8]) { DocumentJson::from_wire(a, 64).and_then(|input| input.decode::<Value>()) }"
+        self.assertEqual(self.contracts(closure), (("read::from_wire#1::decode_document",), ()))
+
+    def test_contract_input_types_have_no_method_selected_reader(self):
+        source = "fn read(bytes: &[u8]) { DocumentJson::from_wire(bytes, 64)?.decode_signed(); }"
+        self.assertEqual(self.contracts(source), (
+            ("read::from_wire#1::unresolved",),
+            ("unresolved decoding contract: read::from_wire#1",),
+        ))
+
     def test_unrelated_receiver_nested_function_and_noise_do_not_supply_contract(self):
         source = '''fn read(bytes: &[u8]) {
             let text = UntrustedJsonText::from_wire(bytes, 64)?;

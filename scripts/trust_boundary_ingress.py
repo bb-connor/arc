@@ -223,7 +223,7 @@ def file_sites(path, code, binding_items, contracts, json_decoders):
             first, *rest = name.split("::")
             expanded = "::".join([bindings.get(first, first), *rest])
             parts = expanded.split("::")
-            if len(parts) >= 2 and parts[-2] == "UntrustedJsonText" and parts[-1] in {"new", "from_wire"}:
+            if len(parts) >= 2 and parts[-2] in contracts.INPUT_TYPES and parts[-1] in {"new", "from_wire"}:
                 original_reader = True
             if parts[0] in FORMATS and parts[-1] in FORMATS[parts[0]][1]:
                 census[path].append(f"{owner}::format-{FORMATS[parts[0]][0]}::{parts[-1]}")

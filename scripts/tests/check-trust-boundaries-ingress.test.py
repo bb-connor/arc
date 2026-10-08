@@ -136,6 +136,19 @@ class IngressCensusCalibration(unittest.TestCase):
         self.assertIn("read::original-json-reader::UntrustedJsonText", rows)
         self.assertIn(f"publish::shared-reader::{path}::read", rows)
 
+    def test_contract_input_types_are_original_readers(self):
+        path = "crates/platform/demo/src/input.rs"
+        code = """
+        use chio_core::canonical::DocumentJson;
+        fn envelope(bytes: &[u8]) { DocumentJson::from_wire(bytes, 100)?.decode() }
+        fn record(bytes: &[u8]) { chio_core::canonical::SignedRecordJson::from_wire(bytes, 100)?.decode() }
+        fn publish(bytes: &[u8]) { envelope(bytes) }
+        """
+        rows = self.census({path: code}).get(path, [])
+        self.assertIn("envelope::original-json-reader::UntrustedJsonText", rows)
+        self.assertIn("record::original-json-reader::UntrustedJsonText", rows)
+        self.assertIn(f"publish::shared-reader::{path}::envelope", rows)
+
     def test_glob_reexport_cycle_terminates_for_an_unresolved_call(self):
         facade = "crates/platform/input-lib/src/lib.rs"
         helper = "crates/platform/input-lib/src/json.rs"

@@ -20,6 +20,10 @@ METHODS = frozenset({
     "canonicalize", "decode_external", "decode_document", "decode_signed",
     "decode_canonical", "decode_canonical_with",
 })
+# Contract input types fix the reader by type. Their single `decode` records
+# the method-selected reader it applies, so evidence names the same contract.
+TYPED_INPUTS = {"DocumentJson": "decode_document", "SignedRecordJson": "decode_signed"}
+INPUT_TYPES = frozenset({"UntrustedJsonText", *TYPED_INPUTS})
 FUNCTION = re.compile(r"\bfn\s+(\w+)\s*(?:<[^{};]*>)?\s*\(")
 
 
@@ -72,18 +76,23 @@ def owner_code(code, row):
 
 
 def input_names(code):
-    names = {"UntrustedJsonText"}
+    names = set(INPUT_TYPES)
     names.update(re.findall(r"\bUntrustedJsonText\s+as\s+(\w+)", code))
     names.update(re.findall(r"\btype\s+(\w+)(?:<[^;=]*>)?\s*=\s*(?:\w+::)*UntrustedJsonText\b", code))
     return names
 
 
-def receiver_methods(code, receiver):
+def input_readers(name):
+    contract = TYPED_INPUTS.get(name)
+    return {"decode": contract} if contract else {method: method for method in METHODS}
+
+
+def receiver_methods(code, receiver, readers):
     pattern = r"\b" + re.escape(receiver) + r"\s*\.\s*(\w+)\s*(?=\(|::<)"
-    return [match.group(1) for match in re.finditer(pattern, code) if match.group(1) in METHODS]
+    return [readers[match.group(1)] for match in re.finditer(pattern, code) if match.group(1) in readers]
 
 
-def chain_methods(code, start):
+def chain_methods(code, start, readers):
     methods = []
     cursor = start
     while True:
@@ -93,13 +102,13 @@ def chain_methods(code, start):
         method = match.group(1)
         argument_start = cursor + match.end() - 1
         argument_end = closing(code, argument_start)
-        if method in METHODS:
-            methods.append(method)
+        if method in readers:
+            methods.append(readers[method])
         elif method in {"and_then", "map"}:
             arguments = code[argument_start + 1:argument_end - 1]
             closure = re.match(r"\s*(?:move\s+)?\|\s*(\w+)\s*\|", arguments)
             if closure:
-                methods.extend(receiver_methods(arguments[closure.end():], closure.group(1)))
+                methods.extend(receiver_methods(arguments[closure.end():], closure.group(1), readers))
         cursor = argument_end
 
 
@@ -107,16 +116,17 @@ def chain_methods(code, start):
 def decoding_contracts(code):
     contracts, errors, ordinals = [], [], Counter()
     names = "|".join(re.escape(name) for name in sorted(input_names(code)))
-    for match in re.finditer(rf"\b(?:{names})\s*::\s*(new|from_wire)\s*\(", code):
+    for match in re.finditer(rf"\b({names})\s*::\s*(new|from_wire)\s*\(", code):
         row = function_at(code, match.start())
         if not row:
             errors.append("constructor outside a named function")
             continue
-        constructor = match.group(1)
+        readers = input_readers(match.group(1))
+        constructor = match.group(2)
         ordinals[row[0]] += 1
         site = f"{row[0]}::{constructor}#{ordinals[row[0]]}"
         arguments_end = closing(code, match.end() - 1)
-        methods, chain_end = chain_methods(code, arguments_end)
+        methods, chain_end = chain_methods(code, arguments_end, readers)
         if not methods:
             prefix = code[row[2] + 1:match.start()]
             binding = re.search(r"\blet\s+(?:mut\s+)?(\w+)(?:\s*:[^=;]+)?\s*=\s*(?:\w+\s*::\s*)*$", prefix)
@@ -130,7 +140,7 @@ def decoding_contracts(code):
                 for receiver, receiver_scope in receivers:
                     shadow = re.search(r"\b(?:let\s+(?:mut\s+)?" + re.escape(receiver) + r"\b|" + re.escape(receiver) + r"\s*=(?!=))", receiver_scope)
                     scope = receiver_scope[:shadow.start()] if shadow else receiver_scope
-                    methods.extend(receiver_methods(scope, receiver))
+                    methods.extend(receiver_methods(scope, receiver, readers))
                     for alias in re.finditer(r"\blet\s+(\w+)\s*=\s*&?" + re.escape(receiver) + r"\s*;", scope):
                         if alias.group(1) not in names_seen:
                             names_seen.add(alias.group(1))

@@ -263,7 +263,7 @@ def scan(root, catalog):
             found["decoder_census"][path] = sorted(
                 f"{owner_at(code, offset)}::{decoder}" for offset, decoder in decoders
             )
-        for match in re.finditer(r"UntrustedJsonText::(new|from_wire)\s*\(", code):
+        for match in re.finditer(r"(?:UntrustedJsonText|\bDocumentJson|\bSignedRecordJson)::(new|from_wire)\s*\(", code):
             found["constructors"].append(f"{path}::{owner_at(code, match.start())}::{match.group(1)}")
         if path in decoder_owners:
             for offset, decoder in decoders:
