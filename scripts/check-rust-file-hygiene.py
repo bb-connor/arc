@@ -499,8 +499,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/kernel/chio-kernel/src/budget_store/in_memory.rs": allow(
         "2026-12-31",
         "in-memory budget store assembled from include! fragments; capped until the fragments become modules",
-        max_lines=2_213,
-        max_fragments=2,
+        max_fragments=1,
     ),
     "crates/platform/chio-store-sqlite/src/finding_status_store.rs": allow(
         "2027-01-31",

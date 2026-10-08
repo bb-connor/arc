@@ -1,5 +1,9 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
+//! Invocation increments and monetary hold charges for the in-memory budget store.
+use super::*;
+
 impl InMemoryBudgetStoreInner {
-    fn try_increment(
+    pub(super) fn try_increment(
         &mut self,
         capability_id: &str,
         grant_index: usize,
@@ -186,7 +190,7 @@ impl InMemoryBudgetStoreInner {
         Ok(allowed)
     }
 
-    fn try_charge_cost(
+    pub(super) fn try_charge_cost(
         &mut self,
         capability_id: &str,
         grant_index: usize,
@@ -207,8 +211,11 @@ impl InMemoryBudgetStoreInner {
         )
     }
 
-    #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
-    fn try_charge_cost_with_ids(
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
+    pub(super) fn try_charge_cost_with_ids(
         &mut self,
         capability_id: &str,
         grant_index: usize,
@@ -232,8 +239,11 @@ impl InMemoryBudgetStoreInner {
         )
     }
 
-    #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
-    fn try_charge_cost_with_ids_and_authority(
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
+    pub(super) fn try_charge_cost_with_ids_and_authority(
         &mut self,
         capability_id: &str,
         grant_index: usize,
@@ -548,7 +558,7 @@ impl InMemoryBudgetStoreInner {
         Ok(allowed)
     }
 
-    fn capture_invocation_reservations(
+    pub(super) fn capture_invocation_reservations(
         &mut self,
         request: &BudgetCaptureInvocationRequest,
     ) -> Result<(bool, u64, String, BudgetUsageRecord), BudgetStoreError> {

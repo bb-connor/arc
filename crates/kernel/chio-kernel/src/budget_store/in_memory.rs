@@ -222,8 +222,8 @@ struct InMemoryBudgetStoreInner {
 
 mod accounting;
 
+mod admission;
 mod composite;
-include!("in_memory/admission.rs");
 include!("in_memory/terminal.rs");
 mod trait_impl;
 
