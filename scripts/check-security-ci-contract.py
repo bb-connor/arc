@@ -794,6 +794,7 @@ EXPECTED_PUBLISHER_STEP_ENV = {
     "PUBLICATION_BINDING_JSON": "${{ needs.authorize-security-check-publication.outputs.publication_binding_json }}",
     "PUBLISHER_REF": "${{ github.ref }}",
     "PUBLISHER_SHA": "${{ github.sha }}",
+    "REPOSITORY_ID": "${{ github.repository_id }}",
     "SECURITY_APP_ID": "${{ vars.CHIO_SECURITY_APP_ID }}",
     "SECURITY_APP_INSTALLATION_ID": "${{ vars.CHIO_SECURITY_APP_INSTALLATION_ID }}",
     "SECURITY_APP_PRIVATE_KEY_PEM": "${{ secrets.CHIO_SECURITY_APP_PRIVATE_KEY_PEM }}",
@@ -948,7 +949,7 @@ EXPECTED_TRUST_JOB_DIGESTS = {
     (
         "enterprise evidence finalizer",
         "publish-security-contract",
-    ): "b3211f80ec4a7c81a6e6c29bbfbd414a7033959188dd50d8192122b18a738d3d",
+    ): "c3d09b25af56e575f5c77390d21e6c2ff592211fe8c0ffb90144076558d9f2e6",
     (
         "security contract revocation",
         "bind-revocation",
@@ -1866,8 +1867,15 @@ def validate_environment_provisioning_document(root: Path) -> None:
         "The\nwhole scan retries at most three times and fails closed if a run appears or any\nmaximum advances.",
         "including an\nearlier failure followed by a successful rerun",
         "This is deliberately conservative: any completed non-success CI\n"
-        "completion for the current `E` and `M` can permanently tombstone\n"
-        "that tuple",
+        "completion for the current `E`, under any pull request, base, test merge, or run\n"
+        "title, can permanently tombstone that tuple",
+        "paginates the complete CI history\nof the evidence head",
+        "A run title is never\nauthentication and never removes a run from this history.",
+        "such a run is never positive\nevidence and never tombstones `E`.",
+        "leaves the history incomplete.",
+        "It never falls back to an unfiltered listing.",
+        "It normalizes the dedicated-App\n`Security contract` namespace before the four Actions mirrors",
+        "Recovery requires a new reviewed evidence head `E`.",
         '{context: "Security mirror / Build, lint, test", integration_id: 15368}',
         '{context: "Security mirror / MSRV build and test", integration_id: 15368}',
         '{context: "Security mirror / cargo-vet (locked supply-chain audit)", integration_id: 15368}',
@@ -6990,6 +6998,7 @@ def validate(root: Path) -> None:
             'test "${SECURITY_APP_ID}" != "15368"',
             '[[ "${FINALIZER_RUN_ATTEMPT}" =~ ^[1-9][0-9]*$ ]]',
             '[[ "${FINALIZER_RUN_ID}" =~ ^[1-9][0-9]*$ ]]',
+            '[[ "${REPOSITORY_ID}" =~ ^[1-9][0-9]*$ ]]',
             'test "${PUBLISHER_REF}" = "refs/heads/main"',
             'test "${LIVE_SECURITY_DEFINITION_SHA}" = "${SECURITY_DEFINITION_SHA}"',
             "contents/.github/workflows/enterprise-evidence-finalizer.yml?ref=${SECURITY_DEFINITION_SHA}",
@@ -7057,14 +7066,20 @@ def validate(root: Path) -> None:
             'query="event=pull_request&head_sha=${EVIDENCE_SHA}&"',
             "actions/workflows/ci.yml/runs?${query}per_page=100&page=1",
             'if test "${total_count}" -ge 1000; then',
-            "actions/workflows/ci.yml/runs?per_page=100&page=1",
+            'reaches the 1,000-result listing ceiling and cannot be proven complete" >&2',
             "actions/workflows/ci.yml/runs?${query}per_page=100&page=${page}",
             'page_response="${first_response}"',
             'test "${page_total}" = "${total_count}"',
             'test "$(jq -r \'length\' <<< "${page_runs}")" = 100',
             'test "$(jq -r \'[.[].id] | unique | length\' <<< "${ci_runs}")" = "${total_count}"',
             "list_matching_ci_runs()",
-            ".display_title == $expected_run_name",
+            ".head_repository.full_name != $repository",
+            "authoritative_ci_identity()",
+            '(.repository.id | tostring) == $repository_id and',
+            "(.head_repository.id | tostring) == $repository_id",
+            'if ! authoritative_ci_identity "${listed_ci_run}"; then',
+            'test "$(jq -r \'.repository.id\' <<< "${candidate_run}")" = "${REPOSITORY_ID}"',
+            'test "$(jq -r \'.head_repository.id\' <<< "${candidate_run}")" = "${REPOSITORY_ID}"',
             'test "$(jq -r --arg run_id "${CI_RUN_ID}" \'[.[] | select((.id | tostring) == $run_id)] | length\' <<< "${matching_ci_runs}")" = 1',
             "get_current_ci_run()",
             "get_exact_ci_attempt()",
@@ -7254,10 +7269,31 @@ def validate(root: Path) -> None:
         )
         > bad_ci_routine.find('if test "${scan_incomplete}" = true; then')
         or 'test "${scan_stable}" = true' not in bad_ci_routine
+        or bad_ci_routine.count("scan_incomplete=true") != 2
     ):
         raise ContractError(
             "dedicated Security contract bad-CI evidence does not dominate failure reconciliation"
         )
+    if (
+        ".display_title" in bad_ci_routine
+        or "query=''" in bad_ci_routine
+        or "actions/workflows/ci.yml/runs?per_page=" in bad_ci_routine
+        or "expected_ci_run_name" in bad_ci_routine
+    ):
+        raise ContractError(
+            "dedicated Security contract CI history is not the complete evidence-head history"
+        )
+
+    def denial_calls(routine: str, call: str) -> list[str]:
+        return [line.strip() for line in routine.splitlines() if line.strip().startswith(call + " ")]
+
+    dedicated_denial = '"${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${EXTERNAL_ID}"'
+    for routine, call in ((bad_ci_routine, "normalize_bad_ci_namespace"), (retry_routine, "fail_existing_retry_namespace")):
+        calls = denial_calls(routine, call)
+        if len(calls) != 5 or calls[0] != f"{call} {dedicated_denial}":
+            raise ContractError(
+                "dedicated Security contract denial no longer precedes the Actions mirrors"
+            )
     if (
         publication_guard.strip() != (
             'require_publishable_ci() {\n  reconcile_bad_ci\n  test "${bad_ci_observed}" = false\n'

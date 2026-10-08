@@ -2329,6 +2329,7 @@ jobs:
           PUBLICATION_BINDING_JSON: ${{ needs.authorize-security-check-publication.outputs.publication_binding_json }}
           PUBLISHER_REF: ${{ github.ref }}
           PUBLISHER_SHA: ${{ github.sha }}
+          REPOSITORY_ID: ${{ github.repository_id }}
           SECURITY_APP_ID: ${{ vars.CHIO_SECURITY_APP_ID }}
           SECURITY_APP_INSTALLATION_ID: ${{ vars.CHIO_SECURITY_APP_INSTALLATION_ID }}
           SECURITY_APP_PRIVATE_KEY_PEM: ${{ secrets.CHIO_SECURITY_APP_PRIVATE_KEY_PEM }}
@@ -2357,6 +2358,7 @@ jobs:
           [[ "${CI_RUN_ATTEMPT}" =~ ^[1-9][0-9]*$ ]]
           [[ "${CI_RUN_ID}" =~ ^[1-9][0-9]*$ ]]
           [[ "${CI_WORKFLOW_ID}" =~ ^[1-9][0-9]*$ ]]
+          [[ "${REPOSITORY_ID}" =~ ^[1-9][0-9]*$ ]]
           test "${PUBLISHER_REF}" = "refs/heads/main"
           test "${LIVE_SECURITY_DEFINITION_SHA}" = "${SECURITY_DEFINITION_SHA}"
           authorized_publisher_blob_sha="$({
@@ -2749,7 +2751,6 @@ jobs:
 
           reconcile_bad_ci() {
             bad_ci_observed=false
-            expected_ci_run_name="CI N=${PR_NUMBER} E=${EVIDENCE_SHA} B=$(jq -r '.base.sha' <<< "${canonical_binding}") M=${MERGE_COMMIT_SHA}"
 
             list_matching_ci_runs() {
               # Conditional callers disable errexit throughout this helper.
@@ -2773,21 +2774,8 @@ jobs:
               total_count="$(jq -er '.total_count | select(type == "number" and . >= 0 and floor == .)' <<< "${first_response}")" || return 1
               [[ "${total_count}" =~ ^[0-9]+$ ]] || return 1
               if test "${total_count}" -ge 1000; then
-                query=''
-                first_response="$({
-                  curl \
-                    --proto '=https' \
-                    --tlsv1.2 \
-                    --fail \
-                    --silent \
-                    --show-error \
-                    -H "Accept: application/vnd.github+json" \
-                    -H "Authorization: Bearer ${GH_TOKEN}" \
-                    -H "X-GitHub-Api-Version: 2026-03-10" \
-                    "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?per_page=100&page=1"
-                })" || return 1
-                total_count="$(jq -er '.total_count | select(type == "number" and . >= 0 and floor == .)' <<< "${first_response}")" || return 1
-                [[ "${total_count}" =~ ^[0-9]+$ ]] || return 1
+                echo "CI history for ${EVIDENCE_SHA} reaches the 1,000-result listing ceiling and cannot be proven complete" >&2
+                return 1
               fi
               while true; do
                 if test "${page}" = 1; then
@@ -2820,19 +2808,34 @@ jobs:
                 page="$((page + 1))"
               done
               test "$(jq -r '[.[].id] | unique | length' <<< "${ci_runs}")" = "${total_count}" || return 1
+              # A run whose head is another repository is outside this
+              # history. Every other listed run, whatever its title, belongs
+              # to it; one without a proven identity makes the history
+              # incomplete rather than disappearing from it.
               jq -cS \
-                --arg evidence_sha "${EVIDENCE_SHA}" \
-                --arg expected_run_name "${expected_ci_run_name}" \
                 --arg repository "${GITHUB_REPOSITORY}" \
-                --arg workflow_id "${CI_WORKFLOW_ID}" \
-                '[.[] | select(
+                '[.[] | select((
                   .path == ".github/workflows/ci.yml" and
+                  (.head_repository | type) == "object" and
+                  (.head_repository.full_name | type) == "string" and
+                  .head_repository.full_name != $repository
+                ) | not)] | sort_by(.id)' <<< "${ci_runs}" || return 1
+            }
+
+            authoritative_ci_identity() {
+              test "$(jq -r \
+                --arg evidence_sha "${EVIDENCE_SHA}" \
+                --arg repository "${GITHUB_REPOSITORY}" \
+                --arg repository_id "${REPOSITORY_ID}" \
+                --arg workflow_id "${CI_WORKFLOW_ID}" \
+                '.path == ".github/workflows/ci.yml" and
                   .event == "pull_request" and
                   (.workflow_id | tostring) == $workflow_id and
-                  .display_title == $expected_run_name and
                   .head_sha == $evidence_sha and
-                  .head_repository.full_name == $repository
-                )] | sort_by(.id)' <<< "${ci_runs}" || return 1
+                  .repository.full_name == $repository and
+                  (.repository.id | tostring) == $repository_id and
+                  .head_repository.full_name == $repository and
+                  (.head_repository.id | tostring) == $repository_id' <<< "$1")" = true
             }
 
             get_current_ci_run() {
@@ -2871,9 +2874,11 @@ jobs:
               test "$(jq -r '.workflow_id' <<< "${candidate_run}")" = "${CI_WORKFLOW_ID}"
               test "$(jq -r '.path' <<< "${candidate_run}")" = .github/workflows/ci.yml
               test "$(jq -r '.event' <<< "${candidate_run}")" = pull_request
-              test "$(jq -r '.display_title' <<< "${candidate_run}")" = "${expected_ci_run_name}"
               test "$(jq -r '.head_sha' <<< "${candidate_run}")" = "${EVIDENCE_SHA}"
+              test "$(jq -r '.repository.full_name' <<< "${candidate_run}")" = "${GITHUB_REPOSITORY}"
+              test "$(jq -r '.repository.id' <<< "${candidate_run}")" = "${REPOSITORY_ID}"
               test "$(jq -r '.head_repository.full_name' <<< "${candidate_run}")" = "${GITHUB_REPOSITORY}"
+              test "$(jq -r '.head_repository.id' <<< "${candidate_run}")" = "${REPOSITORY_ID}"
             }
 
             scan_stable=false
@@ -2892,6 +2897,10 @@ jobs:
               while IFS= read -r listed_ci_run; do
                 run_id="$(jq -r '.id' <<< "${listed_ci_run}")"
                 [[ "${run_id}" =~ ^[1-9][0-9]*$ ]]
+                if ! authoritative_ci_identity "${listed_ci_run}"; then
+                  scan_incomplete=true
+                  continue
+                fi
                 current_ci_run="$(get_current_ci_run "${run_id}")"
                 require_matching_ci_identity "${current_ci_run}" "${run_id}"
                 max_attempt="$(jq -r '.run_attempt' <<< "${current_ci_run}")"
@@ -2994,11 +3003,11 @@ jobs:
                 bad_ci_create_missing=true
               fi
             fi
+            normalize_bad_ci_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${EXTERNAL_ID}"
             normalize_bad_ci_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / Build, lint, test" "${EXTERNAL_ID}:actions:build"
             normalize_bad_ci_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / MSRV build and test" "${EXTERNAL_ID}:actions:msrv"
             normalize_bad_ci_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / cargo-vet (locked supply-chain audit)" "${EXTERNAL_ID}:actions:vet"
             normalize_bad_ci_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / cargo-deny (supply-chain bans/advisories/licenses)" "${EXTERNAL_ID}:actions:deny"
-            normalize_bad_ci_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${EXTERNAL_ID}"
             echo "Bad current CI completion permanently tombstoned ${EXTERNAL_ID}." >> "${GITHUB_STEP_SUMMARY}"
             bad_ci_observed=true
             return 0
@@ -3113,11 +3122,11 @@ jobs:
               revalidate_live_publication_head
               test "$(jq -r --arg id "${retry_id}" --arg app "${retry_app}" --arg slug "${retry_slug}" --arg name "${retry_name}" --arg external "${retry_external}" --arg head "${MERGE_COMMIT_SHA}" --arg text "${retry_text}" '(.id | tostring) == $id and .name == $name and .external_id == $external and .head_sha == $head and (.app.id | tostring) == $app and .app.slug == $slug and .status == "completed" and .conclusion == "failure" and .output.text == $text' <<< "${retry_failed}")" = true
             }
+            fail_existing_retry_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${EXTERNAL_ID}"
             fail_existing_retry_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / Build, lint, test" "${EXTERNAL_ID}:actions:build"
             fail_existing_retry_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / MSRV build and test" "${EXTERNAL_ID}:actions:msrv"
             fail_existing_retry_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / cargo-vet (locked supply-chain audit)" "${EXTERNAL_ID}:actions:vet"
             fail_existing_retry_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / cargo-deny (supply-chain bans/advisories/licenses)" "${EXTERNAL_ID}:actions:deny"
-            fail_existing_retry_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${EXTERNAL_ID}"
           }
 
           require_publishable_ci() {

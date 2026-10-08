@@ -359,10 +359,18 @@ Publication rejects any
 existing failed or duplicate namespace member. Its success-publication branch
 is POST-only and never updates an existing check. The protected job is an
 authority reconciler: before every success POST, immediately after every
-success POST, and after the complete set, it paginates authenticated CI run
-identities for the current PR/E/M. For every matching run it reads the current
+success POST, and after the complete set, it paginates the complete CI history
+of the evidence head: every `ci.yml` `pull_request` run whose API head is `E`,
+for any pull request, base, test merge, or run title. A run title is never
+authentication and never removes a run from this history. A run whose head
+repository is another repository is outside it: such a run is never positive
+evidence and never tombstones `E`. A listed run without a proven
+same-repository head and repository identity, the trusted workflow ID and path,
+the `pull_request` event, and API head `E` leaves the history incomplete.
+For every matching run it reads the current
 maximum attempt, retrieves every exact historical attempt from one through that
 maximum, and fails closed before GitHub's 1,000-result filtered-search ceiling.
+It never falls back to an unfiltered listing.
 A completed non-success attempt dominates any newer incomplete attempt and
 immediately selects the failure-only branch. An incomplete history blocks
 publication when no bad completion exists. It requires the maximum
@@ -374,14 +382,16 @@ maximum advances. If any completed non-success attempt exists, including an
 earlier failure followed by a successful rerun,
 its separate late-CI branch creates missing failure tombstones or
 updates existing members only toward completed failure while preserving
-external IDs and source metadata. After PR or merge-ref drift, the
+external IDs and source metadata. It normalizes the dedicated-App
+`Security contract` namespace before the four Actions mirrors, so a mirror
+namespace that fails closed cannot prevent the dedicated tombstone. After PR or merge-ref drift, the
 publisher branch may normalize existing authority on historical `M` but cannot
 create a missing namespace. Every serialized ordering converges to a failed
 authority tombstone that publication cannot
 restore. This is deliberately conservative: any completed non-success CI
-completion for the current `E` and `M` can permanently tombstone
-that tuple even when a later rerun succeeds. Recovery requires a new reviewed
-source, evidence, or test merge tuple.
+completion for the current `E`, under any pull request, base, test merge, or run
+title, can permanently tombstone that tuple even when a later rerun succeeds.
+Recovery requires a new reviewed evidence head `E`.
 
 Required CI does not subscribe to label-removal events. Its caller and reusable
 enterprise and nonce/FIPS lanes isolate concurrency by run ID and attempt and do
@@ -389,9 +399,10 @@ not cancel another critical run. The process-isolated nextest lane is reported b
 `Security nextest advisory`, outside the CI workflow. Its failures remain visible
 with their original conclusion and JUnit artifact; they do not publish or revoke
 security authority. Every critical CI dependency and exact-success assertion
-remains mandatory. A cancelled critical run for the current tuple remains
-failure-authoritative. Cancellation of an obsolete tuple can affect only its
-historical `M`, subject to the existing no-create rule, and never a new tuple.
+remains mandatory. A cancelled critical run remains failure-authoritative for
+its evidence head, so the publisher refuses every later tuple on the same `E`.
+The listener's writes for an obsolete tuple still reach only its historical `M`,
+subject to the existing no-create rule.
 
 The post-merge audit reads the recorded qualification on test merge `M`, authenticates
 all five App-and-name namespaces and their `arc:<PR>:<E>:<M>:<S>` source identity,

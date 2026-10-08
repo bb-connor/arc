@@ -4100,9 +4100,44 @@ for label, old, new in (
     (
         "revocation contract permits a successful rerun to restore a tuple",
         "This is deliberately conservative: any completed non-success CI\n"
-        "completion for the current `E` and `M` can permanently tombstone\n"
-        "that tuple",
+        "completion for the current `E`, under any pull request, base, test merge, or run\n"
+        "title, can permanently tombstone that tuple",
         "a later successful rerun restores the tuple",
+    ),
+    (
+        "publisher contract scopes CI history to one test merge tuple",
+        "paginates the complete CI history\nof the evidence head",
+        "paginates CI history for the current PR/E/M",
+    ),
+    (
+        "publisher contract lets a run title select CI history",
+        "A run title is never\nauthentication and never removes a run from this history.",
+        "A run title selects the history.",
+    ),
+    (
+        "publisher contract lets another repository tombstone the evidence head",
+        "such a run is never positive\nevidence and never tombstones `E`.",
+        "such a run may tombstone `E`.",
+    ),
+    (
+        "publisher contract silently drops runs without a proven identity",
+        "leaves the history incomplete.",
+        "is ignored.",
+    ),
+    (
+        "publisher contract restores the unfiltered history fallback",
+        "It never falls back to an unfiltered listing.",
+        "It falls back to an unfiltered listing.",
+    ),
+    (
+        "publisher contract reconciles Actions mirrors before the dedicated namespace",
+        "It normalizes the dedicated-App\n`Security contract` namespace before the four Actions mirrors",
+        "It normalizes the four Actions mirrors before the dedicated namespace",
+    ),
+    (
+        "publisher contract lets a new test merge recover a failed evidence head",
+        "Recovery requires a new reviewed evidence head `E`.",
+        "Recovery requires a new test merge.",
     ),
     (
         "revocation contract documents the listener attempt instead of the immutable event attempt",
@@ -4329,7 +4364,7 @@ assert_rejected(
     "weakens App, main-ref, binding, or check payload authentication",
 )
 assert_rejected(
-    "publisher disables the uncapped workflow-run fallback",
+    "publisher disables the 1,000-result history completeness refusal",
     "enterprise-evidence-finalizer.yml",
     replace_in_named_step(
         "Reconcile exact five-context merge authority",
@@ -4453,10 +4488,10 @@ assert_rejected(
     "enterprise-evidence-finalizer.yml",
     replace_in_named_step(
         "Reconcile exact five-context merge authority",
-        "scan_incomplete=true",
-        "true",
+        "                    scan_incomplete=true\n                    continue\n",
+        "                    true\n                    continue\n",
     ),
-    "weakens App, main-ref, binding, or check payload authentication",
+    "bad-CI evidence does not dominate failure reconciliation",
 )
 assert_rejected(
     "publisher lets an incomplete newer attempt suppress a completed failure",
@@ -4477,6 +4512,70 @@ assert_rejected(
         "[.[].id] | unique | length",
     ),
     "weakens App, main-ref, binding, or check payload authentication",
+)
+assert_rejected(
+    "publisher history filters CI runs by title",
+    "enterprise-evidence-finalizer.yml",
+    replace_in_named_step(
+        "Reconcile exact five-context merge authority",
+        ".head_repository.full_name != $repository",
+        '.head_repository.full_name != $repository or .display_title != ""',
+    ),
+    "is not the complete evidence-head history",
+)
+assert_rejected(
+    "publisher history falls back to an unfiltered listing",
+    "enterprise-evidence-finalizer.yml",
+    replace_in_named_step(
+        "Reconcile exact five-context merge authority",
+        'echo "CI history for ${EVIDENCE_SHA} reaches the 1,000-result listing ceiling and cannot be proven complete" >&2',
+        "query=''",
+    ),
+    "weakens App, main-ref, binding, or check payload authentication",
+)
+assert_rejected(
+    "publisher silently drops CI history without a proven identity",
+    "enterprise-evidence-finalizer.yml",
+    replace_in_named_step(
+        "Reconcile exact five-context merge authority",
+        "                  scan_incomplete=true\n                  continue\n",
+        "                  continue\n",
+    ),
+    "bad-CI evidence does not dominate failure reconciliation",
+)
+assert_rejected(
+    "publisher accepts CI history without the head repository ID",
+    "enterprise-evidence-finalizer.yml",
+    replace_in_named_step(
+        "Reconcile exact five-context merge authority",
+        'test "$(jq -r \'.head_repository.id\' <<< "${candidate_run}")" = "${REPOSITORY_ID}"',
+        "true",
+    ),
+    "weakens App, main-ref, binding, or check payload authentication",
+)
+assert_rejected(
+    "publisher bad-CI branch reconciles Actions mirrors before the Security contract",
+    "enterprise-evidence-finalizer.yml",
+    replace_in_named_step(
+        "Reconcile exact five-context merge authority",
+        'normalize_bad_ci_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${EXTERNAL_ID}"\n'
+        '            normalize_bad_ci_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / Build, lint, test" "${EXTERNAL_ID}:actions:build"\n',
+        'normalize_bad_ci_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / Build, lint, test" "${EXTERNAL_ID}:actions:build"\n'
+        '            normalize_bad_ci_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${EXTERNAL_ID}"\n',
+    ),
+    "denial no longer precedes the Actions mirrors",
+)
+assert_rejected(
+    "publisher authorizing-retry branch fails Actions mirrors before the Security contract",
+    "enterprise-evidence-finalizer.yml",
+    replace_in_named_step(
+        "Reconcile exact five-context merge authority",
+        'fail_existing_retry_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${EXTERNAL_ID}"\n'
+        '            fail_existing_retry_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / Build, lint, test" "${EXTERNAL_ID}:actions:build"\n',
+        'fail_existing_retry_namespace "${GH_TOKEN}" 15368 github-actions "Security mirror / Build, lint, test" "${EXTERNAL_ID}:actions:build"\n'
+        '            fail_existing_retry_namespace "${installation_token}" "${SECURITY_APP_ID}" chio-security-authority "Security contract" "${EXTERNAL_ID}"\n',
+    ),
+    "denial no longer precedes the Actions mirrors",
 )
 assert_rejected(
     "publisher displaced revoker does not reconcile every authority namespace",

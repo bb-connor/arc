@@ -1466,7 +1466,7 @@ def publisher_environment() -> dict[str, str]:
     return {
         "AUTHORIZED_SOURCE_SHA": SOURCE, "CI_RUN_ATTEMPT": "1", "CI_RUN_ID": str(CI_RUN),
         "CI_WORKFLOW_ID": str(CI_WORKFLOW), "EVIDENCE_SHA": EVIDENCE, "EXTERNAL_ID": EXTERNAL_ID,
-        "GH_TOKEN": ACTIONS_TOKEN, "MERGE_COMMIT_SHA": MERGE, "PR_NUMBER": str(PR),
+        "GH_TOKEN": ACTIONS_TOKEN, "MERGE_COMMIT_SHA": MERGE, "PR_NUMBER": str(PR), "REPOSITORY_ID": "1195888645",
         "SECURITY_APP_ID": str(APP_ID), "SECURITY_DEFINITION_SHA": DEFINITION,
         "installation_token": INSTALLATION_TOKEN, "canonical_binding": publication_binding(),
     }
