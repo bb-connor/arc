@@ -22,7 +22,7 @@ runner="scripts/check-temporal-security.sh"
 exact_runner="scripts/run-exact-cargo-test-inventory.sh"
 verifier="scripts/check-exact-cargo-test-inventory.py"
 python_bin="/usr/bin/python3"
-expected_runner_sha256="f91b0a9a91fca90a51fd5c016d09c20828a767f07a0c4f4962adcadd12b3811a"
+expected_runner_sha256="c23b0dd2775be2a07af27124a4f1017f3d5f65b2ed5d936c549586c1c9cedc17"
 test -x "${runner}"
 test -x "${exact_runner}"
 test -x "${verifier}"
@@ -52,6 +52,7 @@ import hashlib
 import re
 import shlex
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -69,20 +70,46 @@ def source_names(path: str, prefix: str, test_filter: str = "") -> list[str]:
     return [name for name in names if test_filter in name]
 
 
+def declared_module_names(path: Path, prefix: str) -> list[str]:
+    names = source_names(str(path), prefix)
+    directory = path.parent if path.name == "mod.rs" else path.with_suffix("")
+    modules = re.findall(r"(?m)^mod ([A-Za-z0-9_]+);$", path.read_text())
+    for module in modules:
+        candidates = [directory / (module + ".rs"), directory / module / "mod.rs"]
+        sources = [candidate for candidate in candidates if candidate.is_file()]
+        if len(sources) != 1:
+            raise SystemExit(f"expected one declared module source: {path}: {module}")
+        names.extend(declared_module_names(sources[0], prefix + module + "::"))
+    return names
+
+
 def event_consumer_names(test_filter: str) -> list[str]:
     entrypoint = Path("crates/platform/chio-control-plane/src/security/event_consumer/tests.rs")
-    modules = re.findall(r"(?m)^mod ([A-Za-z0-9_]+);$", entrypoint.read_text())
     prefix = "security::event_consumer::tests::"
-    names = []
-    for module in modules:
-        module_prefix = prefix + module + "::"
-        if test_filter.split("::", 1)[0] not in module:
-            continue
-        names.extend(source_names(
-            str(entrypoint.with_suffix("") / (module + ".rs")), module_prefix,
-            prefix + test_filter,
-        ))
-    return names
+    return [
+        name for name in declared_module_names(entrypoint, prefix)
+        if prefix + test_filter in name
+    ]
+
+
+# A module-name Cargo filter includes descendants, even when their function
+# names do not contain that filter. Follow declarations, not every nearby file.
+
+with tempfile.TemporaryDirectory(prefix="chio-temporal-modules-") as directory:
+    root = Path(directory)
+    (root / "tests" / "selected_policy" / "nested").mkdir(parents=True)
+    (root / "tests.rs").write_text("mod selected_policy;\n")
+    (root / "tests" / "selected_policy.rs").write_text(
+        "mod nested;\n#[test]\nfn direct() {}\n"
+    )
+    (root / "tests" / "selected_policy" / "nested" / "mod.rs").write_text(
+        "#[test]\nfn descendant() {}\n"
+    )
+    (root / "tests" / "orphan.rs").write_text("#[test]\nfn not_declared() {}\n")
+    expected = ["tests::selected_policy::direct", "tests::selected_policy::nested::descendant"]
+    observed = declared_module_names(root / "tests.rs", "tests::")
+    if observed != expected:
+        raise SystemExit(f"nested temporal source inventory changed: {observed!r}")
 
 
 def commitment(names: list[str]) -> tuple[int, str]:
@@ -164,7 +191,7 @@ builtin cd -- "${repo_root}"'''
             "every temporal Cargo test command must use one exact inventory: "
             f"commands={cargo_test_lines} inventories={len(calls)}"
         )
-    completion = '''if [[ "${completed_inventories}" -ne 10 ]] || [[ "${completed_tests}" -ne 40 ]]; then
+    completion = '''if [[ "${completed_inventories}" -ne 10 ]] || [[ "${completed_tests}" -ne 46 ]]; then
   builtin printf '%s\\n' \\
     "Temporal security gate incomplete (${completed_inventories} inventories, ${completed_tests} tests)" >&2
   builtin exit 1
@@ -173,7 +200,7 @@ fi'''
         raise SystemExit("temporal gate completion accounting changed")
     success = (
         "builtin printf '%s\\n' "
-        '"Temporal security gate passed (10 committed inventories, 40 tests)"'
+        '"Temporal security gate passed (10 committed inventories, 46 tests)"'
     )
     if source.count(success) != 1:
         raise SystemExit("temporal gate success contract changed")
@@ -308,7 +335,7 @@ expected_counts = {
     "receipt-backed event provenance rejection": 2,
     "corrupt event ingress rejection": 2,
     "untrusted event producer rejection": 1,
-    "unconfigured event policy rejection": 1,
+    "unconfigured event policy rejection": 7,
     "verified event ingress mutation matrix": 7,
 }
 observed_counts = {label: values[1] for label, values in calls.items()}
@@ -561,8 +588,8 @@ expected_calls = [
     ),
     exact_args(
         "unconfigured event policy rejection",
-        1,
-        "fa4ae1ffe1524711f7d0b591b6288a1c197c5294d6571bb47b72b1bc6986d262",
+        7,
+        "de93fd69aae67a8f836966d826b6682ef20ff6986b83d3b6507edb74aa298d02",
         [
             "cargo",
             "test",
@@ -588,7 +615,7 @@ expected_calls = [
         filtered=True,
     ),
 ]
-success_line = "Temporal security gate passed (10 committed inventories, 40 tests)"
+success_line = "Temporal security gate passed (10 committed inventories, 46 tests)"
 
 
 def json_log(path: Path) -> list[list[str]]:
@@ -1173,4 +1200,4 @@ require(
 )
 PY
 
-builtin printf '%s\n' "Temporal security gate self-test passed (10 committed inventories, 40 tests)"
+builtin printf '%s\n' "Temporal security gate self-test passed (10 committed inventories, 46 tests)"

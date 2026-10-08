@@ -5414,7 +5414,7 @@ assert_rejected(
     replace_in_named_step(
         "Temporal security gate",
         "          printf '%s  %s\\n' "
-        "'f91b0a9a91fca90a51fd5c016d09c20828a767f07a0c4f4962adcadd12b3811a' "
+        "'c23b0dd2775be2a07af27124a4f1017f3d5f65b2ed5d936c549586c1c9cedc17' "
         '"${temporal_runner}" | /usr/bin/sha256sum --check --strict\n'
         '          /bin/bash -p "${temporal_runner}"',
         '          /bin/bash -p "${temporal_runner}"',
@@ -5426,7 +5426,7 @@ assert_rejected(
     "ci.yml",
     replace_in_named_step(
         "Temporal security gate",
-        "f91b0a9a91fca90a51fd5c016d09c20828a767f07a0c4f4962adcadd12b3811a",
+        "c23b0dd2775be2a07af27124a4f1017f3d5f65b2ed5d936c549586c1c9cedc17",
         "0" * 64,
     ),
     "required CI test and Loom evidence changes mandatory step body",
@@ -5436,7 +5436,7 @@ assert_rejected(
     "ci.yml",
     replace_in_named_step(
         "Temporal security gate",
-        "606697a21a5f9ed1ce3af96dc1734cb98c5e95ba441ea2e68441d8382bb29fe1",
+        "a406ec677779a6b5856ebe53c1bd467559da45f09ef3e619edd69ed99f841d2b",
         "1" * 64,
     ),
     "required CI test and Loom evidence changes mandatory step body",

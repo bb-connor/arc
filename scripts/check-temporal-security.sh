@@ -105,7 +105,7 @@ run_filtered_inventory \
 
 run_filtered_inventory \
   "unconfigured event policy rejection" \
-  1 fa4ae1ffe1524711f7d0b591b6288a1c197c5294d6571bb47b72b1bc6986d262 \
+  7 de93fd69aae67a8f836966d826b6682ef20ff6986b83d3b6507edb74aa298d02 \
   cargo test -p chio-control-plane --lib \
   security::event_consumer::tests::trusted_producer_signature
 
@@ -115,10 +115,10 @@ run_filtered_inventory \
   cargo test -p chio-control-plane --lib \
   security::event_consumer::tests::temporal_ingress::verifier_ingress_rejects_
 
-if [[ "${completed_inventories}" -ne 10 ]] || [[ "${completed_tests}" -ne 40 ]]; then
+if [[ "${completed_inventories}" -ne 10 ]] || [[ "${completed_tests}" -ne 46 ]]; then
   builtin printf '%s\n' \
     "Temporal security gate incomplete (${completed_inventories} inventories, ${completed_tests} tests)" >&2
   builtin exit 1
 fi
 
-builtin printf '%s\n' "Temporal security gate passed (10 committed inventories, 40 tests)"
+builtin printf '%s\n' "Temporal security gate passed (10 committed inventories, 46 tests)"
