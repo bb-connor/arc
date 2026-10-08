@@ -445,7 +445,10 @@ mod tests {
             &run,
             &key,
             runtime,
-            &BTreeMap::from([("network-probe".into(), key.clone())])
+            &BTreeMap::from([(
+                "network-probe".into(),
+                chio_core::TrustedPublicKey::new(key.clone())?
+            )])
         )
         .is_err());
         Ok(())
