@@ -145,13 +145,14 @@ pub fn verify_tenant_sig(
 ) -> Result<(), ValidateError> {
     let payload = signing_payload(frame)?;
     let sig_bytes = decode_tenant_sig(&frame.tenant_sig)?;
-    let signature = ed25519_dalek::Signature::from_bytes(&sig_bytes);
-    let verifying_key = ed25519_dalek::VerifyingKey::from_bytes(public_key_bytes)
+    let signature = chio_core::Signature::from_bytes(&sig_bytes);
+    let public_key = chio_core::PublicKey::from_bytes(public_key_bytes)
         .map_err(|e| ValidateError::TenantSig(format!("invalid tenant public key: {e}")))?;
-    use ed25519_dalek::Verifier;
-    verifying_key
-        .verify(&payload, &signature)
-        .map_err(|e| ValidateError::TenantSig(format!("signature verify failed: {e}")))?;
+    if !public_key.verify(&payload, &signature) {
+        return Err(ValidateError::TenantSig(
+            "signature verify failed".to_string(),
+        ));
+    }
     Ok(())
 }
 
@@ -444,6 +445,24 @@ mod replay_validate_tests {
         let err = verify_tenant_sig(&frame, &pk).unwrap_err();
         assert!(matches!(err, ValidateError::TenantSig(_)));
         assert_eq!(err.exit_code(), EXIT_BAD_TENANT_SIG);
+    }
+
+    #[test]
+    fn tenant_sig_verifier_rejects_weak_key_universal_signature() {
+        let mut frame = good_frame_with_invocation(canonical_invocation());
+        let mut universal = [0u8; 64];
+        universal[0] = 1;
+        frame.tenant_sig = format!(
+            "ed25519:{}",
+            base64::engine::general_purpose::STANDARD.encode(universal)
+        );
+        let mut identity = [0u8; 32];
+        identity[0] = 1;
+        let err = verify_tenant_sig(&frame, &identity).unwrap_err();
+        match err {
+            ValidateError::TenantSig(msg) => assert_eq!(msg, "signature verify failed"),
+            other => panic!("expected TenantSig, got {other:?}"),
+        }
     }
 
     #[test]
