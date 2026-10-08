@@ -11,7 +11,7 @@ use super::{
     AttestedFindingResponseOutboxRecord, AttestedFindingResponseOutboxStore,
     AttestedFindingResponseOutboxTransition, AttestedFindingResponsePlanningState,
     AttestedFindingResponsePolicyPlanner, AttestedFindingResponseRecoveryLimits,
-    AuthoritativeCorrelatedFindingEvidence, Clock, Duration, ErrorCode, Instant, PortError,
+    AuthoritativeCorrelatedFindingEvidence, Clock, Duration, ErrorCode, Instant, Mutex, PortError,
     PortErrorKind, PortResult, RecordId, ReservedAttestedFindingResponsePlan, ResponsePlan,
     ATTESTED_FINDING_RESPONSE_INITIAL_RETRY_MS, ATTESTED_FINDING_RESPONSE_MAX_RETRY_MS,
     MAX_ATTESTED_FINDING_RESPONSE_OUTBOX_SCAN,
@@ -24,6 +24,25 @@ pub struct DurableAttestedFindingBatchPlanner {
     policy: Arc<dyn AttestedFindingResponsePolicyPlanner>,
     coordinator: Arc<dyn AttestedFindingResponseCoordinator>,
     clock: Arc<dyn Clock>,
+    health: Mutex<PlannerHealth>,
+}
+
+/// Longest age at which a successful dependency probe (response authority and
+/// policy) is reused by the hot-path readiness check.
+pub(super) const PLANNER_LIVENESS_PROBE_TTL_MS: u64 = 5_000;
+
+/// Verdict of the full-history store audit. Hot-path readiness reads this
+/// instead of re-walking every retained record.
+#[derive(Clone, Debug)]
+enum StoreAuditVerdict {
+    NotRun,
+    Passed,
+    Failed(PortError),
+}
+
+struct PlannerHealth {
+    audit: StoreAuditVerdict,
+    liveness_verified_at_ms: Option<u64>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -104,27 +123,91 @@ impl DurableAttestedFindingBatchPlanner {
         coordinator: Arc<dyn AttestedFindingResponseCoordinator>,
         clock: Arc<dyn Clock>,
     ) -> PortResult<Self> {
-        batch_store.ensure_attested_finding_batches_ready()?;
-        outbox_store.ensure_attested_finding_response_outbox_ready()?;
         finding_authority
             .ensure_ready()
             .map_err(map_finding_authority_error)?;
         policy.ensure_ready()?;
         coordinator.ensure_configured()?;
-        Ok(Self {
+        let planner = Self {
             batch_store,
             outbox_store,
             finding_authority,
             policy,
             coordinator,
             clock,
-        })
+            health: Mutex::new(PlannerHealth {
+                audit: StoreAuditVerdict::NotRun,
+                liveness_verified_at_ms: None,
+            }),
+        };
+        planner.run_store_audit()?;
+        Ok(planner)
     }
 
-    fn ensure_recovery_ready(&self) -> PortResult<()> {
-        self.batch_store.ensure_attested_finding_batches_ready()?;
-        self.outbox_store
-            .ensure_attested_finding_response_outbox_ready()?;
+    fn lock_health(&self) -> PortResult<std::sync::MutexGuard<'_, PlannerHealth>> {
+        self.health
+            .lock()
+            .map_err(|_| PortError::integrity_failure())
+    }
+
+    /// Runs the full-history audit of the batch and response-outbox stores and
+    /// records its verdict. A failed audit keeps readiness closed until a later
+    /// audit passes.
+    pub(crate) fn run_store_audit(&self) -> PortResult<()> {
+        let outcome = self
+            .batch_store
+            .ensure_attested_finding_batches_ready()
+            .and_then(|()| {
+                self.outbox_store
+                    .ensure_attested_finding_response_outbox_ready()
+            });
+        let mut health = self.lock_health()?;
+        health.audit = match &outcome {
+            Ok(()) => StoreAuditVerdict::Passed,
+            Err(error) => StoreAuditVerdict::Failed(error.clone()),
+        };
+        outcome
+    }
+
+    /// Reads the recorded audit verdict without touching the stores.
+    fn ensure_store_audit_passed(&self) -> PortResult<()> {
+        match &self.lock_health()?.audit {
+            StoreAuditVerdict::Passed => Ok(()),
+            StoreAuditVerdict::Failed(error) => Err(error.clone()),
+            StoreAuditVerdict::NotRun => Err(PortError::unavailable()),
+        }
+    }
+
+    /// Probes the response authority and policy, reusing a recent success for
+    /// a bounded time. Failures are never cached, and the coordinator is
+    /// checked on every call so a lost dependency closes readiness at once.
+    fn ensure_dependencies_live(&self) -> PortResult<()> {
+        let now_ms = self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)?;
+        {
+            let mut health = self.lock_health()?;
+            let fresh = health
+                .liveness_verified_at_ms
+                .is_some_and(|verified_at_ms| {
+                    now_ms >= verified_at_ms
+                        && now_ms - verified_at_ms < PLANNER_LIVENESS_PROBE_TTL_MS
+                });
+            if !fresh {
+                health.liveness_verified_at_ms = None;
+                self.finding_authority
+                    .ensure_ready()
+                    .map_err(map_finding_authority_error)?;
+                self.policy.ensure_ready()?;
+                health.liveness_verified_at_ms = Some(now_ms);
+            }
+        }
+        self.coordinator.ensure_ready()
+    }
+
+    pub(super) fn ensure_recovery_ready(&self) -> PortResult<()> {
+        self.ensure_store_audit_passed()?;
         self.clock
             .unix_millis()
             .map(chio_security_types::clock::UnixMillis::get)?;
@@ -1134,9 +1217,7 @@ pub(super) fn map_finding_authority_error(error: ActiveResponseFindingAuthorityE
 
 impl AttestedFindingBatchPlanner for DurableAttestedFindingBatchPlanner {
     fn ensure_bootstrap_ready(&self) -> PortResult<()> {
-        self.batch_store.ensure_attested_finding_batches_ready()?;
-        self.outbox_store
-            .ensure_attested_finding_response_outbox_ready()?;
+        self.run_store_audit()?;
         self.finding_authority
             .ensure_ready()
             .map_err(map_finding_authority_error)?;
@@ -1148,17 +1229,8 @@ impl AttestedFindingBatchPlanner for DurableAttestedFindingBatchPlanner {
     }
 
     fn ensure_ready(&self) -> PortResult<()> {
-        self.batch_store.ensure_attested_finding_batches_ready()?;
-        self.outbox_store
-            .ensure_attested_finding_response_outbox_ready()?;
-        self.finding_authority
-            .ensure_ready()
-            .map_err(map_finding_authority_error)?;
-        self.clock
-            .unix_millis()
-            .map(chio_security_types::clock::UnixMillis::get)?;
-        self.policy.ensure_ready()?;
-        self.coordinator.ensure_ready()
+        self.ensure_store_audit_passed()?;
+        self.ensure_dependencies_live()
     }
 
     fn publish_attested_batch(
