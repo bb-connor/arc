@@ -429,11 +429,6 @@ impl Drop for ProductionResponseWorkerHandle {
         let Some(ResponseWorkerJoinOwnership { join, permit }) = self.join.take() else {
             return;
         };
-        if join.is_finished() {
-            let _ = join_response_worker_thread(join, &self.worker);
-            drop(permit);
-            return;
-        }
         permit.transfer(join, Arc::clone(&self.worker));
     }
 }

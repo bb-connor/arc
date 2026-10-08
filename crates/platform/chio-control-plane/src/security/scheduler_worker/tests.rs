@@ -755,6 +755,8 @@ mod worker_phases_advance_in_order_and_a_stop_is_observable;
 
 mod failed_start_reports_failed_with_the_exact_error;
 
+mod dropping_the_handle_publishes_stopping_and_the_reaper_joins_the_worker;
+
 mod terminated_primary_reuses_its_durable_port_without_concurrent_ticks;
 
 mod recovery_readiness_starts_the_worker_while_admission_stays_closed;
