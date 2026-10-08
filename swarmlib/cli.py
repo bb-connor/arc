@@ -139,7 +139,16 @@ def cmd_metrics(store: Store, a: argparse.Namespace) -> int:
 
 def cmd_build(store: Store, a: argparse.Namespace) -> int:
     command = a.command[1:] if a.command[:1] == ["--"] else a.command
-    return build.run(command, item=a.item or "")
+    return build.run(command, item=a.item or "", build_class=a.build_class or build.class_for_role(store.role))
+
+
+def cmd_prune_target(store: Store, a: argparse.Namespace) -> int:
+    removed, freed, busy = build.prune_target(Path(a.target).expanduser(), older_than_hours=a.hours, dry_run=a.dry_run)
+    verb = "would remove" if a.dry_run else "removed"
+    print(f"{verb} {removed} files, {freed / 2**30:.1f} GB not accessed in {a.hours:g}h")
+    for profile in busy:
+        print(f"skipped {profile}: a cargo build holds its lock")
+    return 0
 
 
 def cmd_ci(store: Store, a: argparse.Namespace) -> int:
@@ -353,8 +362,16 @@ def parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("build", help="run a build command in a build slot")
     s.add_argument("--item")
+    s.add_argument("--class", dest="build_class", choices=build.CLASSES,
+                   help="integrator builds may use the reserved slot; defaults from SWARM_ROLE")
     s.add_argument("command", nargs=argparse.REMAINDER)
     s.set_defaults(fn=cmd_build)
+
+    s = sub.add_parser("prune-target", help="delete cargo artifacts not accessed recently (skips profiles in use)")
+    s.add_argument("target")
+    s.add_argument("--hours", type=float, default=48)
+    s.add_argument("--dry-run", action="store_true")
+    s.set_defaults(fn=cmd_prune_target)
 
     s = sub.add_parser("ci", help="dispatch lane-test.yml for an item and wait")
     s.add_argument("item")
@@ -424,6 +441,6 @@ def main(argv: list[str] | None = None) -> int:
     store.hooks.append(lambda: claims.renew_mine(store))
     try:
         return int(args.fn(store, args))
-    except (SwarmError, gitio.GitError, ci.CIError, FileNotFoundError) as err:
+    except (SwarmError, gitio.GitError, ci.CIError, build.BuildRefused, FileNotFoundError) as err:
         print(f"swarm: {err}", file=sys.stderr)
         return 2

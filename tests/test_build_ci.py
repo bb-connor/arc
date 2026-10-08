@@ -1,6 +1,7 @@
 import json
 import os
 import subprocess
+import time
 import unittest
 from unittest import mock
 
@@ -41,10 +42,10 @@ class BuildTest(SwarmCase):
         self.assertEqual((env["RUSTC_WRAPPER"], env["CARGO_INCREMENTAL"]), ("sccache", "0"))
 
     def test_run_records_wait(self):
-        with mock.patch.dict(os.environ, {"SWARM_BUILD_CGROUP": "0"}):
+        with mock.patch.dict(os.environ, {"SWARM_BUILD_CGROUP": "0", "SWARM_BUILD_DISK_FLOOR_GB": "0"}):
             self.assertEqual(build.run(["true"], item="F1"), 0)
         record = json.loads((build.slot_dir() / "waits.log").read_text().splitlines()[-1])
-        self.assertEqual((record["item"], record["slot"]), ("F1", 0))
+        self.assertEqual((record["item"], record["slot"], record["class"]), ("F1", 1, "coder"))  # slot 0 is the integrator's
 
 
 class FakeGh:
@@ -138,3 +139,87 @@ class ReviewsTest(SwarmCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SchedulerTest(SwarmCase):
+    def test_coders_never_take_the_integrator_slot(self):
+        self.assertEqual(build.slots_for("integrator", 3), [0, 1, 2])
+        self.assertEqual(build.slots_for("coder", 3), [1, 2])
+        self.assertEqual(build.slots_for("coder", 1), [0])
+
+    def test_coder_waits_while_integrator_slot_is_free(self):
+        held = os.open(build.slot_dir() / "slot-1.lock", os.O_RDWR | os.O_CREAT, 0o644)
+        build.fcntl.flock(held, build.fcntl.LOCK_EX)
+        try:
+            with self.assertRaises(TimeoutError):
+                build.acquire(build.slots_for("coder", 2), poll=0.01, timeout=0.05)
+            fd, slot, _ = build.acquire(build.slots_for("integrator", 2), poll=0.01, timeout=1)
+            self.assertEqual(slot, 0)
+            build.release(fd)
+        finally:
+            build.release(held)
+
+    def test_jobs_are_capped_per_slot(self):
+        with mock.patch.dict(os.environ, {"SWARM_BUILD_JOBS": "5"}):
+            self.assertEqual(build.build_env({})["CARGO_BUILD_JOBS"], "5")
+            self.assertEqual(build.build_env({"CARGO_BUILD_JOBS": "3"})["CARGO_BUILD_JOBS"], "3")
+            self.assertEqual(build.build_env({"CARGO_BUILD_JOBS": "8"})["CARGO_BUILD_JOBS"], "5")
+
+    def test_cpu_weight_follows_class(self):
+        with mock.patch.object(build.shutil, "which", return_value="/usr/bin/systemd-run"):
+            self.assertIn("CPUWeight=20", build.scope_prefix("coder"))
+            self.assertIn("CPUWeight=100", build.scope_prefix("integrator"))
+
+    def test_disk_floor_refuses_before_taking_a_slot(self):
+        usage = build.shutil._ntuple_diskusage(100 * 2**30, 90 * 2**30, 10 * 2**30)
+        with mock.patch.object(build.shutil, "disk_usage", return_value=usage), \
+                mock.patch.dict(os.environ, {"SWARM_BUILD_CGROUP": "0", "SWARM_BUILD_DISK_FLOOR_GB": "25"}):
+            with self.assertRaisesRegex(build.BuildRefused, "10.0 GB free, floor 25 GB"):
+                build.run(["true"], item="F1")
+        self.assertFalse((build.slot_dir() / "waits.log").exists())
+
+    def test_default_class_comes_from_role(self):
+        self.assertEqual(build.class_for_role("integrator"), "integrator")
+        self.assertEqual(build.class_for_role("security"), "integrator")
+        self.assertEqual(build.class_for_role("conductor"), "integrator")
+        self.assertEqual(build.class_for_role("worker"), "coder")
+        self.assertEqual(build.class_for_role(""), "coder")
+
+
+class PruneTest(SwarmCase):
+    def make_target(self):
+        target = self.tmp / "target"
+        deps = target / "debug" / "deps"
+        deps.mkdir(parents=True)
+        (target / "CACHEDIR.TAG").write_text("Signature: 8a477f597d28d172789f06886806bc55\n")
+        (target / "debug" / ".cargo-lock").write_text("")
+        old, new = deps / "libold.rlib", deps / "libnew.rlib"
+        old.write_bytes(b"x" * 1000)
+        new.write_bytes(b"y" * 10)
+        stale = time.time() - 72 * 3600
+        os.utime(old, (stale, stale))
+        return target, old, new
+
+    def test_prunes_only_files_not_accessed_within_the_window(self):
+        target, old, new = self.make_target()
+        self.assertEqual(build.prune_target(target, older_than_hours=48, dry_run=True), (1, 1000, []))
+        self.assertTrue(old.exists())
+        self.assertEqual(build.prune_target(target, older_than_hours=48), (1, 1000, []))
+        self.assertFalse(old.exists())
+        self.assertTrue(new.exists())
+
+    def test_skips_a_profile_whose_cargo_lock_is_held(self):
+        target, old, _ = self.make_target()
+        held = os.open(target / "debug" / ".cargo-lock", os.O_RDWR)
+        build.fcntl.flock(held, build.fcntl.LOCK_EX)
+        try:
+            self.assertEqual(build.prune_target(target, older_than_hours=48), (0, 0, ["debug"]))
+            self.assertTrue(old.exists())
+        finally:
+            build.release(held)
+
+    def test_refuses_directories_that_are_not_cargo_targets(self):
+        plain = self.tmp / "notatarget"
+        plain.mkdir()
+        with self.assertRaises(build.BuildRefused):
+            build.prune_target(plain, older_than_hours=48)
