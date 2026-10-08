@@ -380,6 +380,27 @@ mod tests {
     }
 
     #[test]
+    fn operation_errors_convert_to_their_typed_cause_with_unchanged_text() {
+        let error = AdmissionOperationError::StaleVersion {
+            expected: 2,
+            actual: 3,
+        };
+        let reason = error.to_string();
+        let converted = KernelError::from(error);
+        assert!(matches!(
+            converted.durable_admission(),
+            Some(DurableAdmissionError::Operation(
+                AdmissionOperationError::StaleVersion {
+                    expected: 2,
+                    actual: 3
+                }
+            ))
+        ));
+        assert_eq!(converted.disposition(), Disposition::Retry);
+        assert_reads_as_untyped(converted, &reason);
+    }
+
+    #[test]
     fn only_the_typed_variant_exposes_a_durable_admission_cause() {
         assert!(matches!(
             KernelError::admission_pending("owner").durable_admission(),

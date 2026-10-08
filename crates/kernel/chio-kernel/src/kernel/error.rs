@@ -904,7 +904,7 @@ impl KernelError {
 
 impl From<crate::admission_operation::AdmissionOperationError> for KernelError {
     fn from(error: crate::admission_operation::AdmissionOperationError) -> Self {
-        Self::DurableAdmission(error.to_string())
+        Self::admission(error)
     }
 }
 
