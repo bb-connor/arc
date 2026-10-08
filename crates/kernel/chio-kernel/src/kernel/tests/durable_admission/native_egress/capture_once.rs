@@ -5,6 +5,8 @@
 use super::*;
 use crate::budget_store::BudgetHoldDispositionView;
 
+#[path = "capture_once/direct.rs"]
+mod direct;
 #[path = "capture_once/retained.rs"]
 mod retained;
 
