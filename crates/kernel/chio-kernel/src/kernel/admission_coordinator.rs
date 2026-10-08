@@ -1757,10 +1757,7 @@ impl ChioKernel {
             trusted_now_unix_ms,
         )
         .map_err(|error| {
-            KernelError::admission_in(
-                "pre-dispatch finding pool claim release failed",
-                DurableAdmissionError::dependency(error),
-            )
+            KernelError::admission_in("pre-dispatch finding pool claim release failed", error)
         })?;
         // Every budget the operation still holds is internal until dispatch
         // commits. Both the executable hold and an owned preflight hold must be
