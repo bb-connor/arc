@@ -9,6 +9,9 @@ use tower::ServiceExt;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
+#[path = "protocol_refusal/reservation_original.rs"]
+mod reservation_original;
+
 struct CountedTransport {
     inner: Arc<dyn McpTransport>,
     calls: Arc<AtomicUsize>,
