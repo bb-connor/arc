@@ -65,6 +65,7 @@ chio-store-sqlite = { workspace = true }
 chio-risk-comptroller = { workspace = true }
 chio-security-kernel = { workspace = true }
 chio-security-types = { workspace = true, features = ["std"] }
+chio-secure-fs = { workspace = true }
 chio-secure-ipc = { workspace = true }
 chio-settle = { workspace = true }
 chio-siem = { workspace = true }
@@ -102,7 +103,6 @@ url = "2"
 uuid = { workspace = true, features = ["v4"] }
 libc = "0.2"
 zeroize = { workspace = true }
-nix = { version = "0.31.2", features = ["dir", "user"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.60.2", features = [
