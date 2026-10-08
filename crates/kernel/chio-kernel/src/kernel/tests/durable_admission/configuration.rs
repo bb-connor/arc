@@ -132,3 +132,58 @@ fn finding_memory_lineage_requires_a_durable_terminal_projection() {
         .to_string()
         .contains("no qualified admission operation store"));
 }
+
+#[test]
+fn channel_terminal_authority_requires_a_durable_admission_store() {
+    use crate::admission_operation::{
+        AdmissionOperationV1, AdmissionProjectionContext, AdmissionTerminal,
+        ChannelTerminalAdvanceRequest, ChannelTerminalAuthorityError, ChannelTerminalCommitRequest,
+        QualifiedChannelTerminalAuthority,
+    };
+    use chio_settle::channel::{
+        VerifiedAdmittedChannelReservationV1, VerifiedChannelTerminalAdvanceV1,
+    };
+
+    struct Refusing;
+    impl QualifiedChannelTerminalAuthority for Refusing {
+        fn load_admitted_reservation(
+            &self,
+            _: &AdmissionOperationV1,
+            _: &AdmissionProjectionContext,
+        ) -> Result<VerifiedAdmittedChannelReservationV1, ChannelTerminalAuthorityError> {
+            Err(ChannelTerminalAuthorityError::Unavailable(
+                "test authority".to_owned(),
+            ))
+        }
+
+        fn prepare_terminal_advance(
+            &self,
+            _: ChannelTerminalAdvanceRequest<'_>,
+        ) -> Result<VerifiedChannelTerminalAdvanceV1, ChannelTerminalAuthorityError> {
+            Err(ChannelTerminalAuthorityError::Unavailable(
+                "test authority".to_owned(),
+            ))
+        }
+
+        fn commit_anchored_terminal_projection(
+            &self,
+            _: ChannelTerminalCommitRequest<'_>,
+        ) -> Result<AdmissionTerminal, ChannelTerminalAuthorityError> {
+            Err(ChannelTerminalAuthorityError::Unavailable(
+                "test authority".to_owned(),
+            ))
+        }
+    }
+
+    let mut kernel = make_kernel(make_config());
+    let refused = kernel.set_channel_terminal_authority(std::sync::Arc::new(Refusing));
+    assert!(
+        matches!(
+            refused.as_ref().map_err(KernelError::durable_admission),
+            Err(Some(crate::DurableAdmissionError::Unsupported(
+                "channel terminal authority requires a durable admission store"
+            )))
+        ),
+        "{refused:?}"
+    );
+}

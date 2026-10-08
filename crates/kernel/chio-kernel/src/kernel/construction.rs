@@ -827,8 +827,8 @@ impl ChioKernel {
         authority: Arc<dyn crate::admission_operation::QualifiedChannelTerminalAuthority>,
     ) -> Result<(), KernelError> {
         let runtime = self.durable_admission_runtime.as_mut().ok_or_else(|| {
-            KernelError::DurableAdmission(
-                "channel terminal authority requires a durable admission store".to_owned(),
+            KernelError::admission_unsupported(
+                "channel terminal authority requires a durable admission store",
             )
         })?;
         runtime.set_channel_terminal_authority(authority);

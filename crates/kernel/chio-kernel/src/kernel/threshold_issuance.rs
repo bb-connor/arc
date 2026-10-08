@@ -25,11 +25,11 @@ impl ChioKernel {
         now: u64,
     ) -> Result<(), KernelError> {
         let proposal = operation.threshold_proposal().ok_or_else(|| {
-            KernelError::DurableAdmission("approval-required operation omitted its proposal".into())
+            KernelError::admission_record("approval-required operation omitted its proposal")
         })?;
         if proposal.body.proposal_id != operation.binding().operation_id().as_str() {
-            return Err(KernelError::DurableAdmission(
-                "retained threshold proposal changed its admission operation".into(),
+            return Err(KernelError::admission_record(
+                "retained threshold proposal changed its admission operation",
             ));
         }
         let requirement = self.threshold_approval_requirement(request, now)?;

@@ -34,8 +34,8 @@ impl ChioKernel {
         cap: &CapabilityToken,
     ) -> Result<(), KernelError> {
         if self.dpop_authority.is_some() {
-            return Err(KernelError::DurableAdmission(
-                "operation-owned DPoP requires admitted credential custody".into(),
+            return Err(KernelError::admission_refused(
+                "operation-owned DPoP requires admitted credential custody",
             ));
         }
         let proof = request

@@ -365,8 +365,8 @@ impl ChioKernel {
                     .provider_attempt()
                     .is_some_and(is_caller_report_attempt)
             {
-                return Err(KernelError::DurableAdmission(
-                    "return context lost its original admission request".into(),
+                return Err(KernelError::admission_record(
+                    "return context lost its original admission request",
                 ));
             }
             // Ordinary calls retain no original-request artifact. Bind the live
@@ -379,7 +379,7 @@ impl ChioKernel {
                 &request.arguments,
                 request.model_metadata.as_ref(),
             )
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+            .map_err(KernelError::admission)?;
             RetainedToolAdmissionRequestV1::validate_request_binding(
                 admission.operation.binding(),
                 request,
@@ -396,8 +396,8 @@ impl ChioKernel {
                 return Ok(());
             }
         }
-        Err(KernelError::DurableAdmission(
-            "return context request or selected grant differs from admission".into(),
+        Err(KernelError::admission_conflict(
+            "return context request or selected grant differs from admission",
         ))
     }
 }

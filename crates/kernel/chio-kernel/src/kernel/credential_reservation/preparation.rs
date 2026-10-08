@@ -37,8 +37,8 @@ impl<'kernel> PreparedDispatchCredentials<'kernel, '_> {
             && refreshed.kernel.governed_approval_authority.is_some())
             || refreshed.dpop_credential.is_some()
         {
-            return Err(KernelError::DurableAdmission(
-                "operation-owned credentials require their exact admission episode".into(),
+            return Err(KernelError::admission_refused(
+                "operation-owned credentials require their exact admission episode",
             ));
         }
         refreshed.reserve_checked(None, None)

@@ -39,8 +39,8 @@ impl ChioKernel {
                 .supplemental_participant()
                 != Some(supplemental)
         {
-            return Err(KernelError::DurableAdmission(
-                "selected native admission authority does not match this kernel".into(),
+            return Err(KernelError::admission_unsupported(
+                "selected native admission authority does not match this kernel",
             ));
         }
         Ok(())

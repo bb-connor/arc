@@ -911,9 +911,10 @@ impl ChioKernel {
                 durable_admission_operation_id,
             )
             .map_err(|error| {
-                KernelError::DurableAdmission(format!(
-                    "finding pool reservation could not enter durable dispatch: {error}"
-                ))
+                KernelError::admission_in(
+                    "finding pool reservation could not enter durable dispatch",
+                    error,
+                )
             })?;
         }
         Ok(purchase)
