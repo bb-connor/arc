@@ -8,7 +8,14 @@ mod connection_recovery;
 mod foreign_schema_tests;
 #[cfg(test)]
 mod review_tests;
-include!("admission_operation_store/part_02.inc");
+#[cfg(test)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
+#[path = "admission_operation_store/part_02.inc"]
+mod tests;
 
 #[path = "security_admission_operation_store/recovery_pages.rs"]
 mod recovery_pages;
