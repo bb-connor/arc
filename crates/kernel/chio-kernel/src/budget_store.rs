@@ -121,7 +121,18 @@ impl BudgetMutationKind {
     }
 }
 
-include!("budget_store/model.rs");
+mod model;
+use model::{budget_commit_metadata, is_sha256_digest};
+pub use model::{
+    BudgetAdmissionBinding, BudgetAuthorityProfile, BudgetAuthorizationOutcome,
+    BudgetCommitMetadata, BudgetCumulativeApprovalAccountKey, BudgetCumulativeApprovalAccountUsage,
+    BudgetCumulativeApprovalMutation, BudgetCumulativeApprovalRequest,
+    BudgetCumulativeApprovalState, BudgetCumulativeApprovalUsage, BudgetEventAuthority,
+    BudgetGuaranteeLevel, BudgetInvocationQuota, BudgetInvocationQuotaMutation,
+    BudgetInvocationQuotaUsage, BudgetInvocationState, BudgetMeteringProfile, BudgetMonetaryState,
+    BudgetMutationRecord, BudgetQuotaKey, BudgetQuotaProfile, RevocationCommitMetadata,
+    MAX_AUTHORIZATION_ARTIFACT_DIGESTS, MAX_INVOCATION_QUOTAS_PER_ADMISSION,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BudgetAuthorizeHoldRequest {

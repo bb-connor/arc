@@ -582,11 +582,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "quarantine state machine suite assembled from include! fragments; capped until the fragments become modules",
         max_fragments=1,
     ),
-    "crates/kernel/chio-kernel/src/budget_store.rs": allow(
-        "2026-10-31",
-        "budget store surface assembled from include! fragments; capped until the fragments become modules",
-        max_fragments=1,
-    ),
     "crates/protocol/chio-cross-protocol/src/tests.rs": allow(
         "2026-10-31",
         "cross-protocol test suite assembled from include! fragments; capped until the fragments become modules",

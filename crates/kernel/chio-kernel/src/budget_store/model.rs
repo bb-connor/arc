@@ -1,3 +1,7 @@
+//! Budget quota keys, admission bindings, mutation records and commit
+//! metadata shared by every budget store.
+use super::*;
+
 pub const MAX_INVOCATION_QUOTAS_PER_ADMISSION: usize = 8;
 pub const MAX_AUTHORIZATION_ARTIFACT_DIGESTS: usize = 8;
 
@@ -18,7 +22,7 @@ pub(crate) fn validate_authorization_artifact_digests(
     Ok(())
 }
 
-fn is_sha256_digest(value: &str) -> bool {
+pub(super) fn is_sha256_digest(value: &str) -> bool {
     value.len() == 64
         && value
             .bytes()
@@ -477,7 +481,7 @@ impl BudgetCommitMetadata {
     }
 }
 
-fn budget_commit_metadata<T: BudgetStore + ?Sized>(
+pub(super) fn budget_commit_metadata<T: BudgetStore + ?Sized>(
     store: &T,
     authority: Option<BudgetEventAuthority>,
     budget_commit_index: Option<u64>,
