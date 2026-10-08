@@ -4,6 +4,7 @@ use super::active_response_operation_binding::ActiveResponseOperationAnchor;
 use super::approval_cleanup::approval_set_input_is_valid;
 use super::*;
 use crate::approval::{ApprovalSetReservationInput, ApprovalStore};
+use crate::disposition::Disposition;
 use crate::security_admission_operation::{
     AdmissionCleanupAction, AdmissionCleanupActionCasOutcome, AdmissionCleanupActionClaimOutcome,
     AdmissionCleanupActionCreateOutcome, AdmissionCleanupActionKind, AdmissionCleanupActionState,
@@ -725,10 +726,14 @@ impl ChioKernel {
                 ) {
                     Ok(true) => progress.record_completed()?,
                     Ok(false) => {}
-                    Err(ActiveResponseRecoveryFailure::ItemRefusal(error)) => {
-                        progress.record_pending(|| error)?;
+                    Err(ActiveResponseRecoveryFailure { disposition, error }) => {
+                        match disposition {
+                            Disposition::Deny | Disposition::Retry | Disposition::Quarantine => {
+                                progress.record_pending(|| error)?;
+                            }
+                            Disposition::Fatal => return Err(error),
+                        }
                     }
-                    Err(ActiveResponseRecoveryFailure::Fatal(error)) => return Err(error),
                 }
             }
             if !more_remaining {
@@ -746,9 +751,13 @@ impl ChioKernel {
         mut operation: AdmissionOperation,
     ) -> Result<bool, ActiveResponseRecoveryFailure> {
         if operation.coordinator_authority_id() != expected_coordinator_authority_id {
-            return Err(ActiveResponseRecoveryFailure::ItemRefusal(KernelError::Internal(format!(
-                "governed active-response operation {} belongs to a different executor authority", operation.operation_id()
-            ))));
+            return Err(ActiveResponseRecoveryFailure::item(
+                Disposition::Deny,
+                KernelError::Internal(format!(
+                    "governed active-response operation {} belongs to a different executor authority",
+                    operation.operation_id()
+                )),
+            ));
         }
         // Approval commitment is the same commit point in startup and live
         // recovery. It must be reconciled before compensation is considered.
@@ -782,7 +791,8 @@ impl ChioKernel {
                     operation.operation_id(),
                 )?;
                 if !completed {
-                    return Err(ActiveResponseRecoveryFailure::ItemRefusal(
+                    return Err(ActiveResponseRecoveryFailure::item(
+                        Disposition::Retry,
                         KernelError::Internal(format!(
                             "active-response cleanup remains pending for {}",
                             operation.operation_id()
@@ -804,7 +814,8 @@ impl ChioKernel {
                 Ok(false)
             }
             AdmissionOperationState::OutcomeUnknownAfterDispatch => Ok(false),
-            _ => Err(ActiveResponseRecoveryFailure::ItemRefusal(
+            _ => Err(ActiveResponseRecoveryFailure::item(
+                Disposition::Quarantine,
                 KernelError::Internal(
                     "governed active response entered a tool-dispatch-only state".into(),
                 ),
@@ -815,13 +826,24 @@ impl ChioKernel {
 
 // Only explicit semantic item refusals are deferred. Unknown kernel errors,
 // store faults, clock failures, and receipt/integrity failures remain fatal.
-enum ActiveResponseRecoveryFailure {
-    ItemRefusal(KernelError),
-    Fatal(KernelError),
+struct ActiveResponseRecoveryFailure {
+    disposition: Disposition,
+    error: KernelError,
 }
+
+impl ActiveResponseRecoveryFailure {
+    /// A failure confined to one operation. A fatal one comes from `?`.
+    fn item(disposition: Disposition, error: KernelError) -> Self {
+        Self { disposition, error }
+    }
+}
+
 impl From<KernelError> for ActiveResponseRecoveryFailure {
     fn from(error: KernelError) -> Self {
-        Self::Fatal(error)
+        Self {
+            disposition: Disposition::Fatal,
+            error,
+        }
     }
 }
 
