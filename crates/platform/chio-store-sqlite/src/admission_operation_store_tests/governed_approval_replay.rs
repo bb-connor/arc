@@ -24,6 +24,8 @@ mod integrity;
 mod lifecycle;
 #[path = "governed_approval_replay/migration.rs"]
 mod migration;
+#[path = "governed_approval_replay/record_errors.rs"]
+mod record_errors;
 
 const SOURCE_ID: &str = "approval-source";
 const AUTHORITY_ID: &str = "approval-authority";

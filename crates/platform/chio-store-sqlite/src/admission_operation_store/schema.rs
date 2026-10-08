@@ -586,7 +586,7 @@ pub(crate) fn verify_admission_operation_invariants(
     super::dpop_claim::verify_all(connection)?;
     super::governed_approval_replay::verify_all_records(connection)
         .map(|_| ())
-        .map_err(invariant)?;
+        .map_err(AdmissionOperationStoreError::from)?;
     super::dpop_replay::verify_all_records(connection)
         .map(|_| ())
         .map_err(invariant)?;

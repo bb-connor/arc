@@ -1,6 +1,6 @@
 use super::*;
 
-type IntegrityResult<T> = Result<T, String>;
+type IntegrityResult<T> = Result<T, RecordIntegrityError>;
 
 const TABLES: [&str; 3] = [
     "governed_approval_replay_migration_expectations",
@@ -21,7 +21,7 @@ pub(super) struct MigrationEvent {
 }
 
 fn hash(domain: &[u8], value: &impl Serialize) -> IntegrityResult<String> {
-    let encoded = canonical_json_bytes(value).map_err(|error| error.to_string())?;
+    let encoded = canonical_json_bytes(value).map_err(RecordIntegrityError::invalid)?;
     let mut bytes = Vec::with_capacity(domain.len() + encoded.len());
     bytes.extend_from_slice(domain);
     bytes.extend_from_slice(&encoded);
@@ -42,7 +42,7 @@ pub(super) fn new_expectation(
             snapshot.inventory_sha256(),
         ),
     )
-    .map_err(integrity_error)?;
+    .map_err(record_error)?;
     let expectation_digest = hash(
         b"chio.governed-approval-replay-expectation.v1\0",
         &(
@@ -53,7 +53,7 @@ pub(super) fn new_expectation(
             snapshot.inventory_sha256(),
         ),
     )
-    .map_err(integrity_error)?;
+    .map_err(record_error)?;
     Ok(GovernedApprovalReplayMigrationRecordV1 {
         snapshot,
         expectation_id: AdmissionIdentifier::try_new("expectation_id", expectation_id)?,
@@ -137,7 +137,7 @@ pub(super) fn insert_event(
         observed_at_unix_ms: observed,
         fence: fence.clone(),
     };
-    event.event_digest = event_digest(record, &event, previous).map_err(integrity_error)?;
+    event.event_digest = event_digest(record, &event, previous).map_err(record_error)?;
     transaction
         .execute(
             "INSERT INTO governed_approval_replay_migration_events
@@ -211,7 +211,7 @@ fn invalid_row_exists(
             [],
             |row| row.get(0),
         )
-        .map_err(|error| error.to_string())
+        .map_err(RecordIntegrityError::from)
 }
 
 /// Check storage type/count/byte bounds before reading attacker-controlled
@@ -224,27 +224,24 @@ fn validate_storage_bounds(connection: &Connection) -> IntegrityResult<bool> {
           'governed_approval_replay_legacy_tombstones')",
             [],
             |row| row.get(0),
-        )
-        .map_err(|error| error.to_string())?;
+        )?;
     if count == 0 {
         return Ok(false);
     }
     if count != 3 {
         return Err("partial governed approval migration schema".into());
     }
-    let (expectations, bytes): (i64, i64) = connection
-        .query_row(
-            "SELECT COUNT(*), COALESCE(SUM(length(CAST(canonical_source AS BLOB))), 0)
+    let (expectations, bytes): (i64, i64) = connection.query_row(
+        "SELECT COUNT(*), COALESCE(SUM(length(CAST(canonical_source AS BLOB))), 0)
          FROM governed_approval_replay_migration_expectations",
-            [],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )
-        .map_err(|error| error.to_string())?;
+        [],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )?;
     if !(0..=crate::integer::checked::<_, i64>(MAX_MIGRATIONS)
-        .map_err(|error| error.to_string())?)
+        .map_err(RecordIntegrityError::invalid)?)
         .contains(&expectations)
         || !(0..=crate::integer::checked::<_, i64>(MAX_TOTAL_SOURCE_BYTES)
-            .map_err(|error| error.to_string())?)
+            .map_err(RecordIntegrityError::invalid)?)
             .contains(&bytes)
     {
         return Err("migration expectation aggregate limit exceeded".into());
@@ -273,16 +270,16 @@ fn validate_storage_bounds(connection: &Connection) -> IntegrityResult<bool> {
     ] {
         let rows: i64 = connection.query_row(
             &format!("SELECT COUNT(*) FROM {table}"), [], |row| row.get(0),
-        ).map_err(|error| error.to_string())?;
-        if !(0..=crate::integer::checked::<_, i64>(maximum_rows).map_err(|error| error.to_string())?).contains(&rows) {
-            return Err(format!("{table} row limit exceeded"));
+        )?;
+        if !(0..=crate::integer::checked::<_, i64>(maximum_rows).map_err(RecordIntegrityError::invalid)?).contains(&rows) {
+            return Err(format!("{table} row limit exceeded").into());
         }
         let predicate = columns.into_iter()
             .map(|(column, maximum)| text_bound(column, maximum))
             .chain([extra.into()])
             .collect::<Vec<_>>().join(" OR ");
         if invalid_row_exists(connection, table, &predicate)? {
-            return Err(format!("{table} has invalid storage types or sizes"));
+            return Err(format!("{table} has invalid storage types or sizes").into());
         }
     }
     Ok(true)
@@ -299,17 +296,15 @@ pub(in crate::admission_operation_store) fn verify_all_records(
             "NOT EXISTS(SELECT 1 FROM {} AS expectation WHERE expectation.approval_authority_id = {table}.approval_authority_id)",
             TABLES[0],
         ))? {
-            return Err(format!("{table} has an orphan record"));
+            return Err(format!("{table} has an orphan record").into());
         }
     }
     let mut statement = connection.prepare(
         "SELECT approval_authority_id FROM governed_approval_replay_migration_expectations ORDER BY approval_authority_id",
-    ).map_err(|error| error.to_string())?;
+    )?;
     let keys = statement
-        .query_map([], |row| row.get::<_, String>(0))
-        .map_err(|error| error.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|error| error.to_string())?;
+        .query_map([], |row| row.get::<_, String>(0))?
+        .collect::<Result<Vec<_>, _>>()?;
     let records: Vec<GovernedApprovalReplayMigrationRecordV1> = keys
         .into_iter()
         .map(|key| {
@@ -322,7 +317,7 @@ pub(in crate::admission_operation_store) fn verify_all_records(
         let identity = record
             .snapshot
             .file_identity()
-            .map_err(|error| error.to_string())?;
+            .map_err(RecordIntegrityError::invalid)?;
         if !physical_sources.insert((identity.device, identity.inode)) {
             return Err(
                 "approval replay physical source is already pinned under another binding".into(),
@@ -374,8 +369,7 @@ fn load_bounded_record(
                 ))
             },
         )
-        .optional()
-        .map_err(|error| error.to_string())?;
+        .optional()?;
     let Some((
         source_id,
         expectation_id,
@@ -388,7 +382,7 @@ fn load_bounded_record(
         return Ok(None);
     };
     let snapshot = GovernedApprovalReplaySourceSnapshot::from_canonical_bytes(&canonical)
-        .map_err(|error| error.to_string())?;
+        .map_err(RecordIntegrityError::invalid)?;
     if snapshot.source_id() != source_id
         || snapshot.approval_authority_id() != approval_authority_id
         || snapshot.destination_authority_id() != destination
@@ -396,7 +390,7 @@ fn load_bounded_record(
     {
         return Err("stored expectation source binding mismatch".into());
     }
-    let mut record = new_expectation(snapshot).map_err(|error| error.to_string())?;
+    let mut record = new_expectation(snapshot).map_err(RecordIntegrityError::invalid)?;
     if record.expectation_id.as_str() != expectation_id
         || record.expectation_digest != expectation_digest
     {
@@ -407,8 +401,7 @@ fn load_bounded_record(
             "SELECT sequence, mutation_kind, expectation_digest, inventory_sha256, event_digest,
          observed_at_unix_ms, store_uuid, store_lease_id, store_owner_epoch
          FROM governed_approval_replay_migration_events WHERE approval_authority_id = ?1 ORDER BY sequence",
-        )
-        .map_err(|error| error.to_string())?;
+        )?;
     let events = statement
         .query_map([approval_authority_id], |row| {
             Ok(MigrationEvent {
@@ -424,10 +417,8 @@ fn load_bounded_record(
                     owner_epoch: row_u64(row, 8)?,
                 },
             })
-        })
-        .map_err(|error| error.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|error| error.to_string())?;
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
     if events.is_empty() || events.len() > 3 {
         return Err("migration must retain its expectation event".into());
     }
@@ -437,7 +428,7 @@ fn load_bounded_record(
         if event.sequence != crate::integer::count(index) + 1
             || event.mutation_kind
                 != migration_mutation(crate::integer::count(index) + 1)
-                    .map_err(|error| error.to_string())?
+                    .map_err(RecordIntegrityError::invalid)?
             || event.expectation_digest != record.expectation_digest
             || event.inventory_sha256 != record.snapshot.inventory_sha256()
             || event.fence.store_uuid != record.snapshot.destination_authority_id()
@@ -446,24 +437,22 @@ fn load_bounded_record(
         {
             return Err("migration event binding, digest, order or time mismatch".into());
         }
-        let lease_matches: bool = connection
-            .query_row(
-                "SELECT EXISTS(SELECT 1 FROM chio_serving_leases
+        let lease_matches: bool = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM chio_serving_leases
              WHERE store_uuid = ?1 AND owner_epoch = ?2 AND lease_id = ?3)",
-                params![
-                    event.fence.store_uuid,
-                    i64::try_from(event.fence.owner_epoch).map_err(|error| error.to_string())?,
-                    event.fence.lease_id
-                ],
-                |row| row.get(0),
-            )
-            .map_err(|error| error.to_string())?;
+            params![
+                event.fence.store_uuid,
+                i64::try_from(event.fence.owner_epoch).map_err(RecordIntegrityError::invalid)?,
+                event.fence.lease_id
+            ],
+            |row| row.get(0),
+        )?;
         if !lease_matches {
             return Err("migration event historical owner lease mismatch".into());
         }
         if event.sequence == 3 {
             super::verify_source_clock_floor(&record.snapshot, event.observed_at_unix_ms)
-                .map_err(|error| error.to_string())?;
+                .map_err(RecordIntegrityError::invalid)?;
         }
         previous = &event.event_digest;
         observed = event.observed_at_unix_ms;
@@ -482,17 +471,13 @@ fn verify_tombstones(
     connection: &Connection,
     record: &GovernedApprovalReplayMigrationRecordV1,
 ) -> IntegrityResult<()> {
-    let mut statement = connection
-        .prepare(
-            "SELECT subject_id, request_id, intent_hash, source_id, expectation_id,
+    let mut statement = connection.prepare(
+        "SELECT subject_id, request_id, intent_hash, source_id, expectation_id,
              CAST(expires_at AS TEXT), historical_reservation_id
          FROM governed_approval_replay_legacy_tombstones WHERE approval_authority_id = ?1
          ORDER BY subject_id COLLATE BINARY, request_id COLLATE BINARY, intent_hash COLLATE BINARY",
-        )
-        .map_err(|error| error.to_string())?;
-    let mut rows = statement
-        .query([record.snapshot.approval_authority_id()])
-        .map_err(|error| error.to_string())?;
+    )?;
+    let mut rows = statement.query([record.snapshot.approval_authority_id()])?;
     let expected = if record.is_imported() {
         record.snapshot.markers()
     } else {
@@ -500,8 +485,7 @@ fn verify_tombstones(
     };
     for marker in expected {
         let row = rows
-            .next()
-            .map_err(|error| error.to_string())?
+            .next()?
             .ok_or("missing unresolved approval replay tombstone")?;
         let actual: (
             String,
@@ -512,13 +496,13 @@ fn verify_tombstones(
             String,
             Option<String>,
         ) = (
-            row.get(0).map_err(|error| error.to_string())?,
-            row.get(1).map_err(|error| error.to_string())?,
-            row.get(2).map_err(|error| error.to_string())?,
-            row.get(3).map_err(|error| error.to_string())?,
-            row.get(4).map_err(|error| error.to_string())?,
-            row.get(5).map_err(|error| error.to_string())?,
-            row.get(6).map_err(|error| error.to_string())?,
+            row.get(0)?,
+            row.get(1)?,
+            row.get(2)?,
+            row.get(3)?,
+            row.get(4)?,
+            row.get(5)?,
+            row.get(6)?,
         );
         // Preserve the legacy wildcard subject exactly, as well as the
         // distinction between a committed marker and an unresolved reservation.
@@ -537,7 +521,7 @@ fn verify_tombstones(
             return Err("approval replay tombstone does not match the exact pinned source".into());
         }
     }
-    if rows.next().map_err(|error| error.to_string())?.is_some() {
+    if rows.next()?.is_some() {
         return Err("extra or premature approval replay tombstone".into());
     }
     Ok(())

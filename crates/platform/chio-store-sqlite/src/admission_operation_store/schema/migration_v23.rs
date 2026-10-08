@@ -32,7 +32,8 @@ pub(super) fn verify_pre_migration_schema(
         verify_admission_operation_schema(tx, 22)?;
         verify_admission_operation_data_invariants(tx)?;
         super::super::runtime_participant::verify_all(tx)?;
-        super::super::governed_approval_replay::verify_all_records(tx).map_err(invariant)?;
+        super::super::governed_approval_replay::verify_all_records(tx)
+            .map_err(AdmissionOperationStoreError::from)?;
     }
     if table_exists(tx, "governed_approval_replay_migration_events")? {
         let active: bool = tx.query_row(

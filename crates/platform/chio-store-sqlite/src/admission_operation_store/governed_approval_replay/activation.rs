@@ -37,9 +37,9 @@ impl SqliteAdmissionOperationStore {
                 trusted_now_unix_ms,
                 &self.serving_owner,
             )?;
-            verify_all_records(&tx).map_err(integrity_error)?;
+            verify_all_records(&tx).map_err(record_error)?;
             let current = load_record(&tx, binding.approval_authority_id().as_str())
-                .map_err(integrity_error)?
+                .map_err(record_error)?
                 .ok_or_else(|| invariant("approval activation history disappeared"))?;
             require_same_expectation(&current, &expected)?;
             if current.is_active() {
@@ -51,7 +51,7 @@ impl SqliteAdmissionOperationStore {
                 ));
             }
             records::insert_event(&tx, &current, 3, observed, fence)?;
-            verify_all_records(&tx).map_err(integrity_error)?;
+            verify_all_records(&tx).map_err(record_error)?;
             append_migration_commit(
                 &self.serving_owner,
                 &tx,
@@ -82,7 +82,7 @@ pub(in crate::admission_operation_store) fn require_active_source(
     expectation: &AdmissionIdentifier,
 ) -> Result<GovernedApprovalReplaySourceSnapshot, AdmissionOperationStoreError> {
     let record = load_record(connection, authority.as_str())
-        .map_err(integrity_error)?
+        .map_err(record_error)?
         .ok_or_else(|| invariant("approval profile has no source history"))?;
     if !record.is_active() || record.expectation_id() != expectation {
         return Err(invariant(
