@@ -24,6 +24,15 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         self.retain_caller_wait(command, trusted_now_unix_ms)
     }
 
+    fn checkpoint_native_security_history_if_due(
+        &self,
+        binding: &chio_kernel::admission_operation::NativeSecurityAuthorityBindingV1,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<Option<AdmissionDigest>, AdmissionOperationStoreError> {
+        self.checkpoint_selected_native_history_if_due(binding, fence, now)
+    }
+
     fn observe_native_security_flow(
         &self,
         binding: &chio_kernel::admission_operation::NativeSecurityAuthorityBindingV1,

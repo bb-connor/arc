@@ -141,6 +141,21 @@ pub trait AdmissionOperationStore: Send + Sync {
         ))
     }
 
+    /// Trusted history maintenance for the installed native authority. This
+    /// retains authenticated journal bytes and may seal their current prefix;
+    /// it grants no operation, credentials, egress or dispatch authority.
+    /// Native backends must either maintain their history or explicitly refuse.
+    fn checkpoint_native_security_history_if_due(
+        &self,
+        _binding: &NativeSecurityAuthorityBindingV1,
+        _fence: &StoreMutationFence,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<Option<AdmissionDigest>, AdmissionOperationStoreError> {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "native history maintenance is unsupported".into(),
+        ))
+    }
+
     /// Fresh read-only native data under the current serving fence, scoped to
     /// independently verified initialization selected by the trusted host.
     /// This may precede original admission and its first join. It grants no

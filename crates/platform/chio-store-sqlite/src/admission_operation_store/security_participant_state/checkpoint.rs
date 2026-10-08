@@ -1,6 +1,7 @@
 //! Retained snapshots authorized by exact global references and current custody.
 use super::*;
 
+mod cadence;
 mod record;
 mod rows;
 mod schema;
@@ -143,27 +144,65 @@ impl SqliteAdmissionOperationStore {
         fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<AdmissionDigest, AdmissionOperationStoreError> {
+        self.checkpoint_history(
+            cadence::Selection::Initialization(initialized),
+            fence,
+            trusted_now_unix_ms,
+            false,
+        )?
+        .ok_or_else(|| invalid("explicit native checkpoint was not retained"))
+    }
+
+    pub(in crate::admission_operation_store) fn checkpoint_selected_native_history_if_due(
+        &self,
+        binding: &chio_kernel::admission_operation::NativeSecurityAuthorityBindingV1,
+        fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<Option<AdmissionDigest>, AdmissionOperationStoreError> {
+        self.checkpoint_history(
+            cadence::Selection::Binding(binding),
+            fence,
+            trusted_now_unix_ms,
+            true,
+        )
+    }
+
+    fn checkpoint_history(
+        &self,
+        selected: cadence::Selection<'_>,
+        fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+        automatic: bool,
+    ) -> Result<Option<AdmissionDigest>, AdmissionOperationStoreError> {
         let mut connection = self.connection()?;
         let tx = self.begin_write(&mut connection, Some(fence))?;
         if !schema::present(&tx)? {
             return Err(invalid("native checkpoint requires admission schema v36"));
         }
         let observed_at = observed_time(&tx, trusted_now_unix_ms, &self.serving_owner)?;
-        let actual = super::records::load(&tx, initialized.authority.as_str())?
+        let actual = super::records::load(&tx, selected.authority())?
             .ok_or_else(|| invalid("native checkpoint initialization is absent"))?;
-        if &actual != initialized || fence.store_uuid != actual.fence.store_uuid {
+        if !selected.matches(&actual)? || fence.store_uuid != actual.fence.store_uuid {
             return Err(invalid("native checkpoint selected initialization differs"));
         }
         let heads = heads(&tx, &actual)?;
         let previous = latest(&tx, actual.authority.as_str())?;
         if let Some(previous) = &previous {
             if previous.heads == heads {
-                return AdmissionDigest::try_new("native_checkpoint", previous.digest()?)
-                    .map_err(Into::into);
+                return if automatic {
+                    Ok(None)
+                } else {
+                    AdmissionDigest::try_new("native_checkpoint", previous.digest()?)
+                        .map(Some)
+                        .map_err(Into::into)
+                };
             }
         }
         let (events, bytes) = history::ordered::segment_totals(&tx, actual.authority.as_str())?;
         history::ordered::validate_history_bounds(&tx, actual.authority.as_str())?;
+        if automatic && !cadence::due(events)? {
+            return Ok(None);
+        }
         let sequence = previous.as_ref().map_or(Ok(1), |record| {
             record
                 .sequence
@@ -218,7 +257,7 @@ impl SqliteAdmissionOperationStore {
         }
         self.sync_after_write(&connection)?;
         super::cutpoint(74)?;
-        Ok(digest)
+        Ok(Some(digest))
     }
 }
 

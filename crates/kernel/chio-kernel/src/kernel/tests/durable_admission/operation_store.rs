@@ -289,6 +289,20 @@ impl AdmissionOperationStore for TestAdmissionOperationStore {
         self.native_dispatch_ledger.load(id)
     }
 
+    fn checkpoint_native_security_history_if_due(
+        &self,
+        _: &crate::admission_operation::NativeSecurityAuthorityBindingV1,
+        fence: &StoreMutationFence,
+        _: u64,
+    ) -> Result<Option<AdmissionDigest>, AdmissionOperationStoreError> {
+        self.require_fence(fence)?;
+        self.native_egress.require_enabled("history maintenance")?;
+        // This test backend retains one observation/acquisition, without a
+        // participant journal or snapshot archive to seal. Do not consume its
+        // injected observation faults or mutate generation/custody here.
+        Ok(None)
+    }
+
     fn observe_native_security_flow(
         &self,
         binding: &crate::admission_operation::NativeSecurityAuthorityBindingV1,

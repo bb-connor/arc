@@ -32,8 +32,9 @@ pub type NativeSecurityEgressCheckpointHook = Arc<
 >;
 
 impl ChioKernel {
-    /// Refresh only mutable flow observation through the selected, fenced
-    /// authority. Trusted hosts call this before each evaluation, including
+    /// Maintain authenticated history, then refresh mutable flow observation
+    /// through the selected, fenced authority. Trusted hosts call this before
+    /// each evaluation, including
     /// the executable request following nonce preflight. Identity and isolation
     /// stay unchanged; the admission writer still checks the generation itself.
     pub fn refresh_native_security_context(
@@ -46,6 +47,12 @@ impl ChioKernel {
         let runtime = self.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
         let now = runtime.refresh_trusted_time(0)?;
+        store_call(|| {
+            runtime
+                .store
+                .checkpoint_native_security_history_if_due(&binding, &runtime.fence, now)
+        })?;
+        let now = runtime.refresh_trusted_time(now)?;
         let trusted = context.as_v1();
         let key = FlowStateKey {
             tenant_id: trusted.tenant_id().clone(),
