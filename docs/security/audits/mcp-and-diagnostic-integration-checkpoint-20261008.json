@@ -1,0 +1,283 @@
+{
+  "schema": "chio.pr1160.mcp-integration-checkpoint.v1",
+  "source": "2488df7f780d59e92ff5312d42159f15ccdb02b5",
+  "published_source": "89d79ac6ab79de5d55b99a7c8ec611bc8b021cb2",
+  "qualified": false,
+  "merged": false,
+  "repairs": {
+    "MCP-ROOTS": "Next-request stream refresh with stale-root withdrawal; stdio immediate route, original deadlines and reservation ownership preserved.",
+    "MCP-INIT400": "Session-bearing initialize refuses400 before unknown-session resolution; original authenticated/read-limited ordering preserved.",
+    "MCP-PEERS": "Existing Python/C++ nested routers answer carried callbacks; explicit C++ callback scopes prevent duplicate answers and retain safe lifetime.",
+    "MCP-GET": "Exact original priming event and notification-before-response test corrections, no server behavior or replay/ownership oracle relaxation.",
+    "MCP-CANCEL": "Exact carrier identity uses reserved capacity; registration precedes consuming queued refresh, local oversized-ID refusal and internal global fault separate.",
+    "MCP-REJECT-READER": "Explicit8MiB/object-bound streaming DTO, borrowed method cap62 and ignored id presence; only immediate refusal, unchanged accounted fallback, no pre-admission DOM."
+  },
+  "source_maps": [
+    {
+      "original_commit": "f3e7433ec1",
+      "integration_commit": "e37d31ca929960aac78b1dad1fbddbd097895be0",
+      "kind": "original-or-protocol-peer-test",
+      "output": "[integration/process-security-m4 e37d31ca92] test(mcp): roots refresh rides the next request stream and withdraws stale roots\n Date: Wed Oct 7 16:37:15 2026 -0400\n 5 files changed, 547 insertions(+), 81 deletions(-)\n create mode 100644 crates/protocol/chio-mcp-edge/src/runtime/runtime_tests/roots_refresh_invalidation.rs\n create mode 100644 crates/protocol/chio-mcp-remote/src/remote_mcp/tests/worker_lifecycle/roots_next_request.rs\n"
+    },
+    {
+      "original_commit": "0ba3f6283a",
+      "integration_commit": "12dcfa8efde74bf6c3b56e8efe63a2781468c6db",
+      "kind": "original-or-protocol-peer-test",
+      "output": "[integration/process-security-m4 12dcfa8efd] test(cli): expect the MCP 2025-11-25 transport for roots after initialized\n Date: Wed Oct 7 16:37:16 2026 -0400\n 1 file changed, 38 insertions(+), 6 deletions(-)\n"
+    },
+    {
+      "original_commit": "83f20e27fb",
+      "integration_commit": "84f57efc623d7929be7e3857fe692590118b2ba6",
+      "kind": "original-or-protocol-peer-test",
+      "output": "[integration/process-security-m4 84f57efc62] test(conformance): python peer answers server requests on every roots-declaring session stream\n Date: Wed Oct 7 16:37:16 2026 -0400\n 1 file changed, 13 insertions(+)\n"
+    },
+    {
+      "original_commit": "35472f4bc0",
+      "integration_commit": "071d411fc36686d5322b21359164933d70b1e747",
+      "kind": "original-or-protocol-peer-test",
+      "output": "[integration/process-security-m4 071d411fc3] test(mcp-remote): initialize naming MCP-Session-Id is refused before session resolution\n Date: Wed Oct 7 15:24:31 2026 -0400\n 2 files changed, 146 insertions(+)\n create mode 100644 crates/protocol/chio-mcp-remote/src/remote_mcp/tests/worker_lifecycle/initialize_session_header.rs\n"
+    },
+    {
+      "original_commit": "ae02b87bf1",
+      "integration_commit": "f670c630024d04d50cd5351a4e5efc6fdda3c612",
+      "kind": "original-or-protocol-peer-test",
+      "output": "Auto-merging crates/products/chio-cli/tests/mcp_serve_http.rs\n[integration/process-security-m4 f670c63002] test(cli): expect the priming event first on a live GET notification stream\n Date: Wed Oct 7 19:24:02 2026 -0400\n 1 file changed, 8 insertions(+)\n"
+    },
+    {
+      "original_commit": "015291e0aa",
+      "integration_commit": "05af50ab5e0f5d5016436d397def38dff53a8e79",
+      "kind": "source-repair-with-retained-current-Original",
+      "output": "[integration/process-security-m4 05af50ab5e] fix(mcp-edge): carry a queued roots refresh on the next client request stream\n Date: Wed Oct 7 16:37:17 2026 -0400\n 4 files changed, 206 insertions(+), 20 deletions(-)\n"
+    },
+    {
+      "original_commit": "c1712229e3",
+      "integration_commit": "6338947f98c0a3ccf81e6643fcf786ae9facea35",
+      "kind": "source-repair-with-retained-current-Original",
+      "output": "[integration/process-security-m4 6338947f98] fix(mcp-remote): refuse initialize naming MCP-Session-Id before resolving the session\n Date: Wed Oct 7 15:40:48 2026 -0400\n 2 files changed, 57 insertions(+), 15 deletions(-)\n"
+    },
+    {
+      "original_commit": "f6bb624e34",
+      "integration_commit": "13dfc2ebc9986966d66031752c8aac7fccfd5407",
+      "kind": "source-repair-with-retained-current-Original",
+      "output": "[integration/process-security-m4 13dfc2ebc9] test(conformance): C++ peer answers server requests on every roots-declaring session stream\n Date: Wed Oct 7 19:26:02 2026 -0400\n 1 file changed, 50 insertions(+), 2 deletions(-)\n"
+    }
+  ],
+  "verification": {
+    "current_actual_umask": "0002",
+    "original_pre_repair": "3 controls passed;10 runtime failures",
+    "review_originals": "1 control passed;3 failures then registration2 failures; first registration1 also retained as same defect",
+    "owning": {
+      "adapter": 135,
+      "edge": 166,
+      "remote": 177,
+      "failed": 0
+    },
+    "strict_three_owners_all_targets": 0,
+    "workspace_format": 0,
+    "source_gate": {
+      "constructors": 497,
+      "tenant_tables": 86,
+      "sql_principals": 171,
+      "exit_code": 0
+    },
+    "old_gate_calibration": {
+      "cases": 42,
+      "failed": 0
+    },
+    "new_gate_mutations_through_existing_ci_command": {
+      "cases": 21,
+      "failed": 0
+    },
+    "raw_debt45": "all identities/contracts unchanged",
+    "negative1248": "unchanged",
+    "hygiene": "unchanged caps, pass",
+    "combined_cli_all_targets_strict": 0,
+    "fuzz_feature_all_targets_strict": 0,
+    "diagnostic_rust_current": 12,
+    "diagnostic_python_current": 5
+  },
+  "independent_review": {
+    "path": "/tmp/chio-pr1160-qualification-20261007/mcp-independent-review/SEAL.json",
+    "sha256": "682131ee5a8e13169dd96bb10e354accf35cf75c66a75cd01eb5977a2206fef7",
+    "scope": "42 immutable blobs/four final amended source guards, finite review; active reply conflict has unproven production reachability/injected gap, no productionP2 asserted"
+  },
+  "native_evidence": {
+    "source": "8060ded996",
+    "mode": "022",
+    "artifact_files_verified": 296,
+    "scope": "separate Claude finite native tree, not current source native qualification"
+  },
+  "evidence": [
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/mcp-compose/current-originals.log",
+      "sha256": "9bdbe5560d4eb1af2c633cf808415951952afb96d9f337f243606d5604ecb254",
+      "runtime_results": [
+        "FAILED. 1 passed; 4 failed; 0 ignored; 0 measured; 157 filtered out; finished in 0.43s",
+        "FAILED. 2 passed; 6 failed; 0 ignored; 0 measured; 167 filtered out; finished in 12.37s"
+      ]
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/mcp-compose/current-initial-green.log",
+      "sha256": "cad5bb6820ac0334ae76b9c91cef8468b796c3d4bea41f7d2bc15f843c3c887a",
+      "runtime_results": [
+        "ok. 5 passed; 0 failed; 0 ignored; 0 measured; 157 filtered out; finished in 0.38s",
+        "ok. 8 passed; 0 failed; 0 ignored; 0 measured; 167 filtered out; finished in 0.98s"
+      ]
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/mcp-compose/full-mcp-libraries-initial.log",
+      "sha256": "21f3428a0be3bc02f12b263ce76820354da68579b9ee66420b027f210915989b",
+      "runtime_results": [
+        "ok. 135 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.17s",
+        "ok. 162 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.29s",
+        "ok. 175 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 128.66s"
+      ]
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/mcp-compose/review-amendment-original.log",
+      "sha256": "22767e9f043571d2eabe29aef5e0fb978581de753cb54b6b09e6ecd7f19632af",
+      "runtime_results": [
+        "FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 162 filtered out; finished in 0.11s",
+        "FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 175 filtered out; finished in 0.12s"
+      ]
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/mcp-compose/review-amendment-green.log",
+      "sha256": "16b33bcc92e0b9cfb6db3980a3ee174368e29d8e7b0fe5342821995c54c3c95e",
+      "runtime_results": [
+        "ok. 7 passed; 0 failed; 0 ignored; 0 measured; 157 filtered out; finished in 0.40s",
+        "ok. 10 passed; 0 failed; 0 ignored; 0 measured; 167 filtered out; finished in 0.98s"
+      ]
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/mcp-compose/registration-original.log",
+      "sha256": "83266f3a1825dd185aaf596e3f734ddb2c92ce5430a4c102dcb38fb96140c005",
+      "runtime_results": [
+        "FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 164 filtered out; finished in 0.08s",
+        "ok. 0 passed; 0 failed; 0 ignored; 0 measured; 177 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/mcp-compose/registration-global-original.log",
+      "sha256": "ef781bcf84cd52adab6f0448e558b8ea5606e39ec1a46b4587ba35711adcb613",
+      "runtime_results": [
+        "FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 164 filtered out; finished in 0.09s",
+        "ok. 0 passed; 0 failed; 0 ignored; 0 measured; 177 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/mcp-compose/mcp-final-full-libraries.log",
+      "sha256": "355cff10306d94cff216c5c8340deb0b96808b8d71793e3c1831655c8c8db7e0",
+      "runtime_results": [
+        "ok. 135 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.56s",
+        "ok. 166 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.50s",
+        "ok. 177 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 123.08s"
+      ]
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/mcp-compose/mcp-final-three-owner-strict.log",
+      "sha256": "84f774798febb9888df0985df2aa749e19d31dd80551b3719bb1f4d3772bf8e6",
+      "runtime_results": []
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/mcp-compose/mcp-final-format.log",
+      "sha256": "56891f187792ad0c9171cd7b1db53d8c9b4d8ce4df558b02e02845fbec9abc83",
+      "runtime_results": []
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/mcp-compose/installed-witness-mutations.log",
+      "sha256": "3dc368f138c9a660307d62e31d58cdadff9fe4e05508e332442bb15f546a30fd",
+      "runtime_results": []
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/mcp-compose/witness-through-ci-command.log",
+      "sha256": "09e6c60ab8ae307aa75407241500de803f33ad871b9ad49eca3e155f803c06dc",
+      "runtime_results": []
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/mcp-compose/full-trust-calibration.log",
+      "sha256": "ac3c92a8ad7cbbda3aa23946382ef3878d60bbf4c9acd8c2badcc5039686cd71",
+      "runtime_results": []
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/mcp-compose/final-trust-boundaries.log",
+      "sha256": "3e7cd49c64e1d00bac3abb86362201ad479735d0a568d28eb47ee00fe65702e4",
+      "runtime_results": []
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/mcp-compose/final-rust-hygiene.log",
+      "sha256": "27587665aa0b437daf525eb2a7fade85e459873a53c258c83ac1e1fa3a148d64",
+      "runtime_results": []
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/mcp-compose/fuzz-feature-current-original.log",
+      "sha256": "e45fd96fd08c9b58735217146108c2703932b1f362787992530d899557140949",
+      "runtime_results": []
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/mcp-compose/fuzz-feature-current-green.log",
+      "sha256": "19026d58fd08462d9d948dd590f9a4d93d50e34284e941f3f7772cee5d6d5317",
+      "runtime_results": []
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/mcp-compose/miniswe-corrected-current-original.log",
+      "sha256": "63b1bf48ef247a2cee571fd4579e94aabc19828be774d791b1b6e6f5d62825b6"
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/mcp-compose/miniswe-current-green.log",
+      "sha256": "380686131032e7b2a50c6bbc25db6816401994e88c2a33a7e2ba4c16b28c4ef6"
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/mcp-compose/miniswe-python-current-original-locked-env.log",
+      "sha256": "43452634817f7ff2cbc8888419bc649c016d7aaf6e10795cb15ac9b5a9b6994b"
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/mcp-compose/miniswe-python-current-green.log",
+      "sha256": "1966890ba6efc09f86dd998039477f6271ab6aa52cc7ff72888f7d6b6a9bc479"
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/mcp-compose/mcp-cli-current-integration.log",
+      "sha256": "819f251315cf99e5e72399b2476c5a7645e6fdd04fd93ede48034b94aff2129a"
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/mcp-compose/combined-cli-all-targets-strict.log",
+      "sha256": "27f52423a6201a999003d89537360cabf8c6604560768b210eee1452b3ac53b8"
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/mcp-compose/fuzz-current-owning-strict.log",
+      "sha256": "f29616cb9fd82e82047ad7ac5dc6fc373a3aca15be7cd9bc3095be2b2a47bd16"
+    }
+  ],
+  "remaining_acceptance": [
+    "Current combinedCLI HTTP/conformance and owning strict checks after ready fuzz/miniswdiagnostic composition.",
+    "Complete all now pipeline/effect/NF-CAP/F016/PG/F042/F044/F075 repairs and Original acceptance; real nativeattachmentfailure is open.",
+    "Fulldefault/PQ/source/independent slices, exactSource native/cold/trusted/hosted evidence, current review threads and protected landing."
+  ],
+  "preserved_setup_failures": [
+    "Staging marker lookup stopped before shape edit; received draft and final completion retained.",
+    "Misspelled hygiene command and read-only default Python bytecode attempt; correct checker/temp cache later verified.",
+    "System-Python minisweagent missing produced5 setup errors; locked existingenv with RootSource paths later genuine3fail2pass."
+  ],
+  "fuzz_stage": {
+    "source_commit": "3f3dc21b45",
+    "original": "actualE0425atfuzz.rs130 againstunchanged f293blob",
+    "green": "samefeaturecheck0",
+    "remaining": "currentlockedworkspacecorpus/strict verification"
+  },
+  "miniswe_stage": {
+    "original_tests_commit": "dc3be242f9",
+    "diagnostic_source_commit": "f41e8928d9baf5e722801146fef7e20b2921ed10",
+    "rust_original": "9pass3fail atcurrentSource afterzero-selectorunrun",
+    "python_original": "2pass3fail lockedexistingvenv withRootSource paths;5missingdependency setup retained",
+    "current_green": "Rust12/0 andPython5/0",
+    "native_attachment_loss": "OPEN; diagnosticdoesnotrepairnativefailure"
+  },
+  "current_cli_native_attempt": {
+    "source": "f41e8928d9baf5e722801146fef7e20b2921ed10",
+    "exit_code": 101,
+    "conformance": "3pass1preflightfail missing absoluteCHIO_CAGE_INIT",
+    "http": "0pass43preflightfail1existingignored; ARM host rejected by qualifiedLinuxx86_64 requirement",
+    "classification": "failed setup/native availability before enforcement, no currentnative outcome or sourceRED inferred",
+    "local_strict": "owningCLI/fuzz all-target strict0; nativepreflight failure retained"
+  }
+}
