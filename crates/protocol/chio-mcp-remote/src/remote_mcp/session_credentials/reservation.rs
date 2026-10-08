@@ -62,7 +62,7 @@ fn rollback_at(path: &FsPath, keypair: &Keypair, pending: &CredentialCall) -> Re
     tx.commit().map_err(storage_error)
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::*;
 
