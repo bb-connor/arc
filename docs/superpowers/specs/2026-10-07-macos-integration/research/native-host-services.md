@@ -8,6 +8,8 @@ Confidence: high in the cited platform distinctions and inspected source paths; 
 
 Chio is a Rust kernel for building agentic operating systems. macOS hosts its userspace native services and OS adapters; this does not require an XNU replacement or kernel extension. Applications, agent harnesses and Herdr can consume the actual owner bindings without workbench, menu bar or browser. Their UX and orchestration strategy remain application responsibilities.
 
+Current integration targets are the four native harness lanes Claude Code, Codex, Pi and Hermes and the separate Herdr workspace/plugin lane, as specified in [FIRST-CLASS-INTEGRATIONS](../../2026-10-07-desktop-integration/FIRST-CLASS-INTEGRATIONS.md). This is delivery direction, not observed Mac support. Mini-swe is optional reference/conformance only, and no frontend is a native service runtime prerequisite.
+
 An `.app`-shaped service bundle is compatible with this architecture. Apple's official [GUI-less ServiceManagement package sample](https://developer.apple.com/documentation/servicemanagement/updating-your-app-package-installer-to-use-the-new-service-management-api) packages a LaunchAgent and a non-graphical executable that registers, unregisters, checks status and tests XPC from the command line. The sample demonstrates packaging, not Chio's machine-service availability. [Signing a daemon with a restricted entitlement](https://developer.apple.com/documentation/xcode/signing-a-daemon-with-a-restricted-entitlement) likewise describes a non-UI app-like structure that holds an embedded provisioning profile and is tested in daemon context.
 
 The two deployment profiles remain separate:
