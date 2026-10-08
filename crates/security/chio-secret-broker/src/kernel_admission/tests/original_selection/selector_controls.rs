@@ -276,22 +276,59 @@ fn external_corrupt_duplicate_hold_index_poisoning_returns_no_original() -> Test
 }
 
 #[test]
-fn external_oversized_hold_operation_index_poisoning_returns_no_original() -> TestResult {
+fn immutable_composite_hold_rejects_external_operation_id_update_without_changing_custody(
+) -> TestResult {
     let fixture = CompletedOriginal::new()?;
-    // Corruption injection: a physical selector ID exceeds the 512-byte
-    // bound. The separately retained original request is unchanged.
+    let before = fixture
+        .select(&fixture.digest)?
+        .ok_or("original before rejected hold update")?;
+    let hold_id = &before.custody.as_ref().ok_or("original hold")?.hold_id;
     let connection = rusqlite::Connection::open(&fixture.store.database)?;
-    assert_eq!(
-        connection.execute(
-            "UPDATE budget_authorization_holds SET operation_id = ?1 WHERE operation_id = ?2",
-            rusqlite::params!["x".repeat(513), fixture.operation.as_str()],
-        )?,
-        1
+    let before_row: (String, String, Option<i64>) = connection.query_row(
+        "SELECT operation_id, projection_kind, expected_revocation_count
+         FROM budget_authorization_holds WHERE hold_id = ?1",
+        [hold_id],
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+    )?;
+    assert_eq!(before_row.0, fixture.operation.as_str());
+    assert_eq!(before_row.1, "composite_v1");
+    assert!(
+        before_row.2.is_some(),
+        "immutable projection contract exists"
     );
-    assert!(matches!(
-        fixture.select(&fixture.digest),
-        Err(chio_kernel::admission_operation::AdmissionOperationStoreError::OutcomeUnknown(_))
-    ));
+
+    // This external update cannot create a malformed selector row: the
+    // existing composite-hold trigger aborts it. The private owning-connection
+    // oversized-slot control separately exercises the selector's ID bound.
+    let update = connection.execute(
+        "UPDATE budget_authorization_holds SET operation_id = ?1 WHERE operation_id = ?2",
+        rusqlite::params!["x".repeat(513), fixture.operation.as_str()],
+    );
+    assert!(
+        matches!(&update, Err(rusqlite::Error::SqliteFailure(code, Some(message)))
+            if code.code == rusqlite::ErrorCode::ConstraintViolation
+                && code.extended_code == 1811
+                && message == "composite hold projection contract is immutable"),
+        "immutable hold update: {update:?}"
+    );
+    let after_row: (String, String, Option<i64>) = connection.query_row(
+        "SELECT operation_id, projection_kind, expected_revocation_count
+         FROM budget_authorization_holds WHERE hold_id = ?1",
+        [hold_id],
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+    )?;
+    assert_eq!(after_row, before_row);
+    drop(connection);
+
+    let after = fixture
+        .select(&fixture.digest)?
+        .ok_or("original after rejected hold update")?;
+    assert_eq!(after.operation, before.operation);
+    assert_eq!(
+        after.request.canonical_bytes(),
+        before.request.canonical_bytes()
+    );
+    assert_eq!(after.custody, before.custody);
     assert_eq!(fixture.broker.pending_dispatches()?, 0);
     assert_eq!(
         request_operations(&fixture.store.database, REQUEST_ID)?,
