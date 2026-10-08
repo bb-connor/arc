@@ -6,12 +6,8 @@ use chio_kernel::admission_operation::{
 use chio_kernel::{ToolCallOutput, Verdict};
 
 #[allow(dead_code)]
-mod support {
-    include!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/tests/threshold_kernel_lifecycle/support.rs"
-    ));
-}
+#[path = "../../../tests/threshold_kernel_lifecycle/support.rs"]
+mod support;
 
 #[test]
 fn approved_caller_replay_refuses_expired_lease_without_new_hold_or_event() -> support::TestResult {

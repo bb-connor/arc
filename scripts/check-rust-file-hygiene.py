@@ -597,11 +597,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "Creusot core verification surface assembled from include! fragments; capped until the fragments become modules",
         max_fragments=1,
     ),
-    "crates/platform/chio-store-sqlite/src/budget_store/composite/caller_resume_tests.rs": allow(
-        "2026-10-31",
-        "composite budget caller-resume suite assembled from include! fragments; capped until the fragments become modules",
-        max_fragments=1,
-    ),
     "crates/protocol/chio-mcp-edge/src/runtime/runtime_tests/authorization.rs": allow(
         "2026-10-31",
         "MCP edge runtime authorization suite assembled from include! fragments; capped until the fragments become modules",
