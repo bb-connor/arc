@@ -1,6 +1,9 @@
 import importlib.util
 import json
+import os
+import stat
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -299,3 +302,30 @@ def test_native_dispatch_marker_refuses_unknown_truncated_extra_and_worker_lines
     assert result["host_failure_classes"] == ["native_dispatch_handoff_deadline_at_entry"]
     assert result["worker_logs"][1]["classes"] == []
     assert qualifier.failure_classes(line) == []
+
+
+def test_native_capture_fixed_marker_survives_captured_host_stderr_privately(qualifier, tmp_path):
+    secret = "private-host-credential-must-not-survive"
+    marker = (
+        "WARN chio::native_capture message=native capture refused "
+        "native_capture_stage=commit_nonce_expired native_capture_category=invariant\n"
+    )
+    script = "import os; os.write(2," + repr((secret + "\n" + marker).encode()) + "); raise SystemExit(1)"
+    child = subprocess.run([sys.executable, "-c", script], capture_output=True, check=False)
+    assert child.returncode == 1 and marker.encode() in child.stderr
+    output = tmp_path / "output"
+    output.mkdir()
+    failure = subprocess.CalledProcessError(1, ["native-host"], output=child.stdout, stderr=child.stderr)
+    qualifier.save_failure_diagnostics(tmp_path, output, failure)
+    private = tmp_path / "native-capture-failures.json"
+    assert private.is_file(), "fixed physical capture marker was discarded before private export"
+    assert stat.S_IMODE(private.stat().st_mode) == 0o600
+    retained = private.read_text()
+    assert secret not in retained and "request_id" not in retained
+    assert json.loads(retained) == {
+        "schema": "chio.native-capture-failures.v1",
+        "failures": [{"stage": "commit_nonce_expired", "category": "invariant"}],
+    }
+    report = json.loads((output / "operator-failure.json").read_text())
+    assert report["host_failure_classes"] == ["native_capture_commit_nonce_expired"]
+    assert list(output.iterdir()) == [output / "operator-failure.json"]

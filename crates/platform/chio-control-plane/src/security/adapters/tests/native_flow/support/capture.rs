@@ -17,6 +17,8 @@ mod direct_retention;
 
 mod fault_class;
 
+mod store_diagnostic;
+
 impl Fixture {
     fn configure_native_capture_dpop(&mut self) -> TestResult {
         use chio_kernel::admission_operation::AdmissionDigest;

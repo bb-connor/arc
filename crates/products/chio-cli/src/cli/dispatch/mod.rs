@@ -150,6 +150,26 @@ mod redacted_format_tests {
             "quoted \"value\"\\n\\u{1b}[2J"
         );
     }
+
+    #[test]
+    fn native_capture_fixed_stage_uses_the_production_redaction_formatter() {
+        use std::sync::{Arc, Mutex};
+        use tracing_subscriber::prelude::*;
+        let lines = Arc::new(Mutex::new(Vec::new()));
+        let retained = lines.clone();
+        let layer = chio_log_redact::RedactionLayer::new(move |event| {
+            retained.lock().expect("test trace mutex").push(format_redacted_event_line(&event));
+        }).expect("test redaction layer");
+        let subscriber = tracing_subscriber::registry().with(layer);
+        tracing::subscriber::with_default(subscriber, || {
+            tracing::warn!(target: "chio::native_capture",
+                native_capture_stage = "commit_runtime_expired",
+                native_capture_category = "invariant", "native capture refused");
+        });
+        assert_eq!(lines.lock().expect("test trace mutex").as_slice(), &[
+            "WARN chio::native_capture message=native capture refused native_capture_stage=commit_runtime_expired native_capture_category=invariant"
+        ]);
+    }
 }
 
 /// Install the process tracing subscriber whose ONLY event-formatting layer is
