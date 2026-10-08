@@ -2138,5 +2138,51 @@ class AuditFullHistoryOriginalRedTests(unittest.TestCase):
                                        f"failed CI run {PRIOR_CI_RUN} on the evidence head titled for another {label} was skipped")
 
 
+def with_listed_pull_request_run(run: dict) -> dict:
+    data = snapshot()
+    prefix = f"repos/{REPOSITORY}"
+    listing = data[f"{prefix}/actions/runs"]
+    listing["workflow_runs"].append(copy.deepcopy(run))
+    listing["total_count"] += 1
+    data[f"{prefix}/actions/runs/{run['id']}"] = copy.deepcopy(run)
+    data[f"{prefix}/actions/runs/{run['id']}/attempts/1"] = copy.deepcopy(run)
+    return data
+
+
+def fork_pull_request_ci_run(head_repository: dict | None = None) -> dict:
+    run = foreign_head_ci_run(head_repository=head_repository)
+    run["display_title"] = f"CI N={OTHER_PR} E={EVIDENCE} B={BASE} M={OTHER_MERGE}"
+    return run
+
+
+class AuditForeignHeadIdentityTests(unittest.TestCase):
+    def test_fully_identified_foreign_head_or_other_workflow_failure_stays_outside_the_audit_history(self) -> None:
+        other_workflow = pull_request_ci_run(FOREIGN_CI_RUN, MERGE, conclusion="failure", check_suite_id=406,
+                                             display_title="Enterprise hardening")
+        other_workflow.update(workflow_id=103, path=".github/workflows/enterprise-hardening.yml",
+                              name="Enterprise hardening")
+        for label, run in (("fork head", fork_pull_request_ci_run()), ("other workflow", other_workflow)):
+            with self.subTest(run=label):
+                self.assertEqual((run["event"], run["head_sha"], run["conclusion"], run["repository"]["id"]),
+                                 ("pull_request", EVIDENCE, "failure", 1195888645))
+                audit, report = run_logged_audit(with_listed_pull_request_run(run))
+                self.assertIn(f"GET repos/{REPOSITORY}/actions/runs?event=pull_request&head_sha={EVIDENCE}"
+                              "&per_page=100&page=1", audit.calls)
+                self.assertEqual(report.get("status"), "verified", audit.result.stdout + audit.result.stderr)
+                self.assertNotIn(f"GET repos/{REPOSITORY}/actions/runs/{FOREIGN_CI_RUN}/attempts/1", audit.calls)
+
+    def test_foreign_looking_ci_without_a_proven_identity_leaves_the_landing_unverified(self) -> None:
+        healthy, healthy_report = run_logged_audit(snapshot())
+        self.assertEqual(healthy_report.get("status"), "verified", healthy.result.stdout + healthy.result.stderr)
+        for label, head_repository in (MISSING_HEAD_REPOSITORY_IDS | INCONSISTENT_HEAD_REPOSITORIES).items():
+            with self.subTest(head_repository=label):
+                run = fork_pull_request_ci_run(head_repository)
+                self.assertEqual(run["conclusion"], "failure")
+                audit, report = run_logged_audit(with_listed_pull_request_run(run))
+                self.assertEqual(report.get("status"), "unverified", f"foreign-looking CI run with {label} was ignored")
+                self.assertEqual(report.get("error"), "CI history identity for the evidence head is incomplete")
+                self.assertNotEqual(audit.result.returncode, 0)
+
+
 if __name__ == "__main__":
     unittest.main()
