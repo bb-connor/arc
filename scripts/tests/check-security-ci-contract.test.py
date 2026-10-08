@@ -3846,7 +3846,7 @@ assert_rejected(
         'test "${COMMITTED_EVIDENCE_SHA}" = "${evidence_sha}"',
         "true",
     ),
-    "later-CI revocation loses failure-only, definition, source, PR/E/M, or evidence-variable binding",
+    "denial-only CI listener restores title, M or PR gating or loses E scope",
 )
 assert_rejected(
     "failure projector substitutes title evidence for the API head",
