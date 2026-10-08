@@ -16,13 +16,11 @@ impl ChioKernel {
             let operation_ids = ledger
                 .list_claimed_admission_operations(after_operation_id.as_deref(), PAGE_LIMIT)
                 .map_err(|error| {
-                    KernelError::DurableAdmission(format!(
-                        "finding pool claimed-operation scan failed: {error}"
-                    ))
+                    KernelError::admission_in("finding pool claimed-operation scan failed", error)
                 })?;
             if operation_ids.len() > PAGE_LIMIT {
-                return Err(KernelError::DurableAdmission(
-                    "finding pool ledger exceeded the claimed-operation page limit".to_owned(),
+                return Err(KernelError::admission_invariant(
+                    "finding pool ledger exceeded the claimed-operation page limit",
                 ));
             }
             if operation_ids.is_empty() {
@@ -33,8 +31,8 @@ impl ChioKernel {
                     .as_deref()
                     .is_some_and(|after| operation_id.as_str() <= after)
                 {
-                    return Err(KernelError::DurableAdmission(
-                        "finding pool claimed-operation page did not advance".to_owned(),
+                    return Err(KernelError::admission_invariant(
+                        "finding pool claimed-operation page did not advance",
                     ));
                 }
                 let persisted_operation_id =
@@ -46,9 +44,8 @@ impl ChioKernel {
                     .load_by_operation_id(&persisted_operation_id)
                     .map_err(durable_store_error)?
                     .ok_or_else(|| {
-                        KernelError::DurableAdmission(
-                            "finding pool claim references a missing admission operation"
-                                .to_owned(),
+                        KernelError::admission_record(
+                            "finding pool claim references a missing admission operation",
                         )
                     })?;
                 if operation.state() == AdmissionOperationState::NotAcceptedAfterDispatchCommit {
@@ -57,13 +54,14 @@ impl ChioKernel {
                         trusted_now_unix_ms,
                     )
                     .map_err(|error| {
-                        KernelError::DurableAdmission(format!(
-                            "terminal finding pool claim reconciliation failed: {error}"
-                        ))
+                        KernelError::admission_in(
+                            "terminal finding pool claim reconciliation failed",
+                            error,
+                        )
                     })?;
                     reconciled = reconciled.checked_add(1).ok_or_else(|| {
-                        KernelError::DurableAdmission(
-                            "finding pool reconciliation count overflow".to_owned(),
+                        KernelError::admission_invariant(
+                            "finding pool reconciliation count overflow",
                         )
                     })?;
                 }

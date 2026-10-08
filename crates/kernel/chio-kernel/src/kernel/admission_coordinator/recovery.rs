@@ -38,7 +38,7 @@ impl ChioKernel {
         let expires_at_unix_ms = trusted_now_unix_ms
             .checked_add(RECOVERY_LEASE_DURATION_MS)
             .ok_or_else(|| {
-                KernelError::DurableAdmission("recovery lease expiration overflowed".to_owned())
+                KernelError::admission_invariant("recovery lease expiration overflowed")
             })?;
         Ok(RecoveryClaimRequest {
             operation_id: operation.binding().operation_id(),
@@ -58,7 +58,7 @@ impl ChioKernel {
         let expires_at_unix_ms = trusted_now_unix_ms
             .checked_add(RECOVERY_LEASE_DURATION_MS)
             .ok_or_else(|| {
-                KernelError::DurableAdmission("recovery lease expiration overflowed".to_owned())
+                KernelError::admission_invariant("recovery lease expiration overflowed")
             })?;
         runtime
             .store
@@ -87,21 +87,21 @@ impl ChioKernel {
             return Ok(());
         };
         if operation.dispatch_commit().is_some() {
-            return Err(KernelError::DurableAdmission(
-                "committed dispatch holds are never reversed by recovery".to_owned(),
+            return Err(KernelError::admission_invariant(
+                "committed dispatch holds are never reversed by recovery",
             ));
         }
         let hold_id = hold_id.as_str().to_owned();
         let Some(snapshot) =
             self.with_budget_store(|store| Ok(store.get_budget_hold(&hold_id)?))?
         else {
-            return Err(KernelError::DurableAdmission(
-                "retained executable hold is absent from the budget authority".to_owned(),
+            return Err(KernelError::admission_record(
+                "retained executable hold is absent from the budget authority",
             ));
         };
         if snapshot.capability_id != operation.binding().capability_id().as_str() {
-            return Err(KernelError::DurableAdmission(
-                "retained executable hold belongs to another capability".to_owned(),
+            return Err(KernelError::admission_record(
+                "retained executable hold belongs to another capability",
             ));
         }
         if !snapshot.disposition.is_open() {
@@ -142,8 +142,8 @@ impl ChioKernel {
             )
             .is_err()
         {
-            return Err(KernelError::DurableAdmission(
-                "startup recovery is already running".into(),
+            return Err(KernelError::admission_pending(
+                "startup recovery is already running",
             ));
         }
         struct RunningGuard<'a>(&'a std::sync::atomic::AtomicBool);
@@ -162,7 +162,7 @@ impl ChioKernel {
             .and_then(|count| count.checked_add(finding_pool_count))
             .and_then(|count| count.checked_add(receipt_count))
             .ok_or_else(|| {
-                KernelError::DurableAdmission("startup reconciliation count overflow".to_owned())
+                KernelError::admission_invariant("startup reconciliation count overflow")
             })?;
         *runtime.startup_reconciled.lock().map_err(|_| {
             failure::operation_error(
@@ -211,7 +211,7 @@ impl ChioKernel {
     ) -> Result<(), KernelError> {
         let deadline_unix_ms = operation
             .parked_approval_deadline_unix_ms()
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+            .map_err(KernelError::admission)?;
         let Some(deadline_unix_ms) =
             deadline_unix_ms.filter(|deadline| *deadline <= trusted_now_unix_ms)
         else {
@@ -252,8 +252,8 @@ impl ChioKernel {
             .map_err(durable_outcome_store_error)?
             .is_some()
         {
-            return Err(KernelError::DurableAdmission(
-                "dispatch-committed admission already has a durable tool outcome".to_owned(),
+            return Err(KernelError::admission_record(
+                "dispatch-committed admission already has a durable tool outcome",
             ));
         }
         let lease = self.claim_admission_recovery(operation, trusted_now_unix_ms)?;
@@ -272,19 +272,17 @@ impl ChioKernel {
             trusted_now_unix_ms,
         )
         .map_err(|error| {
-            KernelError::DurableAdmission(format!(
-                "outcome-unknown finding pool finalization failed: {error}"
-            ))
+            KernelError::admission_in("outcome-unknown finding pool finalization failed", error)
         })?;
         let terminal = runtime
             .store
             .commit_admission_projection(&projection)
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+            .map_err(KernelError::admission)?;
         if terminal.operation_id != *operation.binding().operation_id()
             || terminal.state != AdmissionOperationState::OutcomeUnknownAfterDispatch
         {
-            return Err(KernelError::DurableAdmission(
-                "admission recovery committed a different terminal operation".to_owned(),
+            return Err(KernelError::admission_invariant(
+                "admission recovery committed a different terminal operation",
             ));
         }
         Ok(())

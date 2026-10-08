@@ -15,7 +15,7 @@ impl ChioKernel {
         now: u64,
     ) -> Result<(), KernelError> {
         let kind = failure::classify(error).ok_or_else(|| {
-            KernelError::DurableAdmission("unclassified recovery failure cannot be deferred".into())
+            KernelError::admission_invariant("unclassified recovery failure cannot be deferred")
         })?;
         let runtime = self.durable_runtime()?;
         let current = runtime

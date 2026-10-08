@@ -12,8 +12,8 @@ impl ChioKernel {
             self.retain_authenticated_caller_wait_inner(operation, now)
         }))
         .unwrap_or_else(|_| {
-            Err(KernelError::DurableAdmission(
-                "caller wait recovery callback panicked".into(),
+            Err(KernelError::admission_panicked(
+                "caller wait recovery callback panicked",
             ))
         })
     }
@@ -56,8 +56,8 @@ impl ChioKernel {
             .map_err(durable_store_error)?
             .into_operation();
         if retained != expected {
-            return Err(KernelError::DurableAdmission(
-                "caller wait changed the committed operation".into(),
+            return Err(KernelError::admission_invariant(
+                "caller wait changed the committed operation",
             ));
         }
         let physical = runtime
@@ -65,8 +65,8 @@ impl ChioKernel {
             .load_retained_tool_request(expected.binding().operation_id(), &runtime.fence, now)
             .map_err(durable_store_error)?;
         if !physical.is_some_and(|(actual, _)| actual == expected) {
-            return Err(KernelError::DurableAdmission(
-                "caller wait physical readback is absent or changed".into(),
+            return Err(KernelError::admission_invariant(
+                "caller wait physical readback is absent or changed",
             ));
         }
         Ok(true)
