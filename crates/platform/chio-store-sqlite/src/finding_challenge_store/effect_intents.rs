@@ -1,3 +1,7 @@
+//! Effect intents, effect-root binding and seller impairment reconciliation.
+
+use super::*;
+
 // Effect intents, root bindings, impairment reconciliation, transitions.
 
 impl SqliteFindingChallengeStore {
@@ -400,7 +404,7 @@ impl SqliteFindingChallengeStore {
         )
     }
 
-    fn reconcile_seller_impairment_quarantine_with_evidence(
+    pub(super) fn reconcile_seller_impairment_quarantine_with_evidence(
         &self,
         evidence: &SellerImpairmentReconciliationEvidence<'_>,
         now: u64,
@@ -464,7 +468,7 @@ impl SqliteFindingChallengeStore {
         Ok(FindingChallengeWriteOutcome::Inserted)
     }
 
-    fn confirm_seller_impairment_with_evidence(
+    pub(super) fn confirm_seller_impairment_with_evidence(
         &self,
         evidence: &SellerImpairmentReconciliationEvidence<'_>,
         quarantine: bool,
@@ -589,7 +593,7 @@ impl SqliteFindingChallengeStore {
     }
 
     #[cfg(test)]
-    fn confirm_reconciled_seller_impairment_for_tests(
+    pub(super) fn confirm_reconciled_seller_impairment_for_tests(
         &self,
         intent_key: &str,
         liability_key: &str,
@@ -616,7 +620,7 @@ impl SqliteFindingChallengeStore {
     }
 
     #[cfg(test)]
-    fn confirm_seller_impairment_and_quarantine_for_tests(
+    pub(super) fn confirm_seller_impairment_and_quarantine_for_tests(
         &self,
         intent_key: &str,
         liability_key: &str,
@@ -642,7 +646,7 @@ impl SqliteFindingChallengeStore {
     }
 
     #[cfg(test)]
-    fn reconcile_seller_impairment_quarantine_for_tests(
+    pub(super) fn reconcile_seller_impairment_quarantine_for_tests(
         &self,
         intent_key: &str,
         liability_key: &str,
@@ -714,7 +718,7 @@ impl SqliteFindingChallengeStore {
     /// source of this edge, so no caller can skip a state by naming a
     /// later one. Idempotent once the head already sits at the target.
     #[cfg(test)]
-    fn transition_liability(
+    pub(super) fn transition_liability(
         &self,
         liability_key: &str,
         expected_state: FindingLiabilityState,
