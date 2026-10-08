@@ -913,3 +913,182 @@ fn session_suspensions_planned_on_one_base_both_hold() {
         "a suspension planned on the same base must compose with the first and outlive its lift"
     );
 }
+
+/// One planned effect under the live lease of its dispatched plan.
+struct LeasedEffect<'a> {
+    plan: &'a ResponsePlan,
+    work: &'a ScheduledWork,
+    ordinal: usize,
+}
+
+impl LeasedEffect<'_> {
+    fn effect(&self) -> &PlannedResponseEffect {
+        self.plan
+            .effects
+            .as_slice()
+            .get(self.ordinal)
+            .unwrap_or_else(|| panic!("planned effect {} missing", self.ordinal))
+    }
+
+    fn id(&self) -> String {
+        self.effect().effect_id.as_str().to_owned()
+    }
+
+    fn request(&self, command: &str) -> EffectRequest {
+        effect_request(self.plan, self.effect(), self.work, command)
+    }
+}
+
+/// Live reads of the one effect key that two plans contribute to.
+struct SharedKey<'a> {
+    version: &'a dyn Fn() -> Digest32,
+    installed: &'a dyn Fn() -> Vec<String>,
+}
+
+/// What a second contribution planned on the first one's base does.
+#[derive(Debug, Eq, PartialEq)]
+struct SharedBaseOutcome {
+    second_apply: Result<bool, PortErrorKind>,
+    second_retry: Result<bool, PortErrorKind>,
+    installed_with_both: Vec<String>,
+    installed_after_lift: Vec<String>,
+}
+
+impl SharedBaseOutcome {
+    /// Both contributions hold together and the second outlives the first.
+    fn composed(first: &LeasedEffect<'_>, second: &LeasedEffect<'_>) -> Self {
+        let mut both = vec![first.id(), second.id()];
+        both.sort();
+        Self {
+            second_apply: Ok(true),
+            second_retry: Ok(true),
+            installed_with_both: both,
+            installed_after_lift: vec![second.id()],
+        }
+    }
+}
+
+/// Apply the first contribution, then apply and retry the second, which was
+/// planned on the same base, and finally lift the first.
+fn shared_base_outcome(
+    effects: &dyn EffectPort,
+    key: &SharedKey<'_>,
+    first: &LeasedEffect<'_>,
+    second: &LeasedEffect<'_>,
+) -> SharedBaseOutcome {
+    let base = first.effect().observed_base_version_hash;
+    assert_eq!(
+        second.effect().observed_base_version_hash,
+        base,
+        "both plans observed the same base"
+    );
+    assert_eq!(
+        (key.version)(),
+        base,
+        "the observed base is the live version"
+    );
+    let first_applied = effects
+        .execute(&first.request("shared-base-first"))
+        .unwrap_or_else(|error| panic!("apply first contribution: {error}"));
+    assert_eq!(
+        (key.installed)(),
+        vec![first.id()],
+        "the first contribution holds alone"
+    );
+    assert_ne!(
+        (key.version)(),
+        base,
+        "the second plan's observed base is no longer the live version"
+    );
+    let second_request = second.request("shared-base-second");
+    let second_apply = effects
+        .execute(&second_request)
+        .map(|result| result.applied)
+        .map_err(|error| error.kind());
+    let second_retry = effects
+        .execute(&second_request)
+        .map(|result| result.applied)
+        .map_err(|error| error.kind());
+    let installed_with_both = (key.installed)();
+    let mut lift = first.request("shared-base-lift-first");
+    lift.operation = EffectOperation::Remove;
+    lift.expected_version_hash = first_applied.resulting_version_hash;
+    let lifted = effects
+        .execute(&lift)
+        .unwrap_or_else(|error| panic!("lift first contribution: {error}"));
+    assert!(!lifted.applied);
+    SharedBaseOutcome {
+        second_apply,
+        second_retry,
+        installed_with_both,
+        installed_after_lift: (key.installed)(),
+    }
+}
+
+fn egress_effect_ids(
+    store: &SqliteSecurityStateStore,
+    key: &EgressRestrictionSessionKey,
+) -> Vec<String> {
+    chio_security_types::ports::EgressRestrictionStore::load_egress_restrictions(store, key)
+        .unwrap_or_else(|error| panic!("load egress restrictions: {error}"))
+        .map(|snapshot| {
+            snapshot
+                .contributions
+                .as_slice()
+                .iter()
+                .map(|entry| entry.effect_id.as_str().to_owned())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+#[test]
+fn egress_restrictions_planned_on_one_base_both_hold() {
+    let fixture = ProductionEffectsFixture::new();
+    let shared_session = session("production-effects-shared-egress-session");
+    let (first_plan, first_work) = fixture.dispatch_with_ttl(
+        "production-effects-shared-egress-first",
+        vec![record(shared_session.as_str())],
+        vec![fixture.egress_spec(&shared_session, &["server-a"])],
+        600_000,
+    );
+    let (second_plan, second_work) = fixture.dispatch_with_ttl(
+        "production-effects-shared-egress-second",
+        vec![record(shared_session.as_str())],
+        vec![fixture.egress_spec(&shared_session, &["server-b"])],
+        3_600_000,
+    );
+    let first = LeasedEffect {
+        plan: &first_plan,
+        work: &first_work,
+        ordinal: 0,
+    };
+    let second = LeasedEffect {
+        plan: &second_plan,
+        work: &second_work,
+        ordinal: 0,
+    };
+    let egress_key = EgressRestrictionSessionKey {
+        tenant_id: tenant(),
+        session_id: shared_session.clone(),
+    };
+    let version = || {
+        egress_restriction_version_hash(fixture.store.as_ref(), &egress_key)
+            .unwrap_or_else(|error| panic!("egress version: {error}"))
+    };
+    let installed = || egress_effect_ids(&fixture.store, &egress_key);
+    let effects = fixture.effects();
+    assert_eq!(
+        shared_base_outcome(
+            effects.as_ref(),
+            &SharedKey {
+                version: &version,
+                installed: &installed,
+            },
+            &first,
+            &second,
+        ),
+        SharedBaseOutcome::composed(&first, &second),
+        "an egress restriction planned on the same base must compose with the first and outlive its lift"
+    );
+}
