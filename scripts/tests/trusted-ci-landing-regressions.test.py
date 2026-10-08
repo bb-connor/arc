@@ -1999,5 +1999,34 @@ class RevokerFullHistoryOriginalRedTests(unittest.TestCase):
                                          "evidence head recorded no tombstone because it ran no jobs")
 
 
+class AuditFullHistoryOriginalRedTests(unittest.TestCase):
+    def assert_unverified(self, data: dict, reason: str) -> None:
+        listed = [run for run in data[f"repos/{REPOSITORY}/actions/runs"]["workflow_runs"] if run["id"] == PRIOR_CI_RUN]
+        self.assertEqual(len(listed), 1)
+        assert_authoritative_history(self, listed[0])
+        self.assertEqual(listed[0]["conclusion"], "failure")
+        healthy, healthy_report = run_logged_audit(snapshot())
+        self.assertEqual(healthy_report.get("status"), "verified", healthy.result.stdout + healthy.result.stderr)
+        run, report = run_logged_audit(data)
+        self.assertIn(f"GET repos/{REPOSITORY}/actions/runs?event=pull_request&head_sha={EVIDENCE}&per_page=100&page=1",
+                      run.calls)
+        self.assertEqual(report.get("status"), "unverified", reason)
+        self.assertNotIn("GitHub read failed", report.get("error", ""))
+        self.assertNotEqual(run.result.returncode, 0)
+
+    def test_failed_ci_with_a_fallback_title_cannot_be_hidden_from_the_audit(self) -> None:
+        self.assert_unverified(with_failed_ci_run(PRIOR_CI_RUN, FALLBACK_TITLE),
+                               f"failed CI run {PRIOR_CI_RUN} on the evidence head was skipped for its fallback title")
+
+    def test_failed_ci_titled_for_another_pull_request_or_base_cannot_be_hidden_from_the_audit(self) -> None:
+        for label, title, title_base, title_merge in (
+            ("pull-request", f"CI N={OTHER_PR} E={EVIDENCE} B={BASE} M={OTHER_MERGE}", BASE, OTHER_MERGE),
+            ("base", f"CI N={PR} E={EVIDENCE} B={OTHER_BASE} M={PRIOR_MERGE}", OTHER_BASE, PRIOR_MERGE),
+        ):
+            with self.subTest(title=label):
+                self.assert_unverified(with_failed_ci_run(PRIOR_CI_RUN, title, title_base, title_merge),
+                                       f"failed CI run {PRIOR_CI_RUN} on the evidence head titled for another {label} was skipped")
+
+
 if __name__ == "__main__":
     unittest.main()
