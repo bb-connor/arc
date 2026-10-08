@@ -7,6 +7,11 @@
 //! requires them to agree when both are present, rejects unknown events and any
 //! tool-call payload outside the tool-call frames, and evaluates every call
 //! before any byte is released.
+//!
+//! Every event belongs to exactly one message: the stream opens with
+//! `message-start` and closes with `message-end`. A stream that omits either
+//! end, or continues past `message-end`, is incomplete and nothing in it is
+//! evaluated or forwarded.
 
 use chio_provider_adapter_core::{
     ensure_streaming_allow_no_redactions, parse_sse_frames, GatedStream, SseParseOptions,
@@ -36,6 +41,14 @@ const KNOWN_EVENTS: &[&str] = &[
     "message-end",
 ];
 
+/// Where the stream is within its single message envelope.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum MessageState {
+    BeforeStart,
+    Open,
+    Ended,
+}
+
 /// A tool call opened by `tool-call-start` and not yet ended.
 struct OpenCall {
     index: Option<u64>,
@@ -60,7 +73,7 @@ impl CohereAdapter {
         let mut invocations = Vec::new();
         let mut verdicts = Vec::new();
         let mut open: Option<OpenCall> = None;
-        let mut message_open = false;
+        let mut message = MessageState::BeforeStart;
 
         for frame in frames {
             let Some(event) = frame.event.as_deref() else {
@@ -85,13 +98,30 @@ impl CohereAdapter {
                     "Cohere {event} frame carried a tool call outside the tool-call frames"
                 )));
             }
+            match (message, event) {
+                (MessageState::BeforeStart, "message-start") => {}
+                (MessageState::BeforeStart, _) => {
+                    return Err(ProviderError::Malformed(format!(
+                        "Cohere {event} arrived before message-start"
+                    )));
+                }
+                (MessageState::Open, "message-start") => {
+                    return Err(malformed("Cohere message-start repeated inside a message"));
+                }
+                (MessageState::Ended, _) => {
+                    return Err(ProviderError::Malformed(format!(
+                        "Cohere {event} arrived after message-end"
+                    )));
+                }
+                (MessageState::Open, _) => {}
+            }
             match event {
-                "message-start" => message_open = true,
+                "message-start" => message = MessageState::Open,
                 "message-end" => {
                     if open.is_some() {
                         return Err(malformed("Cohere message-end arrived inside a tool call"));
                     }
-                    message_open = false;
+                    message = MessageState::Ended;
                 }
                 "tool-call-start" => {
                     if open.is_some() {
@@ -177,7 +207,7 @@ impl CohereAdapter {
         if open.is_some() {
             return Err(malformed("Cohere stream ended before the tool call ended"));
         }
-        if message_open {
+        if message != MessageState::Ended {
             return Err(malformed("Cohere stream ended before message-end"));
         }
 
@@ -347,7 +377,7 @@ mod tests {
         let evaluated = Cell::new(false);
         let err = adapter
             .gate_sse_stream(
-                b"event: tool-call-end\ndata: {\"delta\":{}}\n\n",
+                b"event: message-start\ndata: {}\n\nevent: tool-call-end\ndata: {\"delta\":{}}\n\n",
                 |_invocation| {
                     evaluated.set(true);
                     Ok(VerdictResult::Allow {

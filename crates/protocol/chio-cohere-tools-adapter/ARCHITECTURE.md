@@ -38,11 +38,15 @@ identity purposes; it does not implement `chio_tool_call_fabric::ProviderAdapter
    `type == "function"`, and `function.name`, parses `arguments` as a JSON
    object, and re-encodes it as RFC 8785 canonical bytes.
 4. Stream: `gate_sse_stream` parses SSE frames
-   (`SseParseOptions::ignoring_unknown`) and for each `tool-call-end` frame
-   (`tool_call` read from `data.tool_call` or `data.delta.tool_call`) runs
-   `invocation_from_tool_call` (the same per-call validation as the batch
-   path), then the caller's `evaluate` closure; a `Deny` or a
-   redaction-bearing `Allow` aborts the call. Every frame's raw bytes are
+   (`SseParseOptions::rejecting_unknown` with an event/type cross-check) and
+   requires one complete message: `message-start` first, `message-end` last,
+   and no event outside that envelope. Each call is assembled from
+   `tool-call-start` and `tool-call-delta` content, or read from the
+   `tool_call` embedded on `tool-call-end` (both must agree when both are
+   present), and runs `invocation_from_tool_call` (the same per-call
+   validation as the batch path). Only after the whole message is accepted
+   does the caller's `evaluate` closure run for each call; a `Deny` or a
+   redaction-bearing `Allow` aborts the stream. Every frame's raw bytes are
    otherwise forwarded in order.
 5. The caller, not this crate, produces the `VerdictResult` for each
    invocation, batch or streamed.

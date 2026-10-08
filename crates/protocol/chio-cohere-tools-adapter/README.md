@@ -17,9 +17,10 @@ closed on drift, before any request is sent or provenance is stamped.
   (`reqwest`-backed, bearer auth, via the shared `chio-provider-adapter-core`
   HTTP transport) and lift `message.tool_calls` from the buffered response
   into `chio_tool_call_fabric::ToolInvocation`.
-- Gate the SSE `/v2/chat` stream: buffer each `tool-call-end` frame, run the
-  caller-supplied verdict, and abort the whole response if any call is
-  denied or its allow verdict carries redactions.
+- Gate the SSE `/v2/chat` stream: require one complete message
+  (`message-start` through `message-end`), assemble each tool call, run the
+  caller-supplied verdict, and abort the whole response if the message is
+  incomplete, any call is denied, or an allow verdict carries redactions.
 - Lower a kernel `VerdictResult` and `ToolResult` into a Cohere `tool` role
   message, applying JSON-Pointer redactions and canonicalizing the result
   text.

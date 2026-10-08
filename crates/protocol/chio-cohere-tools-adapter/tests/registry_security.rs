@@ -16,6 +16,8 @@ use serde_json::json;
 
 #[path = "registry_security/delta_identity.rs"]
 mod delta_identity;
+#[path = "registry_security/envelope.rs"]
+mod envelope;
 #[path = "registry_security/lifecycle_payload.rs"]
 mod lifecycle_payload;
 #[path = "registry_security/provider_contract.rs"]
@@ -96,10 +98,22 @@ fn stream_payload(tool_name: &str) -> Vec<u8> {
             "function": {"name": tool_name, "arguments": "{}"}
         }
     });
-    let mut stream = b"event: tool-call-end\ndata: ".to_vec();
-    stream.extend_from_slice(&serde_json::to_vec(&data).test_unwrap());
-    stream.extend_from_slice(b"\n\n");
-    stream
+    message(&frame(Some("tool-call-end"), data)).into_bytes()
+}
+
+/// Wraps frames in the single message envelope every Cohere stream carries.
+fn message(frames: &str) -> String {
+    format!(
+        "{}{frames}{}",
+        frame(
+            Some("message-start"),
+            json!({"type":"message-start","id":"msg-1"})
+        ),
+        frame(
+            Some("message-end"),
+            json!({"type":"message-end","delta":{"finish_reason":"COMPLETE"}})
+        ),
+    )
 }
 
 fn allow() -> VerdictResult {
@@ -256,23 +270,23 @@ fn plain_json_chat_body_with_tool_calls_fails_closed() {
 
 #[test]
 fn data_only_tool_call_end_frame_is_evaluated() {
-    let raw = frame(
+    let raw = message(&frame(
         None,
         json!({"type":"tool-call-end","tool_call":{"id":"call-data-only","type":"function",
             "function":{"name":TOOL_NAME,"arguments":"{}"}}}),
-    );
+    ));
     assert_eq!(gate(raw.as_bytes()).test_unwrap(), 1);
 }
 
 #[test]
 fn start_and_delta_without_end_fails_closed() {
-    let raw = format!("{}{}", start_frame(""), delta_frame("{}"));
+    let raw = message(&format!("{}{}", start_frame(""), delta_frame("{}")));
     assert!(gate(raw.as_bytes()).is_err());
 }
 
 #[test]
 fn start_delta_end_stream_is_assembled_and_evaluated() {
-    let raw = format!(
+    let raw = message(&format!(
         "{}{}{}{}",
         start_frame(""),
         delta_frame("{\"city\":"),
@@ -281,23 +295,26 @@ fn start_delta_end_stream_is_assembled_and_evaluated() {
             Some("tool-call-end"),
             json!({"type":"tool-call-end","index":0})
         ),
-    );
+    ));
     assert_eq!(gate(raw.as_bytes()).test_unwrap(), 1);
 }
 
 #[test]
 fn unknown_event_fails_closed() {
-    let raw = frame(Some("tool-call-future"), json!({"type":"tool-call-future"}));
+    let raw = message(&frame(
+        Some("tool-call-future"),
+        json!({"type":"tool-call-future"}),
+    ));
     assert!(gate(raw.as_bytes()).is_err());
 }
 
 #[test]
 fn tool_calls_outside_tool_call_frames_fail_closed() {
-    let raw = frame(
+    let raw = message(&frame(
         Some("content-delta"),
         json!({"type":"content-delta","delta":{"message":{"tool_calls":{"id":"call-smuggled",
             "type":"function","function":{"name":TOOL_NAME,"arguments":"{}"}}}}}),
-    );
+    ));
     assert!(gate(raw.as_bytes()).is_err());
 }
 

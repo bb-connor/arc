@@ -13,7 +13,11 @@ fn lifecycle_stream(event: &str, carries_call: bool) -> Vec<u8> {
     } else {
         json!({"type": event})
     };
-    let mut bytes = format!("event: {event}\ndata: {data}\n\n").into_bytes();
+    let mut bytes = Vec::new();
+    if event == "message-end" {
+        bytes.extend_from_slice(b"event: message-start\ndata: {\"type\":\"message-start\"}\n\n");
+    }
+    bytes.extend_from_slice(format!("event: {event}\ndata: {data}\n\n").as_bytes());
     if event == "message-start" {
         bytes.extend_from_slice(b"event: message-end\ndata: {\"type\":\"message-end\"}\n\n");
     }
