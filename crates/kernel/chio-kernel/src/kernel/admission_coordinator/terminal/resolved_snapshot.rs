@@ -64,9 +64,8 @@ impl DurableTerminalSnapshot {
                 if snapshot.schema != SCHEMA
                     || (snapshot.finding_denial.is_some() && !snapshot.delivery_status_denied)
                 {
-                    return Err(KernelError::DurableAdmission(
-                        "retained terminal snapshot conflicts with its schema or status decision"
-                            .into(),
+                    return Err(KernelError::admission_record(
+                        "retained terminal snapshot conflicts with its schema or status decision",
                     ));
                 }
                 Ok(snapshot)
@@ -87,7 +86,7 @@ impl DurableTerminalSnapshot {
     }
 
     pub(super) fn canonical_value(&self) -> Result<serde_json::Value, KernelError> {
-        serde_json::to_value(self).map_err(|error| KernelError::DurableAdmission(error.to_string()))
+        serde_json::to_value(self).map_err(KernelError::admission)
     }
 }
 

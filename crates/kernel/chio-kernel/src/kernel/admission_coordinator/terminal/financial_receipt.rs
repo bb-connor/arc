@@ -26,9 +26,7 @@ impl ChioKernel {
                 .load_payment_journal(operation.binding().operation_id().as_str(), &runtime.fence)
                 .map_err(super::super::recovery::failure::payment_store_error)?
                 .ok_or_else(|| {
-                    KernelError::DurableAdmission(
-                        "completed payment journal disappeared".to_owned(),
-                    )
+                    KernelError::admission_record("completed payment journal disappeared")
                 })?;
             let expected_cost = match (journal.rail_mode, journal.settle_action) {
                 // Historical completed receipts keep their original legacy facts.
@@ -40,23 +38,21 @@ impl ChioKernel {
                     crate::payment::PaymentRailMode::ReversibleHold,
                     Some(crate::payment::PaymentSettleAction::Capture),
                 ) => journal.settle_amount_units.ok_or_else(|| {
-                    KernelError::DurableAdmission(
-                        "completed capture journal omitted its amount".to_owned(),
-                    )
+                    KernelError::admission_record("completed capture journal omitted its amount")
                 })?,
                 (
                     crate::payment::PaymentRailMode::ReversibleHold,
                     Some(crate::payment::PaymentSettleAction::Release),
                 ) => 0,
                 _ => {
-                    return Err(KernelError::DurableAdmission(
-                        "completed payment journal omitted its settlement action".to_owned(),
+                    return Err(KernelError::admission_record(
+                        "completed payment journal omitted its settlement action",
                     ));
                 }
             };
             let financial = financial.as_ref().ok_or_else(|| {
-                KernelError::DurableAdmission(
-                    "completed payment receipt omitted financial metadata".to_owned(),
+                KernelError::admission_record(
+                    "completed payment receipt omitted financial metadata",
                 )
             })?;
             let outcome = runtime
@@ -64,16 +60,14 @@ impl ChioKernel {
                 .lookup_by_operation(operation.binding().operation_id())
                 .map_err(durable_outcome_store_error)?
                 .ok_or_else(|| {
-                    KernelError::DurableAdmission("completed financial outcome disappeared".into())
+                    KernelError::admission_record("completed financial outcome disappeared")
                 })?;
             let evaluation = runtime
                 .outcome_store
                 .lookup_post_return_evaluation(operation.binding().operation_id())
                 .map_err(durable_outcome_store_error)?
                 .ok_or_else(|| {
-                    KernelError::DurableAdmission(
-                        "completed financial evaluation disappeared".into(),
-                    )
+                    KernelError::admission_record("completed financial evaluation disappeared")
                 })?;
             evaluation
                 .validate_against(operation, &outcome)
@@ -100,12 +94,10 @@ impl ChioKernel {
                 .scope
                 .grants
                 .get(usize::try_from(journal.grant_index).map_err(|_| {
-                    KernelError::DurableAdmission(
-                        "payment grant index exceeds address space".into(),
-                    )
+                    KernelError::admission_record("payment grant index exceeds address space")
                 })?)
                 .ok_or_else(|| {
-                    KernelError::DurableAdmission("payment journal names a missing grant".into())
+                    KernelError::admission_record("payment journal names a missing grant")
                 })?;
             let expected_ceiling = grant.max_total_cost.as_ref().map(|amount| amount.units);
             if journal.state != crate::payment::PaymentJournalState::Settled
@@ -129,14 +121,13 @@ impl ChioKernel {
                 || financial.budget_remaining > financial.budget_total
                 || financial.attempted_cost.is_some()
             {
-                return Err(KernelError::DurableAdmission(
-                    "projected receipt financial metadata conflicts with the payment journal"
-                        .to_owned(),
+                return Err(KernelError::admission_record(
+                    "projected receipt financial metadata conflicts with the payment journal",
                 ));
             }
         } else if financial.is_some() {
-            return Err(KernelError::DurableAdmission(
-                "nonpayment admission projected financial metadata".to_owned(),
+            return Err(KernelError::admission_record(
+                "nonpayment admission projected financial metadata",
             ));
         }
         Ok(())

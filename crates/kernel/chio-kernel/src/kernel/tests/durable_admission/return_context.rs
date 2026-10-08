@@ -384,3 +384,41 @@ fn frozen_return_context_cannot_cross_operations_with_the_same_request_id() -> T
     );
     Ok(())
 }
+
+#[test]
+fn tool_return_before_dispatch_commitment_is_refused_by_operation_state() -> TestResult {
+    let (kernel, request, store, _) = durable_admission_fixture("return-before-commit");
+    let (mut admission, _mutation) = pending_admission(&kernel, &request)?;
+    let context = kernel.freeze_durable_tool_return_context(&admission, input(&request))?;
+    let result = kernel.record_durable_tool_return(
+        &mut admission,
+        DurableToolReturnInput {
+            request: &request,
+            output: &ToolServerOutput::Value(serde_json::json!({"done": true})),
+            reported_cost: None,
+            context: &context,
+            elapsed: Duration::ZERO,
+            trusted_now_unix_ms: current_unix_timestamp_ms(),
+        },
+    );
+    assert!(
+        matches!(
+            &result,
+            Err(KernelError::DurableAdmission(reason))
+                if reason == "tool return cannot be recorded from state CapturePending"
+        ),
+        "{:?}",
+        result.as_ref().err()
+    );
+    assert!(store
+        .state
+        .lock()
+        .map_err(|_| "test lock")?
+        .raw_outcome
+        .is_none());
+    assert_eq!(
+        store.operation().state(),
+        AdmissionOperationState::CapturePending
+    );
+    Ok(())
+}

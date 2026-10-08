@@ -101,8 +101,8 @@ impl ChioKernel {
             if retained.is_some_and(|(disposition, pricing)| {
                 !matches!(disposition, SettlementDispositionV1::NotApplicable) || pricing.is_some()
             }) {
-                return Err(KernelError::DurableAdmission(
-                    "nonpayment replay retains a financial disposition".into(),
+                return Err(KernelError::admission_record(
+                    "nonpayment replay retains a financial disposition",
                 ));
             }
             return Ok(None);
@@ -114,22 +114,22 @@ impl ChioKernel {
             .load_payment_journal(admission.operation_id(), &runtime.fence)
             .map_err(payment_store_error)?
             .ok_or_else(|| {
-                KernelError::DurableAdmission(
-                    "durable payment participant disappeared during finalization".into(),
+                KernelError::admission_record(
+                    "durable payment participant disappeared during finalization",
                 )
             })?;
         journal.validate().map_err(payment_record_error)?;
         if journal.operation_id != admission.operation_id() {
-            return Err(KernelError::DurableAdmission(
-                "finalization payment changed operation identity".into(),
+            return Err(KernelError::admission_record(
+                "finalization payment changed operation identity",
             ));
         }
         if journal.capability_id != admission.operation.binding().capability_id().as_str()
             || usize::try_from(journal.grant_index).ok()
                 != Some(raw.matched_grant_index().map_err(tool_outcome_error)?)
         {
-            return Err(KernelError::DurableAdmission(
-                "payment journal does not match the recorded tool outcome".into(),
+            return Err(KernelError::admission_record(
+                "payment journal does not match the recorded tool outcome",
             ));
         }
         if let Some((disposition, pricing)) = retained {
@@ -141,8 +141,8 @@ impl ChioKernel {
             }
             if let Some(pricing) = pricing {
                 if pricing.reported_cost.as_ref() != raw.reported_cost() {
-                    return Err(KernelError::DurableAdmission(
-                        "retained pricing changed the reported tool cost".into(),
+                    return Err(KernelError::admission_record(
+                        "retained pricing changed the reported tool cost",
                     ));
                 }
             }
@@ -164,8 +164,8 @@ impl ChioKernel {
         };
         let amount_units = if delivery_denied {
             if journal.rail_mode != crate::payment::PaymentRailMode::ReversibleHold {
-                return Err(KernelError::DurableAdmission(
-                    "delivery denial requires a reversible-hold rail".into(),
+                return Err(KernelError::admission_record(
+                    "delivery denial requires a reversible-hold rail",
                 ));
             }
             0

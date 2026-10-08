@@ -46,9 +46,7 @@ impl ChioKernel {
             .outcome_store
             .lookup_post_return_evaluation(operation.binding().operation_id())
             .map_err(durable_outcome_store_error)?
-            .ok_or_else(|| {
-                KernelError::DurableAdmission("terminal evaluation disappeared".into())
-            })?;
+            .ok_or_else(|| KernelError::admission_record("terminal evaluation disappeared"))?;
         evaluation
             .validate_against(operation, outcome)
             .map_err(tool_outcome_error)?;
@@ -56,8 +54,8 @@ impl ChioKernel {
             evaluation.state(),
             PostReturnEvaluationStateV1::Resolved { .. }
         ) {
-            return Err(KernelError::DurableAdmission(
-                "compacted admission retains a nonterminal evaluation".into(),
+            return Err(KernelError::admission_record(
+                "compacted admission retains a nonterminal evaluation",
             ));
         }
         let normalized = evaluation.retained_normalized_request_context();
@@ -70,8 +68,8 @@ impl ChioKernel {
             || context.max_stream_chunks == 0
             || context.max_stream_total_bytes == 0
         {
-            return Err(KernelError::DurableAdmission(
-                "retained replay context conflicts with its admission".into(),
+            return Err(KernelError::admission_record(
+                "retained replay context conflicts with its admission",
             ));
         }
         let plan = self.durable_post_return_plan()?;
@@ -100,8 +98,8 @@ impl ChioKernel {
                 .map(|original| original.authority_profile()),
         )?;
         if &request_hash != operation.binding().immutable_request_hash() {
-            return Err(KernelError::DurableAdmission(
-                "compacted replay request or frozen profile changed".into(),
+            return Err(KernelError::admission_record(
+                "compacted replay request or frozen profile changed",
             ));
         }
         let selected = matching
@@ -111,9 +109,7 @@ impl ChioKernel {
                     && admission.permits_matching_grant(grant)
             })
             .ok_or_else(|| {
-                KernelError::DurableAdmission(
-                    "compacted replay has no captured matching grant".into(),
-                )
+                KernelError::admission_record("compacted replay has no captured matching grant")
             })?;
         if let Some(reason) =
             crate::kernel::evaluation::evaluation_helpers::delivery_marked_selection_denial(
@@ -121,30 +117,30 @@ impl ChioKernel {
                 context.matched_grant_index,
             )
         {
-            return Err(KernelError::DurableAdmission(format!(
+            return Err(KernelError::admission_record(format!(
                 "compacted replay selection is invalid: {reason}"
             )));
         }
         let receipt_id = match operation.terminal_replay() {
             Some(AdmissionTerminalReplay::Receipt { receipt_id, .. }) => receipt_id,
             _ => {
-                return Err(KernelError::DurableAdmission(
-                    "completed admission has no signed receipt reference".into(),
+                return Err(KernelError::admission_record(
+                    "completed admission has no signed receipt reference",
                 ))
             }
         };
         let receipt = runtime
             .store
             .load_chio_receipt(receipt_id.as_str())?
-            .ok_or_else(|| KernelError::DurableAdmission("projected receipt disappeared".into()))?;
+            .ok_or_else(|| KernelError::admission_record("projected receipt disappeared"))?;
         // Maintenance permits only the explicit original classical selection
         // equal to this immutable capability issuer. The receipt cannot select
         // its own trusted key, and a later installed signer does not replace it.
         if request.capability.issuer.algorithm() != chio_core::crypto::SigningAlgorithm::Ed25519
             || receipt.kernel_key != request.capability.issuer
         {
-            return Err(KernelError::DurableAdmission(
-                "compacted replay receipt does not match the independently selected signer".into(),
+            return Err(KernelError::admission_record(
+                "compacted replay receipt does not match the independently selected signer",
             ));
         }
         for floor in [
@@ -169,8 +165,8 @@ impl ChioKernel {
                 .and_then(|metadata| metadata.get(ADMISSION_RECEIPT_METADATA_KEY))
                 .cloned()
                 .ok_or_else(|| {
-                    KernelError::DurableAdmission(
-                        "compacted replay receipt has no admission metadata".into(),
+                    KernelError::admission_record(
+                        "compacted replay receipt has no admission metadata",
                     )
                 })?,
         )
@@ -181,7 +177,7 @@ impl ChioKernel {
         let action = ToolCallAction::from_parameters(request.arguments.clone())
             .map_err(chio_core::canonical::UntrustedJsonError::Canonicalization)?;
         let dispatch = operation.dispatch_commit().ok_or_else(|| {
-            KernelError::DurableAdmission("compacted replay lost its dispatch commit".into())
+            KernelError::admission_record("compacted replay lost its dispatch commit")
         })?;
         if receipt.id != receipt_id.as_str()
             || receipt.capability_id != request.capability.id
@@ -211,8 +207,8 @@ impl ChioKernel {
             || metadata.store_fence.owner_epoch < dispatch.store_fence.owner_epoch
             || metadata.store_fence.owner_epoch > runtime.fence.owner_epoch
         {
-            return Err(KernelError::DurableAdmission(
-                "compacted replay receipt conflicts with its sealed admission".into(),
+            return Err(KernelError::admission_record(
+                "compacted replay receipt conflicts with its sealed admission",
             ));
         }
         if receipt.metadata.as_ref().is_some_and(|metadata| {
@@ -242,32 +238,30 @@ impl ChioKernel {
             .and_then(serde_json::Value::as_str)
             .is_none_or(str::is_empty)
         {
-            return Err(KernelError::DurableAdmission(
-                "compacted replay receipt has no signing nonce".into(),
+            return Err(KernelError::admission_record(
+                "compacted replay receipt has no signing nonce",
             ));
         }
         let blob = runtime
             .outcome_store
             .load_resolved_output_by_operation(operation.binding().operation_id())
             .map_err(durable_outcome_store_error)?
-            .ok_or_else(|| {
-                KernelError::DurableAdmission("resolved value preimage disappeared".into())
-            })?;
+            .ok_or_else(|| KernelError::admission_record("resolved value preimage disappeared"))?;
         let Some((expected, expected_size)) = outcome.resolved_output_ref() else {
-            return Err(KernelError::DurableAdmission(
-                "compacted admission retains an unresolved outcome".into(),
+            return Err(KernelError::admission_record(
+                "compacted admission retains an unresolved outcome",
             ));
         };
         if blob.blob_ref() != expected
             || u64::try_from(blob.bytes().len()).ok() != Some(expected_size)
             || sha256_hex(blob.bytes()) != receipt.content_hash
         {
-            return Err(KernelError::DurableAdmission(
-                "compacted replay value conflicts with its signed output commitment".into(),
+            return Err(KernelError::admission_record(
+                "compacted replay value conflicts with its signed output commitment",
             ));
         }
         let maximum = usize::try_from(expected_size).map_err(|_| {
-            KernelError::DurableAdmission("retained output size exceeds address space".into())
+            KernelError::admission_record("retained output size exceeds address space")
         })?;
         let value: serde_json::Value =
             chio_core::canonical::UntrustedJsonText::from_wire(blob.bytes(), maximum)
@@ -291,8 +285,8 @@ impl ChioKernel {
                 Some(output),
             ),
             _ => {
-                return Err(KernelError::DurableAdmission(
-                    "compacted completed receipt has an incompatible decision".into(),
+                return Err(KernelError::admission_record(
+                    "compacted completed receipt has an incompatible decision",
                 ))
             }
         };

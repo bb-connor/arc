@@ -199,19 +199,13 @@ impl ChioKernel {
             .outcome_store
             .lookup_by_operation(operation_id)
             .map_err(durable_outcome_store_error)?
-            .ok_or_else(|| {
-                KernelError::DurableAdmission("recorded tool outcome disappeared".to_owned())
-            })?;
+            .ok_or_else(|| KernelError::admission_record("recorded tool outcome disappeared"))?;
         let raw = match runtime
             .outcome_store
             .load_raw_invocation_by_operation(operation_id)
         {
             Ok(Some(raw)) => raw,
-            Ok(None) => {
-                return Err(KernelError::DurableAdmission(
-                    "raw tool return disappeared".into(),
-                ))
-            }
+            Ok(None) => return Err(KernelError::admission_record("raw tool return disappeared")),
             Err(ToolOutcomeStoreError::Compacted {
                 raw_output_digest,
                 raw_output_size_bytes,
@@ -222,8 +216,8 @@ impl ChioKernel {
                 if &raw_output_digest != outcome.raw_output_digest()
                     || raw_output_size_bytes != outcome.to_persisted().raw_output_size_bytes
                 {
-                    return Err(KernelError::DurableAdmission(
-                        "compacted raw metadata conflicts with its immutable outcome".into(),
+                    return Err(KernelError::admission_record(
+                        "compacted raw metadata conflicts with its immutable outcome",
                     ));
                 }
                 return Ok(RetainedDurableToolReturn::Compacted {
@@ -316,8 +310,8 @@ impl ChioKernel {
             )?);
         }
         if step_result_digests.len() != plan.frozen_steps.len() {
-            return Err(KernelError::DurableAdmission(
-                "durable post-invocation result count changed after admission".to_owned(),
+            return Err(KernelError::admission_record(
+                "durable post-invocation result count changed after admission",
             ));
         }
         Ok(DurableEvaluatedOutput {
