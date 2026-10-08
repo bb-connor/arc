@@ -130,18 +130,6 @@ impl AsRef<PublicKey> for TrustedPublicKey {
     }
 }
 
-impl PartialEq<PublicKey> for TrustedPublicKey {
-    fn eq(&self, other: &PublicKey) -> bool {
-        &self.key == other
-    }
-}
-
-impl PartialEq<TrustedPublicKey> for PublicKey {
-    fn eq(&self, other: &TrustedPublicKey) -> bool {
-        self == &other.key
-    }
-}
-
 impl Serialize for TrustedPublicKey {
     fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
     where

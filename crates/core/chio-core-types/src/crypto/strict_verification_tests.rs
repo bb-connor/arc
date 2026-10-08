@@ -257,7 +257,7 @@ fn trusted_public_key_rejects_hybrid_key_with_weak_classical_half() -> Result<()
 fn trusted_public_key_accepts_honest_keys_and_preserves_encoding() -> Result<()> {
     let keypair = Keypair::from_seed(&[79; 32]);
     let trusted = TrustedPublicKey::new(keypair.public_key())?;
-    assert_eq!(trusted, keypair.public_key());
+    assert_eq!(trusted.public_key(), &keypair.public_key());
     assert_eq!(trusted.to_hex(), keypair.public_key().to_hex());
     assert_eq!(trusted.algorithm(), SigningAlgorithm::Ed25519);
     assert_eq!(
