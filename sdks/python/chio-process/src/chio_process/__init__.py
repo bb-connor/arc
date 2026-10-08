@@ -21,6 +21,10 @@ MAX_STATE_BLOB_BYTES = 1024 * 1024
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 
 
+def _reject_constant(name: str) -> Any:
+    raise ValueError(f"non-standard JSON constant {name}")
+
+
 class WorkerError(Exception):
     """A protocol or transport failure. Tool denials retain their signed response."""
 
@@ -197,8 +201,10 @@ class ProcessClient:
             # Do not include paths, request bodies or secrets in error messages.
             raise WorkerError("transport_error") from None
         try:
-            decoded = json.loads(response)
-        except (ValueError, UnicodeError):
+            # Strict UTF-8 without a byte order mark, and standard JSON only:
+            # no NaN or Infinity, matching the host's encoder and the Node client.
+            decoded = json.loads(bytes(response).decode("utf-8"), parse_constant=_reject_constant)
+        except (ValueError, UnicodeError, RecursionError):
             raise WorkerError("invalid_response") from None
         if not isinstance(decoded, dict) or decoded.get("protocol") != PROTOCOL:
             raise WorkerError("invalid_response")
