@@ -17,7 +17,6 @@ mod reservation_original;
 struct CountedTransport {
     inner: Arc<dyn McpTransport>,
     calls: Arc<AtomicUsize>,
-    dispatch_gate: Option<Arc<projection_original::LiveDispatchGate>>,
 }
 impl McpTransport for CountedTransport {
     fn list_tools(&self) -> Result<Vec<chio_mcp_adapter::edge::McpToolInfo>, AdapterError> {
@@ -29,9 +28,6 @@ impl McpTransport for CountedTransport {
         arguments: Value,
     ) -> Result<chio_mcp_adapter::edge::McpToolResult, AdapterError> {
         self.calls.fetch_add(1, Ordering::SeqCst);
-        if let Some(gate) = self.dispatch_gate.as_ref() {
-            gate.capture_before_completion()?;
-        }
         self.inner.call_tool(name, arguments)
     }
 }
@@ -45,12 +41,6 @@ struct HttpFixture {
     trusted_key: PublicKey,
 }
 fn fixture() -> TestResult<HttpFixture> {
-    fixture_with_dispatch_gate(None)
-}
-
-fn fixture_with_dispatch_gate(
-    dispatch_gate: Option<Arc<projection_original::LiveDispatchGate>>,
-) -> TestResult<HttpFixture> {
     let directory = chio_test_support::private_tempdir()?;
     let mut config = support::base_remote_config(directory.path(), "127.0.0.1:0".parse()?);
     config.auth_token = Some("operator-fixture".into());
@@ -60,7 +50,6 @@ fn fixture_with_dispatch_gate(
     config.test_transport = Some(Arc::new(CountedTransport {
         inner: config.test_transport.take().ok_or("transport")?,
         calls: calls.clone(),
-        dispatch_gate,
     }));
     let receipt_path = config.receipt_db_path.clone().ok_or("receipt path")?;
     let factory = Arc::new(RemoteSessionFactory::new(config.clone())?);

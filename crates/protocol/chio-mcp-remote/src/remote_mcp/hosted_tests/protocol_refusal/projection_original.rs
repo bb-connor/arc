@@ -2,56 +2,9 @@
 //! These controls do not claim an unprivileged peer can publish worker events.
 
 use super::*;
-use chio_kernel::admission_operation::{
-    AdmissionIdentifier, AdmissionOperationStore, AdmissionOperationV1,
-    RetainedToolAdmissionRequestV1,
-};
 
 const DEADLINE: Duration = Duration::from_secs(4);
 const FORGED: &str = "unsigned-worker-projection-sentinel";
-
-pub(super) struct LiveDispatchGate {
-    entered: tokio::sync::Notify,
-    released: StdMutex<bool>,
-    changed: std::sync::Condvar,
-}
-
-impl LiveDispatchGate {
-    fn new() -> Self {
-        Self {
-            entered: tokio::sync::Notify::new(),
-            released: StdMutex::new(false),
-            changed: std::sync::Condvar::new(),
-        }
-    }
-
-    pub(super) fn capture_before_completion(&self) -> Result<(), AdapterError> {
-        self.entered.notify_one();
-        let released = self
-            .released
-            .lock()
-            .map_err(|_| AdapterError::ConnectionFailed("test dispatch gate is poisoned".into()))?;
-        let (released, _) = self
-            .changed
-            .wait_timeout_while(released, DEADLINE, |value| !*value)
-            .map_err(|_| AdapterError::ConnectionFailed("test dispatch gate is poisoned".into()))?;
-        if !*released {
-            return Err(AdapterError::ConnectionFailed(
-                "test dispatch capture deadline".into(),
-            ));
-        }
-        Ok(())
-    }
-
-    fn release(&self) -> TestResult {
-        *self
-            .released
-            .lock()
-            .map_err(|_| "test dispatch gate is poisoned")? = true;
-        self.changed.notify_all();
-        Ok(())
-    }
-}
 
 struct CapturedCall {
     fixture: HttpFixture,
@@ -60,7 +13,6 @@ struct CapturedCall {
     request: Value,
     pending: remote_mcp_session_credentials::CredentialCall,
     terminal: Value,
-    live_original: Option<(AdmissionOperationV1, RetainedToolAdmissionRequestV1)>,
 }
 
 async fn status_call(
@@ -81,14 +33,7 @@ async fn status_call(
 }
 
 async fn capture(logical_id: &str) -> TestResult<CapturedCall> {
-    capture_with_dispatch_gate(logical_id, None).await
-}
-
-async fn capture_with_dispatch_gate(
-    logical_id: &str,
-    gate: Option<Arc<LiveDispatchGate>>,
-) -> TestResult<CapturedCall> {
-    let fixture = fixture_with_dispatch_gate(gate.clone())?;
+    let fixture = fixture()?;
     let session = initialize(&fixture).await?;
     let token = credential(&fixture, &session).await?;
     let bound = match fixture.state.sessions.lookup(&session).await {
@@ -111,30 +56,6 @@ async fn capture_with_dispatch_gate(
     )
     .await??;
     assert_eq!(response.status(), StatusCode::OK);
-    let live_original = if let Some(gate) = gate.as_ref() {
-        tokio::time::timeout(DEADLINE, gate.entered.notified()).await?;
-        let runtime = fixture
-            .state
-            .factory
-            .durable_admission
-            .as_ref()
-            .ok_or("runtime")?;
-        let (store, fence) = runtime
-            .local_runtime_participant()
-            .ok_or("local existing owner")?;
-        let selector = AdmissionIdentifier::try_new("request_id", logical_id)?;
-        let retained = store.load_unambiguous_retained_tool_request(
-            &selector,
-            &fence,
-            fixture.state.factory.config.clock.millis()?,
-        );
-        // Release even when the snapshot read fails, so fixture setup cannot
-        // strand the real worker. The original four-second deadlines remain.
-        gate.release()?;
-        Some(retained?.ok_or("live fenced original request")?)
-    } else {
-        None
-    };
     let terminal = tokio::time::timeout(DEADLINE, async {
         loop {
             let event = events.recv().await?;
@@ -167,7 +88,6 @@ async fn capture_with_dispatch_gate(
         request: call,
         pending,
         terminal,
-        live_original,
     })
 }
 
@@ -354,15 +274,14 @@ async fn mcp_projection_original_unsigned_result_extensions_cannot_be_delivered_
 async fn mcp_projection_control_valid_v2_nonce_is_preserved_through_delivery_and_replay(
 ) -> TestResult {
     use chio_kernel::admission_operation::{
+        AdmissionAuthorityProfileV1, AdmissionAuthoritySelectionV1, AdmissionDigest,
         AdmissionExecutionNonceReservationV1, AdmissionOperationBindingInputV1,
-        AdmissionOperationBindingV1, AdmissionRequestBindingV1, AuthenticatedRequestNamespace,
+        AdmissionOperationBindingV1, AdmissionOperationId, AdmissionOperationStore,
+        AdmissionOperationV1, AdmissionRequestBindingV1, AuthenticatedRequestNamespace,
+        RetainedToolAdmissionRequestV1,
     };
 
-    let captured = capture_with_dispatch_gate(
-        "projection-valid-operation-nonce",
-        Some(Arc::new(LiveDispatchGate::new())),
-    )
-    .await?;
+    let captured = capture("projection-valid-operation-nonce").await?;
     let runtime = captured
         .fixture
         .state
@@ -374,17 +293,98 @@ async fn mcp_projection_control_valid_v2_nonce_is_preserved_through_delivery_and
     let receipt: ChioReceipt = serde_json::from_value(
         captured.terminal["result"]["_meta"]["chioEvidence"]["receipt"].clone(),
     )?;
-    let (base, original) = captured
-        .live_original
-        .as_ref()
-        .ok_or("captured live original request")?;
-    assert_eq!(
-        base.binding().operation_id().as_str(),
+    let (store, _) = runtime
+        .local_runtime_participant()
+        .ok_or("local existing owner")?;
+    let original_id = AdmissionOperationId::from_persisted(
         receipt.metadata.as_ref().ok_or("receipt metadata")?["admission_operation"]["operation_id"]
             .as_str()
             .ok_or("terminal operation id")?,
-        "preterminal snapshot belongs to a different actual dispatch"
-    );
+    )?;
+    let base = store
+        .load_by_operation_id(&original_id)?
+        .ok_or("actual operation")?;
+    let bound = match captured
+        .fixture
+        .state
+        .sessions
+        .lookup(&captured.session)
+        .await
+    {
+        Some(RemoteSessionEntry::Active(bound)) => bound,
+        _ => return Err("actual session is inactive".into()),
+    };
+    let capability = bound
+        .issued_capabilities
+        .iter()
+        .find(|capability| capability.id == receipt.capability_id)
+        .ok_or("actual issued capability")?
+        .clone();
+    assert!(capability.verify_signature()?);
+    let request = chio_kernel::ToolCallRequest {
+        request_id: base.binding().request_id().as_str().into(),
+        capability,
+        tool_name: receipt.tool_name.clone(),
+        server_id: receipt.tool_server.clone(),
+        agent_id: bound.agent_id.clone(),
+        arguments: captured.request["params"]["arguments"].clone(),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: vec![],
+        threshold_approval_proposal: None,
+        supplemental_authorization: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+        declassification_grant: None,
+    };
+    assert_eq!(request.arguments, receipt.action.parameters);
+    let grant_index = usize::try_from(
+        receipt.metadata.as_ref().ok_or("receipt metadata")?["attribution"]["grant_index"]
+            .as_u64()
+            .ok_or("actual grant index")?,
+    )?;
+    let grant = request
+        .capability
+        .scope
+        .grants
+        .get(grant_index)
+        .ok_or("actual matching grant")?;
+    let profile = AdmissionAuthorityProfileV1::new(AdmissionAuthoritySelectionV1 {
+        runtime_hook_installed: false,
+        swarm_admission_required: false,
+        runtime_enforces_swarm_authority: false,
+        runtime_requires_dispatch_revalidation: false,
+        runtime: None,
+        approval: None,
+        dpop: None,
+    })?;
+    // Ordinary MCP calls deliberately retain no original-request artifact.
+    // This metadata-only fixture uses the existing canonical store-test recipe
+    // for the actual issued capability, caller arguments and grant selection.
+    // The public binding validator checks both request commitments; no opaque
+    // digest or nonce signature context is fabricated and nothing is dispatched.
+    let prior_request_hash = sha256_hex(&canonical_json_bytes(&json!({
+        "schema":"chio.tool-admission-request.v1", "server_id":request.server_id,
+        "tool_name":request.tool_name, "agent_id":request.agent_id,
+        "arguments":request.arguments, "governed_intent":request.governed_intent,
+        "model_metadata":request.model_metadata,
+        "federated_origin_kernel_id":request.federated_origin_kernel_id,
+        "matching_grants":[{"index":grant_index,"grant":grant}], "post_return_steps":[],
+    }))?);
+    let immutable_request_hash = AdmissionDigest::try_new(
+        "immutable_request_hash",
+        sha256_hex(&canonical_json_bytes(&json!({
+            "schema":"chio.tool-admission-request.v4", "prior_request_hash":prior_request_hash,
+            "authority_profile":&profile,
+        }))?),
+    )?;
+    let original = RetainedToolAdmissionRequestV1::from_canonical_bytes(&canonical_json_bytes(
+        &json!({"schema":"chio.retained-tool-admission-request.v4", "request":&request,
+            "authority_profile":profile,"matching_grant_indices":[grant_index], "post_return_steps":[]}),
+    )?)?;
+    original.validate_request_material(&request)?;
     let binding = base.binding();
     let mut requirements = binding.participant_requirements();
     requirements.execution_nonce = true;
@@ -397,20 +397,21 @@ async fn mcp_projection_control_valid_v2_nonce_is_preserved_through_delivery_and
         capability_id: binding.capability_id().clone(),
         authorization_capability_hash: binding.authorization_capability_hash().clone(),
         request_binding: AdmissionRequestBindingV1::new_with_action_parameter_hash(
-            binding.immutable_request_hash().clone(),
+            immutable_request_hash,
             binding.action_parameter_hash().clone(),
             requirements,
         )?,
         policy_hash: binding.policy_hash().clone(),
         effect_class: binding.effect_class(),
     })?;
+    original.validate_binding(&nonce_binding)?;
     let operation = AdmissionOperationV1::prepare(nonce_binding, base.coordinator_lease_epoch())?;
     // This public API mints checked metadata. It neither reserves a nonce nor
     // commits a new operation, and this control dispatches no additional tool.
     let keypair = runtime.kernel_keypair();
     let issuance = AdmissionExecutionNonceReservationV1::mint_for_operation(
         &operation,
-        original,
+        &original,
         &keypair,
         &chio_kernel::ExecutionNonceConfig::default(),
         now,
