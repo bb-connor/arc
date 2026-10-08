@@ -1374,6 +1374,7 @@
     "crates/platform/chio-control-plane/src/issuance/reputation.rs::inspect_local_reputation_with_read_context::native-adapter",
     "crates/platform/chio-control-plane/src/keyring_runtime.rs::load_keyring_runtime_composition::native-adapter",
     "crates/platform/chio-control-plane/src/keyring_runtime.rs::load_keyring_runtime_from_authority_seed::native-adapter",
+    "crates/platform/chio-control-plane/src/security/adapters/effect_port/dispatch.rs::production::native-adapter",
     "crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_authority.rs::build_pinned_remote_capability_authority::native-adapter",
     "crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_authority.rs::build_remote_capability_authority::native-adapter",
     "crates/platform/chio-store-sqlite/src/encrypted_blob.rs::open::native-adapter",

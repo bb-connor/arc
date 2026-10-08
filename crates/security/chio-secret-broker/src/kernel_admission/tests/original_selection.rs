@@ -32,8 +32,6 @@ use chio_manifest::{
     sign_manifest, AuthoritativeToolPolicy, RuntimeToolTopology, ToolAnnotations, ToolDefinition,
     ToolFlowDeclaration, ToolManifest, VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
 };
-use chio_security_kernel::SystemClock as SecurityClock;
-use chio_security_types::clock::Clock as _;
 use chio_security_types::ports::{
     BoundedVec, ClassificationPort, ClassificationRequest, ClassificationResult, ClassifierId,
     ClassifierVersion, IsolationEpochId, LineageId, PortError, PortResult, SessionId, TenantId,
@@ -373,12 +371,13 @@ impl DurableStore {
     ) -> TestResult<NativeBroker> {
         let authority = SqliteAuthorityStore::open_serving(&self.database, &self.locks)?;
         let mut kernel = self.kernel(&authority)?;
-        let native = initialize_native(&authority, self.directory.path())?;
+        let clock = kernel.authority_clock();
+        let native = initialize_native(&authority, self.directory.path(), Arc::clone(&clock))?;
         let resolver = NativeFlowResolver::new(
             native.clone(),
             manifests()?,
             Arc::new(EmptyClassifier),
-            Arc::new(SecurityClock),
+            Arc::clone(&clock),
             FlowResolverConfig::new(
                 InformationLabel::bottom(),
                 CategoryLabelMap::new(
@@ -396,10 +395,7 @@ impl DurableStore {
         kernel.set_security_pre_dispatch_policy(SecurityPreDispatchPolicy::Enforce);
         kernel.set_security_pre_dispatch_hook(Arc::new(resolver));
         let (fixture_verifier, mut execute, _) = fixture()?;
-        let verifier = BrokerQuotaVerifier::new(
-            fixture_verifier.config,
-            Arc::new(crate::daemon::SystemClock),
-        )?;
+        let verifier = BrokerQuotaVerifier::new(fixture_verifier.config, Arc::clone(&clock))?;
         let participant = Arc::new(BrokerAdmissionParticipant::new(
             BrokerIpcClientConfig {
                 socket_path: self.directory.path().join("broker.sock"),
@@ -456,7 +452,7 @@ impl DurableStore {
             300,
         )?;
         kernel.register_delegation_parent(&parent)?;
-        let now = crate::daemon::SystemClock
+        let now = clock
             .unix_millis()
             .map(chio_security_types::clock::UnixMillis::as_secs)?;
         let mut body = execute.capability.body;
@@ -543,9 +539,10 @@ impl NativeBroker {
             &execute.capability,
             &execute.request,
             nonce,
-            crate::daemon::SystemClock
+            self.kernel
+                .authority_clock_reading()?
                 .unix_millis()
-                .map(chio_security_types::clock::UnixMillis::as_secs)?,
+                .as_secs(),
             &self.caller,
         )?;
         Ok(execute)
@@ -738,17 +735,18 @@ impl SupplementalAdmissionParticipant for AcceptRegistration {
 fn initialize_native(
     authority: &SqliteAuthorityStore,
     directory: &Path,
+    clock: Arc<dyn chio_security_types::clock::Clock>,
 ) -> TestResult<NativeSecurityAuthorityBindingV1> {
     let source_path = directory.join("native-source.sqlite3");
-    drop(SqliteSecurityStateStore::open(&source_path)?);
+    drop(SqliteSecurityStateStore::open_with_trusted_clock(
+        &source_path,
+        Arc::clone(&clock),
+    )?);
     let source = SqliteSecurityParticipantSource::open(source_path)?;
     let store = authority.admission_operation_store();
     let fence = authority.mutation_fence();
     let selected = AdmissionIdentifier::try_new("authority", "broker-original-selection")?;
-    let now: u64 = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)?
-        .as_millis()
-        .try_into()?;
+    let now = clock.unix_millis()?.get();
     let expected =
         store.expect_security_participant_source(&selected, &selected, &source, &fence, now)?;
     store.import_security_participant_source(

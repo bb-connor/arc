@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_kernel::{prepare_response_dispatch, ResponseDispatchPreparationRequest};
@@ -42,11 +41,11 @@ mod finality;
 /// Trusted time ten minutes ahead of the host wall clock.
 const TRUSTED_SKEW_MS: u64 = 600_000;
 
-fn wall_now_unix_ms() -> u64 {
-    let elapsed = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_else(|error| panic!("clock before epoch: {error}"));
-    u64::try_from(elapsed.as_millis()).unwrap_or_else(|error| panic!("clock range: {error}"))
+fn wall_now_unix_ms(clock: &dyn Clock) -> u64 {
+    clock
+        .unix_millis()
+        .unwrap_or_else(|error| panic!("wall clock: {error}"))
+        .get()
 }
 
 fn tenant() -> TenantId {
@@ -184,6 +183,7 @@ struct ProductionEffectsFixture {
     _directory: tempfile::TempDir,
     outbox_path: PathBuf,
     trusted_now: u64,
+    wall_clock: Arc<dyn Clock>,
     trusted_clock: Arc<dyn Clock>,
     store: Arc<SqliteSecurityStateStore>,
     outbox: Arc<SqliteSiemOutbox>,
@@ -198,7 +198,8 @@ impl ProductionEffectsFixture {
     fn with_skew(skew_ms: u64) -> Self {
         let directory =
             chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-        let trusted_now = wall_now_unix_ms().saturating_add(skew_ms);
+        let wall_clock = chio_test_support::clock::clock();
+        let trusted_now = wall_now_unix_ms(wall_clock.as_ref()).saturating_add(skew_ms);
         let trusted_clock: Arc<dyn Clock> = Arc::new(FixedClock::from_millis(trusted_now));
         let store = Arc::new(
             SqliteSecurityStateStore::open_with_trusted_clock(
@@ -224,6 +225,7 @@ impl ProductionEffectsFixture {
             _directory: directory,
             outbox_path,
             trusted_now,
+            wall_clock,
             trusted_clock,
             store,
             outbox,
@@ -664,7 +666,7 @@ fn production_effects_use_the_trusted_clock_for_freeze_leases_and_alert_time() {
         Some(fixture.trusted_now)
     );
     assert!(
-        fixture.trusted_now > wall_now_unix_ms().saturating_add(60_000),
+        fixture.trusted_now > wall_now_unix_ms(fixture.wall_clock.as_ref()).saturating_add(60_000),
         "trusted time runs ahead of the wall clock by more than one fence lease"
     );
 
@@ -687,7 +689,7 @@ fn production_effects_refuse_a_freeze_lease_already_stale_in_trusted_time() {
     let fixture = ProductionEffectsFixture::with_skew(20_000);
     let stale_expiry = fixture.trusted_now.saturating_sub(1_000);
     assert!(
-        stale_expiry > wall_now_unix_ms(),
+        stale_expiry > wall_now_unix_ms(fixture.wall_clock.as_ref()),
         "the wall clock alone would still accept this lease"
     );
     let freeze = fixture.freeze_spec_expiring("production-effects-stale-action", stale_expiry);

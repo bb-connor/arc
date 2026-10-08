@@ -122,6 +122,40 @@ class ClockGateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "source-pinned owners"):
             gate.allowed_sites(root, baseline)
 
+    def test_native_effect_factory_is_a_bounded_reviewed_composition(self):
+        import json
+        import shutil
+        import tempfile
+
+        key = (
+            "crates/platform/chio-control-plane/src/security/adapters/effect_port/"
+            "dispatch.rs::production::native-adapter"
+        )
+        baseline = json.loads(
+            (root / "scripts/security-clock-inventory.json").read_text()
+        )
+        allowed = gate.allowed_sites(root, baseline)
+        self.assertEqual(allowed[key], 1)
+        self.assertNotIn(key, baseline["sites"])
+        self.assertNotIn(key, baseline["expanded_preexisting_sites"])
+        path, owner, _ = key.split("::")
+        self.assertEqual(gate.sites(path, (root / path).read_text())[key], 1)
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = Path(directory)
+            paths = {
+                gate.SCOPE_EVIDENCE,
+                *(contract.split("::")[0] for contract in gate.COMPOSITION_CONTRACTS),
+            }
+            for source_path in paths:
+                (fixture / source_path).parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(root / source_path, fixture / source_path)
+            source = (fixture / path).read_text()
+            (fixture / path).write_text(
+                source + f"\nimpl Other {{ fn {owner}() {{ SystemClock.read(); }} }}\n"
+            )
+            with self.assertRaisesRegex(ValueError, "composition source changed"):
+                gate.allowed_sites(fixture, baseline)
+
     def test_reviewed_composition_does_not_permit_another_observation(self):
         import json
         import shutil
